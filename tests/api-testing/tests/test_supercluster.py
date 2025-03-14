@@ -37,7 +37,12 @@ primary_key_id_tink_val = os.environ["PRIMARY_KEY_ID_VAL"]
 primary_key_id_tink_up = os.environ.get("PRIMARY_KEY_ID_UP", 0)  # Default to 0 if not set
 primary_key_id_tink_val_up = os.environ["PRIMARY_KEY_ID_VAL_UP"]   
 
-def cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO):
+Unique_value = f"u_{random.randint(100000, 999999)}"
+Total_count = 2
+org_id = "org_pytest_data"
+stream_name = "stream_pytest_data"
+
+def create_cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO):
     """Running an E2E test for creating cipher_keys with simple OO cipher."""
     
     # Create a unique cipher name
@@ -72,8 +77,7 @@ def cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO):
         resp_create_cipher_simpleOO = session.post(
             f"{base_url}api/{org_id}/cipher_keys", json=payload_simpleOO
         )
-        print(resp_create_cipher_simpleOO.content)
-
+    
         if resp_create_cipher_simpleOO.status_code == 200:
             break  # Exit the loop if the key is created successfully
         elif resp_create_cipher_simpleOO.status_code == 400:
@@ -81,7 +85,7 @@ def cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO):
         else:
             raise AssertionError(f"Unexpected error: {resp_create_cipher_simpleOO.status_code} {resp_create_cipher_simpleOO.content}")
         
-def cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO):
+def create_cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO):
     """Running an E2E test for create cipher_key with Tink OO cipher.""" 
 
     # Create a unique cipher name
@@ -130,7 +134,7 @@ def cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO):
         resp_create_cipher_tinkOO = session.post(
             f"{base_url}api/{org_id}/cipher_keys", json=payload_tinkOO
         )
-        print(resp_create_cipher_tinkOO.content)
+       
 
         if resp_create_cipher_tinkOO.status_code == 200:
             break  # Exit the loop if the key is created successfully
@@ -140,14 +144,294 @@ def cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO):
             raise AssertionError(f"Unexpected error: {resp_create_cipher_tinkOO.status_code} {resp_create_cipher_tinkOO.content}")
 
 
-def validate_cipher_keys(session, base_url, org_id):
-    """Validate a cipher key."""
+def retrieve_cipherKeys_simpleOO(session, base_url, org_id):
+    """Retrieve a cipher key."""
     response = session.get(f"{base_url}api/{org_id}/cipher_keys")
-    assert response.status_code == 200, f"Failed to validate cipher key: {response.content}"
-    cipher_keys = response.json()
+    assert response.status_code == 200, f"Failed to retrieve cipher key: {response.content}"
+    
+    cipher_keys = response.json().get("keys", [])
+    
+    # Assert that the response contains keys
     assert len(cipher_keys) > 0, "No cipher keys found"
-    return cipher_keys  
+    
+    # Filter keys that start with "sim_ABC"
+    sim_keys = [key for key in cipher_keys if key['name'].startswith(f"sim_{Unique_value}")]
+    
+    # Assert that there are keys starting with "sim_ABC"
+    assert len(sim_keys) > 0, f"No keys found starting with 'sim_{Unique_value}'"
+    
+    # Extract the first key's complete name
+    first_sim_key_name = sim_keys[0]['name']
+    
+    # Return the filtered keys and the first key's name
+    return {
+        "count": len(sim_keys),
+        "first_key_name": first_sim_key_name,
+        "keys": sim_keys
+    }
 
+def retrieve_cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO, local_value_expected):
+    """Retrieve a cipher key and assert local value starts with 'GNf6Mc'."""
+    response = session.get(f"{base_url}api/{org_id}/cipher_keys/{cipher_name_simpleOO}")
+    assert response.status_code == 200, f"Failed to retrieve cipher key: {response.content}"
+    
+    cipher_key = response.json()
+    
+    # Assert that the response contains the expected structure
+    assert "key" in cipher_key, "Key not found in response"
+    assert "store" in cipher_key["key"], "Store not found in key"
+    assert "local" in cipher_key["key"]["store"], "Local not found in store"
+    
+    # Extract the local value
+    local_value = cipher_key["key"]["store"]["local"]
+    
+    # Assert that the local value starts with "GNf6Mc"
+    assert local_value.startswith(local_value_expected), f"Local value does not start with '{local_value_expected}': {local_value}"
+    
+    # Return the cipher key and local value for further use
+    return {
+        "name": cipher_key["name"],
+        "local": local_value
+    }
+
+
+    
+
+def retrieve_cipherKeys_tinkOO(session, base_url, org_id):
+    """Retrieve Tink cipher keys that start with a specific prefix."""
+    response = session.get(f"{base_url}api/{org_id}/cipher_keys")
+    assert response.status_code == 200, f"Failed to retrieve cipher keys: {response.content}"
+    
+    # Parse the JSON response
+    cipher_keys = response.json().get("keys", [])
+    
+    # Assert that the response contains keys
+    assert len(cipher_keys) > 0, "No cipher keys found"
+    
+    # Filter keys that start with "tink_ABC"
+    tink_keys = [key for key in cipher_keys if key['name'].startswith(f"tink_{Unique_value}")]
+    
+    # Assert that there are keys starting with "tink_ABC"
+    assert len(tink_keys) > 0, f"No keys found starting with 'tink_{Unique_value}'"
+    
+    # Extract the first key's complete name
+    first_tink_key_name = tink_keys[0]['name']
+    
+    
+    # Return the cipher key name and local JSON for further use
+    return {
+        "count": len(tink_keys),
+        "first_key_name": first_tink_key_name,
+        "keys": tink_keys
+    }
+
+
+
+def retrieve_cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO, primary_key_id_tink):
+    """Retrieve a Tink cipher key and assert that the local field contains the expected string format for primaryKeyId."""
+    response = session.get(f"{base_url}api/{org_id}/cipher_keys/{cipher_name_tinkOO}")
+    assert response.status_code == 200, f"Failed to retrieve cipher key: {response.content}"
+
+    cipher_key = response.json()
+
+    # Assert that the response contains the expected structure
+    assert "key" in cipher_key, "Key not found in response"
+    assert "store" in cipher_key["key"], "Store not found in key"
+    assert "local" in cipher_key["key"]["store"], "Local not found in store"
+
+    # Extract the local value
+    local_value = cipher_key["key"]["store"]["local"]
+
+    
+    # Check for the expected string format
+    expected_string = '"primaryKeyId": '
+    if expected_string not in local_value:
+        raise AssertionError(f"Expected string '{expected_string}' not found in local value: {local_value}")
+
+    # Extract primaryKeyId from the local_value string
+    try:
+        # Find the start position of the primaryKeyId
+        start_index = local_value.index(expected_string) + len(expected_string)
+        end_index = local_value.index(',', start_index) if ',' in local_value[start_index:] else local_value.index('}', start_index)
+        primary_key_id = local_value[start_index:end_index].strip()
+
+    except ValueError as e:
+        raise AssertionError(f"Could not extract primaryKeyId from local value: {local_value}. Error: {str(e)}")
+    
+    # Assert that the primaryKeyId is a valid integer
+    assert primary_key_id == primary_key_id_tink, f"Primary Key ID is not equal to the expected value: {primary_key_id}"
+    assert primary_key_id.isdigit(), f"Primary Key ID is not a valid integer: {primary_key_id}"
+
+    # Return the cipher key name and the extracted primaryKeyId
+    return {
+        "name": cipher_key["name"],
+        "primaryKeyId": primary_key_id  # Return the extracted primaryKeyId
+    }
+
+def update_cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO):
+    """Running an E2E test for updating cipher_keys with simple OO cipher."""
+    
+    # Create a unique cipher name
+    while True:
+        payload_up_simpleOO = {
+            "name": cipher_name_simpleOO,
+            "key": {
+                "store": {
+                    "type": "local",
+                    "akeyless": {
+                        "base_url": "",
+                        "access_id": "",
+                        "auth": {
+                            "type": "access_key",
+                            "access_key": "",
+                            "ldap": {"username": "", "password": ""}
+                        },
+                        "store": {
+                            "type": "static_secret",
+                            "static_secret": "",
+                            "dfc": {"name": "", "iv": "", "encrypted_data": ""}
+                        }
+                    },
+                    "local": simpleKeysUp
+                },
+                "mechanism": {"type": "simple", "simple_algorithm": "aes-256-siv"}
+            },
+            "isUpdate": True
+        }
+
+    # Attempt to update the cipher key
+        resp_update_cipher_simpleOO = session.put(
+            f"{base_url}api/{org_id}/cipher_keys/{cipher_name_simpleOO}", json=payload_up_simpleOO
+    )
+
+        if resp_update_cipher_simpleOO.status_code == 200:
+            break  # Exit the loop if the key is created successfully
+        elif resp_update_cipher_simpleOO.status_code == 400:
+            continue  # Key already exists, try again
+        else:
+            raise AssertionError(f"Unexpected error: {resp_update_cipher_simpleOO.status_code} {resp_update_cipher_simpleOO.content}")
+
+def update_cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO):
+    """Running an E2E test for updating cipher_keys with Tink OO cipher."""
+    
+    # Create a unique cipher name
+    payload_up_tinkOO = {
+        "name": cipher_name_tinkOO,
+        "key": {
+            "store": {
+                "type": "local",
+                "akeyless": {
+                    "base_url": "",
+                    "access_id": "",
+                    "auth": {
+                        "type": "access_key",
+                        "access_key": "",
+                        "ldap": {"username": "", "password": ""}
+                    },
+                    "store": {
+                        "type": "static_secret",
+                        "static_secret": "",
+                        "dfc": {"name": "", "iv": "", "encrypted_data": ""}
+                    }
+                },
+                "local": json.dumps({  # Use json.dumps to create a valid JSON string
+                "primaryKeyId": int(primary_key_id_tink_up),  # Ensure this is an integer
+                "key": [
+                    {
+                        "keyData": {
+                            "typeUrl": "type.googleapis.com/google.crypto.tink.AesSivKey",
+                            "value": primary_key_id_tink_val_up,
+                            "keyMaterialType": "SYMMETRIC"
+                        },
+                        "status": "ENABLED",
+                        "keyId": int(primary_key_id_tink_up),  # Ensure this is an integer
+                        "outputPrefixType": "TINK"
+                    }
+                ]
+            })
+            },
+            "mechanism": {"type": "tink_keyset", "simple_algorithm": "aes-256-siv"}
+        },
+        "isUpdate": True
+    }
+
+    # Update the cipher key using the correct URL
+    resp_update_cipher_tinkOO = session.put(
+        f"{base_url}api/{org_id}/cipher_keys/{cipher_name_tinkOO}", json=payload_up_tinkOO
+    )
+
+    assert (
+        resp_update_cipher_tinkOO.status_code == 200
+    ), f"Expected 200, but got {resp_update_cipher_tinkOO.status_code} {resp_update_cipher_tinkOO.content}"
+
+    return resp_update_cipher_tinkOO
+
+
+def delete_cipher(session, base_url, org_id, cipher_type):
+    """Running an E2E test for deleting cipher_keys with cipher type."""
+
+    # Retrieve all cipher keys
+    response = session.get(f"{base_url}api/{org_id}/cipher_keys")
+    assert response.status_code == 200, f"Failed to retrieve cipher keys: {response.content}"
+    
+    cipher_keys = response.json().get("keys", [])
+    
+    # Filter keys that start with the specified cipher type
+    cipher_type_keys = [key['name'] for key in cipher_keys if key['name'].startswith(f"{cipher_type}_{Unique_value}")]
+    
+    # Delete each cipher key of the specified type
+    for cipher_name in cipher_type_keys:
+        resp_delete_cipher = session.delete(f"{base_url}api/{org_id}/cipher_keys/{cipher_name}")
+        assert resp_delete_cipher.status_code == 200, f"Failed to delete {cipher_name}: {resp_delete_cipher.content}"
+        
+        # Verify deletion
+        resp_ver_cipher = session.get(f"{base_url}api/{org_id}/cipher_keys/{cipher_name}")
+        assert resp_ver_cipher.status_code == 404, f"Expected 404 for {cipher_name}, but got {resp_ver_cipher.status_code}"
+
+    return cipher_type_keys  # Return the list of deleted cipher keys for verification if needed
+
+
+def validate_deleted_cipher(session, base_url, org_id, cipher_name): 
+    """Running an E2E test for validating deleted cipher."""
+
+    # Verify deleted cipher key
+    resp_ver_cipher = session.get(
+        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    )
+  
+
+    assert (
+        resp_ver_cipher.status_code == 404
+    ), f"Expected 404, but got {resp_ver_cipher.status_code} {resp_ver_cipher.content}"
+
+    return resp_ver_cipher
+
+def validate_deleted_cipher_SC(session, base_url, org_id, cipher_type): 
+    """Running an E2E test for validating deleted cipher in SC."""
+
+    # Retrieve all cipher keys
+    response = session.get(f"{base_url}api/{org_id}/cipher_keys")
+    assert response.status_code == 200, f"Failed to retrieve cipher keys: {response.content}"
+    
+    cipher_keys = response.json().get("keys", [])
+    
+    # Filter keys that start with "sim_u_659404"
+    cipher_type_keys = [key for key in cipher_keys if key['name'].startswith(f"{cipher_type}_{Unique_value}")]
+    
+    # Check if any sim keys exist
+    if len(cipher_type_keys) == 0:
+        print(f"No keys found starting with '{cipher_type}_{Unique_value}'")
+        # Optionally, you can choose to skip the assertion or handle it differently
+    else:
+        assert len(cipher_type_keys) > 0, f"No keys found starting with '{cipher_type}_{Unique_value}'"
+        print(f"Keys found starting with '{cipher_type}_{Unique_value}'")
+
+    return cipher_type_keys
+
+ 
+
+
+# Template functionality
 
 def create_template_webhook(session, base_url, org_id, template_name):
     """Create a Webhook template."""
@@ -177,8 +461,46 @@ def create_template_email(session, base_url, org_id, template_name):
     assert response.status_code == 200, f"Failed to create template: {response.content}"
     return response 
 
-def validate_templates_email(session, base_url, org_id, expected_title):
-    """Validate templates and extract the first template name containing 'template_email' with title 'email_title'."""
+def retrieve_templates_webhook(session, base_url, org_id, expected_title):
+    """Retrieve templates and extract the first template name containing 'template_webhook' with title 'webhook_title'."""
+    response = session.get(f"{base_url}api/{org_id}/alerts/templates")
+    assert response.status_code == 200, f"Failed to validate templates: {response.content}"
+    
+    templates = response.json()
+    assert len(templates) > 0, "No templates found"
+    
+    # Variable to store the first matching template name
+    first_template_name = None
+    
+    for template in templates:
+        # Check if the template name contains 'template_webhook' and the title is 'webhook_title'
+        if "template_webhook" in template["name"] and template["title"] == expected_title:
+            first_template_name = template["name"]
+            break  # Exit loop after finding the first matching template
+    
+    assert first_template_name is not None, f"No template name contains 'template_webhook' with title '{expected_title}'"
+    
+    return first_template_name, templates
+
+
+def retrieve_template_webhook(session, base_url, org_id, template_name, expected_title):
+    """Retrieve the template webhook and assert the title."""
+    response = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
+    assert response.status_code == 200, f"Failed to validate template: {response.content}"
+    
+    template = response.json()  # Assuming the response is a single template, not a list.
+    assert isinstance(template, dict), "Response is not a valid template object"
+    
+    # Assert the title
+    assert "title" in template, "Title key is missing in the response"
+    assert template["title"] == expected_title, f"Expected title '{expected_title}' but got '{template['title']}'"
+    
+    return template
+
+
+
+def retrieve_templates_email(session, base_url, org_id, expected_title):
+    """Retrieve templates and extract the first template name containing 'template_email' with title 'email_title'."""
     response = session.get(f"{base_url}api/{org_id}/alerts/templates")
     assert response.status_code == 200, f"Failed to validate templates: {response.content}"
     
@@ -199,8 +521,8 @@ def validate_templates_email(session, base_url, org_id, expected_title):
     return first_template_name, templates
 
 
-def validate_template_email(session, base_url, org_id, template_name, expected_title):
-    """Validate the template email and assert the title."""
+def retrieve_template_email(session, base_url, org_id, template_name, expected_title):
+    """Retrieve the template email and assert the title."""
     response = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
     assert response.status_code == 200, f"Failed to validate template: {response.content}"
     
@@ -239,6 +561,9 @@ def validate_deleted_template(session, base_url, org_id, template_name):
     response = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
     assert response.status_code == 404, f"Template {template_name} should not exist"
     return response
+
+
+# Destination functionality
 
 def create_destination_webhook(session, base_url, org_id, template_name, destination_name):
     """Create a destination."""
@@ -1149,10 +1474,6 @@ def create_uds_mqr(session, base_url, org_id, stream_name, max_query_range_hours
 
 
     url = f"{base_url}api/{org_id}/streams/{stream_name}/settings?type=logs"
-    
-    # print(f"Sending POST request to: {url}")
-    # print(f"Payload: {payload}")
-
     response = session.post(url, json=payload, headers=headers)
 
     if response.status_code != 200:
@@ -1169,14 +1490,13 @@ def create_uds_mqr(session, base_url, org_id, stream_name, max_query_range_hours
 def test_create_workflow(create_session, base_url):
     session = create_session
     base_url = ZO_BASE_URL
-    org_id = "org_pytest_data"
-    stream_name = "stream_pytest_data"
+    
 
     # Loop to create 500 templates, destinations, and alerts
-    for i in range(2):
+    for i in range(Total_count):
         # Create unique template names
-        template_name_webhook = f"template_webhook_{i + 1}_{random.randint(100000, 999999)}"
-        template_name_email = f"template_email_{i + 1}_{random.randint(100000, 999999)}"
+        template_name_webhook = f"template_webhook_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        template_name_email = f"template_email_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
 
         # Create templates
         try:
@@ -1189,169 +1509,169 @@ def test_create_workflow(create_session, base_url):
         except Exception as e:
             print(f"Failed to create email template: {e}")
 
-        # Create unique destination names
-        destination_name_webhook = f"destination_webhook_{i + 1}_{random.randint(100000, 999999)}"
-        destination_name_email = f"destination_email_{i + 1}_{random.randint(100000, 999999)}"
-        destination_name_pipeline = f"destination_pipeline_{i + 1}_{random.randint(100000, 999999)}"
+        # # Create unique destination names
+        # destination_name_webhook = f"destination_webhook_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # destination_name_email = f"destination_email_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # destination_name_pipeline = f"destination_pipeline_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
 
-        # Create destinations
-        try:
-            create_destination_webhook(session, base_url, org_id, template_name_webhook, destination_name_webhook)
-        except Exception as e:
-            print(f"Failed to create webhook destination: {e}")
+        # # Create destinations
+        # try:
+        #     create_destination_webhook(session, base_url, org_id, template_name_webhook, destination_name_webhook)
+        # except Exception as e:
+        #     print(f"Failed to create webhook destination: {e}")
 
-        try:
-            create_destination_email(session, base_url, org_id, template_name_email, destination_name_email, ZO_ROOT_USER_EMAIL)
-        except Exception as e:
-            print(f"Failed to create email destination: {e}")
+        # try:
+        #     create_destination_email(session, base_url, org_id, template_name_email, destination_name_email, ZO_ROOT_USER_EMAIL)
+        # except Exception as e:
+        #     print(f"Failed to create email destination: {e}")
 
-        try:
-            create_destination_pipeline(session, base_url, org_id, destination_name_pipeline)
-        except Exception as e:
-            print(f"Failed to create pipeline destination: {e}")
+        # try:
+        #     create_destination_pipeline(session, base_url, org_id, destination_name_pipeline)
+        # except Exception as e:
+        #     print(f"Failed to create pipeline destination: {e}")
 
-        # Create alerts with unique names
-        alert_webhook = f"alert_webhook_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            alert_webhook_created = create_standard_alert(session, base_url, org_id, alert_webhook, template_name_webhook, stream_name, destination_name_webhook)
-        except Exception as e:
-            print(f"Failed to create webhook alert: {e}")
+        # # Create alerts with unique names
+        # alert_webhook = f"alert_webhook_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     alert_webhook_created = create_standard_alert(session, base_url, org_id, alert_webhook, template_name_webhook, stream_name, destination_name_webhook)
+        # except Exception as e:
+        #     print(f"Failed to create webhook alert: {e}")
 
-        alert_email = f"alert_email_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            alert_email_created = create_standard_alert(session, base_url, org_id, alert_email, template_name_email, stream_name, destination_name_email)
-        except Exception as e:
-            print(f"Failed to create email alert: {e}")
+        # alert_email = f"alert_email_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     alert_email_created = create_standard_alert(session, base_url, org_id, alert_email, template_name_email, stream_name, destination_name_email)
+        # except Exception as e:
+        #     print(f"Failed to create email alert: {e}")
 
-        alert_cron = f"alert_cron_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            alert_cron_created = create_standard_alert_cron(session, base_url, org_id, alert_cron, template_name_email, stream_name, destination_name_email)
-        except Exception as e:
-            print(f"Failed to create cron alert: {e}")
+        # alert_cron = f"alert_cron_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     alert_cron_created = create_standard_alert_cron(session, base_url, org_id, alert_cron, template_name_email, stream_name, destination_name_email)
+        # except Exception as e:
+        #     print(f"Failed to create cron alert: {e}")
 
-        alert_real_time = f"alert_real_time_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            alert_real_time_created = create_real_time_alert(session, base_url, org_id, alert_real_time, template_name_email, stream_name, destination_name_email)
-        except Exception as e:
-            print(f"Failed to create real-time alert: {e}")
+        # alert_real_time = f"alert_real_time_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     alert_real_time_created = create_real_time_alert(session, base_url, org_id, alert_real_time, template_name_email, stream_name, destination_name_email)
+        # except Exception as e:
+        #     print(f"Failed to create real-time alert: {e}")
 
-        alert_sql = f"alert_sql_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            alert_sql_created = create_standard_alert_sql(session, base_url, org_id, alert_sql, template_name_email, stream_name, destination_name_email)
-        except Exception as e:
-            print(f"Failed to create SQL alert: {e}")
+        # alert_sql = f"alert_sql_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     alert_sql_created = create_standard_alert_sql(session, base_url, org_id, alert_sql, template_name_email, stream_name, destination_name_email)
+        # except Exception as e:
+        #     print(f"Failed to create SQL alert: {e}")
 
-        savedview_name = f"savedview_{i + 1}_{random.randint(100000, 999999)}"      
-        try:
-            create_savedView(session, base_url, org_id, savedview_name, stream_name)
-        except Exception as e:
-            print(f"Failed to create saved view: {e}")
+        # savedview_name = f"savedview_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"      
+        # try:
+        #     create_savedView(session, base_url, org_id, savedview_name, stream_name)
+        # except Exception as e:
+        #     print(f"Failed to create saved view: {e}")
 
-        folder_name = f"folder_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            folder_id = create_folder(session, base_url, org_id, folder_name)
-        except Exception as e:
-            print(f"Failed to create folder: {e}")
+        # folder_name = f"folder_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     folder_id = create_folder(session, base_url, org_id, folder_name)
+        # except Exception as e:
+        #     print(f"Failed to create folder: {e}")
 
-        dashboard_name = f"dashboard_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            dashboard_id = create_dashboard(session, base_url, org_id, dashboard_name, folder_id)
-        except Exception as e:
-            print(f"Failed to create dashboard: {e}")
+        # dashboard_name = f"dashboard_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     dashboard_id = create_dashboard(session, base_url, org_id, dashboard_name, folder_id)
+        # except Exception as e:
+        #     print(f"Failed to create dashboard: {e}")
 
-        function_name = f"function_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            create_function(session, base_url, org_id, function_name)   
-        except Exception as e:
-            print(f"Failed to create function: {e}")
+        # function_name = f"function_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     create_function(session, base_url, org_id, function_name)   
+        # except Exception as e:
+        #     print(f"Failed to create function: {e}")
 
-        enrichment_table_name = f"enrichment_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            create_enrichment_table(session, base_url, org_id, enrichment_table_name)
-        except Exception as e:
-            print(f"Failed to create enrichment table: {e}")
+        # enrichment_table_name = f"enrichment_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     create_enrichment_table(session, base_url, org_id, enrichment_table_name)
+        # except Exception as e:
+        #     print(f"Failed to create enrichment table: {e}")
 
-        realTime_pipeline_name = f"realTime_pipeline_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            create_realTime_pipeline(session, base_url, org_id, realTime_pipeline_name, stream_name)  
-        except Exception as e:
-            print(f"Failed to create real-time pipeline: {e}")
+        # realTime_pipeline_name = f"realTime_pipeline_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     create_realTime_pipeline(session, base_url, org_id, realTime_pipeline_name, stream_name)  
+        # except Exception as e:
+        #     print(f"Failed to create real-time pipeline: {e}")
 
-        scheduled_pipeline_name = f"scheduled_pipeline_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            create_scheduled_pipeline(session, base_url, org_id, scheduled_pipeline_name, stream_name)    
-        except Exception as e:
-            print(f"Failed to create scheduled pipeline: {e}")
+        # scheduled_pipeline_name = f"scheduled_pipeline_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     create_scheduled_pipeline(session, base_url, org_id, scheduled_pipeline_name, stream_name)    
+        # except Exception as e:
+        #     print(f"Failed to create scheduled pipeline: {e}")
 
-        scheduled_report_name = f"scheduled_report_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            create_scheduled_report(session, base_url, org_id, scheduled_report_name, dashboard_id, folder_id)  
-        except Exception as e:
-            print(f"Failed to create scheduled report: {e}")
+        # scheduled_report_name = f"scheduled_report_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     create_scheduled_report(session, base_url, org_id, scheduled_report_name, dashboard_id, folder_id)  
+        # except Exception as e:
+        #     print(f"Failed to create scheduled report: {e}")
 
-        cached_report_name = f"cached_report_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            create_cached_report(session, base_url, org_id, cached_report_name, dashboard_id, folder_id)  
-        except Exception as e:
-            print(f"Failed to create cached report: {e}")
+        # cached_report_name = f"cached_report_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     create_cached_report(session, base_url, org_id, cached_report_name, dashboard_id, folder_id)  
+        # except Exception as e:
+        #     print(f"Failed to create cached report: {e}")
 
-        email_address_admin = f"user_email_admin_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        try:
-            create_user_admin(session, base_url, org_id, email_address_admin)
-        except Exception as e:
-            print(f"Failed to create admin user: {e}")
+        # email_address_admin = f"user_email_admin_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        # try:
+        #     create_user_admin(session, base_url, org_id, email_address_admin)
+        # except Exception as e:
+        #     print(f"Failed to create admin user: {e}")
 
-        email_address_viewer = f"user_email_viewer_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        try:
-            create_user_viewer(session, base_url, org_id, email_address_viewer) 
-        except Exception as e:
-            print(f"Failed to create viewer user: {e}")
+        # email_address_viewer = f"user_email_viewer_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        # try:
+        #     create_user_viewer(session, base_url, org_id, email_address_viewer) 
+        # except Exception as e:
+        #     print(f"Failed to create viewer user: {e}")
 
-        email_address_editor = f"user_email_editor_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        try:
-            create_user_editor(session, base_url, org_id, email_address_editor) 
-        except Exception as e:
-            print(f"Failed to create editor user: {e}")
+        # email_address_editor = f"user_email_editor_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        # try:
+        #     create_user_editor(session, base_url, org_id, email_address_editor) 
+        # except Exception as e:
+        #     print(f"Failed to create editor user: {e}")
 
-        email_address_user = f"user_email_user_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        try:
-            create_user_user(session, base_url, org_id, email_address_user)
-        except Exception as e:
-            print(f"Failed to create regular user: {e}")
+        # email_address_user = f"user_email_user_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        # try:
+        #     create_user_user(session, base_url, org_id, email_address_user)
+        # except Exception as e:
+        #     print(f"Failed to create regular user: {e}")
 
-        service_account_email = f"service_account_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        try:
-            create_service_account(session, base_url, org_id, service_account_email) 
-        except Exception as e:
-            print(f"Failed to create service account: {e}")
+        # service_account_email = f"service_account_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        # try:
+        #     create_service_account(session, base_url, org_id, service_account_email) 
+        # except Exception as e:
+        #     print(f"Failed to create service account: {e}")
 
-        role_name = f"role_{i + 1}_{random.randint(100000, 999999)}"
-        try:
-            create_role(session, base_url, org_id, role_name)
-        except Exception as e:
-            print(f"Failed to create role: {e}")
+        # role_name = f"role_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
+        # try:
+        #     create_role(session, base_url, org_id, role_name)
+        # except Exception as e:
+        #     print(f"Failed to create role: {e}")
         
-        # Example usage within the test
-        max_query_range_hours =  i + 1
-        # print(f"Iteration {i + 1}: max_query_range_hours = {max_query_range_hours}")
-        try:
-            response = create_uds_mqr(session, base_url, org_id, stream_name, max_query_range_hours)
-            if response is not None:
-                print(f"Successfully created UDS max query range for iteration {i + 1} with max_query_range_hours = {max_query_range_hours}.")
-        except Exception as e:
-            print(f"Error occurred while creating UDS max query range: {e}")
+        # # Example usage within the test
+        # max_query_range_hours =  i + 1
+        # # print(f"Iteration {i + 1}: max_query_range_hours = {max_query_range_hours}")
+        # try:
+        #     response = create_uds_mqr(session, base_url, org_id, stream_name, max_query_range_hours)
+        #     if response is not None:
+        #         print(f"Successfully created UDS max query range for iteration {i + 1} with max_query_range_hours = {max_query_range_hours}.")
+        # except Exception as e:
+        #     print(f"Error occurred while creating UDS max query range: {e}")
 
          # Cipher keys creation simple at OpenObserve
-        cipher_name_simpleOO = f"sim_{i + 1}_{random.randint(100000, 999999)}"  
+        cipher_name_simpleOO = f"sim_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"  
         try:
-            cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO)
+            create_cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO)
         except Exception as e:
             print(f"Failed to cipher simple at OpenObserve: {e}")
 
         # Cipher keys creation Tink at OpenObserve
-        cipher_name_tinkOO = f"tink_{i + 1}_{random.randint(100000, 999999)}"
+        cipher_name_tinkOO = f"tink_{Unique_value}_{i + 1}_{random.randint(100000, 999999)}"
         try:
-            cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO)
+            create_cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO)
         except Exception as e:
             print(f"Failed to cipher Tink at OpenObserve: {e}")   
 
@@ -1365,65 +1685,124 @@ def test_create_workflow(create_session, base_url):
 def test_validate_SC(create_session, base_url):
     session = create_session
     base_url = ZO_BASE_URL_SC
-    org_id = "org_pytest_data"
-    stream_name = "stream_pytest_data"
+    
 
-    # Validate templates and extract the first template name containing 'template_email'
-    first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title")
-    print(f"First template name containing 'template_email': {first_template_name}")
-    validate_template_email(session, base_url, org_id, first_template_name, "email_title")
+    result = retrieve_cipherKeys_simpleOO(session, base_url, org_id)
+    assert result['count'] == Total_count, (f"No 'sim_{Unique_value}' keys found")
+    first_key_name_simpleOO = result['first_key_name']
+    retrieve_cipher_simpleOO(session, base_url, org_id, first_key_name_simpleOO, "GNf6Mc")
+
+
+    result = retrieve_cipherKeys_tinkOO(session, base_url, org_id)
+    assert result['count'] == Total_count, (f"No 'tink_{Unique_value}' keys found") 
+    first_key_name_tinkOO = result['first_key_name']
+    retrieve_cipher_tinkOO(session, base_url, org_id, first_key_name_tinkOO, primary_key_id_tink)
+        
+
+
+
+
+     
+    # # Validate templates and extract the first template name containing 'template_email'
+    # first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title")
+    # print(f"First template name containing 'template_email': {first_template_name}")
+    # validate_template_email(session, base_url, org_id, first_template_name, "email_title")
 
     # Validate destinations and extract the first destination name containing 'destination_email'
 
 def test_update_workflow(create_session, base_url):
     session = create_session
     base_url = ZO_BASE_URL
-    org_id = "org_pytest_data"
-    stream_name = "stream_pytest_data"
+    
+    result = retrieve_cipherKeys_simpleOO(session, base_url, org_id)
+    first_key_name_simpleOO = result['first_key_name']
+    update_cipher_simpleOO(session, base_url, org_id, first_key_name_simpleOO)
+    retrieve_cipher_simpleOO(session, base_url, org_id, first_key_name_simpleOO, "6h/Q/O")
 
-    # Validate templates and extract the first template name containing 'template_email'
-    first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title")
-    print(f"First template name containing 'template_email' and title 'email_title' before update: {first_template_name}")
-    # Update the template
-    update_template_email(session, base_url, org_id, first_template_name)
-    # Validate the template after update
-    validate_template_email(session, base_url, org_id, first_template_name, "email_title_updated")
+    result = retrieve_cipherKeys_tinkOO(session, base_url, org_id)
+    first_key_name_tinkOO = result['first_key_name']
+
+    update_cipher_tinkOO(session, base_url, org_id, first_key_name_tinkOO)
+    retrieve_cipher_tinkOO(session, base_url, org_id, first_key_name_tinkOO, primary_key_id_tink_up) 
+
+
+
+
+
+
+ 
+    
+    # # Validate templates and extract the first template name containing 'template_email'
+    # first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title")
+    # print(f"First template name containing 'template_email' and title 'email_title' before update: {first_template_name}")
+    # # Update the template
+    # update_template_email(session, base_url, org_id, first_template_name)
+    # # Validate the template after update
+    # validate_template_email(session, base_url, org_id, first_template_name, "email_title_updated")
 
 def test_validate_updated_SC(create_session, base_url):
     session = create_session
     base_url = ZO_BASE_URL_SC
-    org_id = "org_pytest_data"
-    stream_name = "stream_pytest_data"
 
-    # Validate templates and extract the first template name containing 'template_email'
-    first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
-    print(f"First template name containing 'template_email' and title 'email_title_updated' after update: {first_template_name}")
-    validate_template_email(session, base_url, org_id, first_template_name, "email_title_updated")
+    result = retrieve_cipherKeys_simpleOO(session, base_url, org_id)
+    first_key_name_simpleOO = result['first_key_name']
+    retrieve_cipher_simpleOO(session, base_url, org_id, first_key_name_simpleOO, "6h/Q/O")
+
+    result = retrieve_cipherKeys_tinkOO(session, base_url, org_id)
+    first_key_name_tinkOO = result['first_key_name']
+    retrieve_cipher_tinkOO(session, base_url, org_id, first_key_name_tinkOO, primary_key_id_tink_up)
+
+
+
+
+
+
+    # # Validate templates and extract the first template name containing 'template_email'
+    # first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
+    # print(f"First template name containing 'template_email' and title 'email_title_updated' after update: {first_template_name}")
+    # validate_template_email(session, base_url, org_id, first_template_name, "email_title_updated")
+
+
 
 def test_delete_workflow(create_session, base_url):
     session = create_session
     base_url = ZO_BASE_URL
-    org_id = "org_pytest_data"
-    stream_name = "stream_pytest_data"
+    base_url_sc = ZO_BASE_URL_SC
 
-    # Validate templates and extract the first template name containing 'template_email' and title 'email_title_updated'
-    first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
-    print(f"First template name containing 'template_email' and title 'email_title_updated' before deletion: {first_template_name}")
-    delete_template(session, base_url, org_id, first_template_name)
-    # Validate the template after deletion
-    validate_deleted_template(session, base_url, org_id, first_template_name) 
+    result = retrieve_cipherKeys_simpleOO(session, base_url, org_id)
+    first_key_name_simpleOO = result['first_key_name']
+    delete_cipher(session, base_url, org_id, "sim")
+    validate_deleted_cipher(session, base_url, org_id, first_key_name_simpleOO)
+    validate_deleted_cipher(session, base_url_sc, org_id, first_key_name_simpleOO)
+    
+    result = retrieve_cipherKeys_tinkOO(session, base_url, org_id)
+    first_key_name_tinkOO = result['first_key_name']
+    delete_cipher(session, base_url, org_id, "tink")
+    validate_deleted_cipher(session, base_url, org_id, first_key_name_tinkOO)
+    validate_deleted_cipher(session, base_url_sc, org_id, first_key_name_tinkOO)
+
+
+    # # Validate templates and extract the first template name containing 'template_email' and title 'email_title_updated'
+    # first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
+    # print(f"First template name containing 'template_email' and title 'email_title_updated' before deletion: {first_template_name}")
+    # delete_template(session, base_url, org_id, first_template_name)
+    # # Validate the template after deletion
+    # validate_deleted_template(session, base_url, org_id, first_template_name) 
 
 def test_deleted_SC(create_session, base_url):
     session = create_session
     base_url = ZO_BASE_URL_SC
-    org_id = "org_pytest_data"
-    stream_name = "stream_pytest_data"
+    
+    validate_deleted_cipher_SC(session, base_url, org_id, "sim")
 
-    # Validate templates and extract the first template name containing 'template_email' and title 'email_title_updated'
-    first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
-    print(f"First template name containing 'template_email' and title 'email_title_updated' before deletion: {first_template_name}")
+    validate_deleted_cipher_SC(session, base_url, org_id, "tink")
 
-    validate_deleted_template(session, base_url, org_id, first_template_name) 
+
+#     # Validate templates and extract the first template name containing 'template_email' and title 'email_title_updated'
+#     first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
+#     print(f"First template name containing 'template_email' and title 'email_title_updated' before deletion: {first_template_name}")
+
+#     validate_deleted_template(session, base_url, org_id, first_template_name) 
    
 
     
