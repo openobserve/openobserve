@@ -167,15 +167,19 @@ impl ObjectStore for Remote {
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
         let start = std::time::Instant::now();
         let file = location.to_string();
-        log::debug!(
-            "[STORAGE] get_range remote file: {}, range: {:?}",
-            file,
-            range
-        );
         let data = self
             .client
-            .get_range(&(format_key(&file, true).into()), range)
-            .await?;
+            .get_range(&(format_key(&file, true).into()), range.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[STORAGE] get_range remote file: {}, range: {:?}, error: {:?}",
+                    file,
+                    range,
+                    e
+                );
+                e
+            })?;
 
         // metrics
         let data_len = data.len();
