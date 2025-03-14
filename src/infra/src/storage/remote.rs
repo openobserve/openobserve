@@ -87,7 +87,7 @@ impl ObjectStore for Remote {
                 })
             }
             Err(err) => {
-                log::error!("s3 File upload error: {:?}", err);
+                log::error!("[STORAGE] put_opts remote file: {}, error: {:?}", file, err);
                 Err(err)
             }
         }
@@ -106,7 +106,11 @@ impl ObjectStore for Remote {
         {
             Ok(r) => Ok(r),
             Err(err) => {
-                log::error!("s3 multipart File upload error: {:?}", err);
+                log::error!(
+                    "[STORAGE] put_multipart_opts remote file: {}, error: {:?}",
+                    file,
+                    err
+                );
                 Err(err)
             }
         }
