@@ -20,7 +20,7 @@ ZO_BASE_URL = os.environ.get("ZO_BASE_URL")  # Use environment variable
 ZO_BASE_URL_SC = os.environ.get("ZO_BASE_URL_SC")  # Use environment variable
 ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
 ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
-
+ZO_BASE_URL_SC2 = os.environ.get("ZO_BASE_URL_SC2")  # Use environment variable
 root_dir = Path(__file__).parent.parent.parent
 
 
@@ -711,7 +711,7 @@ def create_destination_pipeline(session, base_url, org_id, destination_name):
     assert response.status_code == 200, f"Failed to create destination: {response.content}"
     return response
 
-def validate_destination(session, base_url, org_id, destination_name):
+def validate_destinations_webhook(session, base_url, org_id, destination_name):
     """Validate a destination."""
     response = session.get(f"{base_url}api/{org_id}/alerts/destinations")
     assert response.status_code == 200, f"Failed to validate destination: {response.content}"
@@ -1780,30 +1780,35 @@ def test_create_workflow(create_session, base_url):
 
 def test_validate_SC(create_session, base_url):
     session = create_session
-    base_url = ZO_BASE_URL_SC
-    
+    base_urls = [ZO_BASE_URL_SC, ZO_BASE_URL_SC2]  # List of supercluster base URLs
 
-    result = retrieve_cipherKeys_simpleOO(session, base_url, org_id)
-    assert result['count'] == Total_count, (f"No 'sim_{Unique_value}' keys found - {result['count']}")
-    first_key_name_simpleOO = result['first_key_name']
-    retrieve_cipher_simpleOO(session, base_url, org_id, first_key_name_simpleOO, "GNf6Mc")
+    for base_url in base_urls:
+        # Validate simpleOO keys
+        result = retrieve_cipherKeys_simpleOO(session, base_url, org_id)
+        assert result['count'] == Total_count, (f"No 'sim_{Unique_value}' keys found in {base_url} - {result['count']}")
+        first_key_name_simpleOO = result['first_key_name']
+        retrieve_cipher_simpleOO(session, base_url, org_id, first_key_name_simpleOO, "GNf6Mc")
+
+        # Validate tinkOO keys
+        result = retrieve_cipherKeys_tinkOO(session, base_url, org_id)
+        assert result['count'] == Total_count, (f"No 'tink_{Unique_value}' keys found in {base_url} - {result['count']}")
+        first_key_name_tinkOO = result['first_key_name']
+        retrieve_cipher_tinkOO(session, base_url, org_id, first_key_name_tinkOO, primary_key_id_tink)
+
+        # Validate email templates
+        templates = retrieve_templates_email(session, base_url, org_id)
+        assert templates['count'] == Total_count, (f"No 'template_email_{Unique_value}' templates found in {base_url} - {templates['count']}")
+        first_template_name_email = templates['first_template_email']
+        retrieve_template_email(session, base_url, org_id, first_template_name_email)
+
+        # Validate webhook templates
+        templates = retrieve_templates_webhook(session, base_url, org_id)
+        assert templates['count'] == Total_count, (f"No 'template_webhook_{Unique_value}' templates found in {base_url} - {templates['count']}")
+        first_template_name_webhook = templates['first_template_webhook']
+        retrieve_template_webhook(session, base_url, org_id, first_template_name_webhook)
 
 
-    result = retrieve_cipherKeys_tinkOO(session, base_url, org_id)
-    assert result['count'] == Total_count, (f"No 'tink_{Unique_value}' keys found - {result['count']}") 
-    first_key_name_tinkOO = result['first_key_name']
-    retrieve_cipher_tinkOO(session, base_url, org_id, first_key_name_tinkOO, primary_key_id_tink)
 
-    templates = retrieve_templates_email(session, base_url, org_id)
-    assert templates['count'] == Total_count, (f"No 'template_email_{Unique_value}' templates found - {templates['count']}")
-    first_template_name_email = templates['first_template_email']
-    retrieve_template_email(session, base_url, org_id, first_template_name_email)    
-
-    templates = retrieve_templates_webhook(session, base_url, org_id)
-    assert templates['count'] == Total_count, (f"No 'template_webhook_{Unique_value}' templates found - {templates['count']}")
-    first_template_name_webhook = templates['first_template_webhook']
-    retrieve_template_webhook(session, base_url, org_id, first_template_name_webhook)  
-        
 
 
 
@@ -1847,11 +1852,12 @@ def test_update_workflow(create_session, base_url):
 
 def test_validate_updated_SC(create_session, base_url):
     session = create_session
-    base_url = ZO_BASE_URL_SC
+    base_urls = [ZO_BASE_URL_SC, ZO_BASE_URL_SC2]  # List of supercluster base URLs
 
-    result = retrieve_cipherKeys_simpleOO(session, base_url, org_id)
-    first_key_name_simpleOO = result['first_key_name']
-    retrieve_cipher_simpleOO(session, base_url, org_id, first_key_name_simpleOO, "6h/Q/O")
+    for base_url in base_urls:
+        result = retrieve_cipherKeys_simpleOO(session, base_url, org_id)
+        first_key_name_simpleOO = result['first_key_name']
+        retrieve_cipher_simpleOO(session, base_url, org_id, first_key_name_simpleOO, "6h/Q/O")
 
     result = retrieve_cipherKeys_tinkOO(session, base_url, org_id)
     first_key_name_tinkOO = result['first_key_name']
@@ -1906,15 +1912,16 @@ def test_delete_workflow(create_session, base_url):
     
 def test_deleted_SC(create_session, base_url):
     session = create_session
-    base_url = ZO_BASE_URL_SC
-    
-    validate_deleted_cipher_SC(session, base_url, org_id, "sim")
+    base_urls = [ZO_BASE_URL_SC, ZO_BASE_URL_SC2]  # List of supercluster base URLs
 
-    validate_deleted_cipher_SC(session, base_url, org_id, "tink")
+    for base_url in base_urls:
+        validate_deleted_cipher_SC(session, base_url, org_id, "sim")
 
-    validate_deleted_template_SC(session, base_url, org_id, "template_email")
+        validate_deleted_cipher_SC(session, base_url, org_id, "tink")
 
-    validate_deleted_template_SC(session, base_url, org_id, "template_webhook")
+        validate_deleted_template_SC(session, base_url, org_id, "template_email")
+
+        validate_deleted_template_SC(session, base_url, org_id, "template_webhook")
 
 
     
