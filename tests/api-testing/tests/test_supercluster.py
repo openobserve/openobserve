@@ -1809,12 +1809,7 @@ def test_validate_SC(create_session, base_url):
 
 
      
-    # # Validate templates and extract the first template name containing 'template_email'
-    # first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title")
-    # print(f"First template name containing 'template_email': {first_template_name}")
-    # validate_template_email(session, base_url, org_id, first_template_name, "email_title")
 
-    # Validate destinations and extract the first destination name containing 'destination_email'
 
 def test_update_workflow(create_session, base_url):
     session = create_session
@@ -1848,13 +1843,7 @@ def test_update_workflow(create_session, base_url):
 
  
     
-    # # Validate templates and extract the first template name containing 'template_email'
-    # first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title")
-    # print(f"First template name containing 'template_email' and title 'email_title' before update: {first_template_name}")
-    # # Update the template
-    # update_template_email(session, base_url, org_id, first_template_name)
-    # # Validate the template after update
-    # validate_template_email(session, base_url, org_id, first_template_name, "email_title_updated")
+
 
 def test_validate_updated_SC(create_session, base_url):
     session = create_session
@@ -1880,11 +1869,7 @@ def test_validate_updated_SC(create_session, base_url):
 
 
 
-    # # Validate templates and extract the first template name containing 'template_email'
-    # first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
-    # print(f"First template name containing 'template_email' and title 'email_title_updated' after update: {first_template_name}")
-    # validate_template_email(session, base_url, org_id, first_template_name, "email_title_updated")
-
+    
 
 
 def test_delete_workflow(create_session, base_url):
@@ -1918,13 +1903,7 @@ def test_delete_workflow(create_session, base_url):
     validate_deleted_template(session, base_url, org_id, first_template_name_webhook)   
     validate_deleted_template(session, base_url_sc, org_id, first_template_name_webhook)    
 
-    # # Validate templates and extract the first template name containing 'template_email' and title 'email_title_updated'
-    # first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
-    # print(f"First template name containing 'template_email' and title 'email_title_updated' before deletion: {first_template_name}")
-    # delete_template(session, base_url, org_id, first_template_name)
-    # # Validate the template after deletion
-    # validate_deleted_template(session, base_url, org_id, first_template_name) 
-
+    
 def test_deleted_SC(create_session, base_url):
     session = create_session
     base_url = ZO_BASE_URL_SC
