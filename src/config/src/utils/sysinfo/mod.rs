@@ -34,7 +34,9 @@ pub struct NodeMetrics {
     pub tcp_conns_established: usize,
     pub tcp_conns_close_wait: usize,
     pub tcp_conns_time_wait: usize,
+    #[serde(default)]
     pub open_fds: usize,
+    #[serde(default)]
     pub tcp_conn_resets: usize,
 }
 
