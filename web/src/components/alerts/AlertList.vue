@@ -128,16 +128,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
               
               <q-td v-for="col in columns" :key="col.name" :props="props">
-                <template v-if="col.name  !== 'actions' && col.name !== 'folder_name'">
-                {{ props.row[col.field] }}
-              </template>
-              <template v-else-if="col.name  === 'folder_name'">
-               <div  @click.stop="updateActiveFolderId(props.row[col.field].id)">
-                  {{ props.row[col.field].name }}
-               </div>
-                
-              </template>
-              <template v-else>
+                    <template v-if="col.name === 'name'">
+                          {{ computedName(props.row[col.field]) }}
+                        </template>
+                        <template v-else-if="col.name === 'owner'">
+                          {{ computedOwner(props.row[col.field]) }}
+                        </template>
+                        <template v-else-if="col.name == 'last_triggered_at' || col.name == 'last_satisfied_at'">
+                        {{ props.row[col.field] }}
+                      </template> 
+                      <template v-else-if="col.name === 'period'">
+                        {{ props.row[col.field] }} Mins
+                      </template>
+                      <template v-else-if="col.name === 'frequency'">
+                        {{ props.row[col.field] }} {{ props.row?.frequency_type == 'cron' ? '' : 'Mins' }}
+                      </template>
+                    <template v-else-if="col.name  === 'folder_name'">
+                    <div  @click.stop="updateActiveFolderId(props.row[col.field].id)">
+                        {{ props.row[col.field].name }}
+                    </div>
+                      
+                    </template>
+              <template v-else-if="col.name == 'actions'">
                 <div
                   data-test="alert-list-loading-alert"
                   v-if="alertStateLoadingMap[props.row.uuid]"
@@ -220,6 +232,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-list>
                   </q-menu>
                 </q-btn>
+              </template>
+              <template v-else>
+                {{ props.row[col.field] }}
               </template>
               </q-td>
             </q-tr>
@@ -603,51 +618,69 @@ export default defineComponent({
     }
     const activeFolderToMove = ref("default");
     const columns: any = ref<QTableProps["columns"]>([
-      {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-      },
-      {
-        name: "name",
-        field: "name",
-        label: t("alerts.name"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "owner",
-        field: "owner",
-        label: t("alerts.owner"),
-        align: "center",
-        sortable: true,
-      },
-      {
-        name: "last_triggered_at",
-        field: "last_triggered_at",
-        label: t("alerts.lastTriggered"),
-        align: "center",
-        sortable: true,
-        style: "width: 150px",
-      },
-      {
-        name: "last_satisfied_at",
-        field: "last_satisfied_at",
-        label: t("alerts.lastSatisfied"),
-        align: "center",
-        sortable: true,
-        style: "width: 150px",
-      },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("alerts.actions"),
-        align: "center",
-        sortable: false,
-        style: "width: 150px",
-      },
-    ]);
+          {
+            name: "#",
+            label: "#",
+            field: "#",
+            align: "left",
+          },
+          {
+            name: "name",
+            field: "name",
+            label: t("alerts.name"),
+            align: "left",
+            sortable: true,
+          },
+          {
+            name: "owner",
+            field: "owner",
+            label: t("alerts.owner"),
+            align: "center",
+            sortable: true,
+            style: "width: 150px",
+          },
+          {
+            name: "period",
+            field: "period",
+            label: t("alerts.period"),
+            align: "center",
+            sortable: true,
+            style: "width: 150px",
+          },
+          {
+            name: "frequency",
+            field: "frequency",
+            label: t("alerts.frequency"),
+            align: "left",
+            sortable: true,
+            style: "width: 150px",
+          },
+          {
+            name: "last_triggered_at",
+            field: "last_triggered_at",
+            label: t("alerts.lastTriggered"),
+            align: "left",
+            sortable: true,
+            style: "width: 150px",
+          },
+          {
+            name: "last_satisfied_at",
+            field: "last_satisfied_at",
+            label: t("alerts.lastSatisfied"),
+            align: "left",
+            sortable: true,
+            style: "width: 150px",
+          },
+          {
+            name: "actions",
+            field: "actions",
+            label: t("alerts.actions"),
+            align: "center",
+            sortable: false,
+            style: "width: 150px",
+    
+          },
+        ]);
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
@@ -711,6 +744,13 @@ export default defineComponent({
                 } else if (data.condition.promql) {
                   conditions = data.condition.promql;
                 }
+                let frequency = "";
+                if(data.trigger_condition?.frequency_type == 'cron'){
+                  frequency = data.trigger_condition.cron;
+                }else{
+                  frequency = data.trigger_condition.frequency;
+                }
+
                 return {
                   "#": counter <= 9 ? `0${counter++}` : counter++,
                   alert_id: data.alert_id,
@@ -723,6 +763,9 @@ export default defineComponent({
                   description: data.description,
                   uuid: data.uuid,
                   owner: data.owner,
+                  period: data?.trigger_condition?.period,
+                  frequency: frequency,
+                  frequency_type: data?.trigger_condition?.frequency_type,
                   last_triggered_at: convertUnixToQuasarFormat(
                     data.last_triggered_at
                   ),
@@ -1461,7 +1504,17 @@ const updateActiveFolderId = (newVal: any) => {
         });
       }
     };
-
+    const computedName = (name: string) => {
+          return name.length >30 ? name.substring(0, 30) + "..." : name;
+        };
+    const computedOwner = (owner: string) => {
+        if (owner.length > 15) {
+          const firstTen = owner.substring(0, 7);
+          const lastFour = owner.substring(owner.length - 4);
+          return firstTen + "****" + lastFour;
+        }
+        return owner;
+      };
 
 
     return {
@@ -1580,7 +1633,9 @@ const updateActiveFolderId = (newVal: any) => {
       openMenu,
       outlinedMoreVert,
       getAlertsFn,
-      multipleExportAlert
+      multipleExportAlert,
+      computedName,
+      computedOwner
     };
 
   },
