@@ -18,7 +18,10 @@ use std::sync::Arc;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::{cluster::CompactionJobType, stream::FileKey},
+    meta::{
+        cluster::CompactionJobType,
+        stream::{FileKey, ALL_STREAM_TYPES},
+    },
     metrics,
 };
 use tokio::sync::{mpsc, Mutex};
@@ -126,6 +129,23 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
             }
         };
 
+        // reset all metrics
+        let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+        for org in orgs {
+            for stream_type in ALL_STREAM_TYPES {
+                if metrics::COMPACT_PENDING_JOBS
+                    .with_label_values(&[org.as_str(), stream_type.as_str()])
+                    .get()
+                    > 0
+                {
+                    metrics::COMPACT_PENDING_JOBS
+                        .with_label_values(&[org.as_str(), stream_type.as_str()])
+                        .set(0);
+                }
+            }
+        }
+
+        // set new metrics
         for (org, inner_map) in job_status {
             for (stream_type, counter) in inner_map {
                 metrics::COMPACT_PENDING_JOBS

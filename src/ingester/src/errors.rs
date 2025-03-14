@@ -107,4 +107,7 @@ pub enum Error {
         source: tokio::sync::mpsc::error::SendError<PathBuf>,
     },
     MemoryTableOverflowError {},
+    ExternalError {
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
 }

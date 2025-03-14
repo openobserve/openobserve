@@ -184,7 +184,3 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
 
     Ok(())
 }
-
-pub(crate) async fn len() -> usize {
-    IMMUTABLES.read().await.len()
-}
