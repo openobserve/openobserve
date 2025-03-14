@@ -138,6 +138,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e');
+    await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Explore' }).first().click({ force: true });
     await page.waitForTimeout(5000);
     await page.waitForSelector('[data-test="logs-search-saved-views-btn"]');
@@ -216,6 +217,7 @@ test.describe("Logs Queries testcases", () => {
     await page.waitForTimeout(3000);
     await page.click('[data-test="streams-search-stream-input"]')
     await page.keyboard.type("e2e_automate");
+    await page.waitForTimeout(2000);
     await page.locator("[title=\"Stream Detail\"]").first().click({ force: true });
     await page.locator(':nth-child(2) > [data-test="schema-stream-index-select"]').click();
     const scope = page.locator(".q-virtual-scroll__content");

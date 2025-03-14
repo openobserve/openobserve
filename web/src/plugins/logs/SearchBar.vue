@@ -1256,7 +1256,7 @@ export default defineComponent({
             query: this.searchObj.data.customDownloadQueryObj,
             page_type: this.searchObj.data.stream.streamType,
           },
-          "UI",
+          "ui",
         )
         .then((res) => {
           this.customDownloadDialog = false;

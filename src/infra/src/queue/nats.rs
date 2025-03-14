@@ -117,7 +117,7 @@ impl super::Queue for NatsQueue {
                 .get_or_create_consumer(&consumer_name, config)
                 .await?;
             // Consume messages from the consumer
-            let mut messages = consumer.messages().await.expect("consumer messages error");
+            let mut messages = consumer.messages().await?;
             while let Ok(Some(message)) = messages.try_next().await {
                 let message = super::Message::Nats(message);
                 tx.send(message)
