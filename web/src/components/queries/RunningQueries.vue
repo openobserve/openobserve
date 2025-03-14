@@ -215,8 +215,8 @@ export default defineComponent({
 
     const selectedQueryTypeTab = ref<"summary" | "all">("summary");
 
-    const selectedSearchType = ref("Dashboards");
-    const searchTypes = ["Dashboards", "UI", "Others"]; // UI, Dashboards, Reports, Alerts, Values, Other, RUM, DerivedStream,
+    const selectedSearchType = ref("dashboards");
+    const searchTypes = ["dashboards", "ui", "Others"]; // UI, Dashboards, Reports, Alerts, Values, Other, RUM, DerivedStream,
 
     const runningQueryTypes = [
       { label: "User Summary", value: "summary" },
@@ -642,7 +642,7 @@ export default defineComponent({
             return {
               ...query,
               search_type_label:
-                query.search_type === "Dashboards" || query.search_type === "UI"
+                query.search_type === "dashboards" || query.search_type === "ui"
                   ? query.search_type
                   : "Others",
             };
