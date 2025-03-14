@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -115,6 +115,7 @@ impl ObjectStore for Remote {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
+        log::debug!("[STORAGE] get remote file: {}", file);
         let result = self.client.get(&(format_key(&file, true).into())).await?;
 
         // metrics
@@ -132,7 +133,6 @@ impl ObjectStore for Remote {
                 .with_label_values(&[columns[1], columns[2], "get", "remote"])
                 .inc_by(time);
         }
-        log::debug!("[STORAGE] get remote file: {}", file);
 
         Ok(result)
     }
@@ -167,6 +167,11 @@ impl ObjectStore for Remote {
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
         let start = std::time::Instant::now();
         let file = location.to_string();
+        log::debug!(
+            "[STORAGE] get_range remote file: {}, range: {:?}",
+            file,
+            range
+        );
         let data = self
             .client
             .get_range(&(format_key(&file, true).into()), range)
@@ -189,10 +194,6 @@ impl ObjectStore for Remote {
         }
 
         Ok(data)
-    }
-
-    async fn head(&self, _location: &Path) -> Result<ObjectMeta> {
-        Err(Error::NotImplemented)
     }
 
     async fn delete(&self, location: &Path) -> Result<()> {
