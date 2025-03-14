@@ -88,17 +88,9 @@ pub async fn save(
     }
 
     if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let cron_exp = report.frequency.cron.clone();
-        if cron_exp.starts_with("* ") {
-            let (_, rest) = cron_exp.split_once(" ").unwrap();
-            let now = chrono::Utc::now().second().to_string();
-            report.frequency.cron = format!("{now} {rest}");
-            log::debug!(
-                "New cron expression for report {}: {}",
-                report.name,
-                report.frequency.cron
-            );
-        }
+        let now = chrono::Utc::now().second();
+        report.frequency.cron =
+            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
         // Check if the cron expression is valid
         Schedule::from_str(&report.frequency.cron)?;
     } else if report.frequency.interval == 0 {
