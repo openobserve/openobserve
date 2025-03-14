@@ -547,7 +547,6 @@
 
 
       const triggerExpand = (props) =>{
-        console.log(props, "props")
         moreDetailsToDisplay.value = JSON.stringify(filterRow(props.row), null, 2);
         if (expandedRow.value === convertTraceIdAndSqlToKey(props.row.trace_id, props.row.sql)) {
             expandedRow.value = null;
