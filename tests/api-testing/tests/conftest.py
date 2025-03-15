@@ -6,8 +6,12 @@ import string
 from pathlib import Path
 
 BASE_URL = os.environ["ZO_BASE_URL"]
+BASE_URL_SC = os.environ["ZO_BASE_URL_SC"]
+BASE_URL_SC2 = os.environ["ZO_BASE_URL_SC2"]
+
 root_dir = Path(__file__).parent.parent.parent
 
+unique_value = f"u_{random.randint(100000, 999999)}"
 
 def random_string(length: int):
     # ascii_letters consist of alphabets for 'a' to 'z' and 'A' to 'Z'
@@ -47,6 +51,13 @@ def create_session():
 def base_url():
     """Return the base URL."""
     return BASE_URL
+
+@pytest.fixture
+def supercluster_base_urls():
+    """Return the base URL."""
+    return [BASE_URL_SC, BASE_URL_SC2]
+
+
 
 
 @pytest.fixture(scope="session", autouse=True)
