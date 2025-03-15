@@ -794,7 +794,10 @@ pub async fn merge_files(
     let mut fi = 0;
     for file in new_file_list.iter() {
         fi += 1;
-        log::info!("[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}", &file.key);
+        log::info!(
+            "[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}",
+            &file.key
+        );
         let buf = file_data::get(&file.key, None).await?;
         let schema = read_schema_from_bytes(&buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
