@@ -87,7 +87,7 @@ impl ObjectStore for Remote {
                 })
             }
             Err(err) => {
-                log::error!("s3 File upload error: {:?}", err);
+                log::error!("[STORAGE] put_opts remote file: {}, error: {:?}", file, err);
                 Err(err)
             }
         }
@@ -106,7 +106,11 @@ impl ObjectStore for Remote {
         {
             Ok(r) => Ok(r),
             Err(err) => {
-                log::error!("s3 multipart File upload error: {:?}", err);
+                log::error!(
+                    "[STORAGE] put_multipart_opts remote file: {}, error: {:?}",
+                    file,
+                    err
+                );
                 Err(err)
             }
         }
@@ -169,8 +173,17 @@ impl ObjectStore for Remote {
         let file = location.to_string();
         let data = self
             .client
-            .get_range(&(format_key(&file, true).into()), range)
-            .await?;
+            .get_range(&(format_key(&file, true).into()), range.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[STORAGE] get_range remote file: {}, range: {:?}, error: {:?}",
+                    file,
+                    range,
+                    e
+                );
+                e
+            })?;
 
         // metrics
         let data_len = data.len();

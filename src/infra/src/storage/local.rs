@@ -180,8 +180,17 @@ impl ObjectStore for Local {
         let file = location.to_string();
         let data = self
             .client
-            .get_range(&(format_key(&file, self.with_prefix).into()), range)
-            .await?;
+            .get_range(&(format_key(&file, self.with_prefix).into()), range.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[STORAGE] get_range local file: {}, range: {:?}, error: {:?}",
+                    file,
+                    range,
+                    e
+                );
+                e
+            })?;
 
         // metrics
         let data_len = data.len();
