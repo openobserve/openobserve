@@ -794,7 +794,7 @@ pub async fn merge_files(
     let mut fi = 0;
     for file in new_file_list.iter() {
         fi += 1;
-        log::info!("[COMPACT:{thread_id}:{fi}] merge small file: {}", &file.key);
+        log::info!("[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}", &file.key);
         let buf = file_data::get(&file.key, None).await?;
         let schema = read_schema_from_bytes(&buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
@@ -930,7 +930,7 @@ pub async fn merge_files(
             let id = ider::generate();
             let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
             log::info!(
-                "[COMPACT:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
                 new_file_key,
                 new_file_meta.original_size,
@@ -997,7 +997,7 @@ pub async fn merge_files(
                 new_file_metas.push(new_file_meta);
             }
             log::info!(
-                "[COMPACT:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
+                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
                 new_file_keys,
                 new_file_metas.iter().map(|m| m.original_size).sum::<i64>(),
