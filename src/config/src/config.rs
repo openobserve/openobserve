@@ -1452,12 +1452,12 @@ pub struct MemoryCache {
     // max_size
     #[env_config(name = "ZO_MEMORY_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
-    // MB, when cache is full will release how many data once time, default is 1% of max_size
+    // MB, when cache is full will release how many data once time, default is 10% of max_size
     #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 50)] // MB
+    #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 100)] // MB
     pub gc_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 0)] // seconds
+    #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 60)] // seconds
     pub gc_interval: u64,
     #[env_config(name = "ZO_MEMORY_CACHE_SKIP_DISK_CHECK", default = false)]
     pub skip_disk_check: bool,
@@ -1488,12 +1488,12 @@ pub struct DiskCache {
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
-    // MB, when cache is full will release how many data once time, default is 1% of max_size
+    // MB, when cache is full will release how many data once time, default is 10% of max_size
     #[env_config(name = "ZO_DISK_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
     #[env_config(name = "ZO_DISK_CACHE_GC_SIZE", default = 100)] // MB
     pub gc_size: usize,
-    #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 0)] // seconds
+    #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 60)] // seconds
     pub gc_interval: u64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
@@ -2232,14 +2232,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.skip_size *= 1024 * 1024;
     }
     if cfg.memory_cache.release_size == 0 {
-        // when cache is full will release how many data once time, default is 1% of
+        // when cache is full will release how many data once time, default is 10% of
         // max_size
-        cfg.memory_cache.release_size = cfg.memory_cache.max_size / 100;
+        cfg.memory_cache.release_size = cfg.memory_cache.max_size / 10;
     } else {
         cfg.memory_cache.release_size *= 1024 * 1024;
     }
     if cfg.memory_cache.gc_size == 0 {
-        cfg.memory_cache.gc_size = 10 * 1024 * 1024; // 10 MB
+        cfg.memory_cache.gc_size = 100 * 1024 * 1024; // 100 MB
     } else {
         cfg.memory_cache.gc_size *= 1024 * 1024;
     }
@@ -2259,7 +2259,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.memory_cache.bucket_num == 0 {
-        cfg.memory_cache.bucket_num = cfg.limit.real_cpu_num;
+        cfg.memory_cache.bucket_num = cfg.limit.cpu_num;
     }
     cfg.memory_cache.max_size /= cfg.memory_cache.bucket_num;
     cfg.memory_cache.release_size /= cfg.memory_cache.bucket_num;
@@ -2350,14 +2350,14 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.disk_cache.skip_size *= 1024 * 1024;
     }
     if cfg.disk_cache.release_size == 0 {
-        // when cache is full will release how many data once time, default is 1% of
+        // when cache is full will release how many data once time, default is 10% of
         // max_size
-        cfg.disk_cache.release_size = cfg.disk_cache.max_size / 100;
+        cfg.disk_cache.release_size = cfg.disk_cache.max_size / 10;
     } else {
         cfg.disk_cache.release_size *= 1024 * 1024;
     }
     if cfg.disk_cache.gc_size == 0 {
-        cfg.disk_cache.gc_size = 10 * 1024 * 1024; // 10 MB
+        cfg.disk_cache.gc_size = 100 * 1024 * 1024; // 100 MB
     } else {
         cfg.disk_cache.gc_size *= 1024 * 1024;
     }
@@ -2369,18 +2369,18 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.bucket_num == 0 {
-        // because we validate thread_query_num before this
+        // because we validate cpu_num before this
         // we can be sure here that that value is sane.
 
         // following numbers are imperically decided, users can set the value
         // directly if they know better, otherwise this was the best numbers
         // for bucket_num based on thread count.
-        let threads = cfg.limit.query_thread_num;
+        let threads = cfg.limit.cpu_num;
         if threads <= 16 {
             // for less than 16 threads, same buckets would be good enough
             // with 16 files in parallel we should not run into that many
             // files going into same bucket, so ok.
-            cfg.disk_cache.bucket_num = cfg.limit.query_thread_num;
+            cfg.disk_cache.bucket_num = threads;
         } else if threads > 16 && threads <= 64 {
             // for 32 -> 64 ish range, there can be a lot of collisions
             // so we set it to double the threads to avoid any collisions
