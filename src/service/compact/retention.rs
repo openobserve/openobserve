@@ -179,17 +179,21 @@ pub async fn delete_by_stream(
         lifecycle_end.timestamp_micros(),
     );
 
-    let final_deletion_time_ranges = generate_time_ranges_for_deletion(
-        extended_retentions.to_vec(),
-        original_deletion_time_range,
-        last_retained_time,
-    );
-
-    log::debug!(
-        "[COMPACTOR] extended_retentions: {}, final_deletion_time_ranges: {}",
-        extended_retentions.iter().join(", "),
-        final_deletion_time_ranges.iter().join(", ")
-    );
+    let final_deletion_time_ranges = if extended_retentions.is_empty() {
+        vec![original_deletion_time_range]
+    } else {
+        let ranges = generate_time_ranges_for_deletion(
+            extended_retentions.to_vec(),
+            original_deletion_time_range,
+            last_retained_time,
+        );
+        log::debug!(
+            "[COMPACTOR] extended_retentions: {}, final_deletion_time_ranges: {}",
+            extended_retentions.iter().join(", "),
+            ranges.iter().join(", ")
+        );
+        ranges
+    };
 
     let job_nos = final_deletion_time_ranges.len();
 
