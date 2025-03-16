@@ -192,21 +192,6 @@ pub async fn ingest(
         };
 
         if executable_pipeline.is_some() {
-            // handle record's timestamp fist in case record is sent to remote destination
-            if let Err(e) = handle_timestamp(&mut item, min_ts) {
-                stream_status.status.failed += 1;
-                stream_status.status.error = e.to_string();
-                metrics::INGEST_ERRORS
-                    .with_label_values(&[
-                        org_id,
-                        StreamType::Logs.as_str(),
-                        &stream_name,
-                        TS_PARSE_FAILED,
-                    ])
-                    .inc();
-                log_failed_record(log_ingestion_errors, &item, &e.to_string());
-                continue;
-            };
             // buffer the records, timestamp, and originals for pipeline batch processing
             pipeline_inputs.push(item);
             original_options.push(original_data);
@@ -301,6 +286,25 @@ pub async fn ingest(
                     }
 
                     for (idx, mut res) in stream_pl_results {
+                        // handle timestamp
+                        let timestamp = match handle_timestamp(&mut res, min_ts) {
+                            Ok(ts) => ts,
+                            Err(e) => {
+                                stream_status.status.failed += 1;
+                                stream_status.status.error = e.to_string();
+                                metrics::INGEST_ERRORS
+                                    .with_label_values(&[
+                                        org_id,
+                                        StreamType::Logs.as_str(),
+                                        &stream_name,
+                                        TS_PARSE_FAILED,
+                                    ])
+                                    .inc();
+                                log_failed_record(log_ingestion_errors, &res, &e.to_string());
+                                continue;
+                            }
+                        };
+
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(val) => val,
@@ -331,24 +335,6 @@ pub async fn ingest(
                                 json::Value::String(record_id.to_string()),
                             );
                         }
-
-                        let Some(timestamp) =
-                            local_val.get(TIMESTAMP_COL_NAME).and_then(|ts| ts.as_i64())
-                        else {
-                            let err = "record _timestamp inserted before pipeline processing, but missing after pipeline processing";
-                            stream_status.status.failed += 1;
-                            stream_status.status.error = err.to_string();
-                            metrics::INGEST_ERRORS
-                                .with_label_values(&[
-                                    org_id,
-                                    StreamType::Logs.as_str(),
-                                    &stream_name,
-                                    TS_PARSE_FAILED,
-                                ])
-                                .inc();
-                            log_failed_record(log_ingestion_errors, &local_val, err);
-                            continue;
-                        };
 
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(stream_params.stream_name.to_string())
