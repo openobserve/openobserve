@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use config::{
     meta::{
         function::{Transform, VRLResultResolver},
@@ -40,6 +40,7 @@ use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
         ingestion::{apply_vrl_fn, compile_vrl_function},
+        logs::ingest::handle_timestamp,
         self_reporting::publish_error,
     },
 };
@@ -709,9 +710,46 @@ async fn process_node(
                 "[Pipeline]: Destination node {node_idx} starts processing, remote_stream : {:?}",
                 remote_stream
             );
-            while let Some((_, record, _)) = receiver.recv().await {
-                // External destinations will automatically flatten the payload, hence
-                // no need to flatten the records here
+            let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+                .timestamp_micros();
+            while let Some((_, mut record, flattened)) = receiver.recv().await {
+                // handle timestamp before sending to remote_write service
+                if !flattened {
+                    record = match flatten::flatten_with_level(
+                        record,
+                        cfg.limit.ingest_flatten_level,
+                    ) {
+                        Ok(flattened) => flattened,
+                        Err(e) => {
+                            let err_msg = format!("DestinationNode error with flattening: {}", e);
+                            if let Err(send_err) = error_sender
+                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .await
+                            {
+                                log::error!(
+                                    "[Pipeline] {} : DestinationNode failed sending errors for collection caused by: {send_err}",
+                                    pipeline_name
+                                );
+                                break;
+                            }
+                            continue;
+                        }
+                    };
+                }
+                if let Err(e) = handle_timestamp(&mut record, min_ts) {
+                    let err_msg = format!("DestinationNode error handling timestamp: {}", e);
+                    if let Err(send_err) = error_sender
+                        .send((node.id.to_string(), node.node_type(), err_msg))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline] {} : DestinationNode failed sending errors for collection caused by: {send_err}",
+                            pipeline_name
+                        );
+                        break;
+                    }
+                    continue;
+                }
                 records.push(record);
                 count += 1;
             }
