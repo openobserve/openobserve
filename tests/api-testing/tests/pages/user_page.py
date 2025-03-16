@@ -1,5 +1,5 @@
 import random
-
+from requests.auth import HTTPBasicAuth
 import time
 
 

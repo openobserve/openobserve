@@ -28,7 +28,17 @@ def verify_objects(session, base_url, user_email, user_password, org_id, num_obj
     cipher_page = CipherPage(session, base_url, org_id)
    
     for i in range(num_objects):
-        # Create templates
+        
+        # Retrieve cipher keys
+        cipher_name_simpleOO = f"sim_{cipher_page.Unique_value_cipher}_{i}"
+        cipher_page.retrieve_cipherKeys_simpleOO(session, base_url, user_email, user_password, org_id)
+        cipher_page.retrieve_cipher_simpleOO(session, base_url, user_email, user_password, org_id, cipher_name_simpleOO)
+
+        cipher_name_tinkOO = f"tink_{cipher_page.Unique_value_cipher}_{i}"
+        cipher_page.retrieve_cipherKeys_tinkOO(session, base_url, user_email, user_password, org_id)
+        cipher_page.retrieve_cipher_tinkOO(session, base_url, user_email, user_password, org_id, cipher_name_tinkOO)   
+
+        # Retrieve templates
         template_name_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}"
         template_page.retrieve_templates_webhook(session, base_url, user_email, user_password, org_id)
         template_page.retrieve_template_webhook(session, base_url, user_email, user_password, org_id, template_name_webhook)
@@ -36,8 +46,6 @@ def verify_objects(session, base_url, user_email, user_password, org_id, num_obj
         template_name_email = f"template_email_{template_page.Unique_value_temp}_{i}"
         template_page.retrieve_templates_email(session, base_url, user_email, user_password, org_id)
         template_page.retrieve_template_email(session, base_url, user_email, user_password, org_id, template_name_email)
-
-        
 
 
 

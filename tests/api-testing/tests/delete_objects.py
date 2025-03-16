@@ -28,7 +28,15 @@ def delete_objects(session, base_url, user_email, user_password, org_id, num_obj
     cipher_page = CipherPage(session, base_url, org_id)
    
     for i in range(num_objects):
-        # Create templates
+        
+        # Delete cipher keys
+        cipher_name_simpleOO = f"sim_{cipher_page.Unique_value_cipher}_{i}"
+        cipher_page.delete_cipher(session, base_url, user_email, user_password, org_id, cipher_name_simpleOO)
+
+        cipher_name_tinkOO = f"tink_{cipher_page.Unique_value_cipher}_{i}"
+        cipher_page.delete_cipher(session, base_url, user_email, user_password, org_id, cipher_name_tinkOO)
+
+        # Delete templates
         template_name_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}"
         template_page.delete_template(session, base_url, user_email, user_password, org_id, template_name_webhook)
 
