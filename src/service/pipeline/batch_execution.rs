@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use config::{
     meta::{
         function::{Transform, VRLResultResolver},
@@ -40,7 +40,6 @@ use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
         ingestion::{apply_vrl_fn, compile_vrl_function},
-        logs::ingest::handle_timestamp,
         self_reporting::publish_error,
     },
 };
@@ -710,8 +709,9 @@ async fn process_node(
                 "[Pipeline]: Destination node {node_idx} starts processing, remote_stream : {:?}",
                 remote_stream
             );
-            let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
-                .timestamp_micros();
+            let min_ts = (Utc::now()
+                - chrono::Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+            .timestamp_micros();
             while let Some((_, mut record, flattened)) = receiver.recv().await {
                 // handle timestamp before sending to remote_write service
                 if !flattened {
@@ -736,7 +736,8 @@ async fn process_node(
                         }
                     };
                 }
-                if let Err(e) = handle_timestamp(&mut record, min_ts) {
+                if let Err(e) = crate::service::logs::ingest::handle_timestamp(&mut record, min_ts)
+                {
                     let err_msg = format!("DestinationNode error handling timestamp: {}", e);
                     if let Err(send_err) = error_sender
                         .send((node.id.to_string(), node.node_type(), err_msg))
