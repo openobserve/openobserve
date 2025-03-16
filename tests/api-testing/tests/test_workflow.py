@@ -1,23 +1,30 @@
-#run this on a single cluster 
+import os
+from create_objects import create_objects
+from verify_objects import verify_objects
+from edit_objects import edit_objects
+from delete_objects import delete_objects
+from verifydeleted_objects import verify_deleted_objects       
 
-#run this on multiple clusters
+# Constants for WebSocket URL and user credentials
+ZO_BASE_URL = os.environ.get("ZO_BASE_URL")  # Use environment variable
+ZO_BASE_URL_SC = os.environ.get("ZO_BASE_URL_SC")  # Use environment variable
+ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
+ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
+ZO_BASE_URL_SC2 = os.environ.get("ZO_BASE_URL_SC2")  # Use environment variable
 
-url1 = "https://usertest.dev.zinclabs.dev"
-user_email1 = ""
-user_password1 = ""
 
-url2 = "https://usertest2.dev.zinclabs.dev"
-user_email2 = ""
-user_password2 = ""
 
-create_objects(url1, user_email1, user_password1, 10)
 
-verify_objects(url2, user_email1, user_password1, 10)
 
-edit_objects(url2, user_email1, user_password1, 10)
+Total_count = 2
+org_id = "default"
+stream_name = "stream_pytest_data"
 
-verify_objects(url1, user_email1, user_password1, 10)
-
-delete_objects(url2, user_email1, user_password1, 10)
-
-verify_objects(url1, user_email1, user_password1, 10)
+def test_workflow(create_session, base_url):
+   
+   create_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
+   verify_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
+   edit_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
+   verify_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
+   delete_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
+   verify_deleted_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
