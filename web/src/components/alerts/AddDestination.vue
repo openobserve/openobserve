@@ -468,7 +468,7 @@ const isValidDestination = computed(
       formData.value.method &&
       formData.value.type === "http") ||
       (formData.value.type === "email" && formData.value.emails.length) ||
-      (formData.value.type === "action" && formData.value.action_id.length) ||
+      (formData.value.type === "action" && formData.value?.action_id?.length) ||
       (!props.isAlerts && formData.value.url && formData.value.method)) &&
     (props.isAlerts ? formData.value.template : true),
 );
