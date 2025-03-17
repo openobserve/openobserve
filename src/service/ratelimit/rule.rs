@@ -113,6 +113,12 @@ pub async fn save(rule: RuleEntry) -> Result<(), RatelimitError> {
 }
 
 pub async fn save_batch(rules: RuleEntry) -> Result<(), RatelimitError> {
+    let RuleEntry::Batch(_) = &rules else {
+        return Err(RatelimitError::NotSupportRuleEntry(
+            "Expected batch rule entry".to_string(),
+        ));
+    };
+
     handle_rule_operation(
         rules.clone(),
         RuleOperation::Save,

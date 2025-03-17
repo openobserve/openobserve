@@ -1133,7 +1133,7 @@ pub async fn search_partition(
 
 /// Search History
 ///
-/// {"ratelimit_module":"Search", "ratelimit_module_operation":"get"}
+/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",

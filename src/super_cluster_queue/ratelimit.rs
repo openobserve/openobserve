@@ -51,7 +51,7 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
         MessageType::RatelimitDelete => {
             let RuleEntry::Single(rule) = rule else {
                 log::error!("[SUPER_CLUSTER:RATELIMIT] Invalid message: {:?}", rule);
-                return Err(anyhow::anyhow!("Invalid message type".to_string()));
+                return Err(anyhow::anyhow!("Invalid rule entry type".to_string()));
             };
 
             match infra::table::ratelimit::delete(rule.rule_id.unwrap()).await {

@@ -629,7 +629,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     }
 }
 
-/// ListUsers
+/// ListUserRoles
 ///
 /// #{"ratelimit_module":"Users", "ratelimit_module_operation":"list"}#
 #[utoipa::path(

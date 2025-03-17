@@ -50,7 +50,7 @@ use {
 // 1. submit
 /// SearchSQL
 ///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"list"}#
+/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",

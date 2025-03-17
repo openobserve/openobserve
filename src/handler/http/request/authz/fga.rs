@@ -348,13 +348,13 @@ pub async fn get_role_permissions(
 }
 
 #[cfg(feature = "enterprise")]
-/// GetRoLesUsers
+/// GetRoleUsers
 ///
 /// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
-    operation_id = "GetRoLesUsers",
+    operation_id = "GetRoleUsers",
     security(
         ("Authorization"= [])
     ),

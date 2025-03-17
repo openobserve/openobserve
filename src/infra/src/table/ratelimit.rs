@@ -245,7 +245,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                 active_model.api_group_operation =
                     Set(rule.api_group_operation.unwrap_or_default());
                 active_model.threshold = Set(rule.threshold);
-                active_model.created_at = Set(current_timestamp);
+                active_model.created_at = Set(existing.created_at);
 
                 active_model.save(&txn).await.map_err(|e| {
                     anyhow!("DbError# Failed to update rule: {:?}, {}", existing, e)
@@ -325,7 +325,7 @@ pub async fn update(rule: RuleEntry) -> Result<(), anyhow::Error> {
     match rule {
         RuleEntry::Single(rule) => update_single(rule).await,
         RuleEntry::Batch(rules) => update_batch(rules).await,
-        RuleEntry::UpsertBatch(_) => Err(anyhow!("UpsertBatch not supported in update operation")),
+        RuleEntry::UpsertBatch(rules) => add_upsert_batch(rules).await,
     }
 }
 

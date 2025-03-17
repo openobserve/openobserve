@@ -48,7 +48,13 @@ pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleRes
     };
 
     let path_columns = path.split('/').collect::<Vec<&str>>();
-    let (path, org_id) = (path.to_string(), path_columns[0].to_string());
+    let (path, org_id) = (
+        path.to_string(),
+        path_columns
+            .get(0)
+            .map(|s| s.to_string())
+            .unwrap_or_default(),
+    );
     let openapi_path = extract_openapi_path(req);
     Box::pin(async move {
         let user_email = get_user_email_from_auth_str(&auth_str)
@@ -197,13 +203,12 @@ fn select_final_rule_resource(
         .max_by_key(|rule| rule.threshold)
         .cloned();
 
+    let user_role = user_role_rule.clone().unwrap().user_role;
     let user_id_rules = custom_rules
         .iter()
         .find(|rule| {
             user_role_rule.is_some()
-                && rule
-                    .user_role
-                    .eq(&user_role_rule.clone().unwrap().user_role)
+                && rule.user_role.eq(&user_role)
                 && rule.user_id.eq(&Some(user_email.to_string()))
         })
         .cloned();
@@ -268,8 +273,8 @@ fn path_to_regex(path: &str) -> Regex {
 }
 
 fn extract_openapi_path(req: &ServiceRequest) -> Option<String> {
+    let api = ApiDoc::openapi();
     let path_patterns: HashMap<String, Regex> = {
-        let api = ApiDoc::openapi();
         api.paths
             .paths
             .keys()
@@ -282,9 +287,6 @@ fn extract_openapi_path(req: &ServiceRequest) -> Option<String> {
 
     let path = req.path();
     let method = req.method();
-
-    // Get OpenAPI spec
-    let api = ApiDoc::openapi();
 
     // Find matching path
     for (openapi_path, path_item) in &api.paths.paths {

@@ -123,7 +123,9 @@ pub async fn list_module_ratelimit(path: web::Path<String>) -> Result<HttpRespon
                 .await;
         }
 
-        let global_default_rules = get_default_rules().await.unwrap();
+        let global_default_rules = get_default_rules()
+            .await
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         // module-level is org-level, we first look for the custom org-level rules
         let mut all_rules = infra::table::ratelimit::fetch_rules(
             global_default_rules.clone(),
@@ -131,7 +133,7 @@ pub async fn list_module_ratelimit(path: web::Path<String>) -> Result<HttpRespon
             Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
         )
         .await
-        .unwrap();
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         // if we have no custom org-level, look for the global org-level
         if all_rules.is_empty() {
@@ -237,7 +239,7 @@ pub async fn update_ratelimit(
     #[cfg(feature = "enterprise")]
     {
         let org_id = path.into_inner();
-        let rules = rules.into_inner();
+        let mut rules = rules.into_inner();
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
             let openapi_info = crate::handler::http::router::openapi::openapi_info().await;
             o2_ratelimit::dataresource::default_rules::init_ratelimit_api_mapping(openapi_info)
@@ -245,12 +247,24 @@ pub async fn update_ratelimit(
         }
 
         // rules org field must eq current org_id
-        for rule in rules.iter() {
+        for rule in rules.iter_mut() {
             if let Err(e) = validate_ratelimit_rule(rule).await {
                 return Ok(MetaHttpResponse::bad_request(format!(
                     "validate ratelimit rule error: {}",
                     e,
                 )));
+            }
+
+            if rule.threshold == -1 {
+                continue;
+            }
+
+            if rule.rule_id.is_none() {
+                rule.rule_id = Some(config::ider::generate());
+            }
+
+            if rule.rule_type.is_none() {
+                rule.rule_type = Some(RatelimitRuleType::Exact.to_string())
             }
 
             if rule.org == DEFAULT_GLOBAL_ORG_IDENTIFIER {
@@ -270,7 +284,7 @@ pub async fn update_ratelimit(
             }
         }
 
-        match ratelimit::rule::update(RuleEntry::Batch(rules)).await {
+        match ratelimit::rule::update(RuleEntry::UpsertBatch(rules)).await {
             Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
                 "Ratelimit rule updated successfully".to_string(),
@@ -380,7 +394,7 @@ pub async fn upload_org_ratelimit(
                             Ok(_) => {
                                 return Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                                     http::StatusCode::OK.into(),
-                                    "Ratelimit rule upload successfully".to_string(),
+                                    "Ratelimit rule uploaded successfully".to_string(),
                                 )));
                             }
                             Err(e) => {

@@ -63,7 +63,7 @@ impl From<&str> for RatelimitRuleType {
         match s {
             "exact" => RatelimitRuleType::Exact,
             "regex" => RatelimitRuleType::Regex,
-            _ => panic!("Invalid RatelimitRuleType"),
+            _ => RatelimitRuleType::Exact, // Default to Exact for invalid input
         }
     }
 }

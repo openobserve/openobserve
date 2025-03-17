@@ -824,7 +824,7 @@ fn get_user_roles_by_org_id(roles: Vec<String>, org_id: Option<&str>) -> Vec<Str
             .filter_map(|role| {
                 let parts: Vec<&str> = role.split('/').collect();
                 if parts.first() == Some(&org_id) {
-                    Some(parts.get(1).unwrap().to_string())
+                    parts.get(1).map(|s| s.to_string())
                 } else {
                     None
                 }
@@ -835,7 +835,7 @@ fn get_user_roles_by_org_id(roles: Vec<String>, org_id: Option<&str>) -> Vec<Str
 }
 #[cfg(feature = "enterprise")]
 async fn check_cache(user_email: &str) -> Option<Vec<String>> {
-    let cache = USER_ROLES_CACHE.write().await;
+    let cache = USER_ROLES_CACHE.read().await;
     if let Some(cached) = cache.get(user_email) {
         if cached.expires_at > Instant::now() {
             return Some(cached.roles.clone());

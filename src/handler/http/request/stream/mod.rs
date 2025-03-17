@@ -259,7 +259,7 @@ async fn update_settings(
 
 /// DeleteStreamFields
 ///
-/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"update"}#
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -500,7 +500,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     }))
 }
 
-/// ListStreams
+/// StreamDeleteCache
 ///
 /// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
