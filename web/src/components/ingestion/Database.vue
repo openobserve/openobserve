@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2025 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-splitter
     v-model="splitterModel"
@@ -23,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="recommended-list-search-input"
+        data-test="database-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -40,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         indicator-color="transparent"
         inline-label
         vertical
-        class="data-sources-recommended-tabs !tw-mt-3"
+        class="data-sources-database-tabs !tw-mt-3 item-left"
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
@@ -75,11 +74,10 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "RecommendedPage",
+  name: "DatabasePage",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -98,12 +96,12 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("ingestFromKubernetes");
+    const ingestTabType = ref("sqlserver");
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name === "recommended") {
+      if (router.currentRoute.value.name === "databases") {
         router.push({
-          name: "ingestFromKubernetes",
+          name: "sqlserver",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -113,9 +111,9 @@ export default defineComponent({
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "recommended") {
+      if (router.currentRoute.value.name === "databases") {
         router.push({
-          name: "ingestFromKubernetes",
+          name: "sqlserver",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -124,108 +122,168 @@ export default defineComponent({
       }
     });
 
-    const recommendedTabs = [
+    const databaseTabs = [
       {
-        name: "ingestFromKubernetes",
+        name: "sqlserver",
         to: {
-          name: "ingestFromKubernetes",
+          name: "sqlserver",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/common/kubernetes.svg"),
-        label: t("ingestion.kubernetes"),
+        icon: "img:" + getImageURL("images/ingestion/sqlserver.png"),
+        label: t('ingestion.sqlserver'),
         contentClass: "tab_content",
       },
       {
-        name: "ingestFromWindows",
+        name: "postgres",
         to: {
-          name: "ingestFromWindows",
+          name: "postgres",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/common/windows.svg"),
-        label: t("ingestion.windows"),
+        icon: "img:" + getImageURL("images/ingestion/postgres.png"),
+        label: t("ingestion.postgres"),
         contentClass: "tab_content",
       },
       {
-        name: "ingestFromLinux",
+        name: "mongodb",
         to: {
-          name: "ingestFromLinux",
+          name: "mongodb",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/common/linux.svg"),
-        label: t("ingestion.linux"),
+        icon: "img:" + getImageURL("images/ingestion/mongodb.svg"),
+        label: t("ingestion.mongodb"),
         contentClass: "tab_content",
       },
       {
-        name: "AWSConfig",
+        name: "redis",
         to: {
-          name: "AWSConfig",
+          name: "redis",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/ingestion/aws.svg"),
-        label: t("ingestion.awsconfig"),
+        icon: "img:" + getImageURL("images/ingestion/redis.svg"),
+        label: t("ingestion.redis"),
         contentClass: "tab_content",
       },
+      // {
+      //   name: "couchdb",
+      //   to: {
+      //     name: "couchdb",
+      //     query: {
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //     },
+      //   },
+      //   icon: "img:" + getImageURL("images/ingestion/couchdb.svg"),
+      //   label: t("ingestion.couchdb"),
+      //   contentClass: "tab_content",
+      // },
+      // {
+      //   name: "elasticsearch",
+      //   to: {
+      //     name: "elasticsearch",
+      //     query: {
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //     },
+      //   },
+      //   icon: "img:" + getImageURL("images/ingestion/elasticsearch.svg"),
+      //   label: t("ingestion.elasticsearch"),
+      //   contentClass: "tab_content",
+      // },
       {
-        name: "GCPConfig",
+        name: "mysql",
         to: {
-          name: "GCPConfig",
+          name: "mysql",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/ingestion/gcp.svg"),
-        label: t("ingestion.gcpconfig"),
+        icon: "img:" + getImageURL("images/ingestion/mysql.svg"),
+        label: t("ingestion.mysql"),
         contentClass: "tab_content",
       },
+      // {
+      //   name: "saphana",
+      //   to: {
+      //     name: "saphana",
+      //     query: {
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //     },
+      //   },
+      //   icon: "img:" + getImageURL("images/ingestion/saphana.png"),
+      //   label: "SAP HANA",
+      //   contentClass: "tab_content",
+      // },
       {
-        name: "AzureConfig",
+        name: "snowflake",
         to: {
-          name: "AzureConfig",
+          name: "snowflake",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/ingestion/azure.png"),
-        label: t("ingestion.azure"),
+        icon: "img:" + getImageURL("images/ingestion/snowflake.svg"),
+        label: t("ingestion.snowflake"),
         contentClass: "tab_content",
       },
       {
-        name: "ingestFromTraces",
+        name: "zookeeper",
         to: {
-          name: "ingestFromTraces",
+          name: "zookeeper",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/ingestion/otlp.svg"),
-        label: t("ingestion.tracesotlp"),
+        icon: "img:" + getImageURL("images/ingestion/zookeeper.png"),
+        label: t("ingestion.zookeeper"),
         contentClass: "tab_content",
       },
       {
-        name: "frontendMonitoring",
+        name: "cassandra",
         to: {
-          name: "frontendMonitoring",
+          name: "cassandra",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/common/monitoring.svg"),
-        label: t("ingestion.rum"),
+        icon: "img:" + getImageURL("images/ingestion/cassandra.png"),
+        label: t("ingestion.cassandra"),
         contentClass: "tab_content",
       },
+      {
+        name: "aerospike",
+        to: {
+          name: "aerospike",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/aerospike.svg"),
+        label: t("ingestion.aerospike"),
+        contentClass: "tab_content",
+      },
+      {
+        name: "dynamodb",
+        to: {
+          name: "dynamodb",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/dynamodb.png"),
+        label: t("ingestion.dynamodb"),
+        contentClass: "tab_content",
+      }
     ];
 
     // create computed property to filter tabs
     const filteredList = computed(() => {
-      return recommendedTabs.filter((tab) => {
+      return databaseTabs.filter((tab) => {
         return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
       });
     });
@@ -250,7 +308,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.data-sources-recommended-tabs {
+.data-sources-database-tabs {
   :deep(.q-tab) {
     min-height: 36px;
   }
@@ -284,24 +342,6 @@ export default defineComponent({
         }
       }
     }
-  }
-}
-</style>
-<style lang="scss">
-.ingestionPage {
-  .q-tab-panel {
-    padding: 0 !important;
-    .tab_content {
-      .q-tab__label {
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-    }
-  }
-
-  .q-icon > img {
-    height: auto !important;
   }
 }
 </style>
