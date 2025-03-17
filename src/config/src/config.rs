@@ -76,7 +76,7 @@ pub const FILE_EXT_TANTIVY_FOLDER: &str = ".mmap";
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
-pub const QUERY_WITH_NO_LIMIT: i64 = -1;
+pub const QUERY_WITH_NO_LIMIT: i64 = -999;
 
 pub const MINIMUM_DB_CONNECTIONS: u32 = 2;
 pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
