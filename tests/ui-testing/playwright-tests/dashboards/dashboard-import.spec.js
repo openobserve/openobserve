@@ -4,10 +4,9 @@ import logsdata from "../../../test-data/logs_data.json";
 import importdata from "../../../test-data/dashboards-import.json";
 import importdata1 from "../../../test-data/dashboard1-import.json";
 import importdata2 from "../../../test-data/dashboard2-import.json";
+import importdata3 from "../../../test-data/dashbaordV3-import.json";
 
 
-const randomDashboardName =
-  "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
 
@@ -86,11 +85,11 @@ async function waitForDashboardPage(page) {
 
 test.describe("dashboard import testcases", () => {
   // let logData;
-  function removeUTFCharacters(text) {
-    // console.log(text, "tex");
-    // Remove UTF characters using regular expression
-    return text.replace(/[^\x00-\x7F]/g, " ");
-  }
+  // function removeUTFCharacters(text) {
+  //   // console.log(text, "tex");
+  //   // Remove UTF characters using regular expression
+  //   return text.replace(/[^\x00-\x7F]/g, " ");
+  // }
   async function applyQueryButton(page) {
     // click on the run query button
     // Type the value of a variable into an input field
@@ -411,5 +410,34 @@ test.describe("dashboard import testcases", () => {
     ).toHaveCount(0);
 
     console.log(`Successfully deleted folder via UI: ${folderName}`);
+  });
+
+  test("should import the old verson dashbaord", async ({ page }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-import"]').click();
+
+    //file name to be used for import
+    const fileContentPath = "../../../test-data/dashbaordV3-import.json";
+
+    // Locate the file input field and set the JSON file
+    const inputFile = await page.locator('input[type="file"]');
+    //is used for setting the file to be imported
+    await inputFile.setInputFiles(fileContentPath);
+
+    await page.waitForTimeout(2000);
+
+    await page.getByRole("button", { name: "Import" }).click();
+
+
+    await expect(
+      page.getByRole("cell", { name: "AWS VPC Flow Log" }).first()
+    ).toBeVisible();
+    await page
+      .getByRole("row", { name: "01 AWS VPC Flow Log" })
+      .locator('[data-test="dashboard-delete"]')
+      .click();
+    await page.locator('[data-test="confirm-button"]').click();
+
   });
 });
