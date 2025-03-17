@@ -16,7 +16,10 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
-use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
+use config::{
+    QUERY_WITH_NO_LIMIT, TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics,
+    utils::json,
+};
 use infra::errors;
 use serde::Serialize;
 use tracing::{Instrument, Span};
@@ -393,7 +396,7 @@ pub async fn get_latest_traces(
         TIMESTAMP_COL_NAME, trace_ids, TIMESTAMP_COL_NAME,
     );
     req.query.from = 0;
-    req.query.size = 9999;
+    req.query.size = QUERY_WITH_NO_LIMIT;
     req.query.sql = query_sql.to_string();
     req.query.start_time = start_time;
     req.query.end_time = end_time;
