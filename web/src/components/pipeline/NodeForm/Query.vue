@@ -37,9 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disableVrlFunction="true"
             :isValidSqlQuery="isValidSqlQuery"
             :disableQueryTypeSelection="true"
+            :expandedLogs="expandedLogs"
+
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
             v-model:promql="streamRoute.query_condition.promql"
+            v-model:promql_condition="streamRoute.query_condition.promql_condition"
             v-model:query_type="streamRoute.query_condition.type"
             v-model:aggregation="streamRoute.query_condition.aggregation"
             v-model:stream_type="streamRoute.stream_type"
@@ -50,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @delete:node="openDeleteDialog"
             @update:fullscreen="updateFullscreenMode"
             @update:stream_type="updateStreamType"
+            @expandLog="toggleExpandLog"
             class="q-mt-sm"
           />
         </div>
@@ -80,10 +84,11 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useQuasar } from "quasar";
-import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+
+import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
 
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
@@ -103,6 +108,11 @@ interface StreamRoute {
   query_condition: {
     sql: string;
     promql: string | null;
+    promql_condition: {
+      column: string;
+      operator: string;
+      value: any;
+    } | null;
     type: string;
     aggregation: {
       group_by: string[];
@@ -161,6 +171,7 @@ const filteredColumns: any = ref([]);
 
 const isValidSqlQuery = ref(true);
 
+const expandedLogs = ref([]);
 const validateSqlQueryPromise = ref<Promise<unknown>>();
 
 const scheduledPipelineRef = ref<any>(null);
@@ -212,6 +223,11 @@ const getDefaultStreamRoute: any = () => {
       sql: "",
       type: "sql",
       aggregation: null,
+      promql_condition: {
+        column: "",
+        operator: "",
+        value: "",
+      },
     },
     trigger_condition: {
       period: 15,
@@ -232,6 +248,7 @@ const getDefaultStreamRoute: any = () => {
 };
 
 onMounted(() => {
+  
   if (pipelineObj.isEditNode) {
     streamRoute.value = pipelineObj.currentSelectedNodeData
       ?.data as StreamRoute;
@@ -372,7 +389,7 @@ const saveQueryData = async () => {
       promql_condition: null,
       aggregation: formData.query_condition.aggregation,
       vrl_function: null,
-      search_event_type: "DerivedStream",
+      search_event_type: "derivedstream",
     },
     trigger_condition: {
       // same as before
@@ -451,6 +468,10 @@ const validateSqlQuery = () => {
 
   delete query.aggs;
 
+  // We get 15 minutes time range for the query, so reducing it by 14 minutes and 55 seconds to get 5 seconds of data as the query is just for validation purpose
+
+  query.query.start_time = query.query.start_time + 895000000;
+
   query.query.sql = streamRoute.value.query_condition.sql;
 
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
@@ -490,6 +511,10 @@ const updateQueryType = (val: string) => {
   if (val == "promql") {
     streamRoute.value.query_condition.sql = "";
   }
+};
+
+const toggleExpandLog = (index: number) => {
+  expandedLogs.value = [];
 };
 </script>
 

@@ -207,7 +207,10 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             let (records, metric_types): (Vec<json::Value>, Vec<String>) =
                 pipeline_inputs.into_iter().unzip();
             let count = records.len();
-            match exec_pl.process_batch(org_id, records).await {
+            match exec_pl
+                .process_batch(org_id, records, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     let err_msg = format!(
                         "[Ingestion]: Stream {} pipeline batch processing failed: {}",
@@ -419,10 +422,11 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = chrono::Utc::now().timestamp_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) =
-                            alert.evaluate(Some(record), (None, alert_end_time)).await
-                        {
-                            trigger_alerts.push((alert.clone(), v));
+                        match alert.evaluate(Some(record), (None, alert_end_time)).await {
+                            Ok(res) if res.data.is_some() => {
+                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
+                            }
+                            _ => {}
                         }
                     }
                     stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
@@ -478,8 +482,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "/api/org/ingest/metrics/_json",
             "200",
             org_id,
-            "",
             StreamType::Metrics.as_str(),
+            "",
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -487,8 +492,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "/api/org/ingest/metrics/_json",
             "200",
             org_id,
-            "",
             StreamType::Metrics.as_str(),
+            "",
+            "",
         ])
         .inc();
 

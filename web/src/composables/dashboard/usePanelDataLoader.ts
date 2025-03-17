@@ -457,7 +457,7 @@ export const usePanelDataLoader = (
                   dashboard_id: dashboardId?.value,
                   folder_id: folderId?.value,
                 },
-                searchType.value ?? "Dashboards",
+                searchType.value ?? "dashboards",
               ),
             abortControllerRef.signal,
           );
@@ -661,7 +661,7 @@ export const usePanelDataLoader = (
           ),
         },
         stream_type: payload.pageType,
-        search_type: "dashboards",
+        search_type: searchType.value ?? "dashboards",
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
@@ -1098,7 +1098,7 @@ export const usePanelDataLoader = (
                           dashboard_id: dashboardId?.value,
                           folder_id: folderId?.value,
                         },
-                        searchType.value ?? "Dashboards",
+                        searchType.value ?? "dashboards",
                       ),
                     abortControllerRef.signal,
                   );
@@ -1355,9 +1355,8 @@ export const usePanelDataLoader = (
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
-          const value = variable.value
-            .map((value: any) => `'${value}'`)
-            .join(",");
+          const value =
+            variable.value.map((value: any) => `'${value}'`).join(",") || "''";
           const possibleVariablesPlaceHolderTypes = [
             {
               placeHolder: `\${${variable.name}:csv}`,
@@ -1369,7 +1368,9 @@ export const usePanelDataLoader = (
             },
             {
               placeHolder: `\${${variable.name}:doublequote}`,
-              value: variable.value.map((value: any) => `"${value}"`).join(","),
+              value:
+                variable.value.map((value: any) => `"${value}"`).join(",") ||
+                '""',
             },
             {
               placeHolder: `\${${variable.name}:singlequote}`,

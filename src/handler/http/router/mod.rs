@@ -20,6 +20,7 @@ use actix_web::{
     HttpRequest, HttpResponse,
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
+    get,
     http::header,
     middleware, web,
 };
@@ -51,7 +52,9 @@ pub mod ui;
 
 pub fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
-        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
+        .allowed_methods(vec![
+            "HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE", "PATCH",
+        ])
         .allowed_headers(vec![
             header::AUTHORIZATION,
             header::ACCEPT,
@@ -142,6 +145,21 @@ async fn audit_middleware(
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     next.call(req).await
+}
+
+#[get("/metrics")]
+async fn get_metrics() -> Result<HttpResponse, actix_web::Error> {
+    let body = if config::get_config().common.prometheus_enabled {
+        config::metrics::gather()
+    } else {
+        "".to_string()
+    };
+    let mut resp = HttpResponse::Ok().body(body);
+    resp.headers_mut().insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"),
+    );
+    Ok(resp)
 }
 
 /// This is a very trivial proxy to overcome the cors errors while
@@ -342,6 +360,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::org::create_user_rumtoken)
         .service(organization::org::get_user_rumtoken)
         .service(organization::org::update_user_rumtoken)
+        .service(organization::org::node_list)
         .service(organization::es::org_index)
         .service(organization::es::org_license)
         .service(organization::es::org_xpack)
@@ -385,7 +404,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(enrichment_table::save_enrichment_table)
         .service(search::search)
         .service(search::search_partition)
-        .service(search::around)
+        .service(search::around_v1)
+        .service(search::around_v2)
         .service(search::values)
         .service(search::search_history)
         .service(search::saved_view::create_view)
@@ -405,6 +425,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::get_dashboard)
         .service(dashboards::delete_dashboard)
         .service(dashboards::move_dashboard)
+        .service(dashboards::move_dashboards)
         .service(dashboards::reports::create_report)
         .service(dashboards::reports::update_report)
         .service(dashboards::reports::get_report)

@@ -27,8 +27,9 @@ use config::meta::{
 use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel, prelude::Expr, sea_query::Func,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DeriveIden, EntityTrait, ModelTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel, prelude::Expr,
+    sea_query::Func,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -501,7 +502,9 @@ async fn list_models<C: ConnectionTrait>(
     let name_substring = params.name_substring.filter(|n| !n.is_empty());
     let query = if let Some(name_substring) = name_substring {
         let name_pattern = format!("%{}%", name_substring.to_lowercase());
-        query.filter(Expr::expr(Func::lower(Expr::col(alerts::Column::Name))).like(name_pattern))
+        query.filter(
+            Expr::expr(Func::lower(Expr::col((Alerts::Table, Alerts::Name)))).like(name_pattern),
+        )
     } else {
         query
     };
@@ -680,4 +683,10 @@ fn update_mutable_fields(
     alert_am.updated_at = Set(Some(updated_at));
 
     Ok(())
+}
+
+#[derive(DeriveIden)]
+enum Alerts {
+    Table,
+    Name,
 }

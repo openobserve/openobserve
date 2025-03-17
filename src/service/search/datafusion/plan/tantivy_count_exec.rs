@@ -24,7 +24,8 @@ use datafusion::{
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
-        DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
+        execution_plan::{Boundedness, EmissionType},
         stream::RecordBatchStreamAdapter,
     },
 };
@@ -67,7 +68,8 @@ impl TantivyCountExec {
             // Output Partitioning
             Partitioning::UnknownPartitioning(1),
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Final,
+            Boundedness::Bounded,
         )
     }
 }

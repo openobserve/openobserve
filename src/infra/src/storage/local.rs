@@ -168,7 +168,7 @@ impl ObjectStore for Local {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "local"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "local"])
                 .inc_by(time);
         }
 
@@ -180,8 +180,17 @@ impl ObjectStore for Local {
         let file = location.to_string();
         let data = self
             .client
-            .get_range(&(format_key(&file, self.with_prefix).into()), range)
-            .await?;
+            .get_range(&(format_key(&file, self.with_prefix).into()), range.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[STORAGE] get_range local file: {}, range: {:?}, error: {:?}",
+                    file,
+                    range,
+                    e
+                );
+                e
+            })?;
 
         // metrics
         let data_len = data.len();
@@ -195,7 +204,7 @@ impl ObjectStore for Local {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "local"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
                 .inc_by(time);
         }
 

@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use ::config::{
     get_config,
     meta::{
@@ -28,6 +26,7 @@ use actix_web::{
     http::{Error, Method},
     route, web,
 };
+use hashbrown::HashMap;
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
@@ -246,7 +245,7 @@ async fn get_url(path: &str) -> URLDetails {
     }
 
     let nodes = nodes.unwrap();
-    let node = get_rand_element(&nodes);
+    let node = cluster::select_best_node(&nodes).unwrap_or(get_rand_element(&nodes));
     URLDetails {
         is_error: false,
         error: None,

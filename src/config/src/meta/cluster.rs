@@ -20,10 +20,21 @@ use serde::{Deserialize, Serialize};
 use crate::{
     get_config, get_instance_id, meta::search::SearchEventType, utils::sysinfo::NodeMetrics,
 };
-
 pub trait NodeInfo: Debug + Send + Sync {
+    fn is_querier(&self) -> bool {
+        true
+    }
+    fn is_ingester(&self) -> bool {
+        false
+    }
     fn get_grpc_addr(&self) -> String;
     fn get_auth_token(&self) -> String;
+    fn get_region(&self) -> String {
+        "openobserve".to_string()
+    }
+    fn get_cluster_name(&self) -> String {
+        crate::config::get_cluster_name()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -44,6 +55,8 @@ pub struct Node {
     pub status: NodeStatus,
     #[serde(default)]
     pub metrics: NodeMetrics,
+    #[serde(default)]
+    pub version: String,
 }
 
 impl Node {
@@ -61,6 +74,7 @@ impl Node {
             broadcasted: false,
             status: NodeStatus::Prepare,
             metrics: Default::default(),
+            version: crate::VERSION.to_string(),
         }
     }
 
@@ -126,6 +140,14 @@ impl Default for Node {
 }
 
 impl NodeInfo for Node {
+    fn is_querier(&self) -> bool {
+        self.is_querier()
+    }
+
+    fn is_ingester(&self) -> bool {
+        self.is_ingester()
+    }
+
     fn get_auth_token(&self) -> String {
         get_internal_grpc_token()
     }

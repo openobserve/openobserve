@@ -23,8 +23,10 @@ use datafusion::{
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, LexOrdering, Partitioning, PhysicalSortExpr},
     physical_plan::{
-        DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, PlanProperties, common,
-        expressions::Column, memory::MemoryStream,
+        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, common,
+        execution_plan::{Boundedness, EmissionType},
+        expressions::Column,
+        memory::MemoryStream,
     },
     prelude::Expr,
 };
@@ -116,7 +118,8 @@ impl NewEmptyExec {
             // Output Partitioning
             output_partitioning,
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Incremental,
+            Boundedness::Bounded,
         )
     }
 

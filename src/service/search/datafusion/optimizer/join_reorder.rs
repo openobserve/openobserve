@@ -21,7 +21,7 @@ use datafusion::{
         tree_node::{Transformed, TransformedResult, TreeNode},
     },
     config::ConfigOptions,
-    physical_optimizer::{PhysicalOptimizerRule, join_selection::swap_hash_join},
+    physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan, ExecutionPlanVisitor, aggregates::AggregateExec, joins::HashJoinExec,
         visit_execution_plan,
@@ -60,7 +60,10 @@ fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn E
         let left = hash_join.left();
         let right = hash_join.right();
         if !is_agg_exec(left) && is_agg_exec(right) {
-            return Ok(Transformed::yes(swap_hash_join(hash_join, hash_join.mode)?));
+            return Ok(Transformed::yes(HashJoinExec::swap_inputs(
+                hash_join,
+                hash_join.mode,
+            )?));
         }
     }
     Ok(Transformed::no(plan))
@@ -107,10 +110,7 @@ mod tests {
     use datafusion::{
         common::Result,
         datasource::MemTable,
-        execution::{
-            SessionStateBuilder,
-            runtime_env::{RuntimeConfig, RuntimeEnv},
-        },
+        execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
         physical_plan::get_plan_string,
         prelude::{SessionConfig, SessionContext},
     };
@@ -141,9 +141,7 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(12))
-            .with_runtime_env(Arc::new(
-                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
-            ))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .build();

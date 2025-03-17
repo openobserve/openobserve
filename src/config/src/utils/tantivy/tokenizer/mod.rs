@@ -28,12 +28,12 @@ pub fn o2_tokenizer_build() -> TextAnalyzer {
         .inverted_index_camel_case_tokenizer_disabled
     {
         tantivy::tokenizer::TextAnalyzer::builder(SimpleTokenizer::default())
-            .filter(tantivy::tokenizer::RemoveLongFilter::limit(40))
+            .filter(tantivy::tokenizer::RemoveLongFilter::limit(64))
             .filter(tantivy::tokenizer::LowerCaser)
             .build()
     } else {
         tantivy::tokenizer::TextAnalyzer::builder(O2Tokenizer::default())
-            .filter(tantivy::tokenizer::RemoveLongFilter::limit(40))
+            .filter(tantivy::tokenizer::RemoveLongFilter::limit(64))
             .filter(tantivy::tokenizer::LowerCaser)
             .build()
     }

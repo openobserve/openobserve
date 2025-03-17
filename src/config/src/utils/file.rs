@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{File, Metadata},
+    fs::{File, Metadata, metadata},
     io::{Read, Seek, Write},
     ops::Range,
     path::Path,
@@ -24,14 +24,12 @@ use async_recursion::async_recursion;
 
 #[inline(always)]
 pub fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
-    let file = File::open(path)?;
-    file.metadata()
+    metadata(path)
 }
 
 #[inline(always)]
-pub fn get_file_len(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
-    let file = File::open(path)?;
-    file.metadata().map(|m| m.len())
+pub fn get_file_size(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
+    metadata(path).map(|f| f.len())
 }
 
 #[inline(always)]
@@ -70,8 +68,18 @@ pub fn get_file_contents(
 
 #[inline(always)]
 pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Error> {
-    let mut file = File::create(file)?;
-    file.write_all(contents)
+    // Create a temporary file in the same directory
+    let temp_file = format!("{}.tmp", file);
+
+    // Write to temporary file first
+    let mut file_handle = File::create(&temp_file)?;
+    file_handle.write_all(contents)?;
+
+    // Atomically rename the temp file to the target file
+    // This ensures we either have the old file or the new file, never a partially written file
+    std::fs::rename(temp_file, file)?;
+
+    Ok(())
 }
 
 #[inline(always)]

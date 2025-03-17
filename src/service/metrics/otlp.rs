@@ -368,7 +368,10 @@ pub async fn handle_otlp_request(
                 continue;
             };
             let count = pipeline_inputs.len();
-            match exec_pl.process_batch(org_id, pipeline_inputs).await {
+            match exec_pl
+                .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     let err_msg = format!(
                         "[Ingestion]: Stream {} pipeline batch processing failed: {}",
@@ -509,10 +512,11 @@ pub async fn handle_otlp_request(
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = chrono::Utc::now().timestamp_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) =
-                            alert.evaluate(Some(val_map), (None, alert_end_time)).await
-                        {
-                            trigger_alerts.push((alert.clone(), v));
+                        match alert.evaluate(Some(val_map), (None, alert_end_time)).await {
+                            Ok(res) if res.data.is_some() => {
+                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
+                            }
+                            _ => {}
                         }
                     }
                     stream_trigger_map.insert(local_metric_name.clone(), Some(trigger_alerts));
@@ -576,10 +580,10 @@ pub async fn handle_otlp_request(
 
     let time_took = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[ep, "200", org_id, "", StreamType::Metrics.as_str()])
+        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
         .observe(time_took);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[ep, "200", org_id, "", StreamType::Metrics.as_str()])
+        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
         .inc();
 
     // only one trigger per request, as it updates etcd

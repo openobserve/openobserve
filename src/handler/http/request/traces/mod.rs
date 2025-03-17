@@ -297,6 +297,7 @@ pub async fn get_latest_traces(
         search_type: None,
         search_event_context: None,
         use_cache: None,
+        local_mode: None,
     };
     let stream_type = StreamType::Traces;
     let user_id = in_req
@@ -320,8 +321,9 @@ pub async fn get_latest_traces(
                     "/api/org/traces/latest",
                     "500",
                     &org_id,
-                    "default",
                     stream_type.as_str(),
+                    "",
+                    "",
                 ])
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
@@ -329,8 +331,9 @@ pub async fn get_latest_traces(
                     "/api/org/traces/latest",
                     "500",
                     &org_id,
-                    "default",
                     stream_type.as_str(),
+                    "",
+                    "",
                 ])
                 .inc();
             log::error!("get traces latest data error: {:?}", err);
@@ -411,8 +414,9 @@ pub async fn get_latest_traces(
                         "/api/org/traces/latest",
                         "500",
                         &org_id,
-                        &stream_name,
                         stream_type.as_str(),
+                        "",
+                        "",
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -420,8 +424,9 @@ pub async fn get_latest_traces(
                         "/api/org/traces/latest",
                         "500",
                         &org_id,
-                        &stream_name,
                         stream_type.as_str(),
+                        "",
+                        "",
                     ])
                     .inc();
                 log::error!("get traces latest data error: {:?}", err);
@@ -504,8 +509,9 @@ pub async fn get_latest_traces(
             "/api/org/traces/latest",
             "200",
             &org_id,
-            &stream_name,
             stream_type.as_str(),
+            "",
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -513,8 +519,9 @@ pub async fn get_latest_traces(
             "/api/org/traces/latest",
             "200",
             &org_id,
-            &stream_name,
             stream_type.as_str(),
+            "",
+            "",
         ])
         .inc();
 

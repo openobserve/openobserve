@@ -24,7 +24,7 @@ use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::{
-            FrequencyType, Operator, QueryType,
+            FrequencyType, Operator, QueryType, TriggerEvalResults,
             alert::{Alert, AlertListFilter, ListAlertsParams},
         },
         destinations::{
@@ -237,17 +237,8 @@ async fn prepare_alert(
     }
 
     if alert.trigger_condition.frequency_type == FrequencyType::Cron {
-        let cron_exp = alert.trigger_condition.cron.clone();
-        if cron_exp.starts_with("* ") {
-            let (_, rest) = cron_exp.split_once(" ").unwrap();
-            let now = Utc::now().second().to_string();
-            alert.trigger_condition.cron = format!("{now} {rest}");
-            log::debug!(
-                "New cron expression for alert {}: {}",
-                alert.name,
-                alert.trigger_condition.cron
-            );
-        }
+        let now = Utc::now().second();
+        alert.trigger_condition.cron = update_cron_expression(&alert.trigger_condition.cron, now);
         // Check the cron expression
         Schedule::from_str(&alert.trigger_condition.cron).map_err(AlertError::ParseCron)?;
     } else if alert.trigger_condition.frequency == 0 {
@@ -406,6 +397,16 @@ async fn prepare_alert(
     // }
 
     Ok(())
+}
+
+pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
+    let mut cron_exp = cron_exp.trim().to_owned();
+    if cron_exp.starts_with("*") {
+        let (_, rest) = cron_exp.split_once("*").unwrap();
+        let rest = rest.trim();
+        cron_exp = format!("{now} {rest}");
+    }
+    cron_exp
 }
 
 /// Creates a new alert in the specified folder.
@@ -680,7 +681,7 @@ pub trait AlertExt: Sync + Send + 'static {
         &self,
         row: Option<&Map<String, Value>>,
         (start_time, end_time): (Option<i64>, i64),
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 
     /// Returns a tuple containing a boolean - if all the send notification jobs successfully
     /// and the error message if any
@@ -699,7 +700,7 @@ impl AlertExt for Alert {
         &self,
         row: Option<&Map<String, Value>>,
         (start_time, end_time): (Option<i64>, i64),
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
@@ -1502,5 +1503,49 @@ mod tests {
         let ret = save(org_id, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_1() {
+        let cron_exp = "* * * * * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} * * * * * *", now);
+        assert_eq!(new_cron_exp, updated);
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_2() {
+        let cron_exp = "47*/12 * * * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        assert_eq!(new_cron_exp, "47*/12 * * * * *");
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_3() {
+        let cron_exp = "**/15 21-23,0-8 * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} */15 21-23,0-8 * * *", now);
+        assert_eq!(new_cron_exp, updated);
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_4() {
+        let cron_exp = "*10*****";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} 10*****", now);
+        assert_eq!(new_cron_exp, updated);
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_5() {
+        let cron_exp = "* */10 2 * * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} */10 2 * * * *", now);
+        assert_eq!(new_cron_exp, updated);
     }
 }

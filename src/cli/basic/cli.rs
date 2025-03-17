@@ -28,7 +28,7 @@ use crate::{
 
 pub async fn cli() -> Result<bool, anyhow::Error> {
     let app = clap::Command::new("openobserve")
-        .version(env!("GIT_VERSION"))
+        .version(config::VERSION)
         .about(clap::crate_description!())
         .subcommands(&[
             clap::Command::new("reset")
@@ -328,9 +328,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "import" => {
+            crate::common::infra::init().await?;
+            crate::common::infra::cluster::register_and_keep_alive().await?;
             import::Import::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "export" => {
+            crate::common::infra::init().await?;
+            crate::common::infra::cluster::register_and_keep_alive().await?;
             export::Export::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "migrate-schemas" => {

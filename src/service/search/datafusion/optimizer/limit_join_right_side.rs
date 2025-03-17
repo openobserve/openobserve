@@ -105,10 +105,7 @@ mod tests {
         arrow::record_batch::RecordBatch,
         common::Result,
         datasource::MemTable,
-        execution::{
-            SessionStateBuilder,
-            runtime_env::{RuntimeConfig, RuntimeEnv},
-        },
+        execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
         physical_plan::get_plan_string,
         prelude::{SessionConfig, SessionContext},
     };
@@ -136,9 +133,7 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(12))
-            .with_runtime_env(Arc::new(
-                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
-            ))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .build();
@@ -210,9 +205,7 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(12))
-            .with_runtime_env(Arc::new(
-                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
-            ))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .with_default_features()
             .build();
@@ -276,9 +269,7 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(12))
-            .with_runtime_env(Arc::new(
-                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
-            ))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .with_default_features()
             .build();

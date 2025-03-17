@@ -160,8 +160,9 @@ pub async fn remote_write(
                 "/prometheus/api/v1/write",
                 "200",
                 org_id,
-                "",
                 StreamType::Metrics.as_str(),
+                "",
+                "",
             ])
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
@@ -169,8 +170,9 @@ pub async fn remote_write(
                 "/prometheus/api/v1/write",
                 "200",
                 org_id,
-                "",
                 StreamType::Metrics.as_str(),
+                "",
+                "",
             ])
             .inc();
         return Ok(());
@@ -264,8 +266,9 @@ pub async fn remote_write(
                         "/prometheus/api/v1/write",
                         "200",
                         org_id,
-                        "",
                         StreamType::Metrics.as_str(),
+                        "",
+                        "",
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -273,8 +276,9 @@ pub async fn remote_write(
                         "/prometheus/api/v1/write",
                         "200",
                         org_id,
-                        "",
                         StreamType::Metrics.as_str(),
+                        "",
+                        "",
                     ])
                     .inc();
                 return Ok(());
@@ -363,7 +367,10 @@ pub async fn remote_write(
             };
             let (records, timestamps): (Vec<json::Value>, Vec<i64>) =
                 pipeline_inputs.into_iter().unzip();
-            match exec_pl.process_batch(org_id, records).await {
+            match exec_pl
+                .process_batch(org_id, records, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     log::error!(
                         "[Ingestion]: Stream {} pipeline batch processing failed: {}",
@@ -498,10 +505,11 @@ pub async fn remote_write(
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = chrono::Utc::now().timestamp_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) =
-                            alert.evaluate(Some(val_map), (None, alert_end_time)).await
-                        {
-                            trigger_alerts.push((alert.clone(), v));
+                        match alert.evaluate(Some(val_map), (None, alert_end_time)).await {
+                            Ok(res) if res.data.is_some() => {
+                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
+                            }
+                            _ => {}
                         }
                     }
                     stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
@@ -563,8 +571,9 @@ pub async fn remote_write(
             "/prometheus/api/v1/write",
             "200",
             org_id,
-            "",
             StreamType::Metrics.as_str(),
+            "",
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -572,8 +581,9 @@ pub async fn remote_write(
             "/prometheus/api/v1/write",
             "200",
             org_id,
-            "",
             StreamType::Metrics.as_str(),
+            "",
+            "",
         ])
         .inc();
 
@@ -748,6 +758,7 @@ pub(crate) async fn get_series(
         search_type: None,
         search_event_context: None,
         use_cache: None,
+        local_mode: None,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
@@ -891,6 +902,7 @@ pub(crate) async fn get_label_values(
         search_type: None,
         search_event_context: None,
         use_cache: None,
+        local_mode: None,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
         Ok(resp) => resp

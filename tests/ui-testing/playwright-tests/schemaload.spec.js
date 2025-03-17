@@ -117,6 +117,7 @@ test.describe("Sanity testcases", () => {
   await page.locator('[data-test="menu-link-\\/streams-item"]').click();
   await page.getByPlaceholder('Search Stream').click();
   await page.getByPlaceholder('Search Stream').fill('stress_test1');
+  await page.waitForTimeout(1000)
   await page.getByRole('button', { name: 'Stream Detail' }).click();
   await page.locator('[data-test="log-stream-store-original-data-toggle-btn"] div').nth(2).click();
   await page.getByRole('button').filter({ hasText: 'close' }).click();

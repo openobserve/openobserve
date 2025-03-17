@@ -43,6 +43,9 @@ use once_cell::sync::Lazy;
 
 mod etcd;
 mod nats;
+mod scheduler;
+
+pub use scheduler::select_best_node;
 
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
@@ -88,7 +91,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role, group: O
     };
     let mut h = config::utils::hash::gxhash::new();
     for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}:{}{}", CONSISTENT_HASH_PRIME, node.name, i);
+        let key = format!("{}:{}:{}", CONSISTENT_HASH_PRIME, node.name, i);
         let hash = h.sum64(&key);
         nodes.remove(&hash);
     }
@@ -278,7 +281,10 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
     })?;
 
     for item in items {
-        let node: Node = json::from_slice(&item)?;
+        let node: Node = json::from_slice(&item).map_err(|e| {
+            log::error!("[CLUSTER] error parsing node: {}, payload: {:#?}", e, item);
+            e
+        })?;
         nodes.push(node.to_owned());
     }
 
@@ -584,6 +590,9 @@ async fn set_node_status_metrics(node: &Node) {
 fn update_node_status_metrics() -> NodeMetrics {
     let node_status = get_node_metrics();
 
+    config::metrics::NODE_UP
+        .with_label_values(&[config::VERSION])
+        .set(1);
     config::metrics::NODE_CPU_TOTAL
         .with_label_values(&[])
         .set(node_status.cpu_total as i64);
@@ -608,6 +617,12 @@ fn update_node_status_metrics() -> NodeMetrics {
     config::metrics::NODE_TCP_CONNECTIONS
         .with_label_values(&["time_wait"])
         .set(node_status.tcp_conns_time_wait as i64);
+    config::metrics::NODE_OPEN_FDS
+        .with_label_values(&[])
+        .set(node_status.open_fds as i64);
+    config::metrics::NODE_TCP_CONN_RESETS
+        .with_label_values(&[])
+        .set(node_status.tcp_conn_resets as i64);
 
     node_status
 }
