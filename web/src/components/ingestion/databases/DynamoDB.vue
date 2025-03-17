@@ -32,4 +32,6 @@ const docURL = databaseDocURLs[name];
       <div class="tw-font-bold tw-pt-6 tw-pb-2">
         Click <a :href="docURL" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">here</a> to check further documentation.
       </div>
+    </div>
   </div>
+</template>
