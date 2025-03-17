@@ -87,87 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <NoData />
           </template>
         </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <div
-              data-test="alert-list-loading-alert"
-              v-if="alertStateLoadingMap[props.row.uuid]"
-              style="display: inline-block; width: 33.14px; height: auto"
-              class="flex justify-center items-center q-ml-xs"
-              :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
-            >
-              <q-circular-progress
-                indeterminate
-                rounded
-                size="16px"
-                :value="1"
-                color="secondary"
-              />
-            </div>
-            <q-btn
-              v-else
-              :data-test="`alert-list-${props.row.name}-pause-start-alert`"
-              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-              class="q-ml-xs material-symbols-outlined"
-              padding="sm"
-              unelevated
-              size="sm"
-              :color="props.row.enabled ? 'negative' : 'positive'"
-              round
-              flat
-              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-              @click="toggleAlertState(props.row)"
-            />
-            <q-btn
-              :data-test="`alert-list-${props.row.name}-update-alert`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.edit')"
-              @click="showAddUpdateFn(props)"
-            ></q-btn>
-            <q-btn
-              icon="content_copy"
-              :title="t('alerts.clone')"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="duplicateAlert(props.row)"
-              :data-test="`alert-list-${props.row.name}-clone-alert`"
-            ></q-btn>
-            <q-btn
-              icon="download"
-              title="Export Alert"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="exportAlert(props.row)"
-              data-test="alert-export"
-            ></q-btn>
-            <q-btn
-              :data-test="`alert-list-${props.row.name}-delete-alert`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.delete')"
-              @click="showDeleteDialogFn(props)"
-            ></q-btn>
-          </q-td>
-        </template>
 
         <template v-slot:body-cell-function="props">
           <q-td :props="props">
@@ -234,6 +153,152 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
+        </template>
+
+        <template v-slot:body="props">
+                <q-tr
+                  :data-test="`stream-association-table-${props.row.uuid}-row`"
+                  :props="props"
+                  style="cursor: pointer"
+                  @click="triggerExpand(props)"
+                >
+
+                  <q-td v-for="col in columns" :key="col.name" :props="props" :style="col.style">
+
+                    <template v-if="col.name === 'name'">
+                      {{ computedName(props.row[col.field]) }}
+                      <q-tooltip v-if="props.row[col.field]?.length > 50" class="alert-name-tooltip" >
+                      {{ props.row[col.field] }}
+                    </q-tooltip>
+                    </template>
+                    <template v-else-if="col.name === 'owner'">
+                      {{ computedOwner(props.row[col.field]) }}
+                    </template>
+                    <template v-else-if="col.name == 'last_triggered_at' || col.name == 'last_satisfied_at'">
+                    {{ props.row[col.field] }}
+                  </template> 
+                  <template v-else-if="col.name === 'period'">
+                    {{ props.row[col.field] }} Mins
+                  </template>
+                  <template v-else-if="col.name === 'frequency'">
+                    {{ props.row[col.field] }} {{ props.row.frequency_type == 'cron' ? '' : 'Mins' }}
+                  </template>
+                  <template v-else-if="col.name == 'actions'">
+                    <div
+                      data-test="alert-list-loading-alert"
+                      v-if="alertStateLoadingMap[props.row.uuid]"
+                      style="display: inline-block; width: 33.14px; height: auto"
+                      class="flex justify-center items-center q-ml-xs"
+                      :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+                    >
+                      <q-circular-progress
+                        indeterminate
+                        rounded
+                        size="16px"
+                        :value="1"
+                        color="secondary"
+                      />
+                    </div>
+                    <q-btn
+                      v-else
+                      :data-test="`alert-list-${props.row.name}-pause-start-alert`"
+                      :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
+                      class="q-ml-xs material-symbols-outlined"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      :color="props.row.enabled ? 'negative' : 'positive'"
+                      round
+                      flat
+                      :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
+                      @click.stop="toggleAlertState(props.row)"
+                    />
+                    <q-btn
+                      :data-test="`alert-list-${props.row.name}-update-alert`"
+                      icon="edit"
+                      class="q-ml-xs"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      :title="t('alerts.edit')"
+                      @click="showAddUpdateFn(props)"
+                    ></q-btn>
+                    <q-btn
+                      icon="content_copy"
+                      :title="t('alerts.clone')"
+                      class="q-ml-xs"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      @click.stop="duplicateAlert(props.row)"
+                      :data-test="`alert-list-${props.row.name}-clone-alert`"
+                    ></q-btn>
+                    <q-btn
+                      icon="download"
+                      title="Export Alert"
+                      class="q-ml-xs"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      @click.stop="exportAlert(props.row)"
+                      data-test="alert-export"
+                    ></q-btn>
+                    <q-btn
+                      :data-test="`alert-list-${props.row.name}-delete-alert`"
+                      :icon="outlinedDelete"
+                      class="q-ml-xs"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      :title="t('alerts.delete')"
+                      @click.stop="showDeleteDialogFn(props)"
+                    ></q-btn>
+                  </template>
+                  <template v-else>
+                    {{ props.row[col.field] }}
+                  </template>
+                  </q-td>
+                </q-tr>
+                <q-tr v-show="expandedRow === props.row.uuid" :props="props" >
+
+                  <q-td  colspan="100%">
+
+                    <div class="text-left tw-px-2 q-mb-sm  alerts-expand-content">
+                      <div class="tw-flex tw-items-start  tw-justify-start" >
+                        <strong >{{ props.row.type == 'sql' ? 'SQL Query' : 'Conditions' }} :  <span v-if="props.row.conditions != '' && props.row.conditions != '--'" >  <q-btn
+                          @click.stop="copyToClipboard(props.row.conditions, 'Conditions')"
+                          size="xs"
+                          dense
+                          flat
+                          icon="content_copy"
+                          class="copy-btn-sql tw-ml-2  tw-py-2 tw-px-2 "
+                        /></span></strong>
+                      </div>
+
+                        <div data-test="alerts-expanded-sql" class="alerts-scroll-content  alerts-expanded-sql ">
+
+                              <pre style="text-wrap: wrap;">{{  (props.row.conditions != '' && props.row.conditions != '--')? props.row?.conditions : 'No condition' }} </pre>
+                            </div>
+                    </div>
+                    <div class="text-left tw-px-2 q-mb-sm  alerts-expand-content">
+                      <div class="tw-flex tw-items-start  tw-justify-start" >
+                        <strong >Description : <span></span></strong>
+                      </div>
+
+                        <div data-test="alerts-expanded-sql" class="alerts-scroll-content  alerts-expanded-sql ">
+                              <pre style="text-wrap: wrap;">{{ props.row?.description || 'No description' }}  </pre>
+                            </div>
+                    </div>
+                  </q-td>
+                  </q-tr>
         </template>
       </q-table>
     </div>
@@ -457,20 +522,23 @@ export default defineComponent({
         label: t("alerts.owner"),
         align: "center",
         sortable: true,
+        style: "width: 150px",
       },
       {
-        name: "conditions",
-        field: "conditions",
-        label: t("alerts.condition"),
-        align: "left",
-        sortable: false,
-      },
-      {
-        name: "description",
-        field: "description",
-        label: t("alerts.description"),
+        name: "period",
+        field: "period",
+        label: t("alerts.period"),
         align: "center",
-        sortable: false,
+        sortable: true,
+        style: "width: 150px",
+      },
+      {
+        name: "frequency",
+        field: "frequency",
+        label: t("alerts.frequency"),
+        align: "left",
+        sortable: true,
+        style: "width: 150px",
       },
       {
         name: "last_triggered_at",
@@ -478,6 +546,7 @@ export default defineComponent({
         label: t("alerts.lastTriggered"),
         align: "left",
         sortable: true,
+        style: "width: 150px",
       },
       {
         name: "last_satisfied_at",
@@ -485,6 +554,7 @@ export default defineComponent({
         label: t("alerts.lastSatisfied"),
         align: "left",
         sortable: true,
+        style: "width: 150px",
       },
       {
         name: "actions",
@@ -492,11 +562,13 @@ export default defineComponent({
         label: t("alerts.actions"),
         align: "center",
         sortable: false,
+        style: "width: 150px",
       },
     ]);
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
+    const expandedRow = ref<any>("");
     const getAlerts = () => {
       const dismiss = $q.notify({
         spinner: true,
@@ -520,6 +592,7 @@ export default defineComponent({
               uuid: getUUID(),
             };
           });
+          
           alertsRows.value = alerts.value.map((data: any) => {
             let conditions = "--";
             if (data.query_condition.conditions?.length) {
@@ -533,8 +606,11 @@ export default defineComponent({
             } else if (data.query_condition.promql) {
               conditions = data.query_condition.promql;
             }
-            if (conditions.length > 50) {
-              conditions = conditions.substring(0, 32) + "...";
+            let frequency = "";
+            if(data.trigger_condition.frequency_type == 'cron'){
+              frequency = data.trigger_condition.cron;
+            }else{
+              frequency = data.trigger_condition.frequency;
             }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
@@ -547,6 +623,9 @@ export default defineComponent({
               description: data.description,
               uuid: data.uuid,
               owner: data.owner,
+              period: data.trigger_condition.period,
+              frequency: frequency,
+              frequency_type: data.trigger_condition.frequency_type,
               last_triggered_at: convertUnixToQuasarFormat(
                 data.last_triggered_at
               ),
@@ -1016,6 +1095,46 @@ export default defineComponent({
     console.error('Alert not found for UUID:', row.uuid);
   }
 };
+    const triggerExpand = (props: any) => {
+            if (expandedRow.value === props.row.uuid) {
+              expandedRow.value = null;
+            } else {
+              expandedRow.value = props.row.uuid;
+            }
+      }
+
+    const  copyToClipboard = (text: string,type: string) => {
+          navigator.clipboard.writeText(text).then(() => {
+            $q.notify({
+                type: "positive",
+                message: `${type} Copied Successfully!`,
+                timeout: 5000,
+              });
+          }).catch(() => {
+              $q.notify({
+                type: "negative",
+                message: "Error while copy content.",
+                timeout: 5000,
+              });
+          });
+        }
+    const computedName = (name: string) => {
+      if(!name){
+        return '--'
+      }
+      return name.length >50 ? name.substring(0, 50) + "..." : name;
+    };
+    const computedOwner = (owner: string) => {
+      if(!owner){
+        return '--'
+      }
+      if (owner?.length > 20) {
+        const firstTen = owner.substring(0, 10);
+        const lastFour = owner.substring(owner.length - 4);
+        return firstTen + "****" + lastFour;
+      }
+      return owner;
+    };
 
     return {
       t,
@@ -1108,6 +1227,11 @@ export default defineComponent({
       importAlert,
       getTemplates,
       exportAlert,
+      triggerExpand,
+      expandedRow,
+      copyToClipboard,
+      computedName,
+      computedOwner
     };
   },
 });
@@ -1177,4 +1301,30 @@ export default defineComponent({
 .clone-alert-popup {
   width: 400px;
 }
+  .alerts-expand-content {
+      padding: 0  3rem;
+      max-height: 100vh;
+      overflow: hidden; 
+    }
+        
+    .alerts-scroll-content {
+      width: 100%; 
+      overflow-y: auto;
+      padding: 10px;
+      border: 1px solid #ddd;
+      height: 100%;
+      max-height: 200px;
+      text-wrap: normal;
+      background-color: #e8e8e8;
+      color: black;
+    }
+    .alerts-expanded-sql{
+      border-left: #7A54A2 3px solid;
+    }
+    .alert-name-tooltip{
+      max-width: 400px; 
+      white-space: normal; 
+      word-wrap: break-word;
+      font-size: 12px;
+    }
 </style>
