@@ -35,7 +35,7 @@ use config::{
 };
 
 use super::promql;
-use crate::service::search as SearchService;
+use crate::service::{search as SearchService, self_reporting::http_report_metrics};
 
 pub mod alert;
 pub mod derived_streams;
@@ -248,6 +248,7 @@ impl QueryConditionExt for QueryCondition {
         };
         let trace_id = ider::uuid();
 
+        let req_start = std::time::Instant::now();
         let resp = if self.multi_time_range.is_some()
             && !self.multi_time_range.as_ref().unwrap().is_empty()
         {
@@ -391,6 +392,16 @@ impl QueryConditionExt for QueryCondition {
         // 2. Vec<Vec<Map<String, Value>>> - for multi_time_range alert
         let resp = match resp {
             Ok(v) => {
+                // the search request doesn't via cache layer, so need report usage separately
+                http_report_metrics(
+                    req_start,
+                    org_id,
+                    stream_type,
+                    "200",
+                    "_search",
+                    &SearchEventType::Alerts.to_string(),
+                    "",
+                );
                 if v.is_partial {
                     return Err(anyhow::anyhow!("Partial response: {}", v.function_error));
                 } else {
