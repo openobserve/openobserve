@@ -437,14 +437,15 @@ const setupDestinationData = () => {
     formData.value.method = props.destination.method;
     formData.value.skip_tls_verify = props.destination.skip_tls_verify;
     formData.value.template = props.destination.template;
+    if (!props.destination.headers) formData.value.headers = {};
     formData.value.headers = props.destination.headers;
-    formData.value.emails = (props.destination.emails || []).join(", ");
+    formData.value.emails = (props.destination?.emails || []).join(", ");
     formData.value.type = props.destination.type || "http";
     formData.value.action_id = props.destination.action_id || "";
 
     if (Object.keys(formData.value?.headers || {}).length) {
       apiHeaders.value = [];
-      Object.entries(formData.value.headers).forEach(([key, value]) => {
+      Object.entries(formData.value?.headers || {}).forEach(([key, value]) => {
         addApiHeader(key, value);
       });
     }
@@ -467,9 +468,9 @@ const isValidDestination = computed(
     ((formData.value.url &&
       formData.value.method &&
       formData.value.type === "http") ||
-      (formData.value.type === "email" && formData.value.emails.length) ||
+      (formData.value.type === "email" && formData.value?.emails?.length) ||
       (formData.value.type === "action" && formData.value?.action_id?.length) ||
-      (!props.isAlerts && formData.value.url && formData.value.method)) &&
+      (!props.isAlerts && formData.value.url && formData?.value?.method)) &&
     (props.isAlerts ? formData.value.template : true),
 );
 
@@ -524,9 +525,9 @@ const saveDestination = () => {
 
   if (formData.value.type === "email") {
     payload["type"] = "email";
-    payload["emails"] = formData.value.emails
-      .split(/[;,]/)
-      .map((email: string) => email.trim());
+    payload["emails"] =
+      formData.value?.emails ||
+      "".split(/[;,]/).map((email: string) => email.trim());
   }
 
   if (formData.value.type === "action") {
@@ -599,8 +600,8 @@ const deleteApiHeader = (header: any) => {
   apiHeaders.value = apiHeaders.value.filter(
     (_header) => _header.uuid !== header.uuid,
   );
-  if (formData.value.headers[header.key])
-    delete formData.value.headers[header.key];
+  if (formData.value?.headers?.[header.key])
+    delete formData.value?.headers?.[header.key];
   if (!apiHeaders.value.length) addApiHeader();
 };
 
