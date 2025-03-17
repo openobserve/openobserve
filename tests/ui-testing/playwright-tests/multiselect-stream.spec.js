@@ -197,10 +197,12 @@ await page.waitForTimeout(1000);
       .click({ force: true });
     await page.getByPlaceholder("Search Stream").click();
     await page.getByPlaceholder("Search Stream").fill("e2e");
+    await page.waitForTimeout(1000);
     await page
       .getByRole("button", { name: "Explore" })
       .first()
       .click({ force: true });
+    await page.waitForTimeout(1000);
     await expect(page.url()).toContain("logs");
   });
 

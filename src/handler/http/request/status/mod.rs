@@ -256,10 +256,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let build_type = "opensource";
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
-        version: VERSION.to_string(),
+        version: config::VERSION.to_string(),
         instance: get_instance_id(),
-        commit_hash: COMMIT_HASH.to_string(),
-        build_date: BUILD_DATE.to_string(),
+        commit_hash: config::COMMIT_HASH.to_string(),
+        build_date: config::BUILD_DATE.to_string(),
         build_type: build_type.to_string(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS

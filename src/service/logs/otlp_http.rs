@@ -398,7 +398,10 @@ pub async fn logs_json_handler(
     // batch process records through pipeline
     if let Some(exec_pl) = &executable_pipeline {
         let records_count = pipeline_inputs.len();
-        match exec_pl.process_batch(org_id, pipeline_inputs).await {
+        match exec_pl
+            .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+            .await
+        {
             Err(e) => {
                 log::error!(
                     "[Pipeline] for stream {}/{}: Batch execution error: {}.",

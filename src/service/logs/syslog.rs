@@ -142,24 +142,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     };
 
     if executable_pipeline.is_some() {
-        // handle record's timestamp fist in case record is sent to remote destination
-        if let Err(e) = handle_timestamp(&mut value, min_ts) {
-            stream_status.status.failed += 1;
-            stream_status.status.error = e.to_string();
-            metrics::INGEST_ERRORS
-                .with_label_values(&[
-                    org_id,
-                    StreamType::Logs.as_str(),
-                    &stream_name,
-                    TS_PARSE_FAILED,
-                ])
-                .inc();
-            log_failed_record(log_ingestion_errors, &value, &stream_status.status.error);
-            return Ok(HttpResponse::Ok().json(IngestionResponse::new(
-                http::StatusCode::OK.into(),
-                vec![stream_status],
-            ))); // just return
-        };
         // buffer the records and originals for pipeline batch processing
         pipeline_inputs.push(value);
         original_options.push(original_data);
@@ -226,7 +208,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     // batch process records through pipeline
     if let Some(exec_pl) = &executable_pipeline {
         let records_count = pipeline_inputs.len();
-        match exec_pl.process_batch(org_id, pipeline_inputs).await {
+        match exec_pl
+            .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+            .await
+        {
             Err(e) => {
                 log::error!(
                     "[Pipeline] for stream {}/{}: Batch execution error: {}.",
@@ -253,6 +238,29 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                     }
 
                     for (idx, mut res) in stream_pl_results {
+                        // handle timestamp
+                        if let Err(e) = handle_timestamp(&mut res, min_ts) {
+                            stream_status.status.failed += 1;
+                            stream_status.status.error = e.to_string();
+                            metrics::INGEST_ERRORS
+                                .with_label_values(&[
+                                    org_id,
+                                    StreamType::Logs.as_str(),
+                                    &stream_name,
+                                    TS_PARSE_FAILED,
+                                ])
+                                .inc();
+                            log_failed_record(
+                                log_ingestion_errors,
+                                &res,
+                                &stream_status.status.error,
+                            );
+                            return Ok(HttpResponse::Ok().json(IngestionResponse::new(
+                                http::StatusCode::OK.into(),
+                                vec![stream_status],
+                            ))); // just return
+                        };
+
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(val) => val,

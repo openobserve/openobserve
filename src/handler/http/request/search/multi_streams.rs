@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -29,6 +29,7 @@ use config::{
     metrics,
     utils::{base64, json},
 };
+use hashbrown::HashMap;
 use infra::errors;
 use tracing::{Instrument, Span};
 
@@ -41,7 +42,7 @@ use crate::{
             functions,
             http::{
                 get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request, get_work_group,
+                get_search_type_from_request, get_stream_type_from_request,
             },
             stream::get_settings_max_query_range,
         },
@@ -819,7 +820,6 @@ pub async fn around_multi(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
 
     let (org_id, stream_names) = path.into_inner();
@@ -833,44 +833,24 @@ pub async fn around_multi(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .map(|v| v.to_str().unwrap_or("").to_string());
 
-    let stream_names = base64::decode_url(&stream_names)?;
-    let mut uses_fn = false;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-
-    let around_key = match query.get("key") {
-        Some(v) => v.parse::<i64>().unwrap_or(0),
-        None => {
-            return Ok(MetaHttpResponse::bad_request("around key is empty"));
-        }
-    };
-    let mut query_fn = query
-        .get("query_fn")
-        .and_then(|v| base64::decode_url(v).ok());
-    if let Some(vrl_function) = &query_fn {
-        if !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{} \n .", vrl_function));
-        }
-    }
+    let stream_names = base64::decode_url(&stream_names)?;
+    let stream_names = stream_names.split(',').collect::<Vec<&str>>();
 
     let mut around_sqls = stream_names
-        .split(',')
-        .collect::<Vec<&str>>()
         .iter()
         .map(|name| format!("SELECT * FROM \"{}\" ", name))
         .collect::<Vec<String>>();
     if let Some(v) = query.get("sql") {
         let sqls = v.split(',').collect::<Vec<&str>>();
         for (i, sql) in sqls.into_iter().enumerate() {
-            uses_fn = functions::get_all_transform_keys(&org_id)
-                .await
-                .iter()
-                .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-            if uses_fn {
-                if let Ok(sql) = base64::decode_url(sql) {
-                    around_sqls[i] = sql;
-                }
+            if let Ok(sql) = base64::decode_url(sql) {
+                around_sqls[i] = sql;
             }
         }
     }
@@ -879,301 +859,74 @@ pub async fn around_multi(
         .get("size")
         .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
 
-    let regions = query.get("regions").map_or(vec![], |regions| {
-        regions
-            .split(',')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()
-    });
-    let clusters = query.get("clusters").map_or(vec![], |clusters| {
-        clusters
-            .split(',')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()
-    });
-    let timeout = query
-        .get("timeout")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
-    let around_start_time = around_key
-        - Duration::try_seconds(900)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-    let around_end_time = around_key
-        + Duration::try_seconds(900)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let mut multi_resp = search::Response {
         size: around_size,
         ..Default::default()
     };
-
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .unwrap()
-        .to_str()
-        .ok()
-        .map(|v| v.to_string());
-
-    for around_sql in around_sqls.iter() {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&org_id])
-            .inc();
-        // get a local search queue lock
-        #[cfg(not(feature = "enterprise"))]
-        let locker = SearchService::QUEUE_LOCKER.clone();
-        #[cfg(not(feature = "enterprise"))]
-        let locker = locker.lock().await;
-        #[cfg(not(feature = "enterprise"))]
-        if !cfg.common.feature_query_queue_enabled {
-            drop(locker);
-        }
-        #[cfg(not(feature = "enterprise"))]
-        let took_wait = start.elapsed().as_millis() as usize;
-        #[cfg(feature = "enterprise")]
-        let took_wait = 0;
-        log::info!(
-            "http search around multi API wait in queue took: {}",
-            took_wait
-        );
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&org_id])
-            .dec();
-
-        // search forward
-        let fw_sql = SearchService::sql::check_or_add_order_by_timestamp(around_sql, false)
-            .unwrap_or(around_sql.to_string());
-        let req = config::meta::search::Request {
-            query: config::meta::search::Query {
-                sql: fw_sql,
-                from: 0,
-                size: around_size / 2,
-                start_time: around_start_time,
-                end_time: around_key,
-                quick_mode: false,
-                query_type: "".to_string(),
-                track_total_hits: false,
-                uses_zo_fn: uses_fn,
-                query_fn: query_fn.clone(),
-                action_id: None,
-                skip_wal: false,
-                streaming_output: false,
-                streaming_id: None,
-            },
-            encoding: config::meta::search::RequestEncoding::Empty,
-            regions: regions.clone(),
-            clusters: clusters.clone(),
-            timeout,
-            search_type: Some(search::SearchEventType::UI),
-            search_event_context: None,
-            use_cache: None,
-        };
-        let search_res =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-                .instrument(http_span.clone())
-                .await;
-
-        let resp_forward = match search_res {
-            Ok(res) => res,
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_around_multi",
-                        "500",
-                        &org_id,
-                        stream_type.as_str(),
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_around_multi",
-                        "500",
-                        &org_id,
-                        stream_type.as_str(),
-                    ])
-                    .inc();
-                log::error!("multi search around error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            )),
-                        _ => HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            ),
-                        ),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
-            }
-        };
-
-        // search backward
-        let bw_sql = SearchService::sql::check_or_add_order_by_timestamp(around_sql, true)
-            .unwrap_or(around_sql.to_string());
-        let req = config::meta::search::Request {
-            query: config::meta::search::Query {
-                sql: bw_sql,
-                from: 0,
-                size: around_size / 2,
-                start_time: around_key,
-                end_time: around_end_time,
-                quick_mode: false,
-                query_type: "".to_string(),
-                track_total_hits: false,
-                uses_zo_fn: uses_fn,
-                query_fn: query_fn.clone(),
-                action_id: None,
-                skip_wal: false,
-                streaming_output: false,
-                streaming_id: None,
-            },
-            encoding: config::meta::search::RequestEncoding::Empty,
-            regions: regions.clone(),
-            clusters: clusters.clone(),
-            timeout,
-            search_type: Some(search::SearchEventType::UI),
-            search_event_context: None,
-            use_cache: None,
-        };
-        let search_res =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-                .instrument(http_span.clone())
-                .await;
-
-        let resp_backward = match search_res {
-            Ok(res) => res,
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_around_multi",
-                        "500",
-                        &org_id,
-                        stream_type.as_str(),
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_around_multi",
-                        "500",
-                        &org_id,
-                        stream_type.as_str(),
-                    ])
-                    .inc();
-                log::error!("multi search around error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            )),
-                        _ => HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            ),
-                        ),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
-            }
-        };
-
-        let hits_num_backward = resp_backward.hits.len();
-        for i in 0..hits_num_backward {
-            multi_resp
-                .hits
-                .push(resp_backward.hits[hits_num_backward - 1 - i].to_owned());
-        }
-        let hits_num_forward = resp_forward.hits.len();
-        for i in 0..hits_num_forward {
-            multi_resp.hits.push(resp_forward.hits[i].to_owned());
-        }
-        let total_hits = hits_num_forward + hits_num_backward;
-        let total_scan_size = resp_forward.scan_size + resp_backward.scan_size;
-        multi_resp.total += total_hits;
-        multi_resp.scan_size += total_scan_size;
-        multi_resp.took += resp_forward.took + resp_backward.took;
-        let cached_ratio_avg = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
-
-        let time = start.elapsed().as_secs_f64();
-        metrics::HTTP_RESPONSE_TIME
-            .with_label_values(&[
-                "/api/org/_around_multi",
-                "200",
-                &org_id,
-                stream_type.as_str(),
-            ])
-            .observe(time);
-        metrics::HTTP_INCOMING_REQUESTS
-            .with_label_values(&[
-                "/api/org/_around_multi",
-                "200",
-                &org_id,
-                stream_type.as_str(),
-            ])
-            .inc();
-
-        let user_id = match &user_id {
-            Some(v) => v,
-            None => "",
-        };
-        let req_stats = RequestStats {
-            records: total_hits as i64,
-            response_time: time,
-            size: multi_resp.scan_size as f64,
-            request_body: Some(around_sql.to_string()),
-            user_email: Some(user_id.to_string()),
-            min_ts: Some(around_start_time),
-            max_ts: Some(around_end_time),
-            cached_ratio: Some(cached_ratio_avg),
-            trace_id: Some(trace_id.clone()),
-            took_wait_in_queue: match (
-                resp_forward.took_detail.as_ref(),
-                resp_backward.took_detail.as_ref(),
-            ) {
-                (Some(forward_took), Some(backward_took)) => {
-                    Some(forward_took.cluster_wait_queue + backward_took.cluster_wait_queue)
-                }
-                (Some(forward_took), None) => Some(forward_took.cluster_wait_queue),
-                (None, Some(backward_took)) => Some(backward_took.cluster_wait_queue),
-                _ => None,
-            },
-            work_group: get_work_group(vec![
-                resp_forward.work_group.clone(),
-                resp_backward.work_group.clone(),
-            ]),
-            ..Default::default()
-        };
-        let num_fn = query_fn.is_some() as u16;
-        report_request_usage_stats(
-            req_stats,
+    for (i, stream_name) in stream_names.iter().enumerate() {
+        let trace_id = format!("{}-{}", trace_id, i);
+        let search_res = super::around::around(
+            &trace_id,
+            http_span.clone(),
             &org_id,
-            &stream_names,
-            StreamType::Logs,
-            UsageType::SearchAround,
-            num_fn,
-            started_at,
+            stream_name,
+            stream_type,
+            query.clone(),
+            Some(around_sqls[i].clone()),
+            None,
+            user_id.clone(),
         )
         .await;
+        let resp = match search_res {
+            Ok(res) => res,
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/api/org/_around_multi",
+                        "500",
+                        &org_id,
+                        stream_type.as_str(),
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/api/org/_around_multi",
+                        "500",
+                        &org_id,
+                        stream_type.as_str(),
+                    ])
+                    .inc();
+                log::error!("multi search around error: {:?}", err);
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => match code {
+                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                            .json(meta::http::HttpResponse::error_code_with_trace_id(
+                                code,
+                                Some(trace_id),
+                            )),
+                        _ => HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error_code_with_trace_id(
+                                code,
+                                Some(trace_id),
+                            ),
+                        ),
+                    },
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
+            }
+        };
+
+        multi_resp.hits.extend(resp.hits);
+        multi_resp.total += resp.total;
+        multi_resp.scan_size += resp.scan_size;
+        multi_resp.took += resp.took;
+        multi_resp.cached_ratio += resp.cached_ratio;
     }
 
     multi_resp.hits.sort_by(|a, b| {

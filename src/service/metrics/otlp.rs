@@ -368,7 +368,10 @@ pub async fn handle_otlp_request(
                 continue;
             };
             let count = pipeline_inputs.len();
-            match exec_pl.process_batch(org_id, pipeline_inputs).await {
+            match exec_pl
+                .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     let err_msg = format!(
                         "[Ingestion]: Stream {} pipeline batch processing failed: {}",

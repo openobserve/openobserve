@@ -18,20 +18,18 @@ use std::{fs::Metadata, ops::Range, path::Path, time::SystemTime};
 use async_walkdir::WalkDir;
 use futures::StreamExt;
 use tokio::{
-    fs::{File, read_dir, remove_dir},
+    fs::{File, metadata, read_dir, remove_dir},
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 
 #[inline(always)]
 pub async fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
-    let file = File::open(path).await?;
-    file.metadata().await
+    metadata(path).await
 }
 
 #[inline(always)]
-pub async fn get_file_len(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
-    let file = File::open(path).await?;
-    file.metadata().await.map(|m| m.len())
+pub async fn get_file_size(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
+    metadata(path).await.map(|f| f.len())
 }
 
 #[inline(always)]

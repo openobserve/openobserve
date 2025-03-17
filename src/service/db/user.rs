@@ -22,14 +22,21 @@ use crate::{
     common::{
         infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
         meta::user::{DBUser, User, UserOrg, UserRole},
+        utils::auth::is_root_user,
     },
     service::db,
 };
 
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
-    let user = match org_id {
-        None => ROOT_USER.get("root"),
-        Some(org_id) => USERS.get(&format!("{org_id}/{name}")),
+    // Do not rely on the org_id to check if the user is root. If the user is root,
+    // Just return the root user.
+    let user = if is_root_user(name) {
+        ROOT_USER.get("root")
+    } else {
+        match org_id {
+            None => ROOT_USER.get("root"),
+            Some(org_id) => USERS.get(&format!("{org_id}/{name}")),
+        }
     };
 
     if let Some(user) = user {

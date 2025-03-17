@@ -30,6 +30,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
     .click({ force: true });
+  await page.waitForTimeout(2000);
   await page
     .locator("div.q-item")
     .getByText(`${stream}`)

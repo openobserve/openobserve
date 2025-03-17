@@ -53,6 +53,7 @@ pub enum TriggerDataType {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct TriggerData {
     pub _timestamp: i64,
     pub org: String,

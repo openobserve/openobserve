@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put, web};
+use hashbrown::HashMap;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,

@@ -207,7 +207,10 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             let (records, metric_types): (Vec<json::Value>, Vec<String>) =
                 pipeline_inputs.into_iter().unzip();
             let count = records.len();
-            match exec_pl.process_batch(org_id, records).await {
+            match exec_pl
+                .process_batch(org_id, records, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     let err_msg = format!(
                         "[Ingestion]: Stream {} pipeline batch processing failed: {}",

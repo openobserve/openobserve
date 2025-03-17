@@ -38,7 +38,7 @@ use openobserve::handler::http::{
 use openobserve::{
     cli::basic::cli,
     common::{
-        infra::{self as common_infra, cluster, config::VERSION},
+        infra::{self as common_infra, cluster},
         meta, migration,
         utils::zo_logger,
     },
@@ -60,7 +60,10 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, metadata, search::SEARCH_SERVER, self_reporting, tls::http_tls_config},
+    service::{
+        db, metadata, node::NodeService, search::SEARCH_SERVER, self_reporting,
+        tls::http_tls_config,
+    },
 };
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::WithExportConfig;
@@ -72,8 +75,8 @@ use opentelemetry_proto::tonic::collector::{
 use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
 use proto::cluster_rpc::{
     event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
-    query_cache_server::QueryCacheServer, search_server::SearchServer,
-    streams_server::StreamsServer,
+    node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
+    search_server::SearchServer, streams_server::StreamsServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
@@ -147,7 +150,7 @@ async fn main() -> Result<(), anyhow::Error> {
             [
                 ("role", cfg.common.node_role.as_str()),
                 ("instance", cfg.common.instance_name.as_str()),
-                ("version", VERSION),
+                ("version", config::VERSION),
             ]
             .to_vec(),
         )
@@ -187,7 +190,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Some(setup_logs())
     };
 
-    log::info!("Starting OpenObserve {}", VERSION);
+    log::info!("Starting OpenObserve {}", config::VERSION);
     log::info!(
         "System info: CPU cores {}, MEM total {}, Disk total {}, free {}",
         cfg.limit.real_cpu_num,
@@ -257,7 +260,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // check version upgrade
             let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
-            if let Err(e) = migration::check_upgrade(&old_version, VERSION).await {
+            if let Err(e) = migration::check_upgrade(&old_version, config::VERSION).await {
                 job_init_tx.send(false).ok();
                 panic!("check upgrade failed: {}", e);
             }
@@ -537,6 +540,12 @@ async fn init_common_grpc_server(
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    let node_svc = NodeServiceServer::new(NodeService)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+
     log::info!(
         "starting gRPC server {} at {}",
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
@@ -563,6 +572,7 @@ async fn init_common_grpc_server(
         .add_service(ingest_svc)
         .add_service(streams_svc)
         .add_service(flight_svc)
+        .add_service(node_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
@@ -709,9 +719,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
-        cfg.limit.http_keep_alive,
-    )))
+    .keep_alive(if cfg.limit.http_keep_alive_disabled {
+        KeepAlive::Disabled
+    } else {
+        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.http_keep_alive)))
+    })
     .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
@@ -818,9 +830,11 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
     })
-    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
-        cfg.limit.http_keep_alive,
-    )))
+    .keep_alive(if cfg.limit.http_keep_alive_disabled {
+        KeepAlive::Disabled
+    } else {
+        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.http_keep_alive)))
+    })
     .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
@@ -982,7 +996,7 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
             Resource::new(vec![
                 KeyValue::new("service.name", cfg.common.node_role.to_string()),
                 KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-                KeyValue::new("service.version", VERSION),
+                KeyValue::new("service.version", config::VERSION),
             ]),
         ))
         .install_batch(opentelemetry_sdk::runtime::Tokio)?;
@@ -1055,9 +1069,11 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
-        cfg.limit.http_keep_alive,
-    )))
+    .keep_alive(if cfg.limit.http_keep_alive_disabled {
+        KeepAlive::Disabled
+    } else {
+        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.http_keep_alive)))
+    })
     .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {

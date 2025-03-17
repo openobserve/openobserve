@@ -333,29 +333,59 @@ async fn handle_diff_schema(
         && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds
     {
         let mut uds_fields = HashSet::with_capacity(cfg.limit.schema_max_fields_to_enable_uds);
-        // add fts fields
+
+        // Helper to check if a field should be skipped
+        let should_skip = |field_name: &str| {
+            field_name == TIMESTAMP_COL_NAME
+                || field_name == ID_COL_NAME
+                || field_name == ORIGINAL_DATA_COL_NAME
+                || field_name == cfg.common.column_all
+        };
+
+        // Add FTS fields first
         for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-            if final_schema.field_with_name(field).is_ok() {
-                uds_fields.insert(field.to_string());
-            }
-        }
-        for field in final_schema.fields() {
-            let field_name = field.name();
-            // skip _timestamp and _all columns
-            if field_name == TIMESTAMP_COL_NAME || field_name == &cfg.common.column_all {
-                continue;
-            }
-            uds_fields.insert(field_name.to_string());
-            if uds_fields.len() == cfg.limit.schema_max_fields_to_enable_uds {
+            if final_schema.field_with_name(field).is_ok()
+                && !should_skip(field)
+                && uds_fields.insert(field.to_string())
+                && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+            {
                 break;
             }
         }
+
+        // Add fields from current schema if available
+        if let Some(stream_schema) = stream_schema_map.get(stream_name) {
+            for field in stream_schema.schema().fields() {
+                let field = field.name();
+                if !should_skip(field)
+                    && uds_fields.insert(field.to_string())
+                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+                {
+                    break;
+                }
+            }
+        }
+
+        // Add remaining fields from final schema
+        if uds_fields.len() < cfg.limit.schema_max_fields_to_enable_uds {
+            for field in final_schema.fields() {
+                let field = field.name();
+                if !should_skip(field)
+                    && uds_fields.insert(field.to_string())
+                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+                {
+                    break;
+                }
+            }
+        }
+
         defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
         stream_setting.defined_schema_fields = Some(defined_schema_fields.clone());
         final_schema.metadata.insert(
             "settings".to_string(),
             json::to_string(&stream_setting).unwrap(),
         );
+
         // save the new settings
         if let Err(e) = super::stream::save_stream_settings(
             org_id,

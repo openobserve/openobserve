@@ -1,6 +1,7 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
+import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
 
 // TODO - Modernize imports to use consistent ES module syntax
 const fs = require("fs");
@@ -154,16 +155,28 @@ test.describe("dashboard testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]'
       )
       .click();
+
     await page.locator('[data-test="dashboard-apply"]').click();
+
+    await waitForDateTimeButtonToBeEnabled(page);
+
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
+
+    await waitForDateTimeButtonToBeEnabled(page);
+
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-45-m-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
+
+    await waitForDateTimeButtonToBeEnabled(page);
+
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-3-d-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
+
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();

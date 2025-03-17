@@ -96,7 +96,7 @@ pub fn str_match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementati
                 ));
             }
         };
-        if needle.is_none() || needle.as_ref().unwrap().is_empty() {
+        if needle.is_none() {
             return Err(DataFusionError::SQL(
                 ParserError::ParserError(
                     "Invalid argument types[needle] to str_match function".to_string(),
@@ -158,6 +158,7 @@ mod tests {
         let sql = vec![
             "select * from t where str_match(log, 'es') and str_match_ignore_case(city, 'be')",
             "select * from t where str_match(log, 'es') and str_match_ignore_case(city, 'BE')",
+            "select * from t where str_match(log, 'es') and str_match_ignore_case(city, '')",
         ];
 
         // define a schema.
@@ -198,7 +199,7 @@ mod tests {
             let df = ctx.sql(sql).await.unwrap();
             let result = df.collect().await.unwrap();
             let count = result.iter().map(|batch| batch.num_rows()).sum::<usize>();
-            assert_eq!(count, 1);
+            assert!(count > 0);
         }
     }
 }

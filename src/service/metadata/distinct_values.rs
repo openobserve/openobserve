@@ -152,14 +152,17 @@ impl Metadata for DistinctValues {
         // count, rest will be dynamically determined
         Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new("count", DataType::Int64, false),
+            Field::new("count", DataType::Int64, true),
         ]))
     }
 
     async fn write(&self, org_id: &str, data: Vec<MetadataItem>) -> Result<()> {
         let mut group_items: FxIndexMap<DvItem, u32> = FxIndexMap::default();
         for item in data {
-            if let MetadataItem::DistinctValues(item) = item {
+            if let MetadataItem::DistinctValues(mut item) = item {
+                // these two are reserved, so we remove them if present
+                item.value.remove("count");
+                item.value.remove(TIMESTAMP_COL_NAME);
                 let count = group_items.entry(item).or_default();
                 *count += 1;
             }

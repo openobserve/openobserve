@@ -169,6 +169,7 @@ const defaultObject = {
     additionalErrorMsg: "",
     savedViewFilterFields: "",
     hasSearchDataTimestampField: false,
+    originalDataCache: new Map(),
     stream: {
       loading: false,
       streamLists: <object[]>[],
@@ -1500,6 +1501,10 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
+      //remove any data that has been cached 
+      if(searchObj.data.originalDataCache.size > 0){
+        searchObj.data.originalDataCache.clear();
+      }
       // Reset cancel query on new search request initation
       searchObj.data.isOperationCancelled = false;
       searchObj.data.searchRequestTraceIds = [];
@@ -1901,7 +1906,7 @@ const useLogs = () => {
                 query: queryReq,
                 page_type: searchObj.data.stream.streamType,
               },
-              "UI",
+              "ui",
             ).then((res: any) => {
               $q.notify({
                 type: "positive",
@@ -2091,7 +2096,7 @@ const useLogs = () => {
               page_type: searchObj.data.stream.streamType,
               traceparent,
             },
-            "UI",
+            "ui",
           )
           .then(async (res) => {
             // check for total records update for the partition and update pagination accordingly
@@ -2261,7 +2266,7 @@ const useLogs = () => {
             page_type: searchObj.data.stream.streamType,
             traceparent,
           },
-          "UI",
+          "ui",
         )
         .then(async (res) => {
           if (
@@ -2583,7 +2588,7 @@ const useLogs = () => {
               page_type: searchObj.data.stream.streamType,
               traceparent,
             },
-            "UI",
+            "ui",
           )
           .then(async (res: any) => {
             removeTraceId(traceId);
@@ -3737,6 +3742,7 @@ const useLogs = () => {
           index: streamName,
           key: obj.key,
           size: obj.size,
+          body: obj.body,
           query_context: sqlContext,
           query_fn: query_fn,
           stream_type: searchObj.data.stream.streamType,

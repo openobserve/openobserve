@@ -20,6 +20,8 @@ pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
 pub const THRESHOLD: i64 = 9383939382;
 
+use config::meta::cluster::Node;
+
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct Organization {
     pub identifier: String,
@@ -187,4 +189,73 @@ impl Default for OrganizationSetting {
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingResponse {
     pub data: OrganizationSetting,
+}
+
+/// Request struct for node listing with region filtering
+///
+/// Regions can be provided in the request body to filter nodes by region.
+/// If no regions are provided, all nodes will be returned.
+#[derive(Serialize, Deserialize, Default)]
+pub struct NodeListRequest {
+    /// List of region names to filter by
+    pub regions: Vec<String>,
+}
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct RegionInfo {
+    #[serde(flatten)]
+    pub clusters: std::collections::HashMap<String, Vec<Node>>,
+}
+
+/// Response struct for node listing with nested hierarchy
+///
+/// Contains a three-level hierarchy with a flat format:
+/// 1. Regions at the top level as object keys
+/// 2. Clusters within each region as object keys
+/// 3. Nodes as arrays directly under each cluster
+#[derive(Serialize, Deserialize, Default)]
+pub struct NodeListResponse {
+    #[serde(flatten)]
+    pub regions: std::collections::HashMap<String, RegionInfo>,
+}
+
+impl NodeListResponse {
+    pub fn new() -> Self {
+        Self {
+            regions: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Adds a node to the appropriate region and cluster
+    ///
+    /// This method will create the region and cluster if they don't exist
+    pub fn add_node(&mut self, node: Node, region_name: String, cluster_name: String) {
+        let region_entry = self
+            .regions
+            .entry(region_name.clone())
+            .or_insert_with(|| RegionInfo {
+                clusters: std::collections::HashMap::new(),
+            });
+
+        let cluster_entry = region_entry
+            .clusters
+            .entry(cluster_name.clone())
+            .or_default();
+
+        cluster_entry.push(node);
+    }
+
+    /// Adds multiple nodes to the response structure
+    pub fn add_nodes(&mut self, nodes: Vec<(Node, String, String)>) {
+        for (node, region, cluster) in nodes {
+            self.add_node(node, region, cluster);
+        }
+    }
+}
+
+// We can also add helper functions for the region and cluster structs
+impl RegionInfo {
+    /// Adds a cluster to this region if it doesn't exist
+    pub fn add_cluster(&mut self, cluster_name: String) -> &mut Vec<Node> {
+        self.clusters.entry(cluster_name).or_default()
+    }
 }

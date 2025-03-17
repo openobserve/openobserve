@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, web};
 use config::{
@@ -25,6 +25,7 @@ use config::{
     },
     utils::json,
 };
+use hashbrown::HashMap;
 use infra::table::entity::search_jobs::Model as JobModel;
 use tracing::Span;
 

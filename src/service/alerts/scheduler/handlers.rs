@@ -865,7 +865,7 @@ async fn handle_derived_stream_triggers(
             _timestamp: Utc::now().timestamp_micros(),
             org: new_trigger.org.clone(),
             module: TriggerDataType::DerivedStream,
-            key: new_trigger.module_key.clone(),
+            key: new_trigger.module_key.to_lowercase(),
             next_run_at: new_trigger.next_run_at,
             is_realtime: new_trigger.is_realtime,
             is_silenced: new_trigger.is_silenced,
@@ -961,7 +961,7 @@ async fn handle_derived_stream_triggers(
                             log::error!("{err_msg}");
                             ingestion_error_msg = Some(err_msg);
                         }
-                        Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val).await {
+                        Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val, None).await {
                             Err(e) => {
                                 let err_msg = format!(
                                     "[SCHEDULER trace_id {trace_id}] Pipeline org/name({}/{}) failed to process DerivedStream query results. Caused by: {}",

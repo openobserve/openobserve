@@ -493,6 +493,7 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.getByRole('button', { name: 'Search History' }).click();

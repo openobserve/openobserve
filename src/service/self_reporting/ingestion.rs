@@ -28,7 +28,7 @@ use config::{
     },
     utils::json,
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, hash_map::Entry};
 use proto::cluster_rpc;
 
 use crate::{common::meta::ingestion, service};
@@ -82,19 +82,20 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             node,
         };
 
-        let is_new = groups.contains_key(&key);
-
-        let entry = groups.entry(key).or_insert_with(|| AggregatedData {
-            count: 1,
-            usage_data: usage_data.clone(),
-        });
-        if !is_new {
-            continue;
-        } else {
-            entry.usage_data.num_records += usage_data.num_records;
-            entry.usage_data.size += usage_data.size;
-            entry.usage_data.response_time += usage_data.response_time;
-            entry.count += 1;
+        match groups.entry(key) {
+            Entry::Vacant(vacant) => {
+                vacant.insert(AggregatedData {
+                    count: 1,
+                    usage_data: usage_data.clone(),
+                });
+            }
+            Entry::Occupied(mut occupied) => {
+                let entry = occupied.get_mut();
+                entry.usage_data.num_records += usage_data.num_records;
+                entry.usage_data.size += usage_data.size;
+                entry.usage_data.response_time += usage_data.response_time;
+                entry.count += 1;
+            }
         }
     }
 
