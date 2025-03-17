@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="alert-list-search-input"
+        data-test="server-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
+            :title="tab.name"
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
@@ -131,21 +132,21 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/nginx.svg"),
-        label: "Nginx",
+        label: t("ingestion.nginx"),
         contentClass: "tab_content",
       },
-      {
-        name: "apache",
-        to: {
-          name: "apache",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/ingestion/apache.svg"),
-        label: "Apache",
-        contentClass: "tab_content",
-      },
+      // {
+      //   name: "apache",
+      //   to: {
+      //     name: "apache",
+      //     query: {
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //     },
+      //   },
+      //   icon: "img:" + getImageURL("images/ingestion/apache.svg"),
+      //   label: t("ingestion.apache"),
+      //   contentClass: "tab_content",
+      // },
       {
         name: "iis",
         to: {
@@ -155,7 +156,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/microsoft-iis.svg"),
-        label: "IIS",
+        label: t("ingestion.iis"),
         contentClass: "tab_content",
       },
     ];

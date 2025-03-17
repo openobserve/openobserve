@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="alert-list-search-input"
+        data-test="message-queue-filter"
         v-model="tabsFilter"
         borderless
         filled
@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
+            :title="tab.name"
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
@@ -131,7 +132,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/rabbitmq.svg"),
-        label: "RabbitMQ",
+        label: t("ingestion.rabbitmq"),
         contentClass: "tab_content",
       },
       {
@@ -143,7 +144,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/kafka.svg"),
-        label: "Kafka",
+        label: t("ingestion.kafka"),
         contentClass: "tab_content",
       },
       {
@@ -155,7 +156,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/nats.svg"),
-        label: "NATS",
+        label: t("ingestion.nats"),
         contentClass: "tab_content",
       },
     ];

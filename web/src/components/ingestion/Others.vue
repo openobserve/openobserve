@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="alert-list-search-input"
+        data-test="others-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
+            :title="tab.name"
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
@@ -131,21 +132,33 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/airflow.svg"),
-        label: "Airflow",
+        label: t("ingestion.airflow"),
         contentClass: "tab_content",
       },
       {
-        name: "airbyte",
+        name: "cribl",
         to: {
-          name: "airbyte",
+          name: "cribl",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/ingestion/airbyte.svg"),
-        label: "Airbyte",
+        icon: "img:" + getImageURL("images/ingestion/cribl.webp"),
+        label: t("ingestion.cribl"),
         contentClass: "tab_content",
       },
+      // {
+      //   name: "airbyte",
+      //   to: {
+      //     name: "airbyte",
+      //     query: {
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //     },
+      //   },
+      //   icon: "img:" + getImageURL("images/ingestion/airbyte.svg"),
+      //   label: "Airbyte",
+      //   contentClass: "tab_content",
+      // },
     ];
 
     // create computed property to filter tabs

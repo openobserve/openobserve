@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="alert-list-search-input"
+        data-test="database-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
+            :title="tab.name"
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
@@ -131,7 +132,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/sqlserver.png"),
-        label: "SQL Server",
+        label: t('ingestion.sqlserver'),
         contentClass: "tab_content",
       },
       {
@@ -143,7 +144,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/postgres.png"),
-        label: "Postgres",
+        label: t("ingestion.postgres"),
         contentClass: "tab_content",
       },
       {
@@ -155,7 +156,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/mongodb.svg"),
-        label: "MongoDB",
+        label: t("ingestion.mongodb"),
         contentClass: "tab_content",
       },
       {
@@ -167,21 +168,21 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/redis.svg"),
-        label: "Redis",
+        label: t("ingestion.redis"),
         contentClass: "tab_content",
       },
-      {
-        name: "couchdb",
-        to: {
-          name: "couchdb",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/ingestion/couchdb.svg"),
-        label: "CouchDB",
-        contentClass: "tab_content",
-      },
+      // {
+      //   name: "couchdb",
+      //   to: {
+      //     name: "couchdb",
+      //     query: {
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //     },
+      //   },
+      //   icon: "img:" + getImageURL("images/ingestion/couchdb.svg"),
+      //   label: t("ingestion.couchdb"),
+      //   contentClass: "tab_content",
+      // },
       {
         name: "elasticsearch",
         to: {
@@ -191,7 +192,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/elasticsearch.svg"),
-        label: "Elasticsearch",
+        label: t("ingestion.elasticsearch"),
         contentClass: "tab_content",
       },
       {
@@ -203,21 +204,21 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/mysql.svg"),
-        label: "MySQL",
+        label: t("ingestion.mysql"),
         contentClass: "tab_content",
       },
-      {
-        name: "saphana",
-        to: {
-          name: "saphana",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/ingestion/saphana.png"),
-        label: "SAP HANA",
-        contentClass: "tab_content",
-      },
+      // {
+      //   name: "saphana",
+      //   to: {
+      //     name: "saphana",
+      //     query: {
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //     },
+      //   },
+      //   icon: "img:" + getImageURL("images/ingestion/saphana.png"),
+      //   label: "SAP HANA",
+      //   contentClass: "tab_content",
+      // },
       {
         name: "snowflake",
         to: {
@@ -227,7 +228,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/snowflake.svg"),
-        label: "Snowflake",
+        label: t("ingestion.snowflake"),
         contentClass: "tab_content",
       },
       {
@@ -239,7 +240,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/zookeeper.png"),
-        label: "Zookeeper",
+        label: t("ingestion.zookeeper"),
         contentClass: "tab_content",
       },
       {
@@ -251,7 +252,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/cassandra.png"),
-        label: "Cassandra",
+        label: t("ingestion.cassandra"),
         contentClass: "tab_content",
       },
       {
@@ -263,7 +264,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/aerospike.svg"),
-        label: "Aerospike",
+        label: t("ingestion.aerospike"),
         contentClass: "tab_content",
       },
       {
@@ -275,7 +276,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/dynamodb.png"),
-        label: "DynamoDB",
+        label: t("ingestion.dynamodb"),
         contentClass: "tab_content",
       }
     ];

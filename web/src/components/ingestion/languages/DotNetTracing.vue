@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import useIngestion from "@/composables/useIngestion";
-const name = "dotnet";
+const name = "dotnettracing";
 const store = useStore();
 const { endpoint, languagesContent, languagesDocURLs } = useIngestion();
 const content = languagesContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());

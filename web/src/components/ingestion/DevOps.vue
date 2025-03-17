@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="alert-list-search-input"
+        data-test="devops-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
+            :title="tab.name"
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
@@ -131,7 +132,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/jenkins.svg"),
-        label: "Jenkins",
+        label: t("ingestion.jenkins"),
         contentClass: "tab_content",
       },
       {
@@ -143,7 +144,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/ansible.svg"),
-        label: "Ansible",
+        label: t("ingestion.ansible"),
         contentClass: "tab_content",
       },
       {
@@ -155,7 +156,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/terraform.svg"),
-        label: "Terraform",
+        label: t("ingestion.terraform"),
         contentClass: "tab_content",
       },
       {
@@ -167,7 +168,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/github-actions.svg"),
-        label: "GitHub Actions",
+        label: t("ingestion.gactions"),
         contentClass: "tab_content",
       }
     ];

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="alert-list-search-input"
+        data-test="networking-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
+            :title="tab.name"
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
@@ -131,7 +132,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/netflow.svg"),
-        label: "netflow",
+        label: t("ingestion.netflow"),
         contentClass: "tab_content",
       },
     ];

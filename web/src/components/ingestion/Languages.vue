@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="alert-list-search-input"
+        data-test="language-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
+            :title="tab.name"
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
@@ -135,15 +136,27 @@ export default defineComponent({
         contentClass: "tab_content",
       },
       {
-        name: "dotnet",
+        name: "dotnettracing",
         to: {
-          name: "dotnet",
+          name: "dotnettracing",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
         icon: "img:" + getImageURL("images/ingestion/dotnet.svg"),
-        label: ".Net",
+        label: t("ingestion.dotnettracing"),
+        contentClass: "tab_content",
+      },
+      {
+        name: "dotnetlogs",
+        to: {
+          name: "dotnetlogs",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/dotnet.svg"),
+        label: t("ingestion.dotnetlogs"),
         contentClass: "tab_content",
       },
       {
@@ -155,7 +168,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/nodejs.svg"),
-        label: "NodeJS",
+        label: t("ingestion.nodejs"),
         contentClass: "tab_content",
       },
       {
@@ -167,7 +180,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/golang.svg"),
-        label: "Go",
+        label: t("ingestion.go"),
         contentClass: "tab_content",
       },
       {
@@ -179,7 +192,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/rust.svg"),
-        label: "Rust",
+        label: t("ingestion.rust"),
         contentClass: "tab_content",
       },
       {
@@ -191,7 +204,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/java.svg"),
-        label: "Java",
+        label: t("ingestion.java"),
         contentClass: "tab_content",
       },
       {
@@ -203,7 +216,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/fastapi.svg"),
-        label: "FastAPI",
+        label: t("ingestion.fastapi"),
         contentClass: "tab_content",
       }
     ];

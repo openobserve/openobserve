@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="alert-list-search-input"
+        data-test="security-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
+            :title="tab.name"
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
@@ -131,7 +132,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/falco.png"),
-        label: "Falco",
+        label: t("ingestion.falco"),
         contentClass: "tab_content",
       },
       {
@@ -143,7 +144,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/os-query.png"),
-        label: "OS Query",
+        label: t("ingestion.osquery"),
         contentClass: "tab_content",
       },
       {
@@ -155,7 +156,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/okta.png"),
-        label: "Okta",
+        label: t("ingestion.okta"),
         contentClass: "tab_content",
       },
       {
@@ -167,7 +168,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/jumpcloud.svg"),
-        label: "Jumpcloud",
+        label: t("ingestion.jumpcloud"),
         contentClass: "tab_content",
       },
       {
@@ -179,7 +180,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/openvpn.png"),
-        label: "OpenVPN",
+        label: t("ingestion.openvpn"),
         contentClass: "tab_content",
       },
       {
@@ -191,7 +192,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/office-365.png"),
-        label: "Office365",
+        label: t("ingestion.office365"),
         contentClass: "tab_content",
       },
       {
@@ -203,7 +204,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/google-workspace.png"),
-        label: "Google Workspace",
+        label: t("ingestion.gworkspace"),
         contentClass: "tab_content",
       }
     ];

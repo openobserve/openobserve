@@ -101,21 +101,22 @@ Access Key: [BASIC_PASSCODE]`;
 Access Key: [BASIC_PASSCODE]`;
 
   const messageQueuesDocURLs = {
-    rabbitmq: "https://short.openobserve.ai/message-queues/rabbitmq",
-    kafka: "https://short.openobserve.ai/message-queues/kafka",
-    nats: "https://short.openobserve.ai/message-queues/nats",
+    rabbitmq: "https://short.openobserve.ai/rabbitmq",
+    kafka: "https://short.openobserve.ai/kafka",
+    nats: "https://short.openobserve.ai/nats",
   };
 
   const languagesContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json
 Access Key: [BASIC_PASSCODE]`;
 
   const languagesDocURLs = {
-    python: "https://short.openobserve.ai/languages/python",
-    dotnet: "https://short.openobserve.ai/languages/dotnet",
+    python: "https://openobserve.ai/blog/handling-errors-with-opentelemetry-python",
+    dotnettracing: "https://short.openobserve.ai/dotnet-tracing",
+    dotnetloggingg: "https://short.openobserve.ai/dotnet-logging",
     nodejs: "https://short.openobserve.ai/languages/nodejs",
-    go: "https://short.openobserve.ai/languages/go",
-    rust: "https://short.openobserve.ai/languages/rust",
-    java: "https://short.openobserve.ai/languages/java",
+    go: "https://short.openobserve.ai/golang",
+    rust: "https://short.openobserve.ai/rust",
+    java: "https://short.openobserve.ai/java",
     fastapi: "https://short.openobserve.ai/framework/fastapi",
   };
 
@@ -125,42 +126,8 @@ Access Key: [BASIC_PASSCODE]`;
   const othersDocURLs = {
     airflow: "https://short.openobserve.ai/others/airflow",
     airbyte: "https://short.openobserve.ai/others/airbyte",
+    cribl: "https://short.openobserve.ai/cribl",
   };
-
-
-  const databaseDocURLs = {
-    sqlServer: "https://short.openobserve.ai/database/sql-server",
-    postgres: "https://short.openobserve.ai/database/postgres",
-    mongoDB: "https://short.openobserve.ai/database/mongodb",
-    redis: "https://short.openobserve.ai/database/redis",
-    couchDB: "https://short.openobserve.ai/database/couchdb",
-    elasticsearch: "https://short.openobserve.ai/database/elasticsearch",
-    mySQL: "https://short.openobserve.ai/database/mysql",
-    sapHana: "https://short.openobserve.ai/database/sap-hana",
-    snowflake: "https://short.openobserve.ai/database/snowflake",
-    zookeeper: "https://short.openobserve.ai/database/zookeeper",
-    cassandra: "https://short.openobserve.ai/database/cassandra",
-    aerospike: "https://short.openobserve.ai/database/aerospike",
-    dynamoDB: "https://short.openobserve.ai/database/dynamodb",
-  };
-
-
-  const databaseDocURLs = {
-    sqlServer: "https://short.openobserve.ai/database/sql-server",
-    postgres: "https://short.openobserve.ai/database/postgres",
-    mongoDB: "https://short.openobserve.ai/database/mongodb",
-    redis: "https://short.openobserve.ai/database/redis",
-    couchDB: "https://short.openobserve.ai/database/couchdb",
-    elasticsearch: "https://short.openobserve.ai/database/elasticsearch",
-    mySQL: "https://short.openobserve.ai/database/mysql",
-    sapHana: "https://short.openobserve.ai/database/sap-hana",
-    snowflake: "https://short.openobserve.ai/database/snowflake",
-    zookeeper: "https://short.openobserve.ai/database/zookeeper",
-    cassandra: "https://short.openobserve.ai/database/cassandra",
-    aerospike: "https://short.openobserve.ai/database/aerospike",
-    dynamoDB: "https://short.openobserve.ai/database/dynamodb",
-  };
-
 
   return {
     endpoint,

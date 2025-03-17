@@ -89,7 +89,8 @@ import NATS from "@/components/ingestion/messagequeues/Nats.vue";
 
 import Languages from "@/components/ingestion/Languages.vue";
 import Python from "@/components/ingestion/languages/Python.vue";
-import DotNet from "@/components/ingestion/languages/DotNet.vue";
+import DotNetTracing from "@/components/ingestion/languages/DotNetTracing.vue";
+import DotNetLogs from "@/components/ingestion/languages/DotNetLogs.vue";
 import NodeJS from "@/components/ingestion/languages/NodeJS.vue";
 import Rust from "@/components/ingestion/languages/Rust.vue";
 import Java from "@/components/ingestion/languages/Java.vue";
@@ -99,6 +100,7 @@ import FastAPI from "@/components/ingestion/languages/FastAPI.vue";
 import Others from "@/components/ingestion/Others.vue";
 import Airflow from "@/components/ingestion/others/Airflow.vue";
 import Airbyte from "@/components/ingestion/others/Airbyte.vue";
+import Cribl from "@/components/ingestion/others/Cribl.vue";
 
 const useIngestionRoutes = () => {
   const ingestionRoutes: any = [
@@ -653,9 +655,17 @@ const useIngestionRoutes = () => {
               },
             },
             {
-              path: "dotnet",
-              name: "dotnet",
-              component: DotNet,
+              path: "dotnettracing",
+              name: "dotnettracing",
+              component: DotNetTracing,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              }
+            },
+            {
+              path: "dotnetlogs",
+              name: "dotnetlogs",
+              component: DotNetLogs,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               }
@@ -722,6 +732,14 @@ const useIngestionRoutes = () => {
               path: "airbyte",
               name: "airbyte",
               component: Airbyte,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "cribl",
+              name: "cribl",
+              component: Cribl,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
