@@ -1,4 +1,6 @@
 import { expect } from "playwright/test";
+// import logData from "../cypress/fixtures/log.json"
+
 // fuction of Dashboard page and Apply query button
 export const waitForDashboardPage = async function (page) {
   const dashboardListApi = page.waitForResponse(
