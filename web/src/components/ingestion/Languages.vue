@@ -183,30 +183,30 @@ export default defineComponent({
         label: t("ingestion.go"),
         contentClass: "tab_content",
       },
-      {
-        name: "rust",
-        to: {
-          name: "rust",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/ingestion/rust.svg"),
-        label: t("ingestion.rust"),
-        contentClass: "tab_content",
-      },
-      {
-        name: "java",
-        to: {
-          name: "java",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/ingestion/java.svg"),
-        label: t("ingestion.java"),
-        contentClass: "tab_content",
-      },
+      // {
+      //   name: "rust",
+      //   to: {
+      //     name: "rust",
+      //     query: {
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //     },
+      //   },
+      //   icon: "img:" + getImageURL("images/ingestion/rust.svg"),
+      //   label: t("ingestion.rust"),
+      //   contentClass: "tab_content",
+      // },
+      // {
+      //   name: "java",
+      //   to: {
+      //     name: "java",
+      //     query: {
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //     },
+      //   },
+      //   icon: "img:" + getImageURL("images/ingestion/java.svg"),
+      //   label: t("ingestion.java"),
+      //   contentClass: "tab_content",
+      // },
       {
         name: "fastapi",
         to: {

@@ -183,18 +183,18 @@ export default defineComponent({
       //   label: t("ingestion.couchdb"),
       //   contentClass: "tab_content",
       // },
-      {
-        name: "elasticsearch",
-        to: {
-          name: "elasticsearch",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/ingestion/elasticsearch.svg"),
-        label: t("ingestion.elasticsearch"),
-        contentClass: "tab_content",
-      },
+      // {
+      //   name: "elasticsearch",
+      //   to: {
+      //     name: "elasticsearch",
+      //     query: {
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //     },
+      //   },
+      //   icon: "img:" + getImageURL("images/ingestion/elasticsearch.svg"),
+      //   label: t("ingestion.elasticsearch"),
+      //   contentClass: "tab_content",
+      // },
       {
         name: "mysql",
         to: {
