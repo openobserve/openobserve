@@ -31,6 +31,4 @@ export const login = async (page) => {
       .click();
     await page.getByRole("option", { name: "default", exact: true }).click();
   }
-  
-  // module.exports = { login };
-  
+    
