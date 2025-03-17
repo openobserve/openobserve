@@ -157,8 +157,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
         <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
-          <span class="lastRefreshedAtIcon">🕑</span
-          ><RelativeTime
+          <span class="lastRefreshedAtIcon"
+            >🕑
+            <q-tooltip anchor="bottom right" self="top right">
+              Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" />
+            </q-tooltip>
+          </span>
+          <RelativeTime
             :timestamp="lastTriggeredAt"
             fullTimePrefix="Last Refreshed At: "
           />
@@ -827,6 +832,9 @@ export default defineComponent({
 .lastRefreshedAt {
   font-size: smaller;
   margin-left: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   &::after {
     content: "";

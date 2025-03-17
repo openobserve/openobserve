@@ -32,6 +32,7 @@ import {
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
+  calculateMaxFormattedWidth,
 } from "./convertDataIntoUnitValue";
 import {
   calculateGridPositions,
@@ -753,19 +754,40 @@ export const convertSQLData = async (
     }
   };
 
+  // Helper for getting max width of axis data with unit formatting
+  const getFormattedAxisWidth = (keys: string[]) => {
+    let maxWidth = 0;
+
+    keys.forEach((key: string) => {
+      const axisValues = getAxisDataFromKey(key);
+      const keyWidth = calculateMaxFormattedWidth(
+        axisValues,
+        panelSchema.config?.unit,
+        panelSchema.config?.unit_custom,
+        panelSchema.config?.decimals,
+      );
+
+      if (keyWidth > maxWidth) {
+        maxWidth = keyWidth;
+      }
+    });
+
+    return maxWidth;
+  };
+
+  // Replace code where yAxisNameGap is calculated (based on your initial snippet)
   const getYAxisNameGap = () => {
     const yAxisLabel = isHorizontalChart ? xAxisKeys[0] : yAxisKeys[0];
 
+    // Get all values for the axis
+    const axisValues = getAxisDataFromKey(yAxisLabel);
+
     return (
-      calculateWidthText(
-        formatUnitValue(
-          getUnitValue(
-            largestLabel(getAxisDataFromKey(yAxisLabel)),
-            panelSchema.config?.unit,
-            panelSchema.config?.unit_custom,
-            panelSchema.config?.decimals,
-          ),
-        ),
+      calculateMaxFormattedWidth(
+        axisValues,
+        panelSchema.config?.unit,
+        panelSchema.config?.unit_custom,
+        panelSchema.config?.decimals,
       ) + 8
     );
   };
@@ -1117,18 +1139,15 @@ export const convertSQLData = async (
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       nameGap:
-        calculateWidthText(
-          panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"
-            ? largestLabel(getAxisDataFromKey(yAxisKeys[0]))
-            : formatUnitValue(
-                getUnitValue(
-                  getLargestLabel(),
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                ),
-              ),
-        ) + 8,
+        panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"
+          ? calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys[0]))) +
+            8
+          : calculateMaxFormattedWidth(
+              getAxisDataFromKey(yAxisKeys[0]),
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals,
+            ) + 8,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
@@ -1542,22 +1561,10 @@ export const convertSQLData = async (
 
       // xAxisKeys will be 1
       if (!panelSchema.config.trellis?.layout) {
-        const xAxisMaxLabel =
-          calculateWidthText(
-            xAxisKeys.reduce(
-              (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
-              "",
-            ),
-          ) + 16;
+        const xAxisMaxLabel = getFormattedAxisWidth(xAxisKeys) + 16;
 
         // breakDownKeys will be 0 or 1
-        const breakDownMaxLabel =
-          calculateWidthText(
-            breakDownKeys.reduce(
-              (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
-              "",
-            ),
-          ) + 16;
+        const breakDownMaxLabel = getFormattedAxisWidth(breakDownKeys) + 16;
 
         options.yAxis.forEach((it: any) => {
           it.axisLabel.overflow = "truncate";
@@ -1951,8 +1958,17 @@ export const convertSQLData = async (
 
       options.yAxis.map((it: any) => {
         it.nameGap =
-          Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) +
-          10;
+          panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"
+            ? calculateWidthText(
+                largestLabel(getAxisDataFromKey(yAxisKeys[0])),
+              ) + 8
+            : calculateMaxFormattedWidth(
+                // Get all values that need to be displayed on this axis
+                getAxisDataFromKey(yAxisKeys[0]),
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals,
+              ) + 8;
       });
 
       options.xAxis.nameGap = 25;

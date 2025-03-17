@@ -698,3 +698,44 @@ export const validateSQLPanelFields = (
     );
   }
 };
+
+/**
+ * Calculates the maximum width needed for formatted values from an array
+ * @param values - Array of values to format
+ * @param unit - Unit configuration
+ * @param unitCustom - Custom unit configuration
+ * @param decimals - Decimal places
+ * @returns Maximum width in pixels
+ */
+export const calculateMaxFormattedWidth = (
+  values: any[],
+  unit: string | undefined,
+  unitCustom: string | undefined,
+  decimals: number | undefined,
+): number => {
+  // Skip null/undefined/empty arrays
+  if (!values || values.length === 0) return 0;
+
+  // Format each value with units and find the one that takes the most space
+  let maxWidth = 0;
+
+  values.forEach((value: any) => {
+    // Skip null/undefined values
+    if (value == null) return;
+
+    // Convert and format the value with units
+    const formattedValue = formatUnitValue(
+      getUnitValue(value, unit ?? "", unitCustom ?? "", decimals ?? 2),
+    );
+
+    // Calculate width of this formatted value
+    const width = calculateWidthText(formattedValue);
+
+    // Keep track of the maximum width
+    if (width > maxWidth) {
+      maxWidth = width;
+    }
+  });
+
+  return maxWidth;
+};
