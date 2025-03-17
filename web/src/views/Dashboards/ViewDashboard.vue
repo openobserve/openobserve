@@ -1061,24 +1061,30 @@ export default defineComponent({
     };
 
     const saveJsonDashboard = useLoading(async (updatedJson: any) => {
-      // Update the dashboard data
-      currentDashboardData.data = updatedJson;
+      try {
+        // Update the dashboard data
+        currentDashboardData.data = updatedJson;
 
-      // Add a wait time for state update
-      await nextTick();
+        // Add a wait time for state update
+        await nextTick();
 
-      // Save changes using existing renderDashboardChartsRef
-      if (renderDashboardChartsRef?.value?.saveDashboardData?.execute) {
-        await renderDashboardChartsRef.value.saveDashboardData.execute();
+        // Save changes using existing renderDashboardChartsRef
+        if (renderDashboardChartsRef?.value?.saveDashboardData?.execute) {
+          await renderDashboardChartsRef.value.saveDashboardData.execute();
 
-        showJsonEditorDialog.value = false;
-
-        // Reload the dashboard to reflect changes
-        await loadDashboard();
-      } else {
+          // Reload the dashboard to reflect changes
+          await loadDashboard();
+        } else {
+          showErrorNotification(
+            "Failed to update dashboard JSON: Save method not available",
+          );
+        }
+      } catch (error) {
         showErrorNotification(
-          "Failed to update dashboard JSON: Save method not available",
+          error?.message || "Failed to save dashboard changes",
         );
+      } finally {
+        showJsonEditorDialog.value = false;
       }
     });
 

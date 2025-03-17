@@ -165,6 +165,9 @@ export default defineComponent({
         await props.saveJsonDashboard.execute(updatedJson);
       } catch (error) {
         console.error("Failed during JSON save:", error);
+        validationErrors.value = [
+          `Failed during JSON save: ${error instanceof Error ? error.message : "Unknown error"}`,
+        ];
       }
     };
 

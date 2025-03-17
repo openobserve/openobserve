@@ -1151,9 +1151,13 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
 
           errors.push(...prefixedErrors);
         } catch (error) {
-          // If validation fails, add a generic error
+          // If validation fails
           errors.push(
-            `Panel ${panel?.id || "unknown"}: Unable to validate panel configuration`,
+            `Panel ${panel?.id || "unknown"}: ${
+              error instanceof Error
+                ? error?.message
+                : "Unable to validate panel configuration"
+            }`,
           );
         }
       }
