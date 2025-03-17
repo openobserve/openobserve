@@ -386,10 +386,11 @@ async fn prepare_alert(
 }
 
 pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
-    let mut cron_exp = cron_exp.trim().to_owned();
+    let mut cron_exp: String = cron_exp.trim().to_owned();
     if cron_exp.starts_with("*") {
         let (_, rest) = cron_exp.split_once("*").unwrap();
-        cron_exp = format!("{now}{rest}");
+        let rest = rest.trim();
+        cron_exp = format!("{now} {rest}");
     }
     cron_exp
 }
@@ -1522,7 +1523,7 @@ mod tests {
         let cron_exp = "**/15 21-23,0-8 * * *";
         let now = Utc::now().second();
         let new_cron_exp = update_cron_expression(&cron_exp, now);
-        let updated = format!("{}*/15 21-23,0-8 * * *", now);
+        let updated = format!("{} */15 21-23,0-8 * * *", now);
         assert_eq!(new_cron_exp, updated);
     }
 
@@ -1531,7 +1532,7 @@ mod tests {
         let cron_exp = "*10*****";
         let now = Utc::now().second();
         let new_cron_exp = update_cron_expression(&cron_exp, now);
-        let updated = format!("{}10*****", now);
+        let updated = format!("{} 10*****", now);
         assert_eq!(new_cron_exp, updated);
     }
 
