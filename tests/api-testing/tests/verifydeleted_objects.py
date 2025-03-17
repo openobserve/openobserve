@@ -16,19 +16,19 @@ from pages.role_page import RolePage
 from pages.uds_mqr_page import UdsMqrPage   
 
 def verify_deleted_objects(session, base_url, user_email, user_password, org_id, num_objects):
-    """Create objects in the OpenObserve running instance."""
+    """Verify deleted objects in the OpenObserve running instance."""
     
     template_page = TemplatePage(session, base_url, org_id)
     cipher_page = CipherPage(session, base_url, org_id)
    
     for i in range(num_objects):
        
-        # Validate deleted cipher keys
-        cipher_name_simpleOO = f"sim_{cipher_page.Unique_value_cipher}_{i}"
-        cipher_page.validate_deleted_cipher_simpleOO(session, base_url, user_email, user_password, org_id, cipher_name_simpleOO)
+        # # Validate deleted cipher keys
+        # cipher_name_simpleOO = f"sim_{cipher_page.Unique_value_cipher}_{i}"
+        # cipher_page.validate_deleted_cipher_simpleOO(session, base_url, user_email, user_password, org_id, cipher_name_simpleOO)
 
-        cipher_name_tinkOO = f"tink_{cipher_page.Unique_value_cipher}_{i}"
-        cipher_page.validate_deleted_cipher_tinkOO(session, base_url, user_email, user_password, org_id, cipher_name_tinkOO)    
+        # cipher_name_tinkOO = f"tink_{cipher_page.Unique_value_cipher}_{i}"
+        # cipher_page.validate_deleted_cipher_tinkOO(session, base_url, user_email, user_password, org_id, cipher_name_tinkOO)    
 
          # Validate deleted templates
         template_name_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}"

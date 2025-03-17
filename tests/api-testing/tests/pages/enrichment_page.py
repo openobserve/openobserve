@@ -1,16 +1,13 @@
 import random
-import uuid
 import base64
 import io
 from pathlib import Path
-import os
 from requests.auth import HTTPBasicAuth
-# Add configuration imports or define variables
-ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
-ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
+
 root_dir = Path(__file__).parent.parent.parent  # Navigate up to the root directory
 
 class EnrichmentPage:
+    # Make Unique_value_enrichment a class variable
     Unique_value_enrichment = f"uEnrichment_{random.randint(100000, 999999)}"
 
     BOUNDARY = "----WebKitFormBoundaryaQgmYHuE6dQrlLss"
@@ -48,10 +45,9 @@ class EnrichmentPage:
 
         return b"\r\n".join(line.encode('utf-8') if isinstance(line, str) else line for line in lines)
 
-    def create_enrichment_table(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, enrichment_table_name):
+    def create_enrichment_table(self, session, base_url, user_email, user_password, org_id, enrichment_table_name):
         """Create an enrichment table."""
-        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD) 
-        # Define headers
+        session.auth = HTTPBasicAuth(user_email, user_password)
         headers = {
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -62,35 +58,37 @@ class EnrichmentPage:
             'Custom-Header': 'value'
         }
 
-        # Define cookies
         cookies = {
             'auth_ext': '{"auth_ext":"","refresh_token":"","request_time":0,"expires_in":0}',
-            'auth_tokens': f'{{"access_token":"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ":" + ZO_ROOT_USER_PASSWORD).encode()).decode()}","refresh_token":""}}'
+            'auth_tokens': f'{{"access_token":"Basic {base64.b64encode((user_email + ":" + user_password).encode()).decode()}","refresh_token":""}}'
         }
 
-        # Open the json data file and read it
-        with open(root_dir / "test-data/protocols.csv") as f:
-            data = f.read()
+        # Create sample data directly instead of reading from file
+        sample_data = """protocol_number,keyword,protocol_description
+                        0,HOPOPT,IPv6 Hop-by-Hop Option
+                        1,ICMP,Internet Control Message
+                        2,IGMP,Internet Group Management"""
 
-        # Prepare the fields for multipart data
-        with open(root_dir / "test-data/protocols.csv", 'rb') as file_obj:
-            file_content = file_obj.read()  # Read the content into memory
-        file_like_object = io.BytesIO(file_content)  # Create an in-memory file-like object
+        # Create in-memory file-like object with the sample data
+        file_like_object = io.BytesIO(sample_data.encode())
 
         fields = {
-            'file': ('protocols.csv', file_like_object, 'text/csv')  # Pass the in-memory object
+            'file': ('protocols.csv', file_like_object, 'text/csv')
         }
 
-        # Now call your function that uses fields
         multipart_data = self.create_multipart_data(fields, self.BOUNDARY)
-
         url = f"{base_url}api/{org_id}/enrichment_tables/{enrichment_table_name}?append=false"
 
-        # Make the POST request
         response = session.post(url, headers=headers, cookies=cookies, data=multipart_data)
-
-        # Check the response
         assert response.status_code == 200, f"Failed to enrich table: {response.content.decode()}"
-        # print("Response:", response.json())  # Print the response for debugging
-
         return response
+
+    def create_enrichment(self, session, base_url, user_email, user_password, org_id, enrichment_name):
+        """Create an enrichment."""
+        # First create the enrichment table
+        response = self.create_enrichment_table(session, base_url, user_email, user_password, org_id, enrichment_name)
+        
+        # Return the enrichment ID if needed
+        if response.status_code == 200:
+            return enrichment_name  # or response.json()['id'] if the API returns an ID
+        return None

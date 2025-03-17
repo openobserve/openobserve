@@ -4,6 +4,7 @@ from verify_objects import verify_objects
 from edit_objects import edit_objects
 from delete_objects import delete_objects
 from verifydeleted_objects import verify_deleted_objects       
+from verifyedited_objects import verify_edited_objects
 
 # Constants for WebSocket URL and user credentials
 ZO_BASE_URL = os.environ.get("ZO_BASE_URL")  # Use environment variable
@@ -25,6 +26,6 @@ def test_workflow(create_session, base_url):
    create_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, Total_count)
    verify_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
    edit_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
-   verify_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
-#    delete_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
-#    verify_deleted_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
+   verify_edited_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
+   delete_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)
+   verify_deleted_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, Total_count)

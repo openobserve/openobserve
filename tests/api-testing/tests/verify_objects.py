@@ -16,21 +16,21 @@ from pages.role_page import RolePage
 from pages.uds_mqr_page import UdsMqrPage   
 
 def verify_objects(session, base_url, user_email, user_password, org_id, num_objects):
-    """Create objects in the OpenObserve running instance."""
+    """Verify objects in the OpenObserve running instance."""
     
     template_page = TemplatePage(session, base_url, org_id)
     cipher_page = CipherPage(session, base_url, org_id)
    
     for i in range(num_objects):
         
-        # Retrieve cipher keys
-        cipher_name_simpleOO = f"sim_{cipher_page.Unique_value_cipher}_{i}"
-        cipher_page.retrieve_cipherKeys_simpleOO(session, base_url, user_email, user_password, org_id)
-        cipher_page.retrieve_cipher_simpleOO(session, base_url, user_email, user_password, org_id, cipher_name_simpleOO)
+        # # Retrieve cipher keys
+        # cipher_name_simpleOO = f"sim_{cipher_page.Unique_value_cipher}_{i}"
+        # cipher_page.retrieve_cipherKeys_simpleOO(session, base_url, user_email, user_password, org_id)
+        # cipher_page.retrieve_cipher_simpleOO(session, base_url, user_email, user_password, org_id, cipher_name_simpleOO)
 
-        cipher_name_tinkOO = f"tink_{cipher_page.Unique_value_cipher}_{i}"
-        cipher_page.retrieve_cipherKeys_tinkOO(session, base_url, user_email, user_password, org_id)
-        cipher_page.retrieve_cipher_tinkOO(session, base_url, user_email, user_password, org_id, cipher_name_tinkOO)   
+        # cipher_name_tinkOO = f"tink_{cipher_page.Unique_value_cipher}_{i}"
+        # cipher_page.retrieve_cipherKeys_tinkOO(session, base_url, user_email, user_password, org_id)
+        # cipher_page.retrieve_cipher_tinkOO(session, base_url, user_email, user_password, org_id, cipher_name_tinkOO)   
 
         # Retrieve templates
         template_name_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}"

@@ -13,10 +13,10 @@ class FolderPage:
         self.base_url = base_url
         self.org_id = org_id
 
-    def create_folder(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, folder_name):
+    def create_folder(self, session, base_url, user_email, user_password, org_id, folder_name):
         """Create a folder."""  
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+        session.auth = HTTPBasicAuth(user_email, user_password)
 
         payload = {
             "description": folder_name,
