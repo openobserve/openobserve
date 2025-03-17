@@ -1,13 +1,13 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { login } from "../../pages/dashLogin.js";
-import { ingestion, removeUTFCharacters } from "../../pages/dashIngestion.js";
+import { login } from "../utils/dashLogin.js";
+import { ingestion, removeUTFCharacters } from "../utils/dashIngestion.js";
 import {
   waitForDashboardPage,
   applyQueryButton,
   deleteDashboard,
-} from "../../pages/dashCreation.js";
+} from "../utils/dashCreation.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);

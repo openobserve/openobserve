@@ -1,5 +1,5 @@
 // ingestion.js
-import logsdata from "../../test-data/logs_data.json"
+import logsdata from "../../../test-data/logs_data.json"
 
 // Exported function to remove UTF characters
 export const removeUTFCharacters = (text) => {
