@@ -173,6 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <template v-else-if="col.name === 'owner'">
                       {{ computedOwner(props.row[col.field]) }}
+                      <q-tooltip v-if="props.row[col.field]?.length > 20" class="alert-name-tooltip" >
+                        {{ props.row[col.field] }}
+                      </q-tooltip>
                     </template>
                     <template v-else-if="col.name == 'last_triggered_at' || col.name == 'last_satisfied_at'">
                     {{ props.row[col.field] }}
