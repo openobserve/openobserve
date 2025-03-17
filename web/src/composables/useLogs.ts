@@ -439,7 +439,7 @@ const useLogs = () => {
       });
       return;
     } catch (e) {
-      showErrorNotification("Error while fetching functions");
+      showErrorNotification("Error while fetching actions");
     }
   };
 
@@ -4808,7 +4808,7 @@ const useLogs = () => {
       addTransformToQuery(queryReq);
 
       // Add action ID if it exists
-      if (searchObj.data.actionId && searchObj.data.transformType === "function") {
+      if (searchObj.data.actionId && searchObj.data.transformType === "action") {
         queryReq.query["action_id"] = searchObj.data.actionId;
       }
 

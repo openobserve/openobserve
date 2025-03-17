@@ -422,74 +422,65 @@ export default defineComponent({
         message: "Please wait while loading actions...",
       });
 
-      try {
-        getAllActions()
-          .then(() => {
-            var counter = 1;
-            resultTotal.value = store.state.organizationData.actions.length;
-            alerts.value = store.state.organizationData.actions.map(
-              (alert: any) => {
-                return {
-                  ...alert,
-                  uuid: getUUID(),
-                };
-              },
-            );
-            actionsScriptRows.value = alerts.value.map((data: any) => {
-              if (data.execution_details_type == "repeat")
-                data.execution_details_type = "Cron Job";
+      getAllActions()
+        .then(() => {
+          var counter = 1;
+          resultTotal.value = store.state.organizationData.actions.length;
+          alerts.value = store.state.organizationData.actions.map(
+            (alert: any) => {
               return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
-                id: data.id,
-                name: data.name,
-                uuid: data.uuid,
-                created_by: data.created_by,
-                created_at: data.created_at
-                  ? convertUnixToQuasarFormat(data.created_at)
-                  : "-",
-                last_run_at: data.last_run_at
-                  ? convertUnixToQuasarFormat(data.last_run_at)
-                  : "-",
-                last_successful_at: data.last_successful_at
-                  ? convertUnixToQuasarFormat(data.last_successful_at)
-                  : "-",
-                status: data.status,
-                execution_details_type: data.execution_details_type,
+                ...alert,
+                uuid: getUUID(),
               };
-            });
-            actionsScriptRows.value.forEach((alert: ActionScriptList) => {
-              alertStateLoadingMap.value[alert.uuid as string] = false;
-            });
-            if (router.currentRoute.value.query.action == "add") {
-              showAddUpdateFn({ row: undefined });
-            }
-            if (router.currentRoute.value.query.action == "update") {
-              const alertName = router.currentRoute.value.query.id as string;
-              showAddUpdateFn({
-                row: getAlertByName(alertName),
-              });
-            }
-            dismiss();
-          })
-          .catch((e) => {
-            console.error(e);
-            dismiss();
-            $q.notify({
-              type: "negative",
-              message: "Error while pulling Actions.",
-              timeout: 2000,
-            });
+            },
+          );
+          actionsScriptRows.value = alerts.value.map((data: any) => {
+            if (data.execution_details_type == "repeat")
+              data.execution_details_type = "Cron Job";
+            return {
+              "#": counter <= 9 ? `0${counter++}` : counter++,
+              id: data.id,
+              name: data.name,
+              uuid: data.uuid,
+              created_by: data.created_by,
+              created_at: data.created_at
+                ? convertUnixToQuasarFormat(data.created_at)
+                : "-",
+              last_run_at: data.last_run_at
+                ? convertUnixToQuasarFormat(data.last_run_at)
+                : "-",
+              last_successful_at: data.last_successful_at
+                ? convertUnixToQuasarFormat(data.last_successful_at)
+                : "-",
+              status: data.status,
+              execution_details_type: data.execution_details_type,
+            };
           });
-      } catch (e) {
-        console.error(e);
-        dismiss();
-        $q.notify({
-          type: "negative",
-          message: "Error while pulling Actions.",
-          timeout: 2000,
+          actionsScriptRows.value.forEach((alert: ActionScriptList) => {
+            alertStateLoadingMap.value[alert.uuid as string] = false;
+          });
+          if (router.currentRoute.value.query.action == "add") {
+            showAddUpdateFn({ row: undefined });
+          }
+          if (router.currentRoute.value.query.action == "update") {
+            const alertName = router.currentRoute.value.query.id as string;
+            showAddUpdateFn({
+              row: getAlertByName(alertName),
+            });
+          }
+          dismiss();
+        })
+        .catch((e) => {
+          console.error(e);
+          dismiss();
+          $q.notify({
+            type: "negative",
+            message: "Error while pulling Actions.",
+            timeout: 2000,
+          });
         });
-      }
     };
+
     const getAlertByName = (id: string) => {
       return alerts.value.find((alert) => alert.id === id);
     };

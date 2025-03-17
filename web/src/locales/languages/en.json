@@ -115,7 +115,7 @@
     "saveFunctionName": "Function Name",
     "savedFunctionNotFound": "Function not found.",
     "actionsNotFound": "Actions not found.",
-    "selectTransformType": "Select Function or Action to \n see available options",
+    "selectTransformType": "Select Function or Action to see available options",
     "actionPlaceholder": "Saved Actions",
     "functions": "Functions",
     "actions": "Actions",
@@ -160,7 +160,7 @@
     "resetFilters": "Reset filters",
     "redirect_to_logs_page": "Go back to Logs page",
     "visualize": "Visualize",
-    "disableVisualizeForMultiStream": "Visualization is disabled for multi stream",
+    "visualizeDisabledForMultiStream": "Visualization is disabled for multi stream",
     "transformType": "Transform Type",
     "saveActionDisabled": "Saving Action is currently unavailable"
   },

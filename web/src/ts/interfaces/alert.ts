@@ -83,24 +83,24 @@ export interface Headers {
 }
 export interface Destination {
   name: string;
-  url: string;
-  method: string;
-  skip_tls_verify: boolean;
-  headers: Headers;
-  template: string | Template;
-  emails: string;
+  url?: string;
+  method?: string;
+  skip_tls_verify?: boolean;
+  headers?: Headers;
+  template?: string | Template;
+  emails?: string;
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
 }
 
 export interface DestinationPayload {
   name: string;
-  url: string;
-  method: string;
-  skip_tls_verify: boolean;
-  headers: Headers;
-  template: string | Template;
-  emails: string[];
+  url?: string;
+  method?: string;
+  skip_tls_verify?: boolean;
+  headers?: Headers;
+  template?: string | Template;
+  emails?: string[];
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
 }

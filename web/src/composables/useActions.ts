@@ -19,8 +19,7 @@ import actionService from "@/services/action_scripts";
 
 const useActions = () => {
   const store = useStore();
-  const $q = useQuasar();
-
+  
   const getAllActions = async () => {
     try {
       return await actionService.list(

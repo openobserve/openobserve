@@ -370,7 +370,7 @@ const isLoadingActions = ref(false);
 
 const router = useRouter();
 
-const actionOptions = ref<any[]>([]);
+const actionOptions = ref<{ value: string; label: string; type: string }[]>([]);
 
 const filteredActions = ref<any[]>([]);
 
