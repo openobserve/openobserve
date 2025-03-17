@@ -1994,6 +1994,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           selectFilter += `${condition.column} IN (${formatINValue(
             condition.value,
           )})`;
+        } else if (condition.operator === "NOT IN") {
+          selectFilter += `${condition.column} NOT IN (${formatINValue(
+            condition.value,
+          )})`;
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${formatValue(condition.value)})`;
         } else if (condition.operator === "match_all_raw") {
@@ -2036,6 +2040,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               break;
             case "Not Contains":
               selectFilter += `NOT LIKE '%${condition.value}%'`;
+              break;
+            case "Starts With":
+              selectFilter += `LIKE '${condition.value}%'`;
+              break;
+            case "Ends With":
+              selectFilter += `LIKE '%${condition.value}'`;
               break;
             default:
               selectFilter += `${condition.operator} ${formatValue(
