@@ -39,7 +39,7 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
     );
 
     if (!fetchResponse.ok) {
-      throw new Error(`HTTP error! status: ${fetchResponse.status}`);
+      throw new Error(`HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`);
     }
 
     return await fetchResponse.json();
