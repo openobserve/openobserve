@@ -253,7 +253,14 @@ pub async fn update_ratelimit(
             }
 
             if rule.org == DEFAULT_GLOBAL_ORG_IDENTIFIER {
-                // todo: check the permisstion
+                if org_id != "_meta" {
+                    return Ok(MetaHttpResponse::bad_request(format!(
+                        "No access to update global org-level: {}, api_group_name: {:?}, api_group_operation: {:?}",
+                        DEFAULT_GLOBAL_ORG_IDENTIFIER,
+                        rule.api_group_name,
+                        rule.api_group_operation
+                    )));
+                }
             } else if rule.org != org_id {
                 return Ok(MetaHttpResponse::bad_request(format!(
                     "Organization ID mismatch: expected '{}', found '{}' in rule",
@@ -343,7 +350,14 @@ pub async fn upload_org_ratelimit(
                             if rule.org.is_empty() {
                                 rule.org = org_id.clone();
                             } else if rule.org == DEFAULT_GLOBAL_ORG_IDENTIFIER {
-                                // todo: check the permisstion
+                                if org_id != "_meta" {
+                                    return Ok(MetaHttpResponse::bad_request(format!(
+                                        "No access to update global org-level: {}, api_group_name: {:?}, api_group_operation: {:?}",
+                                        DEFAULT_GLOBAL_ORG_IDENTIFIER,
+                                        rule.api_group_name,
+                                        rule.api_group_operation
+                                    )));
+                                }
                             } else if rule.org != org_id {
                                 return Ok(MetaHttpResponse::bad_request(format!(
                                     "Organization ID mismatch: expected '{}', found '{}' in rule",
