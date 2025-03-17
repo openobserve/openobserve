@@ -67,11 +67,22 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
   }
 };
 
-const formatValue = (value: any): string => {
-  if (Array.isArray(value)) {
-    return `'${value.map((v) => escapeSingleQuotes(v)).join(",")}'`;
+const formatValue = (value: any): string | null => {
+  if (value == null) {
+    // if value is null or undefined, return it as is
+    return value;
   }
-  return `'${escapeSingleQuotes(value)}'`;
+
+  // if value is a string, remove any single quotes and add double quotes
+  let tempValue = value;
+  if (value?.length > 1 && value.startsWith("'") && value.endsWith("'")) {
+    tempValue = value.substring(1, value.length - 1);
+  }
+  // escape any single quotes in the value
+  tempValue = escapeSingleQuotes(tempValue);
+  // add double quotes around the value
+  tempValue = `'${tempValue}'`;
+  return tempValue;
 };
 
 export const addLabelToSQlQuery = async (

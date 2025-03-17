@@ -1994,11 +1994,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           selectFilter += `${condition.column} IN (${formatINValue(
             condition.value,
           )})`;
-        } else if (condition.operator === "NOT IN")
+        } else if (condition.operator === "NOT IN") {
           selectFilter += `${condition.column} NOT IN (${formatINValue(
             condition.value,
           )})`;
-        else if (condition.operator === "match_all") {
+        } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${formatValue(condition.value)})`;
         } else if (condition.operator === "match_all_raw") {
           selectFilter += `match_all_raw(${formatValue(condition.value)})`;
