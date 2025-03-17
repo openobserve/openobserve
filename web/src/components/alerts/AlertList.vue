@@ -625,6 +625,7 @@ export default defineComponent({
               owner: data.owner,
               period: data.trigger_condition.period,
               frequency: frequency,
+              type:data.query_condition.type,
               frequency_type: data.trigger_condition.frequency_type,
               last_triggered_at: convertUnixToQuasarFormat(
                 data.last_triggered_at
