@@ -7,7 +7,7 @@ export const login = async (page) => {
   }
     await page.waitForTimeout(1000);
     await page
-      .locator('[data-cy="login-user-id"]')
+      .locator('[data-test="login-user-id"]')
       .fill(process.env["ZO_ROOT_USER_EMAIL"]);
   
     const waitForLogin = page.waitForResponse(
@@ -16,7 +16,7 @@ export const login = async (page) => {
     );
   
     await page
-      .locator('[data-cy="login-password"]')
+      .locator('[data-test="login-password"]')
       .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
     await page.locator('[data-cy="login-sign-in"]').click();
   
