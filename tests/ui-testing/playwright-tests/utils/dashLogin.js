@@ -4,8 +4,8 @@ export const login = async (page) => {
     
     if (await page.getByText('Login as internal user').isVisible()) {
       await page.getByText('Login as internal user').click();
-  }
-    await page.waitForTimeout(1000);
+    }
+    await page.waitForSelector('[data-test="login-user-id"]', { timeout: 10000 });
     await page
       .locator('[data-test="login-user-id"]')
       .fill(process.env["ZO_ROOT_USER_EMAIL"]);
