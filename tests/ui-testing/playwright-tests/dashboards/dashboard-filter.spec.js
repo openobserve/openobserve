@@ -1,9 +1,8 @@
-import { test, expect } from "../baseFixtures";
+import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { login } from "../../pages/dashLogin.js";
 import { ingestion, removeUTFCharacters } from "../../pages/dashIngestion.js";
-import { DashFilter } from "../../pages/dashFilter.js";
 import {
   waitForDashboardPage,
   applyQueryButton,
@@ -118,7 +117,9 @@ test.describe("dashboard filter testcases", () => {
 
     await page.locator('[data-test="dashboard-apply"]').click();
 
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
+      timeout: 5000,
+    });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -149,7 +150,9 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-    await page.locator('[data-test="dashboard-add-condition-operator"]').click();
+    await page
+      .locator('[data-test="dashboard-add-condition-operator"]')
+      .click();
 
     await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
@@ -173,14 +176,15 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("Dashbaord_test");
+    await page
+      .locator('[data-test="dashboard-panel-name"]')
+      .fill("Dashboard_test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
-    
-   // Delete dashbaord 
+
+    // Delete dashbaord
     await page.locator('[data-test="dashboard-back-btn"]').click();
 
     await deleteDashboard(page, randomDashboardName);
-
   });
 
   test("should successfully apply filter conditions using both AND and OR operators", async ({
@@ -265,7 +269,9 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
+      timeout: 5000,
+    });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -288,7 +294,7 @@ test.describe("dashboard filter testcases", () => {
       .locator('[data-test="dashboard-variable-query-value-selector"]')
       .click();
 
-      await page
+    await page
       .locator('[data-test="dashboard-variable-query-value-selector"]')
       .fill("ziox");
     await page.getByRole("option", { name: "ziox" }).click();
@@ -302,7 +308,10 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-      await page.locator('[data-test="dashboard-add-condition-operator"]').first().click();
+    await page
+      .locator('[data-test="dashboard-add-condition-operator"]')
+      .first()
+      .click();
 
     await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
@@ -320,7 +329,10 @@ test.describe("dashboard filter testcases", () => {
       .locator('[data-test="dashboard-add-condition-condition-1"]')
       .click();
 
-    await page.locator('[data-test="dashboard-add-condition-operator"]').last().click();
+    await page
+      .locator('[data-test="dashboard-add-condition-operator"]')
+      .last()
+      .click();
 
     await page
       .getByRole("option", { name: "<>" })
@@ -399,10 +411,10 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="dashboard-panel-name"]').fill("test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
-     // Delete dashbaord 
-     await page.locator('[data-test="dashboard-back-btn"]').click();
+    // Delete dashbaord
+    await page.locator('[data-test="dashboard-back-btn"]').click();
 
-     await deleteDashboard(page, randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("Should  apply the  filter group inside group", async ({ page }) => {
@@ -487,7 +499,9 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
+      timeout: 5000,
+    });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -498,13 +512,12 @@ test.describe("dashboard filter testcases", () => {
       .locator('[data-test="dashboard-variable-query-value-selector"]')
       .click();
     await page
-    .locator('[data-test="dashboard-variable-query-value-selector"]')
-    .fill("ziox");
-  const zioxOption = page.getByRole('option', { name: 'ziox' });
+      .locator('[data-test="dashboard-variable-query-value-selector"]')
+      .fill("ziox");
+    const zioxOption = page.getByRole("option", { name: "ziox" });
 
-await expect(zioxOption).toBeVisible();
-await zioxOption.click();
-  
+    await expect(zioxOption).toBeVisible();
+    await zioxOption.click();
 
     await page.locator('[data-test="dashboard-add-condition-add"]').click();
 
@@ -525,7 +538,9 @@ await zioxOption.click();
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click({ force: true });
 
-    await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').click();
+    await page
+      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
+      .click();
 
     await page
       .getByRole("option", { name: "kubernetes_container_name" })
@@ -533,7 +548,10 @@ await zioxOption.click();
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-      await page.locator('[data-test="dashboard-add-condition-operator"]').first().click();
+    await page
+      .locator('[data-test="dashboard-add-condition-operator"]')
+      .first()
+      .click();
 
     await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
@@ -549,28 +567,36 @@ await zioxOption.click();
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
-      // await page.waitForTimeout(3000);
-      await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').first().click();
+    // await page.waitForTimeout(3000);
+    await page
+      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
+      .first()
+      .click();
 
-      await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').first().fill('kubernetes_container_image');
-      
-      await page
+    await page
+      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
+      .first()
+      .fill("kubernetes_container_image");
+
+    await page
       .getByRole("option", { name: "kubernetes_container_image" })
       .first()
       .click({ force: true });
-      // const option = page.getByRole("option", { name: "kubernetes_container_image" }).first();
+    // const option = page.getByRole("option", { name: "kubernetes_container_image" }).first();
 
-      // await option.waitFor({ state: "visible", timeout: 10000 });
-      
-      // await option.click();
+    // await option.waitFor({ state: "visible", timeout: 10000 });
+
+    // await option.click();
 
     await page
-  .locator('[data-test="dashboard-add-condition-condition-0"]')
-  .first()
-  .click();
+      .locator('[data-test="dashboard-add-condition-condition-0"]')
+      .first()
+      .click();
 
-      await page.locator('[data-test="dashboard-add-condition-operator"]').click();
-      await page
+    await page
+      .locator('[data-test="dashboard-add-condition-operator"]')
+      .click();
+    await page
       .getByRole("option", { name: "<>" })
       .locator("div")
       .nth(2)
@@ -596,12 +622,14 @@ await zioxOption.click();
     await page.locator('[data-test="query-inspector-close-btn"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("Dashbaord_test");
+    await page
+      .locator('[data-test="dashboard-panel-name"]')
+      .fill("Dashbaord_test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
-     // Delete dashbaord 
-     await page.locator('[data-test="dashboard-back-btn"]').click();
-  await deleteDashboard(page, randomDashboardName);
+    // Delete dashbaord
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("Should applly the add group filter with apply the list of value apply successflly ", async ({
@@ -706,7 +734,9 @@ await zioxOption.click();
       )
       .click();
 
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
+      timeout: 5000,
+    });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -758,13 +788,15 @@ await zioxOption.click();
     await page.locator('[data-test="query-inspector-close-btn"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("Dashbaord_test");
+    await page
+      .locator('[data-test="dashboard-panel-name"]')
+      .fill("Dashbaord_test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
-     // Delete dashbaord 
-     await page.locator('[data-test="dashboard-back-btn"]').click();
+    // Delete dashbaord
+    await page.locator('[data-test="dashboard-back-btn"]').click();
 
-     await deleteDashboard(page, randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("Should  apply the  filter using the field button", async ({ page }) => {
@@ -848,7 +880,9 @@ await zioxOption.click();
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
+      timeout: 5000,
+    });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -871,14 +905,15 @@ await zioxOption.click();
 
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("Dashbaord_test");
+    await page
+      .locator('[data-test="dashboard-panel-name"]')
+      .fill("Dashbaord_test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
-    
-     // Delete dashbaord 
-     await page.locator('[data-test="dashboard-back-btn"]').click();
 
-     await deleteDashboard(page, randomDashboardName);
+    // Delete dashbaord
+    await page.locator('[data-test="dashboard-back-btn"]').click();
 
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("Should disply an error massge if added the invalid oprator", async ({
@@ -965,7 +1000,9 @@ await zioxOption.click();
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
+      timeout: 5000,
+    });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -1009,13 +1046,15 @@ await zioxOption.click();
 
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("Dashbaord_test");
+    await page
+      .locator('[data-test="dashboard-panel-name"]')
+      .fill("Dashbaord_test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
-      // Delete dashbaord 
-      await page.locator('[data-test="dashboard-back-btn"]').click();
+    // Delete dashbaord
+    await page.locator('[data-test="dashboard-back-btn"]').click();
 
-      // await deleteDashboard(page, randomDashboardName);
+    // await deleteDashboard(page, randomDashboardName);
   });
 
   test("Should Filter work correcly if Added the breakdwon filed", async ({
@@ -1110,7 +1149,9 @@ await zioxOption.click();
 
     await page.locator('[data-test="dashboard-apply"]').click();
 
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
+      timeout: 5000,
+    });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -1123,8 +1164,8 @@ await zioxOption.click();
     await expect(filterButton).toBeVisible();
     await filterButton.click();
     await page
-    .locator('[data-test="dashboard-variable-query-value-selector"]')
-    .click();
+      .locator('[data-test="dashboard-variable-query-value-selector"]')
+      .click();
     await page
       .locator('[data-test="dashboard-variable-query-value-selector"]')
       .fill("ziox");
@@ -1139,8 +1180,10 @@ await zioxOption.click();
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-      await page.locator('[data-test="dashboard-add-condition-operator"]').click();
-      await page.getByText("=", { exact: true }).click();
+    await page
+      .locator('[data-test="dashboard-add-condition-operator"]')
+      .click();
+    await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
     await page.getByLabel("Value").fill("$variablename");
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -1163,14 +1206,14 @@ await zioxOption.click();
 
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("Dashbaord_test");
+    await page
+      .locator('[data-test="dashboard-panel-name"]')
+      .fill("Dashbaord_test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
-      // Delete dashbaord 
-      await page.locator('[data-test="dashboard-back-btn"]').click();
+    // Delete dashbaord
+    await page.locator('[data-test="dashboard-back-btn"]').click();
 
-      await deleteDashboard(page, randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
-
-
-  });
+});

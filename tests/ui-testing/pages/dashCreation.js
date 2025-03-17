@@ -1,6 +1,5 @@
 import { expect } from "playwright/test";
-
-// fuction of Dashboard page and Apply querybutton
+// fuction of Dashboard page and Apply query button
 export const waitForDashboardPage = async function (page) {
   const dashboardListApi = page.waitForResponse(
     (response) =>
@@ -25,14 +24,14 @@ export const applyQueryButton = async function (page) {
   await expect.poll(async () => (await search).status()).toBe(200);
 };
 
-
 export async function deleteDashboard(page, dashboardName) {
   console.log(`Deleting dashboard with name: ${dashboardName}`);
 
   // const dashboardRow = page.locator(`//tr[.//td[text()="${dashboardName}"]]`);
   // await expect(dashboardRow).toBeVisible(); // Ensure the row is visible
-  const dashboardRow = page.locator('//tr[.//td[text()="' + dashboardName + '"]]').nth(0);
-
+  const dashboardRow = page
+    .locator('//tr[.//td[text()="' + dashboardName + '"]]')
+    .nth(0);
 
   const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
   await deleteButton.click();
@@ -43,5 +42,5 @@ export async function deleteDashboard(page, dashboardName) {
   await confirmButton.click();
 
   // Ensure the dashboard is removed
-  await expect(page.getByText('Dashboard deleted successfully')).toBeVisible();
+  await expect(page.getByText("Dashboard deleted successfully")).toBeVisible();
 }
