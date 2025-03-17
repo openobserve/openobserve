@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_multipart::Multipart;
-use actix_web::{HttpResponse, get, http, put, web};
+use actix_web::{HttpResponse, get, put, web};
 use config::meta::ratelimit::RatelimitRule;
 #[cfg(feature = "enterprise")]
 use {
@@ -24,6 +24,7 @@ use {
         common::meta::http::HttpResponse as MetaHttpResponse,
         service::{ratelimit, ratelimit::rule::RatelimitError},
     },
+    actix_web::http,
     config::meta::ratelimit::RatelimitRuleType,
     futures_util::{StreamExt, TryStreamExt},
     infra::table::ratelimit::RuleEntry,
