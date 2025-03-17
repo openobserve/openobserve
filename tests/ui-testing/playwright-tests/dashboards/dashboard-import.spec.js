@@ -3,6 +3,7 @@ import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import importdata from "../../../test-data/dashboards-import.json";
 import importdata1 from "../../../test-data/dashboard1-import.json";
+import importdata2 from "../../../test-data/dashboard2-import.json";
 
 
 const randomDashboardName =
@@ -155,17 +156,25 @@ test.describe("dashboard import testcases", () => {
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-import"]').click();
     await page.locator('[data-test="tab-import_json_url"]').click();
-    await page.getByLabel('Add your url').click();
-    await page.getByLabel('Add your url').fill('https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json');
+    await page.getByLabel("Add your url").click();
+    await page
+      .getByLabel("Add your url")
+      .fill(
+        "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json"
+      );
 
-  //  await page.waitForTimeout(5000);
+    await page.waitForTimeout(2000);
     // await page.waitForSelector('.table-row'); // adjust selector as needed
-    await expect(page.getByRole('code').locator('div').filter({ hasText: '"dashboardId": "' }).nth(4)).toBeVisible();
-
+    await expect(
+      page
+        .getByRole("code")
+        .locator("div")
+        .filter({ hasText: '"dashboardId": "' })
+        .nth(4)
+    ).toBeVisible();
 
     //is used for setting the file to be importedad
     await page.getByRole("button", { name: "Import" }).click();
-
 
     await expect(
       page.getByRole("cell", { name: "Cloudfront to OpenObserve" }).first()
@@ -249,8 +258,9 @@ test.describe("dashboard import testcases", () => {
 
     await page.getByRole("button", { name: "Import" }).click();
 
-    await expect(page.getByText("Title is required for dashboard ")).toBeVisible();
-
+    await expect(
+      page.getByText("Title is required for dashboard ")
+    ).toBeVisible();
   });
 
   test("Should auto-update the .json data at the correct location when the Dashboard title is added from the error validation dialog.", async ({
@@ -298,15 +308,13 @@ test.describe("dashboard import testcases", () => {
     expect(normalizedJsonTitle).toBe(title);
 
     await page.getByRole("button", { name: "Import" }).click();
-    
-  //  delete the dashboard
+
+    //  delete the dashboard
     await page
       .getByRole("row", { name: "01 Cloudfront to OpenObserve" })
       .locator('[data-test="dashboard-delete"]')
       .click();
     await page.locator('[data-test="confirm-button"]').click();
-
-
   });
 
   test("Should display an error validation message if the 'Stream type' field is missing in the .json data when clicking the Import button.", async ({
@@ -326,77 +334,82 @@ test.describe("dashboard import testcases", () => {
 
     await page.getByRole("button", { name: "Import" }).click();
 
-    await expect(page.getByText('Dashboard(s) Failed to Import')).toBeVisible();
-    await expect(page.getByText(' dashboard2-import.json : AxiosError: Request failed with status code 400')).toBeVisible();
-
+    await expect(page.getByText("Dashboard(s) Failed to Import")).toBeVisible();
+    await expect(
+      page.getByText(
+        " dashboard2-import.json : AxiosError: Request failed with status code 400"
+      )
+    ).toBeVisible();
   });
 
-  test("Should save the .json file in the correct folder when selecting a dashboard folder name and delete it via UI", async ({ page }) => {
-
+  test("Should save the .json file in the correct folder when selecting a dashboard folder name and delete it via UI", async ({
+    page,
+  }) => {
     // Step 1: Navigate to the dashboard page
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
-  
+
     // Step 2: Click the import dashboard button
     await page.locator('[data-test="dashboard-import"]').click();
-  
+
     // Step 3: Set the JSON file for import
     const fileContentPath = "../test-data/dashboards-import.json";
     const inputFile = await page.locator('input[type="file"]');
     await inputFile.setInputFiles(fileContentPath);
     await page.waitForTimeout(2000); // Optional wait for file processing
-  
+
     // Step 4: Create a unique folder via UI
     function generateUniqueFolderName(prefix = "u") {
       return `${prefix}_${Date.now()}`;
     }
-  
+
     const folderName = generateUniqueFolderName();
-  
+
     // Fill in the folder name in the input and save it
     await page.locator('[data-test="dashboard-folder-move-new-add"]').click();
 
     await page.locator('[data-test="dashboard-folder-add-name"]').click();
-    await page.locator('[data-test="dashboard-folder-add-name"]').fill(folderName);
+    await page
+      .locator('[data-test="dashboard-folder-add-name"]')
+      .fill(folderName);
     await page.locator('[data-test="dashboard-folder-add-save"]').click();
 
+    const importButton = page.getByRole("button", { name: "Import" });
+    await expect(importButton).toBeVisible({ timeout: 10000 });
+    await importButton.click();
 
-    const importButton = page.getByRole('button', { name: 'Import' });
-await expect(importButton).toBeVisible({ timeout: 10000 }); 
-await importButton.click();
-
-
-//  delete the dashboard
-await page
-.getByRole("row", { name: "01 Cloudfront to OpenObserve" })
-.locator('[data-test="dashboard-delete"]')
-.click();
-await page.locator('[data-test="confirm-button"]').click();
-
+    //  delete the dashboard
+    await page
+      .getByRole("row", { name: "01 Cloudfront to OpenObserve" })
+      .locator('[data-test="dashboard-delete"]')
+      .click();
+    await page.locator('[data-test="confirm-button"]').click();
 
     // Log folder name (for debug)
     console.log(`Created folder name: ${folderName}`);
-    
+
     // Step 6: Find the folder card by folder name and click the More (3 dots) icon
-    const folderCard = page.locator(`[data-test^="dashboard-folder-tab-"]`, { hasText: folderName });
+    const folderCard = page.locator(`[data-test^="dashboard-folder-tab-"]`, {
+      hasText: folderName,
+    });
 
     // Hover over the folder card first
-await folderCard.hover();
+    await folderCard.hover();
     await folderCard.locator('[data-test="dashboard-more-icon"]').click();
-  
+
     // Step 7: Click Delete Folder option
     await page.locator('[data-test="dashboard-delete-folder-icon"]').click();
-  
+
     // Step 8: Confirm deletion in modal
     await page.locator('[data-test="confirm-button"]').click();
 
-      //  Assert folder is deleted
-    await expect(page.locator(`[data-test^="dashboard-folder-tab-"]`, { hasText: folderName })).toHaveCount(0);
-  
+    //  Assert folder is deleted
+    await expect(
+      page.locator(`[data-test^="dashboard-folder-tab-"]`, {
+        hasText: folderName,
+      })
+    ).toHaveCount(0);
+
     console.log(`Successfully deleted folder via UI: ${folderName}`);
   });
-
-  });
-  
-  
-
+});
