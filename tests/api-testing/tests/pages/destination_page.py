@@ -81,3 +81,48 @@ class DestinationPage:
         assert response.status_code == 200, f"Failed to delete destination: {response.content}"
         return response
    
+    
+def test_e2e_alerts(create_session, base_url):
+    """Running an E2E test for get all the alerts list."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    resp_get_allalerts = session.get(f"{url}api/{org_id}/alerts")
+
+    print(resp_get_allalerts.content)
+    assert (
+        resp_get_allalerts.status_code == 200
+    ), f"Get all alerts list 200, but got {resp_get_allalerts.status_code} {resp_get_allalerts.content}"
+
+
+def test_e2e_destinations(create_session, base_url):
+    """Running an E2E test for get all the destination list under alerts."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    resp_get_alldestinations = session.get(f"{url}api/{org_id}/alerts/destinations")
+
+    print(resp_get_alldestinations.content)
+    assert (
+        resp_get_alldestinations.status_code == 200
+    ), f"Get all alerts list 200, but got {resp_get_alldestinations.status_code} {resp_get_alldestinations.content}"
+
+
+def delete_destination(create_session, base_url):
+    """Running an E2E test for deleting destination that does not exist ."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    resp_delete_destination = session.delete(
+        f"{url}api/{org_id}/alerts/destinations/destinationname"
+    )
+    assert (
+        resp_delete_destination.status_code == 404
+    ), f"Deleting this destination, but got {resp_delete_destination.status_code} {resp_delete_destination.content}"
+
+

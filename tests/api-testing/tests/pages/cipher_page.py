@@ -28,9 +28,9 @@ class CipherPage:
 
         
 
-    def create_cipher_simpleOO(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, cipher_name_simpleOO):
+    def create_cipher_simpleOO(self, session, base_url, user_email, user_password, org_id, cipher_name_simpleOO):
         """Running an E2E test for creating cipher_keys with simple OO cipher."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD) 
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         # Create a unique cipher name
         while True:
             payload_simpleOO = {
@@ -71,9 +71,9 @@ class CipherPage:
             else:
                 raise AssertionError(f"Unexpected error: {resp_create_cipher_simpleOO.status_code} {resp_create_cipher_simpleOO.content}")
         
-    def create_cipher_tinkOO(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, cipher_name_tinkOO):
+    def create_cipher_tinkOO(self, session, base_url, user_email, user_password, org_id, cipher_name_tinkOO):
         """Running an E2E test for create cipher_key with Tink OO cipher.""" 
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD) 
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         # Create a unique cipher name
         while True:
             payload_tinkOO = {
@@ -130,9 +130,9 @@ class CipherPage:
                 raise AssertionError(f"Unexpected error: {resp_create_cipher_tinkOO.status_code} {resp_create_cipher_tinkOO.content}")
 
 
-    def retrieve_cipherKeys_simpleOO(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id):
+    def retrieve_cipherKeys_simpleOO(self, session, base_url, user_email, user_password, org_id):
         """Retrieve a cipher key."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD) 
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         response = session.get(f"{base_url}api/{org_id}/cipher_keys")
         assert response.status_code == 200, f"Failed to retrieve cipher key: {response.content}"
         
@@ -155,9 +155,9 @@ class CipherPage:
             "keys": sim_keys
         }
 
-    def retrieve_cipher_simpleOO(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, cipher_name_simpleOO):
+    def retrieve_cipher_simpleOO(self, session, base_url, user_email, user_password, org_id, cipher_name_simpleOO):
         """Retrieve a cipher key and assert local value starts with 'GNf6Mc'."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD) 
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         response = session.get(f"{base_url}api/{org_id}/cipher_keys/{cipher_name_simpleOO}")
         assert response.status_code == 200, f"Failed to retrieve cipher key: {response.content}"
         
@@ -181,9 +181,9 @@ class CipherPage:
 
         
 
-    def retrieve_cipherKeys_tinkOO(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id):
+    def retrieve_cipherKeys_tinkOO(self, session, base_url, user_email, user_password, org_id):
         """Retrieve Tink cipher keys that start with a specific prefix."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD) 
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         response = session.get(f"{base_url}api/{org_id}/cipher_keys")
         assert response.status_code == 200, f"Failed to retrieve cipher keys: {response.content}"
         
@@ -209,9 +209,9 @@ class CipherPage:
 
 
 
-    def retrieve_cipher_tinkOO(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, cipher_name_tinkOO):
+    def retrieve_cipher_tinkOO(self, session, base_url, user_email, user_password, org_id, cipher_name_tinkOO):
         """Retrieve a Tink cipher key and assert that the local field contains the expected string format for primaryKeyId."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD) 
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         response = session.get(f"{base_url}api/{org_id}/cipher_keys/{cipher_name_tinkOO}")
         assert response.status_code == 200, f"Failed to retrieve cipher key: {response.content}"
 
@@ -247,9 +247,9 @@ class CipherPage:
             "primaryKeyId": primary_key_id  # Return the extracted primaryKeyId
         }
 
-    def update_cipher_simpleOO(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, cipher_name_simpleOO):
+    def update_cipher_simpleOO(self, session, base_url, user_email, user_password, org_id, cipher_name_simpleOO):
         """Running an E2E test for updating cipher_keys with simple OO cipher."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD) 
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         # Create a unique cipher name
         while True:
             payload_up_simpleOO = {
@@ -290,9 +290,9 @@ class CipherPage:
             else:
                 raise AssertionError(f"Unexpected error: {resp_update_cipher_simpleOO.status_code} {resp_update_cipher_simpleOO.content}")
 
-    def update_cipher_tinkOO(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, cipher_name_tinkOO):
+    def update_cipher_tinkOO(self, session, base_url, user_email, user_password, org_id, cipher_name_tinkOO):
         """Running an E2E test for updating cipher_keys with Tink OO cipher."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD) 
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         # Create a unique cipher name
         payload_up_tinkOO = {
             "name": cipher_name_tinkOO,
@@ -346,9 +346,9 @@ class CipherPage:
         return resp_update_cipher_tinkOO
 
 
-    def delete_cipher(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, cipher_name):
+    def delete_cipher(self, session, base_url, user_email, user_password, org_id, cipher_name):
         """Running an E2E test for deleting cipher_keys with cipher type."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD) 
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         
         resp_delete_cipher = session.delete(f"{base_url}api/{org_id}/cipher_keys/{cipher_name}")
         assert resp_delete_cipher.status_code == 200, f"Failed to delete {cipher_name}: {resp_delete_cipher.content}"
@@ -363,9 +363,9 @@ class CipherPage:
         return resp_ver_cipher  # Return the list of deleted cipher keys for verification if needed
 
 
-    def validate_deleted_cipher_simpleOO(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, cipher_name_simpleOO): 
+    def validate_deleted_cipher_simpleOO(self, session, base_url, user_email, user_password, org_id, cipher_name_simpleOO): 
         """Running an E2E test for validating deleted cipher in SC."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)         
+        session.auth = HTTPBasicAuth(user_email, user_password)         
         # Retrieve all cipher keys
         response = session.get(f"{base_url}api/{org_id}/cipher_keys")
         assert response.status_code == 200, f"Failed to retrieve cipher keys: {response.content}"
@@ -385,9 +385,9 @@ class CipherPage:
 
         return cipher_type_keys
     
-    def validate_deleted_cipher_tinkOO(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, cipher_name_tinkOO): 
+    def validate_deleted_cipher_tinkOO(self, session, base_url, user_email, user_password, org_id, cipher_name_tinkOO): 
         """Running an E2E test for validating deleted cipher in SC."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)         
+        session.auth = HTTPBasicAuth(user_email, user_password)         
         # Retrieve all cipher keys
         response = session.get(f"{base_url}api/{org_id}/cipher_keys")
         assert response.status_code == 200, f"Failed to retrieve cipher keys: {response.content}"
