@@ -581,7 +581,7 @@ test.describe("dashboard filter testcases", () => {
     await page
       .getByRole("option", { name: "kubernetes_container_image" })
       .first()
-      .click({ force: true });
+      .click();
     // const option = page.getByRole("option", { name: "kubernetes_container_image" }).first();
 
     // await option.waitFor({ state: "visible", timeout: 10000 });
