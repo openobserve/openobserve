@@ -1271,9 +1271,9 @@ export default defineComponent({
               const fields: any = {};
               panelSchema.value.queries.forEach((query: any) => {
                 const panelFields: any = [
-                  ...query.fields.x,
-                  ...query.fields.y,
-                  ...query.fields.z,
+                  ...(query.fields.x || []),
+                  ...(query.fields.y || []),
+                  ...(query.fields.z || []),
                 ];
                 panelFields.forEach((field: any) => {
                   fields[field.label] = drilldownParams[1][0][field.alias];
