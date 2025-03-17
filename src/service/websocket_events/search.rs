@@ -299,21 +299,20 @@ pub async fn handle_search_request(
 
 async fn do_search(
     req: &SearchEventReq,
-    org_id: &str,
     user_id: &str,
     use_cache: bool,
 ) -> Result<Response, Error> {
     let span = tracing::info_span!(
         "src::handler::http::request::websocket::search::do_search",
         trace_id = %req.trace_id,
-        org_id = %org_id,
+        org_id = %req.org_id,
     );
 
     let mut req = req.clone();
     req.payload.use_cache = Some(use_cache);
     let res = SearchService::cache::search(
         &req.trace_id,
-        org_id,
+        &req.org_id,
         req.stream_type,
         Some(user_id.to_string()),
         &req.payload,
@@ -527,7 +526,7 @@ async fn process_delta(
     req.payload.query.start_time = delta.delta_start_time;
     req.payload.query.end_time = delta.delta_end_time;
 
-    let partition_resp = get_partitions(&req, org_id, user_id).await?;
+    let partition_resp = get_partitions(&req, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
@@ -574,7 +573,7 @@ async fn process_delta(
         }
 
         // use cache for delta search
-        let mut search_res = do_search(&req, org_id, user_id, true).await?;
+        let mut search_res = do_search(&req, user_id, true).await?;
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
@@ -686,7 +685,6 @@ async fn process_delta(
 
 async fn get_partitions(
     req: &SearchEventReq,
-    org_id: &str,
     user_id: &str,
 ) -> Result<SearchPartitionResponse, Error> {
     let search_payload = req.payload.clone();
@@ -704,7 +702,7 @@ async fn get_partitions(
 
     let res = SearchService::search_partition(
         &req.trace_id,
-        org_id,
+        &req.org_id,
         Some(user_id),
         req.stream_type,
         &search_partition_req,
@@ -833,7 +831,7 @@ async fn do_partitioned_search(
     let modified_start_time = req.payload.query.start_time;
     let modified_end_time = req.payload.query.end_time;
 
-    let partition_resp = get_partitions(req, org_id, user_id).await?;
+    let partition_resp = get_partitions(req, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
@@ -885,7 +883,7 @@ async fn do_partitioned_search(
         }
 
         // do not use cache for partitioned search without cache
-        let mut search_res = do_search(&req, org_id, user_id, false).await?;
+        let mut search_res = do_search(&req, user_id, false).await?;
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
