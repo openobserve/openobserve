@@ -27,14 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
     <VariablesValueSelector
       v-if="hasGlobalVariables"
-      :variablesConfig="getGlobalOnlyVariables()"
+      :variablesConfig="dashboardData?.variables"
+      :scope="'global'"
+      :currentTabId="selectedTabId"
+      :currentPanelId="null"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
       :selectedTimeDate="currentTimeObj['__global']"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
       ref="variablesValueSelectorRef"
-      :current-tab-id="selectedTabId"
-      :current-panel-id="null"
       class="global-variables-selector"
     />
 
@@ -49,13 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tab level variables -->
     <VariablesValueSelector
       v-if="hasTabLevelVariables"
-      :variablesConfig="getTabOnlyVariables()"
+      :variablesConfig="dashboardData?.variables"
+      :scope="'tabs'"
+      :currentTabId="selectedTabId"
+      :currentPanelId="null"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
       :selectedTimeDate="currentTimeObj['__global']"
       :initialVariableValues="initialVariableValues"
       @variablesData="tabVariablesDataUpdated"
-      :current-tab-id="selectedTabId"
-      :current-panel-id="null"
       class="tab-variables-selector q-mt-sm"
     />
 
@@ -75,7 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="panel-variables-container"
         >
           <VariablesValueSelector
-            :variablesConfig="getPanelOnlyVariablesConfig(panels[0].id)"
+            v-if="hasPanelVariablesForPanel(panels[0].id)"
+            :variablesConfig="dashboardData?.variables"
+            :scope="'panels'"
+            :currentTabId="selectedTabId"
+            :currentPanelId="panels[0].id"
             :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
             :selectedTimeDate="
               currentTimeObj[panels[0].id] || currentTimeObj['__global']
@@ -84,8 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @variablesData="
               (data) => panelVariablesDataUpdated(data, panels[0].id)
             "
-            :current-tab-id="selectedTabId"
-            :current-panel-id="panels[0].id"
             class="panel-variables-selector"
           />
         </div>
@@ -153,7 +157,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="panel-variables-container"
             >
               <VariablesValueSelector
-                :variablesConfig="getPanelOnlyVariablesConfig(item.id)"
+                v-if="hasPanelVariablesForPanel(item.id)"
+                :variablesConfig="dashboardData?.variables"
+                :scope="'panels'"
+                :currentTabId="selectedTabId"
+                :currentPanelId="item.id"
                 :showDynamicFilters="
                   dashboardData.variables?.showDynamicFilters
                 "
@@ -164,8 +172,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @variablesData="
                   (data) => panelVariablesDataUpdated(data, item.id)
                 "
-                :current-tab-id="selectedTabId"
-                :current-panel-id="item.id"
                 class="panel-variables-selector"
               />
             </div>
