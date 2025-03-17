@@ -134,7 +134,7 @@ export const formatRateInterval = (interval: any) => {
 };
 
 export const processVariableContent = (content: string, variablesData: any) => {
-  let processedContent: any = content;
+  let processedContent: string = content;
 
   if (variablesData && variablesData.values) {
     variablesData.values.forEach((variable: any) => {
