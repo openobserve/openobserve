@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @last-triggered-at-update="
                             handleLastTriggeredAtUpdate
                           "
-                          searchType="Dashboards"
+                          searchType="dashboards"
                         />
                         <q-dialog v-model="showViewPanel">
                           <QueryInspector
@@ -458,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @last-triggered-at-update="
                             handleLastTriggeredAtUpdate
                           "
-                          searchType="Dashboards"
+                          searchType="dashboards"
                         />
 
                     </template>

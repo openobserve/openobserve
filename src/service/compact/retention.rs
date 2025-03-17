@@ -52,7 +52,7 @@ fn generate_time_ranges_for_deletion(
         TimeRange::flatten_overlapping_ranges(extended_retention_ranges).into_iter();
 
     log::debug!(
-        "[COMPACT] populate_time_ranges_for_deletion exclude_range: {}, original_time_range: {}",
+        "[COMPACTOR] populate_time_ranges_for_deletion exclude_range: {}, original_time_range: {}",
         extended_retention_ranges_iter.clone().join(", "),
         original_time_range.clone()
     );
@@ -129,7 +129,7 @@ fn generate_time_ranges_for_deletion(
     }
 
     log::debug!(
-        "[COMPACT] populate_time_ranges_for_deletion time_ranges_for_deletion: {}",
+        "[COMPACTOR] populate_time_ranges_for_deletion time_ranges_for_deletion: {}",
         time_ranges_for_deletion.iter().join(", ")
     );
 
@@ -157,7 +157,7 @@ pub async fn delete_by_stream(
     }
 
     log::debug!(
-        "[COMPACT] delete_by_stream {}/{}/{}/{},{}",
+        "[COMPACTOR] delete_by_stream {}/{}/{}/{},{}",
         org_id,
         stream_type,
         stream_name,
@@ -179,17 +179,21 @@ pub async fn delete_by_stream(
         lifecycle_end.timestamp_micros(),
     );
 
-    let final_deletion_time_ranges = generate_time_ranges_for_deletion(
-        extended_retentions.to_vec(),
-        original_deletion_time_range,
-        last_retained_time,
-    );
-
-    log::debug!(
-        "[COMPACT] extended_retentions: {}, final_deletion_time_ranges: {}",
-        extended_retentions.iter().join(", "),
-        final_deletion_time_ranges.iter().join(", ")
-    );
+    let final_deletion_time_ranges = if extended_retentions.is_empty() {
+        vec![original_deletion_time_range]
+    } else {
+        let ranges = generate_time_ranges_for_deletion(
+            extended_retentions.to_vec(),
+            original_deletion_time_range,
+            last_retained_time,
+        );
+        log::debug!(
+            "[COMPACTOR] extended_retentions: {}, final_deletion_time_ranges: {}",
+            extended_retentions.iter().join(", "),
+            ranges.iter().join(", ")
+        );
+        ranges
+    };
 
     let job_nos = final_deletion_time_ranges.len();
 
@@ -207,7 +211,7 @@ pub async fn delete_by_stream(
         }
 
         log::debug!(
-            "[COMPACT] delete_by_stream {}/{}/{}/{},{}",
+            "[COMPACTOR] delete_by_stream {}/{}/{}/{},{}",
             org_id,
             stream_type,
             stream_name,
@@ -236,7 +240,7 @@ pub async fn delete_all(
     let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::retention::get_stream(org_id, stream_type, stream_name, None).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        log::warn!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
+        log::warn!("[COMPACTOR] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }
@@ -284,7 +288,7 @@ pub async fn delete_all(
         if cfg.compact.data_retention_history {
             // only store the file_list into history, don't delete files
             if let Err(e) = infra_file_list::batch_add_history(&files).await {
-                log::error!("[COMPACT] file_list batch_add_history failed: {}", e);
+                log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
                 return Err(e.into());
             }
         }
@@ -324,7 +328,7 @@ pub async fn delete_by_date(
             .await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::warn!(
-            "[COMPACT] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
+            "[COMPACTOR] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
             date_range
         );
         dist_lock::unlock(&locker).await?;
@@ -398,7 +402,7 @@ pub async fn delete_by_date(
         if cfg.compact.data_retention_history {
             // only store the file_list into history, don't delete files
             if let Err(e) = infra_file_list::batch_add_history(&files).await {
-                log::error!("[COMPACT] file_list batch_add_history failed: {}", e);
+                log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
                 return Err(e.into());
             }
         }
@@ -521,19 +525,22 @@ async fn write_file_list(
         for _ in 0..5 {
             if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
             {
-                log::error!("[COMPACT] batch_add_deleted to db failed, retrying: {}", e);
+                log::error!(
+                    "[COMPACTOR] batch_add_deleted to db failed, retrying: {}",
+                    e
+                );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
             if let Err(e) = infra_file_list::batch_add(&put_items).await {
-                log::error!("[COMPACT] batch_add to db failed, retrying: {}", e);
+                log::error!("[COMPACTOR] batch_add to db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
             if !del_items.is_empty() {
                 let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
                 if let Err(e) = infra_file_list::batch_remove(&del_files).await {
-                    log::error!("[COMPACT] batch_delete to db failed, retrying: {}", e);
+                    log::error!("[COMPACTOR] batch_delete to db failed, retrying: {}", e);
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
@@ -542,7 +549,7 @@ async fn write_file_list(
             break;
         }
         if !success {
-            return Err(anyhow::anyhow!("[COMPACT] batch_write to db failed"));
+            return Err(anyhow::anyhow!("[COMPACTOR] batch_write to db failed"));
         }
     }
     Ok(())

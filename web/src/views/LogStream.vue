@@ -133,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 class="q-ml-auto q-mb-xs no-border"
                 :placeholder="t('logStream.search')"
+                debounce="300"
               >
                 <template #prepend>
                   <q-icon name="search" />
@@ -374,7 +375,8 @@ export default defineComponent({
     const sortField = ref("name");
     const sortAsc = ref(true);
 
-    const pageOffset = ref(pagination.value.page - 1 * pagination.value.rowsPerPage);
+    const offset = pagination.value.page - 1 * pagination.value.rowsPerPage < 0 ? 0 : pagination.value.page - 1 * pagination.value.rowsPerPage;
+    const pageOffset = ref(offset);
     const pageRecordsPerPage = ref(pagination.value.rowsPerPage);
     
     const streamFilterValues = [
@@ -855,7 +857,7 @@ export default defineComponent({
         sortAsc.value = true;
       }
 
-      pageOffset.value = (page - 1) * rowsPerPage;
+      pageOffset.value = ((page - 1) * rowsPerPage) < 0 ? 0 : (page - 1) * rowsPerPage;
       pageRecordsPerPage.value = rowsPerPage;
 
       loadingState.value = true

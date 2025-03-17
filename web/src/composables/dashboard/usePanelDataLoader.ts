@@ -455,7 +455,7 @@ export const usePanelDataLoader = (
                   dashboard_id: dashboardId?.value,
                   folder_id: folderId?.value,
                 },
-                searchType.value ?? "Dashboards",
+                searchType.value ?? "dashboards",
               ),
             abortControllerRef.signal,
           );
@@ -1089,7 +1089,7 @@ export const usePanelDataLoader = (
                           dashboard_id: dashboardId?.value,
                           folder_id: folderId?.value,
                         },
-                        searchType.value ?? "Dashboards",
+                        searchType.value ?? "dashboards",
                       ),
                     abortControllerRef.signal,
                   );

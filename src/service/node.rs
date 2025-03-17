@@ -65,6 +65,8 @@ pub fn config_node_to_proto(node: ConfigNode) -> NodeDetails {
         tcp_conns_established: node.metrics.tcp_conns_established as u64,
         tcp_conns_close_wait: node.metrics.tcp_conns_close_wait as u64,
         tcp_conns_time_wait: node.metrics.tcp_conns_time_wait as u64,
+        open_fds: node.metrics.open_fds as u64,
+        tcp_conn_resets: node.metrics.tcp_conn_resets as u64,
     };
 
     NodeDetails {
@@ -129,6 +131,8 @@ pub fn proto_node_to_config(node: NodeDetails) -> ConfigNode {
                 tcp_conns_established: m.tcp_conns_established as usize,
                 tcp_conns_close_wait: m.tcp_conns_close_wait as usize,
                 tcp_conns_time_wait: m.tcp_conns_time_wait as usize,
+                open_fds: m.open_fds as usize,
+                tcp_conn_resets: m.tcp_conn_resets as usize,
             }
         });
 

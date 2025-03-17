@@ -169,6 +169,7 @@ const defaultObject = {
     additionalErrorMsg: "",
     savedViewFilterFields: "",
     hasSearchDataTimestampField: false,
+    originalDataCache: new Map(),
     stream: {
       loading: false,
       streamLists: <object[]>[],
@@ -1499,6 +1500,10 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
+      //remove any data that has been cached 
+      if(searchObj.data.originalDataCache.size > 0){
+        searchObj.data.originalDataCache.clear();
+      }
       // Reset cancel query on new search request initation
       searchObj.data.isOperationCancelled = false;
       searchObj.data.searchRequestTraceIds = [];
@@ -1888,37 +1893,37 @@ const useLogs = () => {
         }
         delete queryReq.aggs;
       }
-      searchObj.data.queryResults.subpage = 1;
-      if (searchObj.meta.jobId == "") {
-        searchService
-          .schedule_search(
-            {
-              org_identifier: searchObj.organizationIdentifier,
-              query: queryReq,
-              page_type: searchObj.data.stream.streamType,
-            },
-            "UI",
-          )
-          .then((res: any) => {
-            $q.notify({
-              type: "positive",
-              message: "Job Added Succesfully",
-              timeout: 2000,
-              actions: [
-                {
-                  label: "Go To Job Scheduler",
-                  color: "white",
-                  handler: () => routeToSearchSchedule(),
-                },
-              ],
-            });
-          });
-      } else {
-        await getPaginatedData(queryReq);
-      }
-      if (searchObj.meta.jobId == "") {
-        searchObj.data.histogram.chartParams.title = getHistogramTitle();
-      }
+              searchObj.data.queryResults.subpage = 1;
+            if (searchObj.meta.jobId == "" ) {
+              searchService
+              .schedule_search(
+              {
+                org_identifier: searchObj.organizationIdentifier,
+                query: queryReq,
+                page_type: searchObj.data.stream.streamType,
+              },
+              "ui",
+            ).then((res: any) => {
+              $q.notify({
+                type: "positive",
+                message: "Job Added Succesfully",
+                timeout: 2000,
+                actions: [
+                  {
+                    label: "Go To Job Scheduler",
+                    color: "white",
+                    handler: () => routeToSearchSchedule(),
+                  },
+                ],
+              });
+            })
+            }
+            else {
+              await getPaginatedData(queryReq);
+            }
+          if (searchObj.meta.jobId == ""){
+            searchObj.data.histogram.chartParams.title = getHistogramTitle();
+          }
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -2085,7 +2090,7 @@ const useLogs = () => {
               page_type: searchObj.data.stream.streamType,
               traceparent,
             },
-            "UI",
+            "ui",
           )
           .then(async (res) => {
             // check for total records update for the partition and update pagination accordingly
@@ -2245,15 +2250,15 @@ const useLogs = () => {
         ? "get_scheduled_search_result"
         : "search";
       searchService[decideSearch](
-        {
-          org_identifier: searchObj.organizationIdentifier,
-          query: queryReq,
-          jobId: searchObj.meta.jobId ? searchObj.meta.jobId : "",
-          page_type: searchObj.data.stream.streamType,
-          traceparent,
-        },
-        "UI",
-      )
+          {
+            org_identifier: searchObj.organizationIdentifier,
+            query: queryReq,
+            jobId: searchObj.meta.jobId ? searchObj.meta.jobId : "",
+            page_type: searchObj.data.stream.streamType,
+            traceparent,
+          },
+          "ui",
+        )
         .then(async (res) => {
           if (
             res.data.hasOwnProperty("function_error") &&
@@ -2573,7 +2578,7 @@ const useLogs = () => {
               page_type: searchObj.data.stream.streamType,
               traceparent,
             },
-            "UI",
+            "ui",
           )
           .then(async (res: any) => {
             removeTraceId(traceId);
