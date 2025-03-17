@@ -433,11 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-select
                         dense
                         filled
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.weight.havingConditions[0].operator
-                        "
+                        v-model="getHavingCondition().operator"
                         :options="operators"
                         style="width: 30%"
                       >
@@ -446,11 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         dense
                         filled
-                        v-model.number="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.weight.havingConditions[0].value
-                        "
+                        v-model.number="getHavingCondition().value"
                         style="width: 50%"
                         type="number"
                         placeholder="Value"
@@ -518,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, watch, computed } from "vue";
+import { defineComponent, ref, reactive, watch, computed, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -763,53 +755,49 @@ export default defineComponent({
 
     const operators = ["=", "<>", ">=", "<=", ">", "<"];
 
-    const havingFilterVisibility: any = ref({});
-
     const isHavingFilterVisible = () => {
-      if (havingFilterVisibility.value === true) {
-        return true;
-      }
-
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
       const currentField =
         dashboardPanelData.data.queries[currentQueryIndex].fields.weight;
 
-      return (
-        currentField.havingConditions &&
-        currentField.havingConditions.length > 0 &&
-        (currentField.havingConditions[0].operator !== null ||
-          currentField.havingConditions[0].value !== null)
-      );
+      const isVisible = !!currentField?.havingConditions?.length;
+      return isVisible;
     };
 
-    const toggleHavingFilter = () => {
+    const toggleHavingFilter = async () => {
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
       const currentField =
         dashboardPanelData.data.queries[currentQueryIndex].fields.weight;
 
-      if (
-        !currentField.havingConditions ||
-        !currentField.havingConditions.length
-      ) {
-        currentField.havingConditions = [
-          {
-            operator: null,
-            value: null,
-          },
-        ];
+      if (!currentField.havingConditions) {
+        currentField.havingConditions = [];
       }
 
-      havingFilterVisibility.value = true;
+      if (!currentField.havingConditions.length) {
+        currentField.havingConditions.push({ operator: null, value: null });
+      }
+
+      await nextTick();
     };
 
-    const cancelHavingFilter = () => {
+    const cancelHavingFilter = async () => {
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
       const currentField =
         dashboardPanelData.data.queries[currentQueryIndex].fields.weight;
 
       currentField.havingConditions = [];
 
-      havingFilterVisibility.value = false;
+      await nextTick();
+    };
+
+    const getHavingCondition = () => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields.weight;
+
+      return (
+        currentField.havingConditions?.[0] || { operator: null, value: null }
+      );
     };
 
     return {
@@ -840,6 +828,7 @@ export default defineComponent({
       isHavingFilterVisible,
       toggleHavingFilter,
       cancelHavingFilter,
+      getHavingCondition,
       options: [
         "=",
         "<>",

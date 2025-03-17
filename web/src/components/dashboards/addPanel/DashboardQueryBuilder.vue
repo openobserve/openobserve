@@ -728,35 +728,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="primary"
                         icon="add"
                         label="Add"
-                        @click="toggleHavingFilter(index)"
-                        v-if="!isHavingFilterVisible(index)"
+                        @click="toggleHavingFilter(index, 'y')"
+                        v-if="!isHavingFilterVisible(index, 'y')"
                       />
 
                       <div
                         class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
-                        v-if="isHavingFilterVisible(index)"
+                        v-if="isHavingFilterVisible(index, 'y')"
                       >
                         <q-select
                           dense
                           filled
-                          v-model="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.y[index].havingConditions[0].operator
-                          "
+                          v-model="getHavingCondition(index, 'y').operator"
                           :options="operators"
                           style="width: 30%"
-                        >
-                        </q-select>
+                        />
 
                         <q-input
                           dense
                           filled
-                          v-model.number="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.y[index].havingConditions[0].value
-                          "
+                          v-model.number="getHavingCondition(index, 'y').value"
                           style="width: 50%"
                           type="number"
                           placeholder="Value"
@@ -766,7 +757,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dense
                           flat
                           icon="close"
-                          @click="cancelHavingFilter(index)"
+                          @click="cancelHavingFilter(index, 'y')"
                         />
                       </div>
                     </div>
@@ -976,34 +967,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color="primary"
                           icon="add"
                           label="Add"
-                          @click="toggleHavingFilter(index)"
-                          v-if="!isHavingFilterVisible(index)"
+                          @click="toggleHavingFilter(index, 'z')"
+                          v-if="!isHavingFilterVisible(index, 'z')"
                         />
 
                         <div
                           class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
-                          v-if="isHavingFilterVisible(index)"
+                          v-if="isHavingFilterVisible(index, 'z')"
                         >
                           <q-select
                             dense
                             filled
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.z[index].havingConditions[0].operator
-                            "
+                            v-model="getHavingCondition(index, 'z').operator"
                             :options="operators"
                             style="width: 30%"
-                          >
-                          </q-select>
+                          />
 
                           <q-input
                             dense
                             filled
                             v-model.number="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.z[index].havingConditions[0].value
+                              getHavingCondition(index, 'z').value
                             "
                             style="width: 50%"
                             type="number"
@@ -1014,7 +998,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dense
                             flat
                             icon="close"
-                            @click="cancelHavingFilter(index)"
+                            @click="cancelHavingFilter(index, 'z')"
                           />
                         </div>
                       </div>
@@ -1082,7 +1066,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
+import {
+  defineComponent,
+  ref,
+  reactive,
+  watch,
+  computed,
+  inject,
+  nextTick,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -1562,56 +1554,49 @@ export default defineComponent({
 
     const operators = ["=", "<>", ">=", "<=", ">", "<"];
 
-    const havingFilterVisibility: any = ref({});
-
-    const isHavingFilterVisible = (index: any) => {
-      if (havingFilterVisibility.value[index] === true) {
-        return true;
-      }
-
+    const isHavingFilterVisible = (index: any, axis: any) => {
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
       const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields.y[index] ||
-        dashboardPanelData.data.queries[currentQueryIndex].fields.z[index];
+        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
 
-      return (
-        currentField.havingConditions &&
-        currentField.havingConditions.length > 0 &&
-        (currentField.havingConditions[0].operator !== null ||
-          currentField.havingConditions[0].value !== null)
-      );
+      const isVisible = !!currentField?.havingConditions?.length;
+      return isVisible;
     };
 
-    const toggleHavingFilter = (index: any) => {
+    const toggleHavingFilter = async (index: any, axis: any) => {
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
       const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields.y[index] ||
-        dashboardPanelData.data.queries[currentQueryIndex].fields.z[index];
+        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
 
-      if (
-        !currentField.havingConditions ||
-        !currentField.havingConditions.length
-      ) {
-        currentField.havingConditions = [
-          {
-            operator: null,
-            value: null,
-          },
-        ];
+      if (!currentField.havingConditions) {
+        currentField.havingConditions = [];
       }
 
-      havingFilterVisibility.value[index] = true;
+      if (!currentField.havingConditions.length) {
+        currentField.havingConditions.push({ operator: null, value: null });
+      }
+
+      await nextTick();
     };
 
-    const cancelHavingFilter = (index: any) => {
+    const cancelHavingFilter = async (index: any, axis: any) => {
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
       const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields.y[index] ||
-        dashboardPanelData.data.queries[currentQueryIndex].fields.z[index];
+        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
 
       currentField.havingConditions = [];
 
-      havingFilterVisibility.value[index] = false;
+      await nextTick();
+    };
+
+    const getHavingCondition = (index: any, axis: any) => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
+
+      return (
+        currentField.havingConditions?.[0] || { operator: null, value: null }
+      );
     };
 
     return {
@@ -1666,6 +1651,7 @@ export default defineComponent({
       isHavingFilterVisible,
       toggleHavingFilter,
       cancelHavingFilter,
+      getHavingCondition,
     };
   },
 });

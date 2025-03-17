@@ -468,12 +468,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               : "ASC"
             : null,
         isDerived,
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       });
     }
 
@@ -534,12 +529,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               : "ASC"
             : null,
         isDerived,
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       });
     }
 
@@ -593,12 +583,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             ? null
             : "count",
         isDerived,
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       });
     }
     updateArrayAlias();
@@ -648,12 +633,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: isDerived ? null : "count",
         isDerived,
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       });
     }
     updateArrayAlias();
@@ -675,12 +655,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       };
     }
   };
@@ -701,12 +676,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       };
     }
   };
@@ -727,12 +697,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: isDerived ? null : "count", // You can set the appropriate aggregation function here
         isDerived,
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       };
     }
   };
@@ -751,12 +716,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       };
     }
   };
@@ -775,12 +735,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: "count", // You can set the appropriate aggregation function here
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       };
     }
   };
@@ -801,12 +756,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       };
     }
   };
@@ -827,12 +777,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       };
     }
   };
@@ -853,12 +798,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: isDerived ? null : "sum", // You can set the appropriate aggregation function here
         isDerived,
-        havingConditions: [
-          {
-            value: null,
-            operator: null,
-          },
-        ],
+        havingConditions: [],
       };
     }
   };
