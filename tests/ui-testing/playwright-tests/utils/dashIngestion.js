@@ -16,6 +16,7 @@ const getAuthToken = async () => {
   return `Basic ${basicAuthCredentials}`;
 };
 
+// page is passed here to access the page object (currently not used)
 export const ingestion = async (page, streamName = "e2e_automate") => {
   if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
