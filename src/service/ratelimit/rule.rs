@@ -16,17 +16,21 @@
 use std::future::Future;
 
 use anyhow::Context;
-use infra::table::ratelimit::RatelimitRule;
-use o2_enterprise::enterprise::super_cluster::queue_item::ratelimit::{
-    ratelimit_rule_delete, ratelimit_rule_put, ratelimit_rule_update, SUPER_CLUSTER_TOPIC_RATELIMIT,
+use config::meta::ratelimit::RatelimitRule;
+use infra::table::ratelimit::RuleEntry;
+use o2_enterprise::enterprise::super_cluster::queue::ratelimit::{
+    SUPER_CLUSTER_RATELIMIT_KEY_PREFIX, ratelimit_rule_delete, ratelimit_rule_put,
+    ratelimit_rule_update,
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum RatelimitError {
     #[error("ratelimit rule with ID {0} not found.")]
     NotFound(String),
+    #[error("ratelimit rule entry type not supported: {0}")]
+    NotSupportRuleEntry(String),
     #[error(transparent)]
-    Other(#[from] anyhow::Error),
+    DbError(#[from] anyhow::Error),
 }
 
 #[derive(Debug)]
@@ -59,11 +63,11 @@ impl RuleOperation {
 }
 
 async fn handle_rule_operation(
-    rule: RatelimitRule,
+    rule: RuleEntry,
     operation: RuleOperation,
     db_operation: impl Future<Output = Result<(), anyhow::Error>>,
 ) -> Result<(), RatelimitError> {
-    let db_result = db_operation.await.map_err(RatelimitError::Other);
+    let db_result = db_operation.await.map_err(RatelimitError::DbError);
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::infra::config::get_config()
@@ -83,15 +87,15 @@ async fn handle_rule_operation(
 }
 
 async fn sync_to_super_cluster(
-    rule: &RatelimitRule,
+    rule: &RuleEntry,
     operation: &RuleOperation,
 ) -> Result<(), anyhow::Error> {
-    let value_vec = config::utils::json::to_vec(rule)
+    let value_vec = config::utils::json::to_vec(&rule)
         .context("[Ratelimit] error serializing ratelimit rule for super_cluster event")?;
 
     let key = format!(
-        "/{SUPER_CLUSTER_TOPIC_RATELIMIT}/{}",
-        rule.rule_id.clone().unwrap_or("".to_string()),
+        "/{SUPER_CLUSTER_RATELIMIT_KEY_PREFIX}/{}",
+        operation.as_str(),
     );
 
     operation
@@ -99,7 +103,7 @@ async fn sync_to_super_cluster(
         .await
 }
 
-pub async fn save(rule: RatelimitRule) -> Result<(), RatelimitError> {
+pub async fn save(rule: RuleEntry) -> Result<(), RatelimitError> {
     handle_rule_operation(
         rule.clone(),
         RuleOperation::Save,
@@ -108,7 +112,16 @@ pub async fn save(rule: RatelimitRule) -> Result<(), RatelimitError> {
     .await
 }
 
-pub async fn update(rule: RatelimitRule) -> Result<(), RatelimitError> {
+pub async fn save_batch(rules: RuleEntry) -> Result<(), RatelimitError> {
+    handle_rule_operation(
+        rules.clone(),
+        RuleOperation::Save,
+        infra::table::ratelimit::add(rules),
+    )
+    .await
+}
+
+pub async fn update(rule: RuleEntry) -> Result<(), RatelimitError> {
     handle_rule_operation(
         rule.clone(),
         RuleOperation::Update,
@@ -117,11 +130,27 @@ pub async fn update(rule: RatelimitRule) -> Result<(), RatelimitError> {
     .await
 }
 
-pub async fn delete(rule: RatelimitRule) -> Result<(), RatelimitError> {
+pub async fn delete(rule: RuleEntry) -> Result<(), RatelimitError> {
+    let RuleEntry::Single(r) = &rule else {
+        return Err(RatelimitError::NotSupportRuleEntry(
+            "Batch rule entry not supported".to_string(),
+        ));
+    };
+
     handle_rule_operation(
         rule.clone(),
         RuleOperation::Delete,
-        infra::table::ratelimit::delete(rule.rule_id.unwrap()),
+        infra::table::ratelimit::delete(r.rule_id.clone().unwrap()),
     )
     .await
+}
+
+pub async fn list(
+    org: &str,
+    api: Option<&str>,
+    user_id: Option<&str>,
+) -> Result<Vec<RatelimitRule>, RatelimitError> {
+    infra::table::ratelimit::list(org, api, user_id)
+        .await
+        .map_err(RatelimitError::DbError)
 }

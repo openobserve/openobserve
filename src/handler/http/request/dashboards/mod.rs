@@ -68,6 +68,8 @@ impl From<DashboardError> for HttpResponse {
 }
 
 /// CreateDashboard
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -112,6 +114,8 @@ pub async fn create_dashboard(
 }
 
 /// UpdateDashboard
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -159,6 +163,8 @@ async fn update_dashboard(
 }
 
 /// ListDashboards
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -192,6 +198,8 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
 }
 
 /// GetDashboard
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -220,6 +228,8 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
 }
 
 /// DeleteDashboard
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -250,6 +260,8 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
 }
 
 /// MoveDashboard
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -289,6 +301,9 @@ async fn move_dashboard(
     }
 }
 
+/// MoveDashboards
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",

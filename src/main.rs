@@ -674,7 +674,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             let factory = web::scope(&cfg.common.base_uri);
             #[cfg(feature = "enterprise")]
             let factory = factory.wrap(
-                o2_ratelimit::middleware::actix::RateLimitController::new_with_extractor(Some(
+                o2_ratelimit::middleware::RateLimitController::new_with_extractor(Some(
                     router::ratelimit::resource_extractor::default_extractor,
                 )),
             );
@@ -1162,7 +1162,8 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
 
     o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
     if config::get_config().ratelimit.ratelimit_enabled {
-        o2_ratelimit::ratelimit::init().await?;
+        o2_ratelimit::init(openobserve::handler::http::router::openapi::openapi_info().await)
+            .await?;
     }
     Ok(())
 }

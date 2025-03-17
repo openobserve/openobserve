@@ -29,11 +29,11 @@ mod search_job;
 mod short_urls;
 mod templates;
 
-use config::cluster::{is_offline, LOCAL_NODE};
+use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    ratelimit::RatelimitSuperClusterQueue, ActionScriptsQueue, AlertsQueue, DashboardsQueue,
-    DestinationsQueue, FoldersQueue, MetaQueue, PipelinesQueue, SchemasQueue, SearchJobsQueue,
-    SuperClusterQueueTrait, TemplatesQueue,
+    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue,
+    PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
+    TemplatesQueue, ratelimit::RatelimitSuperClusterQueue,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins

@@ -26,6 +26,8 @@ use crate::{
 };
 
 /// CreateEnrichmentTable
+///
+/// #{"ratelimit_module":"Enrichment Table", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",

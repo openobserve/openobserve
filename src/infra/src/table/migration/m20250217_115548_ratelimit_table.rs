@@ -53,8 +53,23 @@ fn create_ratelimit_table_statement() -> TableCreateStatement {
                 .not_null(),
         )
         .col(
-            ColumnDef::new(RateLimitRules::Resource)
+            ColumnDef::new(RateLimitRules::UserRole)
+                .string_len(256)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(RateLimitRules::UserId)
+                .string_len(256)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(RateLimitRules::ApiGroupName)
                 .string_len(1024)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(RateLimitRules::ApiGroupOperation)
+                .string_len(128)
                 .not_null(),
         )
         .col(
@@ -87,7 +102,10 @@ fn create_ratelimit_resource_key_idx_stmnt() -> IndexCreateStatement {
         .table(RateLimitRules::Table)
         .col(RateLimitRules::Org)
         .col(RateLimitRules::RuleType)
-        .col(RateLimitRules::Resource)
+        .col(RateLimitRules::UserRole)
+        .col(RateLimitRules::UserId)
+        .col(RateLimitRules::ApiGroupName)
+        .col(RateLimitRules::ApiGroupOperation)
         .unique()
         .to_owned()
 }
@@ -98,7 +116,10 @@ enum RateLimitRules {
     Org,
     RuleId,
     RuleType,
-    Resource,
+    UserRole,
+    UserId,
+    ApiGroupName,
+    ApiGroupOperation,
     Threshold,
     CreatedAt,
 }

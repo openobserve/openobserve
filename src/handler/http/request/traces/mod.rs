@@ -88,6 +88,8 @@ async fn handle_req(
 }
 
 /// GetLatestTraces
+///
+/// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Traces",

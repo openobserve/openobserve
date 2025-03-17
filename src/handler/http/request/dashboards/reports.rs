@@ -24,6 +24,8 @@ use crate::{
 };
 
 /// CreateReport
+///
+/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
@@ -66,6 +68,8 @@ pub async fn create_report(
 }
 
 /// UpdateReport
+///
+/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
@@ -103,6 +107,8 @@ async fn update_report(
 }
 
 /// ListReports
+///
+/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
@@ -165,6 +171,8 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
 }
 
 /// GetReport
+///
+/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
@@ -191,6 +199,8 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 }
 
 /// DeleteReport
+///
+/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
@@ -222,6 +232,8 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
 }
 
 /// EnableReport
+///
+/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Report",
@@ -263,6 +275,8 @@ async fn enable_report(
 }
 
 /// TriggerReport
+///
+/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",

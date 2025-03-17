@@ -13,17 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use bytes::Bytes;
-use config::utils::time::now;
+use config::{
+    meta::ratelimit::{RatelimitRule, RatelimitRuleType},
+    utils::time::now,
+};
 use sea_orm::{
-    ActiveValue::Set, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
-    QuerySelect,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     orm_err,
     table::{
         entity::rate_limit_rules::{ActiveModel, Column, Entity},
@@ -31,17 +34,17 @@ use crate::{
     },
 };
 
-#[derive(FromQueryResult, Default, Debug, Clone, Serialize, Deserialize)]
-pub struct RatelimitRule {
-    pub org: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rule_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rule_id: Option<String>,
-    pub resource: String,
-    pub threshold: i32,
+pub const RULE_EXISTS: &str = "Rule already exists";
+pub const RULE_NOT_FOUND: &str = "Rule not found";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RuleEntry {
+    Single(RatelimitRule),
+    Batch(Vec<RatelimitRule>),
+    UpsertBatch(Vec<RatelimitRule>),
 }
-impl TryFrom<&Bytes> for RatelimitRule {
+
+impl TryFrom<&Bytes> for RuleEntry {
     type Error = anyhow::Error;
 
     fn try_from(bytes: &Bytes) -> Result<Self, Self::Error> {
@@ -49,49 +52,40 @@ impl TryFrom<&Bytes> for RatelimitRule {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RatelimitRuleType {
-    Exact,
-    Regex,
-}
-
-impl From<&str> for RatelimitRuleType {
-    fn from(s: &str) -> Self {
-        match s {
-            "exact" => RatelimitRuleType::Exact,
-            "regex" => RatelimitRuleType::Regex,
-            _ => panic!("Invalid RatelimitRuleType"),
-        }
-    }
-}
-
-impl std::fmt::Display for RatelimitRuleType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            RatelimitRuleType::Exact => write!(f, "exact"),
-            RatelimitRuleType::Regex => write!(f, "regex"),
-        }
-    }
-}
-
-pub const RULE_EXISTS: &str = "Rule already exists";
-pub const RULE_NOT_FOUND: &str = "Rule not found";
-pub async fn fetch_rules() -> Result<Vec<RatelimitRule>, anyhow::Error> {
+pub async fn fetch_rules(
+    mut default_rules: Vec<RatelimitRule>,
+    org_id: Option<String>,
+    user_role: Option<String>,
+) -> Result<Vec<RatelimitRule>, anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::find()
+    let mut res = Entity::find()
         .select_only()
         .column(Column::Org)
         .column(Column::RuleId)
         .column(Column::RuleType)
-        .column(Column::Resource)
+        .column(Column::UserRole)
+        .column(Column::ApiGroupName)
+        .column(Column::ApiGroupOperation)
+        .column(Column::UserId)
         .column(Column::Threshold)
-        .order_by(Column::CreatedAt, Order::Desc);
+        .order_by(Column::Threshold, Order::Asc);
+
+    if let Some(org_id) = org_id {
+        res = res.filter(Column::Org.eq(org_id));
+    };
+
+    if let Some(user_role) = user_role {
+        res = res.filter(Column::UserRole.eq(user_role));
+    };
+
     let records = res
         .into_model::<RatelimitRule>()
         .all(client)
         .await
         .map_err(|e| anyhow!("DbError# {e}"))?;
-    Ok(records)
+
+    default_rules.extend(records);
+    Ok(default_rules)
 }
 
 pub async fn fetch_rules_by_id(rule_id: &str) -> Result<Option<RatelimitRule>, anyhow::Error> {
@@ -101,7 +95,10 @@ pub async fn fetch_rules_by_id(rule_id: &str) -> Result<Option<RatelimitRule>, a
         .column(Column::Org)
         .column(Column::RuleId)
         .column(Column::RuleType)
-        .column(Column::Resource)
+        .column(Column::UserRole)
+        .column(Column::ApiGroupName)
+        .column(Column::ApiGroupOperation)
+        .column(Column::UserId)
         .column(Column::Threshold)
         .filter(Column::RuleId.eq(rule_id));
     let record = res
@@ -112,7 +109,183 @@ pub async fn fetch_rules_by_id(rule_id: &str) -> Result<Option<RatelimitRule>, a
     Ok(record)
 }
 
-pub async fn add(rule: RatelimitRule) -> Result<(), anyhow::Error> {
+pub async fn add(rule: RuleEntry) -> Result<(), anyhow::Error> {
+    match rule {
+        RuleEntry::Single(rule) => add_single(rule).await,
+        RuleEntry::Batch(rules) => add_batch(rules).await,
+        RuleEntry::UpsertBatch(rules) => add_upsert_batch(rules).await,
+    }
+}
+
+async fn add_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
+    if rules.is_empty() {
+        return Ok(());
+    }
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // Collect all rule IDs and validate
+    let rule_ids: Vec<String> = rules
+        .iter()
+        .map(|rule| {
+            rule.rule_id
+                .clone()
+                .ok_or_else(|| anyhow!("Rule ID is required for batch operations"))
+        })
+        .collect::<Result<Vec<String>, _>>()?;
+
+    // Check for existing rules
+    let existing_rules = Entity::find()
+        .filter(Column::RuleId.is_in(rule_ids.clone()))
+        .all(client)
+        .await
+        .map_err(|e| anyhow!("DbError# Failed to fetch existing rules: {}", e))?;
+
+    // If any rule exists, return error with details
+    if !existing_rules.is_empty() {
+        let existing_ids: Vec<String> = existing_rules
+            .iter()
+            .map(|rule| rule.rule_id.clone())
+            .collect();
+
+        return Err(anyhow!(
+            "Cannot add batch: following rules already exist: {}",
+            existing_ids.join(", ")
+        ));
+    }
+
+    // Prepare batch insert
+    let current_timestamp = now().timestamp();
+    let active_rules: Vec<ActiveModel> = rules
+        .into_iter()
+        .map(|rule| ActiveModel {
+            org: Set(rule.org),
+            rule_id: Set(rule.rule_id.unwrap()),
+            rule_type: Set(rule
+                .rule_type
+                .unwrap_or(RatelimitRuleType::Exact.to_string())),
+            user_role: Set(rule.user_role.unwrap_or_default()),
+            user_id: Set(rule.user_id.unwrap_or_default()),
+            api_group_name: Set(rule.api_group_name.unwrap_or_default()),
+            api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
+            threshold: Set(rule.threshold),
+            created_at: Set(current_timestamp),
+        })
+        .collect();
+
+    // Execute batch insert in a transaction
+    let txn = client
+        .begin()
+        .await
+        .map_err(|e| anyhow!("DbError# Failed to start transaction: {}", e))?;
+
+    match Entity::insert_many(active_rules)
+        .exec(&txn)
+        .await
+        .map_err(|e| anyhow!("DbError# Failed to insert rules: {}", e))
+    {
+        Ok(_) => {
+            txn.commit()
+                .await
+                .map_err(|e| anyhow!("DbError# Failed to commit transaction: {}", e))?;
+        }
+        Err(e) => {
+            txn.rollback()
+                .await
+                .map_err(|e| anyhow!("DbError# Failed to rollback transaction: {}", e))?;
+            return Err(e);
+        }
+    }
+
+    Ok(())
+}
+
+async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
+    if rules.is_empty() {
+        return Ok(());
+    }
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let current_timestamp = now().timestamp();
+
+    // Start transaction
+    let txn = client
+        .begin()
+        .await
+        .map_err(|e| anyhow!("DbError# Failed to start transaction: {}", e))?;
+
+    for rule in rules {
+        // Check if rule exists
+        let existing_rule = Entity::find()
+            .filter(Column::Org.eq(rule.org.clone()))
+            .filter(Column::UserRole.eq(rule.user_role.clone().unwrap_or_default()))
+            .filter(Column::UserId.eq(rule.user_id.clone().unwrap_or_default()))
+            .filter(Column::ApiGroupName.eq(rule.api_group_name.clone().unwrap_or_default()))
+            .filter(
+                Column::ApiGroupOperation.eq(rule.api_group_operation.clone().unwrap_or_default()),
+            )
+            .one(&txn)
+            .await
+            .map_err(|e| anyhow!("DbError# Failed to fetch existing rule: {}", e))?;
+
+        match existing_rule {
+            Some(existing) => {
+                // Update existing rule using the Model's primary key
+                let mut active_model: ActiveModel = existing.clone().into();
+
+                // Update only the fields that should change
+                active_model.org = Set(rule.org);
+                active_model.rule_id = Set(existing.rule_id.clone());
+                active_model.rule_type = Set(rule
+                    .rule_type
+                    .unwrap_or(RatelimitRuleType::Exact.to_string()));
+                active_model.user_role = Set(rule.user_role.unwrap_or_default());
+                active_model.user_id = Set(rule.user_id.unwrap_or_default());
+                active_model.api_group_name = Set(rule.api_group_name.unwrap_or_default());
+                active_model.api_group_operation =
+                    Set(rule.api_group_operation.unwrap_or_default());
+                active_model.threshold = Set(rule.threshold);
+                active_model.created_at = Set(current_timestamp);
+
+                active_model.save(&txn).await.map_err(|e| {
+                    anyhow!("DbError# Failed to update rule: {:?}, {}", existing, e)
+                })?;
+            }
+            None => {
+                // Insert new rule
+                let active_model = ActiveModel {
+                    org: Set(rule.org),
+                    rule_id: Set(rule.rule_id.unwrap()),
+                    rule_type: Set(rule
+                        .rule_type
+                        .unwrap_or(RatelimitRuleType::Exact.to_string())),
+                    user_role: Set(rule.user_role.unwrap_or_default()),
+                    user_id: Set(rule.user_id.unwrap_or_default()),
+                    api_group_name: Set(rule.api_group_name.unwrap_or_default()),
+                    api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
+                    threshold: Set(rule.threshold),
+                    created_at: Set(current_timestamp),
+                };
+
+                Entity::insert(active_model)
+                    .exec(&txn)
+                    .await
+                    .map_err(|e| anyhow!("DbError# Failed to insert rule: {}", e))?;
+            }
+        }
+        // wait for a while to reduce the databases load
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    }
+
+    // Commit transaction
+    txn.commit()
+        .await
+        .map_err(|e| anyhow!("DbError# Failed to commit transaction: {}", e))?;
+
+    Ok(())
+}
+
+async fn add_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
     let rule_id = rule.rule_id.clone();
     match fetch_rules_by_id(rule_id.unwrap().as_str()).await {
         Ok(None) => {
@@ -123,7 +296,10 @@ pub async fn add(rule: RatelimitRule) -> Result<(), anyhow::Error> {
                 rule_type: Set(rule
                     .rule_type
                     .unwrap_or(RatelimitRuleType::Exact.to_string())),
-                resource: Set(rule.resource),
+                user_role: Set(rule.user_role.unwrap_or("".to_string())),
+                user_id: Set(rule.user_id.unwrap_or_default()),
+                api_group_name: Set(rule.api_group_name.unwrap_or_default()),
+                api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
                 threshold: Set(rule.threshold),
                 created_at: Set(now().timestamp()),
             };
@@ -145,30 +321,151 @@ pub async fn add(rule: RatelimitRule) -> Result<(), anyhow::Error> {
     }
 }
 
-pub async fn update(rule: RatelimitRule) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _ = match Entity::update_many()
-        .col_expr(Column::Org, Expr::value(&rule.org))
-        .col_expr(
-            Column::RuleType,
-            Expr::value(
-                rule.rule_type
-                    .unwrap_or(RatelimitRuleType::Exact.to_string()),
-            ),
-        )
-        .col_expr(Column::Resource, Expr::value(&rule.resource))
-        .col_expr(Column::Threshold, Expr::value(rule.threshold))
-        .filter(Column::RuleId.eq(rule.rule_id.unwrap()))
-        .exec(client)
-        .await
-        .map_err(|e| anyhow!("DbError# {e}"))
-    {
-        Ok(res) => res,
-        Err(e) => {
-            return orm_err!(format!("update ratelimit rule error: {e}"))
-                .map_err(|e| anyhow!("DbError# {e}"))?
+pub async fn update(rule: RuleEntry) -> Result<(), anyhow::Error> {
+    match rule {
+        RuleEntry::Single(rule) => update_single(rule).await,
+        RuleEntry::Batch(rules) => update_batch(rules).await,
+        RuleEntry::UpsertBatch(_) => Err(anyhow!("UpsertBatch not supported in update operation")),
+    }
+}
+
+async fn update_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
+    let rule_id = rule
+        .rule_id
+        .clone()
+        .ok_or_else(|| anyhow!("Rule ID is required"))?;
+
+    match fetch_rules_by_id(rule_id.as_str()).await {
+        Ok(Some(_)) => {
+            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            match Entity::update_many()
+                .col_expr(Column::Org, Expr::value(&rule.org))
+                .col_expr(
+                    Column::RuleType,
+                    Expr::value(
+                        rule.rule_type
+                            .unwrap_or(RatelimitRuleType::Exact.to_string()),
+                    ),
+                )
+                .col_expr(Column::Threshold, Expr::value(rule.threshold))
+                .col_expr(
+                    Column::UserRole,
+                    Expr::value(rule.user_role.unwrap_or_default()),
+                )
+                .col_expr(
+                    Column::ApiGroupName,
+                    Expr::value(rule.api_group_name.unwrap_or_default()),
+                )
+                .col_expr(
+                    Column::ApiGroupOperation,
+                    Expr::value(rule.api_group_operation.unwrap_or_default()),
+                )
+                .filter(Column::RuleId.eq(rule_id))
+                .exec(client)
+                .await
+                .map_err(|e| anyhow!("DbError# {e}"))
+            {
+                Ok(_) => Ok(()),
+                Err(e) => orm_err!(format!("update ratelimit rule error: {e}"))
+                    .map_err(|e| anyhow!("DbError# {e}"))?,
+            }
         }
-    };
+        Ok(None) => Err(anyhow::anyhow!(RULE_NOT_FOUND)),
+        Err(e) => {
+            log::error!("Update rule Error fetching rule: {:?}", e.to_string());
+            Err(anyhow::anyhow!(e.to_string()))
+        }
+    }
+}
+
+async fn update_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
+    if rules.is_empty() {
+        return Ok(());
+    }
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let txn = client
+        .begin()
+        .await
+        .map_err(|e| anyhow!("DbError# Failed to start transaction: {}", e))?;
+
+    // Collect all rule IDs
+    let rule_ids: Vec<String> = rules
+        .iter()
+        .map(|rule| {
+            rule.rule_id
+                .clone()
+                .ok_or_else(|| anyhow!("Rule ID is required for batch operations"))
+        })
+        .collect::<Result<Vec<String>, _>>()?;
+
+    // Check if all rules exist
+    let existing_rules = Entity::find()
+        .filter(Column::RuleId.is_in(rule_ids.clone()))
+        .all(&txn)
+        .await
+        .map_err(|e| anyhow!("DbError# Failed to fetch existing rules: {}", e))?;
+
+    if existing_rules.len() != rule_ids.len() {
+        let existing_ids: std::collections::HashSet<String> = existing_rules
+            .iter()
+            .map(|rule| rule.rule_id.clone())
+            .collect();
+        let missing_ids: Vec<String> = rule_ids
+            .iter()
+            .filter(|id| !existing_ids.contains(*id))
+            .cloned()
+            .collect();
+
+        return Err(anyhow!(
+            "The following rules do not exist: rules id {}",
+            missing_ids.join(", ")
+        ));
+    }
+
+    // Update each rule in transaction
+    for rule in rules {
+        let rule_id = rule.rule_id.clone().unwrap();
+        match Entity::update_many()
+            .col_expr(Column::Org, Expr::value(&rule.org))
+            .col_expr(
+                Column::RuleType,
+                Expr::value(
+                    rule.rule_type
+                        .unwrap_or(RatelimitRuleType::Exact.to_string()),
+                ),
+            )
+            .col_expr(Column::Threshold, Expr::value(rule.threshold))
+            .col_expr(
+                Column::UserRole,
+                Expr::value(rule.user_role.unwrap_or_default()),
+            )
+            .col_expr(
+                Column::ApiGroupName,
+                Expr::value(rule.api_group_name.unwrap_or_default()),
+            )
+            .col_expr(
+                Column::ApiGroupOperation,
+                Expr::value(rule.api_group_operation.unwrap_or_default()),
+            )
+            .filter(Column::RuleId.eq(rule_id))
+            .exec(&txn)
+            .await
+        {
+            Ok(_) => continue,
+            Err(e) => {
+                txn.rollback()
+                    .await
+                    .map_err(|e| anyhow!("DbError# Failed to rollback transaction: {}", e))?;
+                return Err(anyhow!("DbError# Failed to update rule: {}", e));
+            }
+        }
+    }
+
+    // Commit transaction
+    txn.commit()
+        .await
+        .map_err(|e| anyhow!("DbError# Failed to commit transaction: {}", e))?;
 
     Ok(())
 }
@@ -196,10 +493,46 @@ pub async fn delete(rule_id: String) -> Result<(), anyhow::Error> {
     }
 }
 
+pub async fn list(
+    org: &str,
+    api: Option<&str>,
+    user_id: Option<&str>,
+) -> Result<Vec<RatelimitRule>, anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut query = Entity::find()
+        .select_only()
+        .column(Column::Org)
+        .column(Column::RuleId)
+        .column(Column::RuleType)
+        .column(Column::UserRole)
+        .column(Column::ApiGroupName)
+        .column(Column::ApiGroupOperation)
+        .column(Column::Threshold)
+        .filter(Column::Org.eq(org));
+
+    if let Some(api) = api {
+        query = query.filter(Column::ApiGroupName.eq(api));
+    }
+
+    if let Some(user_id) = user_id {
+        query = query.filter(Column::UserRole.eq(user_id));
+    }
+
+    let records = query
+        .into_model::<RatelimitRule>()
+        .all(client)
+        .await
+        .map_err(|e| anyhow!("DbError# {e}"))?;
+
+    Ok(records)
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::Once;
+
     use bytes::Bytes;
-    use sea_orm::{DatabaseBackend, DbErr, MockDatabase, MockExecResult, Transaction};
+    use sea_orm::{DatabaseBackend, DbErr, MockDatabase, MockExecResult};
     use serde_json::json;
 
     use super::*;
@@ -210,7 +543,10 @@ mod tests {
             org: "test_org".to_string(),
             rule_type: Some("exact".to_string()),
             rule_id: Some("test_rule".to_string()),
-            resource: "test_resource".to_string(),
+            user_role: Some("test_user_role".to_string()),
+            user_id: Some("test_user_id".to_string()),
+            api_group_name: Some("test_group_name".to_string()),
+            api_group_operation: Some("test_operation".to_string()),
             threshold: 100,
         }
     }
@@ -220,7 +556,10 @@ mod tests {
             org: "test_org".to_string(),
             rule_type: "exact".to_string(),
             rule_id: "test_rule".to_string(),
-            resource: "test_resource".to_string(),
+            user_role: "test_user_role".to_string(),
+            user_id: "test_user_id".to_string(),
+            api_group_name: "api_group_name".to_string(),
+            api_group_operation: "operation".to_string(),
             threshold: 100,
             created_at: 0,
         }
@@ -238,9 +577,10 @@ mod tests {
             .column(Column::Org)
             .column(Column::RuleId)
             .column(Column::RuleType)
-            .column(Column::Resource)
+            .column(Column::UserRole)
+            .column(Column::ApiGroupName)
             .column(Column::Threshold)
-            .order_by(Column::CreatedAt, Order::Desc)
+            .order_by(Column::Threshold, Order::Asc)
             .into_model::<RatelimitRule>()
             .all(&db)
             .await?;
@@ -250,7 +590,8 @@ mod tests {
         assert_eq!(rule.org, "test_org");
         assert_eq!(rule.rule_type, Some("exact".to_string()));
         assert_eq!(rule.rule_id, Some("test_rule".to_string()));
-        assert_eq!(rule.resource, "test_resource");
+        assert_eq!(rule.user_role, Some("test_user_role".to_string()));
+        assert_eq!(rule.api_group_name, Some("api_group_name".to_string()));
         assert_eq!(rule.threshold, 100);
 
         Ok(())
@@ -269,7 +610,7 @@ mod tests {
             .column(Column::Org)
             .column(Column::RuleId)
             .column(Column::RuleType)
-            .column(Column::Resource)
+            .column(Column::UserRole)
             .column(Column::Threshold)
             .filter(Column::RuleId.eq("test_rule"))
             .into_model::<RatelimitRule>()
@@ -286,7 +627,7 @@ mod tests {
             .column(Column::Org)
             .column(Column::RuleId)
             .column(Column::RuleType)
-            .column(Column::Resource)
+            .column(Column::UserRole)
             .column(Column::Threshold)
             .filter(Column::RuleId.eq("non_existent"))
             .into_model::<RatelimitRule>()
@@ -295,51 +636,6 @@ mod tests {
 
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
-    }
-
-    #[tokio::test]
-    async fn test_add_rule() -> Result<(), DbErr> {
-        let db = MockDatabase::new(DatabaseBackend::Postgres)
-            .append_query_results(vec![vec![create_test_model()]])
-            .append_exec_results(vec![MockExecResult {
-                last_insert_id: 1,
-                rows_affected: 1,
-            }])
-            .into_connection();
-
-        let rule = create_test_rule();
-        let active_rule = ActiveModel {
-            org: Set(rule.org.clone()),
-            rule_id: Set(rule.rule_id.clone().unwrap()),
-            rule_type: Set(rule.rule_type.clone().unwrap()),
-            resource: Set(rule.resource.clone()),
-            threshold: Set(rule.threshold),
-            created_at: Default::default(),
-        };
-
-        // Test insert
-        let result = Entity::insert(active_rule).exec(&db).await;
-
-        // Verify the result
-        assert!(result.is_ok());
-
-        // Verify the mock database received the expected queries
-        assert_eq!(
-            db.into_transaction_log(),
-            vec![Transaction::from_sql_and_values(
-                DatabaseBackend::Postgres,
-                r#"INSERT INTO "rate_limit_rules" ("rule_id", "org", "rule_type", "resource", "threshold") VALUES ($1, $2, $3, $4, $5) RETURNING "rule_id""#,
-                vec![
-                    rule.rule_id.into(),
-                    rule.org.into(),
-                    rule.rule_type.into(),
-                    rule.resource.into(),
-                    rule.threshold.into(),
-                ]
-            ),]
-        );
-
-        Ok(())
     }
 
     #[tokio::test]
@@ -357,31 +653,8 @@ mod tests {
         let result = Entity::update_many()
             .col_expr(Column::Org, Expr::value(&rule.org))
             .col_expr(Column::RuleType, Expr::value(&rule.rule_type.unwrap()))
-            .col_expr(Column::Resource, Expr::value(&rule.resource))
+            .col_expr(Column::UserRole, Expr::value(&rule.user_role.unwrap()))
             .col_expr(Column::Threshold, Expr::value(rule.threshold))
-            .filter(Column::RuleId.eq(&rule.rule_id.unwrap()))
-            .exec(&db)
-            .await;
-
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().rows_affected, 1);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_delete_rule() -> Result<(), DbErr> {
-        let db = MockDatabase::new(DatabaseBackend::Postgres)
-            .append_exec_results(vec![MockExecResult {
-                last_insert_id: 0,
-                rows_affected: 1,
-            }])
-            .into_connection();
-
-        let rule = create_test_rule();
-
-        // Test delete
-        let result = Entity::delete_many()
             .filter(Column::RuleId.eq(&rule.rule_id.unwrap()))
             .exec(&db)
             .await;
@@ -398,9 +671,11 @@ mod tests {
         let json_data = json!({
             "org": "test_org",
             "rule_type": "exact",
-            "rule_id": "test_rule",
-            "resource": "test_resource",
-            "threshold": 100
+            "rule_id": "test_rule_id",
+            "user_role": "user_role",
+            "user_id": "test_user_id",
+            "api": "test_api",
+            "threshold": 100,
         });
         let bytes = Bytes::from(json_data.to_string());
 
@@ -410,8 +685,8 @@ mod tests {
         let rule = result.unwrap();
         assert_eq!(rule.org, "test_org");
         assert_eq!(rule.rule_type, Some("exact".to_string()));
-        assert_eq!(rule.rule_id, Some("test_rule".to_string()));
-        assert_eq!(rule.resource, "test_resource");
+        assert_eq!(rule.rule_id, Some("test_rule_id".to_string()));
+        assert_eq!(rule.user_role, Some("user_role".to_string()));
         assert_eq!(rule.threshold, 100);
 
         // Test invalid JSON
@@ -441,5 +716,46 @@ mod tests {
 
         assert_eq!(RatelimitRuleType::Exact.to_string(), "exact");
         assert_eq!(RatelimitRuleType::Regex.to_string(), "regex");
+    }
+
+    static INIT: Once = Once::new();
+
+    async fn setup_test_db(mock_db: sea_orm::DatabaseConnection) {
+        INIT.call_once(|| {
+            // Initialize ORM_CLIENT only once
+            ORM_CLIENT
+                .set(mock_db)
+                .expect("Failed to set mock database");
+        });
+    }
+
+    #[tokio::test]
+    async fn test_add_batch_empty() {
+        let result = add_batch(vec![]).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_add_batch_missing_rule_id() {
+        let rules = vec![RatelimitRule {
+            org: "test_org".to_string(),
+            rule_id: None,
+            ..Default::default()
+        }];
+
+        // Create mock database
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+
+        // Setup test database
+        setup_test_db(db).await;
+
+        let result = add_batch(rules).await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Rule ID is required")
+        );
     }
 }

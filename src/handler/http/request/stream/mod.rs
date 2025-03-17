@@ -40,6 +40,8 @@ use crate::{
 };
 
 /// GetSchema
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -119,6 +121,8 @@ async fn schema(
 }
 
 /// CreateStreamSettings
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -161,6 +165,8 @@ async fn settings(
 }
 
 /// UpdateStreamSettings
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -252,6 +258,8 @@ async fn update_settings(
 }
 
 /// DeleteStreamFields
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -299,6 +307,8 @@ async fn delete_fields(
 }
 
 /// DeleteStream
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -328,6 +338,8 @@ async fn delete(
 }
 
 /// ListStreams
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -488,6 +500,9 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     }))
 }
 
+/// ListStreams
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",

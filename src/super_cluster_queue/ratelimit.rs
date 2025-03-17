@@ -15,7 +15,7 @@
 
 use infra::{
     errors::Error,
-    table::ratelimit::{RatelimitRule, RULE_EXISTS, RULE_NOT_FOUND},
+    table::ratelimit::{RULE_EXISTS, RULE_NOT_FOUND, RuleEntry},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
@@ -29,7 +29,7 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
     let bytes = msg
         .value
         .ok_or(Error::Message("Message missing value".to_string()))?;
-    let rule = RatelimitRule::try_from(&bytes)?;
+    let rule = RuleEntry::try_from(&bytes)?;
 
     match msg.message_type {
         MessageType::RatelimitAdd => match infra::table::ratelimit::add(rule).await {
@@ -49,6 +49,11 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
             Err(e) => Err(e),
         },
         MessageType::RatelimitDelete => {
+            let RuleEntry::Single(rule) = rule else {
+                log::error!("[SUPER_CLUSTER:RATELIMIT] Invalid message: {:?}", rule);
+                return Err(anyhow::anyhow!("Invalid message type".to_string()));
+            };
+
             match infra::table::ratelimit::delete(rule.rule_id.unwrap()).await {
                 Ok(_) => Ok(()),
                 Err(e) if e.to_string() == RULE_NOT_FOUND => {

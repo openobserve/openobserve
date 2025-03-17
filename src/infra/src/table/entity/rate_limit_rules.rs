@@ -9,7 +9,10 @@ pub struct Model {
     pub rule_id: String,
     pub org: String,
     pub rule_type: String,
-    pub resource: String,
+    pub user_role: String,
+    pub user_id: String,
+    pub api_group_name: String,
+    pub api_group_operation: String,
     pub threshold: i32,
     pub created_at: i64,
 }

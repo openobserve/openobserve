@@ -1771,11 +1771,11 @@ pub struct RateLimit {
     )]
     pub ratelimit_enabled: bool,
     #[env_config(
-        name = "ZO_RULES_REFRESH_INTERVAL",
+        name = "ZO_RATELIMIT_RULE_REFRESH_INTERVAL",
         default = 10,
         help = "unit: seconds, refresh interval for rate limit rules"
     )]
-    pub rules_refresh_interval: usize,
+    pub ratelimit_rule_refresh_interval: usize,
 }
 pub fn init() -> Config {
     dotenv_override().ok();
@@ -2575,7 +2575,7 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_ratelimit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.ratelimit.rules_refresh_interval < 2 {
+    if cfg.ratelimit.ratelimit_rule_refresh_interval < 2 {
         return Err(anyhow::anyhow!(
             "ratelimit rules refresh interval must gt 2"
         ));
