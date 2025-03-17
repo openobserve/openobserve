@@ -112,7 +112,7 @@ Access Key: [BASIC_PASSCODE]`;
   const languagesDocURLs = {
     python: "https://openobserve.ai/blog/handling-errors-with-opentelemetry-python",
     dotnettracing: "https://short.openobserve.ai/dotnet-tracing",
-    dotnetloggingg: "https://short.openobserve.ai/dotnet-logging",
+    dotnetlogs: "https://short.openobserve.ai/dotnet-logging",
     nodejs: "https://short.openobserve.ai/languages/nodejs",
     go: "https://short.openobserve.ai/golang",
     rust: "https://short.openobserve.ai/rust",
