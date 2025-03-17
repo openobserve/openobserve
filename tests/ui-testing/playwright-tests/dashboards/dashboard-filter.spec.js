@@ -632,7 +632,7 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test("Should applly the add group filter with apply the list of value apply successflly ", async ({
+  test("Should apply the add group filter with apply the list of value successfully", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
