@@ -453,10 +453,10 @@ fn collect_stats(files: &[FileKey]) -> ScanStats {
     let mut scan_stats = ScanStats::new();
     scan_stats.files = files.len() as i64;
     for file in files.iter() {
-        scan_stats.idx_scan_size += file.meta.index_size;
         scan_stats.records += file.meta.records;
         scan_stats.original_size += file.meta.original_size;
         scan_stats.compressed_size += file.meta.compressed_size;
+        scan_stats.idx_scan_size += file.meta.index_size;
     }
     scan_stats
 }
