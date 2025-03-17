@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,20 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    cluster::{is_offline, LOCAL_NODE},
+    FILE_EXT_PARQUET,
+    cluster::{LOCAL_NODE, is_offline},
     ider,
     meta::stream::StreamType,
-    FILE_EXT_PARQUET,
 };
 
 pub mod broadcast;
-pub mod idx;
+mod idx;
 pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_ingester() {
         return Ok(()); // not an ingester, no need to init job
     }
+
+    // load pending delete files to memory cache
+    crate::service::db::file_list::local::load_pending_delete().await?;
 
     tokio::task::spawn(async move { parquet::run().await });
     tokio::task::spawn(async move { broadcast::run().await });

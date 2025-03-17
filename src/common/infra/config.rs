@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use config::{
+    RwAHashMap, RwHashMap,
     meta::{
         alerts::alert::Alert,
         dashboards::reports,
@@ -24,7 +25,6 @@ use config::{
         promql::ClusterLeader,
         stream::StreamParams,
     },
-    RwAHashMap, RwHashMap,
 };
 use dashmap::DashMap;
 use hashbrown::HashMap;
@@ -43,11 +43,6 @@ use crate::{
         pipeline::batch_execution::ExecutablePipeline,
     },
 };
-
-// global version variables
-pub static VERSION: &str = env!("GIT_VERSION");
-pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
-pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);

@@ -24,7 +24,7 @@ use config::{
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
 use opentelemetry::global;
-use proto::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
+use proto::cluster_rpc::{EmptyResponse, FileList, event_server::Event};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -90,10 +90,10 @@ impl Event for Eventer {
         // metrics
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/event/send_file_list", "200", "", "", ""])
+            .with_label_values(&["/event/send_file_list", "200", "", "", "", ""])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/event/send_file_list", "200", "", "", ""])
+            .with_label_values(&["/event/send_file_list", "200", "", "", "", ""])
             .inc();
 
         Ok(Response::new(EmptyResponse {}))

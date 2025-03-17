@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,8 +25,8 @@ use arrow_schema::Schema;
 use futures::TryStreamExt;
 use parquet::{
     arrow::{
-        arrow_reader::ArrowReaderMetadata, async_reader::ParquetRecordBatchStream,
-        AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
+        AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata,
+        async_reader::ParquetRecordBatchStream,
     },
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
@@ -46,15 +46,19 @@ pub fn new_parquet_writer<'a>(
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
-        .set_compression(Compression::ZSTD(Default::default()))
+        .set_compression(get_parquet_compression(&cfg.common.parquet_compression))
         .set_column_dictionary_enabled(
-            cfg.common.column_timestamp.as_str().into(),
+            TIMESTAMP_COL_NAME.into(),
             false,
         )
         .set_column_encoding(
-            cfg.common.column_timestamp.as_str().into(),
+            TIMESTAMP_COL_NAME.into(),
             Encoding::DELTA_BINARY_PACKED,
         );
+    if cfg.common.timestamp_compression_disabled {
+        writer_props = writer_props
+            .set_column_compression(TIMESTAMP_COL_NAME.into(), Compression::UNCOMPRESSED);
+    }
     if write_metadata {
         writer_props = writer_props.set_key_value_metadata(Some(vec![
             KeyValue::new("min_ts".to_string(), metadata.min_ts.to_string()),

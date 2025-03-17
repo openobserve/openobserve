@@ -24,17 +24,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'tw-prose tw-prose-sm tw-max-w-none',
         store.state?.theme === 'dark' && 'tw-prose-invert',
       ]"
-      v-html="DOMPurify.sanitize(marked(markdownContent))"
+      v-html="DOMPurify.sanitize(marked(processedContent))"
       data-test="markdown-renderer"
     ></div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { computed, defineComponent } from "vue";
+import { useStore } from "vuex";
+import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { useStore } from "vuex";
 
 export default defineComponent({
   name: "MarkdownRenderer",
@@ -43,13 +44,23 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    variablesData: {
+      type: Object,
+      default: () => ({}),
+    },
   },
-  setup(): any {
+  setup(props): any {
     const store = useStore();
+
+    const processedContent = computed(() => {
+      return processVariableContent(props.markdownContent, props.variablesData);
+    });
+
     return {
       DOMPurify,
       marked,
       store,
+      processedContent,
     };
   },
 });

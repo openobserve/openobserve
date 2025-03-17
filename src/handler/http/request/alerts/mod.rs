@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, patch, post, put, web};
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
     folder::DEFAULT_FOLDER,
     triggers::{Trigger, TriggerModule},
 };
 use hashbrown::HashMap;
-use infra::db::{connect_to_orm, ORM_CLIENT};
+use infra::db::{ORM_CLIENT, connect_to_orm};
 use svix_ksuid::Ksuid;
 
 use crate::{
@@ -108,7 +108,9 @@ pub async fn create_alert(
         .clone()
         .unwrap_or(DEFAULT_FOLDER.to_string());
     let mut alert: MetaAlert = req_body.into();
-    alert.owner = Some(user_email.user_id.clone());
+    if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
+        alert.owner = Some(user_email.user_id.clone());
+    }
     alert.last_edited_by = Some(user_email.user_id);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -296,7 +298,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/v2/{org_id}/alerts/{alert_id}/enable")]
+#[patch("/v2/{org_id}/alerts/{alert_id}/enable")]
 async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> HttpResponse {
     let (org_id, alert_id) = path.into_inner();
     let Ok(query) = web::Query::<EnableAlertQuery>::from_query(req.query_string()) else {
@@ -334,7 +336,7 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/v2/{org_id}/alerts/{alert_id}/trigger")]
+#[patch("/v2/{org_id}/alerts/{alert_id}/trigger")]
 async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     let (org_id, alert_id) = path.into_inner();
 
@@ -363,7 +365,7 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/v2/{org_id}/alerts/move")]
+#[patch("/v2/{org_id}/alerts/move")]
 async fn move_alerts(
     path: web::Path<String>,
     req_body: web::Json<MoveAlertsRequestBody>,

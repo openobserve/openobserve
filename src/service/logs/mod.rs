@@ -24,7 +24,7 @@ use anyhow::Result;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
-    get_config,
+    DISTINCT_FIELDS, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -32,19 +32,19 @@ use config::{
     },
     metrics,
     utils::{
-        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
+        json::{Map, Value, estimate_json_bytes, get_string_value, pickup_string_value},
         schema_ext::SchemaExt,
     },
-    DISTINCT_FIELDS,
 };
-use infra::schema::{unwrap_partition_time_level, SchemaCache};
+use infra::schema::{SchemaCache, unwrap_partition_time_level};
 
 use super::{
     db::organization::get_org_setting,
-    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    ingestion::{TriggerAlertData, evaluate_trigger, write_file},
     metadata::{
-        distinct_values::{DvItem, DISTINCT_STREAM_PREFIX},
-        write, MetadataItem, MetadataType,
+        MetadataItem, MetadataType,
+        distinct_values::{DISTINCT_STREAM_PREFIX, DvItem},
+        write,
     },
     schema::stream_schema_exists,
 };
@@ -431,11 +431,12 @@ async fn write_logs(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) =
-                        alert.evaluate(Some(&record_val), (None, end_time)).await
-                    {
-                        triggers.push((alert.clone(), v));
-                        evaluated_alerts.insert(key);
+                    match alert.evaluate(Some(&record_val), (None, end_time)).await {
+                        Ok(trigger_results) if trigger_results.data.is_some() => {
+                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        _ => {}
                     }
                 }
             }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,9 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use core::result::Result::Ok;
-use std::collections::HashMap;
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 use config::{
     meta::{
         alerts::alert::{Alert, AlertListFilter},
@@ -25,6 +24,7 @@ use config::{
     },
     utils::json,
 };
+use hashbrown::HashMap;
 
 use crate::{
     common::{
@@ -67,7 +67,9 @@ pub async fn save_alert(
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
-    alert.owner = Some(user_email.user_id.clone());
+    if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
+        alert.owner = Some(user_email.user_id.clone());
+    };
     alert.last_edited_by = Some(user_email.user_id);
     alert.updated_at = Some(datetime_now());
     alert.set_last_satisfied_at(None);
@@ -140,19 +142,11 @@ pub async fn update_alert(
 async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => {
-            return MetaHttpResponse::bad_request(e);
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query);
     let user_filter = query.get("owner").map(|v| v.to_string());
     let enabled_filter = query
         .get("enabled")
-        .and_then(|field| match field.parse::<bool>() {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        });
+        .and_then(|field| field.parse::<bool>().ok());
     let alert_filter = AlertListFilter {
         owner: user_filter,
         enabled: enabled_filter,
@@ -227,11 +221,8 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
     let user_filter = query.get("owner").map(|v| v.to_string());
     let enabled_filter = query
         .get("enabled")
-        .and_then(|field| match field.parse::<bool>() {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        });
-    let stream_type_filter = get_stream_type_from_request(&query).unwrap_or_default();
+        .and_then(|field| field.parse::<bool>().ok());
+    let stream_type_filter = get_stream_type_from_request(&query);
     let stream_name_filter = query.get("stream_name").map(|v| v.as_str());
 
     let alert_filter = AlertListFilter {
@@ -310,12 +301,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
 async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return MetaHttpResponse::bad_request(e);
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     match alert::get_by_name(&org_id, stream_type, &stream_name, &name).await {
         Ok(Some(mut data)) => {
             if let Ok(scheduled_job) = scheduler::get(
@@ -365,12 +351,7 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
 async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return MetaHttpResponse::bad_request(e);
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     match alert::delete_by_name(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => MetaHttpResponse::ok("Alert deleted"),
         Err(e) => e.into(),
@@ -402,12 +383,7 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
 async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return MetaHttpResponse::bad_request(e);
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let enable = match query.get("value") {
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
@@ -447,12 +423,7 @@ async fn trigger_alert(
 ) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return MetaHttpResponse::bad_request(e);
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     match alert::trigger_by_name(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
         Err(e) => e.into(),

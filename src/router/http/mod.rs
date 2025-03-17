@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use ::config::{
     get_config,
     meta::{
@@ -24,9 +22,11 @@ use ::config::{
     utils::rand::get_rand_element,
 };
 use actix_web::{
+    FromRequest, HttpRequest, HttpResponse,
     http::{Error, Method},
-    route, web, FromRequest, HttpRequest, HttpResponse,
+    route, web,
 };
+use hashbrown::HashMap;
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
@@ -245,7 +245,7 @@ async fn get_url(path: &str) -> URLDetails {
     }
 
     let nodes = nodes.unwrap();
-    let node = get_rand_element(&nodes);
+    let node = cluster::select_best_node(&nodes).unwrap_or(get_rand_element(&nodes));
     URLDetails {
         is_error: false,
         error: None,
@@ -426,7 +426,7 @@ async fn proxy_ws(
     start: std::time::Instant,
 ) -> actix_web::Result<HttpResponse, Error> {
     let cfg = get_config();
-    if cfg.common.websocket_enabled {
+    if cfg.websocket.enabled {
         // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
         let ws_url = match ws::convert_to_websocket_url(&new_url.full_url) {
             Ok(url) => url,
@@ -441,10 +441,10 @@ async fn proxy_ws(
         match ws::ws_proxy(req, payload, &ws_url).await {
             Ok(res) => {
                 log::info!(
-                "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
-                ws_url,
-                start.elapsed().as_millis()
-            );
+                    "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
+                    ws_url,
+                    start.elapsed().as_millis()
+                );
                 Ok(res)
             }
             Err(e) => {

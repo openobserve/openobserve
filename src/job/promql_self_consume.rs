@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2025 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,23 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
+    META_ORG_ID,
     cluster::LOCAL_NODE,
     get_config,
     meta::{cluster::get_internal_grpc_token, stream::StreamType},
-    metrics::get_registry,
     utils::{prom_json_encoder::JsonEncoder, util::zero_or},
 };
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
-    ingest_client::IngestClient, IngestionData, IngestionRequest, IngestionType,
+    IngestionData, IngestionRequest, IngestionType, ingest_client::IngestClient,
 };
 use serde_json::Value;
 use tokio::time::{self, Duration};
 use tonic::{
+    Request,
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
-    Request,
 };
 
 use crate::service::{self, grpc::get_ingester_channel};
@@ -46,13 +46,14 @@ static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {
 });
 
 async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<(), tonic::Status> {
-    let org = config.common.usage_org.as_str();
+    let org = META_ORG_ID;
     let req = IngestionRequest {
         org_id: org.to_owned(),
         stream_name: "".to_owned(),
         stream_type: StreamType::Metrics.to_string(),
         data: Some(IngestionData::from(metrics)),
         ingestion_type: Some(IngestionType::Json.into()),
+        metadata: None,
     };
     let org_header_key: MetadataKey<_> = config.grpc.org_header_key.parse().unwrap();
     let token: MetadataValue<_> = get_internal_grpc_token().parse().unwrap();
@@ -74,7 +75,7 @@ async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<()
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let config = get_config();
-    let org = config.common.usage_org.as_str();
+    let org = META_ORG_ID;
 
     log::debug!(
         "self-metrics consumption enabled status : {}",
@@ -90,13 +91,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let registry = get_registry();
-
     // Set up the interval timer for periodic fetching
     let timeout = zero_or(config.common.self_metrics_consumption_interval, 60);
     let mut interval = time::interval(Duration::from_secs(timeout));
     interval.tick().await; // Trigger the first run
 
+    let registry = prometheus::default_registry();
     loop {
         // Wait for the interval before running the task again
         interval.tick().await;

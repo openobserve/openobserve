@@ -1,8 +1,23 @@
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 #[cfg(feature = "enterprise")]
 #[cfg(test)]
 mod tests {
     use actix_http::Method;
-    use actix_web::{test, FromRequest};
+    use actix_web::{FromRequest, test};
     use o2_openfga::meta::mapping::OFGA_MODELS;
 
     use super::super::auth::AuthExtractor;
@@ -2984,6 +2999,13 @@ mod tests {
                 tls_cert_path: String::default(),
                 tls_key_path: String::default(),
             },
+            websocket: config::WebSocket {
+                enabled: bool::default(),
+                session_idle_timeout_secs: i64::default(),
+                session_max_lifetime_secs: i64::default(),
+                session_gc_interval_secs: i64::default(),
+                ping_interval_secs: i64::default(),
+            },
             route: config::Route {
                 timeout: u64::default(),
                 max_connections: usize::default(),
@@ -2992,6 +3014,7 @@ mod tests {
                 app_name: String::default(),
                 local_mode: bool::default(),
                 local_mode_storage: String::default(),
+                is_local_storage: true,
                 cluster_coordinator: String::default(),
                 queue_store: String::default(),
                 meta_store: String::default(),
@@ -3009,8 +3032,9 @@ mod tests {
                 data_stream_dir: String::default(),
                 data_db_dir: String::default(),
                 data_cache_dir: String::default(),
-                column_timestamp: String::default(),
                 column_all: String::default(),
+                parquet_compression: String::default(),
+                timestamp_compression_disabled: bool::default(),
                 feature_per_thread_lock: bool::default(),
                 feature_fulltext_extra_fields: String::default(),
                 feature_secondary_index_extra_fields: String::default(),
@@ -3026,6 +3050,9 @@ mod tests {
                 feature_query_streaming_aggs: bool::default(),
                 feature_join_match_one_enabled: bool::default(),
                 feature_join_right_side_max_rows: usize::default(),
+                feature_query_skip_wal: bool::default(),
+                wal_write_queue_enabled: bool::default(),
+                wal_write_queue_full_reject: bool::default(),
                 ui_enabled: bool::default(),
                 ui_sql_base64_enabled: bool::default(),
                 metrics_dedup_enabled: bool::default(),
@@ -3034,6 +3061,8 @@ mod tests {
                 bloom_filter_default_fields: String::default(),
                 bloom_filter_ndv_ratio: u64::default(),
                 wal_fsync_disabled: bool::default(),
+                search_around_default_fields: String::default(),
+                additional_reporting_orgs: String::default(),
                 tracing_enabled: bool::default(),
                 tracing_search_enabled: bool::default(),
                 otel_otlp_url: String::default(),
@@ -3050,7 +3079,6 @@ mod tests {
                 print_key_event: bool::default(),
                 print_key_sql: bool::default(),
                 usage_enabled: bool::default(),
-                usage_org: String::default(),
                 usage_reporting_mode: String::default(),
                 usage_reporting_url: String::default(),
                 usage_reporting_creds: String::default(),
@@ -3075,6 +3103,7 @@ mod tests {
                 inverted_index_search_format: String::default(),
                 inverted_index_tantivy_mode: String::default(),
                 inverted_index_count_optimizer_enabled: bool::default(),
+                inverted_index_camel_case_tokenizer_disabled: bool::default(),
                 full_text_search_type: String::default(),
                 query_on_stream_selection: bool::default(),
                 show_stream_dates_doc_num: bool::default(),
@@ -3083,7 +3112,6 @@ mod tests {
                 report_user_password: String::default(),
                 report_server_url: String::default(),
                 report_server_skip_tls_verify: bool::default(),
-                schema_cache_compress_enabled: bool::default(),
                 skip_formatting_stream_name: bool::default(),
                 bulk_api_response_errors_only: bool::default(),
                 allow_user_defined_schemas: bool::default(),
@@ -3101,7 +3129,6 @@ mod tests {
                 metrics_cache_enabled: bool::default(),
                 swagger_enabled: bool::default(),
                 fake_es_version: String::default(),
-                websocket_enabled: bool::default(),
                 min_auto_refresh_interval: u32::default(),
             },
             limit: config::Limit {
@@ -3122,6 +3149,7 @@ mod tests {
                 mem_table_bucket_num: 1,
                 mem_persist_interval: u64::default(),
                 wal_write_buffer_size: usize::default(),
+                wal_write_queue_size: usize::default(),
                 file_push_interval: u64::default(),
                 file_push_limit: usize::default(),
                 file_move_fields_limit: usize::default(),
@@ -3131,9 +3159,18 @@ mod tests {
                 usage_reporting_thread_num: usize::default(),
                 query_thread_num: usize::default(),
                 query_timeout: u64::default(),
+                query_ingester_timeout: u64::default(),
                 query_default_limit: i64::default(),
                 query_partition_by_secs: usize::default(),
                 query_group_base_speed: usize::default(),
+                file_download_thread_num: usize::default(),
+                http_keep_alive_disabled: bool::default(),
+                default_max_query_range_days: i64::default(),
+                max_dashboard_series: usize::default(),
+                circuit_breaker_enabled: bool::default(),
+                circuit_breaker_watching_window: i64::default(),
+                circuit_breaker_reset_window_num: i64::default(),
+                circuit_breaker_slow_request_threshold: u64::default(),
                 ingest_allowed_upto: i64::default(),
                 ingest_flatten_level: u32::default(),
                 ignore_file_retention_by_stream: bool::default(),
@@ -3309,6 +3346,8 @@ mod tests {
                 sync_to_cache_interval: u64::default(),
                 max_retries: usize::default(),
                 max_idle_per_host: usize::default(),
+                keepalive_timeout: u64::default(),
+                multi_part_upload_size: usize::default(),
             },
             sns: config::Sns {
                 endpoint: String::default(),
@@ -3323,10 +3362,13 @@ mod tests {
                 ha_cluster_label: String::default(),
                 ha_replica_label: String::default(),
             },
-            profiling: config::Pyroscope {
-                enabled: bool::default(),
-                server_url: String::default(),
-                project_name: String::default(),
+            profiling: config::Profiling {
+                pprof_enabled: bool::default(),
+                pprof_protobuf_enabled: bool::default(),
+                pprof_flamegraph_path: String::default(),
+                pyroscope_enabled: bool::default(),
+                pyroscope_server_url: String::default(),
+                pyroscope_project_name: String::default(),
             },
             smtp: config::Smtp {
                 smtp_enabled: bool::default(),

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -44,7 +44,7 @@ pub async fn delete(
     {
         // maybe the file already deleted, so we just skip the `not found` error
         if !e.to_string().to_lowercase().contains("not found") {
-            log::error!("[COMPACT] delete files from storage failed: {}", e);
+            log::error!("[COMPACTOR] delete files from storage failed: {}", e);
             return Err(e.into());
         }
     }
@@ -73,7 +73,7 @@ pub async fn delete(
             // maybe the file already deleted or there's not related index files,
             // so we just skip the `not found` error
             if !e.to_string().to_lowercase().contains("not found") {
-                log::error!("[COMPACT] delete files from storage failed: {}", e);
+                log::error!("[COMPACTOR] delete files from storage failed: {}", e);
                 return Err(e.into());
             }
         }
@@ -106,7 +106,7 @@ pub async fn delete(
         {
             // maybe the file already deleted, so we just skip the `not found` error
             if !e.to_string().to_lowercase().contains("not found") {
-                log::error!("[COMPACT] delete files from storage failed: {}", e);
+                log::error!("[COMPACTOR] delete files from storage failed: {}", e);
                 return Err(e.into());
             }
         }
@@ -117,7 +117,7 @@ pub async fn delete(
         if let Err(e) =
             storage::del(&files.keys().map(|file| file.as_str()).collect::<Vec<_>>()).await
         {
-            log::error!("[COMPACT] delete files from storage failed: {}", e);
+            log::error!("[COMPACTOR] delete files from storage failed: {}", e);
             return Err(e.into());
         }
     }
@@ -132,7 +132,7 @@ pub async fn delete(
     )
     .await
     {
-        log::error!("[COMPACT] delete files from table failed: {}", e);
+        log::error!("[COMPACTOR] delete files from table failed: {}", e);
         return Err(e.into());
     }
 

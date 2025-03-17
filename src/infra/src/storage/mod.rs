@@ -19,7 +19,7 @@ use bytes::buf::Buf;
 use config::{get_config, is_local_disk_storage, meta::stream::FileMeta, metrics};
 use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt};
-use object_store::{path::Path, GetRange, ObjectMeta, ObjectStore, WriteMultipart};
+use object_store::{GetRange, ObjectMeta, ObjectStore, WriteMultipart, path::Path};
 use once_cell::sync::Lazy;
 use parquet::file::metadata::ParquetMetaDataReader;
 

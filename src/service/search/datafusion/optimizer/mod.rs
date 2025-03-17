@@ -20,7 +20,7 @@ use add_timestamp::AddTimestampRule;
 #[cfg(feature = "enterprise")]
 use cipher::{RewriteCipherCall, RewriteCipherKey};
 use datafusion::optimizer::{
-    common_subexpr_eliminate::CommonSubexprEliminate,
+    OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
     decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
     eliminate_cross_join::EliminateCrossJoin, eliminate_duplicated_expr::EliminateDuplicatedExpr,
     eliminate_filter::EliminateFilter, eliminate_group_by_constant::EliminateGroupByConstant,
@@ -32,7 +32,7 @@ use datafusion::optimizer::{
     push_down_limit::PushDownLimit, replace_distinct_aggregate::ReplaceDistinctWithAggregate,
     scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
     single_distinct_to_groupby::SingleDistinctToGroupBy,
-    unwrap_cast_in_comparison::UnwrapCastInComparison, OptimizerRule,
+    unwrap_cast_in_comparison::UnwrapCastInComparison,
 };
 use infra::schema::get_stream_setting_fts_fields;
 use limit_join_right_side::LimitJoinRightSide;
@@ -53,7 +53,7 @@ pub mod utils;
 
 pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
     let cfg = config::get_config();
-    let limit = if sql.limit as i32 > config::QUERY_WITH_NO_LIMIT {
+    let limit = if sql.limit > config::QUERY_WITH_NO_LIMIT {
         if sql.limit > 0 {
             Some(sql.limit as usize)
         } else {

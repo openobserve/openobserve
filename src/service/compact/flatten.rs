@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,10 +17,11 @@ use std::sync::Arc;
 
 use ::datafusion::arrow::datatypes::Schema;
 use arrow::array::{
-    make_builder, new_null_array, ArrayBuilder, ArrayRef, RecordBatch, StringArray, StringBuilder,
+    ArrayBuilder, ArrayRef, RecordBatch, StringArray, StringBuilder, make_builder, new_null_array,
 };
 use arrow_schema::{DataType, Field};
 use config::{
+    FxIndexMap,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -31,13 +32,12 @@ use config::{
         json,
         parquet::{read_recordbatch_from_bytes, write_recordbatch_to_parquet},
     },
-    FxIndexMap,
 };
 use hashbrown::HashSet;
 use infra::{file_list as infra_file_list, storage};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::{Semaphore, mpsc};
 
 use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 

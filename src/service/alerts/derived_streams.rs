@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,16 +16,15 @@
 use std::str::FromStr;
 
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{Timelike, Utc};
 use config::{
     get_config,
     meta::{
-        alerts::{FrequencyType, QueryType},
+        alerts::{FrequencyType, QueryType, TriggerEvalResults},
         pipeline::components::DerivedStream,
         search::{SearchEventContext, SearchEventType},
         sql::resolve_stream_names,
     },
-    utils::json::{Map, Value},
 };
 use cron::Schedule;
 
@@ -82,7 +81,7 @@ pub async fn save(
                 .query_condition
                 .promql
                 .as_ref()
-                .map_or(false, |promql| promql.is_empty())
+                .is_some_and(|promql| promql.is_empty())
                 || derived_stream.query_condition.promql_condition.is_none()
             {
                 return Err(anyhow::anyhow!(
@@ -96,7 +95,12 @@ pub async fn save(
 
     // 2. update the frequency
     if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
-        // Check the cron expression
+        let now = chrono::Utc::now().second();
+        derived_stream.trigger_condition.cron = super::super::alerts::alert::update_cron_expression(
+            &derived_stream.trigger_condition.cron,
+            now,
+        );
+        // Check if the cron expression is valid
         Schedule::from_str(&derived_stream.trigger_condition.cron)?;
     } else if derived_stream.trigger_condition.frequency == 0 {
         // default 3 mins, set min at 1 minutes
@@ -107,8 +111,13 @@ pub async fn save(
     // test derived_stream
     let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
     let test_end_time = Utc::now().timestamp_micros();
+    let test_start_time = test_end_time
+        - chrono::Duration::try_seconds(5)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
     if let Err(e) = &derived_stream
-        .evaluate((None, test_end_time), &trigger_module_key)
+        .evaluate((Some(test_start_time), test_end_time), &trigger_module_key)
         .await
     {
         return Err(anyhow::anyhow!(
@@ -160,7 +169,7 @@ pub trait DerivedStreamExt: Sync + Send + 'static {
         &self,
         (start_time, end_time): (Option<i64>, i64),
         module_key: &str,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 }
 
 #[async_trait]
@@ -176,7 +185,7 @@ impl DerivedStreamExt for DerivedStream {
         &self,
         (start_time, end_time): (Option<i64>, i64),
         module_key: &str,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
         self.query_condition
             .evaluate_scheduled(
                 &self.org_id,

@@ -1389,9 +1389,7 @@ export default defineComponent({
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");
-        case "stacked":
         case "heatmap":
-        case "h-stacked":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.oneOrMoreFieldsMessage");

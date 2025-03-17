@@ -38,9 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           @click="triggerExpand(props)"
         >
-        <q-tooltip position="bottom">
-                <PipelineView :pipeline="props.row" />
-              </q-tooltip>
           <q-td v-if="activeTab == 'scheduled' "  >
             
             <q-btn
@@ -98,6 +95,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.delete')"
               @click.stop="openDeleteDialog(props.row)"
             ></q-btn>
+            <q-btn
+              :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
+              :icon="outlinedVisibility"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alerts.view')"
+            >
+            <q-tooltip position="bottom">
+              <PipelineView :pipeline="props.row" />
+            </q-tooltip>
+          </q-btn>
           </template>
         </q-td>
 
@@ -224,7 +236,7 @@ import { useQuasar, type QTableProps  } from "quasar";
 import type { QTableColumn } from 'quasar';
 
 import NoData from "../shared/grid/NoData.vue";
-import { outlinedDelete , outlinedPause , outlinedPlayArrow } from "@quasar/extras/material-icons-outlined";
+import { outlinedDelete , outlinedPause , outlinedPlayArrow, outlinedVisibility } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -415,7 +427,6 @@ const getColumnsForActiveTab = (tab : any) => {
     { name: "stream_type", field: "stream_type", label: "Stream Type", align: "left", sortable: true },
     { name: "frequency", field: "frequency", label: "Frequency", align: "left", sortable: true },
     { name: "period", field: "period", label: "Period", align: "left", sortable: true },
-    { name: "silence", field: "silence", label: "Silence", align: "left", sortable: true },
     { name: "cron", field: "cron", label: "Cron", align: "left", sortable: false },
     { name: "sql_query", field: "sql_query", label: "SQL Query", align: "left", sortable: false
       ,
@@ -485,7 +496,6 @@ const getPipelines = async () => {
             pipeline.stream_type = pipeline.source.stream_type;
             pipeline.frequency = pipeline.source.trigger_condition.frequency + " Mins";
             pipeline.period = pipeline.source.trigger_condition.period + " Mins";
-            pipeline.silence = pipeline.source.trigger_condition.silence + " Mins";
             pipeline.cron = pipeline.cron && pipeline.cron !== "" ? pipeline.source.trigger_condition.cron : 'False';
             pipeline.sql_query = pipeline.source.query_condition.sql;
           }

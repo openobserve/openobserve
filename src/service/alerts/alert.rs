@@ -21,16 +21,16 @@ use std::{
 use async_trait::async_trait;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
-    get_config,
+    SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::{
+            FrequencyType, Operator, QueryType, TriggerEvalResults,
             alert::{Alert, AlertListFilter, ListAlertsParams},
-            FrequencyType, Operator, QueryType,
         },
         destinations::{
             AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateType,
         },
-        folder::{Folder, FolderType, DEFAULT_FOLDER},
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -39,12 +39,11 @@ use config::{
         base64,
         json::{Map, Value},
     },
-    SMTP_CLIENT,
 };
 use cron::Schedule;
 use infra::{schema::unwrap_stream_settings, table};
 use itertools::Itertools;
-use lettre::{message::MultiPart, AsyncTransport, Message};
+use lettre::{AsyncTransport, Message, message::MultiPart};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
@@ -54,7 +53,7 @@ use crate::{
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::{
-        alerts::{build_sql, destinations, QueryConditionExt},
+        alerts::{QueryConditionExt, build_sql, destinations},
         db, folders,
         search::sql::RE_ONLY_SELECT,
         short_url,
@@ -130,7 +129,9 @@ pub enum AlertError {
     #[error(transparent)]
     GetDestinationWithTemplateError(#[from] db::alerts::destinations::DestinationError),
 
-    #[error("Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\"")]
+    #[error(
+        "Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\""
+    )]
     PeriodExceedsMaxQueryRange {
         max_query_range_hours: i64,
         stream_name: String,
@@ -236,17 +237,8 @@ async fn prepare_alert(
     }
 
     if alert.trigger_condition.frequency_type == FrequencyType::Cron {
-        let cron_exp = alert.trigger_condition.cron.clone();
-        if cron_exp.starts_with("* ") {
-            let (_, rest) = cron_exp.split_once(" ").unwrap();
-            let now = Utc::now().second().to_string();
-            alert.trigger_condition.cron = format!("{now} {rest}");
-            log::debug!(
-                "New cron expression for alert {}: {}",
-                alert.name,
-                alert.trigger_condition.cron
-            );
-        }
+        let now = Utc::now().second();
+        alert.trigger_condition.cron = update_cron_expression(&alert.trigger_condition.cron, now);
         // Check the cron expression
         Schedule::from_str(&alert.trigger_condition.cron).map_err(AlertError::ParseCron)?;
     } else if alert.trigger_condition.frequency == 0 {
@@ -405,6 +397,16 @@ async fn prepare_alert(
     // }
 
     Ok(())
+}
+
+pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
+    let mut cron_exp = cron_exp.trim().to_owned();
+    if cron_exp.starts_with("*") {
+        let (_, rest) = cron_exp.split_once("*").unwrap();
+        let rest = rest.trim();
+        cron_exp = format!("{now} {rest}");
+    }
+    cron_exp
 }
 
 /// Creates a new alert in the specified folder.
@@ -679,7 +681,7 @@ pub trait AlertExt: Sync + Send + 'static {
         &self,
         row: Option<&Map<String, Value>>,
         (start_time, end_time): (Option<i64>, i64),
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 
     /// Returns a tuple containing a boolean - if all the send notification jobs successfully
     /// and the error message if any
@@ -698,7 +700,7 @@ impl AlertExt for Alert {
         &self,
         row: Option<&Map<String, Value>>,
         (start_time, end_time): (Option<i64>, i64),
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
@@ -984,7 +986,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             process_variable_replace(&mut resp, key, &VarValue::Str(&value), false);
 
             // calculate start and end time
-            if key == &get_config().common.column_timestamp {
+            if key == TIMESTAMP_COL_NAME {
                 let val = value.parse::<i64>().unwrap_or_default();
                 if alert_start_time == 0 || val < alert_start_time {
                     alert_start_time = val;
@@ -1349,12 +1351,10 @@ pub fn get_alert_start_end_time(
         return (start_time, rows_end_time);
     }
 
-    let cfg = get_config();
-
     // calculate start and end time
     let mut alert_start_time = 0;
     let mut alert_end_time = 0;
-    if let Some(values) = vars.get(&cfg.common.column_timestamp) {
+    if let Some(values) = vars.get(TIMESTAMP_COL_NAME) {
         for val in values {
             let val = val.parse::<i64>().unwrap_or_default();
             if alert_start_time == 0 || val < alert_start_time {
@@ -1503,5 +1503,49 @@ mod tests {
         let ret = save(org_id, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_1() {
+        let cron_exp = "* * * * * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} * * * * * *", now);
+        assert_eq!(new_cron_exp, updated);
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_2() {
+        let cron_exp = "47*/12 * * * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        assert_eq!(new_cron_exp, "47*/12 * * * * *");
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_3() {
+        let cron_exp = "**/15 21-23,0-8 * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} */15 21-23,0-8 * * *", now);
+        assert_eq!(new_cron_exp, updated);
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_4() {
+        let cron_exp = "*10*****";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} 10*****", now);
+        assert_eq!(new_cron_exp, updated);
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_5() {
+        let cron_exp = "* */10 2 * * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} */10 2 * * * *", now);
+        assert_eq!(new_cron_exp, updated);
     }
 }

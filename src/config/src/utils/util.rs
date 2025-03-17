@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,11 +17,7 @@ pub fn zero_or<T>(v: T, def: T) -> T
 where
     T: PartialEq + Default,
 {
-    if v == Default::default() {
-        def
-    } else {
-        v
-    }
+    if v == Default::default() { def } else { v }
 }
 
 #[cfg(test)]

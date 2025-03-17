@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,9 +24,9 @@ use byteorder::ByteOrder;
 use bytes::Bytes;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use tantivy::{directory::OwnedBytes, Directory, ReloadPolicy};
+use tantivy::{Directory, ReloadPolicy, directory::OwnedBytes};
 
-use super::{caching_directory::CachingDirectory, EMPTY_FILE_EXT, FOOTER_CACHE};
+use super::{EMPTY_FILE_EXT, FOOTER_CACHE, caching_directory::CachingDirectory};
 
 const FOOTER_CACHE_VERSION: u32 = 1;
 const FOOTER_VERSION_LEN: usize = 4;

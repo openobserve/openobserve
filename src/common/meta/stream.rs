@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -35,9 +35,12 @@ pub struct Stream {
     pub stats: StreamStats,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub schema: Vec<StreamProperty>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uds_schema: Option<Vec<StreamProperty>>,
     pub settings: StreamSettings,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics_meta: Option<Metadata>,
+    pub total_fields: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -63,6 +66,7 @@ pub struct StreamSchema {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListStream {
     pub list: Vec<Stream>,
+    pub total: usize,
 }
 
 pub struct SchemaEvolution {

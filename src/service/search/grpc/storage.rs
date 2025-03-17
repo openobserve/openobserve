@@ -18,7 +18,8 @@ use std::{collections::HashSet, sync::Arc};
 use anyhow::Context;
 use arrow_schema::Schema;
 use config::{
-    get_config, is_local_disk_storage,
+    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL, get_config,
+    is_local_disk_storage,
     meta::{
         bitvec::BitVec,
         inverted_index::{InvertedIndexOptimizeMode, InvertedIndexTantivyMode},
@@ -28,10 +29,9 @@ use config::{
     utils::{
         file::is_exists,
         inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
-        tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
+        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
         time::BASE_TIME,
     },
-    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL,
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
 use futures::future::try_join_all;
@@ -45,18 +45,21 @@ use tantivy::Directory;
 use tokio::sync::Semaphore;
 use tracing::Instrument;
 
-use crate::service::{
-    db, file_list,
-    search::{
-        datafusion::exec,
-        generate_search_schema_diff,
-        index::IndexCondition,
-        tantivy::puffin_directory::{
-            caching_directory::CachingDirectory,
-            convert_puffin_file_to_tantivy_dir,
-            footer_cache::FooterCache,
-            reader::{warm_up_terms, PuffinDirReader},
-            reader_cache,
+use crate::{
+    job,
+    service::{
+        db, file_list,
+        search::{
+            datafusion::exec,
+            generate_search_schema_diff,
+            index::IndexCondition,
+            tantivy::puffin_directory::{
+                caching_directory::CachingDirectory,
+                convert_puffin_file_to_tantivy_dir,
+                footer_cache::FooterCache,
+                reader::{PuffinDirReader, warm_up_terms},
+                reader_cache,
+            },
         },
     },
 };
@@ -188,6 +191,7 @@ pub async fn search(
             scan_stats.records += file.meta.records;
             scan_stats.original_size += file.meta.original_size;
             scan_stats.compressed_size += file.meta.compressed_size;
+            scan_stats.idx_scan_size += file.meta.index_size;
             // check schema version
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
@@ -320,16 +324,18 @@ async fn cache_files(
     file_type: &str,
 ) -> Result<file_data::CacheType, Error> {
     // check how many files already cached
+    let mut cached_files = HashSet::with_capacity(files.len());
     for file in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
+            cached_files.insert(file);
         } else if file_data::disk::exist(file).await {
             scan_stats.querier_disk_cached_files += 1;
+            cached_files.insert(file);
         }
     }
-    if files.len() as i64
-        == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files
-    {
+    let files_num = files.len() as i64;
+    if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
         return Ok(file_data::CacheType::None);
     }
@@ -353,98 +359,49 @@ async fn cache_files(
     };
 
     let trace_id = trace_id.to_string();
-    let files = files.iter().map(|f| f.to_string()).collect_vec();
+    let files = files
+        .iter()
+        .filter_map(|f| {
+            if cached_files.contains(f) {
+                None
+            } else {
+                Some(f.to_string())
+            }
+        })
+        .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
-        let start = std::time::Instant::now();
         let files = files.iter().map(|f| f.as_str()).collect_vec();
-        match cache_files_inner(&trace_id, &files, cache_type).await {
-            Err(e) => {
-                log::error!(
-                    "[trace_id {}] search->storage: cache {} files in background error: {:?}",
-                    trace_id,
-                    file_type,
-                    e
-                );
-            }
-            Ok(cache_type) => {
-                log::info!(
-                    "[trace_id {}] search->storage: cache {} files in background into {:?} cache done, downloaded {} files, took: {} ms",
-                    trace_id,
-                    file_type,
-                    cache_type,
-                    files.len(),
-                    start.elapsed().as_millis()
-                );
-            }
-        }
-    });
-    Ok(cache_type)
-}
-
-#[tracing::instrument(name = "service:search:grpc:storage:cache_files_inner", skip_all)]
-async fn cache_files_inner(
-    trace_id: &str,
-    files: &[&str],
-    cache_type: file_data::CacheType,
-) -> Result<file_data::CacheType, Error> {
-    let cfg = get_config();
-    let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
-    for file in files.iter() {
-        let trace_id = trace_id.to_string();
-        let file_name = file.to_string();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<()> = tokio::task::spawn(async move {
-            let cfg = get_config();
-            let ret = match cache_type {
-                file_data::CacheType::Memory => {
-                    let mut disk_exists = false;
-                    let mem_exists = file_data::memory::exist(&file_name).await;
-                    if !mem_exists && !cfg.memory_cache.skip_disk_check {
-                        // when skip_disk_check = false, need to check disk cache
-                        disk_exists = file_data::disk::exist(&file_name).await;
-                    }
-                    if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
-                        file_data::memory::download(&trace_id, &file_name)
-                            .await
-                            .err()
-                    } else {
-                        None
-                    }
-                }
-                file_data::CacheType::Disk => {
-                    if !file_data::disk::exist(&file_name).await {
-                        file_data::disk::download(&trace_id, &file_name).await.err()
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            };
-            // return file_name if download failed
-            if let Some(e) = ret {
-                log::warn!(
-                        "[trace_id {trace_id}] search->storage: download file to cache err: {}, file: {}",
-                        e,
-                        file_name
+        for file in &files {
+            match job::queue_background_download(&trace_id, file, cache_type).await {
+                Ok(_) => {
+                    log::debug!(
+                        "[trace_id {trace_id}] file {file} successfully queued for download"
                     );
+                }
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] error in queuing file {file} for background download : {e}"
+                    );
+                }
             }
-            drop(permit);
-        });
-        tasks.push(task);
-    }
-
-    for task in tasks {
-        if let Err(e) = task.await {
-            log::error!(
-                "[trace_id {trace_id}] search->storage: load file task err: {}",
-                e
-            );
         }
-    }
+        log::info!(
+            "[trace_id {}] search->storage: successfully enqueued {} files of {} for background download into {:?} ",
+            trace_id,
+            files.len(),
+            file_type,
+            cache_type,
+        );
+    });
 
-    Ok(cache_type)
+    // if cached file less than 50% of the total files, return None
+    if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num / 2
+    {
+        Ok(file_data::CacheType::None)
+    } else {
+        Ok(cache_type)
+    }
 }
 
 /// Filter file list using inverted index
@@ -633,11 +590,21 @@ pub async fn filter_file_list_by_tantivy_index(
                         }
                     } else {
                         // if the bitmap is empty then we remove the file from the list
-                        log::debug!(
-                            "[trace_id {}] search->tantivy: no match found in index for file {}",
-                            query.trace_id,
-                            file_name
-                        );
+                        if hits_in_file > 0 {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
+                                query.trace_id,
+                                index_condition,
+                                hits_in_file,
+                                file_name
+                            );
+                        } else {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: no match found in index for file {}",
+                                query.trace_id,
+                                file_name
+                            );
+                        }
                         file_list_map.remove(&file_name);
                     }
                 }
@@ -926,7 +893,7 @@ fn repartition_sorted_groups(
         }
 
         // split max_group into odd and even groups
-        let group_cap = (max_group.len() + 1) / 2;
+        let group_cap = max_group.len().div_ceil(2);
         let mut odd_group = Vec::with_capacity(group_cap);
         let mut even_group = Vec::with_capacity(group_cap);
 

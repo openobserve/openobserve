@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,16 +17,15 @@ use std::{path::Path, sync::Arc};
 
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use config::{
-    get_config, ider,
+    FILE_EXT_JSON, get_config, ider,
     meta::stream::{PartitionTimeLevel, StreamParams, StreamType},
     metrics,
     utils::async_file::get_file_contents,
-    FILE_EXT_JSON,
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::{
-    fs::{create_dir_all, File, OpenOptions},
+    fs::{File, OpenOptions, create_dir_all},
     io::AsyncWriteExt,
     sync::RwLock,
 };

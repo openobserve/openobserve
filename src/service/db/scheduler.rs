@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -62,7 +62,7 @@ pub async fn delete(org: &str, module: TriggerModule, key: &str) -> Result<()> {
 pub async fn update_trigger(trigger: Trigger) -> Result<()> {
     #[cfg(feature = "enterprise")]
     let trigger_clone = trigger.clone();
-    infra_scheduler::update_trigger(trigger).await?;
+    infra_scheduler::update_trigger(trigger, false).await?;
 
     // super cluster
     #[cfg(feature = "enterprise")]

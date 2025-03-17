@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -185,6 +185,13 @@ pub async fn process_token(
             }
         }
     } else {
+        // check if user is service account and skip the role update ,
+        // assumption is always a service account irrespective of the orgs it belongs to
+        if res.0.user_role.is_some() && res.0.user_role.unwrap().eq(&UserRole::ServiceAccount) {
+            log::info!("User is service account and skipping the role update");
+            return;
+        }
+
         log::info!("User exists in the database perform check for role change");
         let existing_db_user = db_user.unwrap();
         let existing_orgs = existing_db_user.organizations;
@@ -470,6 +477,13 @@ async fn map_group_to_custom_role(
             }
         }
     } else {
+        // check if user is service account and skip the role update
+        if default_role.is_some() && default_role.unwrap().eq(&UserRole::ServiceAccount) {
+            log::info!(
+                "group_to_custom_role: User is external service account and skipping the role update"
+            );
+            return;
+        }
         log::info!("group_to_custom_role: User exists in the database");
         let mut add_tuples = vec![];
         let mut remove_tuples = vec![];

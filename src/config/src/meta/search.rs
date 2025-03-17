@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
@@ -42,7 +40,7 @@ pub struct Session {
     pub target_partitions: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct Request {
     #[schema(value_type = SearchQuery)]
@@ -63,7 +61,10 @@ pub struct Request {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub use_cache: Option<bool>, // used for search job,
+    pub use_cache: Option<bool>, // used for search job
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_mode: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -509,6 +510,7 @@ impl SearchHistoryRequest {
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
             use_cache: None,
+            local_mode: None,
         };
         Ok(search_req)
     }
@@ -767,7 +769,7 @@ impl<'de> Deserialize<'de> for SearchEventType {
             where
                 E: serde::de::Error,
             {
-                SearchEventType::from_str(value).map_err(serde::de::Error::custom)
+                SearchEventType::try_from(value).map_err(serde::de::Error::custom)
             }
         }
 
@@ -791,9 +793,9 @@ impl std::fmt::Display for SearchEventType {
     }
 }
 
-impl FromStr for SearchEventType {
-    type Err = String;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+impl TryFrom<&str> for SearchEventType {
+    type Error = String;
+    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
         let s = s.to_lowercase();
         match s.as_str() {
             "ui" => Ok(SearchEventType::UI),
@@ -1040,6 +1042,7 @@ impl MultiStreamRequest {
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
                 use_cache: None,
+                local_mode: None,
             });
         }
         res

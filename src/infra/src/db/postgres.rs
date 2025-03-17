@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,10 +24,10 @@ use config::{
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
-    postgres::{PgConnectOptions, PgPoolOptions},
     Pool, Postgres,
+    postgres::{PgConnectOptions, PgPoolOptions},
 };
-use tokio::sync::{mpsc, OnceCell};
+use tokio::sync::{OnceCell, mpsc};
 
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;
@@ -40,7 +40,7 @@ fn connect() -> Pool<Postgres> {
     let db_opts = PgConnectOptions::from_str(&cfg.common.meta_postgres_dsn)
         .expect("postgres connect options create failed");
 
-    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 30);
+    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
     let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
 

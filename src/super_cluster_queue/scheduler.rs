@@ -63,7 +63,8 @@ async fn push(msg: Message) -> Result<()> {
 
 async fn update(msg: Message) -> Result<()> {
     let trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
-    if let Err(e) = scheduler::update_trigger(trigger.clone()).await {
+    // Update trigger in super cluster with clone = true, so that it copies everything
+    if let Err(e) = scheduler::update_trigger(trigger.clone(), true).await {
         log::error!(
             "[SUPER_CLUSTER:sync] Failed to update scheduler: {}/{:?}/{}, error: {}",
             trigger.org,

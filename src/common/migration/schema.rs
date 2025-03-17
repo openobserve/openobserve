@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -41,10 +41,7 @@ use o2_openfga::authorizer::authz::get_ownership_tuple;
 use o2_openfga::config::get_config as get_openfga_config;
 
 use crate::{
-    common::{
-        infra::config::VERSION,
-        utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
-    },
+    common::utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
     service::db,
 };
 
@@ -238,11 +235,7 @@ async fn upgrade_schema_row_per_version() -> Result<bool, anyhow::Error> {
         std::result::Result::Ok(val) => {
             let val_str = std::str::from_utf8(&val).unwrap();
             let val = val_str.parse::<i64>().unwrap_or(0);
-            if val > 0 {
-                Ok(false)
-            } else {
-                Ok(true)
-            }
+            if val > 0 { Ok(false) } else { Ok(true) }
         }
         Err(_) => Ok(true),
     }
@@ -294,7 +287,7 @@ pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
     if let Err(e) = db
         .put(
             META_MIGRATION_VERSION_KEY,
-            VERSION.to_string().into(),
+            config::VERSION.to_string().into(),
             NO_NEED_WATCH,
             None,
         )

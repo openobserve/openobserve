@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -52,7 +52,7 @@ pub trait Scheduler: Sync + Send + 'static {
         retries: i32,
         data: Option<&str>,
     ) -> Result<()>;
-    async fn update_trigger(&self, trigger: Trigger) -> Result<()>;
+    async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()>;
     async fn pull(
         &self,
         concurrency: i64,
@@ -110,8 +110,8 @@ pub async fn update_status(
 /// only be used by the node that is currently processing the trigger.
 /// Use `pull()` method to set the status of the job from `Waiting` to `Processing`.
 #[inline]
-pub async fn update_trigger(trigger: Trigger) -> Result<()> {
-    CLIENT.update_trigger(trigger).await
+pub async fn update_trigger(trigger: Trigger, clone: bool) -> Result<()> {
+    CLIENT.update_trigger(trigger, clone).await
 }
 
 /// Scheduler pulls only those triggers that match the conditions-

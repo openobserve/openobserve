@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,16 +15,19 @@
 
 use std::sync::Arc;
 
-use config::{get_config, meta::cluster::NodeInfo, utils::rand::get_rand_element, RwAHashMap};
+use config::{RwAHashMap, get_config, meta::cluster::NodeInfo, utils::rand::get_rand_element};
 use infra::errors::{Error, ErrorCodes};
 use once_cell::sync::Lazy;
-use proto::cluster_rpc::{self, metrics_client::MetricsClient, search_client::SearchClient};
+use proto::cluster_rpc::{
+    self, metrics_client::MetricsClient, node_service_client::NodeServiceClient,
+    search_client::SearchClient,
+};
 use tonic::{
+    Request, Status,
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
     service::interceptor::InterceptedService,
     transport::{Certificate, Channel, ClientTlsConfig},
-    Request, Status,
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -110,7 +113,9 @@ pub async fn make_grpc_search_client<T>(
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
-    SearchClient<InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>>,
+    SearchClient<
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
+    >,
     Error,
 > {
     let cfg = get_config();
@@ -158,7 +163,9 @@ pub async fn make_grpc_metrics_client<T>(
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
-    MetricsClient<InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>>,
+    MetricsClient<
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
+    >,
     Error,
 > {
     let cfg = get_config();
@@ -210,4 +217,52 @@ pub async fn make_grpc_metrics_client<T>(
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     Ok(client)
+}
+
+#[tracing::instrument(name = "grpc:node:make_client", skip_all)]
+pub async fn make_grpc_node_client<T>(
+    request: &mut Request<T>,
+    node: &Arc<dyn NodeInfo>,
+) -> Result<
+    NodeServiceClient<
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
+    >,
+    Error,
+> {
+    let cfg = get_config();
+    request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
+
+    opentelemetry::global::get_text_map_propagator(|propagator| {
+        propagator.inject_context(
+            &tracing::Span::current().context(),
+            &mut MetadataMap(request.metadata_mut()),
+        )
+    });
+
+    let token: MetadataValue<_> = node
+        .get_auth_token()
+        .parse()
+        .map_err(|_| Error::Message("invalid token".to_string()))?;
+    let channel = get_cached_channel(&node.get_grpc_addr())
+        .await
+        .map_err(|err| {
+            log::error!(
+                "node->grpc: node: {}, connect err: {:?}",
+                &node.get_grpc_addr(),
+                err
+            );
+            Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string()))
+        })?;
+    let client = cluster_rpc::node_service_client::NodeServiceClient::with_interceptor(
+        channel,
+        move |mut req: Request<()>| {
+            req.metadata_mut().insert("authorization", token.clone());
+            Ok(req)
+        },
+    );
+    Ok(client
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024))
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,25 +16,25 @@
 use std::{io::Error, sync::Arc};
 
 use actix_web::{
-    cookie,
+    HttpRequest, HttpResponse, cookie,
     cookie::{Cookie, SameSite},
     get, head,
     http::header,
-    put, web, HttpRequest, HttpResponse,
+    put, web,
 };
 use arrow_schema::Schema;
 use config::{
+    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
     meta::{cluster::NodeStatus, function::ZoFunction},
     utils::{json, schema_ext::SchemaExt},
-    Config, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use hashbrown::HashMap;
 use infra::{
     cache::{self, file_data::disk::FileType},
     file_list,
-    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST},
+    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST},
 };
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -43,7 +43,7 @@ use {
     crate::common::utils::{auth::extract_auth_str, jwt::verify_decode_token},
     crate::handler::http::auth::{
         jwt::process_token,
-        validator::{get_user_email_from_auth_str, ID_TOKEN_HEADER, PKCE_STATE_ORG},
+        validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
     crate::service::self_reporting::audit,
     config::{ider, utils::base64},
@@ -124,6 +124,7 @@ struct ConfigResponse<'a> {
     websocket_enabled: bool,
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
+    max_dashboard_series: usize,
 }
 
 #[derive(Serialize)]
@@ -255,10 +256,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let build_type = "opensource";
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
-        version: VERSION.to_string(),
+        version: config::VERSION.to_string(),
         instance: get_instance_id(),
-        commit_hash: COMMIT_HASH.to_string(),
-        build_date: BUILD_DATE.to_string(),
+        commit_hash: config::COMMIT_HASH.to_string(),
+        build_date: config::BUILD_DATE.to_string(),
         build_type: build_type.to_string(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
@@ -268,7 +269,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
-        timestamp_column: cfg.common.column_timestamp.clone(),
+        timestamp_column: TIMESTAMP_COL_NAME.to_string(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: cfg.compact.data_retention_days,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
@@ -297,16 +298,17 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             api_version: cfg.rum.api_version.to_string(),
             insecure_http: cfg.rum.insecure_http,
         },
-        meta_org: cfg.common.usage_org.to_string(),
+        meta_org: META_ORG_ID.to_string(),
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
         user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,
         all_fields_name: cfg.common.column_all.to_string(),
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
-        websocket_enabled: cfg.common.websocket_enabled,
+        websocket_enabled: cfg.websocket.enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
+        max_dashboard_series: cfg.limit.max_dashboard_series,
     }))
 }
 
@@ -425,13 +427,6 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
             stream_schema_num += 1;
             mem_size += schema.1.size();
         }
-    }
-    drop(r);
-    let r = STREAM_SCHEMAS_COMPRESSED.read().await;
-    for (key, val) in r.iter() {
-        stream_num += 1;
-        mem_size += key.len();
-        mem_size += val.len();
     }
     drop(r);
     let r = STREAM_SCHEMAS_LATEST.read().await;
@@ -793,4 +788,16 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
+}
+
+#[get("/list")]
+async fn list_node() -> Result<HttpResponse, Error> {
+    let nodes = cluster::get_cached_nodes(|_| true).await;
+    Ok(MetaHttpResponse::json(nodes))
+}
+
+#[get("/metrics")]
+async fn node_metrics() -> Result<HttpResponse, Error> {
+    let metrics = config::utils::sysinfo::get_node_metrics();
+    Ok(MetaHttpResponse::json(metrics))
 }

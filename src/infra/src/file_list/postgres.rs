@@ -25,7 +25,7 @@ use config::{
     utils::{
         hash::Sum64,
         parquet::parse_file_key_columns,
-        time::{end_of_the_day, DAY_MICRO_SECS},
+        time::{DAY_MICRO_SECS, end_of_the_day},
     },
 };
 use hashbrown::HashMap;
@@ -33,8 +33,8 @@ use sqlx::{Executor, Postgres, QueryBuilder, Row};
 
 use crate::{
     db::{
-        postgres::{create_index, CLIENT},
         IndexStatement,
+        postgres::{CLIENT, create_index},
     },
     errors::{Error, Result},
 };
@@ -654,6 +654,26 @@ SELECT date
             .bind(time_max)
             .bind(limit)
             .fetch_all(&pool).await?;
+        Ok(ret
+            .iter()
+            .map(|r| FileListDeleted {
+                file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                index_file: r.index_file,
+                flattened: r.flattened,
+            })
+            .collect())
+    }
+
+    async fn list_deleted(&self) -> Result<Vec<FileListDeleted>> {
+        let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "file_list_deleted"])
+            .inc();
+        let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
+            r#"SELECT stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+        )
+        .fetch_all(&pool)
+        .await?;
         Ok(ret
             .iter()
             .map(|r| FileListDeleted {

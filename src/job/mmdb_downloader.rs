@@ -16,8 +16,8 @@
 use std::sync::Arc;
 
 use config::{
-    utils::download_utils::{download_file, is_digest_different},
     MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME,
+    utils::download_utils::{download_file, is_digest_different},
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
