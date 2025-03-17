@@ -22,15 +22,21 @@ const name = "python";
 const store = useStore();
 const { endpoint, languagesContent, languagesDocURLs } = useIngestion();
 const content = languagesContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
+
 const docURL = languagesDocURLs[name];
+const docURLFastAPI = languagesDocURLs["fastapi"];
 </script>
 
 <template>
   <div class="q-ma-md">
     <div class="tw-text-[16px]">
       <CopyContent class="q-mt-sm" :content="content" />
-      <div class="tw-font-bold tw-pt-6 tw-pb-2">
-        Click <a :href="docURL" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">here</a> to check further documentation.
+      <div class="tw-font-bold tw-pt-6 tw-pb-2">Check further documentation at:</div>
+      <div class="tw-py-2">
+        <a :href="docURL" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">Python</a>
+      </div>
+      <div class="tw-py-2">
+        <a :href="docURLFastAPI" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">FastAPI</a>
       </div>
     </div>
   </div>

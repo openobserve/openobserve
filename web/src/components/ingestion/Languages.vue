@@ -207,18 +207,6 @@ export default defineComponent({
       //   label: t("ingestion.java"),
       //   contentClass: "tab_content",
       // },
-      {
-        name: "fastapi",
-        to: {
-          name: "fastapi",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/ingestion/fastapi.svg"),
-        label: t("ingestion.fastapi"),
-        contentClass: "tab_content",
-      }
     ];
 
     // create computed property to filter tabs

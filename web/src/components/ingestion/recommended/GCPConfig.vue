@@ -28,7 +28,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           target="_blank"
           rel="noopener noreferrer"
         >
-        Pub/Sub Logs
+        {{ t("ingestion.pubsub") }}
+        </a>
+      </div>
+      <div class="tw-py-2">
+        <a
+          href="https://short.openobserve.ai/security/google-workspace"
+          class="hover:tw-underline text-primary"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+        {{ t("ingestion.gworkspace") }}
         </a>
       </div>
     </div>
@@ -41,6 +51,7 @@ import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getImageURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "GCPConfig",
@@ -54,6 +65,7 @@ export default defineComponent({
   },
   components: { CopyContent },
   setup(props) {
+    const { t } = useI18n();
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -73,6 +85,7 @@ export default defineComponent({
 
     const content = `URL: ${endpoint.value.url}/gcp/${store.state.selectedOrganization.identifier}/default/_sub?API-Key=[BASIC_PASSCODE]`;
     return {
+      t,
       store,
       config,
       endpoint,

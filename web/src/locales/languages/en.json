@@ -590,7 +590,8 @@
     "gworkspace": "Google Workspace",
     "nginx": "Nginx",
     "apache": "Apache",
-    "iis": "IIS"
+    "iis": "IIS",
+    "pubsub": "Pub/Sub Logs"
   },
   "syslog": {
     "stream": "Stream",

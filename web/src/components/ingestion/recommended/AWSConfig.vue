@@ -109,7 +109,7 @@ Access Key: [BASIC_PASSCODE]`;
         link: "https://short.openobserve.ai/aws/ec2",
       },
       {
-        name: "Congnito",
+        name: "Cognito",
         link: "https://short.openobserve.ai/aws/cognito",
       },
       {
