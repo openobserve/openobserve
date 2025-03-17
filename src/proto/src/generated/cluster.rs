@@ -2757,6 +2757,10 @@ pub struct NodeMetrics {
     pub tcp_conns_close_wait: u64,
     #[prost(uint64, tag = "8")]
     pub tcp_conns_time_wait: u64,
+    #[prost(uint64, tag = "9")]
+    pub open_fds: u64,
+    #[prost(uint64, tag = "10")]
+    pub tcp_conn_resets: u64,
 }
 /// Node representation
 #[allow(clippy::derive_partial_eq_without_eq)]
