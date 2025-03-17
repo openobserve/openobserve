@@ -1054,7 +1054,7 @@ test.describe("dashboard filter testcases", () => {
     // Delete dashbaord
     await page.locator('[data-test="dashboard-back-btn"]').click();
 
-    // await deleteDashboard(page, randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("Should Filter work correcly if Added the breakdwon filed", async ({
