@@ -304,6 +304,18 @@ pub async fn handle_text_message(
                     });
                     cleanup_and_close_session(req_id, close_reason).await;
                 }
+                WsClientEvents::TestAbnormalClose { req_id } => {
+                    log::info!(
+                        "[WS_HANDLER]: Request Id: {} Node Role: {} Test Abnormal Close",
+                        req_id,
+                        get_config().common.node_role
+                    );
+                    let close_reason = Some(CloseReason {
+                        code: CloseCode::Error,
+                        description: None,
+                    });
+                    cleanup_and_close_session(&req_id, close_reason).await;
+                }
             }
         }
         Err(e) => {

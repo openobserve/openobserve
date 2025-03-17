@@ -293,6 +293,9 @@ pub enum WsClientEvents {
     Benchmark {
         id: String,
     },
+    TestAbnormalClose {
+        req_id: String,
+    },
 }
 
 impl WsClientEvents {
@@ -302,6 +305,7 @@ impl WsClientEvents {
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { .. } => "cancel",
             WsClientEvents::Benchmark { .. } => "benchmark",
+            WsClientEvents::TestAbnormalClose { .. } => "test_abnormal_close",
         }
         .to_string()
     }
@@ -316,6 +320,7 @@ impl WsClientEvents {
             #[cfg(feature = "enterprise")]
             Self::Cancel { trace_id, .. } => trace_id.clone(),
             Self::Benchmark { id } => id.clone(),
+            Self::TestAbnormalClose { req_id } => req_id.clone(),
         }
     }
 
@@ -325,6 +330,7 @@ impl WsClientEvents {
             #[cfg(feature = "enterprise")]
             Self::Cancel { trace_id, org_id } => !trace_id.is_empty() && !org_id.is_empty(),
             Self::Benchmark { id } => !id.is_empty(),
+            Self::TestAbnormalClose { req_id } => !req_id.is_empty(),
         }
     }
 }
