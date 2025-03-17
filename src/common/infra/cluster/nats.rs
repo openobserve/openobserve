@@ -74,7 +74,12 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
 async fn register() -> Result<()> {
     let cfg = get_config();
     // 1. create a cluster lock for node register
-    let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64).await?;
+    let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64)
+        .await
+        .map_err(|e| {
+            log::error!("[CLUSTER] nats register failed: {}", e);
+            e
+        })?;
 
     // 2. watch node list
     task::spawn(async move { super::watch_node_list().await });
@@ -83,7 +88,10 @@ async fn register() -> Result<()> {
     let node_list = match super::list_nodes().await {
         Ok(v) => v,
         Err(e) => {
-            dist_lock::unlock(&locker).await?;
+            dist_lock::unlock(&locker).await.map_err(|e| {
+                log::error!("[CLUSTER] nats unlock failed: {}", e);
+                e
+            })?;
             return Err(e);
         }
     };
@@ -186,7 +194,10 @@ async fn register() -> Result<()> {
     }
 
     // 7. register ok, release lock
-    dist_lock::unlock(&locker).await?;
+    dist_lock::unlock(&locker).await.map_err(|e| {
+        log::error!("[CLUSTER] nats unlock failed: {}", e);
+        e
+    })?;
 
     log::info!("[CLUSTER] Register to cluster ok");
     Ok(())
