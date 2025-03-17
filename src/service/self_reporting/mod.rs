@@ -320,13 +320,29 @@ pub fn http_report_metrics(
     stream_type: StreamType,
     code: &str,
     uri: &str,
+    search_type: &str,
+    search_group: &str,
 ) {
     let time = start.elapsed().as_secs_f64();
     let uri = format!("/api/org/{}", uri);
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[&uri, code, org_id, stream_type.as_str(), "", ""])
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_type.as_str(),
+            search_type,
+            search_group,
+        ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[&uri, code, org_id, stream_type.as_str(), "", ""])
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_type.as_str(),
+            search_type,
+            search_group,
+        ])
         .inc();
 }

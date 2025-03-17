@@ -37,7 +37,14 @@ pub static HTTP_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream_type", "search_type", "search_group"],
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream_type",
+            "search_type",
+            "search_group",
+        ],
     )
     .expect("Metric created")
 });
@@ -49,7 +56,14 @@ pub static HTTP_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream_type", "search_type", "search_group"],
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream_type",
+            "search_type",
+            "search_group",
+        ],
     )
     .expect("Metric created")
 });
@@ -63,7 +77,14 @@ pub static GRPC_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream_type", "search_type", "search_group"],
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream_type",
+            "search_type",
+            "search_group",
+        ],
     )
     .expect("Metric created")
 });
@@ -75,7 +96,14 @@ pub static GRPC_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream_type", "search_type", "search_group"],
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream_type",
+            "search_type",
+            "search_group",
+        ],
     )
     .expect("Metric created")
 });
