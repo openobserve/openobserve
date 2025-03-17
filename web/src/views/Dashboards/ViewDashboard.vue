@@ -1063,7 +1063,7 @@ export default defineComponent({
     const saveJsonDashboard = useLoading(async (updatedJson: any) => {
       try {
         // Update the dashboard data
-        currentDashboardData.data = updatedJson;
+        currentDashboardData.data = JSON.parse(JSON.stringify(updatedJson));
 
         // Add a wait time for state update
         await nextTick();
