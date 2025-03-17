@@ -14,13 +14,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
+  {{ filteredVariablesData.values }}
   <div
-    v-if="variablesData.values?.length > 0"
-    :key="variablesData.isVariablesLoading"
+    v-if="filteredVariablesData.values?.length > 0"
+    :key="filteredVariablesData.isVariablesLoading"
     class="flex q-mt-xs q-ml-xs"
   >
     <div
-      v-for="(item, index) in filteredVariables"
+      v-for="(item, index) in filteredVariablesData.values"
       :key="
         item.name +
         item.value +
@@ -91,7 +92,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { getCurrentInstance, onMounted, ref, watch, computed } from "vue";
+import {
+  getCurrentInstance,
+  onMounted,
+  ref,
+  watch,
+  computed,
+  nextTick,
+} from "vue";
 import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
@@ -102,6 +110,7 @@ import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import { b } from "vitest/dist/chunks/suite.BJU7kdY9";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -110,6 +119,11 @@ export default defineComponent({
     variablesConfig: Object,
     initialVariableValues: Object,
     showDynamicFilters: Boolean,
+    scope: {
+      type: String,
+      default: "global",
+      validator: (value: any) => ["global", "tabs", "panels"].includes(value),
+    },
     currentTabId: {
       type: String,
       default: null,
@@ -126,16 +140,61 @@ export default defineComponent({
     VariableCustomValueSelector,
   },
   setup(props: any, { emit }) {
+    console.log("props.variablesConfig", props.variablesConfig);
+
     const instance = getCurrentInstance();
     const store = useStore();
 
-    // variables data derived from the variables config list
-    const variablesData: any = reactive({
+    // Create a computed property to filter variables based on scope
+    const filteredVariablesConfig = computed(() => {
+      if (!props.variablesConfig?.list) return { list: [] };
+
+      let filteredList = [];
+
+      switch (props.scope) {
+        case "global":
+          filteredList = props.variablesConfig.list.filter(
+            (variable) => !variable.scope || variable.scope === "global",
+          );
+          break;
+
+        case "tabs":
+          filteredList = props.variablesConfig.list.filter(
+            (variable) =>
+              variable.scope === "tabs" &&
+              variable.tabs?.includes(props.currentTabId),
+          );
+          break;
+
+        case "panels":
+          filteredList = props.variablesConfig.list.filter(
+            (variable) =>
+              variable.scope === "panels" &&
+              variable.tabs?.includes(props.currentTabId) &&
+              variable.panels?.includes(props.currentPanelId),
+          );
+          break;
+      }
+
+      return {
+        ...props.variablesConfig,
+        list: filteredList,
+      };
+    });
+
+    // variables data derived from the complete variables config list
+    const completeVariablesData: any = reactive({
       isVariablesLoading: false,
       values: [],
     });
 
-    // variables dependency graph
+    // The filtered version of variablesData that will be used in the template
+    const filteredVariablesData: any = reactive({
+      isVariablesLoading: false,
+      values: [],
+    });
+
+    // variables dependency graph - built from complete variables list
     let variablesDependencyGraph: any = {};
 
     // track old variables data
@@ -146,24 +205,20 @@ export default defineComponent({
     // and reject object of promise as value
     const currentlyExecutingPromises: any = {};
 
-    // reset variables data
-    // it will executed once on mount
-    const resetVariablesData = () => {
-      variablesData.isVariablesLoading = false;
-      variablesData.values = [];
-    };
-
     const initializeVariablesData = () => {
-      // reset the values
-      resetVariablesData();
+      // Reset both complete and filtered data
+      completeVariablesData.isVariablesLoading = false;
+      completeVariablesData.values = [];
+      filteredVariablesData.isVariablesLoading = false;
+      filteredVariablesData.values = [];
 
-      // check if variables config list is not empty
       if (!props?.variablesConfig) {
         return;
       }
 
       // make list of variables using variables config list
       // set initial variables values from props
+      // Initialize complete variables data first
       props?.variablesConfig?.list?.forEach((item: any) => {
         let initialValue =
           item.type == "dynamic_filters"
@@ -200,13 +255,11 @@ export default defineComponent({
           }
         }
 
-        // push the variable to the list
-        variablesData.values.push(variableData);
-
+        // Add to complete variables data
+        completeVariablesData.values.push(variableData);
         // set old variables data
         oldVariablesData[item.name] = initialValue;
       });
-
       // if showDynamicFilters is true, add the Dynamic filters variable
       if (props.showDynamicFilters) {
         // get the initial value
@@ -220,7 +273,7 @@ export default defineComponent({
           ) ?? [];
 
         // push the variable to the list
-        variablesData.values.push({
+        completeVariablesData.values.push({
           name: "Dynamic filters",
           type: "dynamic_filters",
           label: "Dynamic filters",
@@ -233,11 +286,42 @@ export default defineComponent({
         // set old variables data
         oldVariablesData["Dynamic filters"] = initialValue;
       }
-
-      // need to build variables dependency graph on variables config list change
+      // Build dependency graph from complete variables list
       variablesDependencyGraph = buildVariablesDependencyGraph(
-        variablesData.values,
+        completeVariablesData.values,
       );
+
+      // Filter variables for UI based on scope
+      updateFilteredVariables();
+    };
+
+    // Function to update filtered variables based on scope
+    // Replace updateFilteredVariables with:
+    const updateFilteredVariables = () => {
+      const newFilteredValues = completeVariablesData.values.filter(
+        (variable) => {
+          switch (props.scope) {
+            case "global":
+              return !variable.scope || variable.scope === "global";
+            case "tabs":
+              return (
+                variable.scope === "tabs" &&
+                variable.tabs?.includes(props.currentTabId)
+              );
+            case "panels":
+              return (
+                variable.scope === "panels" &&
+                variable.tabs?.includes(props.currentTabId) &&
+                variable.panels?.includes(props.currentPanelId)
+              );
+            default:
+              return true;
+          }
+        },
+      );
+
+      // Force a complete replacement of the array for reactivity
+      filteredVariablesData.values = [...newFilteredValues];
     };
 
     const rejectAllPromises = () => {
@@ -258,8 +342,9 @@ export default defineComponent({
       loadAllVariablesData(true);
     });
 
+    // Watch for changes in filtered variables config
     watch(
-      () => props.variablesConfig,
+      () => filteredVariablesConfig.value,
       async () => {
         // make list of variables using variables config list
         initializeVariablesData();
@@ -267,12 +352,23 @@ export default defineComponent({
         // reject all promises
         rejectAllPromises();
         skipAPILoad.value = false;
-        // load all variables
+        loadAllVariablesData(true);
+      },
+      { deep: true },
+    );
+
+    // Also watch for changes in scope, currentTabId, and currentPanelId
+    watch(
+      [() => props.scope, () => props.currentTabId, () => props.currentPanelId],
+      async () => {
+        initializeVariablesData();
+
+        rejectAllPromises();
+        skipAPILoad.value = false;
         loadAllVariablesData(true);
       },
     );
 
-    // you may need to query the data if the variable configs or the data/time changes
     watch(
       () => props.selectedTimeDate,
       () => {
@@ -285,7 +381,7 @@ export default defineComponent({
     );
 
     watch(
-      () => variablesData,
+      () => filteredVariablesData,
       () => {
         emitVariablesData();
       },
@@ -294,7 +390,7 @@ export default defineComponent({
 
     const emitVariablesData = () => {
       instance?.proxy?.$forceUpdate();
-      emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
+      emit("variablesData", JSON.parse(JSON.stringify(filteredVariablesData)));
     };
 
     // it is used to change/update initial variables values from outside the component
@@ -302,16 +398,8 @@ export default defineComponent({
     const changeInitialVariableValues = async (
       newInitialVariableValues: any,
     ) => {
-      // reject all promises
       rejectAllPromises();
 
-      // NOTE: need to re-initialize variables data
-      resetVariablesData();
-
-      // set initial variables values
-      props.initialVariableValues.value = newInitialVariableValues;
-
-      // make list of variables using variables config list
       initializeVariablesData();
 
       // load all variables
@@ -471,7 +559,7 @@ export default defineComponent({
 
       // Check if any of the parent variables are loading or pending
       return parentVariables.some((parentName: string) => {
-        const parentVariable = variablesData.values.find(
+        const parentVariable = completeVariablesData.values.find(
           (v: any) => v.name === parentName,
         );
         return (
@@ -516,6 +604,25 @@ export default defineComponent({
       }
     };
 
+    const refreshVariableInArrays = (variableName, updates) => {
+      // Update in complete data
+      const completeIndex = completeVariablesData.values.findIndex(
+        (v) => v.name === variableName,
+      );
+      if (completeIndex >= 0) {
+        completeVariablesData.values[completeIndex] = {
+          ...completeVariablesData.values[completeIndex],
+          ...updates,
+        };
+      }
+
+      // Update filtered array completely to trigger reactivity
+      updateFilteredVariables();
+
+      // Force Vue to recognize changes
+      instance?.proxy?.$forceUpdate();
+    };
+
     /**
      * Loads the data for a single variable by name.
      * If the variable has dependencies, it will only load if all dependencies are loaded.
@@ -551,11 +658,26 @@ export default defineComponent({
           }
         }
 
-        // For variables with dependencies, check if dependencies are loaded
-        if (hasParentVariables && isDependentVariableLoading(variableObject)) {
-          return resolve(false);
-        }
+        // Check dependencies in complete variables data
+        if (hasParentVariables) {
+          const isParentLoading = variablesDependencyGraph[
+            name
+          ].parentVariables.some((parentName: string) => {
+            const parentVariable = completeVariablesData.values.find(
+              (v: any) => v.name === parentName,
+            );
+            return (
+              parentVariable?.isLoading ||
+              parentVariable?.isVariableLoadingPending ||
+              parentVariable?.value === null ||
+              parentVariable?.value === undefined
+            );
+          });
 
+          if (isParentLoading) {
+            return resolve(false);
+          }
+        }
         try {
           const success = await handleVariableType(variableObject);
           await finalizeVariableLoading(variableObject, success);
@@ -629,7 +751,7 @@ export default defineComponent({
       );
 
       // Replace variable placeholders with actual values
-      for (const variable of variablesData.values) {
+      for (const variable of completeVariablesData.values) {
         if (!variable.isLoading && !variable.isVariableLoadingPending) {
           // Replace array values
           if (Array.isArray(variable.value)) {
@@ -696,10 +818,10 @@ export default defineComponent({
       );
 
       if (fieldHit) {
-        // Extract the values for the specified field from the result
-        variableObject.options = fieldHit.values
-          .filter((value: any) => value.zo_sql_key || value.zo_sql_key === "")
-          .map((value: any) => ({
+        // Create a new array for options to trigger reactivity
+        const newOptions = fieldHit.values
+          .filter((value) => value.zo_sql_key || value.zo_sql_key === "")
+          .map((value) => ({
             // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
             label:
               value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
@@ -707,7 +829,9 @@ export default defineComponent({
             value: value.zo_sql_key.toString(),
           }));
 
-        // Set default value
+        // Replace the entire array
+        variableObject.options = [...newOptions];
+
         if (oldVariablesData[variableObject.name] !== undefined) {
           const oldValues = Array.isArray(oldVariablesData[variableObject.name])
             ? oldVariablesData[variableObject.name]
@@ -748,38 +872,43 @@ export default defineComponent({
 
       if (success) {
         // Update old variables data
+        refreshVariableInArrays(name, {
+          value: variableObject.value,
+          isLoading: false,
+          isVariableLoadingPending: false,
+          options: variableObject.options, // Include options too
+        });
         oldVariablesData[name] = variableObject.value;
 
         // Update loading states
-        variableObject.isLoading = false;
-        variableObject.isVariableLoadingPending = false;
-
-        // Update global loading state
-        variablesData.isVariablesLoading = variablesData.values.some(
-          (val: { isLoading: any; isVariableLoadingPending: any }) =>
-            val.isLoading || val.isVariableLoadingPending,
-        );
-
-        // Don't load child variables on dropdown open events
-        // Load child variables if any
-        const childVariables =
-          variablesDependencyGraph[name]?.childVariables || [];
-        if (childVariables.length > 0) {
-          const childVariableObjects = variablesData.values.filter(
-            (variable: any) => childVariables.includes(variable.name),
+        completeVariablesData.isVariablesLoading =
+          completeVariablesData.values.some(
+            (val) => val.isLoading || val.isVariableLoadingPending,
           );
 
-          // Only load children if the parent value actually changed
-          if (oldVariablesData[name] !== variableObject.value) {
-            await Promise.all(
-              childVariableObjects.map((childVariable: any) =>
-                loadSingleVariableDataByName(childVariable),
-              ),
-            );
-          }
+        filteredVariablesData.isVariablesLoading =
+          completeVariablesData.isVariablesLoading;
+
+        // Load child variables
+        const childVariables =
+          variablesDependencyGraph[name]?.childVariables || [];
+        if (
+          childVariables.length > 0 &&
+          oldVariablesData[name] !== variableObject.value
+        ) {
+          const childVariableObjects = completeVariablesData.values.filter(
+            (variable) => childVariables.includes(variable.name),
+          );
+
+          await Promise.all(
+            childVariableObjects.map((childVariable) =>
+              loadSingleVariableDataByName(childVariable),
+            ),
+          );
         }
 
-        // Emit updated data
+        // Force update filtered variables after every variable update
+        updateFilteredVariables();
         emitVariablesData();
       } else {
         variableObject.isLoading = false;
@@ -800,42 +929,57 @@ export default defineComponent({
     let isLoading = false;
     const skipAPILoad = ref(false);
 
-    /**
-     * Loads all variables data.
-     * This function is called when the selected time or date changes.
-     * It loads all variables data in the correct order, taking into account the dependencies between variables.
-     * @async
-     * @returns {Promise<void>} - A promise that resolves when all variables data has been loaded.
-     */
-    const loadAllVariablesData = async (isInitialLoad = false) => {
-      if (isLoading) {
-        return;
+    const forceComponentUpdate = () => {
+      // Create new arrays to force Vue reactivity
+      completeVariablesData.values = [...completeVariablesData.values];
+      filteredVariablesData.values = [...filteredVariablesData.values];
+
+      // Update loading states
+      completeVariablesData.isVariablesLoading =
+        completeVariablesData.values.some(
+          (val) => val.isLoading || val.isVariableLoadingPending,
+        );
+      filteredVariablesData.isVariablesLoading =
+        completeVariablesData.isVariablesLoading;
+
+      // Force Vue component update
+      if (instance?.proxy) {
+        instance.proxy.$forceUpdate();
       }
 
-      if (!isInitialLoad && skipAPILoad.value) {
-        return;
-      }
-
-      isLoading = true;
-
-      if (
-        isInvalidDate(props.selectedTimeDate?.start_time) ||
-        isInvalidDate(props.selectedTimeDate?.end_time)
-      ) {
-        isLoading = false;
-        return;
-      }
-
-      // Set loading state for all variables
-      variablesData.values.forEach((variable: any) => {
-        variable.isVariableLoadingPending = true;
+      // Ensure template updates
+      nextTick(() => {
+        // Create new references again to ensure reactivity
+        filteredVariablesData.values = [...filteredVariablesData.values];
+        completeVariablesData.values = [...completeVariablesData.values];
       });
+    };
 
-      // Find all independent variables (variables with no dependencies)
-      const independentVariables = variablesData.values.filter(
-        (variable: any) =>
-          !variablesDependencyGraph[variable.name]?.parentVariables?.length,
+    const onVariablesValueUpdated = async (variableIndex: number) => {
+      if (variableIndex < 0) return;
+
+      const currentVariable = filteredVariablesData.values[variableIndex];
+      if (!currentVariable) return;
+
+      // Find the variable in complete data
+      const completeVariable = completeVariablesData.values.find(
+        (v) => v.name === currentVariable.name,
       );
+      if (!completeVariable) return;
+
+      // Check if value actually changed
+      const oldValue = oldVariablesData[currentVariable.name];
+      const newValue = currentVariable.value;
+      if (JSON.stringify(oldValue) === JSON.stringify(newValue)) {
+        return;
+      }
+
+      // Update both filtered and complete variables
+      completeVariable.value = newValue;
+      oldVariablesData[currentVariable.name] = newValue;
+
+      // Get all affected variables in dependency order
+      const affectedVariables = getAllAffectedVariables(currentVariable.name);
 
       // Find all dependent variables (variables with dependencies)
       const dependentVariables = variablesData.values.filter(
@@ -894,60 +1038,56 @@ export default defineComponent({
           (variable: any) =>
             !variable.isLoading && !variable.isVariableLoadingPending,
         );
-
-        // If all variables are loaded, break the loop
-        if (allLoaded) break;
-      }
-
-      isLoading = false;
-    };
-
-    /**
-     * Sets the loading state for a variable and all its child nodes recursively.
-     * @param {string} currentVariable - The name of the current variable.
-     */
-    const setLoadingStateToAllChildNode = (currentVariable: string) => {
-      // Retrieve the child variables of the current variable
-      const childVariables =
-        variablesDependencyGraph[currentVariable]?.childVariables || [];
-
-      // Iterate over each child variable
-      for (const variableName of childVariables) {
-        // Find the variable object in the variablesData
-        const variableObj = variablesData.values.find(
-          (it: any) => it.name === variableName,
-        );
-
-        // Set the loading state for the variable
-        if (variableObj) {
-          variableObj.isVariableLoadingPending = true;
-
-          // Recursively set loading state for all child nodes
-          setLoadingStateToAllChildNode(variableObj.name);
+        if (variable) {
+          const scope = variable.scope || "global";
+          scopedVariables[scope].push(variable);
         }
-      }
+      });
+
+      // Load in order: global -> tabs -> panels
+      const loadVariablesInScope = async (variables: any[]) => {
+        for (const variable of variables) {
+          const parentVariables =
+            variablesDependencyGraph[variable.name]?.parentVariables || [];
+          const parentsLoaded = parentVariables.every((parentName) => {
+            const parent = completeVariablesData.values.find(
+              (v) => v.name === parentName,
+            );
+            return (
+              parent &&
+              !parent.isLoading &&
+              !parent.isVariableLoadingPending &&
+              parent.value !== null
+            );
+          });
+
+          if (parentsLoaded) {
+            await loadSingleVariableDataByName(variable);
+            forceComponentUpdate(); // Force UI update after each variable loads
+          }
+        }
+      };
+
+      // Load in sequence
+      await loadVariablesInScope(scopedVariables.global);
+      await loadVariablesInScope(scopedVariables.tabs);
+      await loadVariablesInScope(scopedVariables.panels);
     };
 
-    /**
-     * Handles updating of variables data when a variable value changes.
-     * Updates the value of the variable in the old variables data and loads
-     * data for all its immediate child variables.
-     * @param {number} variableIndex - The index of the variable in the variablesData array.
-     * @returns {Promise<void>} - A promise that resolves when all dependent variables have been updated.
-     */
-    const onVariablesValueUpdated = async (variableIndex: number) => {
-      if (variableIndex < 0) return;
-
-      const currentVariable = variablesData.values[variableIndex];
-      // if currentVariable is undefined, return
-      if (!currentVariable) {
+    const loadAllVariablesData = async (isInitialLoad = false) => {
+      if (isLoading || (!isInitialLoad && skipAPILoad.value)) {
         return;
       }
 
-      // Check if the value actually changed
-      if (oldVariablesData[currentVariable.name] === currentVariable.value) {
-        return;
-      }
+      isLoading = true;
+
+      try {
+        if (
+          isInvalidDate(props.selectedTimeDate?.start_time) ||
+          isInvalidDate(props.selectedTimeDate?.end_time)
+        ) {
+          return;
+        }
 
       // Update the old variables data
       oldVariablesData[currentVariable.name] = currentVariable.value;
@@ -1011,27 +1151,39 @@ export default defineComponent({
         // If variable is hidden on dashboard, don't show it
         if (item.hideOnDashboard) return false;
 
-        // Global scope variables are always visible
-        if (!item.scope || item.scope === "global") return true;
+        // Load globals
+        await loadVariablesInOrder(independentGlobals);
+        await loadVariablesInOrder(dependentGlobals);
 
-        // For tabs scope, check if current tab is in the variable's tabs list
-        if (item.scope === "tabs") {
-          return item.tabs?.includes(props.currentTabId);
-        }
+        // Load tab variables
+        const tabVariables = completeVariablesData.values.filter(
+          (v) => v.scope === "tabs" && v.tabs?.includes(props.currentTabId),
+        );
+        await loadVariablesInOrder(tabVariables);
 
-        // For panels scope, check both tab and panel
-        if (item.scope === "panels") {
-          // First check if the current tab is in the variable's tabs list
-          const isInCorrectTab = item.tabs?.includes(props.currentTabId);
-          // Then check if the current panel is in the variable's panels list
-          const isInCorrectPanel = item.panels?.includes(props.currentPanelId);
-          // Variable is visible only if both conditions are met
-          return isInCorrectTab && isInCorrectPanel;
-        }
+        // Load panel variables
+        const panelVariables = completeVariablesData.values.filter(
+          (v) =>
+            v.scope === "panels" &&
+            v.tabs?.includes(props.currentTabId) &&
+            v.panels?.includes(props.currentPanelId),
+        );
+        await loadVariablesInOrder(panelVariables);
 
-        return true; // Default case for backward compatibility
-      });
-    });
+        // Update filtered variables
+        updateFilteredVariables();
+
+        // Force final UI update
+        forceComponentUpdate();
+
+        // Emit updated data
+        emitVariablesData();
+      } catch (error) {
+        console.error("Error loading variables:", error);
+      } finally {
+        isLoading = false;
+      }
+    };
 
     // Add watchers for debugging (optional)
     watch(
@@ -1049,12 +1201,10 @@ export default defineComponent({
     );
 
     return {
-      props,
-      variablesData,
+      filteredVariablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,
       loadVariableOptions,
-      filteredVariables,
     };
   },
 });
