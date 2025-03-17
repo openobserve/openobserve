@@ -1023,10 +1023,16 @@ export default defineComponent({
           });
         }
     const computedName = (name: string) => {
+      if(!name){
+        return '--'
+      }
       return name.length >50 ? name.substring(0, 50) + "..." : name;
     };
     const computedOwner = (owner: string) => {
-        if (owner.length > 20) {
+        if(!owner){
+          return '--'
+        }
+        if (owner?.length > 20) {
           const firstTen = owner.substring(0, 10);
           const lastFour = owner.substring(owner.length - 4);
           return firstTen + "****" + lastFour;
