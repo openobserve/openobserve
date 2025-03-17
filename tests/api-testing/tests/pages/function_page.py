@@ -1,6 +1,6 @@
 import random
 import uuid
-
+from requests.auth import HTTPBasicAuth
 
 
 class FunctionPage:
@@ -12,8 +12,9 @@ class FunctionPage:
         self.base_url = base_url
         self.org_id = org_id
 
-    def create_function(self, session, base_url, org_id, function_name):
+    def create_function(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, function_name):
         """Create a function."""
+        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
         headers = {
             "Content-Type": "application/json", 
             "Custom-Header": "value"

@@ -1,6 +1,6 @@
 
 import random
-
+from requests.auth import HTTPBasicAuth
 class SavedViewPage:
     # Make Unique_value_destination a class variable
     Unique_value_savedview = f"uSavedView_{random.randint(100000, 999999)}"
@@ -10,10 +10,10 @@ class SavedViewPage:
         self.base_url = base_url
         self.org_id = org_id
 
-    def create_savedView(self, session, base_url, org_id, savedview_name, stream_name):
+    def create_savedView(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, savedview_name):
         """Create a saved view."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
+        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
         payload = {
             "organizationIdentifier": org_id,
             "runQuery": False,

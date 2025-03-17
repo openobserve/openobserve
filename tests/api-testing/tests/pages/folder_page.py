@@ -1,18 +1,9 @@
-import os
-import pytest
-import random
-import uuid
-import json
-from pathlib import Path
-import base64
-import requests
-import io
-import time
-import tink
-from tink import daead
-from tink import secret_key_access
-from datetime import datetime, timezone, timedelta
 
+import random
+
+from pathlib import Path
+
+from requests.auth import HTTPBasicAuth
 class FolderPage:
     # Make Unique_value_destination a class variable
     Unique_value_folder = f"uFolder_{random.randint(100000, 999999)}"
@@ -22,9 +13,10 @@ class FolderPage:
         self.base_url = base_url
         self.org_id = org_id
 
-    def create_folder(self, session, base_url, org_id, folder_name):
-        """Create a folder."""
+    def create_folder(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, folder_name):
+        """Create a folder."""  
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
 
         payload = {
             "description": folder_name,

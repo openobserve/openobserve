@@ -1,6 +1,6 @@
 import os
 import random
-
+from requests.auth import HTTPBasicAuth
 
 
 
@@ -12,12 +12,11 @@ class ReportPage:
         self.base_url = base_url
         self.org_id = org_id
 
-ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")
 
-def create_scheduled_report(self, session, base_url, org_id, scheduled_report_name, dashboard_id, folder_id):
+def create_scheduled_report(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, dashboard_id, folder_id, scheduled_report_name):
     """Create a scheduled report."""
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
     payload = {
     "dashboards": [
         {
@@ -64,9 +63,10 @@ def create_scheduled_report(self, session, base_url, org_id, scheduled_report_na
     assert response.status_code == 200, f"Failed to create scheduled report: {response.content.decode()}"
     return response
 
-def create_cached_report(self, session, base_url, org_id, cached_report_name, dashboard_id, folder_id):
+def create_cached_report(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, cached_report_name, dashboard_id, folder_id):
     """Create a cached report."""
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
 
     payload = {
     "dashboards": [

@@ -11,10 +11,10 @@ class UserPage:
         self.base_url = base_url
         self.org_id = org_id
 
-    def create_user_admin(self, session, base_url, org_id, email_address):
+    def create_user_admin(self, session, base_url, user_email, user_password, org_id, email_address):
         """Create a user as admin."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
+        session.auth = HTTPBasicAuth(user_email, user_password)     
         payload = {
             "organization": org_id,
             "email": email_address,
@@ -28,10 +28,10 @@ class UserPage:
         assert response.status_code == 200, f"Failed to create user as admin: {response.content.decode()}"
         return response
 
-    def create_user_viewer(session, base_url, org_id, email_address):
+    def create_user_viewer(session, base_url, user_email, user_password, org_id, email_address):
         """Create a user as viewer."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         payload = {
             "organization": org_id,
             "email": email_address,
@@ -45,10 +45,10 @@ class UserPage:
         assert response.status_code == 200, f"Failed to create user as viewer: {response.content.decode()}"
         return response
 
-    def create_user_editor(session, base_url, org_id, email_address):
+    def create_user_editor(session, base_url, user_email, user_password, org_id, email_address):
         """Create a user as editor."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         payload = {
             "organization": org_id,
             "email": email_address,
@@ -62,10 +62,10 @@ class UserPage:
         assert response.status_code == 200, f"Failed to create user as editor: {response.content.decode()}"
         return response
 
-    def create_user_user(session, base_url, org_id, email_address):
+    def create_user_user(session, base_url, user_email, user_password, org_id, email_address):
         """Create a user as user."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
+        session.auth = HTTPBasicAuth(user_email, user_password) 
         payload = {
             "organization": org_id,
             "email": email_address,

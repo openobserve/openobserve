@@ -1,6 +1,6 @@
 import random
 import uuid
-
+from requests.auth import HTTPBasicAuth
 
 
 class AlertPage:
@@ -12,9 +12,9 @@ class AlertPage:
         self.base_url = base_url
         self.org_id = org_id
 
-    def create_standard_alert(self, session, base_url, org_id, alert_name, template_name, stream_name, destination_name):
+    def create_standard_alert(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, template_name, destination_name, alert_name):
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-        
+        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
         payload = {
             "name": alert_name,
             "row_template": template_name,
@@ -63,9 +63,9 @@ class AlertPage:
         assert response.status_code == 200, f"Failed to create alert: {response.content}"
         return True  # Indicate successful creation
 
-    def create_standard_alert_sql(self, session, base_url, org_id, alert_name, template_name, stream_name, destination_name):
+    def create_standard_alert_sql(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, template_name, destination_name, alert_name):
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
+        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
         payload = {
             "name": alert_name,
             "row_template": template_name,
@@ -114,9 +114,9 @@ class AlertPage:
         assert response.status_code == 200, f"Failed to create alert: {response.content}"
         return True
 
-    def create_real_time_alert(self, session, base_url, org_id, alert_name, template_name, stream_name, destination_name):
+    def create_real_time_alert(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, template_name, destination_name, alert_name):
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
+        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
         payload = {
             "name": alert_name,
             "row_template": template_name,
@@ -165,9 +165,9 @@ class AlertPage:
         assert response.status_code == 200, f"Failed to create alert: {response.content}"
         return True  # Indicate successful creation
 
-    def create_standard_alert_cron(self, session, base_url, org_id, alert_name, template_name, stream_name, destination_name):
+    def create_standard_alert_cron(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, template_name, destination_name, alert_name):
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
+        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
         payload = {
             "name": alert_name,
             "row_template": template_name,
@@ -217,14 +217,16 @@ class AlertPage:
         return True  # Indicate successful creation
 
 
-def delete_alert(session, base_url, org_id, alert_name, stream_name):
-    """Delete an alert."""
-    response = session.delete(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs")
-    assert response.status_code == 200, f"Failed to delete alert: {response.content}"
-    return response
+    def delete_alert(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, alert_name, stream_name):
+        """Delete an alert."""
+        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+        response = session.delete(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs")
+        assert response.status_code == 200, f"Failed to delete alert: {response.content}"
+        return response
 
-def validate_alert(session, base_url, org_id, alert_name, stream_name):
-    """Get an alert."""
-    response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}")
-    assert response.status_code == 200, f"Failed to get alert: {response.content}"
-    return response
+    def validate_alert(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, alert_name, stream_name):
+        """Get an alert."""
+        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}")
+        assert response.status_code == 200, f"Failed to get alert: {response.content}"
+        return response

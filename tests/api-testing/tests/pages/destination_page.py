@@ -1,4 +1,8 @@
 import random
+import os
+from requests.auth import HTTPBasicAuth
+
+ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
 
 class DestinationPage:
     # Make Unique_value_destination a class variable
@@ -9,9 +13,10 @@ class DestinationPage:
         self.base_url = base_url
         self.org_id = org_id
 
-    def create_destination_webhook(self, session, base_url, org_id, template_name, destination_name):
-        """Create a destination."""
+    def create_destination_webhook(self, session, base_url, org_id, user_email, user_password, template_name, destination_name):
+        """Create a webhook destination."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+        session.auth = HTTPBasicAuth(user_email, user_password)
         skip_tls_verify_value = False
         
         payload = {
@@ -27,14 +32,15 @@ class DestinationPage:
         assert response.status_code == 200, f"Failed to create destination: {response.content}"
         return response
 
-    def create_destination_email(self, session, base_url, org_id, template_email, destination_name, email_address):
-        """Create a destination."""
+    def create_destination_email(self, session, base_url, org_id, user_email, user_password, ZO_ROOT_USER_EMAIL, template_email, destination_name):
+        """Create a email destination."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+        session.auth = HTTPBasicAuth(user_email, user_password)
         skip_tls_verify_value = False
         payload = {
             "url": "",
             "type": "email",
-            "emails": [email_address],
+            "emails": [ZO_ROOT_USER_EMAIL],
             "method": "post",
             "template": template_email,
             "headers": {},
@@ -45,9 +51,10 @@ class DestinationPage:
         assert response.status_code == 200, f"Failed to create destination: {response.content}"
         return response
 
-    def create_destination_pipeline(self, session, base_url, org_id, destination_name):
-        """Create a destination."""
+    def create_destination_pipeline(self, session, base_url, org_id, user_email, user_password, destination_name):
+        """Create a pipeline destination."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+        session.auth = HTTPBasicAuth(user_email, user_password)
         skip_tls_verify_value = False  # Define the skip_tls_verify_value
         payload = {
             "url": "https://jsonplaceholder.typicode.com/todos",
@@ -61,8 +68,9 @@ class DestinationPage:
         assert response.status_code == 200, f"Failed to create destination: {response.content}"
         return response
 
-    def retrieve_destinations_webhook(self, session, base_url, org_id):
-        """Validate a destination."""
+    def retrieve_destinations_webhook(self, session, base_url, org_id, user_email, user_password):
+        """Retrieve a webhook destination."""
+        session.auth = HTTPBasicAuth(user_email, user_password)
         response = session.get(f"{base_url}api/{org_id}/alerts/destinations")
         assert response.status_code == 200, f"Failed to validate destination: {response.content}"
         destinations = response.json()
@@ -72,9 +80,10 @@ class DestinationPage:
         first_webhook_destination = webhook_destinations[0]
         return first_webhook_destination
 
-    def delete_destination(self, session, base_url, org_id, destination_name):
+    def delete_destination(self, session, base_url, org_id, user_email, user_password, destination_id):
         """Delete a destination."""
-        response = session.delete(f"{base_url}api/{org_id}/alerts/destinations/{destination_name}")
+        session.auth = HTTPBasicAuth(user_email, user_password)
+        response = session.delete(f"{base_url}api/{org_id}/alerts/destinations/{destination_id}")
         assert response.status_code == 200, f"Failed to delete destination: {response.content}"
         return response
    

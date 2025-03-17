@@ -4,7 +4,7 @@ import base64
 import io
 from pathlib import Path
 import os
-
+from requests.auth import HTTPBasicAuth
 # Add configuration imports or define variables
 ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
 ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
@@ -12,6 +12,7 @@ root_dir = Path(__file__).parent.parent.parent  # Navigate up to the root direct
 
 class EnrichmentPage:
     Unique_value_enrichment = f"uEnrichment_{random.randint(100000, 999999)}"
+
     BOUNDARY = "----WebKitFormBoundaryaQgmYHuE6dQrlLss"
 
     def __init__(self, session, base_url, org_id):
@@ -47,8 +48,9 @@ class EnrichmentPage:
 
         return b"\r\n".join(line.encode('utf-8') if isinstance(line, str) else line for line in lines)
 
-    def create_enrichment_table(self, session, base_url, org_id, enrichment_table_name):
+    def create_enrichment_table(self, session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, enrichment_table_name):
         """Create an enrichment table."""
+        session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD) 
         # Define headers
         headers = {
             'Accept': 'application/json, text/plain, */*',

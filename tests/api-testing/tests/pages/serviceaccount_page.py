@@ -1,5 +1,5 @@
 import random
-
+from requests.auth import HTTPBasicAuth
 import time
 
 
@@ -11,9 +11,11 @@ class ServiceAccountPage:
         self.base_url = base_url
         self.org_id = org_id
 
-    def create_service_account(self, email_address):
+    def create_service_account(self, session, base_url, user_email, user_password, org_id, email_address):
         """Create a service account.
         
+        session.auth = HTTPBasicAuth(user_email, user_password) 
+
         Args:
             email_address (str): Email address for the service account
             
@@ -29,8 +31,8 @@ class ServiceAccountPage:
             "last_name": "Panjiyar"
         }
 
-        response = self.session.post(
-            f"{self.base_url}api/{self.org_id}/service_accounts", 
+        response = session.post(
+            f"{base_url}api/{org_id}/service_accounts", 
             json=payload, 
             headers=headers
         )
