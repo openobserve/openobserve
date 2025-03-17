@@ -86,6 +86,18 @@ const tabs = ref([
     class: "tab_content",
   },
   {
+    dataTest: "iam-quota-tab",
+    name: "quota",
+    to: {
+      name: "quota",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.quota"),
+    class: "tab_content",
+  },
+  {
     dataTest: "iam-organizations-tab",
     name: "organizations",
     to: {
@@ -131,7 +143,7 @@ watch(
 function setTabs() {
   const cloud = ["users", "organizations", "serviceAccounts"];
 
-  const rbac = ["groups", "roles"];
+  const rbac = ["groups", "roles", "quota"];
 
   const os = ["users", "serviceAccounts"];
 
