@@ -49,7 +49,7 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  setup(props) {
+  setup(props): any {
     const store = useStore();
 
     const processedContent = computed(() => {
