@@ -260,12 +260,12 @@ impl FromRequest for AuthExtractor {
             } else {
                 path_columns[0].to_string()
             }
-        } else if url_len == 2 || (url_len > 2 && path_columns[1].starts_with("settings")) {
+        } else if url_len == 2 || (url_len > 2 && path_columns[1].eq("settings")) {
             // for settings, the post/delete require PUT permissions, GET needs LIST permissions
             // also the special settings exception is for 3-part urls for logo /text
             // which are of path /org/settings/logo , which need permission of operating
             // on permission in general
-            if path_columns[1].starts_with("settings") {
+            if path_columns[1].eq("settings") {
                 if method.eq("POST") || method.eq("DELETE") {
                     method = "PUT".to_string();
                 }
@@ -280,7 +280,7 @@ impl FromRequest for AuthExtractor {
                     .map_or(path_columns[1], |model| model.key),
                 path_columns[0]
             )
-        } else if path_columns[1].starts_with("groups") || path_columns[1].starts_with("roles") {
+        } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need
             // to check permission on role:org/id for permissions on that specific role
             format!(
@@ -295,9 +295,9 @@ impl FromRequest for AuthExtractor {
             // for example, alerts are on route /org/stream/alerts
             // or templates are on route /org/alerts/templates and so on
             // users/roles is one of the special exception here
-            if path_columns[2].starts_with("alerts")
-                || path_columns[2].starts_with("templates")
-                || path_columns[2].starts_with("destinations")
+            if path_columns[2].eq("alerts")
+                || path_columns[2].eq("templates")
+                || path_columns[2].eq("destinations")
                 || path.ends_with("users/roles")
             {
                 if method.eq("GET") {
@@ -338,11 +338,11 @@ impl FromRequest for AuthExtractor {
                 )
             } else if method.eq("PUT")
                 || method.eq("DELETE")
-                || path_columns[1].starts_with("reports")
-                || path_columns[1].starts_with("savedviews")
-                || path_columns[1].starts_with("functions")
-                || path_columns[1].starts_with("service_accounts")
-                || path_columns[1].starts_with("cipher_keys")
+                || path_columns[1].eq("reports")
+                || path_columns[1].eq("savedviews")
+                || path_columns[1].eq("functions")
+                || path_columns[1].eq("service_accounts")
+                || path_columns[1].eq("cipher_keys")
             {
                 // Similar to the alerts/templates etc, but for other entities such as specific
                 // pipeline, specific stream, specific alert/destination etc.
@@ -360,9 +360,9 @@ impl FromRequest for AuthExtractor {
                     path_columns[2]
                 )
             } else if method.eq("GET")
-                && (path_columns[1].starts_with("dashboards")
-                    || path_columns[1].starts_with("folders")
-                    || path_columns[1].starts_with("actions"))
+                && (path_columns[1].eq("dashboards")
+                    || path_columns[1].eq("folders")
+                    || path_columns[1].eq("actions"))
             {
                 format!(
                     "{}:{}",
