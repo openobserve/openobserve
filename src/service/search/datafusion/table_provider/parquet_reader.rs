@@ -94,7 +94,7 @@ impl ParquetFileReaderFactory for NewParquetFileReaderFactory {
         let mut inner = ParquetObjectReader::new(store, file_meta.object_meta);
 
         if let Some(hint) = metadata_size_hint {
-            inner = inner.with_footer_size_hint(hint)
+            inner = inner.with_footer_size_hint(hint);
         };
 
         Ok(Box::new(ParquetFileReader {
