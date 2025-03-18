@@ -689,7 +689,7 @@ export default defineComponent({
         icon: outlinedCode,
         link: "/action-scripts",
         name: "actionScripts",
-        hide: !isActionsEnabled.value,
+        hide: () => !isActionsEnabled.value,
       },
       {
         title: t("menu.ingestion"),
@@ -823,7 +823,15 @@ export default defineComponent({
       store.dispatch("setHiddenMenus", disableMenus);
 
       linksList.value = linksList.value.filter((link) => {
-        const hide = link.hide === undefined ? false : link.hide; // Handle unknown hide values
+        const hide =
+          link.hide === undefined
+            ? false
+            : typeof link.hide === "boolean"
+              ? link.hide
+              : typeof link.hide === "function"
+                ? link.hide()
+                : false;
+
         return !disableMenus.has(link.name) && !hide;
       });
     };
@@ -1141,10 +1149,12 @@ export default defineComponent({
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
-            filterMenus();
           }
+
           store.dispatch("setConfig", res.data);
           await nextTick();
+          filterMenus();
+
           // if rum enabled then setUser to capture session details.
           if (res.data.rum.enabled) {
             setRumUser();
