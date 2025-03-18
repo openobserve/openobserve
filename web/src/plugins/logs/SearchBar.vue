@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-list>
         </q-btn-dropdown>
       </div>
-      <div class="float-right col-auto q-mb-xs flex items-center">
+      <div class="float-right col-auto q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
           v-model="searchObj.meta.toggleSourceWrap"
