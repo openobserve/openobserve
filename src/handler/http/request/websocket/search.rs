@@ -149,7 +149,13 @@ pub async fn handle_search_request(
     }
 
     // create new sql query with histogram interval
-    let sql = Sql::new(&req.payload.query.clone().into(), org_id, stream_type).await?;
+    let sql = Sql::new(
+        &req.payload.query.clone().into(),
+        org_id,
+        stream_type,
+        Some(req.search_type.clone()),
+    )
+    .await?;
     if let Some(interval) = sql.histogram_interval {
         // modify the sql query statement to include the histogram interval
         let updated_query = update_histogram_interval_in_query(&req.payload.query.sql, interval)?;

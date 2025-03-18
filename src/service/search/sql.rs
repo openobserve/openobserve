@@ -21,6 +21,7 @@ use config::{
     ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         inverted_index::InvertedIndexOptimizeMode,
+        search::SearchEventType,
         sql::{OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
@@ -95,13 +96,18 @@ pub struct Sql {
 
 impl Sql {
     pub async fn new_from_req(req: &Request, query: &SearchQuery) -> Result<Sql, Error> {
-        Self::new(query, &req.org_id, req.stream_type).await
+        let search_event_type = req
+            .search_event_type
+            .as_ref()
+            .and_then(|s| SearchEventType::try_from(s.as_str()).ok());
+        Self::new(query, &req.org_id, req.stream_type, search_event_type).await
     }
 
     pub async fn new(
         query: &SearchQuery,
         org_id: &str,
         stream_type: StreamType,
+        search_event_type: Option<SearchEventType>,
     ) -> Result<Sql, Error> {
         let cfg = get_config();
         let sql = query.sql.clone();
@@ -196,6 +202,7 @@ impl Sql {
                 has_original_column,
                 query.quick_mode || cfg.limit.quick_mode_force_enabled,
                 cfg.limit.quick_mode_num_fields,
+                &search_event_type,
             );
         } else {
             for (stream, schema) in total_schemas.iter() {
@@ -231,7 +238,7 @@ impl Sql {
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             statement.visit(&mut add_timestamp_visitor);
-            if o2_id_is_needed(&used_schemas) {
+            if o2_id_is_needed(&used_schemas, &search_event_type) {
                 let mut add_o2_id_visitor = AddO2IdVisitor::new();
                 statement.visit(&mut add_o2_id_visitor);
             }
@@ -332,6 +339,7 @@ fn generate_select_star_schema(
     has_original_column: HashMap<TableReference, bool>,
     quick_mode: bool,
     quick_mode_num_fields: usize,
+    search_event_type: &Option<SearchEventType>,
 ) -> HashMap<TableReference, Arc<SchemaCache>> {
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
@@ -341,8 +349,10 @@ fn generate_select_star_schema(
         // check if it is user defined schema
         if defined_schema_fields.is_empty() || defined_schema_fields.len() > quick_mode_num_fields {
             let quick_mode = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
-            let skip_original_column =
-                !has_original_column && schema.contains_field(ORIGINAL_DATA_COL_NAME);
+            // don't automatically skip _original for scheduled pipeline searches
+            let skip_original_column = !has_original_column
+                && !matches!(search_event_type, Some(SearchEventType::DerivedStream))
+                && schema.contains_field(ORIGINAL_DATA_COL_NAME);
             if quick_mode || skip_original_column {
                 let fields = if quick_mode {
                     let mut columns = columns.get(&name).cloned();
@@ -1582,11 +1592,16 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
     Ok(Some(where_str))
 }
 
-fn o2_id_is_needed(schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> bool {
-    schemas.values().any(|schema| {
-        let stream_setting = unwrap_stream_settings(schema.schema());
-        stream_setting.is_some_and(|setting| setting.store_original_data)
-    })
+fn o2_id_is_needed(
+    schemas: &HashMap<TableReference, Arc<SchemaCache>>,
+    search_event_type: &Option<SearchEventType>,
+) -> bool {
+    // avoid automatically adding _o2_id for pipeline queries
+    !matches!(search_event_type, Some(SearchEventType::DerivedStream))
+        && schemas.values().any(|schema| {
+            let stream_setting = unwrap_stream_settings(schema.schema());
+            stream_setting.is_some_and(|setting| setting.store_original_data)
+        })
 }
 
 #[cfg(feature = "enterprise")]

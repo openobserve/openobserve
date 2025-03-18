@@ -1903,7 +1903,7 @@ const runQuery = async () => {
           org_identifier: store.state.selectedOrganization.identifier,
             query: {query: queryReq},
             page_type: selectedStreamType.value,
-  }
+  }, "derived_stream"
   ).then((res: any) => {
     if(res.data.hits.length > 0){
     rows.value = res.data.hits
