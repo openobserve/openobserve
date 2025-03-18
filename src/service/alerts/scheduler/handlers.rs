@@ -224,6 +224,7 @@ async fn handle_alert_triggers(
                 evaluation_took_in_secs: None,
                 source_node: Some(source_node.clone()),
                 query_took: None,
+                trigger_trace_id: Some(trace_id.to_string()),
             })
             .await;
             log::info!(
@@ -279,6 +280,7 @@ async fn handle_alert_triggers(
         evaluation_took_in_secs: None,
         source_node: Some(source_node),
         query_took: None,
+        trigger_trace_id: Some(trace_id.to_string()),
     };
 
     let evaluation_took = Instant::now();
@@ -682,6 +684,7 @@ async fn handle_report_triggers(
         evaluation_took_in_secs: None,
         source_node: Some(LOCAL_NODE.name.clone()),
         query_took: None,
+        trigger_trace_id: Some(trace_id.to_string()),
     };
 
     if trigger.retries >= max_retries {
@@ -884,6 +887,7 @@ async fn handle_derived_stream_triggers(
             evaluation_took_in_secs: None,
             source_node: Some(LOCAL_NODE.name.clone()),
             query_took: None,
+            trigger_trace_id: Some(trace_id.to_string()),
         };
 
         // evaluate trigger and configure trigger next run time
