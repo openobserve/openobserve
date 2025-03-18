@@ -105,8 +105,8 @@ impl Sql {
     ) -> Result<Sql, Error> {
         let cfg = get_config();
         let sql = query.sql.clone();
-        let limit = query.size as i64;
         let offset = query.from as i64;
+        let mut limit = query.size as i64;
 
         // 1. get table name
         let stream_names =
@@ -164,6 +164,13 @@ impl Sql {
             && order_by[0].0 == TIMESTAMP_COL_NAME
             && order_by[0].1 == OrderBy::Desc;
         let use_inverted_index = column_visitor.use_inverted_index;
+
+        // check if need exact limit and offset
+        if limit == -1 || limit == 0 {
+            if let Some(n) = column_visitor.limit {
+                limit = n;
+            }
+        }
 
         // 4. get match_all() value
         let mut match_visitor = MatchVisitor::new();
@@ -553,6 +560,8 @@ struct ColumnVisitor<'a> {
     schemas: &'a HashMap<TableReference, Arc<SchemaCache>>,
     group_by: Vec<String>,
     order_by: Vec<(String, OrderBy)>, // field_name, order_by
+    offset: Option<i64>,
+    limit: Option<i64>,
     is_wildcard: bool,
     is_distinct: bool,
     has_agg_function: bool,
@@ -567,6 +576,8 @@ impl<'a> ColumnVisitor<'a> {
             schemas,
             group_by: Vec::new(),
             order_by: Vec::new(),
+            offset: None,
+            limit: None,
             is_wildcard: false,
             is_distinct: false,
             has_agg_function: false,
@@ -675,6 +686,18 @@ impl VisitorMut for ColumnVisitor<'_> {
                         self.use_inverted_index =
                             checking_inverted_index_inner(&index_fields, expr);
                     }
+                }
+            }
+        }
+        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref() {
+            if let Ok(num) = n.to_string().parse::<i64>() {
+                self.limit = Some(num);
+            }
+        }
+        if let Some(offset) = query.offset.as_ref() {
+            if let Expr::Value(Value::Number(n, _)) = &offset.value {
+                if let Ok(num) = n.to_string().parse::<i64>() {
+                    self.offset = Some(num);
                 }
             }
         }
