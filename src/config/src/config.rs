@@ -2583,7 +2583,7 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 fn check_ratelimit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.ratelimit.ratelimit_rule_refresh_interval < 2 {
         return Err(anyhow::anyhow!(
-            "ratelimit rules refresh interval must gt 2"
+            "ratelimit rules refresh interval must be greater than or equal to 2 seconds"
         ));
     }
     Ok(())

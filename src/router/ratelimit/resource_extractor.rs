@@ -51,7 +51,7 @@ pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleRes
     let (path, org_id) = (
         path.to_string(),
         path_columns
-            .get(0)
+            .first()
             .map(|s| s.to_string())
             .unwrap_or_default(),
     );

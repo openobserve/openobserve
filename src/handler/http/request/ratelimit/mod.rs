@@ -28,13 +28,12 @@ use {
     config::meta::ratelimit::RatelimitRuleType,
     futures_util::{StreamExt, TryStreamExt},
     infra::table::ratelimit::RuleEntry,
-    o2_ratelimit::dataresource::default_rules::{
-        ApiGroupOperation, DEFAULT_GLOBAL_ORG_IDENTIFIER, has_group_name_and_operation,
-    },
     o2_ratelimit::dataresource::{
         default_rules::{
-            ApiGroup, DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER, RATELIMIT_API_MAPPING,
-            get_ratelimit_global_default_api_info,
+            ApiGroup, ApiGroupOperation, DEFAULT_GLOBAL_ORG_IDENTIFIER,
+            DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER, DEFAULT_THRESHOLD_NO_LIMIT_FRONTEND,
+            RATELIMIT_API_MAPPING, get_ratelimit_global_default_api_info,
+            has_group_name_and_operation,
         },
         default_rules_provider::get_default_rules,
     },
@@ -255,8 +254,8 @@ pub async fn update_ratelimit(
                 )));
             }
 
-            if rule.threshold == -1 {
-                continue;
+            if rule.threshold < DEFAULT_THRESHOLD_NO_LIMIT_FRONTEND {
+                rule.threshold = DEFAULT_THRESHOLD_NO_LIMIT_FRONTEND
             }
 
             if rule.rule_id.is_none() {
@@ -349,9 +348,8 @@ pub async fn upload_org_ratelimit(
                     Ok(mut rules) => {
                         // Validate rules
                         for rule in rules.iter_mut() {
-                            // -1 means no limit, no need to update
-                            if rule.threshold == -1 {
-                                continue;
+                            if rule.threshold < DEFAULT_THRESHOLD_NO_LIMIT_FRONTEND {
+                                rule.threshold = DEFAULT_THRESHOLD_NO_LIMIT_FRONTEND
                             }
 
                             if rule.rule_id.is_none() {
@@ -592,6 +590,7 @@ mod tests {
             rule_id: None,
             ..Default::default()
         };
+
         assert!(!validate_ratelimit_rule(&invalid_rule).await.is_ok());
     }
 }
