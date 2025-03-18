@@ -2274,26 +2274,31 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const havingClauses: any = [];
 
-    // Process y-axis having conditions
-    yAxisFields.forEach((field: any) => {
-      if (
-        field?.havingConditions?.[0]?.operator &&
-        field?.havingConditions?.[0]?.value !== undefined &&
-        field?.havingConditions?.[0]?.value !== null
-      ) {
-        const columnName = field.alias;
-        havingClauses.push(
-          `${columnName} ${field.havingConditions[0].operator} ${field.havingConditions[0].value}`,
-        );
-      }
-    });
+    // Only add having clauses for non-heatmap charts from y-axis
+    if (dashboardPanelData.data.type !== "heatmap") {
+      // Process y-axis having conditions
+      yAxisFields.forEach((field: any) => {
+        if (
+          field?.havingConditions?.[0]?.operator &&
+          field?.havingConditions?.[0]?.value !== undefined &&
+          field?.havingConditions?.[0]?.value !== null &&
+          field?.havingConditions?.[0]?.value !== "" // Check for empty string
+        ) {
+          const columnName = field.alias;
+          havingClauses.push(
+            `${columnName} ${field.havingConditions[0].operator} ${field.havingConditions[0].value}`,
+          );
+        }
+      });
+    }
 
     // Process z-axis having conditions
     zAxisFields.forEach((field: any) => {
       if (
         field?.havingConditions?.[0]?.operator &&
         field?.havingConditions?.[0]?.value !== undefined &&
-        field?.havingConditions?.[0]?.value !== null
+        field?.havingConditions?.[0]?.value !== null &&
+        field?.havingConditions?.[0]?.value !== "" // Check for empty string
       ) {
         const columnName = field.alias;
         havingClauses.push(
@@ -2407,7 +2412,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     if (
       valueForMapsFields?.havingConditions?.[0]?.operator &&
       valueForMapsFields?.havingConditions?.[0]?.value !== undefined &&
-      valueForMapsFields?.havingConditions?.[0]?.value !== null
+      valueForMapsFields?.havingConditions?.[0]?.value !== null &&
+      valueForMapsFields?.havingConditions?.[0]?.value !== ""
     ) {
       const columnName = valueForMapsFields.alias;
       havingClauses.push(
@@ -2525,7 +2531,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     if (
       weightFields?.havingConditions?.[0]?.operator &&
       weightFields?.havingConditions?.[0]?.value !== undefined &&
-      weightFields?.havingConditions?.[0]?.value !== null
+      weightFields?.havingConditions?.[0]?.value !== null &&
+      weightFields?.havingConditions?.[0]?.value !== ""
     ) {
       const columnName = weightFields.alias;
       havingClauses.push(
@@ -2652,7 +2659,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     if (
       valueFields?.havingConditions?.[0]?.operator &&
       valueFields?.havingConditions?.[0]?.value !== undefined &&
-      valueFields?.havingConditions?.[0]?.value !== null
+      valueFields?.havingConditions?.[0]?.value !== null &&
+      valueFields?.havingConditions?.[0]?.value !== ""
     ) {
       const columnName = valueFields.alias;
       havingClauses.push(
