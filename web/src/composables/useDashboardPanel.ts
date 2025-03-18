@@ -197,8 +197,8 @@ const dashboardPanelDataObj: any = {
 
 const getDefaultCustomChartText = () => {
   return `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
-  `
-}
+  `;
+};
 
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
@@ -468,6 +468,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               : "ASC"
             : null,
         isDerived,
+        havingConditions: [],
       });
     }
 
@@ -528,6 +529,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               : "ASC"
             : null,
         isDerived,
+        havingConditions: [],
       });
     }
 
@@ -581,6 +583,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             ? null
             : "count",
         isDerived,
+        havingConditions: [],
       });
     }
     updateArrayAlias();
@@ -630,6 +633,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: isDerived ? null : "count",
         isDerived,
+        havingConditions: [],
       });
     }
     updateArrayAlias();
@@ -651,6 +655,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [],
       };
     }
   };
@@ -671,6 +676,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [],
       };
     }
   };
@@ -691,6 +697,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: isDerived ? null : "count", // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [],
       };
     }
   };
@@ -709,6 +716,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
+        havingConditions: [],
       };
     }
   };
@@ -727,6 +735,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: "count", // You can set the appropriate aggregation function here
+        havingConditions: [],
       };
     }
   };
@@ -747,6 +756,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [],
       };
     }
   };
@@ -767,6 +777,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [],
       };
     }
   };
@@ -787,6 +798,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: isDerived ? null : "sum", // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [],
       };
     }
   };
@@ -831,7 +843,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
@@ -874,7 +887,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
         break;
       case "table":
       case "pie":
@@ -913,7 +927,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
 
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -938,7 +953,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.breakdown = [];
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
 
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.source = null;
@@ -955,7 +971,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "html":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
         dashboardPanelData.data.queryType = "";
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -964,7 +981,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "markdown":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.htmlContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
 
         dashboardPanelData.data.queryType = "";
         dashboardPanelData.data.queries[
@@ -1024,7 +1042,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         };
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.latitude = null;
           query.fields.longitude = null;
@@ -2242,6 +2261,56 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
     }
 
+    // Add HAVING clause if y-axis or z-axis has operator and value
+    const yAxisFields =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.y;
+
+    const zAxisFields =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields?.z || [];
+
+    const havingClauses: any = [];
+
+    // Only add having clauses for non-heatmap charts from y-axis
+    if (dashboardPanelData.data.type !== "heatmap") {
+      // Process y-axis having conditions
+      yAxisFields.forEach((field: any) => {
+        if (
+          field?.havingConditions?.[0]?.operator &&
+          field?.havingConditions?.[0]?.value !== undefined &&
+          field?.havingConditions?.[0]?.value !== null &&
+          field?.havingConditions?.[0]?.value !== ""
+        ) {
+          const columnName = field.alias;
+          havingClauses.push(
+            `${columnName} ${field.havingConditions[0].operator} ${field.havingConditions[0].value}`,
+          );
+        }
+      });
+    }
+
+    // Process z-axis having conditions
+    zAxisFields.forEach((field: any) => {
+      if (
+        field?.havingConditions?.[0]?.operator &&
+        field?.havingConditions?.[0]?.value !== undefined &&
+        field?.havingConditions?.[0]?.value !== null &&
+        field?.havingConditions?.[0]?.value !== "" 
+      ) {
+        const columnName = field.alias;
+        havingClauses.push(
+          `${columnName} ${field.havingConditions[0].operator} ${field.havingConditions[0].value}`,
+        );
+      }
+    });
+
+    if (havingClauses.length > 0) {
+      query += " HAVING " + havingClauses.join(" AND ");
+    }
+
     // array of sorting fields with followed by asc or desc
     const orderByArr: string[] = [];
 
@@ -2330,6 +2399,30 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       if (name) {
         query += ` GROUP BY ${name.alias}`;
       }
+    }
+
+    // Add HAVING clause if y-axis has operator and value
+    const valueForMapsFields =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.value_for_maps;
+
+    const havingClauses: any = [];
+
+    if (
+      valueForMapsFields?.havingConditions?.[0]?.operator &&
+      valueForMapsFields?.havingConditions?.[0]?.value !== undefined &&
+      valueForMapsFields?.havingConditions?.[0]?.value !== null &&
+      valueForMapsFields?.havingConditions?.[0]?.value !== ""
+    ) {
+      const columnName = valueForMapsFields.alias;
+      havingClauses.push(
+        `${columnName} ${valueForMapsFields.havingConditions[0].operator} ${valueForMapsFields.havingConditions[0].value}`,
+      );
+    }
+
+    if (havingClauses.length > 0) {
+      query += " HAVING " + havingClauses.join(" AND ");
     }
 
     // array of sorting fields with followed by asc or desc
@@ -2425,6 +2518,30 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     if (aliases.length) {
       aliases = aliases.filter(Boolean).join(", ");
       query += `GROUP BY ${aliases}`;
+    }
+
+    // Add HAVING clause if y-axis has operator and value
+    const weightFields =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.weight;
+
+    const havingClauses: any = [];
+
+    if (
+      weightFields?.havingConditions?.[0]?.operator &&
+      weightFields?.havingConditions?.[0]?.value !== undefined &&
+      weightFields?.havingConditions?.[0]?.value !== null &&
+      weightFields?.havingConditions?.[0]?.value !== ""
+    ) {
+      const columnName = weightFields.alias;
+      havingClauses.push(
+        `${columnName} ${weightFields.havingConditions[0].operator} ${weightFields.havingConditions[0].value}`,
+      );
+    }
+
+    if (havingClauses.length > 0) {
+      query += " HAVING " + havingClauses.join(" AND ");
     }
 
     // array of sorting fields with followed by asc or desc
@@ -2529,6 +2646,30 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     if (aliases.length) {
       aliases = aliases.filter(Boolean).join(", ");
       query += `GROUP BY ${aliases}`;
+    }
+
+    // Add HAVING clause if y-axis has operator and value
+    const valueFields =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.value;
+
+    const havingClauses: any = [];
+
+    if (
+      valueFields?.havingConditions?.[0]?.operator &&
+      valueFields?.havingConditions?.[0]?.value !== undefined &&
+      valueFields?.havingConditions?.[0]?.value !== null &&
+      valueFields?.havingConditions?.[0]?.value !== ""
+    ) {
+      const columnName = valueFields.alias;
+      havingClauses.push(
+        `${columnName} ${valueFields.havingConditions[0].operator} ${valueFields.havingConditions[0].value}`,
+      );
+    }
+
+    if (havingClauses.length > 0) {
+      query += " HAVING " + havingClauses.join(" AND ");
     }
 
     // Adding sorting

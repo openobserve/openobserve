@@ -442,6 +442,7 @@ pub struct SearchPartitionResponse {
     pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
     pub order_by: OrderBy,
+    pub limit: i64,
     pub streaming_output: bool,
     pub streaming_aggs: bool,
     pub streaming_id: Option<String>,

@@ -2317,6 +2317,12 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.disk_cache.enabled = false;
     }
 
+    // disable result cache and metrics cache if disk cache is disabled
+    if !cfg.disk_cache.enabled {
+        cfg.common.result_cache_enabled = false;
+        cfg.common.metrics_cache_enabled = false;
+    }
+
     let disks = sysinfo::disk::get_disk_usage();
     let disk = disks.iter().find(|d| cache_dir.starts_with(&d.mount_point));
     let (disk_total, disk_free) = match disk {

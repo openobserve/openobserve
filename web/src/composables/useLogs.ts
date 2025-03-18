@@ -23,6 +23,7 @@ import {
   nextTick,
   onBeforeMount,
   watch,
+  computed,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -75,6 +76,7 @@ import searchService from "@/services/search";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
+import useActions from "./useActions";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -124,7 +126,7 @@ const defaultObject = {
     showQuery: true,
     showHistogram: true,
     showDetailTab: false,
-    toggleFunction: true,
+    showTransformEditor: true,
     searchApplied: false,
     toggleSourceWrap: useLocalWrapContent()
       ? JSON.parse(useLocalWrapContent())
@@ -155,6 +157,8 @@ const defaultObject = {
     hasUserDefinedSchemas: false,
     selectedTraceStream: "",
     showSearchScheduler: false,
+    toggleFunction: false, // DEPRECATED use showTransformEditor instead
+    isActionsEnabled: false,
   },
   data: {
     query: <any>"",
@@ -197,6 +201,9 @@ const defaultObject = {
     },
     histogramInterval: <any>0,
     transforms: <any>[],
+    transformType: "function",
+    actions: <any>[],
+    selectedTransform: <any>null,
     queryResults: <any>[],
     sortedQueryResults: <any>[],
     streamResults: <any>[],
@@ -238,6 +245,7 @@ const defaultObject = {
     searchWebSocketRequestIdsAndTraceIds: <{ traceId: string }[]>[],
     isOperationCancelled: false,
     searchRetriesCount: <{ [key: string]: number }>{},
+    actionId: null,
   },
 };
 
@@ -306,6 +314,8 @@ const useLogs = () => {
   const { t } = useI18n();
   const $q = useQuasar();
   const { getAllFunctions } = useFunctions();
+  const { getAllActions } = useActions();
+
   const { showErrorNotification } = useNotifications();
   const { getStreams, getStream, getMultiStreams } = useStreams();
   const router = useRouter();
@@ -409,6 +419,28 @@ const useLogs = () => {
       return;
     } catch (e) {
       showErrorNotification("Error while fetching functions");
+    }
+  };
+
+  const getActions = async () => {
+    try {
+      searchObj.data.actions = [];
+
+      if (store.state.organizationData.actions.length == 0) {
+        await getAllActions();
+      }
+      
+      store.state.organizationData.actions.forEach((data: any) => {
+        if (data.execution_details_type === "service") {
+          searchObj.data.actions.push({
+            name: data.name,
+            id: data.id,
+          });
+        }
+      });
+      return;
+    } catch (e) {
+      showErrorNotification("Error while fetching actions");
     }
   };
 
@@ -577,7 +609,7 @@ const useLogs = () => {
     }
 
     if (
-      searchObj.meta.toggleFunction &&
+      searchObj.data.transformType === "function" &&
       searchObj.data.tempFunctionContent != ""
     ) {
       query["functionContent"] = b64EncodeUnicode(
@@ -1574,14 +1606,8 @@ const useLogs = () => {
           searchObj.meta.refreshHistogram = true;
         }
 
-        // get function definition
-        if (
-          searchObj.data.tempFunctionContent != "" &&
-          searchObj.meta.toggleFunction
-        ) {
-          queryReq.query["query_fn"] =
-            b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
-        }
+        // update query with function or action
+        addTransformToQuery(queryReq);
 
         // in case of relative time, set start_time and end_time to query
         // it will be used in pagination request
@@ -1864,13 +1890,7 @@ const useLogs = () => {
         }
 
         // get function definition
-        if (
-          searchObj.data.tempFunctionContent != "" &&
-          searchObj.meta.toggleFunction
-        ) {
-          queryReq.query["query_fn"] =
-            b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
-        }
+        addTransformToQuery(queryReq);
 
         // in case of relative time, set start_time and end_time to query
         // it will be used in pagination request
@@ -1933,6 +1953,24 @@ const useLogs = () => {
       // notificationMsg.value = "";
     }
   };
+
+  function shouldAddFunctionToSearch() {
+    if (!isActionsEnabled.value) return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
+
+    return searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "";
+  }
+
+  function addTransformToQuery(queryReq: any) {
+    if (shouldAddFunctionToSearch()) {
+      queryReq.query["query_fn"] =
+        b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+    }
+
+    // Add action ID if it exists
+    if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
+      queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
+    }
+  }
 
   function resetHistogramWithError(errorMsg: string, errorCode: number = 0) {
     searchObj.data.histogram = {
@@ -3707,11 +3745,14 @@ const useLogs = () => {
       }
 
       let query_fn: any = "";
-      if (
-        searchObj.data.tempFunctionContent != "" &&
-        searchObj.meta.toggleFunction
-      ) {
+      if (shouldAddFunctionToSearch()) {
         query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
+      }
+
+      let action_id: any = "";
+
+      if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
+        action_id = searchObj.data.selectedTransform.id;
       }
 
       let streamName: string = "";
@@ -3742,6 +3783,7 @@ const useLogs = () => {
           clusters: searchObj.meta.hasOwnProperty("clusters")
             ? searchObj.meta.clusters.join(",")
             : "",
+          action_id,
           is_multistream:
             searchObj.data.stream.selectedStream.length > 1 ? true : false,
           traceparent,
@@ -3892,6 +3934,7 @@ const useLogs = () => {
       await getStreamList();
       // await getSavedViews();
       await getFunctions();
+      if (isActionsEnabled.value) await getActions();
       await extractFields();
       if (searchObj.meta.jobId == "") {
         await getQueryData();
@@ -4055,7 +4098,7 @@ const useLogs = () => {
       searchObj.data.tempFunctionContent =
         b64DecodeUnicode(queryParams.functionContent) || "";
       searchObj.meta.functionEditorPlaceholderFlag = false;
-      searchObj.meta.toggleFunction = true;
+      searchObj.data.transformType = "function";
     }
 
     if (queryParams.stream_type) {
@@ -4750,12 +4793,11 @@ const useLogs = () => {
       }
 
       // get function definition
-      if (
-        searchObj.data.tempFunctionContent != "" &&
-        searchObj.meta.toggleFunction
-      ) {
-        queryReq.query["query_fn"] =
-          b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+      addTransformToQuery(queryReq);
+
+      // Add action ID if it exists
+      if (searchObj.data.actionId && searchObj.data.transformType === "action") {
+        queryReq.query["action_id"] = searchObj.data.actionId;
       }
 
       if (searchObj.data.datetime.type === "relative") {
@@ -5682,6 +5724,10 @@ const useLogs = () => {
     }
   };
 
+  const isActionsEnabled = computed(() => {
+    return (config.isEnterprise == "true" || config.isCloud == "true") && store.state.zoConfig.actions_enabled;
+  });
+
   return {
     searchObj,
     searchAggData,
@@ -5736,6 +5782,7 @@ const useLogs = () => {
     initializeWebSocketConnection,
     addRequestId,
     routeToSearchSchedule,
+    isActionsEnabled,
     sendCancelSearchMessage,
   };
 };

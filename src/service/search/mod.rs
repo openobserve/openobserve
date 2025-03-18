@@ -705,6 +705,7 @@ pub async fn search_partition(
         histogram_interval: sql.histogram_interval,
         partitions: vec![],
         order_by: OrderBy::Desc,
+        limit: sql.limit,
         streaming_output: req.streaming_output,
         streaming_aggs: req.streaming_output && is_streaming_aggregate,
         streaming_id: streaming_id.clone(),

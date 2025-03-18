@@ -39,9 +39,11 @@ use datafusion::{
     catalog::Session,
     common::{Result, Statistics, ToDFSchema, plan_err, project_schema},
     datasource::{
-        TableProvider, get_statistics_with_limit,
+        TableProvider,
+        file_format::parquet::ParquetFormat,
+        get_statistics_with_limit,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl, PartitionedFile},
-        physical_plan::FileScanConfig,
+        physical_plan::{FileScanConfig, parquet::ParquetExecBuilder},
     },
     error::DataFusionError,
     execution::{
@@ -50,7 +52,7 @@ use datafusion::{
     },
     logical_expr::{Expr, SortExpr, TableProviderFilterPushDown, TableType, utils::conjunction},
     physical_expr::{LexOrdering, PhysicalSortExpr, create_physical_expr, expressions},
-    physical_plan::{ExecutionPlan, empty::EmptyExec},
+    physical_plan::{ExecutionPlan, PhysicalExpr, empty::EmptyExec},
 };
 use futures::{
     StreamExt,
@@ -68,6 +70,7 @@ pub mod catalog;
 pub mod empty_table;
 mod helpers;
 pub mod memtable;
+mod parquet_reader;
 pub mod uniontable;
 
 #[derive(Debug)]
@@ -234,7 +237,15 @@ impl NewListingTable {
                     .options
                     .format
                     .infer_stats(ctx, store, self.file_schema.clone(), &part_file.object_meta)
-                    .await?;
+                    .await
+                    .map_err(|e| {
+                        log::error!(
+                            "Failed to infer stats for file: {}, error: {}",
+                            part_file.object_meta.location,
+                            e
+                        );
+                        e
+                    })?;
                 statistics_cache.put_with_extra(
                     &part_file.object_meta.location,
                     statistics.clone().into(),
@@ -243,6 +254,36 @@ impl NewListingTable {
                 Ok(statistics)
             }
         }
+    }
+
+    async fn create_physical_plan(
+        &self,
+        state: &SessionState,
+        conf: FileScanConfig,
+        filters: Option<&Arc<dyn PhysicalExpr>>,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        let Some(parquet) = self.options.format.as_any().downcast_ref::<ParquetFormat>() else {
+            return plan_err!("ParquetFormat not found");
+        };
+        let store = state.runtime_env().object_store(&conf.object_store_url)?;
+        let mut builder = ParquetExecBuilder::new_with_options(conf, parquet.options().clone())
+            .with_parquet_file_reader_factory(Arc::new(
+                parquet_reader::NewParquetFileReaderFactory::new(store),
+            ));
+
+        // If enable pruning then combine the filters to build the predicate.
+        // If disable pruning then set the predicate to None, thus readers
+        // will not prune data based on the statistics.
+        if parquet.enable_pruning() {
+            if let Some(predicate) = filters.cloned() {
+                builder = builder.with_predicate(predicate);
+            }
+        }
+        if let Some(metadata_size_hint) = parquet.metadata_size_hint() {
+            builder = builder.with_metadata_size_hint(metadata_size_hint);
+        }
+
+        Ok(builder.build_arc())
     }
 }
 
@@ -366,8 +407,6 @@ impl TableProvider for NewListingTable {
 
         // create the execution plan
         let parquet_exec = self
-            .options
-            .format
             .create_physical_plan(
                 session_state,
                 FileScanConfig::new(object_store_url, Arc::clone(&self.file_schema))
