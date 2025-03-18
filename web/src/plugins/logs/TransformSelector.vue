@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="padding-top: 0"
             >
               <q-select
-                v-if="searchObj.meta.isActionsEnabled"
+                v-if="isActionsEnabled"
                 v-model="searchObj.data.transformType"
                 :options="transformTypes"
                 :label="t('search.transformType')"

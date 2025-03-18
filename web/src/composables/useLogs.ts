@@ -3944,7 +3944,7 @@ const useLogs = () => {
       await getStreamList();
       // await getSavedViews();
       await getFunctions();
-      await getActions();
+      if (isActionsEnabled.value) await getActions();
       await extractFields();
       if (searchObj.meta.jobId == ""){
         await getQueryData();
@@ -5744,7 +5744,7 @@ const useLogs = () => {
   };
 
   const isActionsEnabled = computed(() => {
-    return searchObj.meta.isActionsEnabled;
+    return (config.isEnterprise == "true" || config.isCloud == "true") && store.state.zoConfig.actions_enabled;
   });
 
   return {
