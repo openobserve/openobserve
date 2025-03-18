@@ -37,7 +37,14 @@ pub static HTTP_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream_type"],
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream_type",
+            "search_type",
+            "search_group",
+        ],
     )
     .expect("Metric created")
 });
@@ -49,7 +56,14 @@ pub static HTTP_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream_type"],
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream_type",
+            "search_type",
+            "search_group",
+        ],
     )
     .expect("Metric created")
 });
@@ -63,7 +77,14 @@ pub static GRPC_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream_type"],
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream_type",
+            "search_type",
+            "search_group",
+        ],
     )
     .expect("Metric created")
 });
@@ -75,7 +96,14 @@ pub static GRPC_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream_type"],
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream_type",
+            "search_type",
+            "search_group",
+        ],
     )
     .expect("Metric created")
 });
@@ -683,6 +711,15 @@ pub static FILE_LIST_CACHE_HIT_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 // Node status metrics
+pub static NODE_UP: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_up", "Node is up")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["version"],
+    )
+    .expect("Metric created")
+});
 pub static NODE_CPU_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("node_cpu_total", "Total CPU usage")
@@ -938,6 +975,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
 
     // node status metrics
+    registry
+        .register(Box::new(NODE_UP.clone()))
+        .expect("Metric registered");
     registry
         .register(Box::new(NODE_CPU_TOTAL.clone()))
         .expect("Metric registered");

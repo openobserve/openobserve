@@ -161,6 +161,8 @@ pub async fn remote_write(
                 "200",
                 org_id,
                 StreamType::Metrics.as_str(),
+                "",
+                "",
             ])
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
@@ -169,6 +171,8 @@ pub async fn remote_write(
                 "200",
                 org_id,
                 StreamType::Metrics.as_str(),
+                "",
+                "",
             ])
             .inc();
         return Ok(());
@@ -263,6 +267,8 @@ pub async fn remote_write(
                         "200",
                         org_id,
                         StreamType::Metrics.as_str(),
+                        "",
+                        "",
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -271,6 +277,8 @@ pub async fn remote_write(
                         "200",
                         org_id,
                         StreamType::Metrics.as_str(),
+                        "",
+                        "",
                     ])
                     .inc();
                 return Ok(());
@@ -564,6 +572,8 @@ pub async fn remote_write(
             "200",
             org_id,
             StreamType::Metrics.as_str(),
+            "",
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -572,6 +582,8 @@ pub async fn remote_write(
             "200",
             org_id,
             StreamType::Metrics.as_str(),
+            "",
+            "",
         ])
         .inc();
 

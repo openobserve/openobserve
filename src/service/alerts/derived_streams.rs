@@ -16,7 +16,7 @@
 use std::str::FromStr;
 
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{Timelike, Utc};
 use config::{
     get_config,
     meta::{
@@ -95,7 +95,12 @@ pub async fn save(
 
     // 2. update the frequency
     if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
-        // Check the cron expression
+        let now = chrono::Utc::now().second();
+        derived_stream.trigger_condition.cron = super::super::alerts::alert::update_cron_expression(
+            &derived_stream.trigger_condition.cron,
+            now,
+        );
+        // Check if the cron expression is valid
         Schedule::from_str(&derived_stream.trigger_condition.cron)?;
     } else if derived_stream.trigger_condition.frequency == 0 {
         // default 3 mins, set min at 1 minutes

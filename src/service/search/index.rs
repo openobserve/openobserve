@@ -97,8 +97,8 @@ impl Debug for IndexCondition {
 pub enum Condition {
     // field, value
     Equal(String, String),
-    Regex(String, String),
     In(String, Vec<String>),
+    Regex(String, String),
     MatchAll(String),
     FuzzyMatchAll(String, u8),
     Or(Box<Condition>, Box<Condition>),
@@ -173,6 +173,12 @@ impl IndexCondition {
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     }
+
+    pub fn can_remove_filter(&self) -> bool {
+        self.conditions
+            .iter()
+            .all(|condition| condition.can_remove_filter())
+    }
 }
 
 impl Condition {
@@ -180,8 +186,8 @@ impl Condition {
     pub fn to_query(&self) -> String {
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
-            Condition::Regex(field, value) => format!("{}=~{}", field, value),
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
+            Condition::Regex(field, value) => format!("{}=~{}", field, value),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
             Condition::FuzzyMatchAll(value, distance) => format!(
                 "{}:fuzzy({}, {})",
@@ -279,10 +285,6 @@ impl Condition {
                 let term = Term::from_field_text(field, value);
                 Box::new(TermQuery::new(term, IndexRecordOption::Basic))
             }
-            Condition::Regex(field, value) => {
-                let field = schema.get_field(field)?;
-                Box::new(RegexQuery::from_pattern(value, field)?)
-            }
             Condition::In(field, values) => {
                 let field = schema.get_field(field)?;
                 let terms: Vec<Box<dyn Query>> = values
@@ -293,6 +295,10 @@ impl Condition {
                     })
                     .collect();
                 Box::new(BooleanQuery::union(terms))
+            }
+            Condition::Regex(field, value) => {
+                let field = schema.get_field(field)?;
+                Box::new(RegexQuery::from_pattern(value, field)?)
             }
             Condition::MatchAll(value) => {
                 let default_field = default_field.ok_or_else(|| {
@@ -363,10 +369,10 @@ impl Condition {
             Condition::Equal(field, _) => {
                 fields.insert(field.clone());
             }
-            Condition::Regex(field, _) => {
+            Condition::In(field, _) => {
                 fields.insert(field.clone());
             }
-            Condition::In(field, _) => {
+            Condition::Regex(field, _) => {
                 fields.insert(field.clone());
             }
             Condition::MatchAll(_) => {
@@ -389,10 +395,10 @@ impl Condition {
             Condition::Equal(field, _) => {
                 fields.insert(field.clone());
             }
-            Condition::Regex(field, _) => {
+            Condition::In(field, _) => {
                 fields.insert(field.clone());
             }
-            Condition::In(field, _) => {
+            Condition::Regex(field, _) => {
                 fields.insert(field.clone());
             }
             Condition::MatchAll(_) => {
@@ -422,9 +428,6 @@ impl Condition {
                 let right = get_scalar_value(value, field.data_type())?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
             }
-            Condition::Regex(..) => {
-                unreachable!("Condition::Regex query only support for promql")
-            }
             Condition::In(name, values) => {
                 let index = schema.index_of(name).unwrap();
                 let left = Arc::new(Column::new(name, index));
@@ -434,6 +437,9 @@ impl Condition {
                     .map(|value| get_scalar_value(value, field.data_type()).map(|v| v as _))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Arc::new(InListExpr::new(left, values, false, None)))
+            }
+            Condition::Regex(..) => {
+                unreachable!("Condition::Regex query only support for promql")
             }
             Condition::MatchAll(value) => {
                 let value = value
@@ -496,6 +502,18 @@ impl Condition {
                 let right = right.to_physical_expr(schema, fst_fields)?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::And, right)))
             }
+        }
+    }
+
+    pub fn can_remove_filter(&self) -> bool {
+        match self {
+            Condition::Equal(..) => true,
+            Condition::In(..) => true,
+            Condition::Regex(..) => false,
+            Condition::MatchAll(v) => is_blank_or_alphanumeric(v),
+            Condition::FuzzyMatchAll(..) => false,
+            Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
+            Condition::And(left, right) => left.can_remove_filter() && right.can_remove_filter(),
         }
     }
 }
@@ -629,4 +647,9 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         )))),
         _ => unimplemented!(),
     })
+}
+
+fn is_blank_or_alphanumeric(s: &str) -> bool {
+    s.chars()
+        .all(|c| c.is_ascii_whitespace() || c.is_ascii_alphanumeric())
 }

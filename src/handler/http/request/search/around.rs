@@ -242,7 +242,7 @@ pub(crate) async fn around(
     resp.cached_ratio = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
 
     let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, org_id, stream_type, "200", "_around");
+    http_report_metrics(start, org_id, stream_type, "200", "_around", "", "");
 
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,

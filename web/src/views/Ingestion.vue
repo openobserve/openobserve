@@ -105,6 +105,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('ingestion.customLabel')"
         content-class="tab_content"
       />
+      <q-route-tab
+        name="server"
+        :to="{
+          name: 'servers',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.serverLabel')"
+        content-class="tab_content"
+      />
+      <q-route-tab
+        name="database"
+        :to="{
+          name: 'databases',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.databaseLabel')"
+        content-class="tab_content"
+      />
+
+      <q-route-tab
+        name="security"
+        :to="{
+          name: 'security',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.securityLabel')"
+        content-class="tab_content"
+      />
+
+      <q-route-tab
+        name="devops"
+        :to="{
+          name: 'devops',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.devopsLabel')"
+        content-class="tab_content"
+      />
+
+      <q-route-tab
+        name="networking"
+        :to="{
+          name: 'networking',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.networkingLabel')"
+        content-class="tab_content"
+      />
+      <q-route-tab
+        name="message-queues"
+        :to="{
+          name: 'message-queues',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.messageQueuesLabel')"
+        content-class="tab_content"
+      />
+      <q-route-tab
+        name="languages"
+        :to="{
+          name: 'languages',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.languagesLabel')"
+        content-class="tab_content"
+      />
+      <q-route-tab
+        name="others"
+        :to="{
+          name: 'others',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.otherLabel')"
+        content-class="tab_content"
+      />
     </q-tabs>
     <q-separator class="separator" />
     <router-view
@@ -229,6 +320,10 @@ export default defineComponent({
       {
         label: t("ingestion.customLabel"),
         value: "custom",
+      },
+      {
+        label: t("ingestion.databaseLabel"),
+        value: "database",
       },
     ];
 
