@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -112,8 +112,12 @@ pub enum DbError {
     SeaORMError(String),
     #[error("error getting dashboard")]
     GetDashboardError(#[from] GetDashboardError),
-    #[error("PutDashbord# {0}")]
+    #[error("PutDashboard# {0}")]
     PutDashboard(#[from] PutDashboardError),
+    #[error("DestinationError# {0}")]
+    DestinationError(#[from] DestinationError),
+    #[error("TemplateError# {0}")]
+    TemplateError(#[from] TemplateError),
     #[error("PutAlert# {0}")]
     PutAlert(#[from] PutAlertError),
 }
@@ -153,6 +157,22 @@ pub enum PutAlertError {
 }
 
 #[derive(ThisError, Debug)]
+pub enum DestinationError {
+    #[error("alert destination template not found")]
+    AlertDestTemplateNotFound,
+    #[error("alert destination in DB has empty template id")]
+    AlertDestEmptyTemplateId,
+    #[error("error converting destination id: {0}")]
+    ConvertingId(String),
+}
+
+#[derive(ThisError, Debug)]
+pub enum TemplateError {
+    #[error("error converting template id: {0}")]
+    ConvertingId(String),
+}
+
+#[derive(ThisError, Debug)]
 pub enum ErrorCodes {
     ServerInternalError(String),
     SearchSQLNotValid(String),
@@ -186,14 +206,21 @@ impl From<PutDashboardError> for Error {
     }
 }
 
+impl From<DestinationError> for Error {
+    fn from(value: DestinationError) -> Self {
+        Error::DbError(value.into())
+    }
+}
+
+impl From<TemplateError> for Error {
+    fn from(value: TemplateError) -> Self {
+        Error::DbError(value.into())
+    }
+}
+
 impl std::fmt::Display for ErrorCodes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            r#"{{"error_code": {}, "error_msg": "{}"}}"#,
-            self.get_code(),
-            self.get_message()
-        )
+        write!(f, "{}", self.to_json())
     }
 }
 

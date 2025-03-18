@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::meta::{
-    pipeline::{components::PipelineSource, Pipeline},
+    pipeline::{Pipeline, components::PipelineSource},
     stream::StreamParams,
 };
 use infra::{
@@ -91,27 +91,11 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>, 
 ///
 /// Used for pipeline execution.
 pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<ExecutablePipeline> {
-    if let Some(exec_pl) = STREAM_EXECUTABLE_PIPELINES.read().await.get(stream_params) {
-        return Some(exec_pl.clone());
-    }
-    match get_by_stream(stream_params).await {
-        Some(pl) if pl.enabled => match ExecutablePipeline::new(&pl).await {
-            Ok(exec_pl) => {
-                let mut stream_exec_pl_cache = STREAM_EXECUTABLE_PIPELINES.write().await;
-                stream_exec_pl_cache.insert(stream_params.to_owned(), exec_pl.clone());
-                drop(stream_exec_pl_cache);
-                Some(exec_pl)
-            }
-            Err(e) => {
-                log::error!(
-                    "[Pipeline]: failed to initialize ExecutablePipeline from Pipeline read from database, {}",
-                    e
-                );
-                None
-            }
-        },
-        _ => None,
-    }
+    STREAM_EXECUTABLE_PIPELINES
+        .read()
+        .await
+        .get(stream_params)
+        .cloned()
 }
 
 /// Returns the pipeline by id.
@@ -212,7 +196,9 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
                 if let Err(e) =
                     o2_enterprise::enterprise::super_cluster::queue::pipelines_delete(&key).await
                 {
-                    log::error!("[Pipeline] error triggering super cluster event to remove pipeline from cache: {e}");
+                    log::error!(
+                        "[Pipeline] error triggering super cluster event to remove pipeline from cache: {e}"
+                    );
                 }
             }
         }
@@ -245,7 +231,9 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
                             )
                             .await
                         {
-                            log::error!("[Pipeline] error triggering super cluster event to add pipeline to cache: {e}");
+                            log::error!(
+                                "[Pipeline] error triggering super cluster event to add pipeline to cache: {e}"
+                            );
                         }
                     }
                 };

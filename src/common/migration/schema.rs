@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,13 @@
 // the changes in executing different migration logic.
 
 use chrono::Utc;
-use config::{meta::dashboards::reports::Report, utils::json};
+use config::{
+    meta::{
+        dashboards::reports::Report,
+        triggers::{Trigger, TriggerModule, TriggerStatus},
+    },
+    utils::json,
+};
 use datafusion::arrow::datatypes::Schema;
 use infra::{
     db::{self as infra_db, NO_NEED_WATCH},
@@ -28,17 +34,14 @@ use infra::{
     scheduler,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_openfga::add_init_ofga_tuples;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::add_init_ofga_tuples;
+use o2_openfga::authorizer::authz::get_ownership_tuple;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::authorizer::authz::get_ownership_tuple;
+use o2_openfga::config::get_config as get_openfga_config;
 
 use crate::{
-    common::{
-        infra::config::VERSION,
-        utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
-    },
+    common::utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
     service::db,
 };
 
@@ -209,14 +212,14 @@ async fn upgrade_trigger() -> Result<(), anyhow::Error> {
         };
         let data: json::Value = json::from_slice(&val).unwrap();
         let data = data.as_object().unwrap();
-        scheduler::push(scheduler::Trigger {
+        scheduler::push(Trigger {
             org: org_id.to_string(),
-            module: scheduler::TriggerModule::Alert,
+            module: TriggerModule::Alert,
             module_key: module_key.to_string(),
             next_run_at: data.get("next_run_at").unwrap().as_i64().unwrap(),
             is_realtime: data.get("is_realtime").unwrap().as_bool().unwrap(),
             is_silenced: data.get("is_silenced").unwrap().as_bool().unwrap(),
-            status: scheduler::TriggerStatus::Waiting,
+            status: TriggerStatus::Waiting,
             ..Default::default()
         })
         .await?;
@@ -232,11 +235,7 @@ async fn upgrade_schema_row_per_version() -> Result<bool, anyhow::Error> {
         std::result::Result::Ok(val) => {
             let val_str = std::str::from_utf8(&val).unwrap();
             let val = val_str.parse::<i64>().unwrap_or(0);
-            if val > 0 {
-                Ok(false)
-            } else {
-                Ok(true)
-            }
+            if val > 0 { Ok(false) } else { Ok(true) }
         }
         Err(_) => Ok(true),
     }
@@ -288,7 +287,7 @@ pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
     if let Err(e) = db
         .put(
             META_MIGRATION_VERSION_KEY,
-            VERSION.to_string().into(),
+            config::VERSION.to_string().into(),
             NO_NEED_WATCH,
             None,
         )
@@ -360,7 +359,7 @@ async fn migrate_report_names() -> Result<(), anyhow::Error> {
         log::info!("[Report:Migration]: Done migrating report: {}", key);
     }
     #[cfg(feature = "enterprise")]
-    if !write_tuples.is_empty() && get_o2_config().openfga.enabled {
+    if !write_tuples.is_empty() && get_openfga_config().enabled {
         add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
@@ -405,7 +404,7 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
         log::info!("[Template:Migration]: Done migrating template: {}", key);
     }
     #[cfg(feature = "enterprise")]
-    if !write_tuples.is_empty() && get_o2_config().openfga.enabled {
+    if !write_tuples.is_empty() && get_openfga_config().enabled {
         add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
@@ -470,7 +469,7 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
         );
     }
     #[cfg(feature = "enterprise")]
-    if !write_tuples.is_empty() && get_o2_config().openfga.enabled {
+    if !write_tuples.is_empty() && get_openfga_config().enabled {
         add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
@@ -561,7 +560,7 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
     }
 
     #[cfg(feature = "enterprise")]
-    if !write_tuples.is_empty() && get_o2_config().openfga.enabled {
+    if !write_tuples.is_empty() && get_openfga_config().enabled {
         add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())

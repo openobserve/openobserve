@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
-use config::{cluster::LOCAL_NODE, meta::cluster::Role};
+use config::cluster::LOCAL_NODE;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
 
 use crate::{
@@ -33,17 +31,18 @@ mod alert_manager;
 #[cfg(feature = "enterprise")]
 mod cipher;
 mod compactor;
+mod file_downloader;
 pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
-mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
 
+pub use file_downloader::queue_background_download;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -77,9 +76,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await;
     }
 
-    if !cfg.common.mmdb_disable_download
-        && matches!(Role::from_str(&cfg.common.node_role), Ok(role) if role != Role::AlertManager)
-    {
+    if !cfg.common.mmdb_disable_download {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
@@ -207,14 +204,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { promql::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
+    tokio::task::spawn(async move { file_downloader::run().await });
 
     // load metrics disk cache
     tokio::task::spawn(async move { crate::service::promql::search::init().await });
     // start pipeline data retention
-    tokio::task::spawn(async move { pipeline::run().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(
+        async move { o2_enterprise::enterprise::pipeline::pipeline_job::run().await },
+    );
 
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::openfga::authorizer::authz::init_open_fga().await;
+    o2_openfga::authorizer::authz::init_open_fga().await;
 
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { cipher::run().await });
@@ -223,7 +224,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // RBAC model
     #[cfg(feature = "enterprise")]
-    if get_o2_config().openfga.enabled {
+    if get_openfga_config().enabled {
         if let Err(e) = crate::common::infra::ofga::init().await {
             log::error!("OFGA init failed: {}", e);
         }

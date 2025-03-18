@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,25 +16,22 @@
 use std::{io::Error, sync::Arc};
 
 use actix_web::{
-    cookie, delete, get,
+    HttpRequest, HttpResponse, cookie, delete, get,
     http::{self},
-    post, put, web, HttpRequest, HttpResponse,
+    post, put, web,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
-    get_config,
+    Config, get_config,
     utils::{base64, json},
-    Config,
 };
 use serde::Serialize;
 use strum::IntoEnumIterator;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::self_reporting::audit,
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, HttpMeta, Protocol},
-        infra::config::get_config as get_o2_config,
-    },
+    o2_dex::config::get_config as get_dex_config,
+    o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol},
 };
 
 use crate::{
@@ -46,7 +43,7 @@ use crate::{
                 UserRequest, UserRole,
             },
         },
-        utils::auth::{generate_presigned_url, UserEmail},
+        utils::auth::{UserEmail, generate_presigned_url},
     },
     service::users,
 };
@@ -253,7 +250,7 @@ pub async fn authentication(
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
-    let native_login_enabled = get_o2_config().dex.native_login_enabled;
+    let native_login_enabled = get_dex_config().native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
 
@@ -287,9 +284,7 @@ pub async fn authentication(
                 if auth_header.is_some() {
                     let auth_header = auth_header.unwrap().to_str().unwrap();
                     if let Some((name, password)) =
-                        o2_enterprise::enterprise::dex::service::auth::get_user_from_token(
-                            auth_header,
-                        )
+                        o2_dex::service::auth::get_user_from_token(auth_header)
                     {
                         SignInUser { name, password }
                     } else {
@@ -315,8 +310,7 @@ pub async fn authentication(
 
     #[cfg(feature = "enterprise")]
     {
-        if get_o2_config().dex.root_only_login
-            && !crate::common::utils::auth::is_root_user(&auth.name)
+        if get_dex_config().root_only_login && !crate::common::utils::auth::is_root_user(&auth.name)
         {
             audit_unauthorized_error(audit_message).await;
             return unauthorized_error(resp);
@@ -513,7 +507,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 return unauthorized_error(resp);
             };
 
-            use o2_enterprise::enterprise::dex::service::auth::get_user_from_token;
+            use o2_dex::service::auth::get_user_from_token;
 
             use crate::handler::http::auth::validator::{
                 validate_user, validate_user_for_query_params,
@@ -679,7 +673,7 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{test, App};
+    use actix_web::{App, test};
     use actix_web_httpauth::headers::authorization::Basic;
 
     use super::*;

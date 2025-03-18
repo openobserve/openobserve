@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -38,10 +38,9 @@ use arrow_schema::{DataType, Schema, SchemaRef};
 use config::{INDEX_SEGMENT_LENGTH, PARQUET_MAX_ROW_GROUP_SIZE};
 use datafusion::{
     common::{
-        project_schema,
+        Column, DataFusionError, Result, project_schema,
         stats::Precision,
         tree_node::{TreeNode, TreeNodeRecursion},
-        Column, DataFusionError, Result,
     },
     datasource::{
         listing::{ListingTableUrl, PartitionedFile},
@@ -50,11 +49,11 @@ use datafusion::{
     logical_expr::{Expr, Volatility},
     parquet::arrow::arrow_reader::{RowSelection, RowSelector},
     physical_plan::{
-        expressions::CastExpr, filter::FilterExec, projection::ProjectionExec, ExecutionPlan,
-        PhysicalExpr,
+        ExecutionPlan, PhysicalExpr, expressions::CastExpr, filter::FilterExec,
+        projection::ProjectionExec,
     },
 };
-use futures::{stream::BoxStream, TryStreamExt};
+use futures::{TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
 use object_store::ObjectStore;
 
@@ -69,7 +68,7 @@ pub fn expr_applicable_for_cols(col_names: &[String], expr: &Expr) -> bool {
     let mut is_applicable = true;
     expr.apply(|expr| {
         match expr {
-            Expr::Column(Column { ref name, .. }) => {
+            Expr::Column(Column { name, .. }) => {
                 is_applicable &= col_names.contains(name);
                 if is_applicable {
                     Ok(TreeNodeRecursion::Jump)
@@ -171,6 +170,7 @@ pub fn split_files(
 }
 
 pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
+    #[allow(deprecated)]
     if config::get_config()
         .common
         .inverted_index_search_format

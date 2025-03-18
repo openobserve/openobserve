@@ -13,11 +13,14 @@ env:
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
   ZO_BASE_URL: http://localhost:5080/
+  ZO_BASE_URL_SC: http://localhost:5080/
+  WS_ZO_BASE_URL: ws://localhost:5080/
+
 
 jobs:
   api_integration_tests:
     name: api_integration_tests
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     steps:
       - name: Remove unused tools
         run: |
@@ -32,7 +35,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2024-10-24
+          toolchain: nightly-2025-03-02
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
@@ -60,7 +63,7 @@ jobs:
           version: '0.27.0'
 
       - name: Start OpenObserve
-        run: target/debug/openobserve &
+        run: ZO_WEBSOCKET_ENABLED=true target/debug/openobserve &
 
       - name: Wait for start
         run: sleep 15
@@ -76,3 +79,13 @@ jobs:
       - name: Run tests
         run: rye run pytest --force-sugar
         working-directory: tests/api-testing/
+
+      - name: Setup websocket client
+        run: pip install websocat
+        working-directory: 'tests/api-testing/'
+           
+      - name: Run websocket tests
+        run: echo "Skipping websocket tests for now"
+        working-directory: 'tests/api-testing/'
+        
+

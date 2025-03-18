@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding-bottom: 30px">
+  <div
+    v-if="dashboardPanelData.data.type == 'custom_chart'"
+    style="padding-bottom: 30px"
+  >
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm" style="font-weight: 600">
         {{ t("dashboard.description") }}
@@ -29,6 +32,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-description"
       />
     </div>
+  </div>
+  <div v-else style="padding-bottom: 30px">
+    <div class="" style="max-width: 300px">
+      <div class="q-mb-sm" style="font-weight: 600">
+        {{ t("dashboard.description") }}
+      </div>
+      <q-input
+        outlined
+        v-model="dashboardPanelData.data.description"
+        filled
+        autogrow
+        class="showLabelOnTop"
+        data-test="dashboard-config-description"
+      />
+    </div>
+
+    <div class="space"></div>
+
+    <q-input
+      v-if="promqlMode"
+      v-model="dashboardPanelData.data.config.step_value"
+      :value="0"
+      :min="0"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-sm showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      placeholder="Default: 0"
+      data-test="dashboard-config-step-value"
+    >
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">
+          Step Value
+          <div>
+            <q-icon
+              class="q-ml-xs"
+              size="20px"
+              name="info"
+              data-test="dashboard-config-top_results-info"
+            />
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              <b>Step - </b>
+              The interval between datapoints, which must be returned from the
+              range query.
+              <br />
+              Eg: 10s, 1h
+            </q-tooltip>
+          </div>
+        </div>
+      </template>
+    </q-input>
 
     <div class="space"></div>
 
@@ -812,7 +875,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="
           ['area', 'line', 'area-stacked', 'bar', 'stacked'].includes(
             dashboardPanelData.data.type,
-          )
+          ) && !promqlMode
         "
         v-model="dashboardPanelData.data.config.no_value_replacement"
         label="No Value Replacement"
@@ -1016,6 +1079,108 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-axis-border"
       />
 
+      <div class="space"></div>
+
+      <div
+        style="width: 100%; display: flex; gap: 16px"
+        v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+      >
+        <q-input
+          v-model.number="dashboardPanelData.data.config.y_axis_min"
+          color="input-border"
+          bg-color="input-bg"
+          style="width: 50%"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="Auto"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelData.data.config.y_axis_min =
+                value !== '' ? value : null)
+          "
+          data-test="dashboard-config-y_axis_min"
+          ><template v-slot:label>
+            <div class="row items-center all-pointer-events">
+              {{ t("common.yAxisMin") }}
+              <div>
+                <q-icon
+                  class="q-ml-xs"
+                  size="20px"
+                  name="info"
+                  data-test="dashboard-config-y_axis_min-info"
+                />
+                <q-tooltip
+                  class="bg-grey-8"
+                  anchor="top middle"
+                  self="bottom middle"
+                >
+                  Set the minimum value for the Y-axis.
+                  <br />
+                  This determines the lowest point displayed on the chart.
+                </q-tooltip>
+              </div>
+            </div>
+          </template>
+        </q-input>
+        <q-input
+          v-model.number="dashboardPanelData.data.config.y_axis_max"
+          color="input-border"
+          bg-color="input-bg"
+          style="width: 50%"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="Auto"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelData.data.config.y_axis_max =
+                value !== '' ? value : null)
+          "
+          data-test="dashboard-config-y_axis_max"
+          ><template v-slot:label>
+            <div class="row items-center all-pointer-events">
+              {{ t("common.yAxisMax") }}
+              <div>
+                <q-icon
+                  class="q-ml-xs"
+                  size="20px"
+                  name="info"
+                  data-test="dashboard-config-y_axis_max-info"
+                />
+                <q-tooltip
+                  class="bg-grey-8"
+                  anchor="top middle"
+                  self="bottom middle"
+                >
+                  Set the maximum value for the Y-axis.
+                  <br />
+                  This determines the highest point displayed on the chart.
+                </q-tooltip>
+              </div>
+            </div>
+          </template>
+        </q-input>
+      </div>
       <div class="space"></div>
 
       <q-select
@@ -1461,8 +1626,9 @@ export default defineComponent({
       }
 
       // by default, set show_symbol as false
-      if (!dashboardPanelData.data.config.show_symbol) {
-        dashboardPanelData.data.config.show_symbol = false;
+      if (dashboardPanelData.data.config.show_symbol === undefined) {
+        const isNewPanel = !dashboardPanelData.data.id;
+        dashboardPanelData.data.config.show_symbol = isNewPanel;
       }
 
       // by default, set line interpolation as smooth
@@ -1473,6 +1639,11 @@ export default defineComponent({
       // Initialize map_type configuration
       if (!dashboardPanelData.data.config.map_type) {
         dashboardPanelData.data.config.map_type = { type: "world" };
+      }
+
+      // If no step value is set, set it to 0
+      if (!dashboardPanelData.data.config.step_value) {
+        dashboardPanelData.data.config.step_value = "0";
       }
     });
 

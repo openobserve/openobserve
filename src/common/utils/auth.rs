@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,17 +17,18 @@ use std::fmt::Debug;
 #[cfg(feature = "enterprise")]
 use std::fmt::Display;
 
+
 #[cfg(feature = "enterprise")]
 use actix_http::Method;
-use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
-use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+use actix_web::{Error, FromRequest, HttpRequest, dev::Payload};
+use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString};
 use base64::Engine;
 use config::utils::json;
-use futures::future::{ready, Ready};
+use futures::future::{Ready, ready};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_openfga::config::get_config as get_openfga_config;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+use o2_openfga::meta::mapping::OFGA_MODELS;
 use once_cell::sync::Lazy;
 use regex::Regex;
 #[cfg(feature = "enterprise")]
@@ -106,7 +107,7 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 pub fn get_role(role: UserRole) -> UserRole {
     use std::str::FromStr;
 
-    let role = o2_enterprise::enterprise::openfga::authorizer::roles::get_role(format!("{role}"));
+    let role = o2_openfga::authorizer::roles::get_role(format!("{role}"));
     UserRole::from_str(&role).unwrap()
 }
 
@@ -117,8 +118,8 @@ pub fn get_role(_role: UserRole) -> UserRole {
 
 #[cfg(feature = "enterprise")]
 pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    if get_o2_config().openfga.enabled {
-        use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
+    if get_openfga_config().enabled {
+        use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
 
         let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
 
@@ -153,8 +154,8 @@ pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
 #[cfg(feature = "enterprise")]
 pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    if get_o2_config().openfga.enabled {
-        use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
+    if get_openfga_config().enabled {
+        use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
         let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
 
         let parent_type = if obj.parent_type.is_empty() {
@@ -530,13 +531,10 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(feature = "enterprise")]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let start = std::time::Instant::now();
-
-        use std::collections::HashMap;
-
         use actix_web::web;
         use config::meta::stream::StreamType;
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+        use hashbrown::HashMap;
+        use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::utils::http::{get_folder, get_stream_type_from_request};
 
@@ -546,11 +544,9 @@ impl FromRequest for AuthExtractor {
             return ready(Ok(auth));
         }
 
+        let start = std::time::Instant::now();
         let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-        let stream_type = match get_stream_type_from_request(&query) {
-            Ok(v) => v,
-            Err(_) => Some(StreamType::Logs),
-        };
+        let stream_type = get_stream_type_from_request(&query);
 
         let folder = get_folder(&query);
 
@@ -702,6 +698,7 @@ impl FromRequest for AuthExtractor {
                 )
             } else if method.eq("GET")
                 && (path_columns[1].starts_with("dashboards")
+                    || path_columns[1].starts_with("folders")
                     || path_columns[1].starts_with("actions"))
             {
                 format!(
@@ -738,7 +735,7 @@ impl FromRequest for AuthExtractor {
             } else if method.eq("PUT")
                 && path_columns[1] != "streams"
                 && path_columns[1] != "pipelines"
-                || method.eq("DELETE")
+                || method.eq("DELETE") && path_columns[3] != "annotations"
             {
                 // for put on on-stream, non-pipeline such as specific alert/template/destination
                 // or delete on any such (stream/pipeline delete are not 4-part routes)
@@ -772,6 +769,19 @@ impl FromRequest for AuthExtractor {
                     OFGA_MODELS
                         .get(path_columns[1])
                         .map_or(path_columns[1], |model| model.key),
+                    path_columns[3]
+                )
+            } else if method.eq("GET")
+                && (path_columns[2].eq("templates")
+                    || path_columns[2].eq("destinations")
+                    || path_columns[2].eq("alerts"))
+            {
+                // To access templates, you need GET permission on the template
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
                     path_columns[3]
                 )
             } else {

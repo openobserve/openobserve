@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,29 +18,28 @@ mod tests {
     use core::time;
     use std::{env, fs, net::SocketAddr, str, sync::Once, thread};
 
-    use actix_web::{http::header::ContentType, test, web, App};
+    use actix_web::{App, http::header::ContentType, test, web};
     use arrow_flight::flight_service_server::FlightServiceServer;
     use bytes::{Bytes, BytesMut};
     use chrono::{Duration, Utc};
     use config::{
         get_config,
         meta::{
-            alerts::{
-                alert::Alert,
-                destinations::{Destination, DestinationType},
-                Operator, QueryCondition, TriggerCondition,
-            },
-            dashboards::{v1, Dashboard},
+            alerts::{Operator, QueryCondition, TriggerCondition, alert::Alert},
+            dashboards::{Dashboard, v1},
+            triggers::Trigger,
         },
         utils::json,
     };
-    use infra::scheduler::Trigger;
     use openobserve::{
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
-            http::router::*,
+            http::{
+                models::destinations::{Destination, DestinationType},
+                router::*,
+            },
         },
-        service::{alerts::scheduler::handle_triggers, search::SEARCH_SERVER},
+        service::{alerts::scheduler::handlers::handle_triggers, search::SEARCH_SERVER},
     };
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
@@ -49,7 +48,7 @@ mod tests {
     static START: Once = Once::new();
 
     fn setup() -> (&'static str, &'static str) {
-        START.call_once(|| {
+        START.call_once(|| unsafe {
             env::set_var("ZO_ROOT_USER_EMAIL", "root@example.com");
             env::set_var("ZO_ROOT_USER_PASSWORD", "Complexpass#123");
             env::set_var("ZO_LOCAL_MODE", "true");
@@ -1559,9 +1558,11 @@ mod tests {
         // Optionally, deserialize and check the response body
         let body = test::read_body(resp).await;
         let destinations: Vec<Destination> = serde_json::from_slice(&body).unwrap();
-        assert!(destinations
-            .iter()
-            .any(|d| d.destination_type == DestinationType::Sns));
+        assert!(
+            destinations
+                .iter()
+                .any(|d| d.destination_type == DestinationType::Sns)
+        );
     }
 
     async fn e2e_update_sns_alert_destination() {
@@ -1737,7 +1738,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alert_multi_range",
         )
         .await;
@@ -1769,7 +1770,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alert_multi_range",
         )
         .await;
@@ -1826,7 +1827,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alertChk",
         )
         .await;
@@ -1867,25 +1868,26 @@ mod tests {
                 .unwrap();
         let trigger = Trigger {
             org: "e2e".to_string(),
-            module: infra::scheduler::TriggerModule::Alert,
+            module: config::meta::triggers::TriggerModule::Alert,
             module_key: "logs/olympics_schema/alertChk".to_string(),
             start_time: Some(now),
             end_time: Some(mins_3_later),
             next_run_at: now,
             is_realtime: false,
             is_silenced: false,
-            status: infra::scheduler::TriggerStatus::Processing,
+            status: config::meta::triggers::TriggerStatus::Processing,
             retries: 2,
             data: "{}".to_string(),
         };
 
-        let res = handle_triggers(trigger).await;
+        let trace_id = "test_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
         // This alert has an invalid destination
         assert!(res.is_ok());
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alertChk",
         )
         .await;
@@ -1903,25 +1905,26 @@ mod tests {
                 .unwrap();
         let trigger = Trigger {
             org: "e2e".to_string(),
-            module: infra::scheduler::TriggerModule::Alert,
+            module: config::meta::triggers::TriggerModule::Alert,
             module_key: "logs/olympics_schema/alertChk".to_string(),
             start_time: Some(now),
             end_time: Some(mins_3_later),
             next_run_at: now,
             is_realtime: false,
             is_silenced: false,
-            status: infra::scheduler::TriggerStatus::Processing,
+            status: config::meta::triggers::TriggerStatus::Processing,
             retries: 3,
             data: "{}".to_string(),
         };
 
-        let res = handle_triggers(trigger).await;
+        let trace_id = "test_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
         // This alert has an invalid destination
         assert!(res.is_ok());
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alertChk",
         )
         .await;
@@ -1931,29 +1934,27 @@ mod tests {
     }
 
     async fn e2e_handle_alert_after_evaluation_retries() {
-        let alert = Alert {
-            name: "test_alert_wrong_sql".to_string(),
-            stream_type: "logs".into(),
-            stream_name: "olympics_schema".to_string(),
-            is_real_time: false,
-            enabled: true,
-            query_condition: QueryCondition {
-                query_type: "sql".into(),
-                conditions: None,
-                sql: Some("SELEC country FROM \"olympics_schema\"".to_string()),
-                ..Default::default()
-            },
-            trigger_condition: TriggerCondition {
-                period: 60,
-                threshold: 1,
-                silence: 0,
-                frequency: 3600,
-                operator: Operator::GreaterThanEquals,
-                ..Default::default()
-            },
-            destinations: vec!["slack".to_string()],
+        let mut alert: Alert = Default::default();
+        alert.name = "test_alert_wrong_sql".to_string();
+        alert.stream_type = "logs".into();
+        alert.stream_name = "olympics_schema".to_string();
+        alert.is_real_time = false;
+        alert.enabled = true;
+        alert.query_condition = QueryCondition {
+            query_type: "sql".into(),
+            conditions: None,
+            sql: Some("SELEC country FROM \"olympics_schema\"".to_string()),
             ..Default::default()
         };
+        alert.trigger_condition = TriggerCondition {
+            period: 60,
+            threshold: 1,
+            silence: 0,
+            frequency: 3600,
+            operator: Operator::GreaterThanEquals,
+            ..Default::default()
+        };
+        alert.destinations = vec!["slack".to_string()];
 
         let res = openobserve::service::db::alerts::alert::set(
             "e2e",
@@ -1973,25 +1974,26 @@ mod tests {
                 .unwrap();
         let trigger = Trigger {
             org: "e2e".to_string(),
-            module: infra::scheduler::TriggerModule::Alert,
+            module: config::meta::triggers::TriggerModule::Alert,
             module_key: "logs/olympics_schema/test_alert_wrong_sql".to_string(),
             start_time: Some(now),
             end_time: Some(mins_3_later),
             next_run_at: now,
             is_realtime: false,
             is_silenced: false,
-            status: infra::scheduler::TriggerStatus::Processing,
+            status: config::meta::triggers::TriggerStatus::Processing,
             retries: 2,
             data: "{}".to_string(),
         };
 
-        let res = handle_triggers(trigger).await;
+        let trace_id = "test_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
         // In case of alert evaluation errors, this error is returned
         assert!(res.is_err());
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/test_alert_wrong_sql",
         )
         .await;
@@ -2035,7 +2037,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alertChk",
         )
         .await;

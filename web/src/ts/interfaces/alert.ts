@@ -89,7 +89,7 @@ export interface Destination {
   headers: Headers;
   template: string | Template;
   emails: string;
-  type: "http" | "email" | "external_destination" | "remote_pipeline";
+  type: "http" | "email" | "sns";
 }
 
 export interface DestinationPayload {
@@ -100,7 +100,7 @@ export interface DestinationPayload {
   headers: Headers;
   template: string | Template;
   emails: string[];
-  type: "http" | "email" | "external_destination" | "remote_pipeline";
+  type: "http" | "email" | "sns";
 }
 
 // Destination object which is modified in frontend to display in table and form

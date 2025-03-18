@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,9 +16,9 @@
 use std::io::{Error, ErrorKind};
 
 use actix_web::{
-    delete, get,
+    HttpRequest, HttpResponse, delete, get,
     http::{self},
-    post, put, web, HttpRequest, HttpResponse,
+    post, put, web,
 };
 use config::utils::rand::generate_random_string;
 use hashbrown::HashMap;

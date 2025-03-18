@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,20 +18,19 @@ use std::{
     net::SocketAddr,
 };
 
-use actix_web::{http, HttpResponse};
+use actix_web::{HttpResponse, http};
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
-use syslog_loose::{Message, ProcId, Protocol};
+use syslog_loose::{Message, ProcId, Protocol, Variant};
 
 use super::{
     bulk::TS_PARSE_FAILED, ingest::handle_timestamp, ingestion_log_enabled, log_failed_record,
@@ -121,7 +120,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let mut json_data_by_stream = HashMap::new();
 
     // parse msg to json::Value
-    let parsed_msg = syslog_loose::parse_message(msg);
+    let parsed_msg = syslog_loose::parse_message(msg, Variant::Either);
     let mut value = message_to_value(parsed_msg);
 
     // store a copy of original data before it's modified, when
@@ -143,24 +142,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     };
 
     if executable_pipeline.is_some() {
-        // handle record's timestamp fist in case record is sent to remote destination
-        if let Err(e) = handle_timestamp(&mut value, min_ts) {
-            stream_status.status.failed += 1;
-            stream_status.status.error = e.to_string();
-            metrics::INGEST_ERRORS
-                .with_label_values(&[
-                    org_id,
-                    StreamType::Logs.as_str(),
-                    &stream_name,
-                    TS_PARSE_FAILED,
-                ])
-                .inc();
-            log_failed_record(log_ingestion_errors, &value, &stream_status.status.error);
-            return Ok(HttpResponse::Ok().json(IngestionResponse::new(
-                http::StatusCode::OK.into(),
-                vec![stream_status],
-            ))); // just return
-        };
         // buffer the records and originals for pipeline batch processing
         pipeline_inputs.push(value);
         original_options.push(original_data);
@@ -227,7 +208,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     // batch process records through pipeline
     if let Some(exec_pl) = &executable_pipeline {
         let records_count = pipeline_inputs.len();
-        match exec_pl.process_batch(org_id, pipeline_inputs).await {
+        match exec_pl
+            .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+            .await
+        {
             Err(e) => {
                 log::error!(
                     "[Pipeline] for stream {}/{}: Batch execution error: {}.",
@@ -254,6 +238,29 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                     }
 
                     for (idx, mut res) in stream_pl_results {
+                        // handle timestamp
+                        if let Err(e) = handle_timestamp(&mut res, min_ts) {
+                            stream_status.status.failed += 1;
+                            stream_status.status.error = e.to_string();
+                            metrics::INGEST_ERRORS
+                                .with_label_values(&[
+                                    org_id,
+                                    StreamType::Logs.as_str(),
+                                    &stream_name,
+                                    TS_PARSE_FAILED,
+                                ])
+                                .inc();
+                            log_failed_record(
+                                log_ingestion_errors,
+                                &res,
+                                &stream_status.status.error,
+                            );
+                            return Ok(HttpResponse::Ok().json(IngestionResponse::new(
+                                http::StatusCode::OK.into(),
+                                vec![stream_status],
+                            ))); // just return
+                        };
+
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(val) => val,
@@ -286,9 +293,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                         }
 
                         // handle timestamp
-                        let Some(timestamp) = local_val
-                            .get(&cfg.common.column_timestamp)
-                            .and_then(|ts| ts.as_i64())
+                        let Some(timestamp) =
+                            local_val.get(TIMESTAMP_COL_NAME).and_then(|ts| ts.as_i64())
                         else {
                             let err = "record _timestamp inserted before pipeline processing, but missing after pipeline processing";
                             stream_status.status.failed += 1;
@@ -365,8 +371,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             "/api/org/ingest/logs/_syslog",
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.as_str(),
+            "",
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -374,8 +381,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             "/api/org/ingest/logs/_syslog",
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.as_str(),
+            "",
+            "",
         ])
         .inc();
 

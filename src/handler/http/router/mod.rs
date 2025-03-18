@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,13 +17,15 @@ use std::{rc::Rc, str::FromStr};
 
 use actix_cors::Cors;
 use actix_web::{
+    HttpRequest, HttpResponse,
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
+    get,
     http::header,
-    middleware, web, HttpRequest, HttpResponse,
+    middleware, web,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
-use actix_web_lab::middleware::{from_fn, Next};
+use actix_web_lab::middleware::{Next, from_fn};
 use config::get_config;
 use futures::FutureExt;
 use utoipa::OpenApi;
@@ -32,8 +34,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use {
     crate::{common::meta::ingestion::INGESTION_EP, service::self_reporting::audit},
     actix_http::h1::Payload,
-    actix_web::{web::BytesMut, HttpMessage},
-    base64::{engine::general_purpose, Engine as _},
+    actix_web::{HttpMessage, web::BytesMut},
+    base64::{Engine as _, engine::general_purpose},
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, HttpMeta, Protocol},
@@ -50,7 +52,9 @@ pub mod ui;
 
 pub fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
-        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
+        .allowed_methods(vec![
+            "HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE", "PATCH",
+        ])
         .allowed_headers(vec![
             header::AUTHORIZATION,
             header::ACCEPT,
@@ -143,6 +147,21 @@ async fn audit_middleware(
     next.call(req).await
 }
 
+#[get("/metrics")]
+async fn get_metrics() -> Result<HttpResponse, actix_web::Error> {
+    let body = if config::get_config().common.prometheus_enabled {
+        config::metrics::gather()
+    } else {
+        "".to_string()
+    };
+    let mut resp = HttpResponse::Ok().body(body);
+    resp.headers_mut().insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"),
+    );
+    Ok(resp)
+}
+
 /// This is a very trivial proxy to overcome the cors errors while
 /// session-replay in rrweb.
 pub fn get_proxy_routes(svc: &mut web::ServiceConfig) {
@@ -216,7 +235,9 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .wrap(cors.clone())
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node),
+            .service(status::flush_node)
+            .service(status::list_node)
+            .service(status::node_metrics),
     );
 
     if get_config().common.swagger_enabled {
@@ -320,8 +341,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
             super::auth::validator::oo_validator,
         ))
         .wrap(cors.clone())
-        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-        .wrap(from_fn(middlewares::check_keep_alive))
         .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
         .service(users::list)
         .service(users::save)
@@ -341,6 +360,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::org::create_user_rumtoken)
         .service(organization::org::get_user_rumtoken)
         .service(organization::org::update_user_rumtoken)
+        .service(organization::org::node_list)
         .service(organization::es::org_index)
         .service(organization::es::org_license)
         .service(organization::es::org_xpack)
@@ -384,7 +404,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(enrichment_table::save_enrichment_table)
         .service(search::search)
         .service(search::search_partition)
-        .service(search::around)
+        .service(search::around_v1)
+        .service(search::around_v2)
         .service(search::values)
         .service(search::search_history)
         .service(search::saved_view::create_view)
@@ -404,6 +425,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::get_dashboard)
         .service(dashboards::delete_dashboard)
         .service(dashboards::move_dashboard)
+        .service(dashboards::move_dashboards)
         .service(dashboards::reports::create_report)
         .service(dashboards::reports::update_report)
         .service(dashboards::reports::get_report)
@@ -411,6 +433,11 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::reports::delete_report)
         .service(dashboards::reports::enable_report)
         .service(dashboards::reports::trigger_report)
+        .service(dashboards::timed_annotations::create_annotations)
+        .service(dashboards::timed_annotations::get_annotations)
+        .service(dashboards::timed_annotations::delete_annotations)
+        .service(dashboards::timed_annotations::update_annotations)
+        .service(dashboards::timed_annotations::delete_annotation_panels)
         .service(folders::create_folder)
         .service(folders::list_folders)
         .service(folders::update_folder)
@@ -511,21 +538,21 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(search::search_job::cancel_job)
         .service(search::search_job::delete_job)
         .service(search::search_job::retry_job)
-        .service(search::job::cancel_multiple_query)
-        .service(search::job::cancel_query)
-        .service(search::job::query_status)
+        .service(search::query_manager::query_status)
+        .service(search::query_manager::cancel_multiple_query)
+        .service(search::query_manager::cancel_query)
         .service(keys::get)
         .service(keys::delete)
         .service(keys::save)
         .service(keys::list)
         .service(keys::update)
-        .service(search::job::query_status)
         .service(actions::action::get_action_from_id)
         .service(actions::action::list_actions)
         .service(actions::action::upload_zipped_action)
         .service(actions::action::update_action_details)
         .service(actions::action::serve_action_zip)
-        .service(actions::action::delete_action);
+        .service(actions::action::delete_action)
+        .service(actions::operations::test_action);
 
     svc.service(service);
 }
@@ -569,8 +596,8 @@ pub fn get_other_service_routes(svc: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use actix_web::{
-        test::{call_service, init_service, TestRequest},
         App,
+        test::{TestRequest, call_service, init_service},
     };
 
     use super::*;

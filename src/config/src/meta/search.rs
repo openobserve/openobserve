@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -12,8 +12,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-use std::str::FromStr;
 
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -42,7 +40,7 @@ pub struct Session {
     pub target_partitions: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct Request {
     #[schema(value_type = SearchQuery)]
@@ -63,7 +61,10 @@ pub struct Request {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub use_cache: Option<bool>, // used for search job,
+    pub use_cache: Option<bool>, // used for search job
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_mode: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -106,8 +107,6 @@ pub struct Query {
     #[serde(default)]
     pub end_time: i64,
     #[serde(default)]
-    pub sort_by: Option<String>,
-    #[serde(default)]
     pub quick_mode: bool,
     #[serde(default)]
     pub query_type: String,
@@ -117,6 +116,8 @@ pub struct Query {
     pub uses_zo_fn: bool,
     #[serde(default)]
     pub query_fn: Option<String>,
+    #[serde(default)]
+    pub action_id: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
     // streaming output
@@ -138,12 +139,12 @@ impl Default for Query {
             size: 10,
             start_time: 0,
             end_time: 0,
-            sort_by: None,
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
@@ -482,7 +483,7 @@ impl SearchHistoryRequest {
         Ok(query)
     }
 
-    pub fn to_query_req(&self, search_stream_name: &str, sort_by: &str) -> Result<Request, String> {
+    pub fn to_query_req(&self, search_stream_name: &str) -> Result<Request, String> {
         let sql = self.build_query(search_stream_name)?;
 
         let search_req = Request {
@@ -492,12 +493,12 @@ impl SearchHistoryRequest {
                 size: self.size,
                 start_time: self.start_time,
                 end_time: self.end_time,
-                sort_by: Some(format!("{} DESC", sort_by)),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: false,
                 query_fn: None,
+                action_id: None,
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,
@@ -509,6 +510,7 @@ impl SearchHistoryRequest {
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
             use_cache: None,
+            local_mode: None,
         };
         Ok(search_req)
     }
@@ -694,10 +696,10 @@ impl From<Query> for cluster_rpc::SearchQuery {
             size: query.size as i32,
             start_time: query.start_time,
             end_time: query.end_time,
-            sort_by: query.sort_by.unwrap_or_default(),
             track_total_hits: query.track_total_hits,
             uses_zo_fn: query.uses_zo_fn,
             query_fn: query.query_fn.unwrap_or_default(),
+            action_id: query.action_id.unwrap_or_default(),
             skip_wal: query.skip_wal,
         }
     }
@@ -767,7 +769,7 @@ impl<'de> Deserialize<'de> for SearchEventType {
             where
                 E: serde::de::Error,
             {
-                SearchEventType::from_str(value).map_err(serde::de::Error::custom)
+                SearchEventType::try_from(value).map_err(serde::de::Error::custom)
             }
         }
 
@@ -791,9 +793,9 @@ impl std::fmt::Display for SearchEventType {
     }
 }
 
-impl FromStr for SearchEventType {
-    type Err = String;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+impl TryFrom<&str> for SearchEventType {
+    type Error = String;
+    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
         let s = s.to_lowercase();
         match s.as_str() {
             "ui" => Ok(SearchEventType::UI),
@@ -1023,12 +1025,12 @@ impl MultiStreamRequest {
                     size: self.size,
                     start_time: query.start_time.unwrap_or(self.start_time),
                     end_time: query.end_time.unwrap_or(self.end_time),
-                    sort_by: self.sort_by.clone(),
                     quick_mode: self.quick_mode,
                     query_type: self.query_type.clone(),
                     track_total_hits: self.track_total_hits,
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn,
+                    action_id: None,
                     skip_wal: self.skip_wal,
                     streaming_output: false,
                     streaming_id: None,
@@ -1040,6 +1042,7 @@ impl MultiStreamRequest {
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
                 use_cache: None,
+                local_mode: None,
             });
         }
         res

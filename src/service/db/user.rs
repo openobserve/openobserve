@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,14 +22,21 @@ use crate::{
     common::{
         infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
         meta::user::{DBUser, User, UserOrg, UserRole},
+        utils::auth::is_root_user,
     },
     service::db,
 };
 
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
-    let user = match org_id {
-        None => ROOT_USER.get("root"),
-        Some(org_id) => USERS.get(&format!("{org_id}/{name}")),
+    // Do not rely on the org_id to check if the user is root. If the user is root,
+    // Just return the root user.
+    let user = if is_root_user(name) {
+        ROOT_USER.get("root")
+    } else {
+        match org_id {
+            None => ROOT_USER.get("root"),
+            Some(org_id) => USERS.get(&format!("{org_id}/{name}")),
+        }
     };
 
     if let Some(user) = user {
@@ -161,24 +168,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
 
-                let item_value: DBUser = if config::get_config().common.meta_store_external {
-                    match db::get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error getting value: {}", e);
-                                continue;
-                            }
-                        },
+                let item_value: DBUser = match db::get(&ev.key).await {
+                    Ok(val) => match json::from_slice(&val) {
+                        Ok(val) => val,
                         Err(e) => {
                             log::error!("Error getting value: {}", e);
                             continue;
                         }
+                    },
+                    Err(e) => {
+                        log::error!("Error getting value: {}", e);
+                        continue;
                     }
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
                 };
-
                 let users = item_value.get_all_users();
                 // Invalidate the entire RUM-TOKEN-CACHE
                 for (_, user) in USERS.clone() {

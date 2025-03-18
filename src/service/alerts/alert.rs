@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,14 +21,16 @@ use std::{
 use async_trait::async_trait;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
-    get_config,
+    SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::{
+            FrequencyType, Operator, QueryType, TriggerEvalResults,
             alert::{Alert, AlertListFilter, ListAlertsParams},
-            destinations::{DestinationType, DestinationWithTemplate, HTTPType},
-            FrequencyType, Operator, QueryType,
         },
-        folder::{Folder, FolderType, DEFAULT_FOLDER},
+        destinations::{
+            AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateType,
+        },
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -37,12 +39,11 @@ use config::{
         base64,
         json::{Map, Value},
     },
-    SMTP_CLIENT,
 };
 use cron::Schedule;
 use infra::{schema::unwrap_stream_settings, table};
 use itertools::Itertools;
-use lettre::{message::MultiPart, AsyncTransport, Message};
+use lettre::{AsyncTransport, Message, message::MultiPart};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
@@ -52,7 +53,7 @@ use crate::{
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::{
-        alerts::{build_sql, destinations, QueryConditionExt},
+        alerts::{QueryConditionExt, build_sql, destinations},
         db, folders,
         search::sql::RE_ONLY_SELECT,
         short_url,
@@ -126,9 +127,11 @@ pub enum AlertError {
     SendNotificationError { error_message: String },
 
     #[error(transparent)]
-    GetDestinationWithTemplateError(anyhow::Error),
+    GetDestinationWithTemplateError(#[from] db::alerts::destinations::DestinationError),
 
-    #[error("Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\"")]
+    #[error(
+        "Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\""
+    )]
     PeriodExceedsMaxQueryRange {
         max_query_range_hours: i64,
         stream_name: String,
@@ -149,7 +152,7 @@ pub enum AlertError {
 
     /// Not support save destination remote pipeline for alert so far
     #[error("Not support save destination {0} type for alert so far")]
-    NotSupportedAlertDestinationType(DestinationType),
+    NotSupportedAlertDestinationType(Module),
 }
 
 pub async fn save(
@@ -219,8 +222,8 @@ async fn prepare_alert(
             if create {
                 return Err(AlertError::CreateAlreadyExists);
             }
-            alert.last_triggered_at = old_alert.last_triggered_at;
-            alert.last_satisfied_at = old_alert.last_satisfied_at;
+            alert.set_last_triggered_at(old_alert.get_last_triggered_at_from_table());
+            alert.set_last_satisfied_at(old_alert.get_last_satisfied_at_from_table());
             alert.owner = old_alert.owner;
         }
         Ok(None) => {
@@ -234,17 +237,8 @@ async fn prepare_alert(
     }
 
     if alert.trigger_condition.frequency_type == FrequencyType::Cron {
-        let cron_exp = alert.trigger_condition.cron.clone();
-        if cron_exp.starts_with("* ") {
-            let (_, rest) = cron_exp.split_once(" ").unwrap();
-            let now = Utc::now().second().to_string();
-            alert.trigger_condition.cron = format!("{now} {rest}");
-            log::debug!(
-                "New cron expression for alert {}: {}",
-                alert.name,
-                alert.trigger_condition.cron
-            );
-        }
+        let now = Utc::now().second();
+        alert.trigger_condition.cron = update_cron_expression(&alert.trigger_condition.cron, now);
         // Check the cron expression
         Schedule::from_str(&alert.trigger_condition.cron).map_err(AlertError::ParseCron)?;
     } else if alert.trigger_condition.frequency == 0 {
@@ -265,7 +259,7 @@ async fn prepare_alert(
             Ok(vrl) => {
                 let vrl = vrl.trim().to_owned();
                 if !vrl.is_empty() && !vrl.ends_with('.') {
-                    let vrl = base64::encode_url(&format!("{vrl} \n ."));
+                    let vrl = base64::encode_url(&format!("{vrl}\n."));
                     alert.query_condition.vrl_function = Some(vrl);
                 } else if vrl.is_empty() || vrl.eq(".") {
                     // In case the vrl contains only ".", no need to save it
@@ -285,10 +279,8 @@ async fn prepare_alert(
     for dest in alert.destinations.iter() {
         match db::alerts::destinations::get(org_id, dest).await {
             Ok(d) => {
-                if d.is_remote_pipeline() {
-                    return Err(AlertError::NotSupportedAlertDestinationType(
-                        d.destination_type,
-                    ));
+                if !d.is_alert_destinations() {
+                    return Err(AlertError::NotSupportedAlertDestinationType(d.module));
                 }
             }
             Err(_) => {
@@ -405,6 +397,16 @@ async fn prepare_alert(
     // }
 
     Ok(())
+}
+
+pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
+    let mut cron_exp = cron_exp.trim().to_owned();
+    if cron_exp.starts_with("*") {
+        let (_, rest) = cron_exp.split_once("*").unwrap();
+        let rest = rest.trim();
+        cron_exp = format!("{now} {rest}");
+    }
+    cron_exp
 }
 
 /// Creates a new alert in the specified folder.
@@ -679,7 +681,7 @@ pub trait AlertExt: Sync + Send + 'static {
         &self,
         row: Option<&Map<String, Value>>,
         (start_time, end_time): (Option<i64>, i64),
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 
     /// Returns a tuple containing a boolean - if all the send notification jobs successfully
     /// and the error message if any
@@ -698,7 +700,7 @@ impl AlertExt for Alert {
         &self,
         row: Option<&Map<String, Value>>,
         (start_time, end_time): (Option<i64>, i64),
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
@@ -731,12 +733,19 @@ impl AlertExt for Alert {
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
         for dest in self.destinations.iter() {
-            let dest = destinations::get_with_template(&self.org_id, dest)
-                .await
-                .map_err(AlertError::GetDestinationWithTemplateError)?;
+            let (dest, template) = destinations::get_with_template(&self.org_id, dest).await?;
+            let Module::Alert {
+                destination_type, ..
+            } = dest.module
+            else {
+                return Err(AlertError::GetDestinationWithTemplateError(
+                    db::alerts::destinations::DestinationError::UnsupportedType,
+                ));
+            };
             match send_notification(
                 self,
-                &dest,
+                &destination_type,
+                &template,
                 rows,
                 rows_end_time,
                 start_time,
@@ -778,7 +787,8 @@ impl AlertExt for Alert {
 
 async fn send_notification(
     alert: &Alert,
-    dest: &DestinationWithTemplate,
+    dest_type: &DestinationType,
+    template: &Template,
     rows: &[Map<String, Value>],
     rows_end_time: i64,
     start_time: Option<i64>,
@@ -789,9 +799,9 @@ async fn send_notification(
     } else {
         process_row_template(&alert.row_template, alert, rows)
     };
-    let is_email = dest.destination_type == DestinationType::Email;
+    let is_email = matches!(dest_type, DestinationType::Email(_));
     let msg: String = process_dest_template(
-        &dest.template.body,
+        &template.body,
         alert,
         rows,
         &rows_tpl_val,
@@ -804,9 +814,9 @@ async fn send_notification(
     )
     .await;
 
-    let email_subject = if !dest.template.title.is_empty() {
+    let email_subject = if let TemplateType::Email { title } = &template.template_type {
         process_dest_template(
-            &dest.template.title,
+            title,
             alert,
             rows,
             &rows_tpl_val,
@@ -819,34 +829,26 @@ async fn send_notification(
         )
         .await
     } else {
-        dest.template.name.clone()
+        template.name.clone()
     };
 
-    match dest.destination_type {
-        DestinationType::Http => send_http_notification(dest, msg.clone()).await,
-        DestinationType::Email => send_email_notification(&email_subject, dest, msg).await,
-        DestinationType::Sns => send_sns_notification(&alert.name, dest, msg).await,
-        DestinationType::RemotePipeline => {
-            // do nothing
-            log::warn!("Remote pipeline destination not supported in send_notification");
-            Ok("".to_string())
-        }
+    match dest_type {
+        DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
+        DestinationType::Email(email) => send_email_notification(&email_subject, email, msg).await,
+        DestinationType::Sns(aws_sns) => send_sns_notification(&alert.name, aws_sns, msg).await,
     }
 }
 
-async fn send_http_notification(
-    dest: &DestinationWithTemplate,
-    msg: String,
-) -> Result<String, anyhow::Error> {
-    let client = if dest.skip_tls_verify {
+async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+    let client = if endpoint.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()?
     } else {
         reqwest::Client::new()
     };
-    let url = url::Url::parse(&dest.url)?;
-    let mut req = match dest.method {
+    let url = url::Url::parse(&endpoint.url)?;
+    let mut req = match endpoint.method {
         HTTPType::POST => client.post(url),
         HTTPType::PUT => client.put(url),
         HTTPType::GET => client.get(url),
@@ -854,7 +856,7 @@ async fn send_http_notification(
 
     // Add additional headers if any from destination description
     let mut has_context_type = false;
-    if let Some(headers) = &dest.headers {
+    if let Some(headers) = &endpoint.headers {
         for (key, value) in headers.iter() {
             if !key.is_empty() && !value.is_empty() {
                 if key.to_lowercase().trim() == "content-type" {
@@ -874,7 +876,7 @@ async fn send_http_notification(
     let resp_body = resp.text().await?;
     log::debug!(
         "Alert sent to destination {} with status: {}, body: {:?}",
-        dest.url,
+        endpoint.url,
         resp_status,
         resp_body,
     );
@@ -897,7 +899,7 @@ async fn send_http_notification(
 
 async fn send_email_notification(
     email_subject: &str,
-    dest: &DestinationWithTemplate,
+    email: &Email,
     msg: String,
 ) -> Result<String, anyhow::Error> {
     let cfg = get_config();
@@ -905,11 +907,7 @@ async fn send_email_notification(
         return Err(anyhow::anyhow!("SMTP configuration not enabled"));
     }
 
-    let mut recipients = vec![];
-    for recipient in &dest.emails {
-        recipients.push(recipient);
-    }
-
+    let recipients = email.recipients.clone();
     let mut email = Message::builder()
         .from(cfg.smtp.smtp_from_email.parse()?)
         .subject(email_subject.to_string());
@@ -935,7 +933,7 @@ async fn send_email_notification(
 
 async fn send_sns_notification(
     alert_name: &str,
-    dest: &DestinationWithTemplate,
+    aws_sns: &AwsSns,
     msg: String,
 ) -> Result<String, anyhow::Error> {
     let mut message_attributes = HashMap::new();
@@ -950,11 +948,7 @@ async fn send_sns_notification(
     let sns_client = config::get_sns_client().await;
     let ret = sns_client
         .publish()
-        .topic_arn(
-            dest.sns_topic_arn
-                .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("SNS Topic ARN is missing"))?,
-        )
+        .topic_arn(&aws_sns.sns_topic_arn)
         .message(msg)
         .set_message_attributes(Some(message_attributes))
         .send()
@@ -992,7 +986,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             process_variable_replace(&mut resp, key, &VarValue::Str(&value), false);
 
             // calculate start and end time
-            if key == &get_config().common.column_timestamp {
+            if key == TIMESTAMP_COL_NAME {
                 let val = value.parse::<i64>().unwrap_or_default();
                 if alert_start_time == 0 || val < alert_start_time {
                     alert_start_time = val;
@@ -1186,7 +1180,7 @@ async fn process_dest_template(
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
-            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}&type={}",
+            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}&type={}&show_histogram=false",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -1225,7 +1219,7 @@ async fn process_dest_template(
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
-            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}",
+            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}&show_histogram=false",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -1357,12 +1351,10 @@ pub fn get_alert_start_end_time(
         return (start_time, rows_end_time);
     }
 
-    let cfg = get_config();
-
     // calculate start and end time
     let mut alert_start_time = 0;
     let mut alert_end_time = 0;
-    if let Some(values) = vars.get(&cfg.common.column_timestamp) {
+    if let Some(values) = vars.get(TIMESTAMP_COL_NAME) {
         for val in values {
             let val = val.parse::<i64>().unwrap_or_default();
             if alert_start_time == 0 || val < alert_start_time {
@@ -1506,12 +1498,54 @@ mod tests {
         let org_id = "default";
         let stream_name = "default";
         let alert_name = "abc/alert";
-        let alert = Alert {
-            name: alert_name.to_string(),
-            ..Default::default()
-        };
+        let mut alert: Alert = Default::default();
+        alert.name = alert_name.to_string();
         let ret = save(org_id, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_1() {
+        let cron_exp = "* * * * * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} * * * * * *", now);
+        assert_eq!(new_cron_exp, updated);
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_2() {
+        let cron_exp = "47*/12 * * * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        assert_eq!(new_cron_exp, "47*/12 * * * * *");
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_3() {
+        let cron_exp = "**/15 21-23,0-8 * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} */15 21-23,0-8 * * *", now);
+        assert_eq!(new_cron_exp, updated);
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_4() {
+        let cron_exp = "*10*****";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} 10*****", now);
+        assert_eq!(new_cron_exp, updated);
+    }
+
+    #[tokio::test]
+    async fn test_update_cron_expression_5() {
+        let cron_exp = "* */10 2 * * * *";
+        let now = Utc::now().second();
+        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let updated = format!("{} */10 2 * * * *", now);
+        assert_eq!(new_cron_exp, updated);
     }
 }

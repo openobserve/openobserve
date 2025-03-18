@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::{cmp::max, fmt::Display};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
 use proto::cluster_rpc;
-use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
 use utoipa::ToSchema;
 
 use super::bitvec::BitVec;
@@ -26,7 +26,7 @@ use crate::{
     get_config,
     meta::self_reporting::usage::Stats,
     utils::{
-        hash::{gxhash, Sum64},
+        hash::{Sum64, gxhash},
         json::{self, Map, Value},
     },
 };
@@ -87,7 +87,7 @@ impl From<&str> for StreamType {
             "file_list" => StreamType::Filelist,
             "metadata" => StreamType::Metadata,
             "index" => StreamType::Index,
-            _ => StreamType::Logs,
+            _ => StreamType::default(),
         }
     }
 }
@@ -175,9 +175,9 @@ pub struct FileKey {
 }
 
 impl FileKey {
-    pub fn new(key: &str, meta: FileMeta, deleted: bool) -> Self {
+    pub fn new(key: String, meta: FileMeta, deleted: bool) -> Self {
         Self {
-            key: key.to_string(),
+            key,
             meta,
             deleted,
             segment_ids: None,
@@ -350,6 +350,17 @@ impl StreamStats {
             self.doc_time_min = stats.doc_time_min;
         }
     }
+
+    pub fn merge(&mut self, other: &StreamStats) {
+        self.created_at = self.created_at.min(other.created_at);
+        self.doc_time_min = self.doc_time_min.min(other.doc_time_min);
+        self.doc_time_max = self.doc_time_max.max(other.doc_time_max);
+        self.doc_num += other.doc_num;
+        self.file_num += other.file_num;
+        self.storage_size += other.storage_size;
+        self.compressed_size += other.compressed_size;
+        self.index_size += other.index_size;
+    }
 }
 
 impl From<&str> for StreamStats {
@@ -385,22 +396,22 @@ impl From<Stats> for StreamStats {
     }
 }
 
-impl std::ops::Sub<FileMeta> for StreamStats {
-    type Output = Self;
+impl std::ops::Sub<&StreamStats> for &StreamStats {
+    type Output = StreamStats;
 
-    fn sub(self, rhs: FileMeta) -> Self::Output {
-        let mut ret = Self {
+    fn sub(self, rhs: &StreamStats) -> Self::Output {
+        let mut ret = StreamStats {
             created_at: self.created_at,
-            file_num: self.file_num - 1,
-            doc_num: self.doc_num - rhs.records,
-            doc_time_min: self.doc_time_min.min(rhs.min_ts),
-            doc_time_max: self.doc_time_max.max(rhs.max_ts),
-            storage_size: self.storage_size - rhs.original_size as f64,
-            compressed_size: self.compressed_size - rhs.compressed_size as f64,
-            index_size: self.index_size - rhs.index_size as f64,
+            file_num: self.file_num - rhs.file_num,
+            doc_num: self.doc_num - rhs.doc_num,
+            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
+            doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
+            storage_size: self.storage_size - rhs.storage_size,
+            compressed_size: self.compressed_size - rhs.compressed_size,
+            index_size: self.index_size - rhs.index_size,
         };
         if ret.doc_time_min == 0 {
-            ret.doc_time_min = rhs.min_ts;
+            ret.doc_time_min = rhs.doc_time_min;
         }
         ret
     }
@@ -692,7 +703,10 @@ impl Serialize for StreamSettings {
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
                 if !fields.is_empty() {
-                    state.serialize_field("defined_schema_fields", fields)?;
+                    let mut fields = fields.clone();
+                    fields.sort_unstable();
+                    fields.dedup();
+                    state.serialize_field("defined_schema_fields", &fields)?;
                 } else {
                     state.skip_field("defined_schema_fields")?;
                 }
@@ -780,13 +794,15 @@ impl From<&str> for StreamSettings {
 
         let mut defined_schema_fields: Option<Vec<String>> = None;
         if let Some(value) = settings.get("defined_schema_fields") {
-            let fields = value
+            let mut fields = value
                 .as_array()
                 .unwrap()
                 .iter()
                 .map(|item| item.as_str().unwrap().to_string())
                 .collect::<Vec<_>>();
             if !fields.is_empty() {
+                fields.sort_unstable();
+                fields.dedup();
                 defined_schema_fields = Some(fields);
             }
         }

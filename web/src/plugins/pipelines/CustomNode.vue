@@ -57,9 +57,6 @@ const hanldeMouseOver = () => {
 
 
 const onFunctionClick = (data,event,id) =>{
-  console.log(data,"data")
-  console.log(id,"id")
-  console.log(event,"event")
   pipelineObj.userSelectedNode = data;
   const dataToOpen  =   {
     label: "Function",
@@ -77,7 +74,6 @@ const onFunctionClick = (data,event,id) =>{
 
 const onConditionClick = (data,event,id) =>{
   data.label = id;
-  console.log(data,"data")
   pipelineObj.userSelectedNode = data;
 
   const dataToOpen  =   {
@@ -149,7 +145,6 @@ const editNode = (id) => {
   const fullNode = pipelineObj.currentSelectedPipeline.nodes.find(
     (node) => node.id === id
   );
-  console.log(fullNode,'full node')
   pipelineObj.isEditNode = true;
   pipelineObj.currentSelectedNodeData = fullNode;
   pipelineObj.currentSelectedNodeID = id;
@@ -607,7 +602,7 @@ function getIcon(data, ioType) {
 
     <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
   <div>
-    <strong>SQL:</strong> <pre style="max-width: 200px ; text-wrap: wrap;">{{ data.query_condition.sql }}</pre><br />
+    <strong>{{  data.query_condition.type == 'sql' ? 'SQL' : 'PromQL' }}:</strong> <pre style="max-width: 200px ; text-wrap: wrap;">{{  data.query_condition.type == 'sql' ? data.query_condition.sql : data.query_condition.promql }}</pre><br />
     <strong>Period:</strong> {{ data.trigger_condition.period }}<br />
     <strong>Frequency:</strong> {{ data.trigger_condition.frequency }} {{ data.trigger_condition.frequency_type }}<br />
     <strong>Operator:</strong> {{ data.trigger_condition.operator }}<br />

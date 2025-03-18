@@ -24,6 +24,8 @@ export interface Query {
 export interface SearchRequestPayload {
   query: QueryPayload;
   aggs?: HistogramQueryPayload;
+  regions?: string[];
+  clusters?: string[];
 }
 
 export interface QueryPayload {
@@ -61,6 +63,7 @@ export interface WebSocketSearchPayload {
   isPagination: boolean;
   traceId: string;
   org_id: string;
+  meta?: any;
 }
 
 export interface ErrorContent {

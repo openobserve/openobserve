@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use chrono::{TimeZone, Utc};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
@@ -60,7 +62,12 @@ pub async fn search(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
-    let use_cache = in_req.use_cache.unwrap_or(false);
+    // result cache can be enable only when its from the start
+    let use_cache = if in_req.query.from == 0 {
+        in_req.use_cache.unwrap_or(false)
+    } else {
+        false
+    };
 
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
@@ -80,11 +87,19 @@ pub async fn search(
         .query_fn
         .as_ref()
         .and_then(|v| base64::decode_url(v).ok());
+    let action = req
+        .query
+        .action_id
+        .as_ref()
+        .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
 
     // calculate hash for the query
     let mut hash_body = vec![origin_sql.to_string()];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
+    }
+    if let Some(action_id) = action {
+        hash_body.push(action_id.to_string());
     }
     if !req.regions.is_empty() {
         hash_body.extend(req.regions.clone());
@@ -120,7 +135,7 @@ pub async fn search(
         match crate::service::search::Sql::new(&query, org_id, stream_type).await {
             Ok(v) => {
                 let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, &cfg.common.column_timestamp, is_aggregate)
+                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
                 MultiCachedQueryResponse {
@@ -281,7 +296,22 @@ pub async fn search(
 
     // do search
     let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, org_id, stream_type, "", "200", "_search");
+    let work_group = get_work_group(work_group_set);
+
+    let search_type = req
+        .search_type
+        .map(|t| t.to_string())
+        .unwrap_or("".to_string());
+    let search_group = work_group.clone().unwrap_or("".to_string());
+    http_report_metrics(
+        start,
+        org_id,
+        stream_type,
+        "200",
+        "_search",
+        &search_type,
+        &search_group,
+    );
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 
@@ -293,7 +323,6 @@ pub async fn search(
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
 
-    let work_group = get_work_group(work_group_set);
     let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
@@ -430,10 +459,8 @@ pub fn merge_response(
         && !search_response.is_empty()
         && search_response
             .first()
-            .map_or(true, |res| res.hits.is_empty())
-        && search_response
-            .last()
-            .map_or(true, |res| res.hits.is_empty())
+            .is_none_or(|res| res.hits.is_empty())
+        && search_response.last().is_none_or(|res| res.hits.is_empty())
     {
         for res in search_response {
             cache_response.total += res.total;
@@ -792,8 +819,6 @@ pub async fn check_cache_v2(
     in_req: &search::Request,
     use_cache: bool,
 ) -> Result<MultiCachedQueryResponse, Error> {
-    let cfg = get_config();
-
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
     origin_sql = origin_sql.replace('\n', " ");
@@ -854,7 +879,7 @@ pub async fn check_cache_v2(
         match crate::service::search::Sql::new(&query, org_id, stream_type).await {
             Ok(v) => {
                 let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, &cfg.common.column_timestamp, is_aggregate)
+                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
                 MultiCachedQueryResponse {

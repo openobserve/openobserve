@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -105,7 +105,6 @@ mod meta {
         pub key1: String,
         pub key2: String,
         pub start_dt: i64,
-        #[sea_orm(column_type = "Text")]
         pub value: String,
     }
 
@@ -127,7 +126,6 @@ mod folder {
         pub org: String,
         pub folder_id: String,
         pub name: String,
-        #[sea_orm(column_type = "Text", nullable)]
         pub description: Option<String>,
         pub r#type: i16,
         pub created_at: DateTime,

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -34,4 +34,6 @@ pub struct SearchEventReq {
     pub search_type: crate::meta::search::SearchEventType,
     #[serde(flatten)]
     pub search_event_context: Option<SearchEventContext>,
+    #[serde(default)]
+    pub fallback_order_by_col: Option<String>,
 }

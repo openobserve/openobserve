@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,12 +17,13 @@ use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_multipart::Multipart;
 use actix_web::{
-    http::{self, StatusCode},
     HttpResponse,
+    http::{self, StatusCode},
 };
 use bytes::Bytes;
 use chrono::Utc;
 use config::{
+    SIZE_IN_MB, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -30,14 +31,13 @@ use config::{
         stream::{PartitionTimeLevel, StreamType},
     },
     utils::{flatten::format_key, json, schema_ext::SchemaExt},
-    SIZE_IN_MB,
 };
 use futures::{StreamExt, TryStreamExt};
 use infra::{
     cache::stats,
     schema::{
-        SchemaCache, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED,
-        STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        SchemaCache,
     },
 };
 
@@ -131,12 +131,12 @@ pub async fn save_enrichment_data(
     let mut records_size = 0;
     let timestamp = Utc::now().timestamp_micros();
     for mut json_record in payload {
-        let timestamp = match json_record.get(&cfg.common.column_timestamp) {
+        let timestamp = match json_record.get(TIMESTAMP_COL_NAME) {
             Some(v) => v.as_i64().unwrap_or(timestamp),
             None => timestamp,
         };
         json_record.insert(
-            cfg.common.column_timestamp.clone(),
+            TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
 
@@ -206,7 +206,18 @@ pub async fn save_enrichment_data(
         stream_name,
     )
     .await;
-    let mut req_stats = write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await;
+    let mut req_stats =
+        match write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await {
+            Ok(stats) => stats,
+            Err(e) => {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        format!("Error writing enrichment table: {}", e),
+                    )),
+                );
+            }
+        };
 
     // notify update
     if stream_schema.has_fields {
@@ -256,9 +267,6 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let mut w = STREAM_SCHEMAS.write().await;
-    w.remove(&key);
-    drop(w);
-    let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
     w.remove(&key);
     drop(w);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;

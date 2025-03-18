@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{get_config, meta::stream::StreamType};
-use utoipa::{openapi::security::SecurityScheme, Modify, OpenApi};
+use utoipa::{Modify, OpenApi, openapi::security::SecurityScheme};
 
 use crate::{common::meta, handler::http::request};
 
@@ -62,7 +62,8 @@ use crate::{common::meta, handler::http::request};
         request::rum::ingest::sessionreplay,
         request::search::search,
         request::search::search_partition,
-        request::search::around,
+        request::search::around_v1,
+        request::search::around_v2,
         request::search::values,
         request::search::search_history,
         request::search::saved_view::create_view,
@@ -94,6 +95,12 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::get_dashboard,
         request::dashboards::delete_dashboard,
         request::dashboards::move_dashboard,
+        request::dashboards::move_dashboards,
+        request::dashboards::timed_annotations::create_annotations,
+        request::dashboards::timed_annotations::get_annotations,
+        request::dashboards::timed_annotations::delete_annotations,
+        request::dashboards::timed_annotations::update_annotations,
+        request::dashboards::timed_annotations::delete_annotation_panels,
         request::alerts::deprecated::save_alert,
         request::alerts::deprecated::update_alert,
         request::alerts::deprecated::list_stream_alerts,
@@ -159,6 +166,21 @@ use crate::{common::meta, handler::http::request};
             config::meta::dashboards::v1::QueryData,
             config::meta::dashboards::v1::CustomFieldsOption,
             config::meta::dashboards::v1::VariableList,
+            config::meta::alerts::alert::Alert,
+            config::meta::alerts::Aggregation,
+            config::meta::alerts::AggFunction,
+            config::meta::alerts::Condition,
+            config::meta::alerts::CompareHistoricData,
+            config::meta::alerts::FrequencyType,
+            config::meta::alerts::Operator,
+            config::meta::alerts::QueryType,
+            config::meta::alerts::QueryCondition,
+            config::meta::alerts::TriggerCondition,
+            config::meta::destinations::HTTPType,
+            config::meta::timed_annotations::TimedAnnotation,
+            config::meta::timed_annotations::TimedAnnotationReq,
+            config::meta::timed_annotations::TimedAnnotationDelete,
+            config::meta::timed_annotations::TimedAnnotationUpdate,
             // Dashboards
             crate::handler::http::models::dashboards::CreateDashboardRequestBody,
             crate::handler::http::models::dashboards::CreateDashboardResponseBody,
@@ -168,21 +190,11 @@ use crate::{common::meta, handler::http::request};
             crate::handler::http::models::dashboards::ListDashboardsResponseBody,
             crate::handler::http::models::dashboards::ListDashboardsResponseBodyItem,
             crate::handler::http::models::dashboards::MoveDashboardRequestBody,
-            config::meta::alerts::alert::Alert,
-            config::meta::alerts::Aggregation,
-            config::meta::alerts::AggFunction,
-            config::meta::alerts::Condition,
-            config::meta::alerts::CompareHistoricData,
-            config::meta::alerts::destinations::Destination,
-            config::meta::alerts::destinations::DestinationWithTemplate,
-            config::meta::alerts::destinations::HTTPType,
-            config::meta::alerts::destinations::DestinationType,
-            config::meta::alerts::FrequencyType,
-            config::meta::alerts::Operator,
-            config::meta::alerts::QueryType,
-            config::meta::alerts::QueryCondition,
-            config::meta::alerts::TriggerCondition,
-            config::meta::alerts::templates::Template,
+            crate::handler::http::models::dashboards::MoveDashboardsRequestBody,
+            // Destinations
+            crate::handler::http::models::destinations::Destination,
+            crate::handler::http::models::destinations::DestinationType,
+            crate::handler::http::models::destinations::Template,
             // Alerts
             crate::handler::http::models::alerts::requests::CreateAlertRequestBody,
             crate::handler::http::models::alerts::requests::UpdateAlertRequestBody,

@@ -1,0 +1,7 @@
+[advisories]
+ignore = [
+  "RUSTSEC-2023-0071", # from rsa, transitive dep of sqlx
+  "RUSTSEC-2024-0421", # from idna, transitive dep of vrl
+  "RUSTSEC-2024-0437", # from protobuf, transitive dep of prometheus
+]
+informational_warnings = ["unmaintained"] # warn for categories of informational advisories

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use config::{
+    cluster::LOCAL_NODE,
     meta::{
         cluster::{IntoArcVec, RoleGroup},
         search::{ScanStats, SearchEventType},
@@ -25,7 +26,7 @@ use config::{
     utils::time::BASE_TIME,
 };
 use datafusion::{
-    common::{tree_node::TreeNode, TableReference},
+    common::{TableReference, tree_node::TreeNode},
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
@@ -45,13 +46,13 @@ use crate::service::search::{
     },
     datafusion::{
         distributed_plan::{
+            NewEmptyExecVisitor,
             codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
             empty_exec::NewEmptyExec,
             node::{RemoteScanNode, SearchInfos},
             remote_scan::RemoteScanExec,
-            NewEmptyExecVisitor,
         },
-        exec::prepare_datafusion_context,
+        exec::{prepare_datafusion_context, register_udf},
     },
     generate_filter_from_equal_items,
     request::{FlightSearchRequest, Request},
@@ -85,7 +86,8 @@ pub async fn search(
         prepare_datafusion_context(req.work_group.clone(), vec![], false, cfg.limit.cpu_num)
             .await?;
 
-    // register function
+    // register udf
+    register_udf(&ctx, &req.org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
@@ -124,7 +126,7 @@ pub async fn search(
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
         req.time_range,
         file_id_list_vec.len(),
         file_id_list_took,
@@ -152,9 +154,19 @@ pub async fn search(
     let node_group = req
         .search_event_type
         .as_ref()
-        .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
+        .map(|v| {
+            SearchEventType::try_from(v.as_str())
+                .ok()
+                .map(RoleGroup::from)
+        })
         .unwrap_or(None);
-    let nodes = get_online_querier_nodes(&trace_id, node_group).await?;
+    let mut nodes = get_online_querier_nodes(&trace_id, node_group).await?;
+
+    // local mode, only use local node as querier for the query
+    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
+        nodes = vec![LOCAL_NODE.clone()];
+    }
+
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");
@@ -277,6 +289,7 @@ async fn get_inverted_index_file_lists(
     match_terms: &[String],
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = config::get_config();
+    #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let use_inverted_index = req.use_inverted_index;
     let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
@@ -311,12 +324,14 @@ async fn get_inverted_index_file_lists(
 
     // use inverted index to filter file list
     let index_terms = generate_filter_from_equal_items(&index_terms);
+    let mut index_req = req.clone();
+    index_req.trace_id = trace_id.to_string(); // reset trace_id for follower
     let (idx_file_list, idx_scan_size, idx_took) =
-        get_inverted_index_file_list(req.clone(), query, stream_name, match_terms, &index_terms)
+        get_inverted_index_file_list(index_req, query, stream_name, match_terms, &index_terms)
             .await?;
 
     log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->follower_leader: get file_list from inverted index time_range: {:?}, files: {}, scan_size: {} mb, took: {} ms",
         req.time_range,
         idx_file_list.len(),
         idx_scan_size,

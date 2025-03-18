@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
-    get_config, ider,
+    TIMESTAMP_COL_NAME, get_config, ider,
     meta::{
         cluster::RoleGroup,
         search,
@@ -54,8 +54,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::grpc::make_grpc_search_client, o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, std::str::FromStr,
-    tracing::info_span,
+    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
@@ -173,10 +172,12 @@ pub async fn search(
     if in_req.query.streaming_output {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
     }
-    log::info!("[{trace_id}] request sql : {}", query.sql.clone());
+    if let Some(v) = in_req.local_mode {
+        request.set_local_mode(Some(v));
+    }
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
+        async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
             .instrument(span),
     );
     let res = match handle.await {
@@ -501,7 +502,7 @@ pub async fn search_multi(
         multi_res.hits
     };
     log::debug!("multi_res len after applying vrl: {}", multi_res.hits.len());
-    let column_timestamp = get_config().common.column_timestamp.to_string();
+    let column_timestamp = TIMESTAMP_COL_NAME.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
         if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
@@ -578,7 +579,7 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
     let is_streaming_aggregate = ts_column.is_none()
         && is_simple_aggregate_query(&req.sql).unwrap_or(false)
@@ -661,13 +662,14 @@ pub async fn search_partition(
                 id: Utc::now().timestamp_micros(),
                 records,
                 original_size,
+                deleted: false,
             });
         }
     }
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
         (req.start_time, req.end_time),
         files.len(),
         file_list_took,
@@ -713,7 +715,11 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        min_step *= sql.histogram_interval.unwrap_or(1);
+        let hist_int = sql.histogram_interval.unwrap_or(1);
+        // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
+        if hist_int > 0 {
+            min_step *= hist_int;
+        }
     }
 
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
@@ -733,7 +739,7 @@ pub async fn search_partition(
     if step < min_step {
         step = min_step;
     }
-    if step % min_step > 0 {
+    if min_step > 0 && step % min_step > 0 {
         step = step - step % min_step;
     }
     // this is to ensure we create partitions less than max_query_range
@@ -886,9 +892,10 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "Long"
         };
-        let search_type: Option<search::SearchEventType> = result
-            .search_type
-            .map(|s_event_type| search::SearchEventType::from_str(&s_event_type).unwrap());
+        let search_type: Option<search::SearchEventType> = result.search_type.map(|s_event_type| {
+            search::SearchEventType::try_from(s_event_type.as_str())
+                .unwrap_or(search::SearchEventType::UI)
+        });
         status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,
@@ -981,17 +988,9 @@ pub async fn cancel_query(
         }
     }
 
-    let mut is_success = false;
-    for res in results {
-        if res.is_success {
-            is_success = true;
-            break;
-        }
-    }
-
     Ok(search::CancelQueryResponse {
         trace_id: trace_id.to_string(),
-        is_success,
+        is_success: true,
     })
 }
 
@@ -1163,7 +1162,7 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
 pub fn generate_search_schema_diff(
     schema: &Schema,
     latest_schema_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<HashMap<String, DataType>, Error> {
+) -> HashMap<String, DataType> {
     // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
@@ -1175,7 +1174,7 @@ pub fn generate_search_schema_diff(
         }
     }
 
-    Ok(diff_fields)
+    diff_fields
 }
 
 pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {

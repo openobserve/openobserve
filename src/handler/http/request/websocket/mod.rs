@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,11 @@
 
 pub mod search;
 pub mod session;
+pub mod sort;
 pub mod utils;
 
-use actix_web::{get, web, Error, HttpRequest, HttpResponse};
-use config::get_config;
+use actix_web::{Error, HttpRequest, HttpResponse, get, web};
+use config::{cluster::LOCAL_NODE, get_config};
 use session::WsSession;
 use utils::sessions_cache_utils;
 
@@ -31,7 +32,7 @@ pub async fn websocket(
 ) -> Result<HttpResponse, Error> {
     let cfg = get_config();
 
-    if !cfg.common.websocket_enabled {
+    if !cfg.websocket.enabled {
         log::info!(
             "[WS_HANDLER]: Node Role: {} Websocket is disabled",
             cfg.common.node_role
@@ -65,4 +66,13 @@ pub async fn websocket(
     actix_web::rt::spawn(session::run(msg_stream, user_id, request_id, org_id, path));
 
     Ok(res)
+}
+
+/// Initialize the job init for websocket
+pub async fn init() -> Result<(), anyhow::Error> {
+    // Run the garbage collector for websocket sessions
+    if !LOCAL_NODE.is_compactor() && !LOCAL_NODE.is_alert_manager() {
+        sessions_cache_utils::run_gc_ws_sessions().await;
+    }
+    Ok(())
 }

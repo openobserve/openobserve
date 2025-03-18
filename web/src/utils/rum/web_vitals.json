@@ -13,7 +13,7 @@
       "title": "Largest Contentful Paint ( LCP )",
       "description": "",
       "config": {
-        "show_legends": true,
+        "show_legends": false,
         "legends_position": null,
         "unit": "seconds",
         "unit_custom": "",
@@ -39,7 +39,7 @@
             ],
             "y": [
               {
-                "label": "",
+                "label": " ",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -64,7 +64,7 @@
       "title": "First Input Delay ( FID )",
       "description": "",
       "config": {
-        "show_legends": true,
+        "show_legends": false,
         "legends_position": null,
         "unit": "milliseconds",
         "base_map": { "type": "osm" },
@@ -89,7 +89,7 @@
             ],
             "y": [
               {
-                "label": "",
+                "label": " ",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -114,7 +114,7 @@
       "title": "Cumulative Layout Shift ( CLS )",
       "description": "",
       "config": {
-        "show_legends": true,
+        "show_legends": false,
         "legends_position": null,
         "base_map": { "type": "osm" },
         "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
@@ -138,7 +138,7 @@
             ],
             "y": [
               {
-                "label": "",
+                "label": " ",
                 "alias": "y_axis_1",
                 "column": "view_cumulative_layout_shift",
                 "color": "#5960b2",

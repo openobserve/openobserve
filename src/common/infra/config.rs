@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,14 +16,15 @@
 use std::sync::Arc;
 
 use config::{
+    RwAHashMap, RwHashMap,
     meta::{
-        alerts::{alert::Alert, destinations::Destination, templates::Template},
+        alerts::alert::Alert,
         dashboards::reports,
+        destinations::{Destination, Template},
         function::Transform,
         promql::ClusterLeader,
         stream::StreamParams,
     },
-    RwAHashMap, RwHashMap,
 };
 use dashmap::DashMap;
 use hashbrown::HashMap;
@@ -43,11 +44,6 @@ use crate::{
     },
 };
 
-// global version variables
-pub static VERSION: &str = env!("GIT_VERSION");
-pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
-pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
-
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
@@ -66,7 +62,7 @@ pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<Alert>>> = Lazy::new(Defau
 pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigger>> =
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
-pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
+pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
 pub static DASHBOARD_REPORTS: Lazy<RwHashMap<String, reports::Report>> =
     Lazy::new(Default::default);
 pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);

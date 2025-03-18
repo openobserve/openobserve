@@ -23,7 +23,7 @@ jobs:
           github.event.client_payload.pull_request.head.sha,
           github.event.client_payload.slash_command.args.named.sha
         )
-      runs-on: ${{ github.event.client_payload.pull_request.head.repo.fork == true && 'ubuntu-2004-8-cores' || 'ubicloud-standard-8' }}
+      runs-on: ${{ github.event.client_payload.pull_request.head.repo.fork == true && 'ubuntu-2204-8-cores' || 'ubicloud-standard-8' }}
       steps:
         - name: Remove unused tools
           run: |
@@ -53,7 +53,7 @@ jobs:
         - name: Setup Rust Toolchain
           uses: dtolnay/rust-toolchain@master
           with:
-            toolchain: nightly-2024-10-24
+            toolchain: nightly-2025-03-02
             
         - uses: Swatinem/rust-cache@v2
           with:
@@ -64,7 +64,7 @@ jobs:
             version: "21.12"
         - uses: actions/setup-node@v4
           with:
-            node-version: 18
+            node-version: 22
         
         - name: Build frontend code
           run: cd web && npm install && npm run build

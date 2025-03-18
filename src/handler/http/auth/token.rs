@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,16 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{dev::ServiceRequest, Error};
+use actix_web::{Error, dev::ServiceRequest};
 #[cfg(feature = "enterprise")]
 use actix_web::{
     error::ErrorUnauthorized,
-    http::{header, Method},
+    http::{Method, header},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config, dex::service::auth::get_dex_jwks,
-};
+use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
 
 use crate::common::utils::auth::AuthExtractor;
 #[cfg(feature = "enterprise")]
@@ -54,7 +52,7 @@ pub async fn token_validator(
     match jwt::verify_decode_token(
         auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
         &keys,
-        &get_o2_config().dex.client_id,
+        &get_dex_config().client_id,
         false,
         true,
     )
@@ -130,7 +128,7 @@ pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
     match jwt::verify_decode_token(
         auth_str.strip_prefix("Bearer").unwrap().trim(),
         &keys,
-        &get_o2_config().dex.client_id,
+        &get_dex_config().client_id,
         false,
         true,
     )

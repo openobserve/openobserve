@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,19 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 
-use config::{get_config, is_local_disk_storage, metrics};
-use datafusion::parquet::data_type::AsBytes;
+use bytes::buf::Buf;
+use config::{get_config, is_local_disk_storage, meta::stream::FileMeta, metrics};
+use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt};
-use object_store::{path::Path, GetRange, ObjectMeta, ObjectStore, WriteMultipart};
+use object_store::{GetRange, ObjectMeta, ObjectStore, WriteMultipart, path::Path};
 use once_cell::sync::Lazy;
+use parquet::file::metadata::ParquetMetaDataReader;
 
 pub mod local;
 pub mod remote;
 
 pub const CONCURRENT_REQUESTS: usize = 1000;
-pub const MULTI_PART_UPLOAD_DATA_SIZE: f64 = 100.0;
 
 pub static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
 pub static LOCAL_WAL: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_wal);
@@ -81,7 +82,8 @@ pub async fn head(file: &str) -> object_store::Result<ObjectMeta> {
 }
 
 pub async fn put(file: &str, data: bytes::Bytes) -> object_store::Result<()> {
-    if bytes_size_in_mb(&data) >= MULTI_PART_UPLOAD_DATA_SIZE {
+    let multi_part_upload_size = get_config().s3.multi_part_upload_size;
+    if multi_part_upload_size > 0 && multi_part_upload_size < bytes_size_in_mb(&data) as usize {
         put_multipart(file, data).await?;
     } else {
         DEFAULT.put(&file.into(), data.into()).await?;
@@ -137,6 +139,41 @@ pub async fn del(files: &[&str]) -> object_store::Result<()> {
     }
 
     Ok(())
+}
+
+pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
+    let mut file_meta = FileMeta::default();
+    let (file_size, parquet_meta) = get_parquet_metadata(file).await?;
+    if let Some(metadata) = parquet_meta.file_metadata().key_value_metadata() {
+        file_meta = metadata.as_slice().into();
+    }
+    file_meta.compressed_size = file_size as i64;
+    Ok(file_meta)
+}
+
+async fn get_parquet_metadata(file: &str) -> Result<(usize, Arc<ParquetMetaData>), anyhow::Error> {
+    // get file info
+    let info = head(file).await?;
+    let file_size = info.size;
+
+    // read metadata len
+    let mut data = get_range(file, file_size - parquet::file::FOOTER_SIZE..file_size).await?;
+    let mut buf = [0_u8; parquet::file::FOOTER_SIZE];
+    data.copy_to_slice(&mut buf);
+    let metadata_len = ParquetMetaDataReader::decode_footer(&buf)?;
+
+    // read metadata
+    let data = get_range(
+        file,
+        file_size - parquet::file::FOOTER_SIZE - metadata_len
+            ..file_size - parquet::file::FOOTER_SIZE,
+    )
+    .await?;
+
+    Ok((
+        file_size,
+        Arc::new(ParquetMetaDataReader::decode_metadata(&data)?),
+    ))
 }
 
 pub fn format_key(key: &str, with_prefix: bool) -> String {

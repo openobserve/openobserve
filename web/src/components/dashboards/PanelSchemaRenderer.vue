@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
+  <div
+    style="width: 100%; height: 100%"
+    @mouseleave="hidePopupsAndOverlays"
+    @mouseenter="showPopupsAndOverlays"
+  >
     <div
       ref="chartPanelRef"
       style="height: 100%; position: relative"
@@ -58,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="panelSchema.htmlContent"
             style="width: 100%; height: 100%"
             class="col"
+            :variablesData="variablesData"
           />
         </div>
         <div
@@ -69,8 +74,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :markdownContent="panelSchema.markdownContent"
             style="width: 100%; height: 100%"
             class="col"
+            :variablesData="variablesData"
           />
         </div>
+
+        <CustomChartRenderer
+          v-else-if="panelSchema.type == 'custom_chart'"
+          :data="panelData"
+          style="width: 100%; height: 100%"
+          class="col"
+          @error="errorDetail = $event"
+        />
         <ChartRenderer
           v-else
           :data="
@@ -84,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : { options: { backgroundColor: 'transparent' } }
           "
           :height="chartPanelHeight"
-          @updated:data-zoom="$emit('updated:data-zoom', $event)"
+          @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
           @click="onChartClick"
         />
@@ -105,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="errorMessage"
       >
         <q-icon size="md" name="warning" />
-        <div style="height: 80%; width: 100%">{{ errorDetail }}</div>
+        <div style="height: 80%; width: 100%">Error Loading Data</div>
       </div>
       <div
         v-if="
@@ -130,6 +144,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
+        v-if="allowAnnotationsAdd && isCursorOverPanel"
+        style="position: absolute; top: 0px; right: 0px; z-index: 9"
+        @click.stop
+      >
+        <q-btn
+          v-if="
+            [
+              'area',
+              'area-stacked',
+              'bar',
+              'h-bar',
+              'line',
+              'scatter',
+              'stacked',
+              'h-stacked',
+            ].includes(panelSchema.type) && checkIfPanelIsTimeSeries === true
+          "
+          color="primary"
+          :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
+          round
+          outline
+          size="sm"
+          @click="toggleAddAnnotationMode"
+        >
+          <q-tooltip anchor="top middle" self="bottom right">
+            {{
+              isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
+            }}
+          </q-tooltip>
+        </q-btn>
+      </div>
+      <div
         style="
           border: 1px solid gray;
           border-radius: 4px;
@@ -143,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         ref="drilldownPopUpRef"
-        @mouseleave="hideDrilldownPopUp"
+        @mouseleave="hidePopupsAndOverlays"
       >
         <div
           v-for="(drilldown, index) in drilldownArray"
@@ -165,6 +211,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+      <div
+        style="
+          border: 1px solid gray;
+          border-radius: 4px;
+          padding: 3px;
+          position: absolute;
+          top: 0px;
+          left: 0px;
+          display: none;
+          max-width: 200px;
+          white-space: normal;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          z-index: 9999999;
+        "
+        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        ref="annotationPopupRef"
+      >
+        <div
+          class="q-px-sm q-py-xs"
+          style="
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            position: relative;
+            word-break: break-word;
+          "
+        >
+          <span style="word-break: break-word">{{
+            selectedAnnotationData.text
+          }}</span>
+        </div>
+      </div>
+      <!-- Annotation Dialog -->
+      <AddAnnotation
+        v-if="isAddAnnotationDialogVisible"
+        :dashboardId="dashboardId"
+        :annotation="annotationToAddEdit"
+        @close="closeAddAnnotation"
+        :panelsList="panelsList"
+      />
     </div>
   </div>
 </template>
@@ -179,6 +266,7 @@ import {
   inject,
   nextTick,
   defineAsyncComponent,
+  onMounted,
 } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
@@ -195,6 +283,9 @@ import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
+import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
+import { event } from "quasar";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -220,6 +311,13 @@ const MarkdownRenderer = defineAsyncComponent(() => {
   return import("./panels/MarkdownRenderer.vue");
 });
 
+const AddAnnotation = defineAsyncComponent(() => {
+  return import("./addPanel/AddAnnotation.vue");
+});
+const CustomChartRenderer = defineAsyncComponent(() => {
+  return import("./panels/CustomChartRenderer.vue");
+});
+
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
@@ -229,6 +327,8 @@ export default defineComponent({
     MapsRenderer,
     HTMLRenderer,
     MarkdownRenderer,
+    AddAnnotation,
+    CustomChartRenderer,
   },
   props: {
     selectedTimeObj: {
@@ -267,6 +367,11 @@ export default defineComponent({
       required: false,
       type: String,
     },
+    allowAnnotationsAdd: {
+      default: false,
+      required: false,
+      type: Boolean,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -277,6 +382,8 @@ export default defineComponent({
     "is-cached-data-differ-with-current-time-range-update",
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
+    "loading-state-change",
+    "limit-number-of-series-warning-message-update",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -287,11 +394,21 @@ export default defineComponent({
     const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
     const drilldownArray: any = ref([]);
+    const selectedAnnotationData: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
+    const annotationPopupRef: any = ref(null);
+
+    const limitNumberOfSeriesWarningMessage: any = ref("");
+
     const chartPanelStyle = ref({
       height: "100%",
       width: "100%",
     });
+
+    const isCursorOverPanel = ref(false);
+    const showPopupsAndOverlays = () => {
+      isCursorOverPanel.value = true;
+    };
 
     // get refs from props
     const {
@@ -303,6 +420,7 @@ export default defineComponent({
       dashboardId,
       folderId,
       reportId,
+      allowAnnotationsAdd,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -311,6 +429,7 @@ export default defineComponent({
       errorDetail,
       metadata,
       resultMetaData,
+      annotations,
       lastTriggeredAt,
       isCachedDataDifferWithCurrentTimeRange,
       searchRequestTraceIds,
@@ -326,12 +445,63 @@ export default defineComponent({
       reportId,
     );
 
+    const {
+      isAddAnnotationMode,
+      isAddAnnotationDialogVisible,
+      annotationToAddEdit,
+      editAnnotation,
+      toggleAddAnnotationMode,
+      handleAddAnnotation,
+      closeAddAnnotation,
+      fetchAllPanels,
+      panelsList,
+    } = useAnnotationsData(
+      store.state.selectedOrganization?.identifier,
+      dashboardId.value,
+      panelSchema.value.id,
+      folderId.value,
+    );
+
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef = ref(null);
 
     // hovered series state
     // used to show tooltip axis for all charts
     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
+
+    const validatePanelData = computed(() => {
+      const errors: any = [];
+
+      // fields validation is not required for promql
+      if (panelSchema.value?.queryType == "promql") {
+        return errors;
+      }
+
+      const currentXLabel =
+        panelSchema?.value?.type == "table"
+          ? "First Column"
+          : panelSchema?.value?.type == "h-bar"
+            ? "Y-Axis"
+            : "X-Axis";
+
+      const currentYLabel =
+        panelSchema?.value?.type == "table"
+          ? "Other Columns"
+          : panelSchema?.value?.type == "h-bar"
+            ? "X-Axis"
+            : "Y-Axis";
+
+      validateSQLPanelFields(
+        panelSchema.value,
+        0,
+        currentXLabel,
+        currentYLabel,
+        errors,
+        true,
+      );
+
+      return errors;
+    });
 
     // ======= [START] dashboard PrintMode =======
 
@@ -341,6 +511,11 @@ export default defineComponent({
       "variablesAndPanelsDataLoadingState",
       { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
     );
+
+    // Watch loading state changes and emit them to parent
+    watch(loading, (newLoadingState) => {
+      emit("loading-state-change", newLoadingState);
+    });
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
     watch(loading, (updatedLoadingValue) => {
@@ -362,6 +537,12 @@ export default defineComponent({
       }
     });
     // ======= [END] dashboard PrintMode =======
+
+    onMounted(async () => {
+      // fetch all panels
+      await fetchAllPanels();
+      panelsList.value = panelsList.value;
+    });
 
     // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
     // As some panels were getting true cancel button and datetime picker were not getting updated
@@ -403,9 +584,10 @@ export default defineComponent({
 
           emit("updated:vrlFunctionFieldList", responseFields);
         }
+        if (panelData.value.chartType == "custom_chart") errorDetail.value = "";
 
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-        if (!errorDetail.value) {
+        if (!errorDetail.value && validatePanelData?.value?.length === 0) {
           try {
             // passing chartpanelref to get width and height of DOM element
             panelData.value = await convertPanelData(
@@ -417,7 +599,12 @@ export default defineComponent({
               resultMetaData,
               metadata.value,
               chartPanelStyle.value,
+              annotations,
+              loading.value,
             );
+
+            limitNumberOfSeriesWarningMessage.value =
+              panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
 
             errorDetail.value = "";
           } catch (error: any) {
@@ -443,11 +630,27 @@ export default defineComponent({
       { deep: true },
     );
 
+    const checkIfPanelIsTimeSeries = computed(() => {
+      return panelData.value?.extras?.isTimeSeries;
+    });
+
     // when we get the new metadata from the apis, emit the metadata update
     watch(
       metadata,
       () => {
         emit("metadata-update", metadata.value);
+      },
+      { deep: true },
+    );
+
+    // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
+    watch(
+      limitNumberOfSeriesWarningMessage,
+      () => {
+        emit(
+          "limit-number-of-series-warning-message-update",
+          limitNumberOfSeriesWarningMessage.value,
+        );
       },
       { deep: true },
     );
@@ -462,6 +665,17 @@ export default defineComponent({
         isCachedDataDifferWithCurrentTimeRange.value,
       );
     });
+
+    const onDataZoom = (event: any) => {
+      if (allowAnnotationsAdd.value && isAddAnnotationMode.value) {
+        // looks like zoom not needed
+        // handle add annotation
+        handleAddAnnotation(event.start, event.end);
+      } else {
+        // default behavior
+        emit("updated:data-zoom", event);
+      }
+    };
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
@@ -543,7 +757,8 @@ export default defineComponent({
       // if panel type is 'html' or 'markdown', return an empty string
       if (
         panelSchema.value.type == "html" ||
-        panelSchema.value.type == "markdown"
+        panelSchema.value.type == "markdown" ||
+        panelSchema.value.type == "custom_chart"
       ) {
         return "";
       }
@@ -567,14 +782,18 @@ export default defineComponent({
     // when the error changes, emit the error
     watch(errorDetail, () => {
       //check if there is an error message or not
-      if (!errorDetail.value) return;
+      // if (!errorDetail.value) return; // emmit is required to reset the error on parent component
       emit("error", errorDetail);
     });
 
-    const hideDrilldownPopUp = () => {
+    const hidePopupsAndOverlays = () => {
       if (drilldownPopUpRef.value) {
         drilldownPopUpRef.value.style.display = "none";
       }
+      if (annotationPopupRef.value) {
+        annotationPopupRef.value.style.display = "none";
+      }
+      isCursorOverPanel.value = false;
     };
 
     // drilldown
@@ -603,6 +822,34 @@ export default defineComponent({
       });
     };
 
+    const replaceDrilldownToLogs = (str: any, obj: any) => {
+      // If str is exactly equal to a key, return its value directly
+      for (const key in obj) {
+        if (`\$\{${key}\}` === str) {
+          let value = obj[key];
+
+          // Ensure string values are wrapped in quotes
+          return typeof value === "string" ? `'${value}'` : value;
+        }
+      }
+
+      return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
+        // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
+        let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
+
+        let value = obj;
+        for (let part of parts) {
+          if (value && part in value) {
+            value = value[part];
+          } else {
+            return "${" + key + "}"; // Keep the placeholder if the key is not found
+          }
+        }
+
+        // Ensure string values are wrapped in quotes
+        return typeof value === "string" ? `'${value}'` : value;
+      });
+    };
     // get offset from parent
     function getOffsetFromParent(parent: any, child: any) {
       const parentRect = parent.getBoundingClientRect();
@@ -616,71 +863,116 @@ export default defineComponent({
 
     // need to save click event params, to open drilldown
     let drilldownParams: any = [];
-
     const onChartClick = async (params: any, ...args: any) => {
-      // check if drilldown data exists
-      if (
-        !panelSchema.value.config.drilldown ||
-        panelSchema.value.config.drilldown.length == 0
-      ) {
-        return;
+      // Check if we have both drilldown and annotation at the same point
+      const hasAnnotation =
+        params?.componentType === "markLine" ||
+        params?.componentType === "markArea";
+      const hasDrilldown = panelSchema.value.config.drilldown?.length > 0;
+
+      // If in annotation add mode, handle that first
+      if (allowAnnotationsAdd.value) {
+        if (isAddAnnotationMode.value) {
+          if (hasAnnotation) {
+            editAnnotation(params?.data?.annotationDetails);
+          } else {
+            handleAddAnnotation(
+              params?.data?.[0] || params?.data?.time || params?.data?.name,
+              null,
+            );
+          }
+          return;
+        }
       }
 
-      drilldownParams = [params, args];
+      // Store click parameters for drilldown
+      if (hasDrilldown) {
+        drilldownParams = [params, args];
+        drilldownArray.value = panelSchema.value.config.drilldown ?? [];
+      }
 
-      // drilldownarrayref offset values
-      let offSetValues = { left: 0, top: 0 };
-
-      // if type is table, calculate offset
-      if (panelSchema.value.type == "table") {
-        offSetValues = getOffsetFromParent(chartPanelRef.value, params?.target);
-
-        // also, add offset of clicked position
-        offSetValues.left += params?.offsetX;
-        offSetValues.top += params?.offsetY;
+      // Calculate offset values based on chart type
+      let offsetValues = { left: 0, top: 0 };
+      if (panelSchema.value.type === "table") {
+        offsetValues = getOffsetFromParent(chartPanelRef.value, params?.target);
+        offsetValues.left += params?.offsetX;
+        offsetValues.top += params?.offsetY;
       } else {
-        // for all other charts
-        offSetValues.left = params?.event?.offsetX;
-        offSetValues.top = params?.event?.offsetY;
+        offsetValues.left = params?.event?.offsetX;
+        offsetValues.top = params?.event?.offsetY;
       }
 
-      // set drilldown array, to show list of drilldowns
-      drilldownArray.value = panelSchema.value.config.drilldown ?? [];
-
-      // temporarily show the popup to calculate its dimensions
-      drilldownPopUpRef.value.style.display = "block";
-
-      // wait for the next DOM update cycle before calculating the dimensions
-      await nextTick();
-
-      // if not enough space to show drilldown at the bottom, show it above the cursor
-      if (
-        offSetValues.top + drilldownPopUpRef.value.offsetHeight >
-        chartPanelRef.value.offsetHeight
-      ) {
-        offSetValues.top =
-          offSetValues.top - drilldownPopUpRef.value.offsetHeight;
-      }
-      if (
-        offSetValues.left + drilldownPopUpRef.value.offsetWidth >
-        chartPanelRef.value.offsetWidth
-      ) {
-        // if not enough space on the right, show the popup to the left of the cursor
-        offSetValues.left =
-          offSetValues.left - drilldownPopUpRef.value.offsetWidth;
-      }
-
-      // 24 px takes panel header height
-      drilldownPopUpRef.value.style.top = offSetValues?.top + 5 + "px";
-      drilldownPopUpRef.value.style.left = offSetValues?.left + 5 + "px";
-
-      // if drilldownArray has at least one element then only show the drilldown pop up
-      if (drilldownArray.value.length > 0) {
+      // Handle popup displays with priority
+      if (hasDrilldown) {
+        // Show drilldown popup first
         drilldownPopUpRef.value.style.display = "block";
-      } else {
-        // hide the popup if there's no drilldown
-        hideDrilldownPopUp();
+        await nextTick();
+
+        const drilldownOffset = calculatePopupOffset(
+          offsetValues.left,
+          offsetValues.top,
+          drilldownPopUpRef,
+          chartPanelRef,
+        );
+
+        drilldownPopUpRef.value.style.top = drilldownOffset.top + 5 + "px";
+        drilldownPopUpRef.value.style.left = drilldownOffset.left + 5 + "px";
+      } else if (hasAnnotation) {
+        // Only show annotation popup if there's no drilldown
+        const description = params?.data?.annotationDetails?.text;
+        if (description) {
+          selectedAnnotationData.value = params?.data?.annotationDetails;
+          annotationPopupRef.value.style.display = "block";
+
+          await nextTick();
+
+          const annotationOffset = calculatePopupOffset(
+            offsetValues.left,
+            offsetValues.top,
+            annotationPopupRef,
+            chartPanelRef,
+          );
+
+          annotationPopupRef.value.style.top = annotationOffset.top + 5 + "px";
+          annotationPopupRef.value.style.left =
+            annotationOffset.left + 5 + "px";
+        }
       }
+
+      // Hide popups if no content to display
+      if (
+        !hasDrilldown &&
+        (!hasAnnotation || !params?.data?.annotationDetails?.text)
+      ) {
+        hidePopupsAndOverlays();
+      }
+    };
+
+    // Helper function to calculate popup offset
+    const calculatePopupOffset = (
+      offsetX: any,
+      offsetY: any,
+      popupRef: any,
+      containerRef: any,
+    ) => {
+      let offSetValues = { left: offsetX, top: offsetY };
+
+      if (popupRef.value) {
+        if (
+          offSetValues.top + popupRef.value.offsetHeight >
+          containerRef.value.offsetHeight
+        ) {
+          offSetValues.top -= popupRef.value.offsetHeight;
+        }
+        if (
+          offSetValues.left + popupRef.value.offsetWidth >
+          containerRef.value.offsetWidth
+        ) {
+          offSetValues.left -= popupRef.value.offsetWidth;
+        }
+      }
+
+      return offSetValues;
     };
 
     const { showErrorNotification } = useNotifications();
@@ -771,6 +1063,75 @@ export default defineComponent({
       return whereClause;
     };
 
+    const replaceVariablesValue = (
+      query: any,
+      currentDependentVariablesData: any,
+      panelSchema: any,
+    ) => {
+      const queryType = panelSchema?.value?.queryType;
+      currentDependentVariablesData?.forEach((variable: any) => {
+        const variableName = `$${variable.name}`;
+
+        let variableValue = "";
+        if (Array.isArray(variable.value)) {
+          const value = variable.value
+            .map((value: any) => `'${value}'`)
+            .join(",");
+          const possibleVariablesPlaceHolderTypes = [
+            {
+              placeHolder: `\${${variable.name}:csv}`,
+              value: variable.value.join(","),
+            },
+            {
+              placeHolder: `\${${variable.name}:pipe}`,
+              value: variable.value.join("|"),
+            },
+            {
+              placeHolder: `\${${variable.name}:doublequote}`,
+              value: variable.value.map((value: any) => `"${value}"`).join(","),
+            },
+            {
+              placeHolder: `\${${variable.name}:singlequote}`,
+              value: value,
+            },
+            {
+              placeHolder: `\${${variable.name}}`,
+              value: queryType === "sql" ? value : variable.value.join("|"),
+            },
+            {
+              placeHolder: `\$${variable.name}`,
+              value: queryType === "sql" ? value : variable.value.join("|"),
+            },
+          ];
+
+          possibleVariablesPlaceHolderTypes.forEach((placeHolderObj) => {
+            // if (query.includes(placeHolderObj.placeHolder)) {
+            //   metadata.push({
+            //     type: "variable",
+            //     name: variable.name,
+            //     value: placeHolderObj.value,
+            //   });
+            // }
+            query = query.replaceAll(
+              placeHolderObj.placeHolder,
+              placeHolderObj.value,
+            );
+          });
+        } else {
+          variableValue = variable.value === null ? "" : variable.value;
+          // if (query.includes(variableName)) {
+          //   metadata.push({
+          //     type: "variable",
+          //     name: variable.name,
+          //     value: variable.value,
+          //   });
+          // }
+          query = query.replaceAll(variableName, variableValue);
+        }
+      });
+
+      return query;
+    };
     const constructLogsUrl = (
       streamName: string,
       calculatedTimeRange: { startTime: number; endTime: number },
@@ -802,7 +1163,7 @@ export default defineComponent({
     };
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
-      hideDrilldownPopUp();
+      hidePopupsAndOverlays();
 
       // if panelSchema exists
       if (panelSchema.value) {
@@ -839,33 +1200,139 @@ export default defineComponent({
             intervalMicro.value,
           );
 
-          if (!parser) {
-            await importSqlParser();
+          let modifiedQuery = originalQuery;
+
+          if (drilldownData.data.logsMode === "auto") {
+            if (!parser) {
+              await importSqlParser();
+            }
+            const ast = await parseQuery(originalQuery, parser);
+
+            if (!ast) return;
+
+            const tableAliases = ast.from
+              ?.filter((fromEntry: any) => fromEntry.as)
+              .map((fromEntry: any) => fromEntry.as);
+
+            const aliasClause = tableAliases?.length
+              ? ` AS ${tableAliases.join(", ")}`
+              : "";
+
+            const breakdownColumn = breakdown[0]?.column;
+
+            const seriesIndex = drilldownParams[0]?.seriesIndex;
+            const breakdownSeriesName =
+              seriesIndex !== undefined
+                ? panelData.value.options.series[seriesIndex]
+                : undefined;
+            const uniqueSeriesName = breakdownSeriesName
+              ? breakdownSeriesName.originalSeriesName
+              : drilldownParams[0]?.seriesName;
+            const breakdownValue = uniqueSeriesName;
+
+            const whereClause = buildWhereClause(
+              ast,
+              breakdownColumn,
+              breakdownValue,
+            );
+
+            modifiedQuery = `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`;
+          } else {
+            // Create drilldown variables object exactly as you do for other drilldown types
+            const drilldownVariables: any = {};
+
+            // Add time range
+            if (
+              selectedTimeObj?.value?.start_time &&
+              selectedTimeObj?.value?.start_time != "Invalid Date"
+            ) {
+              drilldownVariables.start_time = new Date(
+                selectedTimeObj?.value?.start_time?.toISOString(),
+              ).getTime();
+            }
+            if (
+              selectedTimeObj?.value?.end_time &&
+              selectedTimeObj?.value?.end_time != "Invalid Date"
+            ) {
+              drilldownVariables.end_time = new Date(
+                selectedTimeObj?.value?.end_time?.toISOString(),
+              ).getTime();
+            }
+
+            // Add query and encoded query
+            drilldownVariables.query =
+              metadata?.value?.queries[0]?.query ??
+              panelSchema?.value?.queries[0]?.query ??
+              "";
+            drilldownVariables.query_encoded = b64EncodeUnicode(
+              drilldownVariables.query,
+            );
+
+            // Handle different chart types
+            if (panelSchema.value.type == "table") {
+              const fields: any = {};
+              panelSchema.value.queries.forEach((query: any) => {
+                const panelFields: any = [
+                  ...(query.fields.x || []),
+                  ...(query.fields.y || []),
+                  ...(query.fields.z || []),
+                ];
+                panelFields.forEach((field: any) => {
+                  fields[field.label] = drilldownParams[1][0][field.alias];
+                  fields[field.alias] = drilldownParams[1][0][field.alias];
+                });
+              });
+              drilldownVariables.row = {
+                field: fields,
+                index: drilldownParams[1][1],
+              };
+            } else if (panelSchema.value.type == "sankey") {
+              if (drilldownParams[0].dataType == "node") {
+                drilldownVariables.node = {
+                  __name: drilldownParams[0]?.name ?? "",
+                  __value: drilldownParams[0]?.value ?? "",
+                };
+              } else {
+                drilldownVariables.edge = {
+                  __source: drilldownParams[0]?.data?.source ?? "",
+                  __target: drilldownParams[0]?.data?.target ?? "",
+                  __value: drilldownParams[0]?.data?.value ?? "",
+                };
+              }
+            } else {
+              drilldownVariables.series = {
+                __name: ["pie", "donut", "heatmap"].includes(
+                  panelSchema.value.type,
+                )
+                  ? drilldownParams[0].name
+                  : drilldownParams[0].seriesName,
+                __value: Array.isArray(drilldownParams[0].value)
+                  ? drilldownParams[0].value[
+                      drilldownParams[0].value.length - 1
+                    ]
+                  : drilldownParams[0].value,
+              };
+            }
+
+            variablesData?.value?.values?.forEach((variable: any) => {
+              if (variable.type != "dynamic_filters") {
+                drilldownVariables[variable.name] = variable.value;
+              }
+            });
+
+            let queryWithReplacedPlaceholders = replaceVariablesValue(
+              drilldownData?.data?.logsQuery,
+              variablesData?.value?.values,
+              panelSchema,
+            );
+
+            queryWithReplacedPlaceholders = replaceDrilldownToLogs(
+              queryWithReplacedPlaceholders,
+              drilldownVariables,
+            );
+
+            modifiedQuery = queryWithReplacedPlaceholders;
           }
-
-          const ast = await parseQuery(originalQuery, parser);
-          if (!ast) return;
-
-          const tableAliases = ast.from
-            ?.filter((fromEntry: any) => fromEntry.as)
-            .map((fromEntry: any) => fromEntry.as);
-
-          const aliasClause = tableAliases?.length
-            ? ` AS ${tableAliases.join(", ")}`
-            : "";
-
-          const breakdownColumn = breakdown[0]?.column;
-          const breakdownValue = drilldownParams[0]?.seriesName;
-          const whereClause = buildWhereClause(
-            ast,
-            breakdownColumn,
-            breakdownValue,
-          );
-
-          let modifiedQuery =
-            drilldownData.data.logsMode === "auto"
-              ? `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`
-              : drilldownData.data.logsQuery;
 
           modifiedQuery = modifiedQuery.replace(/`/g, '"');
 
@@ -1181,12 +1648,25 @@ export default defineComponent({
       metadata,
       tableRendererRef,
       onChartClick,
+      onDataZoom,
       drilldownArray,
+      selectedAnnotationData,
       openDrilldown,
       drilldownPopUpRef,
-      hideDrilldownPopUp,
+      annotationPopupRef,
+      hidePopupsAndOverlays,
       chartPanelClass,
       chartPanelHeight,
+      validatePanelData,
+      isAddAnnotationDialogVisible,
+      closeAddAnnotation,
+      isAddAnnotationMode,
+      toggleAddAnnotationMode,
+      annotationToAddEdit,
+      checkIfPanelIsTimeSeries,
+      panelsList,
+      isCursorOverPanel,
+      showPopupsAndOverlays,
     };
   },
 });
@@ -1196,6 +1676,7 @@ export default defineComponent({
 .drilldown-item:hover {
   background-color: rgba(202, 201, 201, 0.908);
 }
+
 .errorMessage {
   position: absolute;
   top: 20%;
@@ -1203,7 +1684,7 @@ export default defineComponent({
   height: 80%;
   overflow: hidden;
   text-align: center;
-  color: rgba(255, 0, 0, 0.8);
+  // color: rgba(255, 0, 0, 0.8);
   text-overflow: ellipsis;
 }
 

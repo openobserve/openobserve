@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
+    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         bitvec::BitVec,
@@ -28,12 +30,11 @@ use config::{
     },
     metrics,
     utils::{inverted_index::split_token, json, time::BASE_TIME},
-    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use datafusion::{
-    common::{tree_node::TreeNode, TableReference},
+    common::{TableReference, tree_node::TreeNode},
     error::DataFusionError,
-    physical_plan::{displayable, visit_execution_plan, ExecutionPlan},
+    physical_plan::{ExecutionPlan, displayable, visit_execution_plan},
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -44,17 +45,18 @@ use infra::{
 };
 use itertools::Itertools;
 use proto::cluster_rpc::{self, SearchQuery};
-use tracing::{info_span, Instrument};
+use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::infra::cluster as infra_cluster,
     service::search::{
+        DATAFUSION_RUNTIME,
         datafusion::{
             distributed_plan::{
+                EmptyExecVisitor,
                 remote_scan::RemoteScanExec,
                 rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
-                EmptyExecVisitor,
             },
             exec::{prepare_datafusion_context, register_udf},
             optimizer::generate_optimizer_rules,
@@ -64,7 +66,6 @@ use crate::{
         request::Request,
         sql::Sql,
         utils::{AsyncDefer, ScanStatsVisitor},
-        DATAFUSION_RUNTIME,
     },
 };
 
@@ -110,7 +111,7 @@ pub async fn search(
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, took: {} ms",
         sql.time_range,
         file_id_list_vec.len(),
         file_id_list_took,
@@ -131,9 +132,19 @@ pub async fn search(
     let node_group = req
         .search_event_type
         .as_ref()
-        .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
+        .map(|v| {
+            SearchEventType::try_from(v.as_str())
+                .ok()
+                .map(RoleGroup::from)
+        })
         .unwrap_or(None);
-    let nodes = get_online_querier_nodes(trace_id, node_group).await?;
+    let mut nodes = get_online_querier_nodes(trace_id, node_group).await?;
+
+    // local mode, only use local node as querier for the query
+    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
+        nodes = vec![LOCAL_NODE.clone()];
+    }
+
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");
@@ -371,6 +382,7 @@ pub async fn run_datafusion(
         .collect::<HashMap<_, _>>();
 
     // check inverted index prefix search
+    #[allow(deprecated)]
     if sql.stream_type == StreamType::Index
         && cfg.common.full_text_search_type.to_lowercase() != "contains"
     {
@@ -418,7 +430,9 @@ pub async fn run_datafusion(
 
     let mut visitor = EmptyExecVisitor::default();
     if physical_plan.visit(&mut visitor).is_err() {
-        log::error!("[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable");
+        log::error!(
+            "[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable"
+        );
         return Err(Error::Message(
             "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
         ));
@@ -450,7 +464,13 @@ pub async fn get_online_querier_nodes(
     node_group: Option<RoleGroup>,
 ) -> Result<Vec<Node>> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
+    let cfg = get_config();
+    let nodes = if cfg.common.feature_query_skip_wal {
+        infra_cluster::get_cached_online_querier_nodes(node_group).await
+    } else {
+        infra_cluster::get_cached_online_query_nodes(node_group).await
+    };
+    let mut nodes = match nodes {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] flight->search: no querier node online");
@@ -819,6 +839,7 @@ async fn get_inverted_index_file_lists(
     query: &SearchQuery,
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = get_config();
+    #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
     let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
@@ -844,7 +865,7 @@ async fn get_inverted_index_file_lists(
     )
     .await?;
     log::info!(
-        "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, files: {}, scan_size: {} mb, took: {} ms",
         sql.time_range,
         idx_file_list.len(),
         idx_scan_size,
@@ -876,6 +897,7 @@ pub async fn get_inverted_index_file_list(
     let terms = match_terms
         .iter()
         .filter_map(|t| {
+            #[allow(deprecated)]
             let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
             if tokens.is_empty() {
                 None
@@ -890,6 +912,7 @@ pub async fn get_inverted_index_file_list(
         })
         .collect::<HashSet<String>>();
 
+    #[allow(deprecated)]
     let fts_condition = terms
         .iter()
         .map(|x| match cfg.common.full_text_search_type.as_str() {
@@ -899,6 +922,7 @@ pub async fn get_inverted_index_file_list(
         })
         .collect::<Vec<_>>()
         .join(" OR ");
+    #[allow(deprecated)]
     let fts_condition = if fts_condition.is_empty() {
         fts_condition
     } else if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
@@ -940,6 +964,7 @@ pub async fn get_inverted_index_file_list(
         }
     };
 
+    #[allow(deprecated)]
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -954,11 +979,11 @@ pub async fn get_inverted_index_file_list(
     req.stream_type = StreamType::Index;
     query.sql = sql;
     query.from = 0;
-    query.size = QUERY_WITH_NO_LIMIT;
+    query.size = QUERY_WITH_NO_LIMIT as i32;
     query.track_total_hits = false;
     query.uses_zo_fn = false;
     query.query_fn = "".to_string();
-    let resp = super::http::search(req, query, vec![], vec![]).await?;
+    let resp = super::http::search(req, query, vec![], vec![], false).await?;
 
     // Merge bitmap segment_ids of the same file
     let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();

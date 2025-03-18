@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,12 +15,12 @@
 
 use actix_web::HttpResponse;
 use config::meta::stream::StreamType;
-use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+use o2_openfga::meta::mapping::OFGA_MODELS;
 
 use crate::common::{
     infra::config::USERS,
     meta::{self, http::HttpResponse as MetaHttpResponse},
-    utils::auth::{is_root_user, AuthExtractor},
+    utils::auth::{AuthExtractor, is_root_user},
 };
 
 // Check permissions on stream

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use ::config::{
     get_config,
     meta::{
@@ -24,9 +22,11 @@ use ::config::{
     utils::rand::get_rand_element,
 };
 use actix_web::{
+    FromRequest, HttpRequest, HttpResponse,
     http::{Error, Method},
-    route, web, FromRequest, HttpRequest, HttpResponse,
+    route, web,
 };
+use hashbrown::HashMap;
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
@@ -189,6 +189,7 @@ async fn dispatch(
     let new_url = get_url(&path).await;
     if new_url.is_error {
         return Ok(HttpResponse::ServiceUnavailable()
+            .force_close()
             .body(new_url.error.unwrap_or("internal server error".to_string())));
     }
 
@@ -244,7 +245,7 @@ async fn get_url(path: &str) -> URLDetails {
     }
 
     let nodes = nodes.unwrap();
-    let node = get_rand_element(&nodes);
+    let node = cluster::select_best_node(&nodes).unwrap_or(get_rand_element(&nodes));
     URLDetails {
         is_error: false,
         error: None,
@@ -270,13 +271,15 @@ async fn default_proxy(
         Ok(resp) => resp,
         Err(e) => {
             log::error!(
-                "dispatch: {} to {}, proxy request error: {}, took: {} ms",
+                "dispatch: {} to {}, proxy request error: {:?}, took: {} ms",
                 new_url.path,
                 new_url.node_addr,
                 e,
                 start.elapsed().as_millis()
             );
-            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+            return Ok(HttpResponse::ServiceUnavailable()
+                .force_close()
+                .body(e.to_string()));
         }
     };
 
@@ -299,13 +302,15 @@ async fn default_proxy(
         Ok(b) => b,
         Err(e) => {
             log::error!(
-                "dispatch: {} to {}, proxy response error: {}, took: {} ms",
+                "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
                 new_url.path,
                 new_url.node_addr,
                 e,
                 start.elapsed().as_millis()
             );
-            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+            return Ok(HttpResponse::ServiceUnavailable()
+                .force_close()
+                .body(e.to_string()));
         }
     };
     Ok(new_resp.body(body))
@@ -341,12 +346,16 @@ async fn proxy_querier_by_body(
     // get node name by consistent hash
     let Some(node_name) = cluster::get_node_from_consistent_hash(&key, &Role::Querier, None).await
     else {
-        return Ok(HttpResponse::ServiceUnavailable().body("No online querier nodes"));
+        return Ok(HttpResponse::ServiceUnavailable()
+            .force_close()
+            .body("No online querier nodes"));
     };
 
     // get node by name
     let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
-        return Ok(HttpResponse::ServiceUnavailable().body("No online querier nodes"));
+        return Ok(HttpResponse::ServiceUnavailable()
+            .force_close()
+            .body("No online querier nodes"));
     };
     new_url.full_url = format!("{}{}", node.http_addr, new_url.path);
     new_url.node_addr = node
@@ -365,13 +374,15 @@ async fn proxy_querier_by_body(
         Ok(resp) => resp,
         Err(e) => {
             log::error!(
-                "dispatch: {} to {}, proxy request error: {}, took: {} ms",
+                "dispatch: {} to {}, proxy request error: {:?}, took: {} ms",
                 new_url.path,
                 new_url.node_addr,
                 e,
                 start.elapsed().as_millis()
             );
-            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+            return Ok(HttpResponse::ServiceUnavailable()
+                .force_close()
+                .body(e.to_string()));
         }
     };
 
@@ -394,13 +405,15 @@ async fn proxy_querier_by_body(
         Ok(b) => b,
         Err(e) => {
             log::error!(
-                "dispatch: {} to {}, proxy response error: {}, took: {} ms",
+                "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
                 new_url.path,
                 new_url.node_addr,
                 e,
                 start.elapsed().as_millis()
             );
-            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+            return Ok(HttpResponse::ServiceUnavailable()
+                .force_close()
+                .body(e.to_string()));
         }
     };
     Ok(new_resp.body(body))
@@ -413,28 +426,32 @@ async fn proxy_ws(
     start: std::time::Instant,
 ) -> actix_web::Result<HttpResponse, Error> {
     let cfg = get_config();
-    if cfg.common.websocket_enabled {
+    if cfg.websocket.enabled {
         // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
         let ws_url = match ws::convert_to_websocket_url(&new_url.full_url) {
             Ok(url) => url,
             Err(e) => {
-                log::error!("Error converting URL to WebSocket: {}", e);
-                return Ok(HttpResponse::BadRequest().body("Invalid WebSocket URL"));
+                log::error!("Error converting URL to WebSocket: {:?}", e);
+                return Ok(HttpResponse::BadRequest()
+                    .force_close()
+                    .body("Invalid WebSocket URL"));
             }
         };
 
         match ws::ws_proxy(req, payload, &ws_url).await {
             Ok(res) => {
                 log::info!(
-                "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
-                ws_url,
-                start.elapsed().as_millis()
-            );
+                    "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
+                    ws_url,
+                    start.elapsed().as_millis()
+                );
                 Ok(res)
             }
             Err(e) => {
-                log::error!("[WS_ROUTER] failed: {}", e);
-                Ok(HttpResponse::InternalServerError().body("WebSocket proxy error"))
+                log::error!("[WS_ROUTER] failed: {:?}", e);
+                Ok(HttpResponse::InternalServerError()
+                    .force_close()
+                    .body("WebSocket proxy error"))
             }
         }
     } else {

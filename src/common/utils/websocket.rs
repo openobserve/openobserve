@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,7 @@ use config::meta::{
 };
 use infra::errors::Error;
 use sqlparser::{
-    ast::{visit_statements_mut, Expr, FunctionArguments, Statement},
+    ast::{Expr, FunctionArguments, Statement, visit_statements_mut},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -77,7 +77,7 @@ pub(crate) fn update_histogram_interval_in_query(
         .unwrap();
 
     visit_statements_mut(&mut statement, |stmt| {
-        if let Statement::Query(ref mut query) = stmt {
+        if let Statement::Query(query) = stmt {
             if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
                 for projection in &mut select.projection {
                     match projection {
@@ -194,5 +194,25 @@ mod tests {
             (remaining_query_range - (4.0 - queried_range)).abs() < f64::EPSILON,
             "Updated remaining query range should be correct"
         );
+    }
+
+    #[test]
+    fn test_histogram_with_normal_where() {
+        let sql = "SELECT histogram(_timestamp, '30 seconds') AS time_bucket, COUNT(*) AS count FROM logs WHERE status = 500 AND level = 'error' GROUP BY time_bucket ORDER BY time_bucket ASC";
+        let histogram_interval = 30;
+
+        let result = update_histogram_interval_in_query(sql, histogram_interval).unwrap();
+
+        assert_eq!(result, sql);
+    }
+
+    #[test]
+    fn test_histogram_with_match_all_udf() {
+        let sql = "SELECT histogram(_timestamp, '10 second') AS zo_sql_key, COUNT(*) AS zo_sql_num FROM default WHERE match_all('.parquet') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC";
+        let histogram_interval = 10;
+
+        let result = update_histogram_interval_in_query(sql, histogram_interval).unwrap();
+
+        assert_eq!(result, sql);
     }
 }

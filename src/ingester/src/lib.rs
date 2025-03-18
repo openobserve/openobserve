@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,15 +23,18 @@ mod stream;
 mod wal;
 mod writer;
 
-use std::{path::PathBuf, sync::Arc};
+use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
-use tokio::sync::{mpsc, Mutex};
-pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
+use snafu::ResultExt;
+use tokio::sync::{Mutex, mpsc};
+pub use writer::{Writer, check_memtable_size, flush_all, get_writer, read_from_memtable};
+
+use crate::errors::OpenDirSnafu;
 
 pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchEntry>>);
 
@@ -40,13 +43,27 @@ pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::F
 
 pub static WAL_DIR_DEFAULT_PREFIX: &str = "logs";
 
+// writer signal
+pub enum WriterSignal {
+    Produce,
+    Rotate,
+    Close,
+}
+
 pub async fn init() -> errors::Result<()> {
     // check uncompleted parquet files, need delete those files
     wal::check_uncompleted_parquet_files().await?;
 
     // replay wal files to create immutable
+    let wal_dir = PathBuf::from(&config::get_config().common.data_wal_dir).join("logs");
+    create_dir_all(&wal_dir).context(OpenDirSnafu {
+        path: wal_dir.clone(),
+    })?;
+    let wal_files = wal::wal_scan_files(&wal_dir, "wal")
+        .await
+        .unwrap_or_default();
     tokio::task::spawn(async move {
-        if let Err(e) = wal::replay_wal_files().await {
+        if let Err(e) = wal::replay_wal_files(wal_dir, wal_files).await {
             log::error!("replay wal files error: {}", e);
         }
     });
@@ -75,7 +92,7 @@ pub async fn init() -> errors::Result<()> {
 }
 
 async fn run() -> errors::Result<()> {
-    // start persidt worker
+    // start persist worker
     let cfg = config::get_config();
     let (tx, rx) = mpsc::channel::<PathBuf>(cfg.limit.mem_dump_thread_num);
     let rx = Arc::new(Mutex::new(rx));

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,6 @@
 
 use std::{future::Future, sync::Arc};
 
-use bytes::Bytes;
 use config::meta::{alerts::alert::Alert, stream::StreamType};
 use itertools::Itertools;
 
@@ -51,7 +50,7 @@ pub async fn watch_events<OnPut, OnPutFut, OnDelete, OnDeleteFut>(
     on_delete: OnDelete,
 ) -> Result<(), anyhow::Error>
 where
-    OnPut: Fn(String, StreamType, String, String, Option<Bytes>) -> OnPutFut,
+    OnPut: Fn(String, StreamType, String, String) -> OnPutFut,
     OnPutFut: Future<Output = Result<(), anyhow::Error>>,
     OnDelete: Fn(String, StreamType, String, String) -> OnDeleteFut,
     OnDeleteFut: Future<Output = Result<(), anyhow::Error>>,
@@ -75,7 +74,7 @@ where
                     log::error!("watch_alerts: failed to parse event key {}", &ev.key);
                     continue;
                 };
-                let _ = (on_put)(org, stream_type, stream_name, alert_name, ev.value).await;
+                let _ = (on_put)(org, stream_type, stream_name, alert_name).await;
             }
             Event::Delete(ev) => {
                 let Some((org, stream_type, stream_name, alert_name)) = parse_alert_key(&ev.key)

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,33 +18,32 @@ use std::{ops::ControlFlow, sync::Arc};
 use arrow_schema::FieldRef;
 use chrono::Duration;
 use config::{
-    get_config,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         inverted_index::InvertedIndexOptimizeMode,
-        sql::{resolve_stream_names_with_type, OrderBy, Sql as MetaSql, TableReferenceExt},
+        sql::{OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{
-        get_stream_setting_defined_schema_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
+        SchemaCache, get_stream_setting_defined_schema_fields, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_stream_settings,
     },
 };
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
 use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
-        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, Select,
-        SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut, VisitorMut,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
+        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, Value,
+        VisitMut, VisitorMut, helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -57,9 +56,9 @@ use super::{
         FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
         MATCH_ALL_UDF_NAME,
     },
-    index::{get_index_condition_from_expr, IndexCondition},
+    index::{IndexCondition, get_index_condition_from_expr},
     request::Request,
-    utils::{is_field, is_value, split_conjunction, trim_quotes},
+    utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
@@ -159,10 +158,10 @@ impl Sql {
             && !column_visitor.has_agg_function
             && !column_visitor.is_distinct
         {
-            order_by.push((cfg.common.column_timestamp.clone(), OrderBy::Desc));
+            order_by.push((TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc));
         }
         let need_sort_by_time = order_by.len() == 1
-            && order_by[0].0 == cfg.common.column_timestamp
+            && order_by[0].0 == TIMESTAMP_COL_NAME
             && order_by[0].1 == OrderBy::Desc;
         let use_inverted_index = column_visitor.use_inverted_index;
 
@@ -242,6 +241,7 @@ impl Sql {
         // 11. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
+        #[allow(deprecated)]
         if cfg.common.inverted_index_search_format.eq("tantivy")
             && stream_names.len() == 1
             && cfg.common.inverted_index_enabled
@@ -258,7 +258,7 @@ impl Sql {
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
-            && order_by[0].0 == cfg.common.column_timestamp
+            && order_by[0].0 == TIMESTAMP_COL_NAME
             && can_optimize
         {
             index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleSelect(
@@ -339,13 +339,20 @@ fn generate_select_star_schema(
         let defined_schema_fields = get_stream_setting_defined_schema_fields(&stream_settings);
         let has_original_column = *has_original_column.get(&name).unwrap_or(&false);
         // check if it is user defined schema
-        if defined_schema_fields.is_empty() {
+        if defined_schema_fields.is_empty() || defined_schema_fields.len() > quick_mode_num_fields {
             let quick_mode = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
             let skip_original_column =
                 !has_original_column && schema.contains_field(ORIGINAL_DATA_COL_NAME);
             if quick_mode || skip_original_column {
                 let fields = if quick_mode {
-                    let columns = columns.get(&name);
+                    let mut columns = columns.get(&name).cloned();
+                    // filter columns by defined schema fields
+                    if !defined_schema_fields.is_empty() {
+                        let uds_columns = defined_schema_fields.iter().collect::<HashSet<_>>();
+                        if let Some(columns) = columns.as_mut() {
+                            columns.retain(|column| uds_columns.contains(column));
+                        }
+                    }
                     let fts_fields = get_stream_setting_fts_fields(&stream_settings);
                     generate_quick_mode_fields(
                         schema.schema(),
@@ -382,8 +389,8 @@ fn generate_user_defined_schema(
 ) -> Arc<SchemaCache> {
     let cfg = get_config();
     let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-    if !fields.contains(&cfg.common.column_timestamp) {
-        fields.insert(cfg.common.column_timestamp.to_string());
+    if !fields.contains(TIMESTAMP_COL_NAME) {
+        fields.insert(TIMESTAMP_COL_NAME.to_string());
     }
     if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
         fields.insert(cfg.common.column_all.to_string());
@@ -403,7 +410,7 @@ fn generate_user_defined_schema(
 
 fn generate_quick_mode_fields(
     schema: &Schema,
-    columns: Option<&HashSet<String>>,
+    columns: Option<HashSet<String>>,
     fts_fields: &[String],
     skip_original_column: bool,
 ) -> Vec<Arc<arrow_schema::Field>> {
@@ -443,17 +450,17 @@ fn generate_quick_mode_fields(
         .collect::<HashSet<_>>();
 
     // check _timestamp
-    if !fields_name.contains(&cfg.common.column_timestamp) {
-        if let Ok(field) = schema.field_with_name(&cfg.common.column_timestamp) {
+    if !fields_name.contains(TIMESTAMP_COL_NAME) {
+        if let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME) {
             fields.push(Arc::new(field.clone()));
-            fields_name.insert(cfg.common.column_timestamp.to_string());
+            fields_name.insert(TIMESTAMP_COL_NAME.to_string());
         }
     }
     // add the selected columns
     if let Some(columns) = columns {
         for column in columns {
-            if !fields_name.contains(column) {
-                if let Ok(field) = schema.field_with_name(column) {
+            if !fields_name.contains(&column) {
+                if let Ok(field) = schema.field_with_name(&column) {
                     fields.push(Arc::new(field.clone()));
                     fields_name.insert(column.to_string());
                 }
@@ -493,8 +500,8 @@ fn generate_schema_fields(
     let mut columns = columns;
 
     // 1. add timestamp field
-    if !columns.contains(&get_config().common.column_timestamp) {
-        columns.insert(get_config().common.column_timestamp.clone());
+    if !columns.contains(TIMESTAMP_COL_NAME) {
+        columns.insert(TIMESTAMP_COL_NAME.to_string());
     }
 
     // 2. check _o2_id
@@ -719,11 +726,16 @@ impl VisitorMut for IndexVisitor {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
                 self.index_condition = index;
+                let can_remove_filter = self
+                    .index_condition
+                    .as_ref()
+                    .map(|v| v.can_remove_filter())
+                    .unwrap_or(true);
                 // make sure all filter in where clause can be used in inverted index
-                if other_expr.is_none() && select.selection.is_some() {
+                if other_expr.is_none() && select.selection.is_some() && can_remove_filter {
                     self.can_optimize = true;
                 }
-                if self.is_remove_filter {
+                if self.is_remove_filter && can_remove_filter {
                     select.selection = other_expr;
                 }
             }
@@ -886,6 +898,7 @@ impl VisitorMut for PrefixColumnVisitor<'_> {
                         expr,
                         pattern,
                         escape_char: _,
+                        any: _,
                     } = e
                     {
                         match expr.as_ref() {
@@ -1016,10 +1029,7 @@ impl VisitorMut for AddTimestampVisitor {
                     SelectItem::UnnamedExpr(expr) => {
                         let mut visitor = FieldNameVisitor::new();
                         expr.visit(&mut visitor);
-                        if visitor
-                            .field_names
-                            .contains(&get_config().common.column_timestamp)
-                        {
+                        if visitor.field_names.contains(TIMESTAMP_COL_NAME) {
                             has_timestamp = true;
                             break;
                         }
@@ -1027,10 +1037,7 @@ impl VisitorMut for AddTimestampVisitor {
                     SelectItem::ExprWithAlias { expr, alias: _ } => {
                         let mut visitor = FieldNameVisitor::new();
                         expr.visit(&mut visitor);
-                        if visitor
-                            .field_names
-                            .contains(&get_config().common.column_timestamp)
-                        {
+                        if visitor.field_names.contains(TIMESTAMP_COL_NAME) {
                             has_timestamp = true;
                             break;
                         }
@@ -1046,7 +1053,7 @@ impl VisitorMut for AddTimestampVisitor {
                 select.projection.insert(
                     0,
                     SelectItem::UnnamedExpr(Expr::Identifier(Ident::new(
-                        get_config().common.column_timestamp.clone(),
+                        TIMESTAMP_COL_NAME.to_string(),
                     ))),
                 );
             }
@@ -1257,7 +1264,7 @@ impl VisitorMut for ComplexQueryVisitor {
                 }
             }
             // check select * from table
-            Expr::Wildcard => self.is_complex = true,
+            Expr::Wildcard(_) => self.is_complex = true,
             _ => {}
         }
         if self.is_complex {
@@ -1307,9 +1314,10 @@ impl VisitorMut for HistogramIntervalVistor {
                     self.interval =
                         Some(convert_histogram_interval_to_seconds(&interval).unwrap_or_default());
                 }
+                return ControlFlow::Break(());
             }
         }
-        ControlFlow::Break(())
+        ControlFlow::Continue(())
     }
 }
 
@@ -1359,6 +1367,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                         null_treatment: None,
                         over: None,
                         within_group: vec![],
+                        uses_odbc_syntax: false,
                     }),
                     alias: Ident::new("zo_sql_num"),
                 }];
@@ -1367,8 +1376,10 @@ impl VisitorMut for TrackTotalHitsVisitor {
             }
             SetExpr::SetOperation { .. } => {
                 let select = Box::new(SetExpr::Select(Box::new(Select {
+                    select_token: AttachedToken::empty(),
                     distinct: None,
                     top: None,
+                    top_before_distinct: false,
                     projection: vec![SelectItem::ExprWithAlias {
                         expr: Expr::Function(Function {
                             name: ObjectName(vec![Ident::new("count")]),
@@ -1382,6 +1393,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                             null_treatment: None,
                             over: None,
                             within_group: vec![],
+                            uses_odbc_syntax: false,
                         }),
                         alias: Ident::new("zo_sql_num"),
                     }],
@@ -1446,6 +1458,7 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
         Expr::Identifier(Ident {
             value,
             quote_style: _,
+            span: _,
         }) => index_fields.contains(value),
         Expr::Nested(expr) => checking_inverted_index_inner(index_fields, expr),
         Expr::BinaryOp { left, op, right } => match op {
@@ -1467,6 +1480,7 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             expr,
             pattern: _,
             escape_char: _,
+            any: _,
         } => checking_inverted_index_inner(index_fields, expr),
         Expr::Function(f) => {
             let f = f.name.to_string().to_lowercase();
@@ -1518,14 +1532,17 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> 
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
-    let Some((num, unit)) = interval.splitn(2, ' ').collect_tuple() else {
-        return Err(Error::Message("Invalid interval format".to_string()));
-    };
-    let seconds = match unit.to_lowercase().as_str() {
-        "second" | "seconds" => num.parse::<i64>(),
-        "minute" | "minutes" => num.parse::<i64>().map(|n| n * 60),
-        "hour" | "hours" => num.parse::<i64>().map(|n| n * 3600),
-        "day" | "days" => num.parse::<i64>().map(|n| n * 86400),
+    let interval = interval.trim();
+    let (num, unit) = interval
+        .find(|c: char| !c.is_numeric())
+        .map(|pos| interval.split_at(pos))
+        .ok_or_else(|| Error::Message("Invalid interval format".to_string()))?;
+
+    let seconds = match unit.trim().to_lowercase().as_str() {
+        "second" | "seconds" | "s" | "secs" | "sec" => num.parse::<i64>(),
+        "minute" | "minutes" | "m" | "mins" | "min" => num.parse::<i64>().map(|n| n * 60),
+        "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
+        "day" | "days" | "d" => num.parse::<i64>().map(|n| n * 86400),
         _ => {
             return Err(Error::Message(
                 "Unsupported histogram interval unit".to_string(),
@@ -1568,7 +1585,7 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
 fn o2_id_is_needed(schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> bool {
     schemas.values().any(|schema| {
         let stream_setting = unwrap_stream_settings(schema.schema());
-        stream_setting.map_or(false, |setting| setting.store_original_data)
+        stream_setting.is_some_and(|setting| setting.store_original_data)
     })
 }
 
@@ -1623,6 +1640,7 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 let arg = match &list.args[1] {
                     FunctionArg::Named { arg, .. } => arg,
                     FunctionArg::Unnamed(arg) => arg,
+                    FunctionArg::ExprNamed { arg, .. } => arg,
                 };
                 match arg {
                     FunctionArgExpr::Expr(Expr::Value(
@@ -1656,6 +1674,138 @@ pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
         Err(e)
     } else {
         Ok(visitor.keys)
+    }
+}
+
+/// check if the sql is complex query, if not, add ordering term by timestamp
+pub fn check_or_add_order_by_timestamp(sql: &str, is_asc: bool) -> infra::errors::Result<String> {
+    let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|e| Error::Message(e.to_string()))?
+        .pop()
+        .unwrap();
+    if is_complex_query(&mut statement) {
+        return Ok(sql.to_string());
+    }
+    let mut visitor = AddOrderingTermVisitor::new(TIMESTAMP_COL_NAME.to_string(), is_asc);
+    statement.visit(&mut visitor);
+    Ok(statement.to_string())
+}
+
+struct AddOrderingTermVisitor {
+    field: String,
+    is_asc: bool,
+}
+
+impl AddOrderingTermVisitor {
+    fn new(field: String, is_asc: bool) -> Self {
+        Self { field, is_asc }
+    }
+}
+
+impl VisitorMut for AddOrderingTermVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if query.order_by.is_none() {
+            query.order_by = Some(sqlparser::ast::OrderBy {
+                exprs: vec![OrderByExpr {
+                    expr: Expr::Identifier(Ident::new(self.field.clone())),
+                    asc: Some(self.is_asc),
+                    nulls_first: None,
+                    with_fill: None,
+                }],
+                interpolate: None,
+            });
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+pub fn add_new_filters_with_and_operator(
+    sql: &str,
+    filters: HashMap<String, String>,
+) -> infra::errors::Result<String> {
+    if sql.is_empty() || filters.is_empty() {
+        return Ok(sql.to_string());
+    }
+
+    let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|e| Error::Message(e.to_string()))?
+        .pop()
+        .unwrap();
+    if is_complex_query(&mut statement) {
+        return Ok(sql.to_string());
+    }
+    let mut visitor = AddNewFiltersWithAndOperatorVisitor::new(filters);
+    statement.visit(&mut visitor);
+    Ok(statement.to_string())
+}
+
+struct AddNewFiltersWithAndOperatorVisitor {
+    filters: HashMap<String, String>,
+}
+
+impl AddNewFiltersWithAndOperatorVisitor {
+    fn new(filters: HashMap<String, String>) -> Self {
+        Self { filters }
+    }
+
+    fn build_selection(&mut self) -> Option<Expr> {
+        if self.filters.is_empty() {
+            return None;
+        }
+        let mut exprs = Vec::with_capacity(self.filters.len());
+        let mut keys = self.filters.keys().collect::<Vec<_>>();
+        keys.sort();
+        for key in keys {
+            let value = self.filters.get(key).unwrap();
+            exprs.push(Expr::BinaryOp {
+                left: Box::new(Expr::Identifier(Ident::new(key.to_string()))),
+                op: BinaryOperator::Eq,
+                right: Box::new(Expr::Value(Value::SingleQuotedString(value.to_string()))),
+            });
+        }
+        let exprs = exprs.iter().collect();
+        conjunction(exprs)
+    }
+}
+
+impl VisitorMut for AddNewFiltersWithAndOperatorVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        let Some(filter_exprs) = self.build_selection() else {
+            return ControlFlow::Break(());
+        };
+        match query.body.as_mut() {
+            SetExpr::Select(statement) => match statement.selection.as_mut() {
+                None => {
+                    statement.selection = Some(filter_exprs);
+                }
+                Some(selection) => {
+                    statement.selection = Some(Expr::BinaryOp {
+                        left: if matches!(
+                            selection,
+                            Expr::BinaryOp {
+                                op: BinaryOperator::Or,
+                                ..
+                            }
+                        ) {
+                            Box::new(Expr::Nested(Box::new(selection.clone())))
+                        } else {
+                            Box::new(selection.clone())
+                        },
+                        op: BinaryOperator::And,
+                        // the right side must be AND so don't need to check
+                        right: Box::new(filter_exprs),
+                    });
+                }
+            },
+            _ => {
+                return ControlFlow::Break(());
+            }
+        };
+        ControlFlow::Continue(())
     }
 }
 
@@ -1698,7 +1848,7 @@ mod tests {
         let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
         statement.visit(&mut index_visitor);
         let expected = "";
-        let expected_sql = "SELECT * FROM t WHERE name IS NOT NULL AND (age > 1) AND (match_all('foo') OR abs(age) = 2)";
+        let expected_sql = "SELECT * FROM t WHERE name IS NOT NULL AND age > 1 AND (match_all('foo') OR abs(age) = 2)";
         assert_eq!(
             index_visitor
                 .index_condition
@@ -1747,6 +1897,26 @@ mod tests {
         statement.visit(&mut index_visitor);
         let expected = "((name=b OR (_all:good AND _all:bar)) OR (_all:foo AND name=c))";
         let expected_sql = "SELECT * FROM t";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_index_visitor5() {
+        let sql = "SELECT * FROM t WHERE (foo = 'b' OR foo = 'c') AND foo = 'd' AND ((match_all('good') AND match_all('bar')) OR (match_all('foo') AND name = 'c'))";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        statement.visit(&mut index_visitor);
+        let expected = "((_all:good AND _all:bar) OR (_all:foo AND name=c))";
+        let expected_sql = "SELECT * FROM t WHERE (foo = 'b' OR foo = 'c') AND foo = 'd'";
         assert_eq!(
             index_visitor.index_condition.clone().unwrap().to_query(),
             expected
@@ -1905,5 +2075,368 @@ mod tests {
             .pop()
             .unwrap();
         assert_eq!(is_simple_count_query(&mut statement), false);
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_no_order_asc() {
+        let sql = "SELECT * FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(result, "SELECT * FROM logs ORDER BY _timestamp ASC");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_no_order_desc() {
+        let sql = "SELECT * FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, false).unwrap();
+        assert_eq!(result, "SELECT * FROM logs ORDER BY _timestamp DESC");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_aggregation() {
+        let sql = "SELECT COUNT(*) FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(result, "SELECT COUNT(*) FROM logs");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_existing_order() {
+        let sql = "SELECT * FROM logs ORDER BY field1 DESC";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(sql, result);
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_with_where() {
+        let sql = "SELECT * FROM logs WHERE field1 = 'value'";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(
+            result,
+            "SELECT * FROM logs WHERE field1 = 'value' ORDER BY _timestamp ASC"
+        );
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_abbreviations() {
+        // Test abbreviated formats
+        assert_eq!(convert_histogram_interval_to_seconds("1s").unwrap(), 1);
+        assert_eq!(convert_histogram_interval_to_seconds("5m").unwrap(), 300);
+        assert_eq!(convert_histogram_interval_to_seconds("2h").unwrap(), 7200);
+        assert_eq!(convert_histogram_interval_to_seconds("1d").unwrap(), 86400);
+        assert!(convert_histogram_interval_to_seconds("1w").is_err()); // week is not supported
+        assert!(convert_histogram_interval_to_seconds("1M").is_ok()); // month is not supported, but m also means minute, so it is ok
+        assert!(convert_histogram_interval_to_seconds("1y").is_err()); // year is not supported
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_full_words() {
+        // Test full word formats
+        assert_eq!(
+            convert_histogram_interval_to_seconds("1 second").unwrap(),
+            1
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("1 seconds").unwrap(),
+            1
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("5 minute").unwrap(),
+            300
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("5 minutes").unwrap(),
+            300
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("2 hour").unwrap(),
+            7200
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("2 hours").unwrap(),
+            7200
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("1 day").unwrap(),
+            86400
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("1 days").unwrap(),
+            86400
+        );
+        assert!(convert_histogram_interval_to_seconds("1 week").is_err()); // week is not supported
+        assert!(convert_histogram_interval_to_seconds("1 weeks").is_err()); // weeks is not supported
+        assert!(convert_histogram_interval_to_seconds("1 month").is_err()); // month is not supported
+        assert!(convert_histogram_interval_to_seconds("1 months").is_err()); // months is not supported
+        assert!(convert_histogram_interval_to_seconds("1 year").is_err()); // year is not supported
+        assert!(convert_histogram_interval_to_seconds("1 years").is_err()); // years is not
+        // supported
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_spacing_variants() {
+        // Test different spacing formats
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10second").unwrap(),
+            10
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10 second").unwrap(),
+            10
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10  second").unwrap(),
+            10
+        ); // double space
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10\tsecond").unwrap(),
+            10
+        ); // tab
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10seconds").unwrap(),
+            10
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10 seconds").unwrap(),
+            10
+        );
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_larger_numbers() {
+        // Test larger numbers
+        assert_eq!(
+            convert_histogram_interval_to_seconds("60 seconds").unwrap(),
+            60
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("90 minutes").unwrap(),
+            5400
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("24 hours").unwrap(),
+            86400
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("30 days").unwrap(),
+            2592000
+        );
+        assert!(convert_histogram_interval_to_seconds("52 weeks").is_err());
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_invalid_inputs() {
+        // Test invalid inputs
+        assert!(convert_histogram_interval_to_seconds("").is_err());
+        assert!(convert_histogram_interval_to_seconds("invalid").is_err());
+        assert!(convert_histogram_interval_to_seconds("5x").is_err());
+        assert!(convert_histogram_interval_to_seconds("s").is_err());
+        assert!(convert_histogram_interval_to_seconds("-1s").is_err());
+        assert!(convert_histogram_interval_to_seconds("1.5 seconds").is_err());
+        assert!(convert_histogram_interval_to_seconds("second").is_err());
+        assert!(convert_histogram_interval_to_seconds(" 5 seconds").is_ok()); // leading space
+        assert!(convert_histogram_interval_to_seconds("5 seconds ").is_ok()); // trailing space
+        assert!(convert_histogram_interval_to_seconds("five seconds").is_err());
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_edge_cases() {
+        // Test edge cases
+        assert_eq!(
+            convert_histogram_interval_to_seconds("0 seconds").unwrap(),
+            0
+        );
+        assert_eq!(convert_histogram_interval_to_seconds("0s").unwrap(), 0);
+        assert_eq!(
+            convert_histogram_interval_to_seconds("1000000 seconds").unwrap(),
+            1000000
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_empty_sql() {
+        // Test adding filters to an empty SQL string
+        let sql = "";
+        let filters = HashMap::from([
+            ("column1".to_string(), "'value1'".to_string()),
+            ("column2".to_string(), "10".to_string()),
+        ]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should create a basic WHERE clause with the filters
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_simple_select() {
+        // Test adding filters to a simple SELECT statement
+        let sql = "SELECT * FROM table1";
+        let filters = HashMap::from([
+            ("column1".to_string(), "value1".to_string()),
+            ("column2".to_string(), "10".to_string()),
+        ]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add a WHERE clause
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE column1 = 'value1' AND column2 = '10'"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_existing_where() {
+        // Test adding filters to a query that already has a WHERE clause
+        let sql = "SELECT * FROM table1 WHERE column3 < 5";
+        let filters = HashMap::from([
+            ("column1".to_string(), "value1".to_string()),
+            ("column2".to_string(), "10".to_string()),
+        ]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add to the existing WHERE clause with AND
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE column3 < 5 AND column1 = 'value1' AND column2 = '10'"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_multiple_filters_and_or_condition() {
+        // Test adding filters to a query with multiple filters and OR condition
+        let sql = "SELECT * FROM table1 WHERE column1 = 'value1' OR column2 = 'value2'";
+        let filters = HashMap::from([("column3".to_string(), "value3".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add WHERE before ORDER BY
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE (column1 = 'value1' OR column2 = 'value2') AND column3 = 'value3'"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_multiple_filters_and_and_condition() {
+        // Test adding filters to a query with multiple filters and AND condition
+        let sql = "SELECT * FROM table1 WHERE column1 = 'value1' AND column2 = 'value2'";
+        let filters = HashMap::from([("column3".to_string(), "value3".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add WHERE before ORDER BY
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE column1 = 'value1' AND column2 = 'value2' AND column3 = 'value3'"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_empty_filters() {
+        // Test with empty filters array
+        let sql = "SELECT * FROM table1";
+        let filters: HashMap<String, String> = HashMap::new();
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should return the original SQL unchanged
+        assert_eq!(result, sql);
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_group_by() {
+        // Test adding filters to a query with GROUP BY
+        let sql = "SELECT column1, COUNT(*) FROM table1 GROUP BY column1";
+        let filters = HashMap::from([("column2".to_string(), "value2".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add WHERE before GROUP BY
+        assert_eq!(result, sql.to_string());
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_order_by() {
+        // Test adding filters to a query with ORDER BY
+        let sql = "SELECT * FROM table1 ORDER BY column1 DESC";
+        let filters = HashMap::from([("column2".to_string(), "value2".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add WHERE before ORDER BY
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE column2 = 'value2' ORDER BY column1 DESC"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_limit() {
+        // Test adding filters to a query with LIMIT
+        let sql = "SELECT * FROM table1 LIMIT 10";
+        let filters = HashMap::from([("column1".to_string(), "value1".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add WHERE before LIMIT
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE column1 = 'value1' LIMIT 10"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_complex_query() {
+        // Test adding filters to a complex query
+        let sql = "SELECT t1.column1, t2.column2 FROM table1 t1 JOIN table2 t2 ON t1.id = t2.id WHERE t1.status = 'active' GROUP BY t1.column1 ORDER BY t2.column2 LIMIT 20";
+        let filters = HashMap::from([
+            ("t1.region".to_string(), "west".to_string()),
+            ("t2.value".to_string(), "100".to_string()),
+        ]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // the function don't add WHERE for the aggregation query
+        assert_eq!(result, sql.to_string());
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_having() {
+        // Test adding filters to a query with HAVING
+        let sql = "SELECT department, AVG(salary) FROM employees GROUP BY department HAVING AVG(salary) > 50000";
+        let filters = HashMap::from([("department".to_string(), "'HR'".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // the function don't add WHERE for the aggregation query
+        assert_eq!(result, sql.to_string());
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_subquery() {
+        // Test adding filters to a query with a subquery
+        let sql = "SELECT * FROM (SELECT id, name FROM users) AS u";
+        let filters = HashMap::from([("u.id".to_string(), "100".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // we support subquery
+        assert_eq!(
+            result,
+            "SELECT * FROM (SELECT id, name FROM users WHERE u.id = '100') AS u WHERE u.id = '100'"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_field_in_subquery() {
+        // Test adding filters to a query with a subquery
+        let sql = "SELECT * FROM users WHERE id IN (SELECT id FROM users)";
+        let filters = HashMap::from([("id".to_string(), "100".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // we support this type of query
+        assert_eq!(result, sql.to_string());
     }
 }

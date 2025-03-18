@@ -656,7 +656,7 @@ export default defineComponent({
       {
         title: t("menu.rum"),
         icon: "devices",
-        link: "/rum/performance/overview",
+        link: "/rum",
         name: "rum",
       },
       {
@@ -1303,6 +1303,8 @@ export default defineComponent({
     margin-left: 0.5rem;
     margin-right: 0;
     width: 150px;
+    max-width: 150px; 
+    max-height: 31px;
     cursor: pointer;
 
     &__mini {

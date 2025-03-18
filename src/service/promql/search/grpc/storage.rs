@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{
-    get_config, is_local_disk_storage,
+    TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
         promql::VALUE_LABEL,
         search::{ScanStats, Session as SearchSession, StorageType},
@@ -42,7 +42,7 @@ use crate::service::{
     db, file_list,
     search::{
         datafusion::exec::register_table,
-        grpc::{storage::filter_file_list_by_tantivy_index, QueryParams},
+        grpc::{QueryParams, storage::filter_file_list_by_tantivy_index},
         index::{Condition, IndexCondition},
         match_source,
     },
@@ -183,7 +183,9 @@ pub(crate) async fn create_context(
                     );
                     DataFusionError::Execution(e.to_string())
                 })?;
-        log::info!("[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index took: {idx_took} ms",);
+        log::info!(
+            "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index took: {idx_took} ms",
+        );
     }
 
     let session = SearchSession {
@@ -297,19 +299,12 @@ async fn cache_parquet_files(
                 _ => None,
             };
             let ret = if let Some(e) = ret {
-                if e.to_string().to_lowercase().contains("not found")
-                    || e.to_string().to_lowercase().contains("data size is zero")
-                {
-                    // delete file from file list
-                    log::warn!("found invalid file: {}", file_name);
-                    if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                        log::error!("[trace_id {trace_id}] promql->search->storage: delete from file_list err: {}", e);
-                    }
-                    Some(file_name)
-                } else {
-                    log::error!("[trace_id {trace_id}] promql->search->storage: download file to cache err: {}", e);
-                    None
-                }
+                log::warn!(
+                    "[trace_id {trace_id}] promql->search->storage: download file to cache err: {}, file: {}",
+                    e,
+                    file_name
+                );
+                Some(file_name)
             } else {
                 None
             };
@@ -345,9 +340,8 @@ fn convert_matchers_to_index_condition(
     index_fields: &HashSet<String>,
 ) -> Result<IndexCondition> {
     let mut index_condition = IndexCondition::default();
-    let cfg = get_config();
     for mat in matchers.matchers.iter() {
-        if mat.name == cfg.common.column_timestamp
+        if mat.name == TIMESTAMP_COL_NAME
             || mat.name == VALUE_LABEL
             || !index_fields.contains(&mat.name)
             || schema.field_with_name(&mat.name).is_err()

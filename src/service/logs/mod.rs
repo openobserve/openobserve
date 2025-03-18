@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ use anyhow::Result;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
-    get_config,
+    DISTINCT_FIELDS, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -32,19 +32,19 @@ use config::{
     },
     metrics,
     utils::{
-        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
+        json::{Map, Value, estimate_json_bytes, get_string_value, pickup_string_value},
         schema_ext::SchemaExt,
     },
-    DISTINCT_FIELDS,
 };
-use infra::schema::{unwrap_partition_time_level, SchemaCache};
+use infra::schema::{SchemaCache, unwrap_partition_time_level};
 
 use super::{
     db::organization::get_org_setting,
-    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    ingestion::{TriggerAlertData, evaluate_trigger, write_file},
     metadata::{
-        distinct_values::{DvItem, DISTINCT_STREAM_PREFIX},
-        write, MetadataItem, MetadataType,
+        MetadataItem, MetadataType,
+        distinct_values::{DISTINCT_STREAM_PREFIX, DvItem},
+        write,
     },
     schema::stream_schema_exists,
 };
@@ -276,22 +276,23 @@ async fn write_logs(
     )
     .await;
 
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs)
-        .await
-        .unwrap_or_default();
+    let schema = match stream_schema_map.get(stream_name) {
+        Some(schema) => schema.schema().clone(),
+        None => {
+            return Err(anyhow::anyhow!(
+                "Schema not found for stream: {}",
+                stream_name
+            ));
+        }
+    };
+    let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
     if stream_schema.has_partition_keys {
-        let partition_det = crate::service::ingestion::get_stream_partition_keys(
-            org_id,
-            &StreamType::Logs,
-            stream_name,
-        )
-        .await;
-        partition_keys = partition_det.partition_keys;
+        partition_keys = stream_settings.partition_keys;
         partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Logs);
+            unwrap_partition_time_level(stream_settings.partition_time_level, StreamType::Logs);
     }
 
     // Start get stream alerts
@@ -430,11 +431,12 @@ async fn write_logs(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) =
-                        alert.evaluate(Some(&record_val), (None, end_time)).await
-                    {
-                        triggers.push((alert.clone(), v));
-                        evaluated_alerts.insert(key);
+                    match alert.evaluate(Some(&record_val), (None, end_time)).await {
+                        Ok(trigger_results) if trigger_results.data.is_some() => {
+                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -511,7 +513,7 @@ async fn write_logs(
         write_buf,
         !cfg.common.wal_fsync_disabled,
     )
-    .await;
+    .await?;
 
     // send distinct_values
     if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {

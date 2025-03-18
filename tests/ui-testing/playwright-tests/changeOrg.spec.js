@@ -13,7 +13,7 @@ import { ReportsPage } from "../pages/reportsPage.js";
 import { AlertsPage } from "../pages/alertsPage.js";
 import { DataPage } from "../pages/dataPage.js";
 import { IamPage } from "../pages/iamPage.js";
-import { ManagementPage } from "../pages/managementPage .js";
+import { ManagementPage } from "../pages/managementPage.js";
 import { AboutPage } from "../pages/aboutPage.js";
 
 
@@ -40,7 +40,7 @@ test.describe("Change Organisation", () => {
         managementPage = new ManagementPage(page);
         aboutPage = new AboutPage(page);
         await loginPage.gotoLoginPage();
-        // await loginPage.loginAsInternalUser();
+        await loginPage.loginAsInternalUser();
         await loginPage.login();
         await ingestionPage.ingestion();
         await ingestionPage.ingestionMultiOrg();

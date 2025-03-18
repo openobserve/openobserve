@@ -17,6 +17,7 @@ mod action_scripts;
 mod alerts;
 mod cipher_keys;
 mod dashboards;
+mod destinations;
 mod distinct_values;
 mod folders;
 mod meta;
@@ -25,11 +26,13 @@ mod scheduler;
 mod schemas;
 mod search_job;
 mod short_urls;
+mod templates;
 
-use config::cluster::{is_offline, LOCAL_NODE};
+use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    ActionScriptsQueue, AlertsQueue, DashboardsQueue, FoldersQueue, MetaQueue, PipelinesQueue,
-    SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
+    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue,
+    PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
+    TemplatesQueue,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -54,6 +57,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_alert_msg: alerts::process,
         on_scheduler_msg: scheduler::process,
     };
+    let scheduler_queue = SchedulerQueue {
+        on_scheduler_msg: scheduler::process,
+    };
     let search_jobs_queue = SearchJobsQueue {
         on_search_job_msg: search_job::process,
     };
@@ -65,6 +71,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     };
     let folders_queue = FoldersQueue {
         on_folder_msg: folders::process,
+    };
+    let templates_queue = TemplatesQueue {
+        on_template_msg: templates::process,
+    };
+    let destinations_queue = DestinationsQueue {
+        on_destination_msg: destinations::process,
     };
     let action_scripts_queue = ActionScriptsQueue {
         on_action_script_msg: action_scripts::process,
@@ -78,7 +90,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(dashboards_queue),
         Box::new(pipelines_queue),
         Box::new(folders_queue),
+        Box::new(templates_queue),
+        Box::new(destinations_queue),
         Box::new(action_scripts_queue),
+        Box::new(scheduler_queue),
     ];
 
     for queue in queues {

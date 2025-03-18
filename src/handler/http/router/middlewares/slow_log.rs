@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,23 +14,27 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    future::{ready, Ready},
+    future::{Ready, ready},
     time::{Duration, Instant},
 };
 
 use actix_web::{
-    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     Error,
+    dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
 };
 use futures_util::future::LocalBoxFuture;
 
 pub struct SlowLog {
     threshold_secs: u64,
+    circuit_breaker_enabled: bool,
 }
 
 impl SlowLog {
-    pub fn new(threshold_secs: u64) -> Self {
-        SlowLog { threshold_secs }
+    pub fn new(threshold_secs: u64, circuit_breaker_enabled: bool) -> Self {
+        SlowLog {
+            threshold_secs,
+            circuit_breaker_enabled,
+        }
     }
 }
 
@@ -50,6 +54,7 @@ where
         ready(Ok(SlowLogMiddleware {
             service,
             threshold_secs: self.threshold_secs,
+            circuit_breaker_enabled: self.circuit_breaker_enabled,
         }))
     }
 }
@@ -57,6 +62,7 @@ where
 pub struct SlowLogMiddleware<S> {
     service: S,
     threshold_secs: u64,
+    circuit_breaker_enabled: bool,
 }
 
 impl<S, B> Service<ServiceRequest> for SlowLogMiddleware<S>
@@ -91,6 +97,7 @@ where
             .to_string();
         let method = req.method().to_string();
         let threshold = Duration::from_secs(self.threshold_secs);
+        let circuit_breaker_enabled = self.circuit_breaker_enabled;
 
         let fut = self.service.call(req);
 
@@ -98,9 +105,15 @@ where
             let res = fut.await?;
             let duration = start.elapsed();
 
+            // watch the request duration
+            if circuit_breaker_enabled {
+                crate::service::circuit_breaker::watch_request(duration.as_millis() as u64);
+            }
+
+            // log the slow request
             if duration > threshold {
                 log::warn!(
-                    "Slow request detected - remote_addr: {}, method: {}, path: {}, took: {:.6}",
+                    "slow request detected - remote_addr: {}, method: {}, path: {}, took: {:.6}",
                     remote_addr,
                     method,
                     path,
