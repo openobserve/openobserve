@@ -128,11 +128,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
               
               <q-td v-for="col in columns" :key="col.name" :props="props">
-                    <template v-if="col.name === 'name'">
+                      <template v-if="col.name === 'name'">
                           {{ computedName(props.row[col.field]) }}
+                        <q-tooltip v-if="props.row[col.field]?.length > 30" class="alert-name-tooltip" >
+                          {{ props.row[col.field] }}
+                        </q-tooltip>
                         </template>
                         <template v-else-if="col.name === 'owner'">
                           {{ computedOwner(props.row[col.field]) }}
+                          <q-tooltip v-if="props.row[col.field]?.length > 15" class="alert-name-tooltip" >
+                              {{ props.row[col.field] }}
+                          </q-tooltip>
                         </template>
                         <template v-else-if="col.name == 'last_triggered_at' || col.name == 'last_satisfied_at'">
                         {{ props.row[col.field] }}
@@ -1751,4 +1757,10 @@ const updateActiveFolderId = (newVal: any) => {
 .expanded-sql{
   border-left: #7A54A2 3px solid;
 }
+.alert-name-tooltip{
+    max-width: 400px; 
+    white-space: normal; 
+    word-wrap: break-word;
+    font-size: 12px;
+  }
 </style>
