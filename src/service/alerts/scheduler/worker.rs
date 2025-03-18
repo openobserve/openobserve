@@ -16,7 +16,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use tokio::{
-    sync::{Mutex, Semaphore, mpsc},
+    sync::{Mutex, mpsc},
     time,
 };
 
@@ -32,7 +32,7 @@ pub struct ScheduledJob {
 /// Configuration for the scheduler
 #[derive(Clone)]
 pub struct SchedulerConfig {
-    pub alert_schedule_concurrency: usize,
+    pub alert_schedule_concurrency: i64,
     pub alert_schedule_timeout: i64,
     pub report_schedule_timeout: i64,
     pub poll_interval_secs: u64,
@@ -43,14 +43,12 @@ pub struct SchedulerConfig {
 pub struct SchedulerWorker {
     pub id: usize,
     pub rx: Arc<Mutex<mpsc::Receiver<ScheduledJob>>>,
-    pub available_workers: Arc<Semaphore>,
 }
 
 /// Scheduler job puller that fetches jobs from the database
 #[derive(Clone)]
 pub struct SchedulerJobPuller {
     pub tx: mpsc::Sender<ScheduledJob>,
-    pub available_workers: Arc<Semaphore>,
     pub config: SchedulerConfig,
 }
 
@@ -61,52 +59,42 @@ pub struct Scheduler {
     pub job_puller: SchedulerJobPuller,
     pub tx: mpsc::Sender<ScheduledJob>,
     pub rx: Arc<Mutex<mpsc::Receiver<ScheduledJob>>>,
-    pub available_workers: Arc<Semaphore>,
 }
 
 impl SchedulerWorker {
-    pub fn new(
-        id: usize,
-        rx: Arc<Mutex<mpsc::Receiver<ScheduledJob>>>,
-        available_workers: Arc<Semaphore>,
-    ) -> Self {
-        Self {
-            id,
-            rx,
-            available_workers,
-        }
+    pub fn new(id: usize, rx: Arc<Mutex<mpsc::Receiver<ScheduledJob>>>) -> Self {
+        Self { id, rx }
     }
 
     pub async fn run(&self) -> Result<()> {
         loop {
-            // Try to get next trigger
-            let trigger = {
+            log::debug!("[SCHEDULER][Worker-{}] Waiting for next job", self.id);
+            // Try to get next trigger with permit
+            let job = {
                 let mut rx = self.rx.lock().await;
                 rx.recv().await
             };
 
-            match trigger {
-                Some(trigger) => {
-                    // Acquire permit before processing
-                    let _permit = self.available_workers.acquire().await?;
+            match job {
+                Some(job) => {
+                    log::debug!(
+                        "[SCHEDULER][Worker-{}] trace_id: {} Processing trigger: {}",
+                        self.id,
+                        job.trace_id,
+                        job.trigger.module_key
+                    );
 
                     // Process the trigger
-                    if let Err(e) = self
-                        .handle_trigger(&trigger.trace_id, trigger.trigger)
-                        .await
-                    {
+                    if let Err(e) = self.handle_trigger(&job.trace_id, job.trigger).await {
                         log::error!(
                             "[SCHEDULER][Worker-{}] trace_id: {} Error handling trigger: {}",
                             self.id,
-                            trigger.trace_id,
+                            job.trace_id,
                             e
                         );
                     }
-
-                    // Permit is automatically released when _permit is dropped
                 }
                 None => {
-                    // Channel closed, no more work
                     log::info!(
                         "[SCHEDULER][Worker-{}] Channel closed, no more work",
                         self.id
@@ -115,26 +103,27 @@ impl SchedulerWorker {
                 }
             }
         }
+        log::info!("[SCHEDULER][Worker-{}] Exiting", self.id);
         Ok(())
     }
 
     /// Handles a given trigger
     pub async fn handle_trigger(&self, trace_id: &str, trigger: Trigger) -> Result<()> {
-        handle_triggers(trace_id, trigger).await
+        let trace_id = trace_id.to_owned();
+        // If there is any panic, it should not crash the scheduler worker
+        let handler_job = tokio::spawn(async move { handle_triggers(&trace_id, trigger).await });
+
+        if let Err(e) = handler_job.await {
+            return Err(anyhow::anyhow!("Error in handler: {}", e));
+        }
+
+        Ok(())
     }
 }
 
 impl SchedulerJobPuller {
-    pub fn new(
-        tx: mpsc::Sender<ScheduledJob>,
-        available_workers: Arc<Semaphore>,
-        config: SchedulerConfig,
-    ) -> Self {
-        Self {
-            tx,
-            available_workers,
-            config,
-        }
+    pub fn new(tx: mpsc::Sender<ScheduledJob>, config: SchedulerConfig) -> Self {
+        Self { tx, config }
     }
 
     /// Runs the job puller. Pulls jobs from the database and sends them to the workers.
@@ -148,72 +137,74 @@ impl SchedulerJobPuller {
         let interval = self.config.poll_interval_secs;
         let mut interval = time::interval(time::Duration::from_secs(interval));
         interval.tick().await; // The first tick
+
         loop {
             // Check how many workers are available
-            let available_count = self.available_workers.available_permits();
             let trace_id = config::ider::uuid();
+
+            log::info!("[SCHEDULER][JobPuller-{}] Pulling jobs", trace_id);
+
+            // Pull only as many jobs as we have workers
+            let triggers = match self.pull().await {
+                Ok(triggers) => triggers,
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER][JobPuller-{}] Error pulling triggers: {}",
+                        trace_id,
+                        e
+                    );
+                    continue;
+                }
+            };
+
             log::info!(
-                "[SCHEDULER][JobPuller-{}] Available workers: {}",
+                "[SCHEDULER][JobPuller-{}] Pulled {} jobs from scheduler",
                 trace_id,
-                available_count
+                triggers.len()
             );
 
-            if available_count > 0 {
-                // Pull only as many jobs as we have available workers
-                let triggers = self.pull(available_count).await?;
+            // Print counts for each module
+            if !triggers.is_empty() {
+                let mut grouped_triggers: std::collections::HashMap<TriggerModule, Vec<&Trigger>> =
+                    HashMap::new();
 
-                log::info!(
-                    "[SCHEDULER][JobPuller-{}] Pulled {} jobs from scheduler",
-                    trace_id,
-                    triggers.len()
-                );
-
-                // Print counts for each module
-                if !triggers.is_empty() {
-                    let mut grouped_triggers: std::collections::HashMap<
-                        TriggerModule,
-                        Vec<&Trigger>,
-                    > = HashMap::new();
-
-                    // Group triggers by module
-                    for trigger in &triggers {
-                        grouped_triggers
-                            .entry(trigger.module.clone())
-                            .or_default()
-                            .push(trigger);
-                    }
-
-                    // Print counts for each module
-                    for (module, triggers) in grouped_triggers {
-                        log::info!(
-                            "[SCHEDULER JobPuller trace_id {trace_id}] Pulled {:?}: {} jobs",
-                            module,
-                            triggers.len()
-                        );
-                    }
+                // Group triggers by module
+                for trigger in &triggers {
+                    grouped_triggers
+                        .entry(trigger.module.clone())
+                        .or_default()
+                        .push(trigger);
                 }
 
-                // Send all triggers to be processed
-                for trigger in triggers {
-                    let scheduled_job = ScheduledJob {
-                        trace_id: trace_id.clone(),
-                        trigger,
-                    };
-                    if self.tx.send(scheduled_job).await.is_err() {
-                        // Channel closed, exit loop
-                        log::error!(
-                            "[SCHEDULER][JobPuller-{}] Channel closed, exiting job puller",
-                            trace_id
-                        );
-                        return Ok(());
-                    }
+                // Print counts for each module
+                for (module, triggers) in grouped_triggers {
+                    log::info!(
+                        "[SCHEDULER] [JobPuller-{}] Pulled {:?}: {} jobs",
+                        trace_id,
+                        module,
+                        triggers.len()
+                    );
                 }
             }
 
-            // Wait for the next tick
+            // Send all triggers to be processed
+            for trigger in triggers {
+                let scheduled_job = ScheduledJob {
+                    trace_id: trace_id.clone(),
+                    trigger,
+                };
+
+                if self.tx.send(scheduled_job).await.is_err() {
+                    log::error!(
+                        "[SCHEDULER][JobPuller-{}] Channel closed, exiting job puller",
+                        trace_id
+                    );
+                    return Ok(());
+                }
+            }
+
             interval.tick().await;
 
-            // Check if channel is closed
             if self.tx.is_closed() {
                 break;
             }
@@ -222,9 +213,9 @@ impl SchedulerJobPuller {
         Ok(())
     }
 
-    pub async fn pull(&self, limit: usize) -> Result<Vec<Trigger>> {
+    pub async fn pull(&self) -> Result<Vec<Trigger>> {
         match scheduler_pull(
-            limit as i64,
+            self.config.alert_schedule_concurrency,
             self.config.alert_schedule_timeout,
             self.config.report_schedule_timeout,
         )
@@ -241,7 +232,7 @@ impl SchedulerJobPuller {
 
 impl Scheduler {
     pub fn new(config: SchedulerConfig) -> Self {
-        let max_workers = config.alert_schedule_concurrency;
+        let max_workers = config.alert_schedule_concurrency as usize;
 
         // Create a channel for work distribution with capacity for max workers
         let (tx, rx) = mpsc::channel(max_workers);
@@ -249,17 +240,13 @@ impl Scheduler {
         // Share receiver between workers
         let rx = Arc::new(Mutex::new(rx));
 
-        // Track available workers with a semaphore
-        let available_workers = Arc::new(Semaphore::new(max_workers));
-
         // Create workers
         let workers = (0..max_workers)
-            .map(|id| SchedulerWorker::new(id, rx.clone(), available_workers.clone()))
+            .map(|id| SchedulerWorker::new(id, rx.clone()))
             .collect();
 
         // Create job puller
-        let job_puller =
-            SchedulerJobPuller::new(tx.clone(), available_workers.clone(), config.clone());
+        let job_puller = SchedulerJobPuller::new(tx.clone(), config.clone());
 
         Self {
             config,
@@ -267,7 +254,6 @@ impl Scheduler {
             job_puller,
             tx,
             rx,
-            available_workers,
         }
     }
 
