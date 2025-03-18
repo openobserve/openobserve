@@ -252,6 +252,12 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                 })?;
             }
             None => {
+                // if threshold <= 0 (which means no limit) and no record in the table,
+                // we should not insert a new record
+                if rule.threshold <= 0 {
+                    continue
+                }
+
                 // Insert new rule
                 let active_model = ActiveModel {
                     org: Set(rule.org),
