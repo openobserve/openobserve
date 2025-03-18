@@ -114,7 +114,7 @@ impl SchedulerWorker {
         let handler_job = tokio::spawn(async move { handle_triggers(&trace_id, trigger).await });
 
         if let Err(e) = handler_job.await {
-            log::error!("[SCHEDULER][Worker-{}] Error in handler: {}", self.id, e);
+            return Err(anyhow::anyhow!("Error in handler: {}", e));
         }
 
         Ok(())
