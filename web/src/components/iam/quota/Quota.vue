@@ -287,13 +287,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-card-section>
                 <div>
                     <q-card-actions align="right"  >
-                    <q-btn label="Update" class="text-bold" no-caps padding="sm" @click="uploadTemplate" :disable="uploadingRules" >
+                    <q-btn label="Update" class="text-bold" padding="sm md" no-caps  @click="uploadTemplate" :disable="uploadingRules" >
                         <q-icon :name="outlinedFileUpload" />
                     </q-btn>
-                    <q-btn label="Download"  no-caps  class="text-bold no-border "
+                    <q-btn label="Download"  padding="sm md" no-caps  class="text-bold no-border "
                     style="border-radius: 8px !important;"
                   color="secondary"
-                  padding="sm" @click="downloadTemplate" >
+                   @click="downloadTemplate" >
                         <q-icon :name="outlinedFileDownload" />
                     </q-btn>
                 </q-card-actions>
