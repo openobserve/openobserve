@@ -685,13 +685,6 @@ export default defineComponent({
         name: "alertList",
       },
       {
-        title: t("menu.actions"),
-        icon: outlinedCode,
-        link: "/action-scripts",
-        name: "actionScripts",
-        hide: () => !isActionsEnabled.value,
-      },
-      {
         title: t("menu.ingestion"),
         icon: outlinedFilterAlt,
         link: "/ingestion",
@@ -822,15 +815,8 @@ export default defineComponent({
 
       store.dispatch("setHiddenMenus", disableMenus);
 
-      linksList.value = linksList.value.filter((link) => {
-        const hide =
-          link.hide === undefined
-            ? false
-            : typeof link.hide === "boolean"
-              ? link.hide
-              : typeof link.hide === "function"
-                ? link.hide()
-                : false;
+      linksList.value = linksList.value.filter((link: any) => {
+        const hide = link.hide === undefined ? false : link.hide;
 
         return !disableMenus.has(link.name) && !hide;
       });
@@ -1155,6 +1141,7 @@ export default defineComponent({
           await nextTick();
           filterMenus();
 
+          updateActionsMenu();
           // if rum enabled then setUser to capture session details.
           if (res.data.rum.enabled) {
             setRumUser();
@@ -1200,6 +1187,23 @@ export default defineComponent({
 
     const openSlack = () => {
       window.open(slackURL, "_blank");
+    };
+
+    const updateActionsMenu = () => {
+      if (isActionsEnabled.value) {
+        const alertIndex = linksList.value.findIndex(
+          (link) => link.name === "alertList",
+        );
+
+        if (alertIndex !== -1) {
+          linksList.value.splice(alertIndex, 0, {
+            title: t("menu.actions"),
+            icon: outlinedCode,
+            link: "/action-scripts",
+            name: "actionScripts",
+          });
+        }
+      }
     };
 
     return {
