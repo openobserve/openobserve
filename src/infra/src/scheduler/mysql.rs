@@ -355,7 +355,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
                 .unwrap();
 
         let lock_pool = CLIENT.clone();
-        let lock_key = format!("scheduler_pull_lock");
+        let lock_key = "scheduler_pull_lock".to_string();
         let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
         let lock_sql = format!(
             "SELECT GET_LOCK('{}', {})",

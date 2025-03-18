@@ -370,7 +370,7 @@ RETURNING *;"#;
 
         // Lock the table for the duration of the transaction
         let lock_key = "scheduler_pull_lock";
-        let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
+        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
         let lock_id = if lock_id > i64::MAX as u64 {
             (lock_id >> 1) as i64
         } else {
