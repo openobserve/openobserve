@@ -2282,7 +2282,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           field?.havingConditions?.[0]?.operator &&
           field?.havingConditions?.[0]?.value !== undefined &&
           field?.havingConditions?.[0]?.value !== null &&
-          field?.havingConditions?.[0]?.value !== "" // Check for empty string
+          field?.havingConditions?.[0]?.value !== ""
         ) {
           const columnName = field.alias;
           havingClauses.push(
@@ -2298,7 +2298,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         field?.havingConditions?.[0]?.operator &&
         field?.havingConditions?.[0]?.value !== undefined &&
         field?.havingConditions?.[0]?.value !== null &&
-        field?.havingConditions?.[0]?.value !== "" // Check for empty string
+        field?.havingConditions?.[0]?.value !== "" 
       ) {
         const columnName = field.alias;
         havingClauses.push(
