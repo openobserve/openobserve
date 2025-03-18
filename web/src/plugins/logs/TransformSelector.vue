@@ -187,7 +187,7 @@ const filteredFunctionOptions = computed(() => {
 const filteredActionOptions = computed(() => {
   if (searchObj.data.transformType !== "action") return [];
   if (!searchTerm.value) return searchObj.data.actions;
-  return searchObj.data.actions.filter((item) =>
+  return searchObj.data.actions.filter((item: { name: string }) =>
     item.name.toLowerCase().includes(searchTerm.value.toLowerCase()),
   );
 });
