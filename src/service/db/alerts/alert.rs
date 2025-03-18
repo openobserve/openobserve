@@ -71,7 +71,7 @@ pub async fn set(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match table::put(client, org_id, "default", alert).await {
         Ok(alert) => {
-            cluster::emit_put_event(org_id, &alert).await?;
+            cluster::emit_put_event(org_id, &alert, None).await?;
             #[cfg(feature = "enterprise")]
             if create {
                 super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
@@ -133,7 +133,7 @@ pub async fn set(
 pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let alert = table::put(client, org_id, "default", alert).await?;
-    cluster::emit_put_event(org_id, &alert).await?;
+    cluster::emit_put_event(org_id, &alert, None).await?;
     #[cfg(feature = "enterprise")]
     if alert.id.is_some() {
         super_cluster::emit_update_event(org_id, None, alert.clone()).await?;
@@ -151,7 +151,7 @@ pub async fn create<C: TransactionTrait>(
 ) -> Result<Alert, infra::errors::Error> {
     let alert = table::create(conn, org_id, folder_id, alert, false).await?;
 
-    cluster::emit_put_event(org_id, &alert).await?;
+    cluster::emit_put_event(org_id, &alert, Some(folder_id.to_string())).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_create_event(org_id, folder_id, alert.clone()).await?;
 
@@ -181,7 +181,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 ) -> Result<Alert, infra::errors::Error> {
     let alert = table::update(conn, org_id, folder_id, alert).await?;
 
-    cluster::emit_put_event(org_id, &alert).await?;
+    cluster::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string())).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
 
@@ -331,12 +331,13 @@ async fn put_into_cache(
     stream_type: StreamType,
     stream_name: String,
     alert_name: String,
+    folder_id: Option<String>,
 ) -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let item_value: Alert = match table::get_by_name(
         client,
         &org,
-        "default",
+        folder_id.unwrap_or("default".to_string()).as_str(),
         stream_type,
         &stream_name,
         &alert_name,
