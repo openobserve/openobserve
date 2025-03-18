@@ -34,9 +34,6 @@ pub enum WsError {
     #[error("Pooled connection disconnected")]
     ConnectionDisconnected,
 
-    #[error("Session error: {0}")]
-    SessionError(String),
-
     #[error("Session not found: {0}")]
     SessionNotFound(String),
 
@@ -46,9 +43,6 @@ pub enum WsError {
     #[error("Response channel registered for trace_id {0} not found")]
     ResponseChannelClosed(String),
 
-    #[error("Response channel registered for trace_id {0} closed")]
-    MessageError(String),
-
     #[error("Querier not available: {0}")]
     QuerierNotAvailable(String),
 
@@ -57,12 +51,6 @@ pub enum WsError {
 
     #[error("Querier WS url error: {0}")]
     QuerierWSUrlError(String),
-
-    #[error("Circuit breaker open for querier: {0}")]
-    CircuitBreakerOpen(String),
-
-    #[error("Timeout error: {0}")]
-    Timeout(String),
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),
@@ -75,14 +63,10 @@ impl ResponseError for WsError {
             WsError::SerdeError(_) => StatusCode::BAD_REQUEST,
             WsError::ConnectionError(_) => StatusCode::SERVICE_UNAVAILABLE,
             WsError::ConnectionDisconnected => StatusCode::INTERNAL_SERVER_ERROR,
-            WsError::SessionError(_) => StatusCode::BAD_REQUEST,
             WsError::SessionNotFound(_) => StatusCode::BAD_REQUEST,
-            WsError::MessageError(_) => StatusCode::BAD_REQUEST,
             WsError::QuerierUrlInvalid(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::QuerierWSUrlError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::QuerierNotAvailable(_) => StatusCode::SERVICE_UNAVAILABLE,
-            WsError::CircuitBreakerOpen(_) => StatusCode::SERVICE_UNAVAILABLE,
-            WsError::Timeout(_) => StatusCode::REQUEST_TIMEOUT,
             WsError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::ResponseChannelNotFound(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::ResponseChannelClosed(_) => StatusCode::INTERNAL_SERVER_ERROR,

@@ -94,17 +94,22 @@ impl QuerierConnection {
         mut read: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
         mut shutdown_rx: tokio::sync::mpsc::Receiver<()>,
     ) {
+        // TODO: is there a way to handle when this quierer connection is closed by the querier abnormally
+        // check if the router gets `querier` disconnected event first or the close will close first
+        // if the router gets disconnected event first, it can send a close message to the querier
+
         loop {
+            // Handle incoming messages from querier to router
             tokio::select! {
                 Some(msg) = read.next() => {
                     match msg {
                         Ok(msg) => {
                             match msg {
                                 tungstenite::protocol::Message::Close(reason) => {
-                                    log::debug!("[WS::QuerierConnection] received close message: {:?}", reason);
+                                    log::debug!("[WS::Router::QuerierConnection] received close message: {:?}", reason);
                                 }
                                 tungstenite::protocol::Message::Ping(ping) => {
-                                    log::debug!("[WS::QuerierConnection] received ping message: {:?}", ping);
+                                    log::debug!("[WS::Router::QuerierConnection] received ping message: {:?}", ping);
                                     let pong = tungstenite::protocol::Message::Pong(ping);
                                     let write_clone = self.write.clone();
                                     let mut write_guard = write_clone.lock().await;
@@ -113,19 +118,19 @@ impl QuerierConnection {
                                     }
                                 }
                                 tungstenite::protocol::Message::Pong(pong) => {
-                                    log::debug!("[WS::QuerierConnection] received pong message: {:?}", pong);
+                                    log::debug!("[WS::Router::QuerierConnection] received pong message: {:?}", pong);
                                 }
                                 tungstenite::protocol::Message::Binary(binary) => {
-                                    log::debug!("[WS::QuerierConnection] received binary message: {:?}", binary);
+                                    log::debug!("[WS::Router::QuerierConnection] received binary message: {:?}", binary);
                                 }
                                 msg => {
-                                        log::debug!("[WS::QuerierConnection] received message: {:?}", msg);
+                                    log::debug!("[WS::Router::QuerierConnection] received message: {:?}", msg);
                                         // Convert `tungstenite::protocol::Message` to `StreamMessage`
                                         let message: WsServerEvents = match msg.try_into() {
                                             Ok(message) => message,
                                             Err(e) => {
                                                 log::error!(
-                                                    "[WS::QuerierConnection] Error converting message to StreamMessage: {}",
+                                                    "[WS::Router::QuerierConnection] Error converting message to StreamMessage: {}",
                                                     e
                                                 );
                                                 continue;
@@ -134,21 +139,21 @@ impl QuerierConnection {
                                         match self.response_router.route_response(message).await {
                                             Err(e) => {
                                                 log::error!(
-                                                    "[WS::QuerierConnection] Error routing response from querier back to client socket: {}",
+                                                    "[WS::Router::QuerierConnection] Error routing response from querier back to client socket: {}",
                                                     e
                                                 );
                                             }
                                             Ok(_) => {
                                                 log::debug!(
-                                                "[WS::QuerierConnection] successfully rerouted response from querier back to client socket listener"
-                                            );
-                                        }
+                                                    "[WS::Router::QuerierConnection] successfully rerouted response from querier back to client socket listener"
+                                                );
+                                            }
                                     }
                                 }
                             }
                         }
                         Err(e) => {
-                            log::error!("[WS] Read error: {}", e);
+                            log::error!("[WS::Router::QuerierConnection] Read error: {}", e);
                             // mark the connection disconnected
                             self.is_connected.store(false, Ordering::SeqCst);
                             // TODO: cleanup resource
@@ -158,7 +163,7 @@ impl QuerierConnection {
                     }
                 }
                 _ = shutdown_rx.recv() => {
-                    log::info!("[WS::QuerierConnection] shutting down. Stop listening from the querier");
+                    log::info!("[WS::Router::QuerierConnection] shutting down. Stop listening from the querier");
                     // mark the connection disconnected
                     self.is_connected.store(false, Ordering::SeqCst);
                     // TODO: cleanup resource?
@@ -169,7 +174,7 @@ impl QuerierConnection {
         }
 
         log::info!(
-            "[WS::QuerierConnection] connection to querier {} response handler stopped.",
+            "[WS::Router::QuerierConnection] connection to querier {} response handler stopped.",
             self.querier_name
         );
     }
@@ -196,7 +201,7 @@ impl QuerierConnection {
         }
 
         log::warn!(
-            "[WS:QuerierConnection] connection to querier {} health check failed, disconnecting...",
+            "[WS::Router::QuerierConnection] connection to querier {} health check failed, disconnecting...",
             self.querier_name
         );
     }

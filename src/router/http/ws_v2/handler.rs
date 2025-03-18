@@ -69,9 +69,9 @@ impl WsHandler {
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
 
-        // Spawn message handling tasks
+        // Spawn message handling tasks between client and router
         actix_web::rt::spawn(async move {
-            // Handle incoming messages
+            // Handle incoming messages from client
             let handle_incoming = async {
                 while let Some(msg) = msg_stream.next().await {
                     match msg {
@@ -220,7 +220,7 @@ impl WsHandler {
                 Ok::<_, Error>(())
             };
 
-            // Handle outgoing messages
+            // Handle outgoing messages from router to client
             let handle_outgoing = async {
                 loop {
                     tokio::select! {
@@ -264,7 +264,7 @@ impl WsHandler {
                 _ = ws_session
                     .close(Some(CloseReason::from(CloseCode::Normal)))
                     .await;
-                log::debug!("[WS::Handler]: client ws closed");
+                log::debug!("[WS::Router::Handler]: client ws closed");
                 Ok::<_, Error>(())
             };
 
