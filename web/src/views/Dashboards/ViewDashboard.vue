@@ -154,6 +154,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </q-tooltip>
             </q-btn>
+            <q-btn
+              v-if="config.isEnterprise == 'true' && arePanelsLoading"
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              size="sm"
+              no-caps
+              icon="block"
+              @click="closeSocketWithError"
+              data-test="dashboard-close-socket-btn"
+              color="negative"
+            >
+              <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+            </q-btn>
 
             <ExportDashboard
               v-if="!isFullscreen"
@@ -369,6 +382,7 @@ import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import DashboardJsonEditor from "./DashboardJsonEditor.vue";
+import useSearchWebSocket from "@/composables/useSearchWebSocket.js";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -433,6 +447,8 @@ export default defineComponent({
     const reportId = computed(() => route.query.tab);
 
     const renderDashboardChartsRef = ref(null);
+
+    const { closeSocketWithError } = useSearchWebSocket();
 
     onBeforeMount(async () => {
       await importMoment();
@@ -1150,6 +1166,7 @@ export default defineComponent({
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
+      closeSocketWithError,
     };
   },
 });
