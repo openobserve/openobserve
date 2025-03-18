@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2025 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-splitter
     v-model="splitterModel"
@@ -23,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="recommended-list-search-input"
+        data-test="security-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -40,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         indicator-color="transparent"
         inline-label
         vertical
-        class="data-sources-recommended-tabs !tw-mt-3"
+        class="data-sources-database-tabs !tw-mt-3 item-left"
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
@@ -75,11 +74,10 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "RecommendedPage",
+  name: "SecurityPage",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -98,12 +96,12 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("ingestFromKubernetes");
+    const ingestTabType = ref("falco");
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name === "recommended") {
+      if (router.currentRoute.value.name === "security") {
         router.push({
-          name: "ingestFromKubernetes",
+          name: "falco",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -113,9 +111,9 @@ export default defineComponent({
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "recommended") {
+      if (router.currentRoute.value.name === "security") {
         router.push({
-          name: "ingestFromKubernetes",
+          name: "falco",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -124,108 +122,96 @@ export default defineComponent({
       }
     });
 
-    const recommendedTabs = [
+    const securityTabs = [
       {
-        name: "ingestFromKubernetes",
+        name: "falco",
         to: {
-          name: "ingestFromKubernetes",
+          name: "falco",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/common/kubernetes.svg"),
-        label: t("ingestion.kubernetes"),
+        icon: "img:" + getImageURL("images/ingestion/falco.png"),
+        label: t("ingestion.falco"),
         contentClass: "tab_content",
       },
       {
-        name: "ingestFromWindows",
+        name: "osquery",
         to: {
-          name: "ingestFromWindows",
+          name: "osquery",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/common/windows.svg"),
-        label: t("ingestion.windows"),
+        icon: "img:" + getImageURL("images/ingestion/os-query.png"),
+        label: t("ingestion.osquery"),
         contentClass: "tab_content",
       },
       {
-        name: "ingestFromLinux",
+        name: "okta",
         to: {
-          name: "ingestFromLinux",
+          name: "okta",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/common/linux.svg"),
-        label: t("ingestion.linux"),
+        icon: "img:" + getImageURL("images/ingestion/okta.png"),
+        label: t("ingestion.okta"),
         contentClass: "tab_content",
       },
       {
-        name: "AWSConfig",
+        name: "jumpcloud",
         to: {
-          name: "AWSConfig",
+          name: "jumpcloud",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/ingestion/aws.svg"),
-        label: t("ingestion.awsconfig"),
+        icon: "img:" + getImageURL("images/ingestion/jumpcloud.svg"),
+        label: t("ingestion.jumpcloud"),
         contentClass: "tab_content",
       },
       {
-        name: "GCPConfig",
+        name: "openvpn",
         to: {
-          name: "GCPConfig",
+          name: "openvpn",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/ingestion/gcp.svg"),
-        label: t("ingestion.gcpconfig"),
+        icon: "img:" + getImageURL("images/ingestion/openvpn.png"),
+        label: t("ingestion.openvpn"),
         contentClass: "tab_content",
       },
       {
-        name: "AzureConfig",
+        name: "office365",
         to: {
-          name: "AzureConfig",
+          name: "office365",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/ingestion/azure.png"),
-        label: t("ingestion.azure"),
+        icon: "img:" + getImageURL("images/ingestion/office-365.png"),
+        label: t("ingestion.office365"),
         contentClass: "tab_content",
       },
       {
-        name: "ingestFromTraces",
+        name: "google-workspace",
         to: {
-          name: "ingestFromTraces",
+          name: "google-workspace",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/ingestion/otlp.svg"),
-        label: t("ingestion.tracesotlp"),
+        icon: "img:" + getImageURL("images/ingestion/google-workspace.png"),
+        label: t("ingestion.gworkspace"),
         contentClass: "tab_content",
-      },
-      {
-        name: "frontendMonitoring",
-        to: {
-          name: "frontendMonitoring",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/common/monitoring.svg"),
-        label: t("ingestion.rum"),
-        contentClass: "tab_content",
-      },
+      }
     ];
 
     // create computed property to filter tabs
     const filteredList = computed(() => {
-      return recommendedTabs.filter((tab) => {
+      return securityTabs.filter((tab) => {
         return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
       });
     });
@@ -250,7 +236,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.data-sources-recommended-tabs {
+.data-sources-database-tabs {
   :deep(.q-tab) {
     min-height: 36px;
   }
@@ -284,24 +270,6 @@ export default defineComponent({
         }
       }
     }
-  }
-}
-</style>
-<style lang="scss">
-.ingestionPage {
-  .q-tab-panel {
-    padding: 0 !important;
-    .tab_content {
-      .q-tab__label {
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-    }
-  }
-
-  .q-icon > img {
-    height: auto !important;
   }
 }
 </style>

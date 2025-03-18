@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2025 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-splitter
     v-model="splitterModel"
@@ -23,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="recommended-list-search-input"
+        data-test="devops-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -40,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         indicator-color="transparent"
         inline-label
         vertical
-        class="data-sources-recommended-tabs !tw-mt-3"
+        class="data-sources-database-tabs !tw-mt-3 item-left"
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
@@ -75,11 +74,10 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "RecommendedPage",
+  name: "DevOpsPage",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -98,12 +96,12 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("ingestFromKubernetes");
+    const ingestTabType = ref("jenkins");
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name === "recommended") {
+      if (router.currentRoute.value.name === "devops") {
         router.push({
-          name: "ingestFromKubernetes",
+          name: "jenkins",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -113,9 +111,9 @@ export default defineComponent({
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "recommended") {
+      if (router.currentRoute.value.name === "devops") {
         router.push({
-          name: "ingestFromKubernetes",
+          name: "jenkins",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -124,108 +122,60 @@ export default defineComponent({
       }
     });
 
-    const recommendedTabs = [
+    const devopsTabs = [
       {
-        name: "ingestFromKubernetes",
+        name: "jenkins",
         to: {
-          name: "ingestFromKubernetes",
+          name: "jenkins",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/common/kubernetes.svg"),
-        label: t("ingestion.kubernetes"),
+        icon: "img:" + getImageURL("images/ingestion/jenkins.svg"),
+        label: t("ingestion.jenkins"),
         contentClass: "tab_content",
       },
       {
-        name: "ingestFromWindows",
+        name: "ansible",
         to: {
-          name: "ingestFromWindows",
+          name: "ansible",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/common/windows.svg"),
-        label: t("ingestion.windows"),
+        icon: "img:" + getImageURL("images/ingestion/ansible.svg"),
+        label: t("ingestion.ansible"),
         contentClass: "tab_content",
       },
       {
-        name: "ingestFromLinux",
+        name: "terraform",
         to: {
-          name: "ingestFromLinux",
+          name: "terraform",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/common/linux.svg"),
-        label: t("ingestion.linux"),
+        icon: "img:" + getImageURL("images/ingestion/terraform.svg"),
+        label: t("ingestion.terraform"),
         contentClass: "tab_content",
       },
       {
-        name: "AWSConfig",
+        name: "github-actions",
         to: {
-          name: "AWSConfig",
+          name: "github-actions",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        icon: "img:" + getImageURL("images/ingestion/aws.svg"),
-        label: t("ingestion.awsconfig"),
+        icon: "img:" + getImageURL("images/ingestion/github-actions.svg"),
+        label: t("ingestion.gactions"),
         contentClass: "tab_content",
-      },
-      {
-        name: "GCPConfig",
-        to: {
-          name: "GCPConfig",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/ingestion/gcp.svg"),
-        label: t("ingestion.gcpconfig"),
-        contentClass: "tab_content",
-      },
-      {
-        name: "AzureConfig",
-        to: {
-          name: "AzureConfig",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/ingestion/azure.png"),
-        label: t("ingestion.azure"),
-        contentClass: "tab_content",
-      },
-      {
-        name: "ingestFromTraces",
-        to: {
-          name: "ingestFromTraces",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/ingestion/otlp.svg"),
-        label: t("ingestion.tracesotlp"),
-        contentClass: "tab_content",
-      },
-      {
-        name: "frontendMonitoring",
-        to: {
-          name: "frontendMonitoring",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        icon: "img:" + getImageURL("images/common/monitoring.svg"),
-        label: t("ingestion.rum"),
-        contentClass: "tab_content",
-      },
+      }
     ];
 
     // create computed property to filter tabs
     const filteredList = computed(() => {
-      return recommendedTabs.filter((tab) => {
+      return devopsTabs.filter((tab) => {
         return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
       });
     });
@@ -250,7 +200,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.data-sources-recommended-tabs {
+.data-sources-database-tabs {
   :deep(.q-tab) {
     min-height: 36px;
   }
@@ -284,24 +234,6 @@ export default defineComponent({
         }
       }
     }
-  }
-}
-</style>
-<style lang="scss">
-.ingestionPage {
-  .q-tab-panel {
-    padding: 0 !important;
-    .tab_content {
-      .q-tab__label {
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-    }
-  }
-
-  .q-icon > img {
-    height: auto !important;
   }
 }
 </style>
