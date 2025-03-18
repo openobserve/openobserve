@@ -168,6 +168,8 @@ async fn main() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    let mut tracer_provider = None;
+
     // setup logs
     #[cfg(feature = "tokio-console")]
     let enable_tokio_console = true;
@@ -184,7 +186,7 @@ async fn main() -> Result<(), anyhow::Error> {
         })?;
         None
     } else if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-        enable_tracing()?;
+        tracer_provider = Some(enable_tracing()?);
         None
     } else {
         Some(setup_logs())
@@ -399,6 +401,12 @@ async fn main() -> Result<(), anyhow::Error> {
         log::error!("HTTP server runs failed: {}", e);
     }
     log::info!("HTTP server stopped");
+
+    // stop tracing
+    if let Some(tracer_provider) = tracer_provider {
+        let result = tracer_provider.shutdown();
+        log::info!("Tracer provider shutdown result: {:?}", result);
+    }
 
     // flush usage report
     self_reporting::flush().await;
@@ -948,7 +956,7 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
     guard
 }
 
-fn enable_tracing() -> Result<(), anyhow::Error> {
+fn enable_tracing() -> Result<opentelemetry_sdk::trace::TracerProvider, anyhow::Error> {
     let cfg = get_config();
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
     let tracer = opentelemetry_otlp::new_pipeline().tracing();
@@ -964,6 +972,10 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
                 .with_http_client(
                     reqwest::Client::builder()
                         .danger_accept_invalid_certs(true)
+                        .timeout(Duration::from_secs(10))           // Overall request timeout
+                        .connect_timeout(Duration::from_secs(5))    // Connection establishment timeout
+                        .pool_idle_timeout(Duration::from_secs(60)) // How long to keep idle connections
+                        .pool_max_idle_per_host(10) // How many idle connections to keep per host
                         .build()?,
                 )
                 .with_endpoint(&cfg.common.otel_otlp_url)
@@ -991,15 +1003,18 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
                 .with_protocol(opentelemetry_otlp::Protocol::Grpc)
         })
     };
-    let tracer = tracer
-        .with_trace_config(opentelemetry_sdk::trace::Config::default().with_resource(
-            Resource::new(vec![
-                KeyValue::new("service.name", cfg.common.node_role.to_string()),
-                KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-                KeyValue::new("service.version", config::VERSION),
-            ]),
-        ))
-        .install_batch(opentelemetry_sdk::runtime::Tokio)?;
+
+    // Store the tracer provider before installing batch processor
+    let tracer = tracer.with_trace_config(
+        opentelemetry_sdk::trace::Config::default().with_resource(Resource::new(vec![
+            KeyValue::new("service.name", cfg.common.node_role.to_string()),
+            KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
+            KeyValue::new("service.version", config::VERSION),
+        ])),
+    );
+
+    // Install batch processor
+    let tracer = tracer.install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
     let layer = if cfg.log.json_format {
         tracing_subscriber::fmt::layer()
@@ -1018,7 +1033,9 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
             tracer.tracer("tracing-otel-subscriber"),
         ))
         .init();
-    Ok(())
+
+    // Return the tracer provider
+    Ok(tracer)
 }
 
 #[cfg(feature = "enterprise")]
