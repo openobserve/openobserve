@@ -75,7 +75,9 @@ where
                     continue;
                 };
                 let folder_id = ev.value.map(|v| String::from_utf8_lossy(&v).to_string());
-                let _ = (on_put)(org, stream_type, stream_name, alert_name, folder_id).await;
+                if let Err(e) = (on_put)(org, stream_type, stream_name, alert_name, folder_id).await {
+                    log::error!("Error in alert put handler: {}", e);
+                }
             }
             Event::Delete(ev) => {
                 let Some((org, stream_type, stream_name, alert_name)) = parse_alert_key(&ev.key)
