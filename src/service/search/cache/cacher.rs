@@ -96,7 +96,7 @@ pub async fn check_cache(
     let start = std::time::Instant::now();
 
     let query: SearchQuery = req.query.clone().into();
-    let sql = match Sql::new(&query, org_id, stream_type, req.search_type.clone()).await {
+    let sql = match Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);

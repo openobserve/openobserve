@@ -153,7 +153,7 @@ pub async fn handle_search_request(
         &req.payload.query.clone().into(),
         org_id,
         stream_type,
-        Some(req.search_type.clone()),
+        Some(req.search_type),
     )
     .await?;
     if let Some(interval) = sql.histogram_interval {
