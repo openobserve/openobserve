@@ -247,36 +247,45 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                 active_model.threshold = Set(rule.threshold);
                 active_model.created_at = Set(existing.created_at);
 
-                active_model.save(&txn).await.map_err(|e| {
-                    anyhow!("DbError# Failed to update rule: {:?}, {}", existing, e)
-                })?;
+                if let Err(e) = active_model.save(&txn).await {
+                    txn.rollback()
+                        .await
+                        .map_err(|e| anyhow!("DbError# Failed to rollback transaction: {}", e))?;
+
+                    return Err(anyhow!(
+                        "DbError# Failed to update rule: {:?}, {}",
+                        existing,
+                        e
+                    ));
+                }
             }
             None => {
                 // if threshold <= 0 (which means no limit) and no record in the table,
                 // we should not insert a new record
-                if rule.threshold <= 0 {
-                    continue
+                if rule.threshold > 0 {
+                    // Insert new rule
+                    let active_model = ActiveModel {
+                        org: Set(rule.org),
+                        rule_id: Set(rule.rule_id.unwrap()),
+                        rule_type: Set(rule
+                            .rule_type
+                            .unwrap_or(RatelimitRuleType::Exact.to_string())),
+                        user_role: Set(rule.user_role.unwrap_or_default()),
+                        user_id: Set(rule.user_id.unwrap_or_default()),
+                        api_group_name: Set(rule.api_group_name.unwrap_or_default()),
+                        api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
+                        threshold: Set(rule.threshold),
+                        created_at: Set(current_timestamp),
+                    };
+
+                    if let Err(e) = Entity::insert(active_model).exec(&txn).await {
+                        txn.rollback().await.map_err(|e| {
+                            anyhow!("DbError# Failed to rollback transaction: {}", e)
+                        })?;
+
+                        return Err(anyhow!("DbError# Failed to insert rule: {}", e));
+                    }
                 }
-
-                // Insert new rule
-                let active_model = ActiveModel {
-                    org: Set(rule.org),
-                    rule_id: Set(rule.rule_id.unwrap()),
-                    rule_type: Set(rule
-                        .rule_type
-                        .unwrap_or(RatelimitRuleType::Exact.to_string())),
-                    user_role: Set(rule.user_role.unwrap_or_default()),
-                    user_id: Set(rule.user_id.unwrap_or_default()),
-                    api_group_name: Set(rule.api_group_name.unwrap_or_default()),
-                    api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
-                    threshold: Set(rule.threshold),
-                    created_at: Set(current_timestamp),
-                };
-
-                Entity::insert(active_model)
-                    .exec(&txn)
-                    .await
-                    .map_err(|e| anyhow!("DbError# Failed to insert rule: {}", e))?;
             }
         }
         // wait for a while to reduce the databases load
