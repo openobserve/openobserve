@@ -25,8 +25,11 @@ async function login(page) {
 }
 async function toggleQuickModeIfOff(page) {
   await page.waitForSelector(
-    '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    '[data-test="logs-search-bar-more-options-dropdown"]'
   );
+  
+  await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
+
   const toggleButton = await page.$(
     '[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner'
   );
