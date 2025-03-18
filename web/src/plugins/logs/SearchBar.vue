@@ -322,6 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="more_vert"
           class="no-outline saved-views-dropdown tw-normal-case download-logs-btn q-pl-xs q-ml-xs q-pr-xs"
           size="12px"
+          data-test="logs-search-bar-more-options-dropdown"
         >
           <q-list>
             <q-item class="!tw-py-1">
