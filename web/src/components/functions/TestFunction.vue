@@ -509,9 +509,6 @@ const getResults = async () => {
 
   delete query.aggs;
 
-  // We get 15 minutes time range for the query, so reducing it by 13 minutes to get 2 minute data
-  query.query.start_time = query.query.start_time + 780000000;
-
   // TODO: Handle the edge case when user enters limit in the query
   query.query.sql = inputQuery.value;
 
