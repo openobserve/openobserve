@@ -1505,9 +1505,15 @@ const updateActiveFolderId = (newVal: any) => {
       }
     };
     const computedName = (name: string) => {
+          if(!name){
+            return '--'
+          }
           return name.length >30 ? name.substring(0, 30) + "..." : name;
         };
     const computedOwner = (owner: string) => {
+        if(!owner){
+          return '--'
+        }
         if (owner.length > 15) {
           const firstTen = owner.substring(0, 7);
           const lastFour = owner.substring(owner.length - 4);
