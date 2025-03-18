@@ -15,31 +15,39 @@ type HandlerMap = Record<"message" | "close" | "error", WebSocketHandler[]>;
 
 const webSocket = useWebSocket();
 
-const traces: Record<string, HandlerMap> = {};
+const traces: Record<string, HandlerMap | any> = {};
 
-const openHandlers: OpenHandler[] = [];
+// const openHandlers: OpenHandler[] = [];
 
 const socketId = ref<string | null>(null);
 
 const isCreatingSocket = ref(false);
+
+const socketRetryCodes = [1001, 1006, 1010, 1011, 1012, 1013];
+
+const maxSearchRetries = 3;
+
+const cancelledAbnormalClose = ref(false);
 
 const useSearchWebSocket = () => {
   const store = useStore();
 
   const onOpen = (response: any) => {
     isCreatingSocket.value = false;
-    openHandlers.forEach((handler) => handler(response));
-    openHandlers.length = 0;
+    Object.keys(traces).forEach((traceId) => {
+      console.log("traces[traceId]", traceId, traces[traceId]?.open?.length);
+      traces[traceId].open.forEach((handler: any) => handler(response));
+    });
   };
 
   const onMessage = (response: any) => {
     if (response.type === "end") {
-      traces[response.content.trace_id]?.close?.forEach((handler) =>
+      cleanUpListeners(response.content.trace_id);
+      traces[response.content.trace_id]?.close?.forEach((handler: any) =>
         handler(response),
       );
-      cleanUpListeners(response.content.trace_id);
     }
-    traces[response.content.trace_id]?.message?.forEach((handler) =>
+    traces[response.content.trace_id]?.message?.forEach((handler: any) =>
       handler(response),
     );
   };
@@ -47,14 +55,40 @@ const useSearchWebSocket = () => {
   const onClose = (response: any) => {
     isCreatingSocket.value = false;
     socketId.value = null;
-    Object.keys(traces).forEach((traceId) => {
-      traces[traceId]?.close.forEach((handler) => handler(response));
-      cleanUpListeners(traceId);
-    });
+
+
+    console.log("onClose", response);
+    if (socketRetryCodes.includes(response.code)) {
+      console.log("socketRetryCodes.includes(response.code)", socketRetryCodes.includes(response.code), Object.keys(traces));
+      Object.keys(traces).forEach((traceId) => {
+        traces[traceId].retryCount = traces[traceId].retryCount + 1;
+
+        console.log("Retry count ----", traces[traceId].retryCount);
+
+          if (traces[traceId].retryCount <= maxSearchRetries) {
+              fetchQueryDataWithWebSocket(traces[traceId].data, {
+                open: traces[traceId].open[0],
+                message: traces[traceId].message[0],
+                close: traces[traceId].close[0],
+                error: traces[traceId].error[0],
+              }, true);
+
+            return;
+          } else {
+            traces[traceId]?.close.forEach((handler: any) => handler(response));
+            cleanUpListeners(traceId);
+          }
+      });
+    } else {
+      Object.keys(traces).forEach((traceId) => {
+        traces[traceId]?.close.forEach((handler: any) => handler(response));
+        cleanUpListeners(traceId);
+      });
+    }
   };
 
   const onError = (response: any) => {
-    traces[response.content.trace_id].error.forEach((handler) =>
+    traces[response.content.trace_id].error.forEach((handler: any) =>
       handler(response),
     );
     // cleanUpListeners(response.traceId)
@@ -93,24 +127,32 @@ const useSearchWebSocket = () => {
       close: (data: any, response: any) => void;
       error: (data: any, response: any) => void;
     },
+    retry: boolean = false
   ) => {
     try {
-      traces[data.traceId] = {
-        message: [],
-        close: [],
-        error: [],
-      };
+      if(!retry) {
+        traces[data.traceId] = {
+          open: [],
+          message: [],
+          close: [],
+          error: [],
+          data: data,
+          retryCount: 0,
+        };
 
-      traces[data.traceId].message.push(handlers.message.bind(null, data));
-      traces[data.traceId].close.push(handlers.close.bind(null, data));
-      traces[data.traceId].error.push(handlers.error.bind(null, data));
+        traces[data.traceId].message.push(handlers.message.bind(null, data));
+        traces[data.traceId].close.push(handlers.close.bind(null, data));
+        traces[data.traceId].error.push(handlers.error.bind(null, data));
+        traces[data.traceId].open.push(handlers.open.bind(null, data));
+      } 
+
+      if(retry) console.log("Retrying ----", data.traceId);
 
       if (!socketId.value) {
-        openHandlers.push(handlers.open.bind(null, data));
+        if(retry) console.log("Creating socket connection ----", data.traceId);
         createSocketConnection(data.org_id);
-      } else if (isCreatingSocket.value) {
-        openHandlers.push(handlers.open.bind(null, data));
-      } else {
+      } else if (!isCreatingSocket.value) {
+        if(retry) console.log("call open handler ----", data.traceId);
         handlers.open(data, null);
       }
 
@@ -170,12 +212,25 @@ const useSearchWebSocket = () => {
     delete traces[traceId];
   };
 
+  const closeSocketWithError = () => {
+      webSocket.sendMessage(
+        socketId.value as string,
+        JSON.stringify({
+          type: "test_abnormal_close",
+          content: {
+            req_id: socketId.value,
+          },
+        }),
+      );
+  };
+
   return {
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
     cancelSearchQueryBasedOnRequestId,
     closeSocketBasedOnRequestId,
     cleanUpListeners,
+    closeSocketWithError
   };
 };
 
