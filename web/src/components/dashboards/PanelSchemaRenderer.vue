@@ -286,6 +286,7 @@ import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
+import { exportFile } from "quasar";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -463,7 +464,7 @@ export default defineComponent({
     );
 
     // need tableRendererRef to access downloadTableAsCSV method
-    const tableRendererRef = ref(null);
+    const tableRendererRef: any = ref(null);
 
     // hovered series state
     // used to show tooltip axis for all charts
@@ -975,7 +976,8 @@ export default defineComponent({
       return offSetValues;
     };
 
-    const { showErrorNotification } = useNotifications();
+    const { showErrorNotification, showPositiveNotification } =
+      useNotifications();
 
     let parser: any;
     onBeforeMount(async () => {
@@ -1636,6 +1638,192 @@ export default defineComponent({
       return "";
     });
 
+    const downloadDataAsCSV = (title: string) => {
+      // if panel type is table then download data as csv
+      if (panelSchema.value.type == "table") {
+        tableRendererRef?.value?.downloadTableAsCSV(title);
+      } else {
+        // For non-table charts
+        try {
+          // Check if data exists
+          if (!data?.value || data?.value?.length === 0) {
+            showErrorNotification("No data available to download");
+            return;
+          }
+
+          let csvContent;
+
+          // Check if this is a PromQL query type panel
+          if (panelSchema.value.queryType === "promql") {
+            // Handle PromQL data format
+            const flattenedData: any[] = [];
+
+            // Iterate through each response item (multiple queries can produce multiple responses)
+            data?.value?.forEach((promData: any, queryIndex: number) => {
+              if (!promData?.result || !Array.isArray(promData.result)) return;
+
+              // Iterate through each result (time series)
+              promData.result.forEach((series: any, seriesIndex: number) => {
+                const metricLabels = series.metric || {};
+
+                // Iterate through values array (timestamp, value pairs)
+                series.values.forEach((point: any) => {
+                  const timestamp = point[0];
+                  const value = point[1];
+
+                  // Create a row with timestamp, value, and all metric labels
+                  const row = {
+                    timestamp: timestamp,
+                    value: value,
+                    ...metricLabels,
+                  };
+
+                  flattenedData.push(row);
+                });
+              });
+            });
+
+            // Get all unique keys across all data points
+            const allKeys = new Set();
+            flattenedData.forEach((row: any) => {
+              Object.keys(row).forEach((key: any) => allKeys.add(key));
+            });
+
+            // Convert Set to Array and ensure timestamp and value come first
+            const keys = Array.from(allKeys);
+            keys.sort((a: any, b: any) => {
+              if (a === "timestamp") return -1;
+              if (b === "timestamp") return 1;
+              if (a === "value") return -1;
+              if (b === "value") return 1;
+              return a.localeCompare(b);
+            });
+
+            // Create CSV content
+            csvContent = [
+              keys.join(","), // Headers row
+              ...flattenedData.map((row: any) =>
+                keys.map((key: any) => wrapCsvValue(row[key] ?? "")).join(","),
+              ),
+            ].join("\r\n");
+          } else {
+            // Handle standard SQL format - now supporting multiple arrays
+            const flattenedData: any[] = [];
+
+            // Iterate through all datasets/arrays in the response
+            data?.value?.forEach((dataset: any, datasetIndex: number) => {
+              // Skip if dataset is empty or not an array
+              if (!dataset || !Array.isArray(dataset) || dataset.length === 0)
+                return;
+
+              dataset.forEach((row: any) => {
+                flattenedData.push({
+                  ...row,
+                });
+              });
+            });
+
+            // If after flattening we have no data, show notification and return
+            if (flattenedData.length === 0) {
+              showErrorNotification("No data available to download");
+              return;
+            }
+
+            // Collect all possible keys from all objects
+            const allKeys = new Set();
+            flattenedData.forEach((row: any) => {
+              Object.keys(row).forEach((key: any) => allKeys.add(key));
+            });
+
+            // Convert Set to Array and sort for consistent order
+            const headers = Array.from(allKeys).sort();
+
+            // Create CSV content with headers and data rows
+            csvContent = [
+              headers?.join(","), // Headers row
+              ...flattenedData?.map((row: any) =>
+                headers
+                  ?.map((header: any) => wrapCsvValue(row[header] ?? ""))
+                  .join(","),
+              ),
+            ].join("\r\n");
+          }
+
+          const status = exportFile(
+            (title ?? "chart-export") + ".csv",
+            csvContent,
+            "text/csv",
+          );
+
+          if (status === true) {
+            showPositiveNotification("Chart data downloaded as a CSV file", {
+              timeout: 2000,
+            });
+          } else {
+            showErrorNotification("Browser denied file download...");
+          }
+        } catch (error) {
+          console.error("Error downloading CSV:", error);
+          showErrorNotification("Failed to download data as CSV");
+        }
+      }
+    };
+
+    // Helper function to properly wrap CSV values
+    const wrapCsvValue = (val: any): string => {
+      if (val === null || val === undefined) {
+        return "";
+      }
+
+      // Convert to string and escape any quotes
+      const str = String(val).replace(/"/g, '""');
+
+      // Wrap in quotes if the value contains comma, quotes, or newlines
+      const needsQuotes =
+        str.includes(",") ||
+        str.includes('"') ||
+        str.includes("\n") ||
+        str.includes("\r");
+      return needsQuotes ? `"${str}"` : str;
+    };
+
+    const downloadDataAsJSON = (title: string) => {
+      try {
+        // Handle table type charts
+        if (panelSchema?.value?.type === "table") {
+          tableRendererRef?.value?.downloadTableAsJSON(title);
+        } else {
+          // Handle non-table charts
+          const chartData = data.value;
+
+          if (!chartData || !chartData.length) {
+            showErrorNotification("No data available to download");
+            return;
+          }
+
+          // Export the data as JSON
+          const content = JSON.stringify(chartData, null, 2);
+
+          const status = exportFile(
+            (title ?? "data-export") + ".json",
+            content,
+            "application/json",
+          );
+
+          if (status === true) {
+            showPositiveNotification("Chart data downloaded as a JSON file", {
+              timeout: 2000,
+            });
+          } else {
+            showErrorNotification("Browser denied file download...");
+          }
+        }
+      } catch (error) {
+        console.error("Error downloading JSON:", error);
+        showErrorNotification("Failed to download data as JSON");
+      }
+    };
+
     return {
       store,
       chartPanelRef,
@@ -1667,6 +1855,8 @@ export default defineComponent({
       panelsList,
       isCursorOverPanel,
       showPopupsAndOverlays,
+      downloadDataAsCSV,
+      downloadDataAsJSON,
     };
   },
 });
