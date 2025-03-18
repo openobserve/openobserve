@@ -4,7 +4,8 @@ import logsdata from "../../../test-data/logs_data.json";
 import importdata from "../../../test-data/dashboards-import.json";
 import importdata1 from "../../../test-data/dashboard1-import.json";
 import importdata2 from "../../../test-data/dashboard2-import.json";
-import importdata3 from "../../../test-data/dashbaordV3-import.json";
+import importdata3 from "../../../test-data/dashboardV3-import.json";
+import importdata4 from "../../../test-data/dashboardAzure.json";
 
 
 
@@ -161,6 +162,7 @@ test.describe("dashboard import testcases", () => {
       .fill(
         "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json"
       );
+      
 
     await page.waitForTimeout(2000);
     // await page.waitForSelector('.table-row'); // adjust selector as needed
@@ -412,23 +414,22 @@ test.describe("dashboard import testcases", () => {
     console.log(`Successfully deleted folder via UI: ${folderName}`);
   });
 
-  test("should import the old verson dashbaord", async ({ page }) => {
+  test("Should import the Version 3 dashboard successfully", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-import"]').click();
 
     //file name to be used for import
-    const fileContentPath = "../../../test-data/dashbaordV3-import.json";
+    const fileContentPath1 = "../test-data/dashboardV3-import.json";
 
     // Locate the file input field and set the JSON file
     const inputFile = await page.locator('input[type="file"]');
     //is used for setting the file to be imported
-    await inputFile.setInputFiles(fileContentPath);
-
-    await page.waitForTimeout(2000);
+    await inputFile.setInputFiles(fileContentPath1);
 
     await page.getByRole("button", { name: "Import" }).click();
 
+    await page.waitForTimeout(2000);
 
     await expect(
       page.getByRole("cell", { name: "AWS VPC Flow Log" }).first()
@@ -440,4 +441,79 @@ test.describe("dashboard import testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
 
   });
-});
+  test("Should import the Azure dashboard without errors", async ({ page }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-import"]').click();
+
+    //file name to be used for import
+    const fileContentPath = "../test-data/dashboardAzure.json";
+
+    // Locate the file input field and set the JSON file
+    const inputFile = await page.locator('input[type="file"]');
+    //is used for setting the file to be imported
+    await inputFile.setInputFiles(fileContentPath);
+
+    await page.getByRole("button", { name: "Import" }).click();
+
+    await page.waitForTimeout(2000);
+
+    await expect(
+      page.getByRole("cell", { name: "Frontdoor" }).first()
+    ).toBeVisible();
+    await page
+      .getByRole("row", { name: "01 Frontdoor" })
+      .locator('[data-test="dashboard-delete"]')
+      .click();
+    await page.locator('[data-test="confirm-button"]').click();
+
+  });
+
+  test.skip("123should import the dashbaord using URL import", async ({ page }) => {
+
+    // Set up listener to catch console errors
+    let errorMessage = "";
+    page.on("console", (msg) => {
+      if (msg.type() === "error") {
+        errorMessage += msg.text() + "\n";
+      }
+    });
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-import"]').click();
+    await page.locator('[data-test="tab-import_json_url"]').click();
+    await page.getByLabel("Add your url").click();
+    await page
+      .getByLabel("Add your url")
+      .fill(
+        "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Azure/Azure%20Loadblancer.dashboard.json"
+      );
+      
+    await page.waitForTimeout(2000);
+    // await page.waitForSelector('.table-row'); // adjust selector as needed
+    await expect(
+      page
+        .getByRole("code")
+        .locator("div")
+        .filter({ hasText: '"dashboardId": "' })
+        .nth(4)
+    ).toBeVisible();
+
+    //is used for setting the file to be importedad
+    await page.getByRole("button", { name: "Import" }).click();
+
+    await expect(
+      page.getByRole("cell", { name: "Azure Loadblancer" }).first()
+    ).toBeVisible();
+    await page
+      .getByRole("row", { name: "01 Azure Loadblancer" })
+      .locator('[data-test="dashboard-delete"]')
+      .click();
+    await page.locator('[data-test="confirm-button"]').click();
+
+    // Assert no error occurred
+ expect(errorMessage).toBe("");  
+  });
+  
+  });
+  
