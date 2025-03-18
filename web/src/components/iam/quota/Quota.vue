@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        style="min-height: inherit">
         <q-table
             :rows="apiLimitsRows"
-            :columns="apiLimitsColumns"
+            :columns="generateColumns()"
             row-key="name"
             :pagination="pagination"
         >
@@ -147,15 +147,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template v-slot:body-cell="props">
-            <q-td :props="props" v-if="editTable">
+            <q-td :props="props" 
+                  v-if="editTable" 
+                  :class="{
+                      'editable-cell': editTable && props.col.name !== 'module_name',
+                      'edited-cell': isEdited(props.row.module_name, props.col.name)
+                  }">
                 <q-input
-                v-if="props.row[ props.col.name ] != '--' && props.col.name != 'module_name' "
-                v-model.number="props.row[ props.col.name ]"
-                input-class="text-center"
-                type="number"
-                dense
-                flat
-                borderless
+                    v-if="props.row[props.col.name] != '--' && props.col.name != 'module_name'"
+                    :model-value="changedValues[props.row.module_name]?.[props.col.name]?.threshold ?? props.row[props.col.name].threshold"
+                    @update:model-value="(val) => handleInputChange(props.row.module_name , props.row[props.col.name], props.col.name, val)"
+                    :class="{
+                        'edited-input': isEdited(props.row.module_name, props.col.name)
+                    }"
+                    input-class="text-center"
+                    class="title-height"
+                    type="number"
+                    dense
+                    flat
+                    borderless
+                    :min="-1"
+                    :rules="[
+                        val => val >= -1 || 'Value must be greater than or equal to -1'
+                    ]"
                 />
                 <q-input
                 v-else-if="props.row[ props.col.name ] == '--' && props.col.name != 'module_name' "
@@ -169,16 +183,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
 
                 <div v-else>
+                    
                     {{ props.row[ props.col.name ] }}
                 </div>
             </q-td>
             <q-td :props="props" v-else>
-                {{ props.row[ props.col.name ] }}
+                <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '--'">
+                    {{ props.row[ props.col.name ].threshold }}
+                </div>
+                    <div v-else-if="props.col.name == 'module_name'"> 
+                    {{ props.row[ props.col.name ] }}
+                </div>
+                <div v-else-if="props.row[props.col.name] == '--'">
+                   --
+                </div>
             </q-td>
             </template>
 
         </q-table>
-        <div class="flex justify-end w-full tw-ml-auto floating-buttons "
+        <div class="flex justify-end w-full tw-ml-auto floating-buttons  q-pr-md"
         v-if="editTable"
       >
                 <q-btn
@@ -188,9 +211,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="cancelChanges"
                 />
                 <q-btn
-                label="Save"
-                class="border q-ml-md title-height"
-                no-caps
+                label="Save Changes"
+                class="text-bold no-border q-ml-md"
+                  :color="Object.keys(changedValues).length > 0 ? 'secondary' : 'grey'"
+                  :disable="Object.keys(changedValues).length === 0"
+                  padding="sm md"
+                  no-caps
                 @click="saveChanges"
                 />
             </div>
@@ -209,6 +235,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
+import { useQuasar } from "quasar";
+import { useRouter } from "vue-router";
 export default defineComponent ({
     name: "Quota",
     components: {
@@ -220,6 +248,7 @@ export default defineComponent ({
         const { t } = useI18n();
         const selectedOrganization = ref<any>(null);
         const store = useStore();
+        const $q = useQuasar();
         const organizations = ref<any[]>([]);
         const isOrgLoading = ref<boolean>(false);
         const resultTotal = ref<number>(0);
@@ -287,10 +316,10 @@ export default defineComponent ({
         const searchQuery = ref<string>("");
         const apiLimitsRows = ref<any[]>([]);
         const editTable = ref<boolean>(false);
-        //functions starts from here
+        const changedValues = ref<any>({});
+        const router = useRouter();
 
         onMounted(async ()=>{
-
             await getOrganizations();
             await getApiLimitsByOrganization();
         })
@@ -381,16 +410,17 @@ export default defineComponent ({
                     // Check if the operation exists for the current module
                     if (module[operation]) {
                         // If the operation exists, get the threshold value
-                        moduleThresholds[operation.toLowerCase()] = module[operation].threshold === -1 ? -1 : module[operation].threshold;
+                        moduleThresholds[operation.toLowerCase()] =  module[operation];
                     } else {
                         // If the operation doesn't exist, set it as '--'
                         moduleThresholds[operation.toLowerCase()] = '--';
                     }
                 });
-
                 // Add the transformed data to the array
                 transformedData.push(moduleThresholds);
+
             });
+            console.log(transformedData,'transformeddata');
             apiLimitsRows.value = transformedData;
             resultTotal.value = transformedData.length;
         } catch (error) {
@@ -398,13 +428,69 @@ export default defineComponent ({
         }
     };
 
-    const cancelChanges = () => {
-        editTable.value = false;
-    }
-    const saveChanges = () => {
-        editTable.value = false;
-    }
+    const handleInputChange = (moduleName: string, row: any, operation: string, value: any) => {
+        if (!changedValues.value[moduleName]) {
+            changedValues.value[moduleName] = {};
+        }
+        const rowRule = row.rule;
+        rowRule.threshold = parseInt(value);
+        changedValues.value[moduleName][operation] = {
+            ...rowRule
+        };
+    };
 
+    const saveChanges = async () => {
+        try {
+            // Here you would call your API to save the changes
+                 let leafArray = [];
+
+                // Iterate through the top-level keys and extract the leaf values
+                for (let category in changedValues.value) {
+                    for (let operation in changedValues.value[category]) {
+                        leafArray.push(changedValues.value[category][operation]);
+                    }
+                }
+
+            const response = await ratelimitService.update_batch(selectedOrganization.value.value, leafArray);
+            if(response.status === 200){
+                $q.notify({
+                    type: "positive",
+                    message: response.data.message,
+                    timeout: 3000,
+                })
+            }
+            
+            // After successful save, refresh the data
+            await getApiLimitsByOrganization();
+            editTable.value = false;
+            changedValues.value = {};
+        } catch (error) {
+            $q.notify({
+                type: "negative",
+                message: error.response.data.message || "Error while updating rate limits rule",
+                timeout: 3000,
+            })
+            console.error('Error saving changes:', error);
+        }
+    };
+
+    const cancelChanges = () => {
+        changedValues.value = {};
+        editTable.value = false;
+    };
+
+    const isEdited = (moduleName: string, operation: string) => {
+        return changedValues.value[moduleName] && changedValues.value[moduleName][operation]?.threshold !== undefined;
+    };
+
+    const generateColumns = () => {
+        if(selectedOrganization.value?.hasOwnProperty('value') && selectedOrganization.value.value != ''){
+            return apiLimitsColumns;
+        }
+        else{
+            return [];
+        }
+    }
 
         
         return {
@@ -428,7 +514,13 @@ export default defineComponent ({
             apiLimitsColumns,
             pagination,
             editTableWithInput,
-            store
+            store,
+            handleInputChange,
+            changedValues,
+            cancelChanges,
+            saveChanges,
+            isEdited,
+            generateColumns
         }
     }
 })
@@ -486,6 +578,33 @@ export default defineComponent ({
 .light-theme-page {
     .floating-buttons{
         background-color: $white;
+    }
+}
+.light-theme-page {
+    .editable-cell {
+        padding: 0px 10px;
+        background-color: #F9F9F8;
+    }
+    .edited-cell {
+        background-color: #EBECF6; // light blue color
+    }
+    .edited-input {
+        color: #2196F3; // blue text color for edited values
+        font-weight: 500;
+    }
+}
+
+.dark-theme-page {
+    .editable-cell {
+        padding: 0px 10px;
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    .edited-cell {
+        background-color: #777883; // light blue color
+    }
+    .edited-input {
+        color: #64B5F6; // lighter blue text color for dark theme
+        font-weight: 500;
     }
 }
 </style>

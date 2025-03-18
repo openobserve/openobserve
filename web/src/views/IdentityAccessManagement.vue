@@ -129,7 +129,6 @@ watch(
     immediate: true,
   }
 );
-
 watch(
   () => store.state.zoConfig,
   () => {
@@ -143,7 +142,7 @@ watch(
 function setTabs() {
   const cloud = ["users", "organizations", "serviceAccounts"];
 
-  const rbac = ["groups", "roles", "quota"];
+  const rbac = ["groups", "roles"];
 
   const os = ["users", "serviceAccounts"];
 
@@ -155,10 +154,14 @@ function setTabs() {
     let filteredTabs = tabs.value.filter((tab) => cloud.includes(tab.name));
 
     if (store.state.zoConfig.rbac_enabled) {
+      if(store.state.selectedOrganization.identifier === '_meta'){
+        rbac.push("quota")
+      }
       filteredTabs = [
         ...filteredTabs,
         ...tabs.value.filter((tab) => rbac.includes(tab.name)),
       ];
+
     }
 
     tabs.value = filteredTabs;
