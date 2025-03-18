@@ -160,16 +160,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         'edited-input': isEdited(props.row.module_name, props.col.name)
                     }"
                     input-class="text-center"
-                    class="title-height"
+                    class="title-height full-width"
                     type="number"
                     dense
+                    label=""
                     flat
                     borderless
-                    :min="-1"
+                     
+                     hide-bottom-space
+                    :min="0"
                     :rules="[
-                        val => val >= -1 || 'Value must be greater than or equal to -1'
+                        val => val >= 0 || 'Value must be greater than or equal to 0'
                     ]"
-                />
+                    style="border: 1px solid #E0E0E0; padding: 0px 30px;"
+                ></q-input>
                 <q-input
                 v-else-if="props.row[ props.col.name ] == '--' && props.col.name != 'module_name' "
                 v-model="props.row[ props.col.name ]"
@@ -231,17 +235,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-card-section style="height: 100px !important;">
                     <div class="flex items-center justify-between">
                         <div class="text-h6">Bulk Update</div>
-                        <q-icon name="close" size="24px" />
+                        <q-btn icon="close" size="sm" flat dense @click="closeBulkUpdate" />
                     </div>
-                    <div class="q-mt-xs text-grey-9" >
+                    <div class="q-mt-xs"
+                    :class="store.state.theme === 'dark' ? 'text-grey' : 'text-grey-9'"
+                     >
                         To perform bulk updates, download the provided JSON file, edit the default values within it, and then re-upload the modified file back into the system.
                     </div>
                 </q-card-section>
 
-                <q-card-section style="height: 190px !important;" >
+                <q-card-section style="height: 180px !important;" >
                    <div style="border: 1px solid #E0E0E0; border-radius: 2px;" class=" tw-border tw-border-solid tw-border-grey   full-width full-height q-mt-sm">
 
-                    <div class="flex justify-center items-center full-width full-height">
+                    <div  class="flex justify-center items-center full-width full-height">
                         <q-file
                         style="height: 100%  !important;  z-index: 1000;"
                         v-model="uploadedRules"
@@ -255,12 +261,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div v-if="!uploadedRules" class="flex full-width full-height items-center " style="flex-direction: column;">   
                                 <q-img :src="getImageURL('images/common/hard-drive.svg')" style="width: 48px; height: 48px;" />
                                 <div class="q-mt-md">
-                                    <div class=" text-black flex text-center full-width items-center justify-center q-mt-sm">Click or drag the file to this area to upload</div>
-                                    <div class="text-grey-8 flex text-center full-width items-center justify-center q-mt-sm">Maximum file size: 2MB</div>
+                                    <div class=" flex text-center full-width items-center justify-center q-mt-sm" :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-9'">Click or drag the file to this area to upload</div>
+                                    <div class="     flex text-center full-width items-center justify-center q-mt-sm" :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-9'">Maximum file size: 2MB</div>
                                 </div>
                             </div>
                         </template>
-                        <template v-slot:file="scope">
+                        <template v-slot:file="scope" >
                             <div class="full-width full-height flex items-center justify-center">
                                 {{ fileListToDisplay }}
                             </div>
@@ -270,14 +276,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     
                         </div>
                         </q-card-section>
-                <q-card-section style="height: 10px !important;" >
-                    <div>
+                <q-card-section style="height: 32px !important; padding-top: 0px !important;" >
+                    <div style="background-color: #FFDEDE; color: #931B1E; border-radius: 5px;" v-if="uploadError && !uploadingRules" class="full-width  flex items-center q-py-xs  " >
+                        <q-icon name="warning" class="q-mx-sm" style="color: #931B1E;" />{{ uploadError }}
                         <!-- error section / uploading notification section -->
                    </div>
                 </q-card-section>
                 <div>
-                    <q-card-actions align="right" >
-                    <q-btn label="Update" class="text-bold" no-caps padding="sm" @click="uploadTemplate" >
+                    <q-card-actions align="right"  >
+                    <q-btn label="Update" class="text-bold" no-caps padding="sm" @click="uploadTemplate" :disable="uploadingRules" >
                         <q-icon :name="outlinedFileUpload" />
                     </q-btn>
                     <q-btn label="Download"  no-caps  class="text-bold no-border "
@@ -404,6 +411,8 @@ export default defineComponent ({
         const isBulkUpdate = ref<boolean>(false);
         const uploadedRules = ref<any>(null);
         const fileListToDisplay = ref<string>("");
+        const uploadingRules = ref<boolean>(false);
+        const uploadError = ref<string>("");
 
         onMounted(async ()=>{
             await getOrganizations();
@@ -421,6 +430,10 @@ export default defineComponent ({
         //watch here
 
         watch (()=>uploadedRules.value, (newVal) => {
+            if(!newVal || newVal.length == 0){
+                fileListToDisplay.value = '';
+                return;
+            }
             fileListToDisplay.value = '';
             if(newVal.length > 1){
             newVal.forEach((file: any) => {
@@ -592,6 +605,9 @@ export default defineComponent ({
 
                 const response = await ratelimitService.update_batch(selectedOrganization.value.value, leafArray);
                 if(response.status === 200){
+                    uploadError.value = '';
+                    uploadedRules.value = [];
+                    isBulkUpdate.value = false;
                     $q.notify({
                         type: "positive",
                         message: response.data.message,
@@ -650,9 +666,33 @@ export default defineComponent ({
 
     const uploadTemplate = async () => {
         const combinedJson = await convertUploadRulesToJson(uploadedRules.value);
-        console.log(combinedJson,'combined json')
-        const response = await ratelimitService.upload_template(selectedOrganization.value.value, combinedJson);
-        console.log(response,'response')
+        try{
+            const dismiss = $q.notify({
+                spinner: true,
+                message: "Please wait while uploading rules...",
+                timeout: 1000,
+            });
+            uploadingRules.value = true;
+            const response = await ratelimitService.upload_template(selectedOrganization.value.value, combinedJson);
+            if(response.status === 200){
+                $q.notify({
+                    type: "positive",
+                    message: response.data.message,
+                    timeout: 3000,
+                })
+            }
+            uploadingRules.value = false;
+            isBulkUpdate.value = false;
+            uploadedRules.value = null;
+            dismiss();
+        }
+        catch(error){
+            uploadingRules.value = false;
+            uploadError.value = "Error while uploading rules";
+        }
+        finally{
+            uploadingRules.value = false;
+        }
     }
 
     const convertUploadRulesToJson = async (files: any) => {
@@ -688,6 +728,11 @@ export default defineComponent ({
           }
         }
         return combinedJson;
+    }
+    const closeBulkUpdate = () => {
+        isBulkUpdate.value = false;
+        uploadedRules.value = null;
+        uploadError.value = '';
     }
 
 
@@ -729,7 +774,10 @@ export default defineComponent ({
             getImageURL,
             fileListToDisplay,
             downloadTemplate,
-            uploadTemplate
+            uploadTemplate,
+            uploadError,
+            uploadingRules,
+            closeBulkUpdate
         }
     }
 })
