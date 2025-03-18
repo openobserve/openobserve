@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="font-size: 1.5rem"
     >
       <q-img
-        :src="getImageURL('images/common/selectOrganization.png')"
+        :src="getImageURL('images/common/selectOrganization.svg')"
         style="width: 200px; height: 200px; margin-top: 20vh;"
       />
       <div class="q-ma-none no-org-selected" >{{ t("ticket.noOrganizationSelected") }}</div>
