@@ -453,6 +453,9 @@ export class LogsPage {
 }
 
 async toggleHistogram() {
+  await this.page.waitForSelector('[data-test="logs-search-bar-more-options-dropdown"]');
+  await this.page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
+  await this.page.waitForSelector('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
   await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
 }
 
