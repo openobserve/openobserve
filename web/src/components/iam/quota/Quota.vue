@@ -393,7 +393,7 @@ export default defineComponent ({
         const getApiLimitsByOrganization = async () => {
         try {
             const response = await ratelimitService.getApiLimits(selectedOrganization.value.value);
-            let transformedData = [];
+            let transformedData: any = [];
 
             //predefined operation that we get from the api
             const operations = ['List', 'Get', 'Create', 'Update', 'Delete'];
@@ -402,7 +402,7 @@ export default defineComponent ({
                 const module = response.data.api_group_info[moduleName];
 
                 // Create an object to store the threshold values for each operation
-                let moduleThresholds = {
+                let moduleThresholds: any = {
                     module_name: moduleName,
                 };
 
@@ -464,7 +464,7 @@ export default defineComponent ({
             await getApiLimitsByOrganization();
             editTable.value = false;
             changedValues.value = {};
-        } catch (error) {
+        } catch (error: any) {
             $q.notify({
                 type: "negative",
                 message: error.response.data.message || "Error while updating rate limits rule",
