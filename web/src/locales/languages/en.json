@@ -1158,7 +1158,7 @@
     "header": "Quota",
     "api-limits": "API Limits",
     "role-limits": "Role Limits",
-    "api-search": "Search APIs",
+    "api-search": "Search Modules",
     "role-search": "Search Roles",
     "moduleName": "Module Name",
     "listLimit": "List (Req/s)",

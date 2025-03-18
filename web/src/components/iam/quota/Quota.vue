@@ -24,6 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="generateColumns()"
             row-key="name"
             :pagination="pagination"
+            :filter="searchQuery"
+            :filter-method="filteredData"
+
         >
         <template #no-data></template>
 
@@ -152,28 +155,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'editable-cell': editTable && props.col.name !== 'module_name',
                       'edited-cell': isEdited(props.row.module_name, props.col.name)
                   }">
-                <q-input
-                    v-if="props.row[props.col.name] != '--' && props.col.name != 'module_name'"
-                    :model-value="changedValues[props.row.module_name]?.[props.col.name]?.threshold ?? props.row[props.col.name].threshold"
-                    @update:model-value="(val) => handleInputChange(props.row.module_name , props.row[props.col.name], props.col.name, val)"
-                    :class="{
-                        'edited-input': isEdited(props.row.module_name, props.col.name)
-                    }"
-                    input-class="text-center"
-                    class="title-height full-width"
-                    type="number"
-                    dense
-                    label=""
-                    flat
-                    borderless
-                     
-                     hide-bottom-space
-                    :min="0"
-                    :rules="[
-                        val => val >= 0 || 'Value must be greater than or equal to 0'
-                    ]"
-                    style="border: 1px solid #E0E0E0; padding: 0px 30px;"
-                ></q-input>
+                    <q-input
+                        v-if="props.row[props.col.name] != '--' && props.col.name != 'module_name'"
+                        :model-value="changedValues[props.row.module_name]?.[props.col.name]?.threshold ?? props.row[props.col.name].threshold"
+                        @update:model-value="(val) => handleInputChange(props.row.module_name , props.row[props.col.name], props.col.name, val)"
+                        :class="{
+                        'edited-input': isEdited(props.row.module_name, props.col.name),
+                        'focused-input': focusedInputId === generateUniqueId(props.row[props.col.name])
+                        }"
+                        input-class="text-center"
+                        class="title-height full-width cursor-text editable-input"
+                        type="number"
+                        dense
+                        stack-label
+                        borderless
+                        hide-bottom-space
+                        :min="0"
+                        :rules="[
+                            val => val >= 0 || 'Value must be greater than or equal to 0'
+                        ]"
+                        @focus="onFocus(props.row[props.col.name])"
+                        @blur="onBlur"
+                    />
                 <q-input
                 v-else-if="props.row[ props.col.name ] == '--' && props.col.name != 'module_name' "
                 v-model="props.row[ props.col.name ]"
@@ -413,6 +416,8 @@ export default defineComponent ({
         const fileListToDisplay = ref<string>("");
         const uploadingRules = ref<boolean>(false);
         const uploadError = ref<string>("");
+        const focusedInputId = ref(null);
+
 
         onMounted(async ()=>{
             await getOrganizations();
@@ -734,7 +739,29 @@ export default defineComponent ({
         uploadedRules.value = null;
         uploadError.value = '';
     }
+    const onFocus = (row: any) => {
+        console.log('focus', generateUniqueId(row));
+        focusedInputId.value = generateUniqueId(row);
+    };
 
+    // Handle blur event and clear the focused input ID
+    const onBlur = () => {
+    };
+
+    const generateUniqueId = (row: any) => {
+        return row.api_group_name + '_' + row.api_operation_name;
+    }
+
+    const filteredData = (rows: any, terms: any) => {
+        var filtered = [];
+        terms = terms.toLowerCase();
+        for (var i = 0; i < rows.length; i++) {
+            if(rows[i].module_name.toLowerCase().includes(terms)){
+                filtered.push(rows[i]);
+            }
+        }
+        return filtered;
+      }
 
         
         return {
@@ -777,7 +804,12 @@ export default defineComponent ({
             uploadTemplate,
             uploadError,
             uploadingRules,
-            closeBulkUpdate
+            closeBulkUpdate,
+            focusedInputId,
+            onFocus,
+            onBlur,
+            generateUniqueId,
+            filteredData
         }
     }
 })
@@ -848,6 +880,7 @@ export default defineComponent ({
     .edited-input {
         color: #2196F3; // blue text color for edited values
         font-weight: 500;
+        padding: 0px !important;
     }
 }
 
@@ -862,6 +895,7 @@ export default defineComponent ({
     .edited-input {
         color: #64B5F6; // lighter blue text color for dark theme
         font-weight: 500;
+        padding: 0px !important;
     }
 }
 .file-upload-input {
@@ -887,5 +921,10 @@ export default defineComponent ({
     justify-content: start;
 
 }
+.focused-input {
+  border: 1px solid #007bff; /* Customize the border color */
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5); /* Optional: Add shadow for better focus effect */
+}
+
 
 </style>
