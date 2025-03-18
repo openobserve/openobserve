@@ -19,7 +19,7 @@ import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import { extractFields } from "@/utils/query/sqlUtils";
-import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 const colors = [
   "#5960b2",
@@ -1994,6 +1994,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           selectFilter += `${condition.column} IN (${formatINValue(
             condition.value,
           )})`;
+        } else if (condition.operator === "NOT IN") {
+          selectFilter += `${condition.column} NOT IN (${formatINValue(
+            condition.value,
+          )})`;
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${formatValue(condition.value)})`;
         } else if (condition.operator === "match_all_raw") {
@@ -2036,6 +2040,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               break;
             case "Not Contains":
               selectFilter += `NOT LIKE '%${condition.value}%'`;
+              break;
+            case "Starts With":
+              selectFilter += `LIKE '${condition.value}%'`;
+              break;
+            case "Ends With":
+              selectFilter += `LIKE '%${condition.value}'`;
               break;
             default:
               selectFilter += `${condition.operator} ${formatValue(
@@ -2633,194 +2643,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     { deep: true },
   );
 
-  // so, it is not above common state
-  // expect 2nd arg for x, y and breakdown field validation
-  const validatePanel = (
+  // Replace the existing validatePanel function with a wrapper that calls the generic function
+  const validatePanelWrapper = (
     errors: string[],
     isFieldsValidationRequired: boolean = true,
   ) => {
-    //check each query is empty or not for promql
-    if (dashboardPanelData?.data?.queryType == "promql") {
-      dashboardPanelData.data.queries.map((q: any, index: number) => {
-        if (q && q.query == "") {
-          errors.push(`Query-${index + 1} is empty`);
-        }
-      });
-    }
-
-    //check each query is empty or not for geomap
-    if (dashboardPanelData.data.type == "geomap") {
-      dashboardPanelData.data.queries.map((q: any, index: number) => {
-        if (q && q.query == "") {
-          errors.push(`Query-${index + 1} is empty`);
-        }
-      });
-    }
-
-    //check content should be empty for html
-    if (dashboardPanelData.data.type == "html") {
-      if (dashboardPanelData.data.htmlContent.trim() == "") {
-        errors.push("Please enter your HTML code");
-      }
-    }
-
-    //check content should be empty for html
-    if (dashboardPanelData.data.type == "markdown") {
-      if (dashboardPanelData.data.markdownContent.trim() == "") {
-        errors.push("Please enter your markdown code");
-      }
-    }
-    if (dashboardPanelData.data.type == 'custom_chart'){
-      if(dashboardPanelData.data.queries[0].query.trim() == ""){
-         errors.push("Please enter query for custom chart")
-      }
-    }
-
-    if (promqlMode.value) {
-      // 1. chart type: only line chart is supported
-      const allowedChartTypes = [
-        "area",
-        "line",
-        "bar",
-        "scatter",
-        "area-stacked",
-        "metric",
-        "gauge",
-        "html",
-        "markdown",
-      ];
-      if (!allowedChartTypes.includes(dashboardPanelData.data.type)) {
-        errors.push(
-          "Selected chart type is not supported for PromQL. Only line chart is supported.",
-        );
-      }
-
-      // 2. x axis, y axis, filters should be blank
-      if (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.x.length > 0
-      ) {
-        errors.push(
-          "X-Axis is not supported for PromQL. Remove anything added to the X-Axis.",
-        );
-      }
-
-      if (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.length > 0
-      ) {
-        errors.push(
-          "Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.",
-        );
-      }
-
-      if (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.conditions.length > 0
-      ) {
-        errors.push(
-          "Filters are not supported for PromQL. Remove anything added to the Filters.",
-        );
-      }
-
-      // if(!dashboardPanelData.data.query) {
-      //   errors.push("Query should not be empty")
-      // }
-    } else {
-      validateSQLPanelFields(
-        dashboardPanelData.data,
-        dashboardPanelData.layout.currentQueryIndex,
-        currentXLabel.value,
-        currentYLabel.value,
-        errors,
-        isFieldsValidationRequired,
-      );
-
-      if (isFieldsValidationRequired) {
-        // check if field selection is from the custom query fields when the custom query mode is ON
-        if (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery
-        ) {
-          const customQueryXFieldError = dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.x.filter(
-            (it: any) =>
-              ![
-                ...dashboardPanelData.meta.stream.customQueryFields,
-                ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
-              ].find((i: any) => i.name == it.column),
-          );
-          if (customQueryXFieldError.length) {
-            errors.push(
-              ...customQueryXFieldError.map(
-                (it: any) =>
-                  `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`,
-              ),
-            );
-          }
-
-          const customQueryYFieldError = dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.y.filter(
-            (it: any) =>
-              ![
-                ...dashboardPanelData.meta.stream.customQueryFields,
-                ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
-              ].find((i: any) => i.name == it.column),
-          );
-          if (customQueryYFieldError.length) {
-            errors.push(
-              ...customQueryYFieldError.map(
-                (it: any) =>
-                  `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`,
-              ),
-            );
-          }
-        } else {
-          // check if field selection is from the selected stream fields when the custom query mode is OFF
-          const customQueryXFieldError = dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.x.filter(
-            (it: any) =>
-              ![
-                ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
-                ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
-              ].find((i: any) => i.name == it.column),
-          );
-          if (customQueryXFieldError.length) {
-            errors.push(
-              ...customQueryXFieldError.map(
-                (it: any) =>
-                  `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`,
-              ),
-            );
-          }
-
-          const customQueryYFieldError = dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.y.filter(
-            (it: any) =>
-              ![
-                ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
-                ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
-              ].find((i: any) => i.name == it.column),
-          );
-          if (customQueryYFieldError.length) {
-            errors.push(
-              ...customQueryYFieldError.map(
-                (it: any) =>
-                  `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`,
-              ),
-            );
-          }
-        }
-      }
-    }
+    validatePanel(dashboardPanelData, errors, isFieldsValidationRequired, [
+      ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
+      ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+    ]);
   };
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
@@ -3116,7 +2947,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     resetAggregationFunction,
     cleanupDraggingFields,
     getDefaultQueries,
-    validatePanel,
+    validatePanel: validatePanelWrapper, // Replace with the wrapper function
     currentXLabel,
     currentYLabel,
     generateLabelFromName,

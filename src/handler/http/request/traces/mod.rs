@@ -324,6 +324,8 @@ pub async fn get_latest_traces(
                     "500",
                     &org_id,
                     stream_type.as_str(),
+                    "",
+                    "",
                 ])
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
@@ -332,6 +334,8 @@ pub async fn get_latest_traces(
                     "500",
                     &org_id,
                     stream_type.as_str(),
+                    "",
+                    "",
                 ])
                 .inc();
             log::error!("get traces latest data error: {:?}", err);
@@ -413,6 +417,8 @@ pub async fn get_latest_traces(
                         "500",
                         &org_id,
                         stream_type.as_str(),
+                        "",
+                        "",
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -421,6 +427,8 @@ pub async fn get_latest_traces(
                         "500",
                         &org_id,
                         stream_type.as_str(),
+                        "",
+                        "",
                     ])
                     .inc();
                 log::error!("get traces latest data error: {:?}", err);
@@ -504,6 +512,8 @@ pub async fn get_latest_traces(
             "200",
             &org_id,
             stream_type.as_str(),
+            "",
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -512,6 +522,8 @@ pub async fn get_latest_traces(
             "200",
             &org_id,
             stream_type.as_str(),
+            "",
+            "",
         ])
         .inc();
 

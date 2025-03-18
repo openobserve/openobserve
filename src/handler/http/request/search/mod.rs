@@ -346,7 +346,19 @@ pub async fn search(
     match res {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, "500", "_search");
+            let search_type = req
+                .search_type
+                .map(|t| t.to_string())
+                .unwrap_or("".to_string());
+            http_report_metrics(
+                start,
+                &org_id,
+                stream_type,
+                "500",
+                "_search",
+                &search_type,
+                "",
+            );
             log::error!("[trace_id {trace_id}] search error: {}", err);
             Ok(match err {
                 errors::Error::ErrorCode(code) => match code {
@@ -457,7 +469,7 @@ pub async fn around_v1(
     match ret {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, "500", "_around");
+            http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
             log::error!("search around error: {:?}", err);
             Ok(match err {
                 errors::Error::ErrorCode(code) => match code {
@@ -578,7 +590,7 @@ pub async fn around_v2(
     match ret {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, "500", "_around");
+            http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
             log::error!("search around error: {:?}", err);
             Ok(match err {
                 errors::Error::ErrorCode(code) => match code {
@@ -917,7 +929,7 @@ async fn values_v1(
         let resp_search = match search_res {
             Ok(res) => res,
             Err(err) => {
-                http_report_metrics(start, org_id, stream_type, "500", "_values/v1");
+                http_report_metrics(start, org_id, stream_type, "500", "_values/v1", "", "");
                 log::error!("search values error: {:?}", err);
                 return Ok(match err {
                     errors::Error::ErrorCode(code) => match code {
@@ -993,7 +1005,7 @@ async fn values_v1(
     resp.took = start.elapsed().as_millis() as usize;
 
     let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, org_id, stream_type, "200", "_values/v1");
+    http_report_metrics(start, org_id, stream_type, "200", "_values/v1", "", "");
 
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
@@ -1112,11 +1124,27 @@ pub async fn search_partition(
     // do search
     match search_res {
         Ok(res) => {
-            http_report_metrics(start, &org_id, stream_type, "200", "_search_partition");
+            http_report_metrics(
+                start,
+                &org_id,
+                stream_type,
+                "200",
+                "_search_partition",
+                "",
+                "",
+            );
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, "500", "_search_partition");
+            http_report_metrics(
+                start,
+                &org_id,
+                stream_type,
+                "500",
+                "_search_partition",
+                "",
+                "",
+            );
             log::error!("search error: {:?}", err);
             Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
@@ -1282,7 +1310,15 @@ pub async fn search_history(
     let mut search_res = match search_res {
         Ok(res) => res,
         Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, "500", "_search_history");
+            http_report_metrics(
+                start,
+                &org_id,
+                stream_type,
+                "500",
+                "_search_history",
+                "",
+                "",
+            );
             log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
@@ -1317,7 +1353,15 @@ pub async fn search_history(
     search_res.trace_id = trace_id.clone();
 
     // report http metrics
-    http_report_metrics(start, &org_id, stream_type, "200", "_search_history");
+    http_report_metrics(
+        start,
+        &org_id,
+        stream_type,
+        "200",
+        "_search_history",
+        "",
+        "",
+    );
 
     // prepare usage metrics
     let time_taken = start.elapsed().as_secs_f64();

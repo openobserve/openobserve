@@ -296,7 +296,22 @@ pub async fn search(
 
     // do search
     let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, org_id, stream_type, "200", "_search");
+    let work_group = get_work_group(work_group_set);
+
+    let search_type = req
+        .search_type
+        .map(|t| t.to_string())
+        .unwrap_or("".to_string());
+    let search_group = work_group.clone().unwrap_or("".to_string());
+    http_report_metrics(
+        start,
+        org_id,
+        stream_type,
+        "200",
+        "_search",
+        &search_type,
+        &search_group,
+    );
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 
@@ -308,7 +323,6 @@ pub async fn search(
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
 
-    let work_group = get_work_group(work_group_set);
     let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
         records: res.hits.len() as i64,

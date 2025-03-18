@@ -81,19 +81,21 @@ pub async fn report_request_usage_stats(
     num_functions: u16,
     timestamp: i64,
 ) {
-    metrics::INGEST_RECORDS
-        .with_label_values(&[org_id, stream_type.as_str()])
-        .inc_by(stats.records as u64);
-    metrics::INGEST_BYTES
-        .with_label_values(&[org_id, stream_type.as_str()])
-        .inc_by((stats.size * SIZE_IN_MB) as u64);
     let event: UsageEvent = usage_type.into();
-    let now = DateTime::from_timestamp_micros(timestamp).unwrap();
+    if matches!(event, UsageEvent::Ingestion) {
+        metrics::INGEST_RECORDS
+            .with_label_values(&[org_id, stream_type.as_str()])
+            .inc_by(stats.records as u64);
+        metrics::INGEST_BYTES
+            .with_label_values(&[org_id, stream_type.as_str()])
+            .inc_by((stats.size * SIZE_IN_MB) as u64);
+    }
 
     if !get_config().common.usage_enabled {
         return;
     }
 
+    let now = DateTime::from_timestamp_micros(timestamp).unwrap();
     let request_body = stats.request_body.unwrap_or(usage_type.to_string());
     let user_email = stats.user_email.unwrap_or("".to_owned());
 
@@ -318,13 +320,29 @@ pub fn http_report_metrics(
     stream_type: StreamType,
     code: &str,
     uri: &str,
+    search_type: &str,
+    search_group: &str,
 ) {
     let time = start.elapsed().as_secs_f64();
     let uri = format!("/api/org/{}", uri);
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[&uri, code, org_id, stream_type.as_str()])
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_type.as_str(),
+            search_type,
+            search_group,
+        ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[&uri, code, org_id, stream_type.as_str()])
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_type.as_str(),
+            search_type,
+            search_group,
+        ])
         .inc();
 }

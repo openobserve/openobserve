@@ -726,11 +726,16 @@ impl VisitorMut for IndexVisitor {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
                 self.index_condition = index;
+                let can_remove_filter = self
+                    .index_condition
+                    .as_ref()
+                    .map(|v| v.can_remove_filter())
+                    .unwrap_or(true);
                 // make sure all filter in where clause can be used in inverted index
-                if other_expr.is_none() && select.selection.is_some() {
+                if other_expr.is_none() && select.selection.is_some() && can_remove_filter {
                     self.can_optimize = true;
                 }
-                if self.is_remove_filter {
+                if self.is_remove_filter && can_remove_filter {
                     select.selection = other_expr;
                 }
             }

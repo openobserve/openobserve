@@ -162,27 +162,14 @@ impl std::fmt::Display for UsageEvent {
 
 impl From<UsageType> for UsageEvent {
     fn from(usage: UsageType) -> UsageEvent {
-        match usage {
-            UsageType::Bulk
-            | UsageType::Json
-            | UsageType::Multi
-            | UsageType::KinesisFirehose
-            | UsageType::GCPSubscription
-            | UsageType::Logs
-            | UsageType::Traces
-            | UsageType::Metrics
-            | UsageType::PrometheusRemoteWrite
-            | UsageType::JsonMetrics
-            | UsageType::RUM
-            | UsageType::EnrichmentTable
-            | UsageType::Syslog => UsageEvent::Ingestion,
-            UsageType::Search
-            | UsageType::SearchAround
-            | UsageType::SearchTopNValues
-            | UsageType::MetricSearch
-            | UsageType::SearchHistory => UsageEvent::Search,
-            UsageType::Functions => UsageEvent::Functions,
-            UsageType::Retention => UsageEvent::Other,
+        if usage.is_ingestion() {
+            UsageEvent::Ingestion
+        } else if usage.is_search() {
+            UsageEvent::Search
+        } else if usage.is_function() {
+            UsageEvent::Functions
+        } else {
+            UsageEvent::Other
         }
     }
 }
@@ -229,6 +216,42 @@ pub enum UsageType {
     Syslog,
     #[serde(rename = "enrichment_table")]
     EnrichmentTable,
+}
+
+impl UsageType {
+    pub fn is_search(&self) -> bool {
+        matches!(
+            self,
+            UsageType::Search
+                | UsageType::SearchAround
+                | UsageType::SearchTopNValues
+                | UsageType::SearchHistory
+                | UsageType::MetricSearch
+        )
+    }
+
+    pub fn is_ingestion(&self) -> bool {
+        matches!(
+            self,
+            UsageType::Bulk
+                | UsageType::Json
+                | UsageType::Multi
+                | UsageType::KinesisFirehose
+                | UsageType::GCPSubscription
+                | UsageType::Logs
+                | UsageType::Traces
+                | UsageType::Metrics
+                | UsageType::PrometheusRemoteWrite
+                | UsageType::JsonMetrics
+                | UsageType::RUM
+                | UsageType::EnrichmentTable
+                | UsageType::Syslog
+        )
+    }
+
+    pub fn is_function(&self) -> bool {
+        matches!(self, UsageType::Functions)
+    }
 }
 
 impl std::fmt::Display for UsageType {
