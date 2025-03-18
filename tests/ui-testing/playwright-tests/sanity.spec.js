@@ -150,6 +150,7 @@ test.describe("Sanity testcases", () => {
   test("should not display chart if histogram off and display again when toggle is on", async ({
     page,
   }) => {
+    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
       .click();
@@ -159,6 +160,7 @@ test.describe("Sanity testcases", () => {
         .locator('[data-test="logs-search-result-bar-chart"]')
         .isVisible()
     ).toBe(false);
+    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)
