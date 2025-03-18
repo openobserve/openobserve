@@ -60,9 +60,9 @@ pub async fn get_stream(
         .await
         .unwrap();
 
-    let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
-    transform_stats(&mut stats);
     if schema != Schema::empty() {
+        let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
+        transform_stats(&mut stats);
         Some(stream_res(stream_name, stream_type, schema, Some(stats)))
     } else {
         None
