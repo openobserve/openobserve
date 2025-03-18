@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="searchObj.meta.showHistogram"
                 :label="t('search.showHistogramLabel')"
                 size="32px"
-                @click.stop.prevent
+                v-close-popup
               />
             </q-item>
             <q-item class="!tw-py-1">
@@ -340,6 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('search.quickModeLabel')"
                 @click="handleQuickMode"
                 size="32px"
+                v-close-popup
               />
             </q-item>
           </q-list>
@@ -354,137 +355,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="float-left"
           size="32px"
         />
-        <q-toggle
-          data-test="logs-search-bar-show-query-toggle-btn"
-          v-model="searchObj.meta.showTransformEditor"
-          :icon="transformIcon"
-          title="Toggle Function Editor"
-          class="float-left tw-cursor-pointer"
-          size="32px"
-          :disable="!searchObj.data.transformType"
-          @update:model-value="updateTransformEditor()"
-        >
-          <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
-            {{ searchObj.meta.showTransformEditor ? "Hide" : "Show" }}
-            {{
-              searchObj.data.transformType === "action"
-                ? "Action"
-                : searchObj.data.transformType === "function"
-                  ? "Function"
-                  : "Transform"
-            }}
-            Editor
-          </q-tooltip>
-        </q-toggle>
-        <q-btn-group class="no-outline q-pa-none no-border float-left q-mr-xs">
-          <div>
-            <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">{{
-              transformsLabel
-            }}</q-tooltip>
-            <q-btn-dropdown
-              data-test="logs-search-bar-function-dropdown"
-              v-model="functionModel"
-              size="12px"
-              :icon="transformIcon"
-              :label="transformsLabel"
-              no-caps
-              class="saved-views-dropdown btn-function no-case q-pl-sm q-pr-none"
-              :class="`${searchObj.data.transformType || 'transform'}-icon`"
-              label-class="no-case"
-            >
-              <q-list data-test="logs-search-saved-function-list">
-                <!-- Search Input -->
-                <div
-                  data-test="logs-search-bar-transform-type-select"
-                  class="logs-transform-type o2-input q-mx-sm"
-                  style="padding-top: 0"
-                >
-                  <q-select
-                    v-model="searchObj.data.transformType"
-                    :options="transformTypes"
-                    :label="t('search.transformType')"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="q-py-sm showLabelOnTop no-case"
-                    stack-label
-                    outlined
-                    emit-value
-                    filled
-                    dense
-                    clearable
-                    @update:model-value="updateTransforms()"
-                  />
-                </div>
-                <div>
-                  <q-input
-                    v-model="searchTerm"
-                    dense
-                    filled
-                    borderless
-                    clearable
-                    debounce="300"
-                    :placeholder="t('search.searchSavedFunction')"
-                    data-test="function-search-input"
-                  >
-                    <template #prepend>
-                      <q-icon name="search" />
-                    </template>
-                  </q-input>
-                </div>
 
-                <div v-if="filteredTransformOptions.length">
-                  <q-item
-                    class="tw-border-b saved-view-item"
-                    clickable
-                    v-for="(item, i) in filteredTransformOptions"
-                    :key="'transform-' + item?.name"
-                    v-close-popup
-                  >
-                    <q-item-section
-                      @click.stop="selectTransform(item, true)"
-                      v-close-popup
-                    >
-                      <q-item-label>{{ item.name }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </div>
-                <div v-else>
-                  <q-item>
-                    <q-item-section>
-                      <q-item-label
-                        v-if="searchObj.data.transformType === 'function'"
-                        >{{ t("search.savedFunctionNotFound") }}</q-item-label
-                      >
-                      <q-item-label
-                        v-if="searchObj.data.transformType === 'action'"
-                        >{{ t("search.actionsNotFound") }}</q-item-label
-                      >
-                      <q-item-label v-if="!searchObj.data.transformType">{{
-                        t("search.selectTransformType")
-                      }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </div>
-              </q-list>
-            </q-btn-dropdown>
-          </div>
-          <q-btn
-            data-test="logs-search-bar-save-transform-btn"
-            class="q-mr-xs save-transform-btn q-px-sm"
-            size="sm"
-            icon="save"
-            :disable="searchObj.data.transformType !== 'function'"
-            @click="fnSavedFunctionDialog"
-          >
-            <q-tooltip class="tw-text-[12px]" :offset="[0, 6]">
-              {{
-                searchObj.data.transformType === "action"
-                  ? t("search.saveActionDisabled")
-                  : t("common.save")
-              }}
-            </q-tooltip>
-          </q-btn>
-        </q-btn-group>
+        <transform-selector
+          v-if="isActionsEnabled"
+          :function-options="functionOptions"
+          @select:function="populateFunctionImplementation"
+          @save:function="fnSavedFunctionDialog"
+        />
+        <function-selector
+          v-else
+          :function-options="functionOptions"
+          @select:function="populateFunctionImplementation"
+          @save:function="fnSavedFunctionDialog"
+        />
+
         <q-btn-group
           v-if="config.isEnterprise == 'true'"
           class="no-outline q-pa-none no-border"
@@ -768,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="searchObj.data.transformType"
               style="width: 100%; height: 100%"
             >
-              <template v-if="searchObj.data.transformType === 'function'">
+              <template v-if="showFunctionEditor">
                 <query-editor
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
@@ -1253,6 +1137,9 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
+import TransformSelector from "./TransformSelector.vue";
+import FunctionSelector from "./FunctionSelector.vue";
+
 const defaultValue: any = () => {
   return {
     name: "",
@@ -1270,6 +1157,8 @@ export default defineComponent({
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
+    TransformSelector,
+    FunctionSelector,
   },
   emits: [
     "searchdata",
@@ -1419,6 +1308,7 @@ export default defineComponent({
       setSelectedStreams,
       getJobData,
       routeToSearchSchedule,
+      isActionsEnabled,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -1527,6 +1417,13 @@ export default defineComponent({
         { label: "Function", value: "function" },
         { label: "Action", value: "action" },
       ];
+    });
+
+    const showFunctionEditor = computed(() => {
+      // IF actions are disabled, we are reverting to the old behavior of function editor
+      if (!isActionsEnabled.value) return searchObj.meta.showTransformEditor;
+
+      return searchObj.data.transformType === "function";
     });
 
     watch(
@@ -1947,7 +1844,7 @@ export default defineComponent({
 
     onMounted(async () => {
       searchObj.data.transformType =
-        router.currentRoute.value.query.transformType;
+        router.currentRoute.value.query.transformType || "function";
 
       if (
         router.currentRoute.value.query.transformType === "function" &&
@@ -1982,7 +1879,6 @@ export default defineComponent({
           searchObj.data.tempFunctionContent) &&
         searchObj.data.transformType === "function"
       ) {
-        searchObj.data.transformType = "function";
         const fnContent = router.currentRoute.value.query.functionContent
           ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
           : searchObj.data.tempFunctionContent;
@@ -2154,8 +2050,14 @@ export default defineComponent({
           timeout: 3000,
         });
       }
+      console.log(
+        "fnValue",
+        fnValue,
+        fnEditorRef?.value,
+        showFunctionEditor.value,
+      );
       searchObj.config.fnSplitterModel = 60;
-      fnEditorRef.value.setValue(fnValue.function);
+      fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
     };
@@ -2352,6 +2254,8 @@ export default defineComponent({
                   extractedObj.data.tempFunctionContent;
                 searchObj.meta.functionEditorPlaceholderFlag = false;
                 searchObj.data.transformType = "function";
+                if (showFunctionEditor.value)
+                  searchObj.meta.showTransformEditor = true;
               } else {
                 populateFunctionImplementation(
                   {
@@ -2363,6 +2267,7 @@ export default defineComponent({
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
               }
+
               dateTimeRef.value.setSavedDate(searchObj.data.datetime);
               if (searchObj.meta.refreshInterval != "0") {
                 onRefreshIntervalUpdate();
@@ -3075,6 +2980,8 @@ export default defineComponent({
       emit("handleQuickModeChange");
     };
 
+    const handleHistogramMode = () => {};
+
     const handleRunQueryFn = () => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         emit("handleRunQueryFn");
@@ -3377,6 +3284,7 @@ export default defineComponent({
       config,
       handleRegionsSelection,
       handleQuickMode,
+      handleHistogramMode,
       regionFilterMethod,
       regionFilterRef,
       regionFilter,
@@ -3417,6 +3325,8 @@ export default defineComponent({
       updateTransforms,
       selectTransform,
       actionEditorQuery,
+      isActionsEnabled,
+      showFunctionEditor,
     };
   },
   computed: {
@@ -4004,37 +3914,5 @@ export default defineComponent({
 .expand-on-focus {
   height: calc(100vh - 200px) !important;
   z-index: 20 !important;
-}
-
-.dark-theme {
-  :deep(.transform-icon),
-  :deep(.function-icon) {
-    .q-icon {
-      &.on-left {
-        filter: invert(1);
-      }
-    }
-  }
-}
-
-.logs-search-bar-component {
-  :deep(.btn-function) {
-    width: 140px;
-
-    .q-btn__content {
-      justify-content: start !important;
-
-      span {
-        text-overflow: ellipsis;
-        overflow: hidden;
-        white-space: nowrap;
-        width: 80px;
-      }
-
-      .q-btn-dropdown__arrow {
-        margin-left: 4px !important;
-      }
-    }
-  }
 }
 </style>

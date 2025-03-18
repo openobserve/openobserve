@@ -332,7 +332,7 @@ import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import actionService from "@/services/action_scripts";
-import { useLoading } from "@/composables/useLoading";
+import config from "@/aws-exports";
 
 const props = defineProps({
   templates: {
@@ -387,41 +387,51 @@ const apiHeaders: Ref<
   }[]
 > = ref([{ key: "", value: "", uuid: getUUID() }]);
 
-const tabs = computed(() => [
-  {
-    label: "Web Hook",
-    value: "http",
-    style: {
-      width: "fit-content",
-      padding: "4px 14px",
-      background: formData.value.type === "http" ? "#5960B2" : "",
-      border: "none !important",
-      color: formData.value.type === "http" ? "#ffffff !important" : "",
+const tabs = computed(() => {
+  let tabs = [
+    {
+      label: "Web Hook",
+      value: "http",
+      style: {
+        width: "fit-content",
+        padding: "4px 14px",
+        background: formData.value.type === "http" ? "#5960B2" : "",
+        border: "none !important",
+        color: formData.value.type === "http" ? "#ffffff !important" : "",
+      },
     },
-  },
-  {
-    label: "Email",
-    value: "email",
-    style: {
-      width: "fit-content",
-      padding: "4px 14px",
-      background: formData.value.type === "email" ? "#5960B2" : "",
-      border: "none !important",
-      color: formData.value.type === "email" ? "#ffffff !important" : "",
+    {
+      label: "Email",
+      value: "email",
+      style: {
+        width: "fit-content",
+        padding: "4px 14px",
+        background: formData.value.type === "email" ? "#5960B2" : "",
+        border: "none !important",
+        color: formData.value.type === "email" ? "#ffffff !important" : "",
+      },
     },
-  },
-  {
-    label: "Action",
-    value: "action",
-    style: {
-      width: "fit-content",
-      padding: "4px 14px",
-      background: formData.value.type === "action" ? "#5960B2" : "",
-      border: "none !important",
-      color: formData.value.type === "action" ? "#ffffff !important" : "",
-    },
-  },
-]);
+  ];
+
+  if (
+    (config.isEnterprise == "true" || config.isCloud == "true") &&
+    store.state.zoConfig.actions_enabled
+  ) {
+    tabs.push({
+      label: "Action",
+      value: "action",
+      style: {
+        width: "fit-content",
+        padding: "4px 14px",
+        background: formData.value.type === "action" ? "#5960B2" : "",
+        border: "none !important",
+        color: formData.value.type === "action" ? "#ffffff !important" : "",
+      },
+    });
+  }
+
+  return tabs;
+});
 
 onActivated(() => setupDestinationData());
 onBeforeMount(async () => {

@@ -616,6 +616,13 @@ export default defineComponent({
       "/ingestion/",
     ];
 
+    const isActionsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig.actions_enabled
+      );
+    });
+
     const orgOptions = ref([{ label: Number, value: String }]);
     let slackURL = "https://short.openobserve.ai/community";
     if (
@@ -682,7 +689,7 @@ export default defineComponent({
         icon: outlinedCode,
         link: "/action-scripts",
         name: "actionScripts",
-        hide: config.isEnterprise == "true" ? false : true
+        hide: !isActionsEnabled.value,
       },
       {
         title: t("menu.ingestion"),
@@ -812,12 +819,13 @@ export default defineComponent({
           ?.split(",")
           ?.filter((val: string) => val?.trim()) || [],
       );
+
       store.dispatch("setHiddenMenus", disableMenus);
 
       linksList.value = linksList.value.filter((link) => {
-          const hide = link.hide === undefined ? false : link.hide; // Handle unknown hide values
-          return !disableMenus.has(link.name) && !hide;
-        });
+        const hide = link.hide === undefined ? false : link.hide; // Handle unknown hide values
+        return !disableMenus.has(link.name) && !hide;
+      });
     };
 
     // additional links based on environment and conditions
@@ -1303,7 +1311,7 @@ export default defineComponent({
     margin-left: 0.5rem;
     margin-right: 0;
     width: 150px;
-    max-width: 150px; 
+    max-width: 150px;
     max-height: 31px;
     cursor: pointer;
 

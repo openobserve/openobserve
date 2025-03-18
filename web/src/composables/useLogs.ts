@@ -23,6 +23,7 @@ import {
   nextTick,
   onBeforeMount,
   watch,
+  computed,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -156,6 +157,8 @@ const defaultObject = {
     hasUserDefinedSchemas: false,
     selectedTraceStream: "",
     showSearchScheduler: false,
+    toggleFunction: false, // DEPRECATED use showTransformEditor instead
+    isActionsEnabled: false,
   },
   data: {
     query: <any>"",
@@ -198,7 +201,7 @@ const defaultObject = {
     },
     histogramInterval: <any>0,
     transforms: <any>[],
-    transformType: <string>"function",
+    transformType: "function",
     actions: <any>[],
     selectedTransform: <any>null,
     queryResults: <any>[],
@@ -1955,11 +1958,14 @@ const useLogs = () => {
     }
   };
 
+  function shouldAddFunctionToSearch() {
+    if (!isActionsEnabled.value) return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
+
+    return searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "";
+  }
+
   function addTransformToQuery(queryReq: any) {
-    if (
-      searchObj.data.tempFunctionContent != "" &&
-      searchObj.data.transformType === "function"
-    ) {
+    if (shouldAddFunctionToSearch()) {
       queryReq.query["query_fn"] =
         b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
     }
@@ -3749,10 +3755,7 @@ const useLogs = () => {
       }
 
       let query_fn: any = "";
-      if (
-        searchObj.data.tempFunctionContent != "" &&
-        searchObj.data.transformType === "function"
-      ) {
+      if (shouldAddFunctionToSearch()) {
         query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
       }
 
@@ -5740,6 +5743,10 @@ const useLogs = () => {
     }
   };
 
+  const isActionsEnabled = computed(() => {
+    return searchObj.meta.isActionsEnabled;
+  });
+
   return {
     searchObj,
     searchAggData,
@@ -5794,6 +5801,7 @@ const useLogs = () => {
     initializeWebSocketConnection,
     addRequestId,
     routeToSearchSchedule,
+    isActionsEnabled
   };
 };
 
