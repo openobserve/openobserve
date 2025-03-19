@@ -35,18 +35,20 @@ const useSearchWebSocket = () => {
   const onOpen = (response: any) => {
     isCreatingSocket.value = false;
     Object.keys(traces).forEach((traceId) => {
-      console.log("traces[traceId]", traceId, traces[traceId]?.open?.length);
+      console.log("on open", traceId, traces[traceId]?.open?.length);
       traces[traceId].open.forEach((handler: any) => handler(response));
     });
   };
 
   const onMessage = (response: any) => {
     if (response.type === "end") {
-      cleanUpListeners(response.content.trace_id);
       traces[response.content.trace_id]?.close?.forEach((handler: any) =>
         handler(response),
       );
+      cleanUpListeners(response.content.trace_id);
+      return;
     }
+
     traces[response.content.trace_id]?.message?.forEach((handler: any) =>
       handler(response),
     );
@@ -130,6 +132,7 @@ const useSearchWebSocket = () => {
     retry: boolean = false
   ) => {
     try {
+      console.log("fetchQueryDataWithWebSocket", retry, handlers.close);
       if(!retry) {
         traces[data.traceId] = {
           open: [],

@@ -5410,6 +5410,7 @@ const useLogs = () => {
   }
 
   const handleSearchClose = (payload: any, response: any) => {
+    console.log("handleSearchClose", payload, response);
     if (payload.traceId) removeRequestId(payload.traceId);
 
     // Any case where below logic may end in recursion
