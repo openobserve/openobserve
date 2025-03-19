@@ -352,6 +352,7 @@ import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
+import commonService from "@/services/common";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -697,6 +698,23 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           ) as Resource;
         }
       }
+      if (!resourceMapper[resource] && resource === "alert") {
+        if (!resourceMapper["afolder"])
+          resourceMapper["afolder"] = getResourceByName(
+            permissionsState.permissions,
+            "afolder",
+          ) as Resource;
+
+        await getResourceEntities(resourceMapper["afolder"]);
+
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource,
+          ) as Resource;
+        }
+      }
+      
 
       if (!resourceMapper[resource]) continue;
 
@@ -730,7 +748,17 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(dashResource as Entity);
-      } else if (
+      }
+      else if (resource === "alert") {
+        const [folderId, alertId] = entity.split("/");
+
+
+        const alertResource = resourceMapper["afolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        );
+        await getResourceEntities(alertResource as Entity);
+      }
+      else if (
         resource === "logs" ||
         resource === "metrics" ||
         resource === "traces" ||
@@ -778,7 +806,11 @@ const handlePermissionChange = (row: any, permission: string) => {
   if (row.type === "Resource" && row.top_level) {
     resourceName = row.name;
     entity = "_all_" + store.state.selectedOrganization.identifier;
+
   }
+
+
+
 
   const permissionHash = `${resourceName}:${entity}:${permission}`;
 
@@ -886,6 +918,7 @@ const updateJsonInTable = () => {
   let entity = "";
   let resourceDetails: Entity | Resource;
 
+
   // Update added permissions
   updateRolePermissions(permissions);
 
@@ -903,7 +936,15 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
-      } else if (entity === "_all_" + getOrgId()) {
+      } 
+      else if (resource === "alert") {
+        const [folderId] = entity.split("/");
+
+        resourceDetails = resourceMapper.value["afolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        ) as Entity;
+      }
+      else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
             getPermissionHash(resource, permission.permission, entity),
@@ -949,7 +990,15 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
-      } else if (entity === "_all_" + getOrgId()) {
+      } 
+      else if (resource === "alert") {
+        const [folderId] = entity.split("/");
+
+        resourceDetails = resourceMapper.value["afolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        ) as Entity;
+      } 
+      else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
             getPermissionHash(resource, permission.permission, entity),
@@ -1282,6 +1331,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     service_accounts: getServiceAccounts,
     action_scripts: getActionScripts,
     cipher_keys: getCipherKeys,
+    afolder: getAlertFolders,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1393,7 +1443,33 @@ const getFolders = async () => {
     resolve(true);
   });
 };
+const getAlertFolders = async () => {
+  //this is exaclty same as getFolders, but we are using different endpoint
+  const folders: any = await commonService.list_Folders(
+    store.state.selectedOrganization.identifier,
+    "alerts"
+  );
 
+  let isDefaultPresent = folders.data.list.find(
+    (folder: any) => folder.folderId === "default",
+  );
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
+  updateResourceEntities(
+    "afolder",
+    ["folderId"],
+    [...folders.data.list],
+    true,
+    "name",
+    "alert",
+  );
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
 const _getGroups = async () => {
   const groups = await getGroups(store.state.selectedOrganization.identifier);
   updateResourceEntities("group", [], [...groups.data]);
@@ -1466,17 +1542,27 @@ const getPipelines = async () => {
   });
 };
 
-const getAlerts = async () => {
-  const alerts = await alertService.list(
-    1,
+const getAlerts = async (resource: Entity | Resource) => {
+  let alerts: any = await alertService.listByFolderId(
+    0,
     10000,
     "name",
     false,
     "",
     store.state.selectedOrganization.identifier,
+    resource.name,
+    "",
   );
 
-  updateResourceEntities("alert", ["name"], [...alerts.data.list]);
+  updateEntityEntities(
+    resource,
+    ["alertId"],
+    [
+      ...alerts.data.list,
+    ],
+    false,
+    "name",
+  );
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1612,6 +1698,7 @@ const updateEntityEntities = (
   hasEntities: boolean = false,
   displayNameKey?: string,
 ) => {
+
   if (!entity) return;
 
   const entities: Entity[] = data.map((_entity: any) => {
@@ -1625,6 +1712,9 @@ const updateEntityEntities = (
 
       if (entity.childName === "dashboard") {
         entityName = entity["name"] + "/" + _entity["dashboardId"];
+      }
+      if (entity.childName === "alert") {
+        entityName = entity["name"] + "/" + _entity["alert_id"];
       }
     }
 
