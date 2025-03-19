@@ -14,8 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ::config::{cache_instance_id, ider};
-#[cfg(feature = "enterprise")]
-use o2_openfga::config::get_config as get_openfga_config;
 
 use crate::service::db::instance;
 
