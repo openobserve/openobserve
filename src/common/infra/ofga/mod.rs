@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod migrations;
+
 use std::cmp::Ordering;
 
 use hashbrown::HashSet;
@@ -46,6 +48,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_pipeline_migration = false;
     let mut need_cipher_keys_migration = false;
     let mut need_action_scripts_migration = false;
+    let mut need_alert_folders_migration = false;
     let mut existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
             Ok(Some(model)) => Some(model),
@@ -117,6 +120,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
         let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
         let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
+        let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
+        let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
         if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
             need_migrate_index_streams = true;
         }
@@ -128,6 +133,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
         if meta_version > v0_0_9 && existing_model_version < v0_0_10 {
             need_action_scripts_migration = true;
+        }
+        if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
+            log::info!("Alert folders migration needed");
+            need_alert_folders_migration = true;
         }
     }
 
@@ -160,6 +169,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     get_tuple_for_new_index(org_name, split_key[2], &mut tuples);
                 }
             }
+            log::info!("Migrating native objects");
             if migrate_native_objects {
                 for org_name in orgs {
                     get_org_creation_tuples(
@@ -203,6 +213,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                 }
             } else {
+                log::info!("Migrating index streams");
                 for org_name in orgs {
                     if need_migrate_index_streams {
                         get_index_creation_tuples(org_name, &mut tuples).await;
@@ -228,6 +239,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
                                     e
                                 );
                             }
+                        }
+                    }
+                    if need_alert_folders_migration {
+                        get_ownership_all_org_tuple(org_name, "alert_folders", &mut tuples);
+                    }
+                }
+                if need_alert_folders_migration {
+                    match migrations::migrate_alert_folders().await {
+                        Ok(_) => {
+                            log::info!("Alert folders migrated to openfga");
+                        }
+                        Err(e) => {
+                            log::error!("Error migrating alert folders to openfga: {}", e);
                         }
                     }
                 }
