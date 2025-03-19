@@ -75,10 +75,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
             (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
             {
                 Ordering::Less => {
+                    log::info!(
+                        "OFGA model version changed: {} -> {}",
+                        existing_model.version,
+                        model.version
+                    );
                     // update version in super cluster
                     set_model(Some(existing_model.clone())).await?;
                 }
                 Ordering::Greater => {
+                    log::info!(
+                        "OFGA model version changed: {} -> {}",
+                        existing_model.version,
+                        model.version
+                    );
                     // update version in local
                     existing_meta = Some(model.clone());
                     migrate_native_objects = false;
@@ -110,6 +120,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
             return Ok(());
         }
+
         // Check if ofga migration of index streams are needed
         let meta_version = version_compare::Version::from(&meta.version).unwrap();
         let existing_model_version =
