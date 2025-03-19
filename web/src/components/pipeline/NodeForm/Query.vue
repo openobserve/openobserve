@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :isValidSqlQuery="isValidSqlQuery"
             :disableQueryTypeSelection="true"
             :expandedLogs="expandedLogs"
+            :validatingSqlQuery="validatingSqlQuery"
 
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
@@ -170,6 +171,8 @@ const isUpdating = ref(false);
 const filteredColumns: any = ref([]);
 
 const isValidSqlQuery = ref(true);
+
+const validatingSqlQuery = ref(false);
 
 const expandedLogs = ref([]);
 const validateSqlQueryPromise = ref<Promise<unknown>>();
@@ -457,8 +460,10 @@ const removeVariable = (variable: any) => {
 };
 
 const validateSqlQuery = () => {
+  validatingSqlQuery.value = true;
   if (streamRoute.value.query_condition.type == "promql") {
     isValidSqlQuery.value = true;
+    validatingSqlQuery.value = false;
     return;
   }
   const query = buildQueryPayload({
@@ -483,9 +488,11 @@ const validateSqlQuery = () => {
       })
       .then((res: any) => {
         isValidSqlQuery.value = true;
+        validatingSqlQuery.value = false;
         resolve("");
       })
       .catch((err: any) => {
+        validatingSqlQuery.value = false;
         if (err) {
           isValidSqlQuery.value = false;
           const message = err?.response?.data?.message
