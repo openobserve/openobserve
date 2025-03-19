@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             await addFolderForm.value.resetValidation();
           } catch (err: any) {
             showErrorNotification(
-              err?.message ??
+              err?.response?.data?.message ??
                 (props.editMode
                   ? "Folder updation failed"
                   : "Folder creation failed"),
