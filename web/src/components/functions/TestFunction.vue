@@ -125,7 +125,20 @@
             >
               {{ t("common.duration") + " *" }}
             </div>
-            <DateTime label="Start Time" class="q-py-xs tw-w-full" />
+
+            <DateTime
+              label="Start Time"
+              class="q-py-xs tw-w-full"
+              auto-apply
+              :default-type="dateTime.type"
+              :default-absolute-time="{
+                startTime: dateTime.startTime,
+                endTime: dateTime.endTime,
+              }"
+              :default-relative-time="dateTime.relativeTimePeriod"
+              data-test="logs-search-bar-date-time-dropdown"
+              @on:date-change="updateDateTime"
+            />
           </div>
 
           <div
@@ -491,6 +504,10 @@ const updateStreams = async (resetStream = true) => {
     })
     .catch(() => Promise.reject())
     .finally(() => (isFetchingStreams.value = false));
+};
+
+const updateDateTime = (value: any) => {
+  dateTime.value = value;
 };
 
 const getResults = async () => {
