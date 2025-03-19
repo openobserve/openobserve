@@ -413,7 +413,10 @@ impl QueryConditionExt for QueryCondition {
                     "",
                 );
                 if v.is_partial {
-                    return Err(anyhow::anyhow!("Partial response: {}", v.function_error));
+                    return Err(anyhow::anyhow!(
+                        "Partial response: {}",
+                        v.function_error.join(", ")
+                    ));
                 } else {
                     v
                 }
