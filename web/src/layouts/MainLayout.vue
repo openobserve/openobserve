@@ -1139,9 +1139,10 @@ export default defineComponent({
 
           store.dispatch("setConfig", res.data);
           await nextTick();
-          filterMenus();
 
           updateActionsMenu();
+
+          filterMenus();
           // if rum enabled then setUser to capture session details.
           if (res.data.rum.enabled) {
             setRumUser();
@@ -1200,7 +1201,7 @@ export default defineComponent({
         );
 
         if (alertIndex !== -1 && !actionExists) {
-          linksList.value.splice(alertIndex, 0, {
+          linksList.value.splice(alertIndex + 1, 0, {
             title: t("menu.actions"),
             icon: outlinedCode,
             link: "/actions",
