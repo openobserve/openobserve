@@ -714,6 +714,9 @@ export default defineComponent({
           selected.value = [];
           allSelected.value = false;
           toggleAll();
+          if(query){
+            alertsRows.value = [];
+          }
           const dismiss = $q.notify({
             spinner: true,
             message: "Please wait while loading alerts...",
@@ -1389,8 +1392,10 @@ const updateActiveFolderId = (newVal: any) => {
       set(value) {
         if (searchAcrossFolders.value) {
           searchQuery.value = value;
+          filterQuery.value = value;
         } else {
           filterQuery.value = value;
+          searchQuery.value = value;
         }
       },
     });
