@@ -354,6 +354,10 @@ pub async fn run_datafusion(
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
+    log::info!(
+        "[trace_id {trace_id}] flight->search: datafusion context created with target_partitions: {}",
+        ctx.state().config().target_partitions(),
+    );
 
     register_table(&ctx, &sql).await?;
 
