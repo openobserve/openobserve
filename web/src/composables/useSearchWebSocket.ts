@@ -25,9 +25,9 @@ const isCreatingSocket = ref(false);
 
 const socketRetryCodes = [1001, 1006, 1010, 1011, 1012, 1013];
 
-const maxSearchRetries = 3;
+const socketFailureCount = ref(0);
 
-const cancelledAbnormalClose = ref(false);
+const maxSearchRetries = 5;
 
 const useSearchWebSocket = () => {
   const store = useStore();
@@ -42,6 +42,7 @@ const useSearchWebSocket = () => {
 
   const onMessage = (response: any) => {
     if (response.type === "end") {
+      socketFailureCount.value = 0;
       traces[response.content.trace_id]?.close?.forEach((handler: any) =>
         handler(response),
       );
@@ -55,35 +56,21 @@ const useSearchWebSocket = () => {
   };
 
   const onClose = (response: any) => {
+    const id = socketId.value;
     isCreatingSocket.value = false;
     socketId.value = null;
 
+    const shouldRetry = socketRetryCodes.includes(response.code);
+    
+    if(shouldRetry) socketFailureCount.value++;
 
-    console.log("onClose", response);
-    if (socketRetryCodes.includes(response.code)) {
-
+    if (shouldRetry && socketFailureCount.value < maxSearchRetries) {
       setTimeout(() => {
-      console.log("socketRetryCodes.includes(response.code)", socketRetryCodes.includes(response.code), Object.keys(traces));
-      Object.keys(traces).forEach((traceId) => {
-        traces[traceId].retryCount = traces[traceId].retryCount + 1;
-
-        console.log("Retry count ----", traces[traceId].retryCount);
-
-          if (traces[traceId].retryCount <= maxSearchRetries) {
-              fetchQueryDataWithWebSocket(traces[traceId].data, {
-                open: traces[traceId].open[0],
-                message: traces[traceId].message[0],
-                close: traces[traceId].close[0],
-                error: traces[traceId].error[0],
-                reset: traces[traceId].reset[0],
-              }, true);
-
-            return;
-          } else {
-            traces[traceId]?.close.forEach((handler: any) => handler(response));
-            cleanUpListeners(traceId);
-          }
-      });
+        Object.keys(traces).forEach((traceId) => {
+          traces[traceId]?.close.forEach((handler: any) => handler(response));
+          traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data));
+          cleanUpListeners(traceId);        
+        });
       }, 1000);
     } else {
       Object.keys(traces).forEach((traceId) => {
@@ -138,10 +125,6 @@ const useSearchWebSocket = () => {
   ) => {
     try {
       console.log("fetchQueryDataWithWebSocket", retry, handlers.close);
-
-      if(retry) {
-       resetSearchData(data.traceId);
-      }
 
       if(!retry) {
         traces[data.traceId] = {
@@ -238,10 +221,6 @@ const useSearchWebSocket = () => {
         }),
       );
   };
-
-  const resetSearchData = (traceId: string) => {
-    traces[traceId].reset.forEach((handler: any) => handler(traces[traceId].data));
-  }
 
   return {
     fetchQueryDataWithWebSocket,

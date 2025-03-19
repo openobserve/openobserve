@@ -4926,9 +4926,9 @@ const useLogs = () => {
   };
 
 
-  const handleSearchReset = (data: any) => {
+  const handleSearchReset = async (data: any) => {
     // reset query data
-    console.log("handleSearchReset", data);
+    
     if(data.type === "search") {
       resetQueryData();
       searchObj.data.queryResults = {};
@@ -4956,6 +4956,11 @@ const useLogs = () => {
         errorDetail: "",
       };
       resetHistogramError();
+
+      const payload = buildWebSocketPayload(data.queryReq, data.isPagination, "search");
+
+      initializeWebSocketConnection(payload);
+      addRequestId(payload.traceId);
     }
 
     if(data.type === "histogram") {
@@ -4973,6 +4978,22 @@ const useLogs = () => {
         errorDetail: "",
       };
       resetHistogramError();
+
+      searchObj.loadingHistogram = true;
+
+      await generateHistogramSkeleton();
+
+      histogramResults = [];
+
+      const payload = buildWebSocketPayload(
+        data.queryReq,
+        false,
+        "histogram",
+      );
+
+      initializeWebSocketConnection(payload);
+
+      addRequestId(payload.traceId);
     }
 
   };
@@ -5463,7 +5484,6 @@ const useLogs = () => {
   }
 
   const handleSearchClose = (payload: any, response: any) => {
-    console.log("handleSearchClose", payload, response);
     if (payload.traceId) removeRequestId(payload.traceId);
 
     // Any case where below logic may end in recursion
