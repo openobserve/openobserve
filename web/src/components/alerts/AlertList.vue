@@ -357,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 v-if="selected.length > 0"
                 data-test="alert-list-move-across-folders-btn"
-                class="flex items-center move-btn q-mr-md"
+                class="flex items-center move-btn q-mr-md no-border"
                 color="secondary"
                 :icon="outlinedDriveFileMove"
                 :label="'Move'"
@@ -366,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 v-if="selected.length > 0"
                 data-test="alert-list-export-alerts-btn"
-                class="flex items-center export-btn"
+                class="flex items-center export-btn no-border"
                 color="secondary"
                 icon="download"
                 :label="'Export'"
@@ -1664,11 +1664,11 @@ const updateActiveFolderId = (newVal: any) => {
 }
 
 .move-btn {
-  width: 10vw;
+  width: calc(14vw);
 }
 
 .export-btn {
-  width: 10vw;
+  width: calc(14vw);
 }
 
 .q-table {
