@@ -1047,7 +1047,8 @@ export default defineComponent({
         alertsService
           .create_by_alert_id(
             store.state.selectedOrganization.identifier,
-            toBeClonedAlert.value
+            toBeClonedAlert.value,
+            activeFolderId.value
           )
           .then((res) => {
             dismiss();
