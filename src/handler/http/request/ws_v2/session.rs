@@ -219,6 +219,7 @@ pub async fn handle_text_message(
                     errors::Error::Message("Invalid event".to_string()),
                     Some(req_id.to_string()),
                     None,
+                    Default::default(),
                 );
                 let _ = send_message(req_id, err_res.to_json()).await;
                 return;
@@ -325,7 +326,12 @@ pub async fn handle_text_message(
                 msg,
                 e
             );
-            let err_res = WsServerEvents::error_response(e.into(), Some(req_id.to_string()), None);
+            let err_res = WsServerEvents::error_response(
+                e.into(),
+                Some(req_id.to_string()),
+                None,
+                Default::default(),
+            );
             let _ = send_message(req_id, err_res.to_json()).await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
@@ -546,8 +552,12 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
 
     log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
     // Send error response
-    let err_res =
-        WsServerEvents::error_response(e, Some(trace_id.to_string()), Some(req_id.to_string()));
+    let err_res = WsServerEvents::error_response(
+        e,
+        Some(trace_id.to_string()),
+        Some(req_id.to_string()),
+        Default::default(),
+    );
     let _ = send_message(req_id, err_res.to_json()).await;
 
     // Close with error

@@ -104,6 +104,7 @@ impl ResponseRouter {
                     ),
                     None,
                     Some(trace_id.clone()),
+                    true, // Indicate client should retry since the querier connection is closed
                 ))
                 .await;
         }
@@ -144,7 +145,7 @@ impl QuerierConnection {
         &self,
         mut read: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
         mut shutdown_rx: tokio::sync::mpsc::Receiver<()>,
-    ) {
+    ) -> WsResult<()> {
         loop {
             // Handle incoming messages from querier to router
             tokio::select! {
@@ -200,32 +201,26 @@ impl QuerierConnection {
                             }
                         }
                         Err(e) => {
-                            log::error!("[WS::Router::QuerierConnection] Read error: {}", e);
+                            log::error!("[WS::Router::QuerierConnection] Read error: {}, Querier: {}", e, self.querier_name);
                             // mark the connection disconnected
                             self.is_connected.store(false, Ordering::SeqCst);
                             // TODO: cleanup resource
-
-                            break;
+                            return Err(WsError::QuerierConnectionClosed(e.to_string()));
                         }
                     }
                 }
                 _ = shutdown_rx.recv() => {
-                    log::info!("[WS::Router::QuerierConnection] shutting down. Stop listening from the querier");
+                    log::info!("[WS::Router::QuerierConnection] shutting down. Stop listening from the querier {}", self.querier_name);
                     // mark the connection disconnected
                     self.is_connected.store(false, Ordering::SeqCst);
                     // TODO: cleanup resource?
-                    break;
+                    return Err(WsError::QuerierConnectionClosed(self.querier_name.to_string()));
                 }
             }
         }
-
-        log::info!(
-            "[WS::Router::QuerierConnection] connection to querier {} response handler stopped.",
-            self.querier_name
-        );
     }
 
-    async fn health_check(&self) {
+    async fn health_check(&self) -> WsResult<()> {
         // TODO: configurable duration interval
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
 
@@ -235,21 +230,20 @@ impl QuerierConnection {
             match write_guard.as_mut() {
                 None => {
                     self.is_connected.store(false, Ordering::SeqCst);
-                    break;
+                    return Err(WsError::QuerierConnectionClosed(
+                        self.querier_name.to_string(),
+                    ));
                 }
                 Some(w) => {
                     if w.send(WsMessage::Ping(vec![])).await.is_err() {
                         self.is_connected.store(false, Ordering::SeqCst);
-                        break;
+                        return Err(WsError::QuerierConnectionClosed(
+                            self.querier_name.to_string(),
+                        ));
                     }
                 }
             }
         }
-
-        log::warn!(
-            "[WS::Router::QuerierConnection] connection to querier {} health check failed, disconnecting...",
-            self.querier_name
-        );
     }
 }
 
@@ -334,7 +328,7 @@ impl Connection for QuerierConnection {
         // Spawn task to listen to querier responses
         let conn_t1 = conn.clone();
         tokio::spawn(async move {
-            conn_t1.listen_to_querier_response(read, shutdown_rx).await;
+            let _ = conn_t1.listen_to_querier_response(read, shutdown_rx).await;
             if !conn_t1.is_connected().await {
                 log::info!(
                     "[WS::QuerierConnection] connection to querier {} closed",
@@ -346,7 +340,7 @@ impl Connection for QuerierConnection {
         // Spawn health check task
         let conn_t2 = conn.clone();
         tokio::spawn(async move {
-            conn_t2.health_check().await;
+            let _ = conn_t2.health_check().await;
             if !conn_t2.is_connected().await {
                 log::info!(
                     "[WS::QuerierConnection] connection to querier {} closed",

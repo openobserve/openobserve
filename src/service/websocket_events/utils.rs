@@ -366,6 +366,7 @@ pub enum WsServerEvents {
         error_detail: Option<String>,
         trace_id: Option<String>,
         request_id: Option<String>,
+        should_client_retry: bool,
     },
     End {
         trace_id: Option<String>,
@@ -381,6 +382,7 @@ impl WsServerEvents {
         err: errors::Error,
         request_id: Option<String>,
         trace_id: Option<String>,
+        should_client_retry: bool,
     ) -> Self {
         match err {
             errors::Error::ErrorCode(code) => WsServerEvents::Error {
@@ -389,6 +391,7 @@ impl WsServerEvents {
                 error_detail: Some(code.get_error_detail()),
                 trace_id: trace_id.clone(),
                 request_id: request_id.clone(),
+                should_client_retry,
             },
             _ => WsServerEvents::Error {
                 code: StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -396,6 +399,7 @@ impl WsServerEvents {
                 error_detail: None,
                 trace_id,
                 request_id,
+                should_client_retry,
             },
         }
     }

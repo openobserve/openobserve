@@ -111,6 +111,7 @@ pub async fn handle_search_request(
                 Error::Message(e.to_string()),
                 Some(req_id.to_string()),
                 Some(trace_id),
+                Default::default(),
             );
             send_message(req_id, err_res.to_json()).await?;
             return Ok(());
@@ -127,6 +128,7 @@ pub async fn handle_search_request(
                 Error::Message(e),
                 Some(req_id.to_string()),
                 Some(trace_id),
+                Default::default(),
             );
             send_message(req_id, err_res.to_json()).await?;
             return Ok(());
