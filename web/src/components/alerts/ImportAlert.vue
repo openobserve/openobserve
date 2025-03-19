@@ -1053,6 +1053,7 @@ export default defineComponent({
         await alertsService.create_by_alert_id(
           store.state.selectedOrganization.identifier,
           input,
+          folderId
         );
 
         // Success
