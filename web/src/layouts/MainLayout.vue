@@ -1195,11 +1195,15 @@ export default defineComponent({
           (link) => link.name === "alertList",
         );
 
-        if (alertIndex !== -1) {
+        const actionExists = linksList.value.some(
+          (link) => link.name === "actionScripts",
+        );
+
+        if (alertIndex !== -1 && !actionExists) {
           linksList.value.splice(alertIndex, 0, {
             title: t("menu.actions"),
             icon: outlinedCode,
-            link: "/action-scripts",
+            link: "/actions",
             name: "actionScripts",
           });
         }
