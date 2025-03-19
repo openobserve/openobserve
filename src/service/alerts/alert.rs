@@ -205,7 +205,7 @@ async fn create_default_alerts_folder(org_id: &str) -> Result<Folder, AlertError
     };
     folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
         .await
-        .map_err(|_| AlertError::CreateDefaultFolderError)?
+        .map_err(|_| AlertError::CreateDefaultFolderError)
 }
 
 /// Validates the alert and prepares it before it is written to the database.

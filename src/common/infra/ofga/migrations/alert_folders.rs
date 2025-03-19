@@ -15,6 +15,7 @@
 
 use std::collections::HashSet;
 
+use config::meta::folder::DEFAULT_FOLDER;
 use o2_openfga::{authorizer, config::get_config as get_o2_config, meta::mapping::OFGA_MODELS};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 
@@ -51,7 +52,7 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
                 folder.org,
             );
             let org_id = folder.org;
-            let folder_id = folder.id;
+            let folder_id = folder.folder_id;
             let obj_str = format!("{}:{}", alert_folders_ofga_type, folder_id);
             authorizer::authz::set_ownership(&org_id, &obj_str, "", "").await;
         }
@@ -72,7 +73,8 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
             orgs.insert(org_id.clone());
             // Use the alert id
             let alert_id = alert.id;
-            let alert_folder_id = alert.folder_id;
+            // All the alerts are in the default folder only
+            let alert_folder_id = DEFAULT_FOLDER;
             let object =
                 authorizer::authz::get_ownership_tuple(&org_id, "alerts", &alert_id, &mut tuples);
             authorizer::authz::get_parent_tuple(
