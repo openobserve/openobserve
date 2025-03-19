@@ -170,9 +170,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("syslog settings cache failed");
 
-    // cache pipeline
-    db::pipeline::cache().await.expect("Pipeline cache failed");
-
     infra_file_list::create_table_index().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
     tokio::task::spawn(async move { db::file_list::cache_stats().await });
@@ -227,6 +224,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("syslog server run failed");
     }
+
+    Ok(())
+}
+
+/// Additional jobs that init processes should be deferred until the gRPC service
+/// starts in the main thread
+pub async fn init_deferred() -> Result<(), anyhow::Error> {
+    db::schema::cache_enrichment_tables()
+        .await
+        .expect("EnrichmentTables cache failed");
+    // pipelines can potentially depend on enrichment tables, so cached afterwards
+    db::pipeline::cache().await.expect("Pipeline cache failed");
 
     Ok(())
 }
