@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[
                     (val: any) => {
                       if (!isEditingActionScript) {
-                        return !!val || 'CSV File is required!';
+                        return !!val || t("actions.zipFileRequired");
                       }
                       return true;
                     },
