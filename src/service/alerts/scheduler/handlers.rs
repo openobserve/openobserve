@@ -856,6 +856,39 @@ async fn handle_derived_stream_triggers(
         ..trigger.clone()
     };
 
+    // In case the scheduler background job (watch_timeout) updates the trigger retries
+    // (not through this handler), we need to skip to the next run at but with the same
+    // trigger start time. If we don't handle here, in that case, the `clean_complete`
+    // background job will clear this job as it has reached max retries.
+    if trigger.retries >= max_retries {
+        log::info!(
+            "[SCHEDULER trace_id {trace_id}] DerivedStream trigger: {}/{} has reached maximum possible retries. Skipping to next run",
+            new_trigger.org,
+            new_trigger.module_key
+        );
+        // Go to the next nun at, but use the same trigger start time
+        if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
+            let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
+            // tz_offset is in minutes
+            let tz_offset = FixedOffset::east_opt(derived_stream.tz_offset * 60).unwrap();
+            new_trigger.next_run_at = schedule
+                .upcoming(tz_offset)
+                .next()
+                .unwrap()
+                .timestamp_micros();
+        } else {
+            new_trigger.next_run_at +=
+                Duration::try_minutes(derived_stream.trigger_condition.frequency)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap();
+        }
+        // Start over next time
+        new_trigger.retries = 0;
+        db::scheduler::update_trigger(new_trigger).await?;
+        return Ok(());
+    }
+
     while end <= now {
         log::debug!(
             "[SCHEDULER trace_id {trace_id}] DerivedStream: querying for time range: start_time {}, end_time {}. Final end_time is {}",
