@@ -22,11 +22,20 @@ use crate::{db::Event, errors::Error};
 
 /// Sends event to the cluster coordinator indicating that an alert has been put
 /// into the database.
-pub async fn emit_put_event(org: &str, alert: &Alert, folder_id: Option<String>) -> Result<(), Error> {
+pub async fn emit_put_event(
+    org: &str,
+    alert: &Alert,
+    folder_id: Option<String>,
+) -> Result<(), Error> {
     let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
     let cluster_coordinator = super::get_coordinator().await;
     cluster_coordinator
-        .put(&key, bytes::Bytes::from(folder_id.unwrap_or("default".to_string())), true, None)
+        .put(
+            &key,
+            bytes::Bytes::from(folder_id.unwrap_or("default".to_string())),
+            true,
+            None,
+        )
         .await?;
     Ok(())
 }
@@ -75,7 +84,8 @@ where
                     continue;
                 };
                 let folder_id = ev.value.map(|v| String::from_utf8_lossy(&v).to_string());
-                if let Err(e) = (on_put)(org, stream_type, stream_name, alert_name, folder_id).await {
+                if let Err(e) = (on_put)(org, stream_type, stream_name, alert_name, folder_id).await
+                {
                     log::error!("Error in alert put handler: {}", e);
                 }
             }

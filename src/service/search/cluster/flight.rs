@@ -358,7 +358,7 @@ pub async fn run_datafusion(
         "[trace_id {trace_id}] flight->search: datafusion context created with target_partitions: {}",
         ctx.state().config().target_partitions(),
     );
-    
+
     register_table(&ctx, &sql).await?;
 
     let plan = ctx.state().create_logical_plan(&sql.sql).await?;
