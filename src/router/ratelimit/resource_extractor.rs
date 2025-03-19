@@ -203,7 +203,12 @@ fn select_final_rule_resource(
         .max_by_key(|rule| rule.threshold)
         .cloned();
 
-    let user_role = user_role_rule.clone().unwrap().user_role;
+    let user_role = if let Some(user_role_rule) = &user_role_rule {
+        user_role_rule.user_role.clone()
+    } else {
+        None
+    };
+
     let user_id_rules = custom_rules
         .iter()
         .find(|rule| {
