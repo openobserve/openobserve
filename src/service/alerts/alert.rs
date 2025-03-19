@@ -44,6 +44,11 @@ use cron::Schedule;
 use infra::{schema::unwrap_stream_settings, table};
 use itertools::Itertools;
 use lettre::{AsyncTransport, Message, message::MultiPart};
+#[cfg(feature = "enterprise")]
+use o2_openfga::{
+    authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
+    config::get_config as get_openfga_config,
+};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
@@ -171,18 +176,17 @@ pub async fn save(
     prepare_alert(org_id, stream_name, name, &mut alert, create).await?;
 
     // save the alert
-    let alert_id = alert.id.clone();
     // TODO: Get the folder id
     match db::alerts::alert::set(org_id, alert.stream_type, stream_name, alert, create).await {
-        Ok(_) => {
+        Ok(alert) => {
             if name.is_empty() {
                 set_ownership(
                     org_id,
                     "alerts",
                     Authz {
-                        obj_id: alert_id,
+                        obj_id: alert.id.unwrap().to_string(),
                         parent_type: "alert_folders".to_owned(),
-                        parent: "".to_owned(), // TODO: Set the parent folder
+                        parent: DEFAULT_FOLDER.to_owned(),
                     },
                 )
                 .await;
@@ -193,7 +197,7 @@ pub async fn save(
     }
 }
 
-async fn create_default_alerts_folder(org_id: &str) -> Result<(), AlertError> {
+async fn create_default_alerts_folder(org_id: &str) -> Result<Folder, AlertError> {
     let default_folder = Folder {
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: "default".to_owned(),
@@ -201,8 +205,7 @@ async fn create_default_alerts_folder(org_id: &str) -> Result<(), AlertError> {
     };
     folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
         .await
-        .map_err(|_| AlertError::CreateDefaultFolderError)?;
-    Ok(())
+        .map_err(|_| AlertError::CreateDefaultFolderError)?
 }
 
 /// Validates the alert and prepares it before it is written to the database.
@@ -439,6 +442,17 @@ pub async fn create<C: TransactionTrait>(
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
 
     let alert = db::alerts::alert::create(conn, org_id, folder_id, alert).await?;
+
+    set_ownership(
+        org_id,
+        "alerts",
+        Authz {
+            obj_id: alert.id.unwrap().to_string(),
+            parent_type: "alert_folders".to_owned(),
+            parent: folder_id.to_owned(),
+        },
+    )
+    .await;
     Ok(alert)
 }
 
@@ -450,11 +464,19 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
     dst_folder_id: &str,
 ) -> Result<(), AlertError> {
     for alert_id in alert_ids {
-        let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, *alert_id).await? else {
+        let Some((curr_folder, alert)) =
+            db::alerts::alert::get_by_id(conn, org_id, *alert_id).await?
+        else {
             return Err(AlertError::AlertNotFound);
         };
 
-        update(conn, org_id, Some(dst_folder_id), alert).await?;
+        update(
+            conn,
+            org_id,
+            Some((&curr_folder.folder_id, dst_folder_id)),
+            alert,
+        )
+        .await?;
     }
     Ok(())
 }
@@ -465,25 +487,49 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
 pub async fn update<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
-    folder_id: Option<&str>,
+    folder_id: Option<(&str, &str)>,
     mut alert: Alert,
 ) -> Result<Alert, AlertError> {
-    if let Some(folder_id) = folder_id {
+    let mut dst_folder_id_info = None;
+    let folder_info = if let Some((curr_folder_id, dst_folder_id)) = folder_id {
         // Ensure that the destination folder exists.
-        if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
-            if folder_id == DEFAULT_FOLDER {
+        if !table::folders::exists(org_id, dst_folder_id, FolderType::Alerts).await? {
+            if dst_folder_id == DEFAULT_FOLDER {
                 create_default_alerts_folder(org_id).await?;
             } else {
                 return Err(AlertError::MoveDestinationFolderNotFound);
             }
         }
-    }
+        dst_folder_id_info = Some(dst_folder_id);
+        Some((curr_folder_id, dst_folder_id))
+    } else {
+        None
+    };
 
     let alert_name = alert.name.clone();
     let stream_name = alert.stream_name.clone();
+
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false).await?;
 
-    let alert = db::alerts::alert::update(conn, org_id, folder_id, alert).await?;
+    let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
+    if folder_info.is_some() && get_openfga_config().enabled {
+        let alert_id = alert.id.unwrap().to_string();
+        let (curr_folder_id, dst_folder_id) = folder_info.unwrap();
+        set_parent_relation(
+            &alert_id,
+            &get_ofga_type("alerts"),
+            dst_folder_id,
+            &get_ofga_type("alert_folders"),
+        )
+        .await;
+        remove_parent_relation(
+            &alert_id,
+            &get_ofga_type("alerts"),
+            curr_folder_id,
+            &get_ofga_type("alert_folders"),
+        )
+        .await;
+    }
     Ok(alert)
 }
 
@@ -584,13 +630,17 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), AlertError> {
-    let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+    if db::alerts::alert::get_by_id(conn, org_id, alert_id)
+        .await?
+        .is_none()
+    {
         return Ok(());
     };
 
+    let alert_id_str = alert_id.to_string();
     match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
         Ok(_) => {
-            remove_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
+            remove_ownership(org_id, "alerts", Authz::new(&alert_id_str)).await;
             Ok(())
         }
         Err(e) => Err(e.into()),

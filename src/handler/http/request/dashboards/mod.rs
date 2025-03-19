@@ -327,7 +327,7 @@ async fn move_dashboards(
     }
 }
 
-fn get_folder(req: HttpRequest) -> String {
+pub fn get_folder(req: HttpRequest) -> String {
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     crate::common::utils::http::get_folder(&query)
 }
