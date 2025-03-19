@@ -491,7 +491,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     mut alert: Alert,
 ) -> Result<Alert, AlertError> {
     let mut dst_folder_id_info = None;
-    let folder_info = if let Some((curr_folder_id, dst_folder_id)) = folder_id {
+    let _folder_info = if let Some((curr_folder_id, dst_folder_id)) = folder_id {
         // Ensure that the destination folder exists.
         if !table::folders::exists(org_id, dst_folder_id, FolderType::Alerts).await? {
             if dst_folder_id == DEFAULT_FOLDER {
@@ -512,9 +512,10 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false).await?;
 
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
-    if folder_info.is_some() && get_openfga_config().enabled {
+    #[cfg(feature = "enterprise")]
+    if _folder_info.is_some() && get_openfga_config().enabled {
         let alert_id = alert.id.unwrap().to_string();
-        let (curr_folder_id, dst_folder_id) = folder_info.unwrap();
+        let (curr_folder_id, dst_folder_id) = _folder_info.unwrap();
         set_parent_relation(
             &alert_id,
             &get_ofga_type("alerts"),
