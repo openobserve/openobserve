@@ -73,7 +73,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 db::ofga::set_ofga_model_to_db(meta_model).await?;
             }
             (Some(meta_model), Some(existing_model)) => {
-                match meta_model.version.cmp(&existing_model.version) {
+                let meta_version = version_compare::Version::from(&meta_model.version).unwrap();
+                let existing_version =
+                    version_compare::Version::from(&existing_model.version).unwrap();
+                match meta_version.cmp(&existing_version) {
                     Ordering::Less => {
                         log::info!(
                             "[OFGA:SuperCluster] model version changed: {} -> {}",
