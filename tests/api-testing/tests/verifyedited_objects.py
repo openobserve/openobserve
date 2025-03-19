@@ -41,6 +41,8 @@ def verify_edited_objects(session, base_url, user_email, user_password, org_id, 
         template_page.retrieve_templates_email(session, base_url, user_email, user_password, org_id)
         template_page.retrieve_template_email(session, base_url, user_email, user_password, org_id, template_name_email)
 
+        
+
 
 
 

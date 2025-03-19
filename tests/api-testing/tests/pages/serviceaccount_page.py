@@ -4,7 +4,7 @@ from requests.auth import HTTPBasicAuth
 
 
 class ServiceAccountPage:
-    Unique_value_serviceaccount = f"serviceaccount{random.randint(100000, 999999)}"  # Class variable
+    Unique_value_serviceaccount = f"d3m18_{random.randint(100000, 999999)}"  # Class variable
 
     def __init__(self, session, base_url, org_id):
         self.session = session
@@ -25,7 +25,7 @@ class ServiceAccountPage:
             "first_name": "Shyam",
             "last_name": "Panjiyar"
         }
-
+        print("Payload for service account creation:", payload)  # Log the payload
         response = session.post(
             f"{base_url}api/{org_id}/service_accounts", 
             json=payload, 

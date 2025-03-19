@@ -5,7 +5,7 @@ from requests.auth import HTTPBasicAuth
 
 
 class ReportPage:
-    Unique_value_report = f"uReport_{random.randint(100000, 999999)}"  # Class variable
+    Unique_value_report = f"d4m18_{random.randint(100000, 999999)}"  # Class variable
 
     def __init__(self, session, base_url, org_id):
         self.session = session

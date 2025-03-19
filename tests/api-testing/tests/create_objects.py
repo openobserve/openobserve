@@ -1,4 +1,4 @@
-import os
+
 
 
 from requests.auth import HTTPBasicAuth
@@ -61,43 +61,49 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
         destination_name_webhook = f"destination_webhook_{destination_page.Unique_value_destination}_{i}"
         destination_page.create_destination_webhook(session, base_url, org_id, user_email, user_password, template_name_webhook, destination_name_webhook)
 
+        email_address_admin = f"admin{user_page.Unique_value_user}{i}@gmail.com"
+        user_page.create_user_admin(session, base_url, user_email, user_password, org_id, email_address_admin)
+
         destination_name_email = f"destination_email_{destination_page.Unique_value_destination}_{i}"
-        destination_page.create_destination_email(session, base_url, org_id, user_email, user_password, template_name_email, destination_name_email)  
+        destination_page.create_destination_email(session, base_url, org_id, user_email, user_password, email_address_admin, template_name_email, destination_name_email)  
         
-        destination_name_pipeline = f"destination_pipeline_{destination_page.Unique_value_destination}_{i}"
-        destination_page.create_destination_pipeline(session, base_url, org_id, user_email, user_password, destination_name_pipeline)
+        # destination_name_pipeline = f"destination_pipeline_{destination_page.Unique_value_destination}_{i}"
+        # destination_page.create_destination_pipeline(session, base_url, org_id, user_email, user_password, destination_name_pipeline)
 
-        # # Create alerts
-        # alert_webhook = f"alert_webhook_{alert_page.Unique_value_alert}_{i}"
-        # alert_page.create_standard_alert(session, base_url, user_email, user_password, org_id, stream_name, template_name_webhook, destination_name_webhook, alert_webhook) 
+        # Create alerts
+        alert_webhook = f"alert_webhook_{alert_page.Unique_value_alert}_{i}"
+        alert_page.create_standard_alert(session, base_url, user_email, user_password, org_id, stream_name, template_name_webhook, destination_name_webhook, alert_webhook) 
 
-        # alert_email = f"alert_email_{alert_page.Unique_value_alert}_{i}"  
-        # alert_page.create_standard_alert(session, base_url, user_email, user_password, org_id, stream_name, template_name_email, destination_name_email, alert_email)
+        alert_email = f"alert_email_{alert_page.Unique_value_alert}_{i}"  
+        alert_page.create_standard_alert(session, base_url, user_email, user_password, org_id, stream_name, template_name_email, destination_name_email, alert_email)
 
-        # alert_cron = f"alert_cron_{alert_page.Unique_value_alert}_{i}"
-        # alert_page.create_standard_alert_cron(session, base_url, user_email, user_password, org_id, stream_name, template_name_email, destination_name_email, alert_cron)
+        alert_cron = f"alert_cron_{alert_page.Unique_value_alert}_{i}"
+        alert_page.create_standard_alert_cron(session, base_url, user_email, user_password, org_id, stream_name, template_name_email, destination_name_email, alert_cron)
 
-        # alert_real_time = f"alert_real_time_{alert_page.Unique_value_alert}_{i}"
-        # alert_page.create_real_time_alert(session, base_url, user_email, user_password, org_id, stream_name, template_name_webhook, destination_name_webhook, alert_real_time)
+        alert_real_time = f"alert_real_time_{alert_page.Unique_value_alert}_{i}"
+        alert_page.create_real_time_alert(session, base_url, user_email, user_password, org_id, stream_name, template_name_webhook, destination_name_webhook, alert_real_time)
 
-        # alert_sql = f"alert_sql_{alert_page.Unique_value_alert}_{i}"
-        # alert_page.create_standard_alert_sql(session, base_url, user_email, user_password, org_id, stream_name, template_name_webhook, destination_name_webhook, alert_sql)
+        alert_sql = f"alert_sql_{alert_page.Unique_value_alert}_{i}"
+        alert_page.create_standard_alert_sql(session, base_url, user_email, user_password, org_id, stream_name, template_name_webhook, destination_name_webhook, alert_sql)
 
 
         # savedview_name = f"savedview_{savedview_page.Unique_value_savedview}_{i}"
         # savedview_page.create_savedView(session, base_url, user_email, user_password, org_id, stream_name, savedview_name)
 
-        # folder_name = f"folder_{folder_page.Unique_value_folder}_{i}"
-        # folder_id = folder_page.create_folder(session, base_url, user_email, user_password, org_id, folder_name)
+        folder_name = f"folder_{folder_page.Unique_value_folder}_{i}"
+        folder_id = folder_page.create_folder(session, base_url, user_email, user_password, org_id, folder_name)
 
         # dashboard_name = f"dashboard_{dashboard_page.Unique_value_dashboard}_{i}"
         # dashboard_id = dashboard_page.create_dashboard(session, base_url, user_email, user_password, org_id, folder_id, dashboard_name)
 
-        # scheduled_report_name = f"scheduled_report_{report_page.Unique_value_report}_{i}"
-        # scheduled_report_id = report_page.create_scheduled_report(session, base_url, user_email, user_password, org_id, dashboard_id, folder_id, scheduled_report_name)
+        panel_name = f"panel_{dashboard_page.Unique_value_panel}_{i}"
+        panel_id = dashboard_page.create_panel(session, base_url, user_email, user_password, org_id, stream_name, folder_id, panel_name)
 
-        # cached_report_name = f"cached_report_{report_page.Unique_value_report}_{i}"
-        # cached_report_id = report_page.create_cached_report(session, base_url, user_email, user_password, org_id, dashboard_id, folder_id, cached_report_name)
+        scheduled_report_name = f"scheduled_report_{report_page.Unique_value_report}_{i}"
+        scheduled_report_id = report_page.create_scheduled_report(session, base_url, user_email, user_password, org_id, panel_id, folder_id, scheduled_report_name)
+
+        cached_report_name = f"cached_report_{report_page.Unique_value_report}_{i}"
+        cached_report_id = report_page.create_cached_report(session, base_url, user_email, user_password, org_id, panel_id, folder_id, cached_report_name)
 
         # function_name = f"function_{function_page.Unique_value_function}_{i}"
         # function_id = function_page.create_function(session, base_url, user_email, user_password, org_id, function_name)

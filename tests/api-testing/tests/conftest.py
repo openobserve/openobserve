@@ -69,8 +69,8 @@ def ingest_data():
     with open(root_dir / "test-data/logs_data.json") as f:
         data = f.read()
 
-    stream_name = "stream_pytest_data"
-    org = "org_pytest_data"
+    stream_name = "default"
+    org = "default"
     url = f"{BASE_URL}api/{org}/{stream_name}/_json"
     resp = session.post(url, data=data, headers={"Content-Type": "application/json"})
     print("Data ingested successfully, status code: ", resp.status_code)
