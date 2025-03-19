@@ -45,7 +45,7 @@ impl SessionManager {
 
         let now = chrono::Utc::now();
         let session_info = SessionInfo {
-            session_id: ider::uuid(),
+            session_id: client_id.clone(),
             querier_mappings: HashMap::default(),
             created_at: now,
             last_active: now,

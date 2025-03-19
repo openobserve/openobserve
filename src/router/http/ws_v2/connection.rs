@@ -67,9 +67,60 @@ pub struct QuerierConnection {
     is_connected: Arc<AtomicBool>,
 }
 
+impl Drop for QuerierConnection {
+    fn drop(&mut self) {
+        let response_router: Arc<ResponseRouter> = self.response_router.clone();
+        let _ = tokio::spawn(async move {
+            let _ = response_router.flush().await;
+        });
+        log::info!(
+            "[WS::QuerierConnection] connection to querier {} closed",
+            self.querier_name
+        );
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct ResponseRouter {
     routes: RwAHashMap<TraceId, Sender<WsServerEvents>>,
+}
+
+impl Drop for ResponseRouter {
+    fn drop(&mut self) {
+        log::info!("[WS::ResponseRouter] shutting down. Stop routing responses from querier");
+    }
+}
+
+impl ResponseRouter {
+    pub async fn flush(&self) {
+        for (trace_id, sender) in self.routes.read().await.iter() {
+            // Send error response to client
+            let _ = sender
+                .send(WsServerEvents::error_response(
+                    infra::errors::Error::ErrorCode(
+                        infra::errors::ErrorCodes::ServerInternalError(
+                            "Querier connection closed".to_string(),
+                        ),
+                    ),
+                    None,
+                    Some(trace_id.clone()),
+                ))
+                .await;
+        }
+
+        log::info!(
+            "[WS::ResponseRouter] flushed {} routes",
+            self.routes.read().await.len()
+        );
+
+        // Drop all senders
+        self.routes.write().await.clear();
+
+        log::info!(
+            "[WS::ResponseRouter] flushed {} routes",
+            self.routes.read().await.len()
+        );
+    }
 }
 
 pub async fn create_connection(querier_name: &QuerierName) -> WsResult<Arc<QuerierConnection>> {
@@ -94,10 +145,6 @@ impl QuerierConnection {
         mut read: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
         mut shutdown_rx: tokio::sync::mpsc::Receiver<()>,
     ) {
-        // TODO: is there a way to handle when this quierer connection is closed by the querier abnormally
-        // check if the router gets `querier` disconnected event first or the close will close first
-        // if the router gets disconnected event first, it can send a close message to the querier
-
         loop {
             // Handle incoming messages from querier to router
             tokio::select! {
@@ -167,7 +214,6 @@ impl QuerierConnection {
                     // mark the connection disconnected
                     self.is_connected.store(false, Ordering::SeqCst);
                     // TODO: cleanup resource?
-
                     break;
                 }
             }
@@ -289,12 +335,24 @@ impl Connection for QuerierConnection {
         let conn_t1 = conn.clone();
         tokio::spawn(async move {
             conn_t1.listen_to_querier_response(read, shutdown_rx).await;
+            if !conn_t1.is_connected().await {
+                log::info!(
+                    "[WS::QuerierConnection] connection to querier {} closed",
+                    conn_t1.querier_name
+                );
+            }
         });
 
         // Spawn health check task
         let conn_t2 = conn.clone();
         tokio::spawn(async move {
             conn_t2.health_check().await;
+            if !conn_t2.is_connected().await {
+                log::info!(
+                    "[WS::QuerierConnection] connection to querier {} closed",
+                    conn_t2.querier_name
+                );
+            }
         });
 
         Ok(conn)
