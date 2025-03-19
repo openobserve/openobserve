@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[
                     (val: any) => {
                       if (!isEditingActionScript) {
-                        return !!val || t("actions.zipFileRequired");
+                        return !!val || 'ZIP File is required!';
                       }
                       return true;
                     },
@@ -847,7 +847,10 @@ const saveActionScript = async () => {
   // );
 
   // Add cron expression if needed
-  if (frequency.value.type === "repeat") {
+  if (
+    formData.value.type === "scheduled" &&
+    frequency.value.type === "repeat"
+  ) {
     commonFields.cron_expr = frequency.value.cron.toString().trim();
     // commonFields.timezoneOffset = convertedDateTime.offset.toString();
     // commonFields.timezone = scheduling.value.timezone;
