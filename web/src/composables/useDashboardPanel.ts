@@ -2792,6 +2792,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     validatePanel(dashboardPanelData, errors, isFieldsValidationRequired, [
       ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
       ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+      ...dashboardPanelData.meta.stream.customQueryFields,
     ]);
   };
 
