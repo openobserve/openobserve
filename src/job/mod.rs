@@ -243,3 +243,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
+
+/// Additional jobs that init processes should be deferred until the gRPC service
+/// starts in the main thread
+pub async fn init_deferred() -> Result<(), anyhow::Error> {
+    db::schema::cache_enrichment_tables()
+        .await
+        .expect("EnrichmentTables cache failed");
+    // pipelines can potentially depend on enrichment tables, so cached afterwards
+    db::pipeline::cache().await.expect("Pipeline cache failed");
+
+    Ok(())
+}

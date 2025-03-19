@@ -375,13 +375,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // let node online
     let _ = cluster::set_online(false).await;
 
-    // This is specifically for enrichment tables, as caching is happening using
-    // search service
-    db::schema::cache_enrichment_tables()
+    // initialize the jobs are deferred until the gRPC service starts
+    job::init_deferred()
         .await
-        .expect("EnrichmentTables cache failed");
-    // pipelines can potentially depend on enrichment tables, so cached afterwards
-    db::pipeline::cache().await.expect("Pipeline cache failed");
+        .expect("Deferred jobs failed to init");
 
     if cfg.log.events_enabled {
         tokio::task::spawn(async move { zo_logger::send_logs().await });
