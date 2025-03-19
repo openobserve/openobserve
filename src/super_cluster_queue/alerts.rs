@@ -53,7 +53,8 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
                 return Ok(());
             }
             table::alerts::create(conn, &org_id, &folder_id, alert.clone(), true).await?;
-            infra::cluster_coordinator::alerts::emit_put_event(&org_id, &alert, Some(folder_id)).await?;
+            infra::cluster_coordinator::alerts::emit_put_event(&org_id, &alert, Some(folder_id))
+                .await?;
         }
         AlertMessage::Update {
             org_id,

@@ -265,7 +265,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             if tuples.is_empty() {
                 log::info!("No orgs to update to the openfga");
             } else {
-                log::debug!("tuples not empty: {:#?}", tuples);
+                // log::debug!("tuples not empty: {:#?}", tuples);
                 match update_tuples(tuples, vec![]).await {
                     Ok(_) => {
                         log::info!("Data migrated to openfga");
