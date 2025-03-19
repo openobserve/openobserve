@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::cmp::Ordering;
+mod migrations;
 
 use hashbrown::HashSet;
 use infra::dist_lock;
@@ -46,6 +46,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_pipeline_migration = false;
     let mut need_cipher_keys_migration = false;
     let mut need_action_scripts_migration = false;
+    let mut need_alert_folders_migration = false;
     let mut existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
             Ok(Some(model)) => Some(model),
@@ -63,26 +64,36 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 // set to super cluster
                 set_model(Some(existing_model.clone())).await?;
             }
-            (Some(model), None) => {
+            (Some(meta_model), None) => {
                 // set to local
-                existing_meta = Some(model.clone());
+                existing_meta = Some(meta_model.clone());
                 migrate_native_objects = false;
-                db::ofga::set_ofga_model_to_db(model).await?;
+                db::ofga::set_ofga_model_to_db(meta_model).await?;
             }
-            (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
-            {
-                Ordering::Less => {
+            (Some(meta_model), Some(existing_model)) => {
+                let meta_version = version_compare::Version::from(&meta_model.version).unwrap();
+                let existing_version =
+                    version_compare::Version::from(&existing_model.version).unwrap();
+                if meta_version < existing_version {
+                    log::info!(
+                        "[OFGA:SuperCluster] model version changed: {} -> {}",
+                        existing_model.version,
+                        meta_model.version
+                    );
                     // update version in super cluster
                     set_model(Some(existing_model.clone())).await?;
-                }
-                Ordering::Greater => {
+                } else if meta_version > existing_version {
+                    log::info!(
+                        "[OFGA:SuperCluster] model version changed: {} -> {}",
+                        existing_model.version,
+                        meta_model.version
+                    );
                     // update version in local
-                    existing_meta = Some(model.clone());
+                    existing_meta = Some(meta_model.clone());
                     migrate_native_objects = false;
-                    db::ofga::set_ofga_model_to_db(model).await?;
+                    db::ofga::set_ofga_model_to_db(meta_model).await?;
                 }
-                Ordering::Equal => {}
-            },
+            }
             _ => {}
         }
     }
@@ -91,11 +102,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     get_all_init_tuples(&mut init_tuples).await;
     if let Some(existing_model) = &existing_meta {
         if meta.version == existing_model.version {
-            log::info!("OFGA model already exists & no changes required");
+            log::info!("[OFGA:Local] model already exists & no changes required");
             if !init_tuples.is_empty() {
                 match update_tuples(init_tuples, vec![]).await {
                     Ok(_) => {
-                        log::info!("Data migrated to openfga");
+                        log::info!("[OFGA:Local] Data migrated to openfga");
                     }
                     Err(e) => {
                         log::error!(
@@ -107,6 +118,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
             return Ok(());
         }
+
+        log::info!(
+            "[OFGA:Local] model version changed: {} -> {}",
+            existing_model.version,
+            meta.version
+        );
+
         // Check if ofga migration of index streams are needed
         let meta_version = version_compare::Version::from(&meta.version).unwrap();
         let existing_model_version =
@@ -117,6 +135,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
         let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
         let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
+        let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
+        let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
         if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
             need_migrate_index_streams = true;
         }
@@ -129,6 +149,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if meta_version > v0_0_9 && existing_model_version < v0_0_10 {
             need_action_scripts_migration = true;
         }
+        if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
+            log::info!("[OFGA:Local] Alert folders migration needed");
+            need_alert_folders_migration = true;
+        }
     }
 
     // 1. create a cluster lock
@@ -138,7 +162,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     match db::ofga::set_ofga_model(existing_meta).await {
         Ok(store_id) => {
             if store_id.is_empty() {
-                log::error!("OFGA store id is empty");
+                log::error!("[OFGA:Local] OFGA store id is empty");
             }
             o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), store_id);
 
@@ -160,6 +184,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     get_tuple_for_new_index(org_name, split_key[2], &mut tuples);
                 }
             }
+            log::info!("[OFGA:Local] Migrating native objects");
             if migrate_native_objects {
                 for org_name in orgs {
                     get_org_creation_tuples(
@@ -203,6 +228,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                 }
             } else {
+                log::info!("[OFGA:Local] Migrating index streams");
                 for org_name in orgs {
                     if need_migrate_index_streams {
                         get_index_creation_tuples(org_name, &mut tuples).await;
@@ -230,6 +256,22 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             }
                         }
                     }
+                    if need_alert_folders_migration {
+                        get_ownership_all_org_tuple(org_name, "alert_folders", &mut tuples);
+                    }
+                }
+                if need_alert_folders_migration {
+                    match migrations::migrate_alert_folders().await {
+                        Ok(_) => {
+                            log::info!("[OFGA:Local] Alert folders migrated to openfga");
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[OFGA:Local] Error migrating alert folders to openfga: {}",
+                                e
+                            );
+                        }
+                    }
                 }
             }
 
@@ -239,12 +281,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
 
             if tuples.is_empty() {
-                log::info!("No orgs to update to the openfga");
+                log::info!("[OFGA:Local] No orgs to update to the openfga");
             } else {
-                log::debug!("tuples not empty: {:#?}", tuples);
+                log::debug!("[OFGA:Local] tuples not empty: {:#?}", tuples);
                 match update_tuples(tuples, vec![]).await {
                     Ok(_) => {
-                        log::info!("Data migrated to openfga");
+                        log::info!("[OFGA:Local] Data migrated to openfga");
                     }
                     Err(e) => {
                         log::error!(

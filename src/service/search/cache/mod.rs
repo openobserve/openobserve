@@ -362,17 +362,20 @@ pub async fn search(
     if res.is_partial {
         let partial_err = "Please be aware that the response is based on partial data";
         res.function_error = if res.function_error.is_empty() {
-            partial_err.to_string()
+            vec![partial_err.to_string()]
         } else {
-            format!("{} \n {}", partial_err, res.function_error)
+            res.function_error.push(partial_err.to_string());
+            res.function_error
         };
     }
     if !range_error.is_empty() {
         res.is_partial = true;
+        let range_error_str = range_error.clone();
         res.function_error = if res.function_error.is_empty() {
-            range_error
+            vec![range_error_str]
         } else {
-            format!("{} \n {}", range_error, res.function_error)
+            res.function_error.push(range_error_str);
+            res.function_error
         };
         res.new_start_time = Some(req.query.start_time);
         res.new_end_time = Some(req.query.end_time);
@@ -383,15 +386,20 @@ pub async fn search(
     // 2. Super cluster error
     // 3. Range error (max_query_limit)
     // Cache partial results only if there is a range error
-    let skip_cache_results = (res.is_partial
-        && (res.new_start_time.is_none() || res.new_end_time.is_none()))
-        || (!res.function_error.is_empty() && res.function_error.contains("vrl"));
+
+    let mut should_cache_results =
+        res.new_start_time.is_some() || res.new_end_time.is_some() || res.function_error.is_empty();
+
+    if !res.function_error.is_empty() && !range_error.is_empty() {
+        res.function_error.retain(|err| !err.contains(&range_error));
+        should_cache_results = should_cache_results && res.function_error.is_empty();
+    }
 
     // result cache save changes start
     if cfg.common.result_cache_enabled
         && should_exec_query
         && c_resp.cache_query_response
-        && !skip_cache_results
+        && should_cache_results
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
@@ -430,7 +438,7 @@ pub fn merge_response(
     if cache_responses.is_empty() && search_response.is_empty() {
         return config::meta::search::Response::default();
     }
-    let mut fn_error = String::new();
+    let mut fn_error = vec![];
 
     let mut cache_response = if cache_responses.is_empty() {
         config::meta::search::Response::default()
@@ -448,7 +456,7 @@ pub fn merge_response(
             resp.hits.extend(res.hits.clone());
             resp.histogram_interval = res.histogram_interval;
             if !res.function_error.is_empty() {
-                fn_error = res.function_error.clone();
+                fn_error.extend(res.function_error.clone());
             }
         }
         resp.took = cache_took;
@@ -468,7 +476,7 @@ pub fn merge_response(
             cache_response.took += res.took;
             cache_response.histogram_interval = res.histogram_interval;
             if !res.function_error.is_empty() {
-                fn_error = res.function_error.clone();
+                fn_error.extend(res.function_error.clone());
             }
         }
         cache_response.function_error = fn_error;
@@ -507,7 +515,7 @@ pub fn merge_response(
             res_took.nodes.append(&mut took_details.nodes);
         }
         if !res.function_error.is_empty() {
-            fn_error = res.function_error.clone();
+            fn_error.extend(res.function_error.clone());
         }
 
         cache_response.hits.extend(res.hits.clone());
@@ -536,7 +544,7 @@ pub fn merge_response(
         / ((result_cache_len + cache_hits_len) as f64))
         as usize;
     if !fn_error.is_empty() {
-        cache_response.function_error = fn_error;
+        cache_response.function_error.extend(fn_error);
     }
     cache_response
 }

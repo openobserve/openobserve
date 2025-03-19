@@ -442,12 +442,12 @@ pub async fn search_multi(
                 if res.is_partial {
                     multi_res.is_partial = true;
                     multi_res.function_error = if res.function_error.is_empty() {
-                        PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
+                        vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]
                     } else {
-                        format!(
-                            "{} \n {}",
-                            PARTIAL_ERROR_RESPONSE_MESSAGE, res.function_error
-                        )
+                        vec![
+                            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+                            res.function_error.join(", "),
+                        ]
                     };
                 }
                 if multi_res.histogram_interval.is_none() && res.histogram_interval.is_some() {
@@ -478,7 +478,8 @@ pub async fn search_multi(
                     .inc();
 
                 log::error!("search error: {:?}", err);
-                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
+                multi_res.function_error =
+                    vec![multi_res.function_error.join(", "), err.to_string()];
                 if let errors::Error::ErrorCode(code) = err {
                     if let errors::ErrorCodes::SearchCancelQuery(_) = code {
                         return Ok(HttpResponse::TooManyRequests().json(
@@ -516,7 +517,8 @@ pub async fn search_multi(
             }
             Err(err) => {
                 log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
-                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
+                multi_res.function_error =
+                    vec![multi_res.function_error.join(", "), err.to_string()];
                 None
             }
         };
@@ -585,9 +587,10 @@ pub async fn search_multi(
     if !range_error.is_empty() {
         multi_res.is_partial = true;
         multi_res.function_error = if multi_res.function_error.is_empty() {
-            range_error
+            vec![range_error]
         } else {
-            format!("{} \n {}", range_error, multi_res.function_error)
+            multi_res.function_error.push(range_error);
+            multi_res.function_error
         };
     }
 
