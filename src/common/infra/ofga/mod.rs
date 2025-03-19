@@ -15,8 +15,6 @@
 
 mod migrations;
 
-use std::cmp::Ordering;
-
 use hashbrown::HashSet;
 use infra::dist_lock;
 use o2_enterprise::enterprise::{
@@ -76,28 +74,24 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let meta_version = version_compare::Version::from(&meta_model.version).unwrap();
                 let existing_version =
                     version_compare::Version::from(&existing_model.version).unwrap();
-                match meta_version.cmp(&existing_version) {
-                    Ordering::Less => {
-                        log::info!(
-                            "[OFGA:SuperCluster] model version changed: {} -> {}",
-                            existing_model.version,
-                            meta_model.version
-                        );
-                        // update version in super cluster
-                        set_model(Some(existing_model.clone())).await?;
-                    }
-                    Ordering::Greater => {
-                        log::info!(
-                            "[OFGA:SuperCluster] model version changed: {} -> {}",
-                            existing_model.version,
-                            meta_model.version
-                        );
-                        // update version in local
-                        existing_meta = Some(meta_model.clone());
-                        migrate_native_objects = false;
-                        db::ofga::set_ofga_model_to_db(meta_model).await?;
-                    }
-                    Ordering::Equal => {}
+                if meta_version < existing_version {
+                    log::info!(
+                        "[OFGA:SuperCluster] model version changed: {} -> {}",
+                        existing_model.version,
+                        meta_model.version
+                    );
+                    // update version in super cluster
+                    set_model(Some(existing_model.clone())).await?;
+                } else if meta_version > existing_version {
+                    log::info!(
+                        "[OFGA:SuperCluster] model version changed: {} -> {}",
+                        existing_model.version,
+                        meta_model.version
+                    );
+                    // update version in local
+                    existing_meta = Some(meta_model.clone());
+                    migrate_native_objects = false;
+                    db::ofga::set_ofga_model_to_db(meta_model).await?;
                 }
             }
             _ => {}
