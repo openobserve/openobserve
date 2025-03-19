@@ -24,6 +24,7 @@ use config::{
             AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition,
             TriggerEvalResults,
         },
+        cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -384,7 +385,16 @@ impl QueryConditionExt for QueryCondition {
                 "evaluate_scheduled begin to call SearchService::search, {:?}",
                 req
             );
-            SearchService::search(&trace_id, org_id, stream_type, None, &req).await
+            // SearchService::search(&trace_id, org_id, stream_type, None, &req).await
+            SearchService::grpc_search::grpc_search(
+                &trace_id,
+                org_id,
+                stream_type,
+                None,
+                &req,
+                Some(RoleGroup::Background),
+            )
+            .await
         };
 
         // Resp hits can be of two types -
@@ -403,7 +413,10 @@ impl QueryConditionExt for QueryCondition {
                     "",
                 );
                 if v.is_partial {
-                    return Err(anyhow::anyhow!("Partial response: {}", v.function_error));
+                    return Err(anyhow::anyhow!(
+                        "Partial response: {}",
+                        v.function_error.join(", ")
+                    ));
                 } else {
                     v
                 }

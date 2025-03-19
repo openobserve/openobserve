@@ -200,8 +200,8 @@ pub struct Response {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trace_id: String,
     #[serde(default)]
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub function_error: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub function_error: Vec<String>,
     #[serde(default)]
     pub is_partial: bool,
     #[serde(default)]
@@ -266,7 +266,7 @@ impl Response {
             hits: Vec::new(),
             response_type: "".to_string(),
             trace_id: "".to_string(),
-            function_error: "".to_string(),
+            function_error: Vec::new(),
             is_partial: false,
             histogram_interval: None,
             new_start_time: None,
@@ -358,10 +358,12 @@ impl Response {
 
     pub fn set_partial(&mut self, is_partial: bool, msg: String) {
         self.is_partial = is_partial;
-        if self.function_error.is_empty() {
-            self.function_error = msg;
-        } else {
-            self.function_error = format!("{} \n {}", self.function_error, msg);
+        if !msg.is_empty() {
+            if self.function_error.is_empty() {
+                self.function_error = vec![msg];
+            } else {
+                self.function_error.push(msg);
+            }
         }
     }
 
@@ -442,6 +444,7 @@ pub struct SearchPartitionResponse {
     pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
     pub order_by: OrderBy,
+    pub limit: i64,
     pub streaming_output: bool,
     pub streaming_aggs: bool,
     pub streaming_id: Option<String>,

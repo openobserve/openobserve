@@ -16,7 +16,6 @@
 use actix_web::{HttpRequest, HttpResponse, delete, get, patch, post, put, web};
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
-    folder::DEFAULT_FOLDER,
     triggers::{Trigger, TriggerModule},
 };
 use hashbrown::HashMap;
@@ -25,12 +24,15 @@ use svix_ksuid::Ksuid;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::alerts::{
-        requests::{
-            CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody,
-            UpdateAlertRequestBody,
+    handler::http::{
+        models::alerts::{
+            requests::{
+                CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody,
+                UpdateAlertRequestBody,
+            },
+            responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
         },
-        responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
+        request::dashboards::get_folder,
     },
     service::{
         alerts::alert::{self, AlertError},
@@ -101,14 +103,12 @@ pub async fn create_alert(
     path: web::Path<String>,
     req_body: web::Json<CreateAlertRequestBody>,
     user_email: UserEmail,
+    req: HttpRequest,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let req_body = req_body.into_inner();
 
-    let folder_id = req_body
-        .folder_id
-        .clone()
-        .unwrap_or(DEFAULT_FOLDER.to_string());
+    let folder_id = get_folder(req);
     let mut alert: MetaAlert = req_body.into();
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
         alert.owner = Some(user_email.user_id.clone());

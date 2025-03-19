@@ -260,12 +260,12 @@ impl FromRequest for AuthExtractor {
             } else {
                 path_columns[0].to_string()
             }
-        } else if url_len == 2 || (url_len > 2 && path_columns[1].starts_with("settings")) {
+        } else if url_len == 2 || (url_len > 2 && path_columns[1].eq("settings")) {
             // for settings, the post/delete require PUT permissions, GET needs LIST permissions
             // also the special settings exception is for 3-part urls for logo /text
             // which are of path /org/settings/logo , which need permission of operating
             // on permission in general
-            if path_columns[1].starts_with("settings") {
+            if path_columns[1].eq("settings") {
                 if method.eq("POST") || method.eq("DELETE") {
                     method = "PUT".to_string();
                 }
@@ -280,7 +280,7 @@ impl FromRequest for AuthExtractor {
                     .map_or(path_columns[1], |model| model.key),
                 path_columns[0]
             )
-        } else if path_columns[1].starts_with("groups") || path_columns[1].starts_with("roles") {
+        } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need
             // to check permission on role:org/id for permissions on that specific role
             format!(
@@ -291,13 +291,24 @@ impl FromRequest for AuthExtractor {
                 path_columns[2]
             )
         } else if url_len == 3 {
+            // Handle /v2 alert apis
+            if path_columns[0].eq("v2") && path_columns[2].eq("alerts") {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                }
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("alert_folders").unwrap().key,
+                    folder
+                )
+            }
             // these are cases where the entity is "sub-entity" of some other entity,
             // for example, alerts are on route /org/stream/alerts
             // or templates are on route /org/alerts/templates and so on
             // users/roles is one of the special exception here
-            if path_columns[2].starts_with("alerts")
-                || path_columns[2].starts_with("templates")
-                || path_columns[2].starts_with("destinations")
+            else if path_columns[2].eq("alerts")
+                || path_columns[2].eq("templates")
+                || path_columns[2].eq("destinations")
                 || path.ends_with("users/roles")
             {
                 if method.eq("GET") {
@@ -338,11 +349,11 @@ impl FromRequest for AuthExtractor {
                 )
             } else if method.eq("PUT")
                 || method.eq("DELETE")
-                || path_columns[1].starts_with("reports")
-                || path_columns[1].starts_with("savedviews")
-                || path_columns[1].starts_with("functions")
-                || path_columns[1].starts_with("service_accounts")
-                || path_columns[1].starts_with("cipher_keys")
+                || path_columns[1].eq("reports")
+                || path_columns[1].eq("savedviews")
+                || path_columns[1].eq("functions")
+                || path_columns[1].eq("service_accounts")
+                || path_columns[1].eq("cipher_keys")
             {
                 // Similar to the alerts/templates etc, but for other entities such as specific
                 // pipeline, specific stream, specific alert/destination etc.
@@ -360,9 +371,9 @@ impl FromRequest for AuthExtractor {
                     path_columns[2]
                 )
             } else if method.eq("GET")
-                && (path_columns[1].starts_with("dashboards")
-                    || path_columns[1].starts_with("folders")
-                    || path_columns[1].starts_with("actions"))
+                && (path_columns[1].eq("dashboards")
+                    || path_columns[1].eq("folders")
+                    || path_columns[1].eq("actions"))
             {
                 format!(
                     "{}:{}",
@@ -383,9 +394,40 @@ impl FromRequest for AuthExtractor {
                 )
             }
         } else if url_len == 4 {
+            // Handle /v2 alert apis
+            if path_columns[0].eq("v2") {
+                if path_columns[2].eq("alerts") {
+                    if method.eq("PATCH") {
+                        method = "PUT".to_string();
+                    }
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[2])
+                            .map_or(path_columns[2], |model| model.key),
+                        path_columns[3]
+                    )
+                } else {
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    }
+                    let ofga_type = if path_columns[3].eq("alerts") {
+                        "alert_folders"
+                    } else {
+                        "folders"
+                    };
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(ofga_type)
+                            .map_or(ofga_type, |model| model.key),
+                        path_columns[1]
+                    )
+                }
+            }
             // this is for specific sub-items like specific alert, destination etc.
             // and sub-items such as schema, stream settings, or enabling/triggering reports
-            if method.eq("PUT") && path_columns[1].eq("reports") {
+            else if method.eq("PUT") && path_columns[1].eq("reports") {
                 // for report enable/trigger, we need permissions on that specific
                 // report, so this will be name:reports
                 format!(
@@ -467,8 +509,30 @@ impl FromRequest for AuthExtractor {
             if path_columns[url_len - 1].eq("delete_fields") {
                 method = "DELETE".to_string();
             }
+            // Handle /v2 folders apis
+            if path_columns[0].eq("v2") && path_columns[2].eq("folders") {
+                let ofga_type = if path_columns[3].eq("alerts") {
+                    "alert_folders"
+                } else {
+                    "folders"
+                };
+                if url_len == 6 {
+                    // Should check for all_org permissions
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS.get(ofga_type).unwrap().key,
+                        path_columns[1]
+                    )
+                } else {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS.get(ofga_type).unwrap().key,
+                        path_columns[4]
+                    )
+                }
+            }
             //  this is specifically for enabling alerts
-            if path_columns[url_len - 1].eq("enable") {
+            else if path_columns[url_len - 1].eq("enable") {
                 // this will take form name:alert
                 format!(
                     "{}:{}",

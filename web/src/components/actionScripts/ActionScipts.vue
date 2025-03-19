@@ -277,6 +277,7 @@ import {
   outlinedPlayArrow,
 } from "@quasar/extras/material-icons-outlined";
 import actions from "@/services/action_scripts";
+import useActions from "@/composables/useActions";
 
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
@@ -329,6 +330,7 @@ export default defineComponent({
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const isSubmitting = ref(false);
+    const { getAllActions } = useActions();
 
     const { getStreams } = useStreams();
 
@@ -419,17 +421,19 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading actions...",
       });
-      actions
-        .list(store.state.selectedOrganization.identifier)
-        .then((res) => {
+
+      getAllActions()
+        .then(() => {
           var counter = 1;
-          resultTotal.value = res.data.length;
-          alerts.value = res.data.map((alert: any) => {
-            return {
-              ...alert,
-              uuid: getUUID(),
-            };
-          });
+          resultTotal.value = store.state.organizationData.actions.length;
+          alerts.value = store.state.organizationData.actions.map(
+            (alert: any) => {
+              return {
+                ...alert,
+                uuid: getUUID(),
+              };
+            },
+          );
           actionsScriptRows.value = alerts.value.map((data: any) => {
             if (data.execution_details_type == "repeat")
               data.execution_details_type = "Cron Job";
@@ -476,6 +480,7 @@ export default defineComponent({
           });
         });
     };
+
     const getAlertByName = (id: string) => {
       return alerts.value.find((alert) => alert.id === id);
     };
