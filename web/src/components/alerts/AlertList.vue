@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               borderless
               :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
-              data-test="dashboard-search"
+              data-test="alert-list-search-input"
               :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
             >
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-input>
                   <div>
               <q-toggle
-                data-test="dashboard-search-across-folders-toggle"
+                data-test="alert-list-search-across-folders-toggle"
                 v-model="searchAcrossFolders"
                 label="All Folders"
                 class="tw-mr-3"
