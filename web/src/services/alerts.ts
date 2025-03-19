@@ -123,9 +123,14 @@ const alerts = {
   create_by_alert_id: (
     org_identifier: string,
     data: any,
+    folder_id?: string
   ) => {
+      let url = `/api/v2/${org_identifier}/alerts`;
+      if(folder_id){
+        url += `?folder=${folder_id}`;
+      }
     return http().post(
-      `/api/v2/${org_identifier}/alerts`,
+      url,
       data
     );
   },

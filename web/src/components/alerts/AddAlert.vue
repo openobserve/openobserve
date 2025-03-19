@@ -1550,6 +1550,7 @@ export default defineComponent({
           callAlert = alertsService.create_by_alert_id(
             this.store.state.selectedOrganization.identifier,
             payload,
+            this.router.currentRoute.value.query.folder || "default"
           );
 
           callAlert
