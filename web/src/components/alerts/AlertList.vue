@@ -711,6 +711,9 @@ export default defineComponent({
         }
     };
     const getAlertsFn = async (store: any, folderId: string, query = "") => {
+          selected.value = [];
+          allSelected.value = false;
+          toggleAll();
           const dismiss = $q.notify({
             spinner: true,
             message: "Please wait while loading alerts...",
@@ -869,7 +872,6 @@ export default defineComponent({
           (it: any) => it.folderId === router.currentRoute.value.query.folder,
         )
       ) {
-        console.log(router.currentRoute.value.query.folder,'router.currentRoute.value.query.folder')
         activeFolderId.value = router.currentRoute.value.query.folder as string;
       } else {
         activeFolderId.value = "default";
@@ -1302,34 +1304,34 @@ export default defineComponent({
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id)
 
-  // Ensure that the alert exists before proceeding
-  if (alertToBeExported) {
+      // Ensure that the alert exists before proceeding
+      if (alertToBeExported) {
 
-    // Convert the alert object to a JSON string
-    const alertJson = JSON.stringify(alertToBeExported, null, 2);
+        // Convert the alert object to a JSON string
+        const alertJson = JSON.stringify(alertToBeExported, null, 2);
 
-    // Create a Blob from the JSON string
-    const blob = new Blob([alertJson], { type: 'application/json' });
+        // Create a Blob from the JSON string
+        const blob = new Blob([alertJson], { type: 'application/json' });
 
-    // Create an object URL for the Blob
-    const url = URL.createObjectURL(blob);
+        // Create an object URL for the Blob
+        const url = URL.createObjectURL(blob);
 
-    // Create an anchor element to trigger the download
-    const link = document.createElement('a');
-    link.href = url;
+        // Create an anchor element to trigger the download
+        const link = document.createElement('a');
+        link.href = url;
 
-    // Set the filename of the download
-    link.download = `${alertToBeExported.name}.json`;
+        // Set the filename of the download
+        link.download = `${alertToBeExported.name}.json`;
 
-    // Trigger the download by simulating a click
-    link.click();
+        // Trigger the download by simulating a click
+        link.click();
 
-    // Clean up the URL object after download
-    URL.revokeObjectURL(url);
-  } else {
-    // Alert not found, handle error or show notification
-    console.error('Alert not found for UUID:', row.uuid);
-  }
+        // Clean up the URL object after download
+        URL.revokeObjectURL(url);
+      } else {
+        // Alert not found, handle error or show notification
+        console.error('Alert not found for UUID:', row.uuid);
+      }
 };
 const updateActiveFolderId = (newVal: any) => {
       searchQuery.value = "";
@@ -1360,6 +1362,7 @@ const updateActiveFolderId = (newVal: any) => {
       activeFolderToMove.value = "";
       selected.value = [];
       allSelected.value = false;
+      toggleAll();
     }
 
     const getSelectedString = () => {
@@ -1501,6 +1504,9 @@ const updateActiveFolderId = (newVal: any) => {
           message: `Successfully exported ${selectedAlerts.length} alert${selectedAlerts.length > 1 ? 's' : ''}`,
           timeout: 2000
         });
+        selected.value = [];
+        allSelected.value = false;
+        toggleAll();        
 
       } catch (error) {
         console.error('Error exporting alerts:', error);
@@ -1510,6 +1516,8 @@ const updateActiveFolderId = (newVal: any) => {
           timeout: 2000
         });
       }
+      
+
     };
     const computedName = (name: string) => {
           if(!name){

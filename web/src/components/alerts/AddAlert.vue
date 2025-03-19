@@ -908,8 +908,6 @@ export default defineComponent({
       let whereClause = formData.value.query_condition.conditions
         .map((condition: any) => {
           if (condition.column && condition.operator && condition.value) {
-            console.log(streamFieldsMap.value,'streamFieldsMap')
-            console.log(condition.column,'condition.column')
             // If value is string then add single quotes
             const value =
               streamFieldsMap.value[condition.column].type === "Int64" ||
