@@ -4931,6 +4931,35 @@ const useLogs = () => {
         return;
       }
 
+      // reset query data
+      resetQueryData();
+      searchObj.data.queryResults = {};
+
+      // reset searchAggData
+      searchAggData.total = 0;
+      searchAggData.hasAggregation = false;
+      searchObj.meta.showDetailTab = false;
+      searchObj.meta.searchApplied = true;
+      searchObj.data.functionError = "";
+
+      searchObj.data.errorCode = 0;
+
+      // Histogram reset
+      searchObj.data.histogram = {
+        xData: [],
+        yData: [],
+        chartParams: {
+          title: "",
+          unparsed_x_data: [],
+          timezone: "",
+        },
+        errorCode: 0,
+        errorMsg: "",
+        errorDetail: "",
+      };
+      resetHistogramError()
+
+
       const payload = {
         type: "search",
         content: {
@@ -5426,44 +5455,44 @@ const useLogs = () => {
       return;
     }
 
-    if (response.code === 1001 || response.code === 1006) {
-      if (!searchObj.data.searchRetriesCount[payload.traceId]) {
-        searchObj.data.searchRetriesCount[payload.traceId] = 1;
-      } else {
-        searchObj.data.searchRetriesCount[payload.traceId] += 1;
-      }
+    // if (response.code === 1001 || response.code === 1006) {
+    //   if (!searchObj.data.searchRetriesCount[payload.traceId]) {
+    //     searchObj.data.searchRetriesCount[payload.traceId] = 1;
+    //   } else {
+    //     searchObj.data.searchRetriesCount[payload.traceId] += 1;
+    //   }
 
-      if (
-        searchObj.data.searchRetriesCount[payload.traceId] <=
-        searchReconnectDelay
-      ) {
-        if (payload.type === "search") searchObj.loading = true;
-        if (payload.type === "histogram") searchObj.loadingHistogram = true;
+    //   if (
+    //     searchObj.data.searchRetriesCount[payload.traceId] <=
+    //     searchReconnectDelay
+    //   ) {
+    //     if (payload.type === "search") searchObj.loading = true;
+    //     if (payload.type === "histogram") searchObj.loadingHistogram = true;
 
-        setTimeout(() => {
-          const requestId = initializeWebSocketConnection(payload);
+    //     setTimeout(() => {
+    //       const requestId = initializeWebSocketConnection(payload);
 
-          addRequestId(payload.traceId);
-        }, maxSearchRetries);
+    //       addRequestId(payload.traceId);
+    //     }, maxSearchRetries);
 
-        return;
-      } else {
-        handleSearchError(payload, {
-          content: {
-            message:
-              "WebSocket connection terminated unexpectedly. Please check your network and try again",
-            trace_id: payload.traceId,
-            code: response.code,
-            error_detail: "",
-          },
-          type: "error",
-        });
-      }
-    }
+    //     return;
+    //   } else {
+    //     handleSearchError(payload, {
+    //       content: {
+    //         message:
+    //           "WebSocket connection terminated unexpectedly. Please check your network and try again",
+    //         trace_id: payload.traceId,
+    //         code: response.code,
+    //         error_detail: "",
+    //       },
+    //       type: "error",
+    //     });
+    //   }
+    // }
 
-    if (searchObj.data.searchRetriesCount[payload.traceId]) {
-      delete searchObj.data.searchRetriesCount[payload.traceId];
-    }
+    // if (searchObj.data.searchRetriesCount[payload.traceId]) {
+    //   delete searchObj.data.searchRetriesCount[payload.traceId];
+    // }
 
     if (payload.traceId) removeTraceId(payload.traceId);
 
