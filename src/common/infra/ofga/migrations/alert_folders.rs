@@ -78,8 +78,8 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
             let object =
                 authorizer::authz::get_ownership_tuple(&org_id, "alerts", &alert_id, &mut tuples);
             authorizer::authz::get_parent_tuple(
-                &alert_folder_id,
-                &alert_folders_ofga_type,
+                alert_folder_id,
+                alert_folders_ofga_type,
                 &object,
                 &mut tuples,
             );
@@ -110,25 +110,20 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
         // 2. Get all the alerts assigned to the roles
         for role in roles.iter() {
             let mut add_roles = vec![];
-            let alerts = match authorizer::roles::get_role_permissions(
-                org,
-                &role,
-                &alerts_ofga_type,
-            )
-            .await
-            {
-                Ok(alerts) => alerts,
-                Err(e) => {
-                    log::error!("Error openfga getting alerts for role: {}", e);
-                    continue;
-                }
-            };
+            let alerts =
+                match authorizer::roles::get_role_permissions(org, role, alerts_ofga_type).await {
+                    Ok(alerts) => alerts,
+                    Err(e) => {
+                        log::error!("Error openfga getting alerts for role: {}", e);
+                        continue;
+                    }
+                };
             // 3. Add the role assignment tuples for the alerts
             for alert in alerts.iter() {
                 // Get the alert id from the alert name
                 // TODO: Optimize this workflow
 
-                let alert_name = match alert.object.split(':').last() {
+                let alert_name = match alert.object.split(':').next_back() {
                     Some(alert_name) => alert_name,
                     None => {
                         log::error!("Error openfga getting alert id from alert name");
@@ -161,8 +156,7 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
             }
             if !add_roles.is_empty() {
                 let add_roles_len = add_roles.len();
-                match authorizer::roles::update_role(&org, &role, add_roles, vec![], None, None)
-                    .await
+                match authorizer::roles::update_role(org, role, add_roles, vec![], None, None).await
                 {
                     Ok(_) => {
                         log::debug!("{} roles added to openfga", add_roles_len);
