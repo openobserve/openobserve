@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disableQueryTypeSelection="true"
             :expandedLogs="expandedLogs"
             :validatingSqlQuery="validatingSqlQuery"
-
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
             v-model:promql="streamRoute.query_condition.promql"
@@ -237,6 +236,7 @@ const getDefaultStreamRoute: any = () => {
       frequency_type: "minutes",
       cron: "",
       frequency: frequency <= 15 ? 15 : frequency,
+      timezone: "UTC",
     },
     context_attributes: [
       {
