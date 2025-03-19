@@ -66,36 +66,37 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 // set to super cluster
                 set_model(Some(existing_model.clone())).await?;
             }
-            (Some(model), None) => {
+            (Some(meta_model), None) => {
                 // set to local
-                existing_meta = Some(model.clone());
+                existing_meta = Some(meta_model.clone());
                 migrate_native_objects = false;
-                db::ofga::set_ofga_model_to_db(model).await?;
+                db::ofga::set_ofga_model_to_db(meta_model).await?;
             }
-            (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
-            {
-                Ordering::Less => {
-                    log::info!(
-                        "[OFGA:SuperCluster] model version changed: {} -> {}",
-                        existing_model.version,
-                        model.version
-                    );
-                    // update version in super cluster
-                    set_model(Some(existing_model.clone())).await?;
+            (Some(meta_model), Some(existing_model)) => {
+                match meta_model.version.cmp(&existing_model.version) {
+                    Ordering::Less => {
+                        log::info!(
+                            "[OFGA:SuperCluster] model version changed: {} -> {}",
+                            existing_model.version,
+                            meta_model.version
+                        );
+                        // update version in super cluster
+                        set_model(Some(existing_model.clone())).await?;
+                    }
+                    Ordering::Greater => {
+                        log::info!(
+                            "[OFGA:SuperCluster] model version changed: {} -> {}",
+                            existing_model.version,
+                            meta_model.version
+                        );
+                        // update version in local
+                        existing_meta = Some(meta_model.clone());
+                        migrate_native_objects = false;
+                        db::ofga::set_ofga_model_to_db(meta_model).await?;
+                    }
+                    Ordering::Equal => {}
                 }
-                Ordering::Greater => {
-                    log::info!(
-                        "[OFGA:SuperCluster] model version changed: {} -> {}",
-                        existing_model.version,
-                        model.version
-                    );
-                    // update version in local
-                    existing_meta = Some(model.clone());
-                    migrate_native_objects = false;
-                    db::ofga::set_ofga_model_to_db(model).await?;
-                }
-                Ordering::Equal => {}
-            },
+            }
             _ => {}
         }
     }
@@ -124,7 +125,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         log::info!(
             "[OFGA:Local] model version changed: {} -> {}",
             existing_model.version,
-            model.version
+            meta.version
         );
 
         // Check if ofga migration of index streams are needed
