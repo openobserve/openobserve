@@ -2,7 +2,7 @@ import random
 
 class DestinationPage:
     # Make Unique_value_destination a class variable
-    Unique_value_destination = f"d4m21_{random.randint(100000, 999999)}"
+    Unique_value_destination = f"uDestination_{random.randint(100000, 999999)}"
 
     def __init__(self, session, base_url, org_id):
         self.session = session
@@ -28,15 +28,15 @@ class DestinationPage:
         assert response.status_code == 200, f"Failed to create destination: {response.content}"
         return response
 
-    def create_destination_email(self, session, base_url, org_id, template_email, destination_name, email_address):
-        """Create a destination."""
+    def create_destination_email(self, session, base_url, org_id, user_email, user_password, template_email, destination_name):
+        """Create a email destination."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
         session.auth = HTTPBasicAuth(user_email, user_password)
         skip_tls_verify_value = False
         payload = {
             "url": "",
             "type": "email",
-            "emails": [email_address],
+            "emails": [user_email],
             "method": "post",
             "template": template_email,
             "headers": {},
@@ -82,20 +82,7 @@ class DestinationPage:
         return response
    
     
-def test_e2e_alerts(create_session, base_url):
-    """Running an E2E test for get all the alerts list."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-    resp_get_allalerts = session.get(f"{url}api/{org_id}/alerts")
-
-    print(resp_get_allalerts.content)
-    assert (
-        resp_get_allalerts.status_code == 200
-    ), f"Get all alerts list 200, but got {resp_get_allalerts.status_code} {resp_get_allalerts.content}"
-
+    
 
 def test_e2e_destinations(create_session, base_url):
     """Running an E2E test for get all the destination list under alerts."""
