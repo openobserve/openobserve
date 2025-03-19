@@ -43,17 +43,3 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
-
-#[cfg(feature = "enterprise")]
-pub async fn init_openfga() -> Result<(), anyhow::Error> {
-    crate::service::db::ofga::cache()
-        .await
-        .expect("ofga model cache failed");
-    o2_openfga::authorizer::authz::init_open_fga().await;
-    if get_openfga_config().enabled {
-        if let Err(e) = ofga::init().await {
-            log::error!("OFGA init failed: {}", e);
-        }
-    }
-    Ok(())
-}
