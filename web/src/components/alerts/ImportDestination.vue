@@ -222,7 +222,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dense
                             tabindex="0"
                             @update:model-value="
-                              updateDestinationName(userSelectedDestinationName[index], index)
+                              updateDestinationName(
+                                userSelectedDestinationName[index],
+                                index,
+                              )
                             "
                           />
                         </div>
@@ -250,7 +253,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dense
                             tabindex="0"
                             @update:model-value="
-                              updateDestinationUrl(userSelectedDestinationUrl[index], index)
+                              updateDestinationUrl(
+                                userSelectedDestinationUrl[index],
+                                index,
+                              )
                             "
                           />
                         </div>
@@ -284,7 +290,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             fill-input
                             :input-debounce="400"
                             @update:model-value="
-                              updateDestinationType(userSelectedDestinationType[index], index)
+                              updateDestinationType(
+                                userSelectedDestinationType[index],
+                                index,
+                              )
                             "
                             behavior="menu"
                           />
@@ -318,7 +327,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             fill-input
                             :input-debounce="400"
                             @update:model-value="
-                              updateDestinationMethod(userSelectedDestinationMethod[index], index)
+                              updateDestinationMethod(
+                                userSelectedDestinationMethod[index],
+                                index,
+                              )
                             "
                             behavior="menu"
                           />
@@ -353,11 +365,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             hide-selected
                             fill-input
                             @filter="filterTemplates"
-                            :rules="[
-                              (val) => !!val || 'Field is required!',
-                            ]"
+                            :rules="[(val) => !!val || 'Field is required!']"
                             style="width: 300px"
-                            @update:model-value="updateDestinationTemplate($event, index)"
+                            @update:model-value="
+                              updateDestinationTemplate($event, index)
+                            "
                           >
                           </q-select>
                         </div>
@@ -384,9 +396,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dense
                             tabindex="0"
                             @update:model-value="
-                              updateDestinationEmails(userSelectedEmails[index], index)
+                              updateDestinationEmails(
+                                userSelectedEmails[index],
+                                index,
+                              )
                             "
                           />
+                        </div>
+                      </span>
+                      <span
+                        class="text-red"
+                        v-else-if="
+                          typeof errorMessage === 'object' &&
+                          errorMessage.field == 'action_id'
+                        "
+                      >
+                        {{ errorMessage.message }}
+                        <div>
+                          <q-select
+                            data-test="destination-import-template-input"
+                            v-model="userSelectedActionId[index]"
+                            :options="filteredActions"
+                            label="Templates *"
+                            :popup-content-style="{
+                              textTransform: 'lowercase',
+                            }"
+                            color="input-border"
+                            bg-color="input-bg"
+                            class="q-py-sm showLabelOnTop no-case"
+                            filled
+                            stack-label
+                            dense
+                            use-input
+                            emit-value
+                            map-options
+                            input-debounce="400"
+                            behavior="menu"
+                            hide-selected
+                            fill-input
+                            @filter="filterActions"
+                            :rules="[(val) => !!val || 'Field is required!']"
+                            style="width: 300px"
+                            @update:model-value="
+                              updateDestinationAction($event, index)
+                            "
+                          >
+                          </q-select>
                         </div>
                       </span>
                       <span
@@ -400,7 +455,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div style="width: 300px">
                           <q-toggle
                             data-test="destination-import-skip-tls-verify-input"
-                            :model-value="userSelectedSkipTlsVerify[index] ?? false"
+                            :model-value="
+                              userSelectedSkipTlsVerify[index] ?? false
+                            "
                             :label="t('alert_destinations.skip_tls_verify')"
                             class="q-mt-sm"
                             @update:model-value="
@@ -416,7 +473,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="error-section" v-if="destinationCreators.length > 0">
-                <div class="section-title text-primary" data-test="destination-import-creation-title">Destination Creation</div>
+                <div
+                  class="section-title text-primary"
+                  data-test="destination-import-creation-title"
+                >
+                  Destination Creation
+                </div>
                 <div
                   class="error-list"
                   v-for="(val, index) in destinationCreators"
@@ -518,6 +580,7 @@ export default defineComponent({
     const activeTab = ref("import_json_file");
     const splitterModel = ref(60);
     const filteredTemplates = ref<string[]>([]);
+    const filteredActions = ref<string[]>([]);
 
     const userSelectedSkipTlsVerify = ref<boolean[]>([]);
 
@@ -525,8 +588,10 @@ export default defineComponent({
       return props.templates
         .filter((template: any) => {
           // Get the current destination type
-          const currentDestinationType = jsonArrayOfObj.value[destinationErrorsToDisplay.value.length - 1]?.type;
-          
+          const currentDestinationType =
+            jsonArrayOfObj.value[destinationErrorsToDisplay.value.length - 1]
+              ?.type;
+
           if (currentDestinationType === "email" && template.type === "email") {
             return true;
           } else if (currentDestinationType !== "email") {
@@ -538,6 +603,8 @@ export default defineComponent({
     });
 
     const userSelectedEmails = ref([]);
+
+    const userSelectedActionId = ref([]);
 
     const updateDestinationType = (type: any, index: number) => {
       jsonArrayOfObj.value[index].type = type;
@@ -562,9 +629,14 @@ export default defineComponent({
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
 
+    const updateDestinationAction = (id: string, index: number) => {
+      jsonArrayOfObj.value[index].action_id = id;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+
     const updateDestinationEmails = (emails: string, index: number) => {
       // Split comma-separated emails and trim whitespace
-      const emailArray = emails.split(',').map(email => email.trim());
+      const emailArray = emails.split(",").map((email) => email.trim());
       jsonArrayOfObj.value[index].emails = emailArray;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
@@ -586,15 +658,53 @@ export default defineComponent({
       update(() => {
         const needle = val.toLowerCase();
         filteredTemplates.value = getFormattedTemplates.value.filter(
-          (template: string) => template.toLowerCase().includes(needle)
+          (template: string) => template.toLowerCase().includes(needle),
         );
       });
+    };
+
+    const filterActions = (val: string, update: Function) => {
+      if (val === "") {
+        update(() => {
+          filteredActions.value = store.state.organizationData.actions
+            .filter(
+              (action: any) => action.execution_details_type === "service",
+            )
+            .map((action: any) => ({
+              label: action.name,
+              value: action.id,
+            }));
+        });
+        return;
+      }
+
+      update(() => {
+        const needle = val.toLowerCase();
+        getServiceActions()
+          .map((action: any) => ({
+            label: action.name,
+            value: action.id,
+          }))
+          .filter(
+            (action: { name: string; id: string }) =>
+              action.name.toLowerCase().includes(needle) ||
+              action.id.toLowerCase().includes(needle),
+          );
+      });
+    };
+
+    const getServiceActions = () => {
+      return (
+        store.state.organizationData.actions.filter(
+          (action: any) => action.execution_details_type === "service",
+        ) || []
+      );
     };
 
     watch(jsonFiles, async (newVal: any, oldVal: any) => {
       if (newVal && newVal.length > 0) {
         let combinedJson: any[] = [];
-        
+
         for (const file of newVal) {
           try {
             const result: any = await new Promise((resolve) => {
@@ -603,7 +713,9 @@ export default defineComponent({
                 try {
                   const parsedJson = JSON.parse(e.target.result);
                   // Convert to array if it's a single object
-                  const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+                  const jsonArray = Array.isArray(parsedJson)
+                    ? parsedJson
+                    : [parsedJson];
                   resolve(jsonArray);
                 } catch (error) {
                   q.notify({
@@ -617,13 +729,13 @@ export default defineComponent({
               };
               reader.readAsText(file);
             });
-            
+
             combinedJson = [...combinedJson, ...result];
           } catch (error) {
-            console.error('Error reading file:', error);
+            console.error("Error reading file:", error);
           }
         }
-        
+
         // Update the refs with combined JSON data
         jsonArrayOfObj.value = combinedJson;
         jsonStr.value = JSON.stringify(combinedJson, null, 2);
@@ -697,7 +809,9 @@ export default defineComponent({
           throw new Error("JSON string is empty");
         } else {
           const parsedJson = JSON.parse(jsonStr.value);
-          jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+          jsonArrayOfObj.value = Array.isArray(parsedJson)
+            ? parsedJson
+            : [parsedJson];
         }
       } catch (e: any) {
         q.notify({
@@ -801,10 +915,11 @@ export default defineComponent({
         });
       }
       if (
-        input.type == "http" && (!input.method ||
-        (input.method !== "post" &&
-          input.method !== "get" &&
-          input.method !== "put"))
+        input.type == "http" &&
+        (!input.method ||
+          (input.method !== "post" &&
+            input.method !== "get" &&
+            input.method !== "put"))
       ) {
         destinationErrors.push({
           message: `Destination - ${index} 'method' is required and should be either 'post', 'get', or 'put'`,
@@ -828,22 +943,39 @@ export default defineComponent({
         });
       }
 
-      // Check type for email and it should be present only for email
-      if (input.type != "email" && input.type != "http") {
+      const availableActions = getServiceActions().map(
+        (action: any) => action.id,
+      );
+
+      if (
+        input.type === "action" &&
+        !availableActions.includes(input.action_id)
+      ) {
         destinationErrors.push({
-          message: `Destination - ${index} 'type' should be email or http`,
-          field: "type",
+          message: `Destination - ${index} action "${input.action_id}" does not exist for type "${input.type}"`,
+          field: "action_id",
         });
       }
 
-      
+      // Check type for email and it should be present only for email
+      if (
+        input.type != "email" &&
+        input.type != "http" &&
+        input.type !== "action"
+      ) {
+        destinationErrors.push({
+          message: `Destination - ${index} 'type' should be email, http or action`,
+          field: "type",
+        });
+      }
 
       // Check if 'method' is required for both webhook and email
 
       // Check if 'skip_tls_verify' is required for both webhook and email, and it should be a boolean
       if (
-        input.type == "http" && (input.skip_tls_verify === undefined ||
-        typeof input.skip_tls_verify !== "boolean")
+        input.type == "http" &&
+        (input.skip_tls_verify === undefined ||
+          typeof input.skip_tls_verify !== "boolean")
       ) {
         destinationErrors.push({
           message: `Destination - ${index} 'skip_tls_verify' is required and should be a boolean value`,
@@ -851,26 +983,23 @@ export default defineComponent({
         });
       }
 
-
-      if(input.type == 'http' && input.headers != undefined) {
-        if(typeof input.headers !== 'object') {
+      if (input.type == "http" && input.headers != undefined) {
+        if (typeof input.headers !== "object") {
           destinationErrors.push(
             `Destination - ${index} 'headers' should be an object for webhook`,
           );
         }
       }
 
-
-      if (input.type === "email" && input.hasOwnProperty('headers') && Object.keys(input.headers).length !== 0) {
+      if (
+        input.type === "email" &&
+        input.hasOwnProperty("headers") &&
+        Object.keys(input.headers).length !== 0
+      ) {
         destinationErrors.push(
           `Destination - ${index} 'headers' should not be provided for email`,
         );
       }
-
-
-
-
-
 
       // Check if 'name' is required for both webhook and email
       if (!input.name || typeof input.name !== "string") {
@@ -878,7 +1007,6 @@ export default defineComponent({
           `Destination - ${index} 'name' is required and should be a string`,
         );
       }
-
 
       // 'emails' should be required for email type and should be an array of strings
       if (input.type === "email") {
@@ -901,14 +1029,11 @@ export default defineComponent({
         );
       }
 
-
       // Log all destination errors at the end if any exist
       if (destinationErrors.length > 0) {
         destinationErrorsToDisplay.value.push(destinationErrors);
         return false;
       }
-
-
 
       // If all validations pass
       return true;
@@ -943,7 +1068,7 @@ export default defineComponent({
 
         // Emit update after each successful creation
         emit("update:destinations");
-        
+
         return true;
       } catch (error: any) {
         destinationCreators.value.push({
@@ -967,6 +1092,7 @@ export default defineComponent({
     };
 
     return {
+      store,
       t,
       jsonStr,
       importJson,
@@ -1003,6 +1129,10 @@ export default defineComponent({
       filteredTemplates,
       userSelectedSkipTlsVerify,
       updateSkipTlsVerify,
+      userSelectedActionId,
+      filterActions,
+      filteredActions,
+      updateDestinationAction,
     };
   },
   components: {
