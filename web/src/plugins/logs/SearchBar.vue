@@ -604,6 +604,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 >{{ t("search.runQuery") }}</q-btn
               >
+              <q-btn
+                v-if="
+                  config.isEnterprise == 'true' &&
+                  !!searchObj.data.searchRequestTraceIds.length &&
+                  (searchObj.loading == true ||
+                    searchObj.loadingHistogram == true)
+                "
+                outline
+                class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+                size="sm"
+                no-caps
+                icon="block"
+                @click="closeSocketWithError"
+                data-test="dashboard-close-socket-btn"
+                color="negative"
+              >
+                <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+              </q-btn>
             </div>
           </div>
         </div>
@@ -1140,6 +1158,7 @@ import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
+import useSearchWebSocket from "@/composables/useSearchWebSocket";
 
 const defaultValue: any = () => {
   return {
@@ -1315,6 +1334,8 @@ export default defineComponent({
 
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
+
+    const { closeSocketWithError } = useSearchWebSocket();
 
     const transformsExpandState = ref({
       actions: false,
@@ -3328,6 +3349,7 @@ export default defineComponent({
       actionEditorQuery,
       isActionsEnabled,
       showFunctionEditor,
+      closeSocketWithError,
     };
   },
   computed: {

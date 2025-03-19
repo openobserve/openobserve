@@ -689,6 +689,7 @@ export const usePanelDataLoader = (
               close: handleSearchClose,
               error: handleSearchError,
               message: handleSearchResponse,
+              reset: handleSearchReset,
             });
 
             addTraceId(payload.traceId);
@@ -736,6 +737,11 @@ export const usePanelDataLoader = (
     // save current state to cache
     saveCurrentStateToCache();
   };
+
+  const handleSearchReset = (payload: any) => {
+    // Handle search reset
+    console.log("handleSearchReset", payload);
+  }
 
   const handleSearchError = (payload: any, response: any) => {
     removeTraceId(payload.traceId);
@@ -790,6 +796,7 @@ export const usePanelDataLoader = (
         close: handleSearchClose,
         error: handleSearchError,
         message: handleSearchResponse,
+        reset: handleSearchReset,
       });
 
       addTraceId(traceId);

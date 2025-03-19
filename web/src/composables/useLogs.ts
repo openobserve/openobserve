@@ -4921,30 +4921,28 @@ const useLogs = () => {
       close: handleSearchClose,
       error: handleSearchError,
       message: handleSearchResponse,
+      reset: handleSearchReset,
     }) as string;
   };
 
-  const sendSearchMessage = (queryReq: any) => {
-    try {
-      if (searchObj.data.isOperationCancelled) {
-        closeSocketBasedOnRequestId(queryReq.traceId);
-        return;
-      }
 
-      // reset query data
+  const handleSearchReset = (data: any) => {
+    // reset query data
+    console.log("handleSearchReset", data);
+    if(data.type === "search") {
       resetQueryData();
       searchObj.data.queryResults = {};
-
+   
       // reset searchAggData
       searchAggData.total = 0;
       searchAggData.hasAggregation = false;
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
       searchObj.data.functionError = "";
-
+    
       searchObj.data.errorCode = 0;
-
-      // Histogram reset
+    
+          // Histogram reset
       searchObj.data.histogram = {
         xData: [],
         yData: [],
@@ -4957,8 +4955,34 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
-      resetHistogramError()
+      resetHistogramError();
+    }
 
+    if(data.type === "histogram") {
+      searchObj.data.queryResults.aggs = [];
+      searchObj.data.histogram = {
+        xData: [],
+        yData: [],
+        chartParams: {
+          title: "",
+          unparsed_x_data: [],
+          timezone: "",
+        },
+        errorCode: 0,
+        errorMsg: "",
+        errorDetail: "",
+      };
+      resetHistogramError();
+    }
+
+  };
+
+  const sendSearchMessage = (queryReq: any) => {
+    try {
+      if (searchObj.data.isOperationCancelled) {
+        closeSocketBasedOnRequestId(queryReq.traceId);
+        return;
+      }
 
       const payload = {
         type: "search",
