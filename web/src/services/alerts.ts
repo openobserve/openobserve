@@ -123,7 +123,7 @@ const alerts = {
   create_by_alert_id: (
     org_identifier: string,
     data: any,
-    folder_id?: string
+    folder_id?: any
   ) => {
       let url = `/api/v2/${org_identifier}/alerts`;
       if(folder_id){
