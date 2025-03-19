@@ -996,13 +996,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-btn
                   data-test="stream-routing-query-save-btn"
-                  :label="'Validate and Close'"
+                  :label="validatingSqlQuery ? 'Validating...' : 'Validate and Close'"
                   class="text-bold no-border q-ml-md"
                   color="secondary"
                   padding="sm xl"
                   no-caps
                   type="submit"
                   @click="$emit('submit:form')"
+                  :disable="validatingSqlQuery"
                 />
                 <q-btn
                   v-if="pipelineObj.isEditNode"
@@ -1109,7 +1110,8 @@ const props = defineProps([
   "disableVrlFunction",
   "disableQueryTypeSelection",
   "showTimezoneWarning",
-  "streamType"
+  "streamType",
+  "validatingSqlQuery"
 ]);
 
 const emits = defineEmits([
