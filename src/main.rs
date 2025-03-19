@@ -380,6 +380,8 @@ async fn main() -> Result<(), anyhow::Error> {
     db::schema::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
+    // pipelines can potentially depend on enrichment tables, so cached afterwards
+    db::pipeline::cache().await.expect("Pipeline cache failed");
 
     if cfg.log.events_enabled {
         tokio::task::spawn(async move { zo_logger::send_logs().await });
