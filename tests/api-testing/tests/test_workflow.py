@@ -1,10 +1,10 @@
 import os
 from create_objects import create_objects
-from verify_objects import verify_objects
-from edit_objects import edit_objects
-from delete_objects import delete_objects
-from verifydeleted_objects import verify_deleted_objects       
-from verifyedited_objects import verify_edited_objects
+# from verify_objects import verify_objects
+# from edit_objects import edit_objects
+# from delete_objects import delete_objects
+# from verifydeleted_objects import verify_deleted_objects       
+# from verifyedited_objects import verify_edited_objects
 
 # Constants for WebSocket URL and user credentials
 ZO_BASE_URL = os.environ.get("ZO_BASE_URL")  # Use environment variable
