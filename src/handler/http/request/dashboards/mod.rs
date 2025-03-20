@@ -17,7 +17,7 @@ use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, 
 use hashbrown::HashMap;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::models::dashboards::{
         CreateDashboardRequestBody, CreateDashboardResponseBody, GetDashboardResponseBody,
         ListDashboardsQuery, ListDashboardsResponseBody, MoveDashboardRequestBody,
@@ -96,13 +96,27 @@ pub async fn create_dashboard(
     path: web::Path<String>,
     req_body: web::Json<CreateDashboardRequestBody>,
     req: HttpRequest,
+    user_email: UserEmail,
 ) -> impl Responder {
     let org_id = path.into_inner();
     let folder = get_folder(req);
-    let dashboard = match req_body.into_inner().try_into() {
+    let mut dashboard: config::meta::dashboards::Dashboard = match req_body.into_inner().try_into()
+    {
         Ok(dashboard) => dashboard,
         Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
     };
+
+    match dashboard.owner() {
+        Some(owner) => {
+            if owner.is_empty() {
+                dashboard.set_owner(user_email.user_id);
+            }
+        }
+        None => {
+            dashboard.set_owner(user_email.user_id);
+        }
+    }
+
     let saved = match dashboards::create_dashboard(&org_id, &folder, dashboard).await {
         Ok(saved) => saved,
         Err(err) => return err.into(),
@@ -138,16 +152,29 @@ async fn update_dashboard(
     path: web::Path<(String, String)>,
     req_body: web::Json<UpdateDashboardRequestBody>,
     req: HttpRequest,
+    user_email: UserEmail,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
 
-    let dashboard = match req_body.into_inner().try_into() {
+    let mut dashboard: config::meta::dashboards::Dashboard = match req_body.into_inner().try_into()
+    {
         Ok(dashboard) => dashboard,
         Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
     };
+
+    match dashboard.owner() {
+        Some(owner) => {
+            if owner.is_empty() {
+                dashboard.set_owner(user_email.user_id);
+            }
+        }
+        None => {
+            dashboard.set_owner(user_email.user_id);
+        }
+    }
     let saved = match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash)
         .await
     {
