@@ -464,7 +464,7 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
     dst_folder_id: &str,
 ) -> Result<(), AlertError> {
     for alert_id in alert_ids {
-        let alert_id_str = alert_id.to_string();
+        let _alert_id_str = alert_id.to_string();
         let Some((curr_folder, alert)) =
             db::alerts::alert::get_by_id(conn, org_id, *alert_id).await?
         else {
@@ -482,14 +482,14 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
         #[cfg(feature = "enterprise")]
         if get_openfga_config().enabled {
             set_parent_relation(
-                &alert_id_str,
+                &_alert_id_str,
                 &get_ofga_type("alerts"),
                 dst_folder_id,
                 &get_ofga_type("alert_folders"),
             )
             .await;
             remove_parent_relation(
-                &alert_id_str,
+                &_alert_id_str,
                 &get_ofga_type("alerts"),
                 &curr_folder.folder_id,
                 &get_ofga_type("alert_folders"),
