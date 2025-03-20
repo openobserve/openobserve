@@ -3,7 +3,7 @@ import random
 from requests.auth import HTTPBasicAuth
 class SavedViewPage:
     # Make Unique_value_destination a class variable
-    Unique_value_savedview = f"d3m18_{random.randint(100000, 999999)}"
+    Unique_value_savedview = f"d4m20_{random.randint(100000, 999999)}"
 
     def __init__(self, session, base_url, org_id):
         self.session = session

@@ -8,7 +8,7 @@ root_dir = Path(__file__).parent.parent.parent  # Navigate up to the root direct
 
 class EnrichmentPage:
     # Make Unique_value_enrichment a class variable
-    Unique_value_enrichment = f"d3m18_{random.randint(100000, 999999)}"
+    Unique_value_enrichment = f"d4m20_{random.randint(100000, 999999)}"
 
     BOUNDARY = "----WebKitFormBoundaryaQgmYHuE6dQrlLss"
 

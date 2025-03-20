@@ -4,7 +4,7 @@ from requests.auth import HTTPBasicAuth
 
 
 class UserPage:
-    Unique_value_user = f"d3m18_{random.randint(100000, 999999)}"  # Class variable
+    Unique_value_user = f"d4m20_{random.randint(100000, 999999)}"  # Class variable
 
     def __init__(self, session, base_url, org_id):
         self.session = session
