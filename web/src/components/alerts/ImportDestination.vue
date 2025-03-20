@@ -414,10 +414,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div>
                           <q-select
-                            data-test="destination-import-template-input"
+                            data-test="destination-import-action-input"
                             v-model="userSelectedActionId[index]"
                             :options="filteredActions"
-                            label="Templates *"
+                            label="Actions *"
                             :popup-content-style="{
                               textTransform: 'lowercase',
                             }"
