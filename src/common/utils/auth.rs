@@ -49,6 +49,8 @@ pub const V2_API_PREFIX: &str = "v2";
 
 pub const V2_API_PREFIX: &str = "v2";
 
+pub const V2_API_PREFIX: &str = "v2";
+
 pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
 static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
