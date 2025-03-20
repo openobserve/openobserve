@@ -69,6 +69,7 @@ const useSearchWebSocket = () => {
     
     if(shouldRetry) socketFailureCount.value++;
 
+    // reset isInDrainMode to false
     if (shouldRetry && socketFailureCount.value < maxSearchRetries) {
       setTimeout(() => {
         Object.keys(traces).forEach((traceId) => {
@@ -104,6 +105,11 @@ const useSearchWebSocket = () => {
         // Store the current socketId as inactive and clear it
         inactiveSocketId.value = socketId.value;
         socketId.value = null;
+        isInDrainMode.value = true;
+
+        const traceIdToRetry = response.content.trace_id;
+
+        if(traceIdToRetry) retryActiveTrace(traceIdToRetry, response);
 
         // Mark all traces from old socket as inactive
         Object.keys(traces).forEach(traceId => {
@@ -218,7 +224,7 @@ const useSearchWebSocket = () => {
   const sendSearchMessageBasedOnRequestId = (data: any) => {
     try {
       
-      if(isInDrainMode.value && !traces[data.traceId].isActive && inactiveSocketId.value) {
+      if(!traces[data.traceId].isActive && inactiveSocketId.value) {
         webSocket.sendMessage(inactiveSocketId.value as string, JSON.stringify(data));
         return;
       }
@@ -294,8 +300,10 @@ const useSearchWebSocket = () => {
 
   const resetAuthToken = () => {
     authService.refresh_token().then((res: any) => {
+      isInDrainMode.value = false;
       console.log("resetAuthToken", res);
       // Retry the request
+      console.log("traces", Object.keys(traces));
       Object.keys(traces).forEach((traceId) => {
         console.log("reset request closed by 401", traces[traceId], traces[traceId].isInitiated);
         if(!traces[traceId].isInitiated) {
@@ -310,6 +318,8 @@ const useSearchWebSocket = () => {
       });
     }).catch((err: any) => {
       console.error("Error in refreshing auth token", err);
+    }).finally(() => {
+      isInDrainMode.value = false;
     });
   }
 
