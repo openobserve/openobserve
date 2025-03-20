@@ -15,7 +15,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use config::{RwAHashMap, ider};
+use chrono::{DateTime, Utc};
+use config::RwAHashMap;
+use time::OffsetDateTime;
 
 use super::{
     error::*,
@@ -32,23 +34,29 @@ pub struct SessionManager {
 pub struct SessionInfo {
     pub session_id: SessionId,
     pub querier_mappings: HashMap<TraceId, QuerierName>,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub last_active: chrono::DateTime<chrono::Utc>,
+    pub created_at: DateTime<Utc>,
+    pub last_active: DateTime<Utc>,
+    pub expires_datetime: Option<DateTime<Utc>>,
 }
 
 impl SessionManager {
-    pub async fn register_client(&self, client_id: &ClientId) {
+    pub async fn register_client(
+        &self,
+        client_id: &ClientId,
+        cookie_expiry: Option<DateTime<Utc>>,
+    ) {
         if self.sessions.read().await.get(client_id).is_some() {
             self.update_session_activity(client_id).await;
             return;
         }
 
-        let now = chrono::Utc::now();
+        let now = Utc::now();
         let session_info = SessionInfo {
             session_id: client_id.clone(),
             querier_mappings: HashMap::default(),
             created_at: now,
             last_active: now,
+            expires_datetime: cookie_expiry,
         };
 
         let mut write_guard = self.sessions.write().await;
@@ -74,6 +82,15 @@ impl SessionManager {
                     trace_ids.retain(|tid| tid != &trace_id);
                 }
             }
+        }
+    }
+
+    pub async fn is_client_cookie_valid(&self, client_id: &ClientId) -> bool {
+        match self.sessions.read().await.get(client_id) {
+            Some(session_info) => session_info
+                .expires_datetime
+                .map_or(false, |expiry| expiry > Utc::now()),
+            None => false,
         }
     }
 
