@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div v-if="searchObj.data?.histogram?.errorMsg == ''">
+        {{ searchObj.data.queryResults.aggs.length }}
         <ChartRenderer
           v-if="searchObj.meta.showHistogram && searchObj.data.queryResults?.aggs.length > 0"
           data-test="logs-search-result-bar-chart"
