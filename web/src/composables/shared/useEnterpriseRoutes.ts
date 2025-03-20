@@ -70,7 +70,7 @@ const useEnterpriseRoutes = () => {
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
     routes.push({
-      path: "action-scripts",
+      path: "actions",
       name: "actionScripts",
       component: ActionScipts,
       beforeEnter(to: any, from: any, next: any) {
