@@ -55,8 +55,7 @@ const useSearchWebSocket = () => {
     );
   };
 
-  const onClose = (response: any) => {
-    const id = socketId.value;
+  const onClose = (response: any) => {    
     isCreatingSocket.value = false;
     socketId.value = null;
 
@@ -222,13 +221,18 @@ const useSearchWebSocket = () => {
       );
   };
 
+  const closeSocket = () => {
+    webSocket.cleanupSocket(socketId.value as string);
+  }
+
   return {
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
     cancelSearchQueryBasedOnRequestId,
     closeSocketBasedOnRequestId,
     cleanUpListeners,
-    closeSocketWithError
+    closeSocketWithError,
+    closeSocket
   };
 };
 

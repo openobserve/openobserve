@@ -132,14 +132,17 @@ const closeSocket = (socketId: string) => {
 const useWebSocket = () => {
   onBeforeUnmount(() => {
     for (const socketId in sockets) {
-      const socket = sockets[socketId];
-      if (socket) {
-        cleanupSocket(socketId, socket);
-      }
+      cleanupSocket(socketId);
     }
   });
 
-  const cleanupSocket = (socketId: string, socket: WebSocket) => {
+  const cleanupSocket = (socketId: string) => {
+    const socket = sockets[socketId];
+
+    if(!socket) {
+      console.error("Cleanup socket failed, socket not found", socketId);
+      return;
+    }
     // Remove all event listeners
     socket.onopen = null;
     socket.onmessage = null;
@@ -169,6 +172,7 @@ const useWebSocket = () => {
     connect,
     sendMessage,
     closeSocket,
+    cleanupSocket,
     getWebSocketBasedOnSocketId,
     addMessageHandler: (socketId: string, handler: MessageHandler) =>
       addHandler(messageHandlers, socketId, handler),
