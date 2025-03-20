@@ -755,24 +755,24 @@ const useLogs = () => {
         req["clusters"] = searchObj.meta.clusters;
       }
 
-      if (searchObj.data.stream.selectedStreamFields.length == 0) {
-        const streamData: any = getStreams(
-          searchObj.data.stream.streamType,
-          true,
-          true,
-        );
+      // if (searchObj.data.stream.selectedStreamFields.length == 0) {
+      //   const streamData: any = getStreams(
+      //     searchObj.data.stream.streamType,
+      //     true,
+      //     true,
+      //   );
 
-        searchObj.data.stream.selectedStreamFields = streamData.schema;
+      //   searchObj.data.stream.selectedStreamFields = streamData.schema;
 
-        if (
-          !searchObj.data.stream.selectedStreamFields ||
-          searchObj.data.stream.selectedStreamFields.length == 0
-        ) {
-          searchObj.data.stream.selectedStreamFields = [];
-          searchObj.loading = false;
-          return false;
-        }
-      }
+      //   if (
+      //     !searchObj.data.stream.selectedStreamFields ||
+      //     searchObj.data.stream.selectedStreamFields.length == 0
+      //   ) {
+      //     searchObj.data.stream.selectedStreamFields = [];
+      //     searchObj.loading = false;
+      //     return false;
+      //   }
+      // }
 
       const streamFieldNames: any =
         searchObj.data.stream.selectedStreamFields.map(
@@ -879,33 +879,35 @@ const useLogs = () => {
 
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
-        const histogramParsedSQL: any = fnHistogramParsedSQL(
-          req.aggs.histogram,
-        );
+        if (parsedSQL != undefined) {
+          const histogramParsedSQL: any = fnHistogramParsedSQL(
+            req.aggs.histogram,
+          );
 
-        histogramParsedSQL.where = parsedSQL.where;
+          histogramParsedSQL.where = parsedSQL.where;
 
-        let histogramQuery = fnUnparsedSQL(histogramParsedSQL);
-        histogramQuery = histogramQuery.replace(/`/g, '"');
-        req.aggs.histogram = histogramQuery;
+          let histogramQuery = fnUnparsedSQL(histogramParsedSQL);
+          histogramQuery = histogramQuery.replace(/`/g, '"');
+          req.aggs.histogram = histogramQuery;
 
-        if (!parsedSQL?.columns?.length) {
-          notificationMsg.value = "No column found in selected stream.";
-          return false;
-        }
-
-        if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
-          req.query.size = parsedSQL.limit.value[0].value;
-
-          if (parsedSQL.limit.separator == "offset") {
-            req.query.from = parsedSQL.limit.value[1].value || 0;
+          if (!parsedSQL?.columns?.length) {
+            notificationMsg.value = "No column found in selected stream.";
+            return false;
           }
 
-          query = fnUnparsedSQL(parsedSQL);
+          if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
+            req.query.size = parsedSQL.limit.value[0].value;
 
-          //replace backticks with \" for sql_mode
-          query = query.replace(/`/g, '"');
-          searchObj.data.queryResults.hits = [];
+            if (parsedSQL.limit.separator == "offset") {
+              req.query.from = parsedSQL.limit.value[1].value || 0;
+            }
+
+            query = fnUnparsedSQL(parsedSQL);
+
+            //replace backticks with \" for sql_mode
+            query = query.replace(/`/g, '"');
+            searchObj.data.queryResults.hits = [];
+          }
         }
 
         req.query.sql = query;
@@ -1144,11 +1146,11 @@ const useLogs = () => {
 
       const parsedSQL: any = fnParsedSQL();
 
-      if (searchObj.meta.sqlMode && parsedSQL == undefined) {
-        searchObj.data.queryResults.error =
-          "Error while search partition. Search query is invalid.";
-        return;
-      }
+      // if (searchObj.meta.sqlMode && parsedSQL == undefined) {
+      //   searchObj.data.queryResults.error =
+      //     "Error while search partition. Search query is invalid.";
+      //   return;
+      // }
 
       // In Limit we don't need to get partitions, as we directly hit search request with query limit
       if (
@@ -1586,7 +1588,7 @@ const useLogs = () => {
       searchObjDebug["buildSearchStartTime"] = performance.now();
       const queryReq: any = buildSearch();
       searchObjDebug["buildSearchEndTime"] = performance.now();
-      if (queryReq == false) {
+      if (queryReq == false && searchObj.meta.sqlMode == false) {
         throw new Error(notificationMsg.value || "Something went wrong.");
       }
       // reset query data and get partition detail for given query.
@@ -2070,6 +2072,7 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
 
+      console.log(parser.astify(filteredQuery))
       return parser.astify(filteredQuery);
 
       // return convertPostgreToMySql(parser.astify(filteredQuery));
@@ -2267,7 +2270,7 @@ const useLogs = () => {
       }
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
-      if (searchObj.meta.sqlMode == true) {
+      if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
         // issue #5432
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
@@ -2366,7 +2369,7 @@ const useLogs = () => {
 
           searchAggData.total = 0;
           searchAggData.hasAggregation = false;
-          if (searchObj.meta.sqlMode == true) {
+          if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
             if (
               hasAggregation(parsedSQL?.columns) ||
               parsedSQL.groupby != null
@@ -4557,6 +4560,7 @@ const useLogs = () => {
   const setSelectedStreams = (value: string) => {
     try {
       const parsedSQL = fnParsedSQL();
+      console.log(parsedSQL, "parsedSQL")
 
       if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from.length === 0) {
         console.error("Failed to parse SQL query:", value);
@@ -4565,9 +4569,38 @@ const useLogs = () => {
 
       const newSelectedStreams: string[] = [];
 
+      // handled WITH query
+      if (parsedSQL?.with) {
+        let withObj = parsedSQL.with;
+        withObj.forEach((obj: any) => {
+          console.log("inside withobj", obj)
+          // Map through each "from" array in the _next object, as it can contain multiple tables
+          if (obj?.stmt?.from) {
+            console.log(obj.stmt.from)
+            obj?.stmt?.from.forEach((stream: { table: string }) => {
+              console.log(stream.table , "stream");
+              newSelectedStreams.push(stream.table);
+            }
+            );
+          }
+        });
+      }
+      // additionally, if union is there then it will have _next object which will have the table name it should check recursuvely as user can write multiple union
+      else if (parsedSQL?._next) {
+        let nextTable = parsedSQL._next;
+        while (nextTable) {
+          // Map through each "from" array in the _next object, as it can contain multiple tables
+          if (nextTable.from) {
+            nextTable.from.forEach((stream: { table: string }) =>
+              newSelectedStreams.push(stream.table),
+            );
+          }
+          nextTable = nextTable._next;
+        }
+      }
       //for simple query get the table name from the parsedSQL object
       // this will handle joins as well
-      if (parsedSQL?.from) {
+      else if (parsedSQL?.from) {
         parsedSQL.from.map((stream: any) => {
           // Check if 'expr' and 'ast' exist, then access 'from' to get the table
           if (stream.expr?.ast?.from) {
@@ -4582,20 +4615,6 @@ const useLogs = () => {
             newSelectedStreams.push(stream.table);
           }
         });
-      }
-
-      // additionally, if union is there then it will have _next object which will have the table name it should check recursuvely as user can write multiple union
-      if (parsedSQL?._next) {
-        let nextTable = parsedSQL._next;
-        while (nextTable) {
-          // Map through each "from" array in the _next object, as it can contain multiple tables
-          if (nextTable.from) {
-            nextTable.from.forEach((stream: { table: string }) =>
-              newSelectedStreams.push(stream.table),
-            );
-          }
-          nextTable = nextTable._next;
-        }
       }
 
       if (

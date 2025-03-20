@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="margin: 30px 0px"
           v-if="searchObj.data.histogram.errorCode != 0"
         >
-          <q-icon name="warning" color="warning" size="30px"></q-icon> Error
+          <q-icon name="warning" color="warning" size="xs"></q-icon> Error
           while fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
