@@ -505,6 +505,14 @@ async selectQuery1DayTime() {
   await this.page.waitForTimeout(5000);
 }
 
+async selectQuery6DaysTime() {
+  await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+  await this.page.locator(this.dateTimeButton).click();
+  await this.page.waitForSelector('[data-test="date-time-relative-6-d-btn"]');
+  await this.page.locator('[data-test="date-time-relative-6-d-btn"]').click();
+  await this.page.waitForTimeout(5000);
+}
+
 async logsPageOtlpOrg() {
 
   await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
