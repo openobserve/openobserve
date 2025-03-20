@@ -63,6 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+        <q-toggle
+          data-test="logs-search-bar-show-histogram-toggle-btn"
+          v-model="searchObj.meta.showHistogram"
+          :label="t('search.showHistogramLabel')"
+          size="32px"
+          v-close-popup
+        />
 
         <q-toggle
           data-test="logs-search-bar-sql-mode-toggle-btn"
@@ -318,35 +325,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </q-btn-dropdown>
         </q-btn-group>
-        <q-btn-dropdown
-          icon="more_vert"
-          class="no-outline saved-views-dropdown tw-normal-case download-logs-btn q-pl-xs q-ml-xs q-pr-xs"
-          size="12px"
-          data-test="logs-search-bar-more-options-dropdown"
-        >
-          <q-list>
-            <q-item class="!tw-py-1">
-              <q-toggle
-                data-test="logs-search-bar-show-histogram-toggle-btn"
-                v-model="searchObj.meta.showHistogram"
-                :label="t('search.showHistogramLabel')"
-                size="32px"
-                v-close-popup
-              />
-            </q-item>
-            <q-item class="!tw-py-1">
-              <q-toggle
-                data-test="logs-search-bar-quick-mode-toggle-btn"
-                v-model="searchObj.meta.quickMode"
-                :label="t('search.quickModeLabel')"
-                @click="handleQuickMode"
-                size="32px"
-                v-close-popup
-              />
-            </q-item>
-          </q-list>
-        </q-btn-dropdown>
+        <q-toggle
+          data-test="logs-search-bar-quick-mode-toggle-btn"
+          v-model="searchObj.meta.quickMode"
+          :label="t('search.quickModeLabel')"
+          @click="handleQuickMode"
+          size="32px"
+          v-close-popup
+        />
       </div>
+      
+
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
