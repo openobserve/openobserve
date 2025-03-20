@@ -31,16 +31,19 @@ use regex::Regex;
 use super::jwt;
 #[cfg(feature = "enterprise")]
 use crate::common::infra::config::USER_SESSIONS;
-use crate::common::{
-    infra::config::{PASSWORD_HASH, USERS},
-    meta::{
-        authz::Authz,
-        organization::DEFAULT_ORG,
-        user::{AuthTokens, UserRole},
-    },
-};
 #[cfg(feature = "enterprise")]
 use crate::common::{meta, meta::ingestion::INGESTION_EP};
+use crate::{
+    common::{
+        infra::config::{PASSWORD_HASH, USERS},
+        meta::{
+            authz::Authz,
+            organization::DEFAULT_ORG,
+            user::{AuthTokens, UserRole},
+        },
+    },
+    service::db::session,
+};
 
 pub const V2_API_PREFIX: &str = "v2";
 
@@ -857,34 +860,40 @@ pub async fn extract_auth_expiry(req: &HttpRequest) -> Option<chrono::DateTime<c
 
     if auth_str.starts_with("session ") {
         let session_key = auth_str.strip_prefix("session ").unwrap();
-        if let Some(bearer_token) = USER_SESSIONS.get(session_key) {
-            let keys = get_dex_jwks().await;
-            match jwt::verify_decode_token(
-                &*bearer_token,
-                &keys,
-                &o2_dex::config::get_config().client_id,
-                true,
-                true,
-            )
-            .await
-            {
-                Ok((_, Some(token_data))) => {
-                    // Extract exp from claims and convert to DateTime<Utc>
-                    if let Some(exp) = token_data.claims.get("exp") {
-                        // exp is in seconds
-                        if let Some(exp_ts) = exp.as_i64() {
-                            return chrono::DateTime::from_timestamp(exp_ts, 0);
+        match session::get(session_key).await {
+            Ok(bearer_token) => {
+                let keys = get_dex_jwks().await;
+                match jwt::verify_decode_token(
+                    &bearer_token,
+                    &keys,
+                    &o2_dex::config::get_config().client_id,
+                    true,
+                    true,
+                )
+                .await
+                {
+                    Ok((_, Some(token_data))) => {
+                        // Extract exp from claims and convert to DateTime<Utc>
+                        if let Some(exp) = token_data.claims.get("exp") {
+                            // exp is in seconds
+                            if let Some(exp_ts) = exp.as_i64() {
+                                return chrono::DateTime::from_timestamp(exp_ts, 0);
+                            }
                         }
                     }
+                    Ok(_) => {
+                        log::debug!("No token data returned");
+                        return None;
+                    }
+                    Err(e) => {
+                        log::error!("Error verifying token: {}", e);
+                        return None;
+                    }
                 }
-                Ok(_) => {
-                    log::debug!("No token data returned");
-                    return None;
-                }
-                Err(e) => {
-                    log::error!("Error verifying token: {}", e);
-                    return None;
-                }
+            }
+            Err(e) => {
+                log::error!("Error getting session: {}", e);
+                return None;
             }
         }
     }
