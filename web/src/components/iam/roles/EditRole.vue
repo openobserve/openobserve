@@ -535,37 +535,87 @@ const getResourceByName = (
   if (!level) return null;
 };
 
-const setDefaultPermissions = () => {
-  //TODO: Need to make it recursive to support multi level nested resources
-  permissionsState.resources.forEach((resource: any) => {
-    const resourcePermission = getDefaultResource();
-    resourcePermission.name = resource.key;
-    resourcePermission.resourceName = resource.key;
-    resourcePermission.display_name = resource.display_name;
-    resourcePermission.top_level = resource.top_level;
+const setPermission = (resource: any, visited: Set<string>) => {
+  if (!resource || !resource.key) {
+    return;
+  }
 
-    if (resource.has_entities) resourcePermission.has_entities = true;
+  // Prevent infinite recursion by tracking visited resources
+  if (visited.has(resource.key)) {
+    return;
+  }
+  visited.add(resource.key);
 
-    resourcePermission.parent = resource.parent;
+  const resourcePermission = getDefaultResource();
+  resourcePermission.name = resource.key;
+  resourcePermission.resourceName = resource.key;
+  resourcePermission.display_name = resource.display_name;
+  resourcePermission.top_level = resource.top_level;
 
-    resourceMapper.value[resourcePermission.name] = resourcePermission;
+  if (resource.has_entities) resourcePermission.has_entities = true;
 
-    if (resource.parent) {
-      const parentResource = getResourceByName(
-        permissionsState.permissions,
-        resource.parent,
+  resourcePermission.parent = resource.parent;
+
+  resourceMapper.value[resourcePermission.name] = resourcePermission;
+
+  if (resource.parent) {
+    const parentResource = getResourceByName(
+      permissionsState.permissions,
+      resource.parent,
+    );
+
+    if (parentResource) {
+      parentResource.childs.push(resourcePermission as Resource);
+      return;
+    } else {
+      // Find parent in resources array
+      const _parentResource = permissionsState.resources.find(
+        (r) => r.key === resource.parent,
       );
-      if (parentResource) {
-        parentResource.childs.push(resourcePermission as Resource);
-        return;
+
+      if (_parentResource && !visited.has(_parentResource.key)) {
+        // Process parent first
+        setPermission(_parentResource, visited);
+
+        // Get the processed parent resource
+        const processedParentResource = getResourceByName(
+          permissionsState.permissions,
+          resource.parent,
+        );
+
+        if (processedParentResource) {
+          processedParentResource.childs.push(resourcePermission as Resource);
+        }
       }
     }
+  }
 
-    modifyResourcePermissions(resourcePermission);
+  modifyResourcePermissions(resourcePermission);
+  permissionsState.permissions.push(resourcePermission as Resource);
+};
 
-    permissionsState.permissions.push(resourcePermission as Resource);
-  });
+const setDefaultPermissions = () => {
+  // Create a single visited set to be shared across all recursive calls
+  const visited = new Set<string>();
 
+  // Process resources in order of their parent relationships
+  const processResource = (resource: any) => {
+    if (!visited.has(resource.key)) {
+      setPermission(resource, visited);
+    }
+  };
+
+  // First process resources without parents
+  permissionsState.resources
+    .filter((resource: any) => !resource.parent)
+    .forEach(processResource);
+
+  // Then process resources with parents
+  permissionsState.resources
+    .filter((resource: any) => resource.parent)
+    .forEach(processResource);
+
+  // Filter out child resources from the top level
   permissionsState.permissions = permissionsState.permissions.filter(
     (resource) => !resource.parent,
   );
@@ -680,14 +730,14 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           resource,
         ) as Resource;
       }
-
       // Added it intentionally, as to get parent resource for dashboard, before getting dashboard permissions
       if (!resourceMapper[resource] && resource === "dashboard") {
-        if (!resourceMapper["dfolder"])
+        if (!resourceMapper["dfolder"]) {
           resourceMapper["dfolder"] = getResourceByName(
             permissionsState.permissions,
             "dfolder",
           ) as Resource;
+        }
 
         await getResourceEntities(resourceMapper["dfolder"]);
 
@@ -698,12 +748,14 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           ) as Resource;
         }
       }
+
       if (!resourceMapper[resource] && resource === "alert") {
-        if (!resourceMapper["afolder"])
+        if (!resourceMapper["afolder"]) {
           resourceMapper["afolder"] = getResourceByName(
             permissionsState.permissions,
             "afolder",
           ) as Resource;
+        }
 
         await getResourceEntities(resourceMapper["afolder"]);
 
@@ -714,7 +766,6 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           ) as Resource;
         }
       }
-      
 
       if (!resourceMapper[resource]) continue;
 
@@ -748,17 +799,14 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(dashResource as Entity);
-      }
-      else if (resource === "alert") {
+      } else if (resource === "alert") {
         const [folderId, alertId] = entity.split("/");
-
 
         const alertResource = resourceMapper["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(alertResource as Entity);
-      }
-      else if (
+      } else if (
         resource === "logs" ||
         resource === "metrics" ||
         resource === "traces" ||
@@ -806,11 +854,7 @@ const handlePermissionChange = (row: any, permission: string) => {
   if (row.type === "Resource" && row.top_level) {
     resourceName = row.name;
     entity = "_all_" + store.state.selectedOrganization.identifier;
-
   }
-
-
-
 
   const permissionHash = `${resourceName}:${entity}:${permission}`;
 
@@ -918,7 +962,6 @@ const updateJsonInTable = () => {
   let entity = "";
   let resourceDetails: Entity | Resource;
 
-
   // Update added permissions
   updateRolePermissions(permissions);
 
@@ -936,15 +979,13 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
-      } 
-      else if (resource === "alert") {
+      } else if (resource === "alert") {
         const [folderId] = entity.split("/");
 
         resourceDetails = resourceMapper.value["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
-      }
-      else if (entity === "_all_" + getOrgId()) {
+      } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
             getPermissionHash(resource, permission.permission, entity),
@@ -990,15 +1031,13 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
-      } 
-      else if (resource === "alert") {
+      } else if (resource === "alert") {
         const [folderId] = entity.split("/");
 
         resourceDetails = resourceMapper.value["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
-      } 
-      else if (entity === "_all_" + getOrgId()) {
+      } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
             getPermissionHash(resource, permission.permission, entity),
@@ -1447,7 +1486,7 @@ const getAlertFolders = async () => {
   //this is exaclty same as getFolders, but we are using different endpoint
   const folders: any = await commonService.list_Folders(
     store.state.selectedOrganization.identifier,
-    "alerts"
+    "alerts",
   );
 
   let isDefaultPresent = folders.data.list.find(
@@ -1557,9 +1596,7 @@ const getAlerts = async (resource: Entity | Resource) => {
   updateEntityEntities(
     resource,
     ["alertId"],
-    [
-      ...alerts.data.list,
-    ],
+    [...alerts.data.list],
     false,
     "name",
   );
@@ -1698,7 +1735,6 @@ const updateEntityEntities = (
   hasEntities: boolean = false,
   displayNameKey?: string,
 ) => {
-
   if (!entity) return;
 
   const entities: Entity[] = data.map((_entity: any) => {
