@@ -84,7 +84,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                   style="min-width: 480px"
                 />
+                <div class="alert-select-folder-dropdown-list">
+                  <SelectFolderDropDown
+                    :disableDropdown="beingUpdated"
+                    :type="'alerts'"
+                    @folder-selected="updateActiveFolderId"
+                    :activeFolderId="activeFolderId"
+                    :style="'height: 30px'"
+                />
+                </div>
+               
               </div>
+
               <div
                 class="flex justify-start items-center"
                 style="padding-top: 0px"
@@ -494,6 +505,8 @@ import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
+
+import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import cronParser from "cron-parser";
 
 const defaultValue: any = () => {
@@ -573,6 +586,7 @@ export default defineComponent({
     RealTimeAlert: defineAsyncComponent(() => import("./RealTimeAlert.vue")),
     VariablesInput: defineAsyncComponent(() => import("./VariablesInput.vue")),
     PreviewAlert: defineAsyncComponent(() => import("./PreviewAlert.vue")),
+    SelectFolderDropDown,
   },
   setup(props) {
     const store: any = useStore();
@@ -639,6 +653,12 @@ export default defineComponent({
     const vrlFunctionError = ref("");
 
     const showTimezoneWarning = ref(false);
+    
+    const activeFolderId = ref(router.currentRoute.value.query.folder || "default");
+
+    const updateActiveFolderId = (folderId: any) => {
+      activeFolderId.value = folderId.value;
+    };
 
     onBeforeMount(async () => {
       await importSqlParser();
@@ -1341,6 +1361,8 @@ export default defineComponent({
       updateMultiTimeRange,
       routeToCreateDestination,
       handleAlertError,
+      activeFolderId,
+      updateActiveFolderId,
     };
   },
 
@@ -1544,17 +1566,17 @@ export default defineComponent({
           });
           return;
         } else {
-          payload.folder_id = this.router.currentRoute.value.query.folder || "default";
+          payload.folder_id = this.activeFolderId;
           callAlert = alertsService.create_by_alert_id(
             this.store.state.selectedOrganization.identifier,
             payload,
-            this.router.currentRoute.value.query.folder || "default"
+            this.activeFolderId
           );
 
           callAlert
             .then((res: { data: any }) => {
               this.formData = { ...defaultValue };
-              this.$emit("update:list");
+              this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
               this.q.notify({
@@ -1636,6 +1658,13 @@ export default defineComponent({
 
   .q-field--dark .q-field__control {
     background-color: rgba(255, 255, 255, 0.07) !important;
+  }
+}
+.alert-select-folder-dropdown-list {
+  :deep(.q-field--labeled.showLabelOnTop) {
+    padding-top: 12px; /* Example override */
+    height: 10px !important;
+    background-color: red;
   }
 }
 </style>

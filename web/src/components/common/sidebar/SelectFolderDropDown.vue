@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         class="q-mb-xs showLabelOnTop"
         style="width: calc(100% - 40px)"
+        :disable="disableDropdown"
       >
         <template #no-option>
           <q-item>
@@ -42,17 +43,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`${type}-folder-move-new-add`"
         label="+"
         text-color="light-text"
-        style="width: 40px; height: 42px"
+        style="width: 40px;"
+        :style="computedStyle"
         no-caps
         @click="
           () => {
             showAddFolderDialog = true;
           }
         "
+        :disable="disableDropdown"
       />
     </div>
     <!-- add folder -->
     <q-dialog
+      v-if="!disableDropdown"
       v-model="showAddFolderDialog"
       position="right"
       full-height
@@ -69,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useStore } from "vuex";
   import AddFolder from "./AddFolder.vue";
   import { useRoute } from "vue-router";
+import { computed } from "vue";
 
   export default defineComponent({
     name: "SelectedFolderDropdown",
@@ -84,6 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       type: {
         type: String,
         default: "alerts"
+      },
+      disableDropdown: {
+        type: Boolean,
+        default: false,
+      },
+      style: {
+        type: String,
+        default: "",
       },
     },
     setup(props, { emit }) {
@@ -119,6 +132,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         };
       };
 
+      const computedStyle = computed (() => {
+        return props.style ? props.style : 'height: 42px';
+      });
+
       onActivated(() => {
         // refresh selected folder
         selectedFolder.value = getInitialFolderValue();
@@ -145,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         selectedFolder,
         updateFolderList,
         showAddFolderDialog,
+        computedStyle,
       };
     },
   });

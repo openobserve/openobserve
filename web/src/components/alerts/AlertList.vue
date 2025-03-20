@@ -1133,9 +1133,9 @@ export default defineComponent({
         });
       }
     };
-    const refreshList = () => {
-      getAlertsFn(store, activeFolderId.value);
-      hideForm();
+    const refreshList = (folderId: string) => {
+        getAlertsFn(store, folderId);
+        hideForm();
     };
     const hideForm = () => {
       showAddAlertDialog.value = false;
