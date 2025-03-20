@@ -235,6 +235,7 @@ export const convertSQLData = async (
       : (store.state?.zoConfig?.max_dashboard_series ?? 100);
 
     const innerDataArray = data[0];
+
     if (!breakDownKeys.length) {
       return innerDataArray;
     }
@@ -243,13 +244,22 @@ export const convertSQLData = async (
     const yAxisKey = yAxisKeys[0];
     const xAxisKey = xAxisKeys[0];
 
-    // Step 1: Aggregate y_axis values by breakdown, ignoring items without a breakdown key
+    // Step 1: Aggregate y_axis values by breakdown, ensuring missing values are set to empty string
     const breakdown = innerDataArray.reduce((acc, item) => {
-      const breakdownValue = item[breakdownKey];
-      const yAxisValue = item[yAxisKey];
-      if (breakdownValue !== null && breakdownValue !== undefined) {
-        acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
+      let breakdownValue = item[breakdownKey];
+
+      // Convert null, undefined, and empty string to a default empty string
+      if (
+        breakdownValue == null ||
+        breakdownValue === "" ||
+        breakdownValue === undefined
+      ) {
+        breakdownValue = "";
       }
+
+      const yAxisValue = item[yAxisKey];
+
+      acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
       return acc;
     }, {});
 
@@ -278,9 +288,19 @@ export const convertSQLData = async (
     const othersObj: any = {};
 
     innerDataArray.forEach((item) => {
-      const breakdownValue = item[breakdownKey];
-      if (topKeys.includes(breakdownValue?.toString())) {
-        resultArray.push(item);
+      let breakdownValue = item[breakdownKey];
+
+      // Ensure missing breakdown values are treated as empty strings
+      if (
+        breakdownValue == null ||
+        breakdownValue === "" ||
+        breakdownValue === undefined
+      ) {
+        breakdownValue = "";
+      }
+
+      if (topKeys.includes(breakdownValue.toString())) {
+        resultArray.push({ ...item, [breakdownKey]: breakdownValue });
       } else if (top_results_others) {
         const xAxisValue = String(item[xAxisKey]);
         othersObj[xAxisValue] =
