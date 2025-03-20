@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -127,6 +127,51 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .about("rollback last N SeaORM migration steps")
                     .arg(clap::Arg::new("N").help("number of migration steps to rollback (default is 1)").value_parser(clap::value_parser!(u32)))
                 ),
+            clap::Command::new("recover-file-list").about("recover file list from s3").args([
+                clap::Arg::new("prefix")
+                    .short('p')
+                    .long("prefix")
+                    .value_name("prefix")
+                    .required(true)
+                    .help("only migrate specified prefix"),
+                clap::Arg::new("insert")
+                    .short('i')
+                    .long("insert")
+                    .value_name("insert")
+                    .required(false)
+                    .action(clap::ArgAction::SetTrue)
+                    .help("insert file list into db"),
+            ]),
+            clap::Command::new("node").about("node command").subcommands([
+                clap::Command::new("offline").about("offline node"),
+                clap::Command::new("online").about("online node"),
+                clap::Command::new("flush").about("flush memtable to disk"),
+                clap::Command::new("list").about("list cached nodes"),
+            ]),
+            clap::Command::new("sql").about("query data").args([
+                clap::Arg::new("org") 
+                    .long("org")
+                    .required(false)
+                    .default_value("default")
+                    .help("org name"),
+                clap::Arg::new("execute")
+                    .short('e')
+                    .long("execute")
+                    .required(true)
+                    .help("execute sql"),
+                clap::Arg::new("time")
+                    .short('t')
+                    .long("time")
+                    .required(false)
+                    .default_value("15m")
+                    .help("time range, e.g. 15m, 1h, 1d, 1w, 1y"),
+                clap::Arg::new("limit")
+                    .short('l')
+                    .long("limit")
+                    .required(false)
+                    .default_value("10")
+                    .help("limit the number of results"),
+            ]),
         ])
         .get_matches();
 
@@ -274,9 +319,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "import" => {
+            crate::common::infra::init().await?;
+            crate::common::infra::cluster::register_and_keep_alive().await?;
             import::Import::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "export" => {
+            crate::common::infra::init().await?;
+            crate::common::infra::cluster::register_and_keep_alive().await?;
             export::Export::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "migrate-schemas" => {
@@ -304,6 +353,42 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 return Err(anyhow::anyhow!("missing sub command"));
             }
         },
+        "recover-file-list" => {
+            let prefix = command.get_one::<String>("prefix").unwrap();
+            let insert = command.get_flag("insert");
+            super::load::load_file_list_from_s3(prefix, insert).await?;
+        }
+        "node" => {
+            let command = command.subcommand();
+            match command {
+                Some(("offline", _)) => {
+                    super::http::node_offline().await?;
+                }
+                Some(("online", _)) => {
+                    super::http::node_online().await?;
+                }
+                Some(("flush", _)) => {
+                    super::http::node_flush().await?;
+                }
+                Some(("list", _)) => {
+                    super::http::node_list().await?;
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupported sub command: {name}"));
+                }
+            }
+        }
+        "sql" => {
+            let org = command.get_one::<String>("org").unwrap();
+            let sql = command.get_one::<String>("execute").unwrap();
+            let time = command.get_one::<String>("time").unwrap();
+            let limit = command.get_one::<String>("limit").unwrap();
+            let mut limit = limit.parse::<i64>().unwrap_or(10);
+            if !(1..=1000).contains(&limit) {
+                limit = 10;
+            }
+            super::http::query(org, sql, time, limit).await?;
+        }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));
         }

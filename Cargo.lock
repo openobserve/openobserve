@@ -4811,6 +4811,7 @@ dependencies = [
  "object_store",
  "once_cell",
  "parking_lot",
+ "parquet",
  "sea-orm",
  "sea-orm-migration",
  "serde",
@@ -6127,6 +6128,7 @@ dependencies = [
  "parking_lot",
  "parquet",
  "pprof",
+ "prettytable-rs",
  "prometheus",
  "promql-parser",
  "prost 0.13.4",
@@ -6810,6 +6812,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eea25e07510aa6ab6547308ebe3c036016d162b8da920dbb079e3ba8acf3d95a"
 dependencies = [
+ "csv",
  "encode_unicode",
  "is-terminal",
  "lazy_static",
