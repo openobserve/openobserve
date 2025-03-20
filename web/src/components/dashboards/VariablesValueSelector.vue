@@ -978,7 +978,7 @@ export default defineComponent({
 
       // Load variables in dependency order
       for (const varName of affectedVariables) {
-        const variable = variablesData.values.find((v) => v.name === varName);
+        const variable = variablesData.values.find((v: any) => v.name === varName);
         if (variable) {
           await loadSingleVariableDataByName(variable);
         }
