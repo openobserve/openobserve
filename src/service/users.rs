@@ -556,10 +556,31 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
 }
 
 pub async fn list_users(
+    _user_id: &str,
     org_id: &str,
     role: Option<UserRole>,
     permitted: Option<Vec<String>>,
 ) -> Result<HttpResponse, Error> {
+    // If the role is not
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled {
+        let need_check_permission = !matches!(role, Some(UserRole::ServiceAccount));
+
+        if need_check_permission && permitted.is_none() {
+            let mut user_list = vec![];
+            if let Some(user) = USERS.get(&format!("{org_id}/{_user_id}")) {
+                user_list.push(UserResponse {
+                    email: user.value().email.clone(),
+                    role: user.value().role.clone(),
+                    first_name: user.value().first_name.clone(),
+                    last_name: user.value().last_name.clone(),
+                    is_external: user.value().is_external,
+                });
+            }
+            return Ok(HttpResponse::Ok().json(UserList { data: user_list }));
+        }
+    }
+
     let mut user_list: Vec<UserResponse> = USERS
         .iter()
         .filter(|user| user.key().starts_with(&format!("{org_id}/"))) // Filter by organization ID
@@ -827,7 +848,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users() {
         set_up().await;
-        assert!(list_users("dummy", None, None).await.is_ok())
+        assert!(list_users("", "dummy", None, None).await.is_ok())
     }
 
     #[tokio::test]

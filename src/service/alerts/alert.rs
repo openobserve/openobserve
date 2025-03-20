@@ -52,6 +52,8 @@ use o2_openfga::{
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{
         meta::authz::Authz,
@@ -154,6 +156,12 @@ pub enum AlertError {
     /// enterprise mode using the validator.
     #[error("PermittedAlertsValidator# {0}")]
     PermittedAlertsValidator(String),
+
+    #[error("Permission denied")]
+    PermissionDenied,
+
+    #[error("User not found")]
+    UserNotFound,
 
     /// Not support save destination remote pipeline for alert so far
     #[error("Not support save destination {0} type for alert so far")]
@@ -462,14 +470,33 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
     org_id: &str,
     alert_ids: &[Ksuid],
     dst_folder_id: &str,
+    _user_id: &str,
 ) -> Result<(), AlertError> {
     for alert_id in alert_ids {
         let _alert_id_str = alert_id.to_string();
+
         let Some((curr_folder, alert)) =
             db::alerts::alert::get_by_id(conn, org_id, *alert_id).await?
         else {
             return Err(AlertError::AlertNotFound);
         };
+
+        #[cfg(feature = "enterprise")]
+        if get_openfga_config().enabled {
+            // TODO: Try to make a single call for all alerts
+            if !check_permissions(
+                Some(_alert_id_str.clone()),
+                org_id,
+                _user_id,
+                "alerts",
+                "PUT",
+                &curr_folder.folder_id,
+            )
+            .await
+            {
+                return Err(AlertError::PermissionDenied);
+            }
+        }
 
         update(
             conn,
@@ -619,22 +646,24 @@ pub async fn list_v2<C: ConnectionTrait>(
     user_id: Option<&str>,
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, AlertError> {
-    let (permissions, is_all_permitted) = match permitted_alerts(&params.org_id, user_id).await? {
-        Some(ps) => {
-            let org_all_permitted = ps.contains(&format!("alert:_all_{}", params.org_id));
-            (ps, org_all_permitted)
-        }
-        None => (vec![], true),
-    };
+    let (permissions, is_all_permitted) =
+        match permitted_alerts(&params.org_id, user_id, params.folder_id.as_deref()).await? {
+            Some(ps) => {
+                let org_all_permitted = ps.contains(&format!("alert:_all_{}", params.org_id));
+                (ps, org_all_permitted)
+            }
+            None => (vec![], true),
+        };
 
     let alerts = db::alerts::alert::list_with_folders(conn, params)
         .await?
         .into_iter()
-        .filter(|(_f, a)| {
+        .filter(|(f, a)| {
             // Include the alert if all alerts are permitted.
             is_all_permitted
                 // Include the alert if the alert is permitted with the old OpenFGA identifier.
                 || permissions.contains(&format!("alert:{}", a.name))
+                || permissions.contains(&format!("alert:{}/{}", f.folder_id, a.id.as_ref().unwrap()))
                 // Include the alert if the alert is permitted with the new OpenFGA identifier.
                 || a.id
                     .filter(|id| permissions.contains(&format!("alert:{id}")))
@@ -1549,6 +1578,7 @@ impl VarValue<'_> {
 async fn permitted_alerts(
     _org_id: &str,
     _user_id: Option<&str>,
+    _folder_id: Option<&str>,
 ) -> Result<Option<Vec<String>>, AlertError> {
     Ok(None)
 }
@@ -1557,16 +1587,72 @@ async fn permitted_alerts(
 async fn permitted_alerts(
     org_id: &str,
     user_id: Option<&str>,
+    folder_id: Option<&str>,
 ) -> Result<Option<Vec<String>>, AlertError> {
     let Some(user_id) = user_id else {
         return Err(AlertError::PermittedAlertsMissingUser);
     };
-    let stream_list = crate::handler::http::auth::validator::list_objects_for_user(
-        org_id, user_id, "GET", "alert",
+
+    // If the list_only_permitted is true, then we will only return the alerts that the user has
+    // `GET` permission on.
+    if !get_openfga_config().list_only_permitted {
+        return Ok(None);
+    }
+
+    // This function assumes the user already has `LIST` permission on the folder.
+    // Otherwise, the user will not be able to see the folder in the first place.
+
+    // So, we check for the `GET` permission on the folder.
+    // If the user has `GET` permission on the folder, then they will be able to see the folder and
+    // all its contents. This includes the dashboards inside the folder.
+
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
+
+    if let Some(folder_id) = folder_id {
+        let user_role = match get_user(Some(org_id), user_id).await {
+            Ok(Some(user)) => user.role,
+            _ => return Err(AlertError::UserNotFound),
+        };
+        let permitted = crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            AuthExtractor {
+                org_id: org_id.to_string(),
+                o2_type: format!(
+                    "{}:{folder_id}",
+                    OFGA_MODELS.get("alert_folders").unwrap().key,
+                ),
+                method: "GET".to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+                auth: "".to_string(), // We don't need to pass the auth token here.
+            },
+            user_role,
+            false,
+        )
+        .await;
+        if permitted {
+            // The user has `GET` permission on the folder.
+            // So, they will be able to see all the dashboards inside the folder.
+            return Ok(None);
+        }
+    }
+
+    // We also check for the `GET_INDIVIDUAL` permission on the dashboards.
+    // If the user has `GET_INDIVIDUAL` permission on a dashboard, then they will be able to see the
+    // dashboard. This is used to check if the user has permission to see a specific dashboard.
+
+    let permitted_objects = crate::handler::http::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        "GET_INDIVIDUAL",
+        OFGA_MODELS.get("alerts").unwrap().key,
     )
     .await
     .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
-    Ok(stream_list)
+
+    Ok(permitted_objects)
 }
 
 #[cfg(test)]

@@ -75,6 +75,8 @@ impl From<AlertError> for HttpResponse {
             AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
             AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
             AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
+            AlertError::PermissionDenied => MetaHttpResponse::forbidden("Unauthorized access"),
+            AlertError::UserNotFound => MetaHttpResponse::forbidden("Unauthorized access"),
         }
     }
 }
@@ -369,6 +371,7 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 async fn move_alerts(
     path: web::Path<String>,
     req_body: web::Json<MoveAlertsRequestBody>,
+    user_email: UserEmail,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -377,6 +380,7 @@ async fn move_alerts(
         &org_id,
         &req_body.alert_ids,
         &req_body.dst_folder_id,
+        &user_email.user_id,
     )
     .await
     {
