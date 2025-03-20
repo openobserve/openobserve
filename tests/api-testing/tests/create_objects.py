@@ -24,7 +24,7 @@ from pages.alertV2_page import AlertV2Page
 
 from pages.role_page import RolePage
 from pages.uds_mqr_page import UdsMqrPage  
-from pages.action_page import ActionPage
+# from pages.action_page import ActionPage
 
 def create_objects(session, base_url, user_email, user_password, org_id, num_objects):
     """Create objects in the OpenObserve running instance."""
@@ -33,7 +33,7 @@ def create_objects(session, base_url, user_email, user_password, org_id, num_obj
     cipher_page = CipherPage(session, base_url, org_id)
    
     destination_page = DestinationPage(session, base_url, org_id)
-    alert_page = AlertPage(session, base_url, org_id)
+    # alert_page = AlertPage(session, base_url, org_id)
     savedview_page = SavedViewPage(session, base_url, org_id)
     folder_page = FolderPage(session, base_url, org_id)
     dashboard_page = DashboardPage(session, base_url, org_id)
@@ -45,7 +45,7 @@ def create_objects(session, base_url, user_email, user_password, org_id, num_obj
     serviceaccount_page = ServiceAccountPage(session, base_url, org_id)
     role_page = RolePage(session, base_url, org_id)
     uds_mqr_page = UdsMqrPage(session, base_url, org_id)
-    action_page = ActionPage(session, base_url, org_id)
+    # action_page = ActionPage(session, base_url, org_id)
 
     for i in range(num_objects):
 
