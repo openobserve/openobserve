@@ -50,6 +50,14 @@ const useSearchWebSocket = () => {
       return;
     }
 
+    if(response.type === 'error'){
+      if(response.content.should_client_retry && response.content.trace_id){
+        setTimeout(() => {
+          retryActiveTrace(response.content.trace_id, response);
+        }, 300)
+      }
+    }
+
     traces[response.content.trace_id]?.message?.forEach((handler: any) =>
       handler(response),
     );
@@ -223,6 +231,12 @@ const useSearchWebSocket = () => {
 
   const closeSocket = () => {
     webSocket.cleanupSocket(socketId.value as string);
+  }
+
+  const retryActiveTrace = (traceId: string, response: any) => {
+    traces[traceId]?.close.forEach((handler: any) => handler(response));
+    traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data));
+    cleanUpListeners(traceId);   
   }
 
   return {
