@@ -240,4 +240,4 @@ mod tests {
         assert_token(&tokens[4], 4, "Current", 16, 23);
         assert_token(&tokens[5], 5, "Users", 24, 29);
     }
-}	
+}

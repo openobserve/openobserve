@@ -115,11 +115,14 @@ impl ObjectStore for Remote {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
-        let result = self.client.get(&(format_key(&file, true).into())) .await
-        .map_err(|e| {
-            log::error!("[STORAGE] get remote file: {}, error: {:?}", file, e);
-            e
-        })?;
+        let result = self
+            .client
+            .get(&(format_key(&file, true).into()))
+            .await
+            .map_err(|e| {
+                log::error!("[STORAGE] get remote file: {}, error: {:?}", file, e);
+                e
+            })?;
 
         // metrics
         let data_len = result.meta.size;
