@@ -18,7 +18,7 @@ primary_key_id_tink_val_up = os.environ["PRIMARY_KEY_ID_VAL_UP"]
 
 class CipherPage:
     # Make Unique_value_cipher a class variable
-    Unique_value_cipher = f"d3m18_{random.randint(100000, 999999)}"
+    Unique_value_cipher = f"d4m20_{random.randint(100000, 999999)}"
     
     def __init__(self, session, base_url, org_id):
         self.session = session
