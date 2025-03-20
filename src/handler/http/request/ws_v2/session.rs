@@ -121,13 +121,7 @@ impl WsSession {
     }
 }
 
-pub async fn run(
-    mut msg_stream: MessageStream,
-    user_id: String,
-    req_id: String,
-    org_id: String,
-    path: String,
-) {
+pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String, path: String) {
     let cfg = get_config();
     let mut ping_interval =
         tokio::time::interval(Duration::from_secs(cfg.websocket.ping_interval_secs as u64));
@@ -162,7 +156,7 @@ pub async fn run(
                             get_config().common.node_role,
                             msg
                         );
-                        handle_text_message(&org_id, &user_id, &req_id, msg.to_string(), path.clone()).await;
+                        handle_text_message(&user_id, &req_id, msg.to_string(), path.clone()).await;
                     }
                     Ok(actix_ws::Message::Close(reason)) => {
                         if let Some(reason) = reason.as_ref() {
@@ -203,13 +197,7 @@ pub async fn run(
 /// Text message is parsed into `WsClientEvents` and processed accordingly
 /// Depending on each event type, audit must be done
 /// Currently audit is done only for the search event
-pub async fn handle_text_message(
-    org_id: &str,
-    user_id: &str,
-    req_id: &str,
-    msg: String,
-    path: String,
-) {
+pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path: String) {
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             // Validate the events
@@ -227,10 +215,45 @@ pub async fn handle_text_message(
 
             match client_msg {
                 WsClientEvents::Search(ref search_req) => {
-                    handle_search_event(search_req, org_id, user_id, req_id, path.clone()).await;
+                    let mut user_id = user_id;
+                    // verify user_id for handling stream permissions
+                    #[cfg(feature = "enterprise")]
+                    {
+                        user_id = if get_config().common.local_mode {
+                            // single node mode, use user_id from the http request header
+                            &user_id
+                        } else {
+                            // cluster mode, use user_id from the ws event added by the router
+                            if let Some(user_id) = &search_req.user_id {
+                                user_id
+                            } else {
+                                log::error!("[WS_HANDLER]: User id not found in search request");
+                                let err_res = WsServerEvents::error_response(
+                                    errors::Error::Message(
+                                        "User id not found in search request".to_string(),
+                                    ),
+                                    Some(req_id.to_string()),
+                                    Some(search_req.trace_id.clone()),
+                                    Default::default(),
+                                );
+                                let _ = send_message(req_id, err_res.to_json()).await;
+                                return;
+                            }
+                        };
+                    }
+                    handle_search_event(
+                        search_req,
+                        &search_req.org_id,
+                        user_id,
+                        req_id,
+                        path.clone(),
+                    )
+                    .await;
                 }
                 #[cfg(feature = "enterprise")]
-                WsClientEvents::Cancel { trace_id, org_id } => {
+                WsClientEvents::Cancel {
+                    trace_id, org_id, ..
+                } => {
                     if org_id.is_empty() {
                         log::error!(
                             "[WS_HANDLER]: Request Id: {} Node Role: {} Org id not found",
@@ -256,10 +279,13 @@ pub async fn handle_text_message(
                     let res = handle_cancel(&trace_id, &org_id).await;
                     let _ = send_message(req_id, res.to_json()).await;
 
+                    // Only used for audit
                     #[cfg(feature = "enterprise")]
                     let client_msg = WsClientEvents::Cancel {
                         trace_id,
                         org_id: org_id.to_string(),
+                        // setting user_id to None to handle PII
+                        user_id: None,
                     };
 
                     // Add audit before closing

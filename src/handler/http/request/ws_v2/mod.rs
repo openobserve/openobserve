@@ -25,7 +25,7 @@ pub async fn websocket(
         return Ok(HttpResponse::NotFound().body("WebSocket is disabled"));
     }
 
-    let (org_id, router_id) = path_params.into_inner();
+    let (_, router_id) = path_params.into_inner();
 
     let prefix = format!("{}/api/", get_config().common.base_uri);
     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
@@ -48,7 +48,7 @@ pub async fn websocket(
     );
 
     // Spawn the handler
-    actix_web::rt::spawn(session::run(msg_stream, user_id, router_id, org_id, path));
+    actix_web::rt::spawn(session::run(msg_stream, user_id, router_id, path));
 
     Ok(res)
 }

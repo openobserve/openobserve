@@ -289,6 +289,8 @@ pub enum WsClientEvents {
         trace_id: String,
         // TODO: remove this once v1 is deprecated
         org_id: String,
+        // TODO: is it PII safe?
+        user_id: Option<String>,
     },
     Benchmark {
         id: String,
@@ -328,9 +330,21 @@ impl WsClientEvents {
         match self {
             Self::Search(req) => req.is_valid(),
             #[cfg(feature = "enterprise")]
-            Self::Cancel { trace_id, org_id } => !trace_id.is_empty() && !org_id.is_empty(),
+            Self::Cancel {
+                trace_id, org_id, ..
+            } => !trace_id.is_empty() && !org_id.is_empty(),
             Self::Benchmark { id } => !id.is_empty(),
             Self::TestAbnormalClose { req_id } => !req_id.is_empty(),
+        }
+    }
+
+    // Append `user_id` to the ws client events when run in cluster mode to handle stream
+    // permissions
+    pub fn append_user_id(&mut self, user_id: Option<String>) {
+        match self {
+            Self::Search(req) => req.user_id = user_id,
+            Self::Cancel { user_id: uid, .. } => *uid = user_id,
+            _ => {}
         }
     }
 }

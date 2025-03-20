@@ -38,6 +38,8 @@ pub struct SearchEventReq {
     pub fallback_order_by_col: Option<String>,
     // TODO: modify this once v1 is deprecated
     pub org_id: String,
+    // TODO: is it PII safe?
+    pub user_id: Option<String>,
 }
 
 impl SearchEventReq {

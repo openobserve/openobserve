@@ -858,19 +858,28 @@ pub async fn check_permissions(
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn extract_auth_expiry(req: &HttpRequest) -> Option<chrono::DateTime<chrono::Utc>> {
+pub async fn extract_auth_expiry_and_user_id(
+    req: &HttpRequest,
+) -> (Option<chrono::DateTime<chrono::Utc>>, Option<String>) {
+    use crate::handler::http::auth::validator::get_user_email_from_auth_str;
+
     let auth_str = extract_auth_str(req);
 
     if auth_str.is_empty() {
-        return None;
+        return (None, None);
     }
 
     // TODO: handle basic auth, bearer token
 
-    if auth_str.starts_with("session ") {
+    let (mut exp, mut user_id) = (None, None);
+
+    exp = if auth_str.starts_with("session ") {
         let session_key = auth_str.strip_prefix("session ").unwrap();
         match crate::service::db::session::get(session_key).await {
             Ok(bearer_token) => {
+                let bearer_full_token = format!("Bearer {}", bearer_token);
+                user_id = get_user_email_from_auth_str(&bearer_full_token).await;
+
                 let keys = get_dex_jwks().await;
                 match jwt::verify_decode_token(
                     &bearer_token,
@@ -883,31 +892,32 @@ pub async fn extract_auth_expiry(req: &HttpRequest) -> Option<chrono::DateTime<c
                 {
                     Ok((_, Some(token_data))) => {
                         // Extract exp from claims and convert to DateTime<Utc>
-                        if let Some(exp) = token_data.claims.get("exp") {
-                            // exp is in seconds
-                            if let Some(exp_ts) = exp.as_i64() {
-                                return chrono::DateTime::from_timestamp(exp_ts, 0);
-                            }
-                        }
+                        token_data
+                            .claims
+                            .get("exp")
+                            .and_then(|exp| exp.as_i64())
+                            .and_then(|exp_ts| chrono::DateTime::from_timestamp(exp_ts, 0))
                     }
                     Ok(_) => {
                         log::debug!("No token data returned");
-                        return None;
+                        None
                     }
                     Err(e) => {
                         log::error!("Error verifying token: {}", e);
-                        return None;
+                        None
                     }
                 }
             }
             Err(e) => {
                 log::error!("Error getting session: {}", e);
-                return None;
+                None
             }
         }
-    }
+    } else {
+        None
+    };
 
-    None
+    (exp, user_id)
 }
 
 #[cfg(test)]

@@ -27,7 +27,7 @@ use super::{
     session::SessionManager,
 };
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::extract_auth_expiry;
+use crate::common::utils::auth::extract_auth_expiry_and_user_id;
 use crate::service::websocket_events::{WsClientEvents, WsServerEvents};
 
 pub type SessionId = String;
@@ -63,20 +63,19 @@ impl WsHandler {
 
         let cfg = get_config();
 
-        // Create session by registering the client
-        let cookie_expiry = if cfg.websocket.check_cookie_expiry {
-            #[cfg(feature = "enterprise")]
-            {
-                extract_auth_expiry(&req).await
-            }
+        // Create session by registering the client & extract the user_id from the auth
+        #[cfg(feature = "enterprise")]
+        let (mut cookie_expiry, user_id) = extract_auth_expiry_and_user_id(&req).await;
 
-            #[cfg(not(feature = "enterprise"))]
-            {
-                None
+        #[cfg(feature = "enterprise")]
+        {
+            if !cfg.websocket.check_cookie_expiry {
+                cookie_expiry = None;
             }
-        } else {
-            None
-        };
+        }
+
+        #[cfg(not(feature = "enterprise"))]
+        let cookie_expiry = None;
 
         self.session_manager
             .register_client(&client_id, cookie_expiry)
@@ -135,12 +134,14 @@ impl WsHandler {
                                                 break;
                                             }
                                         }
-                                        Ok(message) => {
-                                            // check if cookie is valid for each client event
-                                            let mut is_cookie_valid = session_manager
-                                                .is_client_cookie_valid(&client_id)
-                                                .await;
-                                            if cfg.websocket.check_cookie_expiry && !is_cookie_valid
+                                        Ok(mut message) => {
+                                            // check if cookie is valid for each client event only
+                                            // for enterprise
+                                            #[cfg(feature = "enterprise")]
+                                            if cfg.websocket.check_cookie_expiry
+                                                && !session_manager
+                                                    .is_client_cookie_valid(&client_id)
+                                                    .await
                                             {
                                                 log::info!(
                                                     "[WS::Router::Handler] Client cookie expired. Disconnect..."
@@ -160,6 +161,13 @@ impl WsHandler {
                                                 break;
                                             }
                                             // end of cookie check
+
+                                            // Append `user_id` to the ws client events when run in
+                                            // cluster mode to handle stream permissions
+                                            #[cfg(feature = "enterprise")]
+                                            {
+                                                message.append_user_id(user_id.clone());
+                                            }
 
                                             log::debug!(
                                                 "[WS::Router::Handler] received message: {:?}",
