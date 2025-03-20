@@ -22,7 +22,7 @@ pub const O2_TOKENIZER: &str = "o2";
 
 pub fn o2_tokenizer_build() -> TextAnalyzer {
     tantivy::tokenizer::TextAnalyzer::builder(O2Tokenizer::default())
-        .filter(tantivy::tokenizer::RemoveLongFilter::limit(40))
+        .filter(tantivy::tokenizer::RemoveLongFilter::limit(64))
         .filter(tantivy::tokenizer::LowerCaser)
         .build()
 }
