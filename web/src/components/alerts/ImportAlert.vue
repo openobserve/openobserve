@@ -519,7 +519,7 @@ export default defineComponent({
     const splitterModel = ref(60);
     const filteredDestinations = ref<string[]>([]);
     const streamTypes = ["logs", "metrics", "traces"];
-    const selectedFolderId = ref<any>(router.currentRoute.value.query.folderId || "default");
+    const selectedFolderId = ref<any>(router.currentRoute.value.query.folder || "default");
     const activeFolderId = ref(router.currentRoute.value.query.folder || router.currentRoute.value.query?.folderId);
     const activeFolderAlerts = ref<any>([]);
     const getFormattedDestinations: any = computed(() => {
