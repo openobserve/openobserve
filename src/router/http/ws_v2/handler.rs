@@ -26,7 +26,10 @@ use super::{
     pool::QuerierConnectionPool,
     session::SessionManager,
 };
-use crate::service::websocket_events::{WsClientEvents, WsServerEvents};
+use crate::{
+    common::utils::auth::extract_auth_expiry,
+    service::websocket_events::{WsClientEvents, WsServerEvents},
+};
 
 pub type SessionId = String;
 pub type ClientId = String;
@@ -59,17 +62,7 @@ impl WsHandler {
         // Client -> Router connection
         let (response, mut ws_session, mut msg_stream) = actix_ws::handle(&req, stream)?;
 
-        // get the cookie of the request:
-        let cookie_expiry = req
-            .cookie("auth_token")
-            .and_then(|cookie| cookie.expires_datetime())
-            .map(|offset_dt| {
-                chrono::DateTime::<chrono::Utc>::from_timestamp(
-                    offset_dt.unix_timestamp(),
-                    offset_dt.nanosecond(),
-                )
-                .unwrap_or_else(|| chrono::Utc::now())
-            });
+        let cookie_expiry = extract_auth_expiry(&req).await;
 
         // Create session. maybe change to register client
         // TODO: get cookie expiry date from the initial connection handshake and set it for the

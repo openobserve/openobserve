@@ -20,6 +20,7 @@ use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::
 use base64::Engine;
 use config::utils::json;
 use futures::future::{Ready, ready};
+use o2_dex::service::auth::get_dex_jwks;
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 #[cfg(feature = "enterprise")]
@@ -27,6 +28,7 @@ use o2_openfga::meta::mapping::OFGA_MODELS;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+use super::jwt;
 #[cfg(feature = "enterprise")]
 use crate::common::infra::config::USER_SESSIONS;
 use crate::common::{
@@ -842,6 +844,52 @@ pub async fn check_permissions(
         .await;
     }
     true
+}
+
+pub async fn extract_auth_expiry(req: &HttpRequest) -> Option<chrono::DateTime<chrono::Utc>> {
+    let auth_str = extract_auth_str(req);
+
+    if auth_str.is_empty() {
+        return None;
+    }
+
+    // TODO: handle basic auth, bearer token
+
+    if auth_str.starts_with("session ") {
+        let session_key = auth_str.strip_prefix("session ").unwrap();
+        if let Some(bearer_token) = USER_SESSIONS.get(session_key) {
+            let keys = get_dex_jwks().await;
+            match jwt::verify_decode_token(
+                &*bearer_token,
+                &keys,
+                &o2_dex::config::get_config().client_id,
+                true,
+                true,
+            )
+            .await
+            {
+                Ok((_, Some(token_data))) => {
+                    // Extract exp from claims and convert to DateTime<Utc>
+                    if let Some(exp) = token_data.claims.get("exp") {
+                        // exp is in seconds
+                        if let Some(exp_ts) = exp.as_i64() {
+                            return chrono::DateTime::from_timestamp(exp_ts, 0);
+                        }
+                    }
+                }
+                Ok(_) => {
+                    log::debug!("No token data returned");
+                    return None;
+                }
+                Err(e) => {
+                    log::error!("Error verifying token: {}", e);
+                    return None;
+                }
+            }
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]
