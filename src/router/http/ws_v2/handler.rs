@@ -64,8 +64,16 @@ impl WsHandler {
         let cfg = get_config();
 
         // Create session by registering the client
-        let cookie_expiry = if cfg!(feature = "enterprise") && cfg.websocket.check_cookie_expiry {
-            extract_auth_expiry(&req).await
+        let cookie_expiry = if cfg.websocket.check_cookie_expiry {
+            #[cfg(feature = "enterprise")]
+            {
+                extract_auth_expiry(&req).await
+            }
+
+            #[cfg(not(feature = "enterprise"))]
+            {
+                None
+            }
         } else {
             None
         };

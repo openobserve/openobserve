@@ -17,7 +17,6 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use config::RwAHashMap;
-use time::OffsetDateTime;
 
 use super::{
     error::*,
