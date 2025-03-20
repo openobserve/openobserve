@@ -423,21 +423,21 @@ impl From<WsClientEvents> for tungstenite::protocol::Message {
     }
 }
 
-impl TryFrom<tungstenite::protocol::Message> for WsServerEvents {
-    type Error = String;
+// impl TryFrom<tungstenite::protocol::Message> for WsServerEvents {
+//     type Error = String;
 
-    fn try_from(value: tungstenite::protocol::Message) -> Result<Self, String> {
-        match value {
-            tungstenite::protocol::Message::Text(text) => {
-                let event: WsServerEvents = json::from_str(&text).map_err(|e| e.to_string())?;
-                Ok(event)
-            }
-            _ => {
-                todo!("Convert `tungstenite::protocol::Message` to `WsServerEvents`")
-            }
-        }
-    }
-}
+//     fn try_from(value: tungstenite::protocol::Message) -> Result<Self, String> {
+//         match value {
+//             tungstenite::protocol::Message::Text(text) => {
+//                 let event: WsServerEvents = json::from_str(&text).map_err(|e| e.to_string())?;
+//                 Ok(event)
+//             }
+//             _ => {
+//                 todo!("Convert `tungstenite::protocol::Message` to `WsServerEvents`")
+//             }
+//         }
+//     }
+// }
 
 impl From<WsServerEvents> for tungstenite::protocol::Message {
     fn from(event: WsServerEvents) -> Self {

@@ -60,6 +60,8 @@ impl WsHandler {
         let (response, mut ws_session, mut msg_stream) = actix_ws::handle(&req, stream)?;
 
         // Create session. maybe change to register client
+        // TODO: get cookie expiry date from the initial connection handshake and set it for the
+        // client in the session_manager
         self.session_manager.register_client(&client_id).await;
 
         // Setup message channels
@@ -134,27 +136,6 @@ impl WsHandler {
                                         )
                                         .await
                                         {
-                                            Err(WsError::QuerierNotAvailable(e)) => {
-                                                log::error!(
-                                                    "[WS::Router::Handler] error getting querier_conn: {e}"
-                                                );
-                                                let err_msg = ErrorMessage::new(
-                                                    WsError::QuerierNotAvailable(e),
-                                                    Some(trace_id),
-                                                    None,
-                                                );
-                                                let should_disconnect = err_msg.should_disconnect;
-                                                if let Err(_) = error_tx.send(Some(err_msg)).await {
-                                                    log::error!(
-                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop"
-                                                    );
-                                                }
-                                                if should_disconnect {
-                                                    break;
-                                                } else {
-                                                    continue;
-                                                }
-                                            }
                                             Err(e) => {
                                                 log::error!(
                                                     "[WS::Router::Handler] error getting querier_conn: {e}"
@@ -260,7 +241,6 @@ impl WsHandler {
                         }
                     }
                 }
-                // TODO: need to
                 _ = ws_session
                     .close(Some(CloseReason::from(CloseCode::Normal)))
                     .await;
