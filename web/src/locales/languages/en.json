@@ -984,7 +984,10 @@
     "lastSuccessfulAt":"Last Successfull At",
     "status":"Status",
     "numOfEvents": "Number of Events",
-    "view":"View"
+    "view":"View",
+    "webhook":"Web Hook",
+    "email":"Email",
+    "action":"Action"
   },
   "alert_templates": {
     "header": "Templates",
