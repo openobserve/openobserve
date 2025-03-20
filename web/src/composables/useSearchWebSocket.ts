@@ -152,6 +152,10 @@ const useSearchWebSocket = () => {
 
     socketId.value = getUUID();
 
+    Object.keys(traces).forEach((traceId) => {
+      if(traces[traceId].isActive) traces[traceId].socketId = socketId.value;
+    });
+
     const url = getWebSocketUrl(socketId.value, org_id);
     // If needed we can store the socketID in global state
     webSocket.connect(socketId.value, url);
@@ -183,6 +187,7 @@ const useSearchWebSocket = () => {
       reset: (data: any, response: any) => void;
     }  
   ) => {
+    console.log("fetchQueryDataWithWebSocket", data.traceId, traces, socketId.value);
     try {
       traces[data.traceId] = {
         open: [],
@@ -202,6 +207,7 @@ const useSearchWebSocket = () => {
       traces[data.traceId].open.push(handlers.open.bind(null, data));
       traces[data.traceId].reset.push(handlers.reset.bind(null, data));
 
+      console.log("isInDrainMode", isInDrainMode.value);
       if (isInDrainMode.value) {
         return data.traceId;
       }
@@ -324,6 +330,7 @@ const useSearchWebSocket = () => {
       Object.keys(traces).forEach((traceId) => {
         console.log("reset request closed by 401", traces[traceId], traces[traceId].isInitiated);
         if(!traces[traceId].isInitiated) {
+          console.log("initiateSocketConnection", traces[traceId].data);
           initiateSocketConnection(traces[traceId].data, {
             open: traces[traceId].open[0],
             message: traces[traceId].message[0],
