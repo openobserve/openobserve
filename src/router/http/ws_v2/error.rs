@@ -108,19 +108,19 @@ impl ErrorMessage {
         }
     }
 
-    pub fn new_unauthorized() -> Self {
+    pub fn new_unauthorized(trace_id: Option<String>) -> Self {
         let ws_server_events = WsServerEvents::Error {
             code: StatusCode::UNAUTHORIZED.into(),
             message: "Cookie expired. Please retry".to_string(),
             error_detail: None,
-            trace_id: None,
+            trace_id,
             request_id: None,
             // client should not retry on the same ws session, only when cookie is expired
             should_client_retry: false,
         };
         Self {
             ws_server_events,
-            should_disconnect: false,
+            should_disconnect: true,
         }
     }
 }

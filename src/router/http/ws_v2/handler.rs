@@ -111,21 +111,6 @@ impl WsHandler {
                             }
                         }
                         Ok(msg) => {
-                            if cfg.websocket.check_cookie_expiry
-                                && !session_manager.is_client_cookie_valid(&client_id).await
-                            {
-                                log::info!(
-                                    "[WS::Router::Handler] Client cookie expired. Disconnect..."
-                                );
-                                let error_msg = ErrorMessage::new_unauthorized();
-                                if let Err(_) = error_tx.send(Some(error_msg)).await {
-                                    log::error!(
-                                        "[WS::Router::Handler] Error informing handle_outgoing to stop"
-                                    );
-                                };
-                                log::info!("[WS::Router::Handler] Stop handle_incoming");
-                                break;
-                            }
                             match msg {
                                 actix_ws::Message::Text(text) => {
                                     match json::from_str::<WsClientEvents>(&text) {
@@ -151,6 +136,31 @@ impl WsHandler {
                                             }
                                         }
                                         Ok(message) => {
+                                            // check if cookie is valid for each client event
+                                            let mut is_cookie_valid = session_manager
+                                                .is_client_cookie_valid(&client_id)
+                                                .await;
+                                            if cfg.websocket.check_cookie_expiry && !is_cookie_valid
+                                            {
+                                                log::info!(
+                                                    "[WS::Router::Handler] Client cookie expired. Disconnect..."
+                                                );
+                                                let error_msg = ErrorMessage::new_unauthorized(
+                                                    Some(message.get_trace_id()),
+                                                );
+                                                if let Err(_) = error_tx.send(Some(error_msg)).await
+                                                {
+                                                    log::error!(
+                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                                    );
+                                                };
+                                                log::info!(
+                                                    "[WS::Router::Handler] Stop handle_incoming"
+                                                );
+                                                break;
+                                            }
+                                            // end of cookie check
+
                                             log::debug!(
                                                 "[WS::Router::Handler] received message: {:?}",
                                                 message
