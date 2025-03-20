@@ -1661,7 +1661,8 @@ const getActionScripts = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-  updateResourceEntities("action_scripts", ["name"], [...actionScripts.data]);
+
+  updateResourceEntities("action_scripts", ["id"], [...actionScripts.data],false,"name");
 
   return new Promise((resolve) => {
     resolve(true);
