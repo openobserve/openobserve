@@ -56,30 +56,6 @@ const useSearchWebSocket = () => {
       return;
     }
 
-    if(response.type === 'error'){
-      console.log("on message error", response);
-      if(response.content.should_client_retry && response.content.trace_id){
-        setTimeout(() => {
-          retryActiveTrace(response.content.trace_id, response);
-        }, 300)
-      }
-
-      if(response.content.code === 401) {
-        // Store the current socketId as inactive and clear it
-        inactiveSocketId.value = socketId.value;
-        socketId.value = null;
-
-        // Mark all traces from old socket as inactive
-        Object.keys(traces).forEach(traceId => {
-          if (traces[traceId].socketId === inactiveSocketId.value) {
-            traces[traceId].isActive = false;
-          }
-        });
-
-        resetAuthToken();
-      }
-    }
-
     traces[response.content.trace_id]?.message?.forEach((handler: any) =>
       handler(response),
     );
@@ -115,6 +91,33 @@ const useSearchWebSocket = () => {
   };
 
   const onError = (response: any) => {
+    if(response.type === 'error'){
+      if(response.content.should_client_retry && response.content.trace_id){
+        setTimeout(() => {
+          retryActiveTrace(response.content.trace_id, response);
+        }, 300)
+
+        return;
+      }
+
+      if(response.content.code === 401) {
+        // Store the current socketId as inactive and clear it
+        inactiveSocketId.value = socketId.value;
+        socketId.value = null;
+
+        // Mark all traces from old socket as inactive
+        Object.keys(traces).forEach(traceId => {
+          if (traces[traceId].socketId === inactiveSocketId.value) {
+            traces[traceId].isActive = false;
+          }
+        });
+
+        resetAuthToken();
+
+        return;
+      }
+    }
+
     traces[response.content.trace_id].error.forEach((handler: any) =>
       handler(response),
     );
