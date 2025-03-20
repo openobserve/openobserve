@@ -535,9 +535,9 @@ const saveDestination = () => {
 
   if (formData.value.type === "email") {
     payload["type"] = "email";
-    payload["emails"] =
-      formData.value?.emails ||
-      "".split(/[;,]/).map((email: string) => email.trim());
+    payload["emails"] = (formData.value?.emails || "")
+      .split(/[;,]/)
+      .map((email: string) => email.trim());
   }
 
   if (formData.value.type === "action") {
@@ -648,7 +648,6 @@ const filterColumns = (options: any[], val: String, update: Function) => {
 };
 
 const filterActions = (val: string, update: any) => {
-  console.log(val, "val");
   filteredActions.value = filterColumns(actionOptions.value, val, update);
 };
 </script>
