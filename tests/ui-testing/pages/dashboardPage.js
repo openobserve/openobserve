@@ -196,9 +196,9 @@ async addCustomChart(page, pictorialJSON) {
 }
 
 async navigateToDashboardFolder() {
-  await this.page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/dashboards?org_identifier=otlp-production&folder=default");
+  await this.page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default&folder=7304836846041702868");
   await this.page.waitForTimeout(5000);
-  await this.page.getByRole('cell', { name: '7296021498282649800' }).click();
+  await this.page.getByRole('cell', { name: '7304836846041703371' }).click();
   await this.page.waitForTimeout(5000);
 }
 
