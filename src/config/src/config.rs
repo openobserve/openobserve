@@ -431,6 +431,8 @@ pub struct WebSocket {
     pub session_gc_interval_secs: i64,
     #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 15)]
     pub ping_interval_secs: i64,
+    #[env_config(name = "ZO_WEBSOCKET_CHECK_COOKIE_EXPIRY", default = false)]
+    pub check_cookie_expiry: bool,
 }
 
 #[derive(EnvConfig)]

@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use actix_web::{Error, HttpRequest, HttpResponse, web};
 use actix_ws::{CloseCode, CloseReason};
-use config::{meta::cluster::RoleGroup, utils::json};
+use config::{get_config, meta::cluster::RoleGroup, utils::json};
 use futures_util::StreamExt;
 
 use super::{
@@ -61,18 +61,15 @@ impl WsHandler {
         // Client -> Router connection
         let (response, mut ws_session, mut msg_stream) = actix_ws::handle(&req, stream)?;
 
-        // TODO: check if this is only for enterprise
-        #[allow(unused_mut)]
-        let mut cookie_expiry = None;
+        let cfg = get_config();
 
-        #[cfg(feature = "enterprise")]
-        {
-            cookie_expiry = extract_auth_expiry(&req).await;
-        }
+        // Create session by registering the client
+        let cookie_expiry = if cfg!(feature = "enterprise") && cfg.websocket.check_cookie_expiry {
+            extract_auth_expiry(&req).await
+        } else {
+            None
+        };
 
-        // Create session. maybe change to register client
-        // TODO: get cookie expiry date from the initial connection handshake and set it for the
-        // client in the session_manager
         self.session_manager
             .register_client(&client_id, cookie_expiry)
             .await;
@@ -106,8 +103,9 @@ impl WsHandler {
                             }
                         }
                         Ok(msg) => {
-                            #[cfg(feature = "enterprise")]
-                            if !session_manager.is_client_cookie_valid(&client_id).await {
+                            if cfg.websocket.check_cookie_expiry
+                                && !session_manager.is_client_cookie_valid(&client_id).await
+                            {
                                 log::info!(
                                     "[WS::Router::Handler] Client cookie expired. Disconnect..."
                                 );
@@ -268,8 +266,8 @@ impl WsHandler {
                                 Some(err_msg) => {
                                     _ = ws_session.text(err_msg.ws_server_events.to_json()).await;
                                     if err_msg.should_disconnect {
-                                        // TODO: shouldn't be closing if received msg because cookie expired.
-                                        // have to let any ongoing requests to be finished.
+                                        // TODO: special handling for unauthorized error message
+                                        // shouldn't close directly but wait for all ongoing requests to finish
                                         if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Error))).await {
                                             log::error!("Error closing websocket session: {}", e);
                                         };
@@ -306,7 +304,7 @@ impl WsHandler {
             .await;
     }
 
-    pub async fn shutdown(&self) {
+    pub async fn _shutdown(&self) {
         // just need to disconnect all the ws_conns in connection_pool
         self.connection_pool.shutdown().await;
     }

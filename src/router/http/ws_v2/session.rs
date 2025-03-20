@@ -89,7 +89,8 @@ impl SessionManager {
         match self.sessions.read().await.get(client_id) {
             Some(session_info) => session_info
                 .expires_datetime
-                .map_or(false, |expiry| expiry > Utc::now()),
+                // default true: authorized if cookie expiry wasn't present
+                .map_or(true, |expiry| expiry > Utc::now()),
             None => false,
         }
     }
