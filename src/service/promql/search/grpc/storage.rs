@@ -296,25 +296,14 @@ async fn cache_parquet_files(
                 }
                 _ => None,
             };
-            let ret = if let Some(e) = ret {
-                if e.to_string().to_lowercase().contains("not found")
-                    || e.to_string().to_lowercase().contains("data size is zero")
-                {
-                    // delete file from file list
-                    log::warn!("found invalid file: {}", file_name);
-                    if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                        log::error!("[trace_id {trace_id}] promql->search->storage: delete from file_list err: {}", e);
-                    }
-                    Some(file_name)
-                } else {
-                    log::error!("[trace_id {trace_id}] promql->search->storage: download file to cache err: {}", e);
-                    None
-                }
-            } else {
-                None
-            };
+            if let Some(e) = ret {
+                log::error!(
+                    "[trace_id {trace_id}] promql->search->storage: download file to cache err: {}",
+                    e
+                );
+            }
             drop(permit);
-            ret
+            None
         });
         tasks.push(task);
     }

@@ -1082,34 +1082,58 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
         let file_name = file.key.to_string();
+        let file_size = file.meta.compressed_size;
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download("", &file_name).await.err()
+                file_data::disk::download("", &file_name).await
             } else {
-                None
+                Ok(0)
             };
             // In case where the parquet file is not found or has no data, we assume that it
             // must have been deleted by some external entity, and hence we
             // should remove the entry from file_list table.
-            let file_name = if let Some(e) = ret {
-                if e.to_string().to_lowercase().contains("not found")
-                    || e.to_string().to_lowercase().contains("data size is zero")
-                {
-                    // delete file from file list
-                    log::error!("found invalid file: {}", file_name);
-                    if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                        log::error!("[COMPACT] delete from file_list err: {}", e);
+            let file_name = match ret {
+                Ok(data_len) => {
+                    if data_len > 0 && data_len != file_size as usize {
+                        log::warn!(
+                            "[COMPACT] download file {} found size mismatch, expected: {}, actual: {}, will update it",
+                            file_name,
+                            file_size,
+                            data_len,
+                        );
+                        if let Err(e) =
+                            file_list::update_compressed_size(&file_name, data_len as i64).await
+                        {
+                            log::error!(
+                                "[COMPACT] update file size for file {} err: {}",
+                                file_name,
+                                e
+                            );
+                        }
                     }
-                    Some(file_name)
-                } else {
-                    log::error!("[COMPACT] download file to cache err: {}", e);
-                    // remove downloaded file
-                    let _ = file_data::disk::remove("", &file_name).await;
                     None
                 }
-            } else {
-                None
+                Err(e) => {
+                    if e.to_string().to_lowercase().contains("not found")
+                        || e.to_string().to_lowercase().contains("data size is zero")
+                    {
+                        // delete file from file list
+                        log::error!(
+                            "[COMPACT] found invalid file: {}, will delete it",
+                            file_name
+                        );
+                        if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
+                            log::error!("[COMPACT] delete from file_list err: {}", e);
+                        }
+                        Some(file_name)
+                    } else {
+                        log::error!("[COMPACT] download file to cache err: {}", e);
+                        // remove downloaded file
+                        let _ = file_data::disk::remove("", &file_name).await;
+                        None
+                    }
+                }
             };
             drop(permit);
             file_name
