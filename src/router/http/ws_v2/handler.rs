@@ -26,10 +26,9 @@ use super::{
     pool::QuerierConnectionPool,
     session::SessionManager,
 };
-use crate::{
-    common::utils::auth::extract_auth_expiry,
-    service::websocket_events::{WsClientEvents, WsServerEvents},
-};
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::extract_auth_expiry;
+use crate::service::websocket_events::{WsClientEvents, WsServerEvents};
 
 pub type SessionId = String;
 pub type ClientId = String;
@@ -62,7 +61,14 @@ impl WsHandler {
         // Client -> Router connection
         let (response, mut ws_session, mut msg_stream) = actix_ws::handle(&req, stream)?;
 
-        let cookie_expiry = extract_auth_expiry(&req).await;
+        // TODO: check if this is only for enterprise
+        #[allow(unused_mut)]
+        let mut cookie_expiry = None;
+
+        #[cfg(feature = "enterprise")]
+        {
+            cookie_expiry = extract_auth_expiry(&req).await;
+        }
 
         // Create session. maybe change to register client
         // TODO: get cookie expiry date from the initial connection handshake and set it for the
@@ -100,6 +106,7 @@ impl WsHandler {
                             }
                         }
                         Ok(msg) => {
+                            #[cfg(feature = "enterprise")]
                             if !session_manager.is_client_cookie_valid(&client_id).await {
                                 log::info!(
                                     "[WS::Router::Handler] Client cookie expired. Disconnect..."

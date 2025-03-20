@@ -20,6 +20,7 @@ use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::
 use base64::Engine;
 use config::utils::json;
 use futures::future::{Ready, ready};
+#[cfg(feature = "enterprise")]
 use o2_dex::service::auth::get_dex_jwks;
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
@@ -28,26 +29,20 @@ use o2_openfga::meta::mapping::OFGA_MODELS;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+#[cfg(feature = "enterprise")]
 use super::jwt;
 #[cfg(feature = "enterprise")]
 use crate::common::infra::config::USER_SESSIONS;
+use crate::common::{
+    infra::config::{PASSWORD_HASH, USERS},
+    meta::{
+        authz::Authz,
+        organization::DEFAULT_ORG,
+        user::{AuthTokens, UserRole},
+    },
+};
 #[cfg(feature = "enterprise")]
 use crate::common::{meta, meta::ingestion::INGESTION_EP};
-use crate::{
-    common::{
-        infra::config::{PASSWORD_HASH, USERS},
-        meta::{
-            authz::Authz,
-            organization::DEFAULT_ORG,
-            user::{AuthTokens, UserRole},
-        },
-    },
-    service::db::session,
-};
-
-pub const V2_API_PREFIX: &str = "v2";
-
-pub const V2_API_PREFIX: &str = "v2";
 
 pub const V2_API_PREFIX: &str = "v2";
 
@@ -853,6 +848,7 @@ pub async fn check_permissions(
     true
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn extract_auth_expiry(req: &HttpRequest) -> Option<chrono::DateTime<chrono::Utc>> {
     let auth_str = extract_auth_str(req);
 
@@ -864,7 +860,7 @@ pub async fn extract_auth_expiry(req: &HttpRequest) -> Option<chrono::DateTime<c
 
     if auth_str.starts_with("session ") {
         let session_key = auth_str.strip_prefix("session ").unwrap();
-        match session::get(session_key).await {
+        match crate::service::db::session::get(session_key).await {
             Ok(bearer_token) => {
                 let keys = get_dex_jwks().await;
                 match jwt::verify_decode_token(
