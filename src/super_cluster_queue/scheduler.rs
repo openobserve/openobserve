@@ -47,7 +47,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 async fn push(msg: Message) -> Result<()> {
-    let trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    trigger_modify_module_key(&mut trigger).await?;
     if let Err(e) = scheduler::push(trigger.clone()).await {
         log::error!(
             "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
@@ -62,7 +63,8 @@ async fn push(msg: Message) -> Result<()> {
 }
 
 async fn update(msg: Message) -> Result<()> {
-    let trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    trigger_modify_module_key(&mut trigger).await?;
     // Update trigger in super cluster with clone = true, so that it copies everything
     if let Err(e) = scheduler::update_trigger(trigger.clone(), true).await {
         log::error!(
@@ -78,7 +80,8 @@ async fn update(msg: Message) -> Result<()> {
 }
 
 async fn update_status(msg: Message) -> Result<()> {
-    let trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    trigger_modify_module_key(&mut trigger).await?;
     if let Err(e) = scheduler::update_status(
         &trigger.org,
         trigger.module.clone(),
@@ -107,7 +110,8 @@ async fn update_status(msg: Message) -> Result<()> {
 }
 
 async fn delete(msg: Message) -> Result<()> {
-    let trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    trigger_modify_module_key(&mut trigger).await?;
     if let Err(e) =
         scheduler::delete(&trigger.org, trigger.module.clone(), &trigger.module_key).await
     {
@@ -120,5 +124,19 @@ async fn delete(msg: Message) -> Result<()> {
         );
         return Err(e);
     }
+    Ok(())
+}
+
+async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
+    let module_key = trigger.module_key.clone();
+    let parts = module_key.split("/").collect::<Vec<&str>>();
+    let org = parts[1];
+    let stream_type = parts[2];
+    let stream_name = parts[3];
+    let alert_name = parts[4];
+
+    // get alert id from alert name
+    let alert_id = db::alerts::alert::get_by_name(org, stream_type, stream_name, alert_name).await?;
+    trigger.module_key = format!("{}", alert_id);
     Ok(())
 }

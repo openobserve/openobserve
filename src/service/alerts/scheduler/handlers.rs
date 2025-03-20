@@ -88,11 +88,44 @@ async fn handle_alert_triggers(
         &trigger.module_key
     );
     let columns = trigger.module_key.split('/').collect::<Vec<&str>>();
-    assert_eq!(columns.len(), 3);
     let org_id = trigger.org.clone();
     let stream_type: StreamType = columns[0].into();
     let stream_name = columns[1];
-    let alert_name = columns[2];
+    
+    // here it can be alert id or alert name
+
+    let alert = if let Ok(alert_id) = Ksuid::from_str(columns[2]) {
+        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        match db::alerts::alert::get_by_id(&client, &org_id, alert_id).await {
+            Ok(Some((_, alert))) => {
+                alert
+            }
+            Ok(None) => {
+                log::error!("[SCHEDULER trace_id {trace_id}] Alert not found for module_key: {}", trigger.module_key);
+                return Err(anyhow::anyhow!("Alert not found"));
+            }
+            Err(e) => {
+                log::error!("[SCHEDULER trace_id {trace_id}] Error getting alert by id: {}", e);
+                return Err(e);
+            }
+        }
+    } else {
+        match db::alerts::alert::get_by_name(&org_id, stream_type, stream_name, columns[2]).await {
+            Ok(Some(alert)) => {
+                alert
+            }
+            Ok(None) => {
+                log::error!("[SCHEDULER trace_id {trace_id}] Alert not found for module_key: {}", trigger.module_key);
+                return Err(anyhow::anyhow!("Alert not found"));
+            }
+            Err(e) => {
+                log::error!("[SCHEDULER trace_id {trace_id}] Error getting alert by name: {}", e);
+                return Err(e);
+            }
+        }
+    };
+
+    
     let is_realtime = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
     let triggered_at = trigger.start_time.unwrap_or_default();
@@ -116,18 +149,6 @@ async fn handle_alert_triggers(
         return Ok(());
     }
 
-    let alert = match get_by_name(&org_id, stream_type, stream_name, alert_name).await? {
-        Some(alert) => alert,
-        None => {
-            return Err(anyhow::anyhow!(
-                "alert not found: {}/{}/{}/{}",
-                org_id,
-                stream_name,
-                stream_type,
-                alert_name
-            ));
-        }
-    };
     let now = Utc::now().timestamp_micros();
 
     let mut new_trigger = db::scheduler::Trigger {
