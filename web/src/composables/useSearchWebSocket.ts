@@ -40,8 +40,8 @@ const useSearchWebSocket = () => {
     Object.keys(traces).forEach((traceId) => {
       console.log("on open", traceId, traces[traceId]?.open?.length);
       if(traces[traceId].isActive) {
-        traces[traceId].open.forEach((handler: any) => handler(response));
         traces[traceId].isInitiated = true;
+        traces[traceId].open.forEach((handler: any) => handler(response));
       }
     });
   };
@@ -210,8 +210,8 @@ const useSearchWebSocket = () => {
     if (!socketId.value) {
       createSocketConnection(data.org_id);
     } else if (!isCreatingSocket.value) {
-      handlers.open(data, null);
       traces[data.traceId].isInitiated = true;
+      handlers.open(data, null);
     }
   }
 
@@ -294,20 +294,20 @@ const useSearchWebSocket = () => {
 
   const resetAuthToken = () => {
     authService.refresh_token().then((res: any) => {
-      if (res.status === 200) {
-        // Retry the request
-        Object.keys(traces).forEach((traceId) => {
-          if(!traces[traceId].isInitiated) {
-            initiateSocketConnection(traces[traceId].data, {
-              open: traces[traceId].open[0],
-              message: traces[traceId].message[0],
-              close: traces[traceId].close[0],
-              error: traces[traceId].error[0],
-              reset: traces[traceId].reset[0],
-            });
-          }
-        });
-      }
+      console.log("resetAuthToken", res);
+      // Retry the request
+      Object.keys(traces).forEach((traceId) => {
+        console.log("reset request closed by 401", traces[traceId], traces[traceId].isInitiated);
+        if(!traces[traceId].isInitiated) {
+          initiateSocketConnection(traces[traceId].data, {
+            open: traces[traceId].open[0],
+            message: traces[traceId].message[0],
+            close: traces[traceId].close[0],
+            error: traces[traceId].error[0],
+            reset: traces[traceId].reset[0],
+          });
+        }
+      });
     }).catch((err: any) => {
       console.error("Error in refreshing auth token", err);
     });
