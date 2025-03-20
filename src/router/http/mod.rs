@@ -437,21 +437,7 @@ async fn proxy_ws(
         // Path format example: /api/{org_id}/ws/v2/{client_id}
         if path.contains("/ws/v2/") {
             let path_parts: Vec<&str> = path.split('/').collect();
-            let client_id = if path_parts.len() >= 5 {
-                path_parts[path_parts.len() - 1].to_string()
-            } else {
-                // Fallback to a default or query parameter
-                req.query_string()
-                    .split('&')
-                    .find_map(|pair| {
-                        if pair.starts_with("client_id=") {
-                            Some(pair[10..].to_string())
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or_else(|| "anonymous".to_string())
-            };
+            let client_id = path_parts[path_parts.len() - 1].to_string();
 
             log::info!(
                 "[WS_V2_ROUTER] Handling WS v2 connection for client: {}, took: {} ms",

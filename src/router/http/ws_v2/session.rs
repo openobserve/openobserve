@@ -61,7 +61,6 @@ impl SessionManager {
         let mut write_guard = self.sessions.write().await;
         if !write_guard.contains_key(client_id) {
             write_guard.insert(client_id.clone(), session_info.clone());
-            return;
         }
     }
 
@@ -89,7 +88,7 @@ impl SessionManager {
             Some(session_info) => session_info
                 .expires_datetime
                 // default true: authorized if cookie expiry wasn't present
-                .map_or(true, |expiry| expiry > Utc::now()),
+                .is_none_or(|expiry| expiry > Utc::now()),
             None => false,
         }
     }
@@ -149,7 +148,7 @@ impl SessionManager {
             .write()
             .await
             .entry(querier_name.clone())
-            .or_insert_with(|| Vec::new())
+            .or_insert_with(Vec::new)
             .push(trace_id.clone());
         Ok(())
     }

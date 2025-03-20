@@ -121,13 +121,13 @@ impl WsHandler {
                                             let trace_id = json::from_str::<json::Value>(&text)
                                                 .ok()
                                                 .and_then(|val| val.get("trace_id").cloned())
-                                                .and_then(|v| Some(v.to_string()));
+                                                .map(|v| v.to_string());
                                             let err_msg =
                                                 ErrorMessage::new(e.into(), trace_id, None);
                                             let should_disconnect = err_msg.should_disconnect;
-                                            if let Err(_) = error_tx.send(Some(err_msg)).await {
+                                            if let Err(e) = error_tx.send(Some(err_msg)).await {
                                                 log::error!(
-                                                    "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                                    "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                                 );
                                             }
                                             if should_disconnect {
@@ -149,10 +149,10 @@ impl WsHandler {
                                                 let error_msg = ErrorMessage::new_unauthorized(
                                                     Some(message.get_trace_id()),
                                                 );
-                                                if let Err(_) = error_tx.send(Some(error_msg)).await
+                                                if let Err(e) = error_tx.send(Some(error_msg)).await
                                                 {
                                                     log::error!(
-                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                                     );
                                                 };
                                                 log::info!(
@@ -176,7 +176,7 @@ impl WsHandler {
                                             let trace_id = message.get_trace_id();
                                             let role_group =
                                                 if let WsClientEvents::Search(req) = &message {
-                                                    Some(RoleGroup::from(req.search_type.clone()))
+                                                    Some(RoleGroup::from(req.search_type))
                                                 } else {
                                                     None
                                                 };
@@ -197,11 +197,11 @@ impl WsHandler {
                                                         ErrorMessage::new(e, Some(trace_id), None);
                                                     let should_disconnect =
                                                         err_msg.should_disconnect;
-                                                    if let Err(_) =
+                                                    if let Err(e) =
                                                         error_tx.send(Some(err_msg)).await
                                                     {
                                                         log::error!(
-                                                            "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                                            "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                                         );
                                                     }
                                                     if should_disconnect {
@@ -227,9 +227,9 @@ impl WsHandler {
                                                 let err_msg =
                                                     ErrorMessage::new(e, Some(trace_id), None);
                                                 let should_disconnect = err_msg.should_disconnect;
-                                                if let Err(_) = error_tx.send(Some(err_msg)).await {
+                                                if let Err(e) = error_tx.send(Some(err_msg)).await {
                                                     log::error!(
-                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                                     );
                                                 }
                                                 if should_disconnect {
@@ -245,9 +245,9 @@ impl WsHandler {
                                     log::info!(
                                         "[WS::Router::Handler] disconnect signal received from client."
                                     );
-                                    if let Err(_) = error_tx.send(None).await {
+                                    if let Err(e) = error_tx.send(None).await {
                                         log::error!(
-                                            "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                            "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                         );
                                     };
                                     log::info!("[WS::Router::Handler] Stop handle_incoming");
