@@ -16,7 +16,7 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Duration;
-use config::metrics::DB_QUERY_NUMS;
+use config::{metrics::DB_QUERY_NUMS, utils::hash::Sum64};
 use sqlx::Row;
 
 use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
@@ -350,9 +350,6 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
-        DB_QUERY_NUMS
-            .with_label_values(&["update", "scheduled_jobs"])
-            .inc();
         let query = r#"UPDATE scheduled_jobs
 SET status = $1, start_time = $2,
     end_time = CASE
@@ -370,6 +367,29 @@ WHERE id IN (
 RETURNING *;"#;
 
         let mut tx = pool.begin().await?;
+
+        // Lock the table for the duration of the transaction
+        let lock_key = "scheduler_pull_lock";
+        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+        let lock_id = if lock_id > i64::MAX as u64 {
+            (lock_id >> 1) as i64
+        } else {
+            lock_id as i64
+        };
+        let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
+        DB_QUERY_NUMS
+            .with_label_values(&["get_lock", "scheduled_jobs"])
+            .inc();
+        if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SCHEDULER] rollback pull scheduled_jobs error: {}", e);
+            }
+            return Err(e.into());
+        }
+
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
         let jobs: Vec<Trigger> = match sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
             .bind(now)

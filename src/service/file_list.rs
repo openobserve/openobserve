@@ -196,6 +196,7 @@ pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats> {
         stats.records += file.meta.records;
         stats.original_size += file.meta.original_size;
         stats.compressed_size += file.meta.compressed_size;
+        stats.idx_scan_size += file.meta.index_size;
     }
     Ok(stats)
 }

@@ -72,6 +72,7 @@ const search = {
     is_multistream,
     traceparent,
     body,
+    action_id,
   }: {
     org_identifier: string;
     index: string;
@@ -85,6 +86,7 @@ const search = {
     is_multistream: boolean;
     traceparent: string;
     body: any;
+    action_id: string;
   }) => {
     // let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     let url: string = "";
@@ -95,6 +97,10 @@ const search = {
     }
     if (query_fn.trim() != "") {
       url = url + `&query_fn=${query_fn}`;
+    }
+
+    if (action_id.trim() != "") {
+      url = url + `&action_id=${action_id}`;
     }
 
     if (regions.trim() != "") {

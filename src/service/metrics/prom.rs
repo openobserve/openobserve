@@ -35,7 +35,7 @@ use hashbrown::HashSet;
 use infra::{
     cache::stats,
     errors::{Error, Result},
-    schema::{SchemaCache, unwrap_partition_time_level, update_setting},
+    schema::{SchemaCache, unwrap_partition_time_level},
 };
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -140,8 +140,13 @@ pub async fn remote_write(
             break;
         }
         if need_update {
-            if let Err(e) =
-                update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata).await
+            if let Err(e) = db::schema::update_setting(
+                org_id,
+                &metric_name,
+                StreamType::Metrics,
+                extra_metadata,
+            )
+            .await
             {
                 log::error!(
                     "Error updating metadata for stream: {}, err: {}",
@@ -161,6 +166,8 @@ pub async fn remote_write(
                 "200",
                 org_id,
                 StreamType::Metrics.as_str(),
+                "",
+                "",
             ])
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
@@ -169,6 +176,8 @@ pub async fn remote_write(
                 "200",
                 org_id,
                 StreamType::Metrics.as_str(),
+                "",
+                "",
             ])
             .inc();
         return Ok(());
@@ -263,6 +272,8 @@ pub async fn remote_write(
                         "200",
                         org_id,
                         StreamType::Metrics.as_str(),
+                        "",
+                        "",
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -271,6 +282,8 @@ pub async fn remote_write(
                         "200",
                         org_id,
                         StreamType::Metrics.as_str(),
+                        "",
+                        "",
                     ])
                     .inc();
                 return Ok(());
@@ -564,6 +577,8 @@ pub async fn remote_write(
             "200",
             org_id,
             StreamType::Metrics.as_str(),
+            "",
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -572,6 +587,8 @@ pub async fn remote_write(
             "200",
             org_id,
             StreamType::Metrics.as_str(),
+            "",
+            "",
         ])
         .inc();
 

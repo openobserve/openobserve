@@ -53,7 +53,7 @@ pub mod utils;
 
 pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
     let cfg = config::get_config();
-    let limit = if sql.limit as i32 > config::QUERY_WITH_NO_LIMIT {
+    let limit = if sql.limit > config::QUERY_WITH_NO_LIMIT {
         if sql.limit > 0 {
             Some(sql.limit as usize)
         } else {

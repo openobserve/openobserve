@@ -539,6 +539,7 @@ pub async fn upload_zipped_action(
         &user_email.user_id,
         "actions",
         method,
+        "",
     )
     .await
     {

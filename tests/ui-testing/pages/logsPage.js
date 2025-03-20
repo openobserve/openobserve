@@ -325,7 +325,10 @@ export class LogsPage {
 
   async clickQuickModeToggle() {
 
-    await this.page.waitForSelector('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+    await this.page.waitForSelector(
+      '[data-test="logs-search-bar-more-options-dropdown"]'
+    );
+    await this.page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     // Get the toggle button element
     const toggleButton = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
     // Evaluate the class attribute to determine if the toggle is in the off state
@@ -450,6 +453,9 @@ export class LogsPage {
 }
 
 async toggleHistogram() {
+  await this.page.waitForSelector('[data-test="logs-search-bar-more-options-dropdown"]');
+  await this.page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
+  await this.page.waitForSelector('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
   await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
 }
 

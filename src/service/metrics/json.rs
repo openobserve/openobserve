@@ -483,6 +483,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "200",
             org_id,
             StreamType::Metrics.as_str(),
+            "",
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -491,6 +493,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "200",
             org_id,
             StreamType::Metrics.as_str(),
+            "",
+            "",
         ])
         .inc();
 

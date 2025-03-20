@@ -132,6 +132,7 @@ test.describe("Sanity testcases", () => {
   test("should display pagination when histogram is off and clicking and closing the result", async ({
     page,
   }) => {
+    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)
@@ -146,6 +147,7 @@ test.describe("Sanity testcases", () => {
   test("should display pagination when only SQL is on clicking and closing the result", async ({
     page,
   }) => {
+    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)

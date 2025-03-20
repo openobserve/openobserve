@@ -1130,9 +1130,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   anchor="top middle"
                   self="bottom middle"
                 >
-                  Set the minimum value for the Y-axis.
+                  <b>Set the minimum value for the Y-axis.</b>
                   <br />
-                  This determines the lowest point displayed on the chart.
+                  This defines the lowest point to display on the chart, but the
+                  axis
+                  <br />
+                  may adjust lower if the data includes smaller values.
                 </q-tooltip>
               </div>
             </div>
@@ -1172,9 +1175,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   anchor="top middle"
                   self="bottom middle"
                 >
-                  Set the maximum value for the Y-axis.
+                  <b>Set the maximum value for the Y-axis.</b>
                   <br />
-                  This determines the highest point displayed on the chart.
+                  This defines the highest point to display on the chart, but
+                  the
+                  <br />
+                  axis may adjust higher if the data includes larger values.
                 </q-tooltip>
               </div>
             </div>

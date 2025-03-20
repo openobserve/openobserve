@@ -22,11 +22,20 @@ use crate::{db::Event, errors::Error};
 
 /// Sends event to the cluster coordinator indicating that an alert has been put
 /// into the database.
-pub async fn emit_put_event(org: &str, alert: &Alert) -> Result<(), Error> {
+pub async fn emit_put_event(
+    org: &str,
+    alert: &Alert,
+    folder_id: Option<String>,
+) -> Result<(), Error> {
     let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
     let cluster_coordinator = super::get_coordinator().await;
     cluster_coordinator
-        .put(&key, bytes::Bytes::from(""), true, None)
+        .put(
+            &key,
+            bytes::Bytes::from(folder_id.unwrap_or("default".to_string())),
+            true,
+            None,
+        )
         .await?;
     Ok(())
 }
@@ -50,7 +59,7 @@ pub async fn watch_events<OnPut, OnPutFut, OnDelete, OnDeleteFut>(
     on_delete: OnDelete,
 ) -> Result<(), anyhow::Error>
 where
-    OnPut: Fn(String, StreamType, String, String) -> OnPutFut,
+    OnPut: Fn(String, StreamType, String, String, Option<String>) -> OnPutFut,
     OnPutFut: Future<Output = Result<(), anyhow::Error>>,
     OnDelete: Fn(String, StreamType, String, String) -> OnDeleteFut,
     OnDeleteFut: Future<Output = Result<(), anyhow::Error>>,
@@ -74,7 +83,11 @@ where
                     log::error!("watch_alerts: failed to parse event key {}", &ev.key);
                     continue;
                 };
-                let _ = (on_put)(org, stream_type, stream_name, alert_name).await;
+                let folder_id = ev.value.map(|v| String::from_utf8_lossy(&v).to_string());
+                if let Err(e) = (on_put)(org, stream_type, stream_name, alert_name, folder_id).await
+                {
+                    log::error!("Error in alert put handler: {}", e);
+                }
             }
             Event::Delete(ev) => {
                 let Some((org, stream_type, stream_name, alert_name)) = parse_alert_key(&ev.key)

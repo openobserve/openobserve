@@ -36,7 +36,7 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt},
 };
 use hashbrown::HashSet;
-use infra::schema::{SchemaCache, unwrap_partition_time_level, update_setting};
+use infra::schema::{SchemaCache, unwrap_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
@@ -268,8 +268,13 @@ pub async fn handle_otlp_request(
 
                 // update schema metadata
                 if !schema_exists.has_metadata {
-                    if let Err(e) =
-                        update_setting(org_id, metric_name, StreamType::Metrics, prom_meta).await
+                    if let Err(e) = db::schema::update_setting(
+                        org_id,
+                        metric_name,
+                        StreamType::Metrics,
+                        prom_meta,
+                    )
+                    .await
                     {
                         log::error!(
                             "Failed to set metadata for metric: {} with error: {}",
@@ -580,10 +585,10 @@ pub async fn handle_otlp_request(
 
     let time_took = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str()])
+        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
         .observe(time_took);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str()])
+        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
         .inc();
 
     // only one trigger per request, as it updates etcd

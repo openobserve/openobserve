@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <q-input
-        data-test="alert-list-search-input"
+        data-test="recommended-list-search-input"
         v-model="tabsFilter"
         borderless
         filled
@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="(tab, index) in filteredList" :key="tab.name">
           <q-route-tab
+            :title="tab.name"
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
@@ -133,7 +134,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/kubernetes.svg"),
-        label: "Kubernetes",
+        label: t("ingestion.kubernetes"),
         contentClass: "tab_content",
       },
       {
@@ -145,7 +146,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/windows.svg"),
-        label: "Windows",
+        label: t("ingestion.windows"),
         contentClass: "tab_content",
       },
       {
@@ -157,7 +158,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/linux.svg"),
-        label: "Linux",
+        label: t("ingestion.linux"),
         contentClass: "tab_content",
       },
       {
@@ -169,7 +170,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/aws.svg"),
-        label: "Amazon Web Services(AWS)",
+        label: t("ingestion.awsconfig"),
         contentClass: "tab_content",
       },
       {
@@ -181,7 +182,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/gcp.svg"),
-        label: "Google Cloud Platform(GCP)",
+        label: t("ingestion.gcpconfig"),
         contentClass: "tab_content",
       },
       {
@@ -193,7 +194,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/azure.png"),
-        label: "Microsoft Azure",
+        label: t("ingestion.azure"),
         contentClass: "tab_content",
       },
       {
@@ -205,7 +206,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/otlp.svg"),
-        label: "Traces (OpenTelemetry)",
+        label: t("ingestion.tracesotlp"),
         contentClass: "tab_content",
       },
       {
@@ -217,7 +218,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/monitoring.svg"),
-        label: "Real User Monitoring",
+        label: t("ingestion.rum"),
         contentClass: "tab_content",
       },
     ];

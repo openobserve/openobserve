@@ -407,7 +407,7 @@ pub async fn search_multi(
                 } else {
                     // Error in subsequent queries, add the error to the response and break
                     // No need to run the remaining queries
-                    multi_res.function_error = format!("{};{:?}", multi_res.function_error, e);
+                    multi_res.function_error.push(e.to_string());
                     multi_res.is_partial = true;
                     break;
                 }
@@ -436,7 +436,8 @@ pub async fn search_multi(
             }
             Err(err) => {
                 log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
-                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
+                multi_res.function_error.push(err.to_string());
+                multi_res.is_partial = true;
                 None
             }
         };
@@ -562,7 +563,7 @@ pub async fn search_partition(
         sql: req.sql.to_string(),
         ..Default::default()
     };
-    let sql = Sql::new(&query, org_id, stream_type).await?;
+    let sql = Sql::new(&query, org_id, stream_type, None).await?;
 
     // check for vrl
     let apply_over_hits = match req.query_fn.as_ref() {
@@ -705,6 +706,7 @@ pub async fn search_partition(
         histogram_interval: sql.histogram_interval,
         partitions: vec![],
         order_by: OrderBy::Desc,
+        limit: sql.limit,
         streaming_output: req.streaming_output,
         streaming_aggs: req.streaming_output && is_streaming_aggregate,
         streaming_id: streaming_id.clone(),
