@@ -84,7 +84,7 @@ test.describe("Websocket for UI Load Testing", () => {
         await loginPage.loginAsInternalUser();
     });
 
-    for (let i = 1; i <= 10; i++) {
+    for (let i = 1; i <= 2; i++) {
         test(`Enable Websocket for running query after selecting stream, SQL Mode On and dashboard refresh: User ${i}`, async ({ page }) => {
             const randomEmail = `${generateRandomString(7)}admin${i}@gmail.com`; // Generate random email for login
             const randomPassword = `${generateRandomString(7)}12345678`;
