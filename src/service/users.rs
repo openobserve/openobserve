@@ -564,10 +564,7 @@ pub async fn list_users(
     // If the role is not
     #[cfg(feature = "enterprise")]
     if get_openfga_config().enabled {
-        let need_check_permission = match role {
-            Some(UserRole::ServiceAccount) => false,
-            _ => true,
-        };
+        let need_check_permission = !matches!(role, Some(UserRole::ServiceAccount));
 
         if need_check_permission && permitted.is_none() {
             let mut user_list = vec![];

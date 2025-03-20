@@ -646,19 +646,14 @@ pub async fn list_v2<C: ConnectionTrait>(
     user_id: Option<&str>,
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, AlertError> {
-    let (permissions, is_all_permitted) = match permitted_alerts(
-        &params.org_id,
-        user_id,
-        params.folder_id.as_ref().map(|x| x.as_str()),
-    )
-    .await?
-    {
-        Some(ps) => {
-            let org_all_permitted = ps.contains(&format!("alert:_all_{}", params.org_id));
-            (ps, org_all_permitted)
-        }
-        None => (vec![], true),
-    };
+    let (permissions, is_all_permitted) =
+        match permitted_alerts(&params.org_id, user_id, params.folder_id.as_deref()).await? {
+            Some(ps) => {
+                let org_all_permitted = ps.contains(&format!("alert:_all_{}", params.org_id));
+                (ps, org_all_permitted)
+            }
+            None => (vec![], true),
+        };
 
     let alerts = db::alerts::alert::list_with_folders(conn, params)
         .await?
