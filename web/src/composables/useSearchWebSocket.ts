@@ -57,6 +57,7 @@ const useSearchWebSocket = () => {
     }
 
     if(response.type === 'error'){
+      console.log("on message error", response);
       if(response.content.should_client_retry && response.content.trace_id){
         setTimeout(() => {
           retryActiveTrace(response.content.trace_id, response);
@@ -282,6 +283,7 @@ const useSearchWebSocket = () => {
   }
 
   const retryActiveTrace = (traceId: string, response: any) => {
+    console.log("retryActiveTrace", traceId, response);
     traces[traceId]?.close.forEach((handler: any) => handler(response));
     traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data));
     cleanUpListeners(traceId);   
