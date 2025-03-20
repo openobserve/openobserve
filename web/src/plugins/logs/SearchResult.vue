@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="max-height: 100px"
           @updated:dataZoom="onChartUpdate"
         />
-        <div v-else>
+        <div v-else-if="searchObj.meta.showHistogram && searchObj.data.queryResults.aggs.length == 0">
           <h3
             class="text-center"
             style="margin: 30px 0px"
