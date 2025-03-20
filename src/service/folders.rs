@@ -176,10 +176,13 @@ pub async fn list_folders(
 ) -> Result<Vec<Folder>, FolderError> {
     let permitted_folders = permitted_folders(org_id, user_id, folder_type).await?;
     let folders = table::folders::list_folders(org_id, folder_type).await?;
+    #[cfg(feature = "enterprise")]
     let folder_ofga_model = match folder_type {
         FolderType::Dashboards => OFGA_MODELS.get("folders").unwrap().key,
         FolderType::Alerts => OFGA_MODELS.get("alert_folders").unwrap().key,
     };
+    #[cfg(not(feature = "enterprise"))]
+    let folder_ofga_model = "";
 
     let filtered = match permitted_folders {
         Some(permitted_folders) => {
@@ -288,7 +291,6 @@ async fn permitted_folders(
     user_id: Option<&str>,
     folder_type: FolderType,
 ) -> Result<Option<Vec<String>>, FolderError> {
-    use o2_openfga::meta::mapping::OFGA_MODELS;
     let (folder_ofga_model, child_ofga_model) = match folder_type {
         FolderType::Dashboards => (
             OFGA_MODELS.get("folders").unwrap().key,

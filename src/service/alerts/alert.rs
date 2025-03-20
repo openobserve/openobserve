@@ -663,7 +663,7 @@ pub async fn list_v2<C: ConnectionTrait>(
             is_all_permitted
                 // Include the alert if the alert is permitted with the old OpenFGA identifier.
                 || permissions.contains(&format!("alert:{}", a.name))
-                || permissions.contains(&format!("alert:{}/{}", f.folder_id, a.id.as_ref().unwrap().to_string()))
+                || permissions.contains(&format!("alert:{}/{}", f.folder_id, a.id.as_ref().unwrap()))
                 // Include the alert if the alert is permitted with the new OpenFGA identifier.
                 || a.id
                     .filter(|id| permissions.contains(&format!("alert:{id}")))
