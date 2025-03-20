@@ -414,10 +414,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div>
                           <q-select
-                            data-test="destination-import-template-input"
+                            data-test="destination-import-action-input"
                             v-model="userSelectedActionId[index]"
                             :options="filteredActions"
-                            label="Templates *"
+                            label="Actions *"
                             :popup-content-style="{
                               textTransform: 'lowercase',
                             }"
@@ -526,6 +526,7 @@ import destinationService from "@/services/alert_destination";
 
 import AppTabs from "../common/AppTabs.vue";
 import axios from "axios";
+import useActions from "@/composables/useActions";
 
 export default defineComponent({
   name: "ImportDestination",
@@ -583,6 +584,8 @@ export default defineComponent({
     const filteredActions = ref<string[]>([]);
 
     const userSelectedSkipTlsVerify = ref<boolean[]>([]);
+
+    const { isActionsEnabled } = useActions();
 
     const getFormattedTemplates = computed(() => {
       return props.templates
@@ -948,6 +951,7 @@ export default defineComponent({
       );
 
       if (
+        isActionsEnabled.value &&
         input.type === "action" &&
         !availableActions.includes(input.action_id)
       ) {
@@ -1005,6 +1009,12 @@ export default defineComponent({
       if (!input.name || typeof input.name !== "string") {
         destinationErrors.push(
           `Destination - ${index} 'name' is required and should be a string`,
+        );
+      }
+
+      if (input.type === "action" && !isActionsEnabled.value) {
+        destinationErrors.push(
+          `Destination - ${index} 'action' type is not supported.`,
         );
       }
 
