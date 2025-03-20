@@ -164,6 +164,7 @@ export default createStore({
       state.organizationData.quotaThresholdMsg = payload;
     },
     setConfig(state, payload) {
+      payload.websocket_enabled = true;
       state.zoConfig = payload;
     },
     setFolders(state, payload) {
