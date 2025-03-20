@@ -95,7 +95,7 @@ impl ResponseRouter {
             // Send error response to client
             let _ = sender
                 .send(WsServerEvents::Error {
-                    code: StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    code: StatusCode::SERVICE_UNAVAILABLE.into(),
                     message: "Querier connection closed".to_string(),
                     error_detail: None,
                     trace_id: Some(trace_id),
