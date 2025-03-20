@@ -106,16 +106,7 @@ pub async fn create_dashboard(
         Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
     };
 
-    match dashboard.owner() {
-        Some(owner) => {
-            if owner.is_empty() {
-                dashboard.set_owner(user_email.user_id);
-            }
-        }
-        None => {
-            dashboard.set_owner(user_email.user_id);
-        }
-    }
+    set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
 
     let saved = match dashboards::create_dashboard(&org_id, &folder, dashboard).await {
         Ok(saved) => saved,
@@ -165,16 +156,8 @@ async fn update_dashboard(
         Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
     };
 
-    match dashboard.owner() {
-        Some(owner) => {
-            if owner.is_empty() {
-                dashboard.set_owner(user_email.user_id);
-            }
-        }
-        None => {
-            dashboard.set_owner(user_email.user_id);
-        }
-    }
+    set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
+
     let saved = match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash)
         .await
     {
@@ -365,4 +348,20 @@ fn get_user_id(req: HttpRequest) -> Option<String> {
         .get("user_id")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
+}
+
+fn set_dashboard_owner_if_empty(
+    dashboard: &mut config::meta::dashboards::Dashboard,
+    user_email: &str,
+) {
+    match dashboard.owner() {
+        Some(owner) => {
+            if owner.is_empty() {
+                dashboard.set_owner(user_email.to_string());
+            }
+        }
+        None => {
+            dashboard.set_owner(user_email.to_string());
+        }
+    }
 }
