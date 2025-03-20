@@ -76,17 +76,7 @@ export const usePanelDataLoader = (
   };
   let runCount = 0;
 
-  const searchRetriesCount = ref<{ [key: string]: number }>({});
-
   const store = useStore();
-
-  // Add cleanup function
-  const cleanupSearchRetries = (traceId: string) => {
-    removeTraceId(traceId);
-    if (searchRetriesCount.value[traceId]) {
-      delete searchRetriesCount.value[traceId];
-    }
-  };
 
   const {
     fetchQueryDataWithWebSocket,
@@ -669,66 +659,11 @@ export const usePanelDataLoader = (
   };
 
   const handleSearchClose = (payload: any, response: any) => {
-    const MAX_RETRIES = 2;
-    const RECONNECT_DELAY = 1000; // 1 second
-
-    removeTraceId(payload.traceId);
-
-    if (response.code === 1001 || response.code === 1006) {
-      const retryCount = searchRetriesCount.value[payload.traceId] || 0;
-      searchRetriesCount.value[payload.traceId] = retryCount + 1;
-
-      if (retryCount < MAX_RETRIES) {
-        state.loading = true;
-        state.isOperationCancelled = false;
-
-        setTimeout(() => {
-          try {
-            fetchQueryDataWithWebSocket(payload, {
-              open: sendSearchMessage,
-              close: handleSearchClose,
-              error: handleSearchError,
-              message: handleSearchResponse,
-              reset: handleSearchReset,
-            });
-
-            addTraceId(payload.traceId);
-          } catch (error: any) {
-            console.error("Error reconnecting WebSocket:", error);
-            cleanupSearchRetries(payload?.traceId);
-            handleSearchError(payload, {
-              content: {
-                message: "Failed to reconnect WebSocket",
-                trace_id: payload.traceId,
-                code: response.code,
-                error_detail: error?.message,
-              },
-            });
-          }
-        }, RECONNECT_DELAY);
-
-        return;
-      } else {
-        // remove current traceId
-        cleanupSearchRetries(payload?.traceId);
-        handleSearchError(payload, {
-          content: {
-            message:
-              "WebSocket connection terminated unexpectedly. Please check your network and try again",
-            trace_id: payload.traceId,
-            code: response.code,
-            error_detail: "",
-          },
-        });
-      }
-    }
+    removeTraceId(payload?.traceId);
 
     if (response.type === "error") {
       processApiError(response?.content, "sql");
     }
-
-    // remove current traceId
-    cleanupSearchRetries(payload?.traceId);
 
     // set loading to false
     state.loading = false;
@@ -739,14 +674,22 @@ export const usePanelDataLoader = (
   };
 
   const handleSearchReset = (payload: any) => {
-    // Handle search reset
-    console.log("handleSearchReset", payload);
+    // reset old state data
+    state.data = [];
+    state.resultMetaData = [];
+
+    getDataThroughWebSocket(
+      payload.queryReq.query,
+      payload.queryReq.it,
+      payload.queryReq.startISOTimestamp,
+      payload.queryReq.endISOTimestamp,
+      payload.pageType,
+      payload.currentQueryIndex,
+    );
   }
 
   const handleSearchError = (payload: any, response: any) => {
     removeTraceId(payload.traceId);
-
-    cleanupSearchRetries(payload?.traceId);
 
     // set loading to false
     state.loading = false;
@@ -761,7 +704,6 @@ export const usePanelDataLoader = (
     startISOTimestamp: string,
     endISOTimestamp: string,
     pageType: string,
-    abortControllerRef: AbortController,
     currentQueryIndex: number,
   ) => {
     try {
@@ -781,7 +723,6 @@ export const usePanelDataLoader = (
           it,
           startISOTimestamp,
           endISOTimestamp,
-          abortControllerRef,
           currentQueryIndex,
         },
         type: "histogram",
@@ -964,7 +905,8 @@ export const usePanelDataLoader = (
         const abortControllerRef = abortController;
 
         try {
-          // reset old state data
+
+          // Call search API
           state.data = [];
           state.metadata = {
             queries: [],
@@ -972,9 +914,7 @@ export const usePanelDataLoader = (
           state.resultMetaData = [];
           state.annotations = [];
           state.isOperationCancelled = false;
-
-          // Call search API
-
+          
           // Get the page type from the first query in the panel schema
           const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 
@@ -1220,7 +1160,6 @@ export const usePanelDataLoader = (
                   startISOTimestamp,
                   endISOTimestamp,
                   pageType,
-                  abortControllerRef,
                   panelQueryIndex,
                 );
               } else {
