@@ -96,6 +96,7 @@ const useSearchWebSocket = () => {
       setTimeout(() => {
         Object.keys(traces).forEach((traceId) => {
           if(traces[traceId].isInitiated) {
+            response.code = 1000;
             traces[traceId]?.close.forEach((handler: any) => handler(response));
             traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data));
             cleanUpListeners(traceId);        
@@ -212,6 +213,12 @@ const useSearchWebSocket = () => {
 
   const sendSearchMessageBasedOnRequestId = (data: any) => {
     try {
+      
+      if(isInDrainMode.value && !traces[data.traceId].isActive && inactiveSocketId.value) {
+        webSocket.sendMessage(inactiveSocketId.value as string, JSON.stringify(data));
+        return;
+      }
+
       webSocket.sendMessage(socketId.value as string, JSON.stringify(data));
     } catch (error: any) {
       console.error(

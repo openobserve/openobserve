@@ -665,6 +665,21 @@ export const usePanelDataLoader = (
       processApiError(response?.content, "sql");
     }
 
+
+    const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
+
+    if (errorCodes.includes(response.code)) {
+      handleSearchError(payload, {
+        content: {
+          message:
+            "WebSocket connection terminated unexpectedly. Please check your network and try again",
+          trace_id: payload.traceId,
+          code: response.code,
+          error_detail: "",
+        }
+      });
+    }
+
     // set loading to false
     state.loading = false;
     state.isOperationCancelled = false;

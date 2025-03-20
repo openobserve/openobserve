@@ -5499,40 +5499,21 @@ const useLogs = () => {
       return;
     }
 
-    // if (response.code === 1001 || response.code === 1006) {
-    //   if (!searchObj.data.searchRetriesCount[payload.traceId]) {
-    //     searchObj.data.searchRetriesCount[payload.traceId] = 1;
-    //   } else {
-    //     searchObj.data.searchRetriesCount[payload.traceId] += 1;
-    //   }
+    //TODO Omkar: Remove the duplicate error codes, are present same in useSearchWebSocket.ts
+    const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
 
-    //   if (
-    //     searchObj.data.searchRetriesCount[payload.traceId] <=
-    //     searchReconnectDelay
-    //   ) {
-    //     if (payload.type === "search") searchObj.loading = true;
-    //     if (payload.type === "histogram") searchObj.loadingHistogram = true;
-
-    //     setTimeout(() => {
-    //       const requestId = initializeWebSocketConnection(payload);
-
-    //       addRequestId(payload.traceId);
-    //     }, maxSearchRetries);
-
-    //     return;
-    //   } else {
-    //     handleSearchError(payload, {
-    //       content: {
-    //         message:
-    //           "WebSocket connection terminated unexpectedly. Please check your network and try again",
-    //         trace_id: payload.traceId,
-    //         code: response.code,
-    //         error_detail: "",
-    //       },
-    //       type: "error",
-    //     });
-    //   }
-    // }
+    if (errorCodes.includes(response.code)) {
+      handleSearchError(payload, {
+        content: {
+          message:
+            "WebSocket connection terminated unexpectedly. Please check your network and try again",
+          trace_id: payload.traceId,
+          code: response.code,
+          error_detail: "",
+        },
+        type: "error",
+      });
+    }
 
     // if (searchObj.data.searchRetriesCount[payload.traceId]) {
     //   delete searchObj.data.searchRetriesCount[payload.traceId];
