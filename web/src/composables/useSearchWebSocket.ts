@@ -56,18 +56,28 @@ const useSearchWebSocket = () => {
       return;
     }
 
+    // close the inactive socket if there are no any traces with isActive false
+    if(Object.keys(traces).every((traceId) => !traces[traceId].isActive) && inactiveSocketId.value) {
+      webSocket.closeSocket(inactiveSocketId.value as string);
+      inactiveSocketId.value = null;
+    }
+
     traces[response.content.trace_id]?.message?.forEach((handler: any) =>
       handler(response),
     );
   };
 
-  const onClose = (response: any) => {    
+  const onClose = (response: any, _socketId: string) => {    
     isCreatingSocket.value = false;
     socketId.value = null;
 
     const shouldRetry = socketRetryCodes.includes(response.code);
     
     if(shouldRetry) socketFailureCount.value++;
+
+    if(inactiveSocketId.value && _socketId === inactiveSocketId.value) {
+      inactiveSocketId.value = null;
+    }
 
     // reset isInDrainMode to false
     if (shouldRetry && socketFailureCount.value < maxSearchRetries) {

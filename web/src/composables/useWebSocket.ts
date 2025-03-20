@@ -4,7 +4,7 @@ import { onBeforeUnmount } from "vue";
 
 type MessageHandler = (event: MessageEvent) => void;
 type OpenHandler = (event: Event) => void;
-type CloseHandler = (event: CloseEvent) => void;
+type CloseHandler = (event: CloseEvent, socketId: string) => void;
 type ErrorHandler = (event: Event) => void;
 
 type WebSocketHandler =
@@ -71,7 +71,7 @@ const onClose = (socketId: string, event: CloseEvent) => {
   delete pingIntervals[socketId];
   delete sockets[socketId];
 
-  closeHandlers[socketId]?.forEach((handler) => handler(event));
+  closeHandlers[socketId]?.forEach((handler) => handler(event, socketId));
 };
 
 const onError = (socketId: string, event: Event) => {
