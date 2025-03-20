@@ -127,7 +127,11 @@ impl ObjectStore for Local {
         let result = self
             .client
             .get(&(format_key(&file, self.with_prefix).into()))
-            .await?;
+            .await
+            .map_err(|e| {
+                log::error!("[STORAGE] get local file: {}, error: {:?}", file, e);
+                e
+            })?;
 
         // metrics
         let data_len = result.meta.size;
@@ -154,7 +158,11 @@ impl ObjectStore for Local {
         let result = self
             .client
             .get_opts(&(format_key(&file, self.with_prefix).into()), options)
-            .await?;
+            .await
+            .map_err(|e| {
+                log::error!("[STORAGE] get_opts local file: {}, error: {:?}", file, e);
+                e
+            })?;
 
         // metrics
         let data_len = result.meta.size;

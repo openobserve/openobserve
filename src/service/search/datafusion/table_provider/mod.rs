@@ -234,7 +234,15 @@ impl NewListingTable {
                     .options
                     .format
                     .infer_stats(ctx, store, self.file_schema.clone(), &part_file.object_meta)
-                    .await?;
+                    .await
+                    .map_err(|e| {
+                        log::error!(
+                            "Failed to infer stats for file: {}, error: {}",
+                            part_file.object_meta.location,
+                            e
+                        );
+                        e
+                    })?;
                 statistics_cache.put_with_extra(
                     &part_file.object_meta.location,
                     statistics.clone().into(),
