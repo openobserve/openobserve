@@ -947,7 +947,7 @@ export default defineComponent({
 
         const immediateChildren =
           variablesDependencyGraph[varName]?.childVariables || [];
-        const allChildren: any = [...immediateChildren];
+        const allChildren: string[] = [...immediateChildren];
 
         for (const childName of immediateChildren) {
           const childrenOfChild = getAllAffectedVariables(childName, visited);
