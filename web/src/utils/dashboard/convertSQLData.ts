@@ -249,7 +249,11 @@ export const convertSQLData = async (
       let breakdownValue = item[breakdownKey];
 
       // Convert null, undefined, and empty string to a default empty string
-      if (breakdownValue == null || breakdownValue === "") {
+      if (
+        breakdownValue == null ||
+        breakdownValue === "" ||
+        breakdownValue === undefined
+      ) {
         breakdownValue = "";
       }
 
@@ -287,7 +291,11 @@ export const convertSQLData = async (
       let breakdownValue = item[breakdownKey];
 
       // Ensure missing breakdown values are treated as empty strings
-      if (breakdownValue == null || breakdownValue === "") {
+      if (
+        breakdownValue == null ||
+        breakdownValue === "" ||
+        breakdownValue === undefined
+      ) {
         breakdownValue = "";
       }
 
