@@ -685,13 +685,6 @@ export default defineComponent({
         name: "alertList",
       },
       {
-        title: t("menu.actions"),
-        icon: outlinedCode,
-        link: "/action-scripts",
-        name: "actionScripts",
-        hide: !isActionsEnabled.value,
-      },
-      {
         title: t("menu.ingestion"),
         icon: outlinedFilterAlt,
         link: "/ingestion",
@@ -822,8 +815,9 @@ export default defineComponent({
 
       store.dispatch("setHiddenMenus", disableMenus);
 
-      linksList.value = linksList.value.filter((link) => {
-        const hide = link.hide === undefined ? false : link.hide; // Handle unknown hide values
+      linksList.value = linksList.value.filter((link: any) => {
+        const hide = link.hide === undefined ? false : link.hide;
+
         return !disableMenus.has(link.name) && !hide;
       });
     };
@@ -1141,10 +1135,14 @@ export default defineComponent({
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
-            filterMenus();
           }
+
           store.dispatch("setConfig", res.data);
           await nextTick();
+
+          updateActionsMenu();
+
+          filterMenus();
           // if rum enabled then setUser to capture session details.
           if (res.data.rum.enabled) {
             setRumUser();
@@ -1190,6 +1188,27 @@ export default defineComponent({
 
     const openSlack = () => {
       window.open(slackURL, "_blank");
+    };
+
+    const updateActionsMenu = () => {
+      if (isActionsEnabled.value) {
+        const alertIndex = linksList.value.findIndex(
+          (link) => link.name === "alertList",
+        );
+
+        const actionExists = linksList.value.some(
+          (link) => link.name === "actionScripts",
+        );
+
+        if (alertIndex !== -1 && !actionExists) {
+          linksList.value.splice(alertIndex + 1, 0, {
+            title: t("menu.actions"),
+            icon: outlinedCode,
+            link: "/actions",
+            name: "actionScripts",
+          });
+        }
+      }
     };
 
     return {
