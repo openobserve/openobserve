@@ -115,7 +115,8 @@ impl ErrorMessage {
             error_detail: None,
             trace_id: None,
             request_id: None,
-            should_client_retry: true,
+            // client should not retry on the same ws session, only when cookie is expired
+            should_client_retry: false,
         };
         Self {
             ws_server_events,
