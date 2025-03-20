@@ -34,7 +34,22 @@ class ServiceAccountPage:
         assert response.status_code == 200, f"Failed to create service account: {response.content.decode()}"
 
         print(f"Service account created successfully: {response.json()}")
-        return response
+
+        response_get = session.get(
+            f"{base_url}api/{org_id}/service_accounts/{email_address}", 
+            headers=headers
+        )
+        assert response_get.status_code == 200, f"Failed to get service account: {response_get.content.decode()}"
+        
+        print(f"Service account created successfully: {response_get.json()}")
+
+        token = response_get.json()['token']
+
+        print(f"Token: {token}")
+
+        return token
+    
+
     
     # def test_delete_serviceaccount(create_session, base_url):
 #     """Running an E2E test for deleting a service account."""

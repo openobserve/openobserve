@@ -17,7 +17,7 @@ ZO_BASE_URL_SC2 = os.environ.get("ZO_BASE_URL_SC2")  # Use environment variable
 
 
 
-Total_count = 20
+Total_count = 2
 org_id = "default"
 stream_name = "default"
 
