@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
     :title="t('search.syntaxGuideLabel')"
     icon="help"
+    label="Syntax Guide"
   >
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <q-card flat v-if="!sqlmode">
@@ -224,7 +225,7 @@ export default defineComponent({
 .syntax-guide-button {
   cursor: pointer;
   text-transform: capitalize;
-  width: 32px;
+  width: 150px;
   height: 32px;
   font-weight: bold;
   border: 1px solid rgba(89, 96, 178, 0.3);
