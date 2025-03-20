@@ -40,6 +40,8 @@ use crate::common::{
 #[cfg(feature = "enterprise")]
 use crate::common::{meta, meta::ingestion::INGESTION_EP};
 
+pub const V2_API_PREFIX: &str = "v2";
+
 pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
 static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
@@ -224,7 +226,7 @@ impl FromRequest for AuthExtractor {
 
         let path_columns = path.split('/').collect::<Vec<&str>>();
         let url_len = path_columns.len();
-        let org_id = if url_len > 1 && path_columns[0].eq("v2") {
+        let org_id = if url_len > 1 && path_columns[0].eq(V2_API_PREFIX) {
             path_columns[1].to_string()
         } else {
             path_columns[0].to_string()
@@ -296,7 +298,7 @@ impl FromRequest for AuthExtractor {
             )
         } else if url_len == 3 {
             // Handle /v2 alert apis
-            if path_columns[0].eq("v2") && path_columns[2].eq("alerts") {
+            if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 }
@@ -399,7 +401,7 @@ impl FromRequest for AuthExtractor {
             }
         } else if url_len == 4 {
             // Handle /v2 alert apis
-            if path_columns[0].eq("v2") {
+            if path_columns[0].eq(V2_API_PREFIX) {
                 if path_columns[2].eq("alerts") {
                     if method.eq("PATCH") {
                         method = "PUT".to_string();
@@ -519,7 +521,7 @@ impl FromRequest for AuthExtractor {
             }
 
             // Handle /v2 folders apis
-            if path_columns[0].eq("v2") && path_columns[2].eq("folders") {
+            if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("folders") {
                 let ofga_type = if path_columns[3].eq("alerts") {
                     "alert_folders"
                 } else {

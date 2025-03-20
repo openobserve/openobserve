@@ -36,6 +36,7 @@ pub async fn token_validator(
     use actix_web::error::ErrorForbidden;
 
     use super::validator::check_permissions;
+    use crate::common::utils::auth::V2_API_PREFIX;
 
     let user;
     let keys = get_dex_jwks().await;
@@ -78,11 +79,12 @@ pub async fn token_validator(
                 } else {
                     user = match path.find('/') {
                         Some(index) => {
-                            let org_id = if path_columns.len() > 1 && path_columns[0].eq("v2") {
-                                path_columns[1]
-                            } else {
-                                &path[0..index]
-                            };
+                            let org_id =
+                                if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
+                                    path_columns[1]
+                                } else {
+                                    &path[0..index]
+                                };
                             users::get_user(Some(org_id), user_id).await
                         }
                         None => users::get_user(None, user_id).await,

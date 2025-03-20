@@ -36,7 +36,7 @@ use crate::{
             },
         },
         utils::{
-            auth::{AuthExtractor, get_hash, is_root_user},
+            auth::{AuthExtractor, V2_API_PREFIX, get_hash, is_root_user},
             redirect_response::RedirectResponseBuilder,
         },
     },
@@ -163,7 +163,7 @@ pub async fn validate_credentials(
     } else {
         user = match path.find('/') {
             Some(index) => {
-                let org_id = if path_columns.len() > 1 && path_columns[0].eq("v2") {
+                let org_id = if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
                     path_columns[1]
                 } else {
                     &path[0..index]
@@ -324,7 +324,7 @@ pub async fn validate_credentials_ext(
     } else {
         user = match path.find('/') {
             Some(index) => {
-                let org_id = if path_columns.len() > 1 && path_columns[0].eq("v2") {
+                let org_id = if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
                     path_columns[1]
                 } else {
                     &path[0..index]
