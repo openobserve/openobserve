@@ -5,6 +5,10 @@ const rate_limit = {
         const url = `/api/${org_identifier}/ratelimit/module_list`;
         return http().get(url);
     },
+    getRoleLimits: (org_identifier: string, role_name: string) => {
+        const url = `/api/${org_identifier}/ratelimit/role_list/${role_name}`;
+        return http().get(url);
+    },
     update_batch: (org_identifier: string, data: any) => {
         const url = `/api/${org_identifier}/ratelimit/update`;
         return http().put(url, data);

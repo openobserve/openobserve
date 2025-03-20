@@ -1172,6 +1172,7 @@
     "api-search": "Search Modules",
     "role-search": "Search Roles",
     "moduleName": "Module Name",
+    "roleName": "Roles",
     "listLimit": "List (Req/s)",
     "getLimit": "Get (Req/s)",
     "createLimit": "Create (Req/s)",

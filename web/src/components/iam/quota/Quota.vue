@@ -19,15 +19,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-page class="q-px-sm quota-page text-left"
         :class="store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'"
        style="min-height: inherit">
-        <q-table
+        <div :style="{ height: '100%', marginTop: 0 }" class="app-table-container" >
+            <q-table
             :rows="apiLimitsRows"
             :columns="generateColumns()"
             row-key="name"
             :pagination="pagination"
             :filter="searchQuery"
             :filter-method="filteredData"
+            v-if="activeTab == 'api-limits'"
 
         >
+        <template v-slot:header="props">
+        <q-tr :props="props" class="thead-sticky">
+          <q-th
+            v-for="col in props.cols"
+            :key="col.name"
+            :props="props"
+            :style="col.style"
+          >
+            {{ col.label }}
+          </q-th>
+        </q-tr>
+      </template>
         <template #no-data></template>
 
             <template #top="scope">
@@ -156,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'edited-cell': isEdited(props.row.module_name, props.col.name)
                   }">
                     <q-input
-                        v-if="props.row[props.col.name] != '--' && props.col.name != 'module_name'"
+                        v-if="props.row[props.col.name] != '-' && props.col.name != 'module_name'"
                         :model-value="changedValues[props.row.module_name]?.[props.col.name]?.threshold ?? props.row[props.col.name].threshold"
                         @update:model-value="(val) => handleInputChange(props.row.module_name , props.row[props.col.name], props.col.name, val)"
                         :class="{
@@ -178,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @blur="onBlur"
                     />
                 <q-input
-                v-else-if="props.row[ props.col.name ] == '--' && props.col.name != 'module_name' "
+                v-else-if="props.row[ props.col.name ] == '-' && props.col.name != 'module_name' "
                 v-model="props.row[ props.col.name ]"
                 input-class="text-center"
                 type="text"
@@ -194,17 +208,274 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
             </q-td>
             <q-td :props="props" v-else>
-                <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '--'">
+                <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'">
                     {{ props.row[ props.col.name ].threshold }}
                 </div>
                     <div v-else-if="props.col.name == 'module_name'"> 
                     {{ props.row[ props.col.name ] }}
                 </div>
-                <div v-else-if="props.row[props.col.name] == '--'">
-                   --
+                <div v-else-if="props.row[props.col.name] == '-'">
+                   -
                 </div>
             </q-td>
             </template>
+
+        </q-table>
+        <q-table
+            :rows="rolesRows"
+            :columns="roleLimitsColumns"
+            row-key="name"
+            :pagination="pagination"
+            :filter="searchQuery"
+            :filter-method="filteredData"
+            v-if="activeTab == 'role-limits'"
+
+        >
+        <template v-slot:header="props">
+        <q-tr :props="props" class="thead-sticky">
+          <q-th
+            v-for="col in props.cols"
+            :key="col.name"
+            :props="props"
+            :style="col.style"
+          >
+            {{ col.label }}
+          </q-th>
+        </q-tr>
+      </template>
+        <template #no-data></template>
+
+            <template #top="scope">
+                <div
+                    class="q-table__title full-width"
+                    data-test="user-title-text"
+                >
+                    {{ t("quota.header") }}
+                </div>
+                <div class="flex items-center justify-between full-width q-mb-sm">
+                    <div class="flex items-center ">
+                    <q-select
+                    :loading="isOrgLoading"
+                    v-model="selectedOrganization"
+                    :options="organizations"
+                    placeholder="Select Org"
+                    :popup-content-style="{ textTransform: 'lowercase' }"
+                    color="input-border"
+                    bg-color="input-bg"
+                    class="q-py-sm no-case q-mr-md input-width"
+                    stack-label
+                    outlined
+                    filled
+                    dense
+                    use-input
+                    hide-selected
+                    fill-input                    
+                    @update:model-value="updateOrganization()"
+                    :rules="[(val: any) => !!val || 'Field is required!']"
+                   
+                  >
+                    </q-select>
+                    <div class="quota-tabs">
+                        <q-tabs
+                        data-test="quota-tabs"
+                        v-model="activeTab"
+                        no-caps
+                        outside-arrows
+                        size="sm"
+                        mobile-arrows
+                        class="bg-white text-primary"
+                        @update:model-value="updateActiveTab"
+                         >
+                        <q-tab
+                        data-test="quota-api-limit-tab"
+                        name="api-limits"
+                        :label="t('quota.api-limits')"
+                        />
+                        <q-tab
+                        data-test="quota-role-limit-tab"
+                        name="role-limits"
+                        :label="t('quota.role-limits')"
+                        />
+                    </q-tabs>
+                    </div>
+                    </div>
+                    <div class="flex items-center" v-if="selectedOrganization">
+                        <q-btn
+                            data-test="bulk-update-btn"
+                            label="Bulk Update"
+                            class="border q-ml-md title-height"
+                            no-caps
+                            @click="bulkUpdate"
+                        >
+                        <q-icon name="cached" style="font-weight: 200; opacity: 0.7;"  class="q-ml-sm"/>
+                    </q-btn>
+                        <q-btn
+                        v-if="!editTable"
+                            data-test="edit-table-btn"
+                            label="Edit Table"
+                            class="border q-ml-md title-height"
+                            no-caps
+
+                            @click="editTableWithInput"
+                        >
+                        <q-icon name="edit" style="font-weight: 200; opacity: 0.7;"  class="q-ml-sm"/>
+                    </q-btn>
+
+                    </div>
+                </div>
+                <div v-if="selectedOrganization" class="flex items-center justify-between full-width ">
+                    <q-input
+                        data-test="pipeline-list-search-input"
+                        v-model="searchQuery"
+                        borderless
+                        filled
+                        dense
+                        class=" q-mb-xs no-border input-width"
+                        :placeholder="{
+                            'api-limits': t('quota.api-search'),
+                            'role-limits': t('quota.role-search')
+                        }[activeTab]"
+                    >
+                        <template #prepend>
+                        <q-icon name="search" class="cursor-pointer" />
+                        </template>
+                    </q-input>
+                    <div v-if="selectedOrganization">
+                        <q-table-pagination
+                            :scope="scope"
+                            :position="'top'"
+                            :resultTotal="resultTotal"
+                            :perPageOptions="perPageOptions"
+                            @update:changeRecordPerPage="changePagination"
+                        />
+                    </div>
+                </div>
+                
+            </template>
+
+            <template #bottom="scope">
+                <q-table-pagination
+                :scope="scope"
+                :resultTotal="resultTotal"
+                position="bottom"
+                :perPageOptions="perPageOptions"
+                @update:changeRecordPerPage="changePagination"
+            />
+            </template>
+            <template v-slot:body="props">
+        <q-tr
+          :data-test="`quota-role-list-table-${props.row.uuid}-row`"
+          :props="props"
+          style="cursor: pointer"
+        >
+
+        <q-td v-for="col in roleLimitsColumns" :key="col.name" :props="props" :style="col.style">
+            <template v-if="col.name == '#'" >
+                <q-btn
+                    dense
+                    flat
+                    size="xs"
+                    :icon=" 
+                expandedRow != props.row.uuid
+                    ? 'chevron_right'
+                    : 'expand_more'
+                "
+            @click="triggerExpand(props)"
+            />
+            </template>
+            <template v-if="col.name == 'role_name'">
+                {{ props.row[col.name] }}
+            </template>
+            
+        </q-td>
+        </q-tr>
+        <q-tr data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.uuid" :props="props" >
+            <q-td  colspan="100%" class="q-pa-none" >
+            <q-table
+            :rows="apiLimitsRows"
+            :columns="roleLimitsColumns"
+            row-key="name"
+            :filter="searchQuery"
+            enablePagination="false"
+            :filter-method="filteredData"
+            :hide-bottom="true"
+
+        >
+        <template #no-data></template>
+
+        <template #header="props">
+            <q-tr :props="props" class="thead-sticky test-table">
+                <q-th :props="props" v-for="col in roleLimitsColumns" :key="col.name" :style="col.style">
+                    {{ col.label }}
+                </q-th>
+            </q-tr>
+        </template>
+
+            <template v-slot:body-cell="props">
+            <q-td :props="props" 
+                  v-if="editTable" 
+                  :class="{
+                      'editable-cell': editTable && props.col.name !== 'module_name',
+                      'edited-cell': isEdited(props.row.module_name, props.col.name)
+                  }">
+                    <q-input
+                        v-if="props.row[props.col.name] != '-' && props.col.name != 'module_name'"
+                        :model-value="changedValues[props.row.module_name]?.[props.col.name]?.threshold ?? props.row[props.col.name].threshold"
+                        @update:model-value="(val) => handleInputChange(props.row.module_name , props.row[props.col.name], props.col.name, val)"
+                        :class="{
+                        'edited-input': isEdited(props.row.module_name, props.col.name),
+                        'focused-input': focusedInputId === generateUniqueId(props.row[props.col.name])
+                        }"
+                        input-class="text-center"
+                        class="title-height full-width cursor-text editable-input"
+                        type="number"
+                        dense
+                        stack-label
+                        borderless
+                        hide-bottom-space
+                        :min="0"
+                        :rules="[
+                            val => val >= 0 || 'Value must be greater than or equal to 0'
+                        ]"
+                        @focus="onFocus(props.row[props.col.name])"
+                        @blur="onBlur"
+                    />
+                <q-input
+                v-else-if="props.row[ props.col.name ] == '-' && props.col.name != 'module_name' "
+                v-model="props.row[ props.col.name ]"
+                input-class="text-center"
+                type="text"
+                :disable="true"
+                flat
+                dense
+                borderless
+                />
+
+                <div v-else>
+                    
+                    {{ props.row[ props.col.name ] }}
+                </div>
+            </q-td>
+            <q-td :props="props" v-else>
+                <div v-if="props.col.name != 'role_name' && props.row[props.col.name] != '-' && props.col.name != '#'">
+                    {{ props.row[ props.col.name ]?.threshold }}
+                </div>
+                    <div v-else-if="props.col.name == 'role_name'"> 
+                   {{ props.row['module_name'] }}
+                 </div>
+                <div v-else-if="props.row[props.col.name] == '-'">
+                   -
+                </div>
+                <div v-else-if="props.col.name == '#' ">
+                    
+                </div>
+            </q-td>
+            </template>
+
+        </q-table>
+            </q-td>
+       </q-tr>
+      </template>
 
         </q-table>
         <div v-if="loading && !apiLimitsRows.length" class="flex justify-center items-center">
@@ -301,6 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                
             </q-card>
         </q-dialog>
+        </div>
 
       </q-page>
       
@@ -319,7 +591,7 @@ import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, getUUID } from "@/utils/zincutils";
 import {
   outlinedDelete,
   outlinedPause,
@@ -329,12 +601,13 @@ import {
   outlinedFileUpload,
   outlinedInsertDriveFile
 } from "@quasar/extras/material-icons-outlined";
+import AppTable from "@/components/AppTable.vue";
 export default defineComponent ({
     name: "Quota",
     components: {
         NoOrganizationSelected ,
         AppTabs,
-        QTablePagination
+        QTablePagination,
     },
     setup() {
         const { t } = useI18n();
@@ -404,6 +677,58 @@ export default defineComponent ({
                 sortable: true,
             }
             ];
+            const roleLimitsColumns: any = [
+                {
+                    name: "#",
+                    field: "#",
+                    label: "#",
+                    align: "left",
+                    sortable: true,
+                },
+            {
+                name: "role_name",
+                field: "role_name",
+                label: t("quota.roleName"),
+                align: "left",
+                sortable: true,
+
+            },
+            {
+                name: "list",
+                field: "list",
+                label: t("quota.listLimit"),
+                align: "left",
+                sortable: true,
+            },
+            {
+                name: "get",
+                field: "get",
+                label: t("quota.getLimit"),
+                align: "left",
+                sortable: true,
+            },
+            {
+                name: "create",
+                field: "create",
+                label: t("quota.createLimit"),
+                align: "left",
+                sortable: true,
+            },
+            {
+                name: "update",
+                field: "update",
+                label: t("quota.updateLimit"),
+                align: "left",
+                sortable: true,
+            },
+            {
+                name: "delete",
+                field: "delete",
+                label: t("quota.deleteLimit"),
+                align: "left",
+                sortable: true,
+            }
+            ];
         const activeTab = ref<string>("api-limits");
         const searchQuery = ref<string>("");
         const apiLimitsRows = ref<any[]>([]);
@@ -417,6 +742,8 @@ export default defineComponent ({
         const uploadingRules = ref<boolean>(false);
         const uploadError = ref<string>("");
         const focusedInputId = ref(null);
+        const expandedRow = ref<string>("");
+        const roleLimitRows = ref<any[]>([]);
 
 
         onMounted(async ()=>{
@@ -517,16 +844,22 @@ export default defineComponent ({
             ]
         }
         const getRolesByOrganization = async () => {
-            // try{
-            //     const response = await getRoles(selectedOrganization.value.value);
-            //     console.log(response.data.api_group_info);
-            //         rolesRows.value = response.data.api_group_info.map((role: any) => ({
-
-            //         }));
-            // }
-            // catch(error){
-            //     console.log(error);
-            // }
+            try{
+                const response = await getRoles(selectedOrganization.value.value);
+                rolesRows.value = response.data.map((role: any) => ({
+                    role_name: role,
+                    uuid: getUUID(),
+                    list: 10,
+                    get: 10,
+                    create: 10,
+                    update: 10,
+                    delete: 10
+                }));
+                console.log(rolesRows.value,'rolesRows');
+            }
+            catch(error){
+                console.log(error);
+            }
         }
         const getApiLimitsByOrganization = async () => {
             loading.value = true;
@@ -554,7 +887,7 @@ export default defineComponent ({
                         moduleThresholds[operation.toLowerCase()] =  module[operation];
                     } else {
                         // If the operation doesn't exist, set it as '--'
-                        moduleThresholds[operation.toLowerCase()] = '--';
+                        moduleThresholds[operation.toLowerCase()] = '-';
                     }
                 });
                 // Add the transformed data to the array
@@ -762,6 +1095,18 @@ export default defineComponent ({
         }
         return filtered;
       }
+      const triggerExpand = async (props : any) =>{
+  if (expandedRow.value === props.row.uuid) {
+      expandedRow.value = null;
+    } else {
+        const response = await ratelimitService.getRoleLimits(selectedOrganization.value.value, props.row.role_name);
+
+        
+
+      // Otherwise, expand the clicked row and collapse any other row
+      expandedRow.value = props.row.uuid;
+  }
+}
 
         
         return {
@@ -809,7 +1154,11 @@ export default defineComponent ({
             onFocus,
             onBlur,
             generateUniqueId,
-            filteredData
+            filteredData,
+            roleLimitsColumns,
+            triggerExpand,
+            expandedRow,
+            roleLimitRows
         }
     }
 })
@@ -924,6 +1273,53 @@ export default defineComponent ({
 .focused-input {
   border: 1px solid #007bff; /* Customize the border color */
   box-shadow: 0 0 5px rgba(0, 123, 255, 0.5); /* Optional: Add shadow for better focus effect */
+}
+
+.expanded-content {
+  padding: 0  3rem;
+  max-height: 100vh; /* Set a fixed height for the container */
+  overflow: hidden; /* Hide overflow by default */
+}
+
+.scrollable-content {
+  width: 100%; /* Use the full width of the parent */
+  overflow-y: auto; /* Enable vertical scrolling for long content */
+  padding: 10px; /* Optional: padding for aesthetics */
+  border: 1px solid #ddd; /* Optional: border for visibility */
+  height: 100%;
+  max-height: 200px;
+   /* Use the full height of the parent */
+  text-wrap: normal;
+  background-color: #e8e8e8;
+  color: black;
+}
+.expanded-sql{
+  border-left: #7A54A2 3px solid;
+}
+
+
+.app-table-container {
+  .thead-sticky,
+  .tfoot-sticky {
+    position: sticky;
+    top: 0;
+    opacity: 1;
+    z-index: 1;
+    background: #f5f5f5;
+    
+  }
+
+  .q-table--dark .thead-sticky,
+  .q-table--dark .tfoot-sticky {
+    background: #565656 !important;
+  }
+
+  .q-table__bottom {
+    .q-table__control {
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+  }
 }
 
 
