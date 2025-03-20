@@ -658,11 +658,12 @@ pub async fn list_v2<C: ConnectionTrait>(
     let alerts = db::alerts::alert::list_with_folders(conn, params)
         .await?
         .into_iter()
-        .filter(|(_f, a)| {
+        .filter(|(f, a)| {
             // Include the alert if all alerts are permitted.
             is_all_permitted
                 // Include the alert if the alert is permitted with the old OpenFGA identifier.
                 || permissions.contains(&format!("alert:{}", a.name))
+                || permissions.contains(&format!("alert:{}/{}", f.folder_id, a.id.as_ref().unwrap().to_string()))
                 // Include the alert if the alert is permitted with the new OpenFGA identifier.
                 || a.id
                     .filter(|id| permissions.contains(&format!("alert:{id}")))
@@ -1594,7 +1595,7 @@ async fn permitted_alerts(
 
     // If the list_only_permitted is true, then we will only return the alerts that the user has
     // `GET` permission on.
-    if get_openfga_config().list_only_permitted {
+    if !get_openfga_config().list_only_permitted {
         return Ok(None);
     }
 
@@ -1646,7 +1647,7 @@ async fn permitted_alerts(
         org_id,
         user_id,
         "GET_INDIVIDUAL",
-        "alerts",
+        OFGA_MODELS.get("alerts").unwrap().key,
     )
     .await
     .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;

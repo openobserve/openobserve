@@ -25,6 +25,8 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     table,
 };
+#[cfg(feature = "enterprise")]
+use o2_openfga::meta::mapping::OFGA_MODELS;
 
 use crate::common::{
     meta::authz::Authz,
@@ -172,18 +174,23 @@ pub async fn list_folders(
     user_id: Option<&str>,
     folder_type: FolderType,
 ) -> Result<Vec<Folder>, FolderError> {
-    let permitted_folders = permitted_folders(org_id, user_id).await?;
+    let permitted_folders = permitted_folders(org_id, user_id, folder_type).await?;
     let folders = table::folders::list_folders(org_id, folder_type).await?;
+    let folder_ofga_model = match folder_type {
+        FolderType::Dashboards => OFGA_MODELS.get("folders").unwrap().key,
+        FolderType::Alerts => OFGA_MODELS.get("alert_folders").unwrap().key,
+    };
+
     let filtered = match permitted_folders {
         Some(permitted_folders) => {
-            if permitted_folders.contains(&format!("{}:_all_{}", "dfolder", org_id)) {
+            if permitted_folders.contains(&format!("{}:_all_{}", folder_ofga_model, org_id)) {
                 folders
             } else {
                 folders
                     .into_iter()
                     .filter(|folder_loc| {
                         permitted_folders
-                            .contains(&format!("{}:{}", "dfolder", folder_loc.folder_id))
+                            .contains(&format!("{}:{}", folder_ofga_model, folder_loc.folder_id))
                     })
                     .collect::<Vec<_>>()
             }
@@ -270,6 +277,7 @@ pub async fn delete_folder(
 async fn permitted_folders(
     _org_id: &str,
     _user_id: Option<&str>,
+    _folder_type: FolderType,
 ) -> Result<Option<Vec<String>>, FolderError> {
     Ok(None)
 }
@@ -278,9 +286,19 @@ async fn permitted_folders(
 async fn permitted_folders(
     org_id: &str,
     user_id: Option<&str>,
+    folder_type: FolderType,
 ) -> Result<Option<Vec<String>>, FolderError> {
     use o2_openfga::meta::mapping::OFGA_MODELS;
-    let folder_ofga_model = OFGA_MODELS.get("folders").unwrap().key;
+    let (folder_ofga_model, child_ofga_model) = match folder_type {
+        FolderType::Dashboards => (
+            OFGA_MODELS.get("folders").unwrap().key,
+            OFGA_MODELS.get("dashboards").unwrap().key,
+        ),
+        FolderType::Alerts => (
+            OFGA_MODELS.get("alert_folders").unwrap().key,
+            OFGA_MODELS.get("alerts").unwrap().key,
+        ),
+    };
 
     let Some(user_id) = user_id else {
         return Err(FolderError::PermittedFoldersMissingUser);
@@ -291,7 +309,7 @@ async fn permitted_folders(
         org_id,
         user_id,
         "GET",
-        OFGA_MODELS.get("folders").unwrap().key,
+        folder_ofga_model,
     )
     .await
     .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
@@ -304,12 +322,12 @@ async fn permitted_folders(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",
-        OFGA_MODELS.get("dashboards").unwrap().key,
+        child_ofga_model,
     )
     .await
     .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
 
-    log::info!("permitted_dashboards: {:?}", permitted_dashboards);
+    log::debug!("permitted_dashboards: {:?}", permitted_dashboards);
     if permitted_dashboards.is_some() {
         let mut folder_list_with_roles = vec![];
         for dashboard in permitted_dashboards.unwrap() {
