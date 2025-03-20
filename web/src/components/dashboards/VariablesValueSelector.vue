@@ -120,7 +120,7 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const instance = getCurrentInstance();
     const store = useStore();
-    
+
     // variables data derived from the variables config list
     const variablesData: any = reactive({
       isVariablesLoading: false,
@@ -937,19 +937,38 @@ export default defineComponent({
       // Update the old variables data
       oldVariablesData[currentVariable.name] = currentVariable.value;
 
-      // Get immediate child variables
-      const immediateChildren =
-        variablesDependencyGraph[currentVariable.name]?.childVariables || [];
+      // Get all affected variables recursively
+      const getAllAffectedVariables = (
+        varName: string,
+        visited = new Set<string>(),
+      ): string[] => {
+        if (visited.has(varName)) return []; // Prevent circular dependencies
+        visited.add(varName);
 
-      // Load data only for immediate child variables
-      const childrenToUpdate = variablesData.values.filter((v: any) =>
-        immediateChildren.includes(v.name),
+        const immediateChildren =
+          variablesDependencyGraph[varName]?.childVariables || [];
+        const allChildren: string[] = [...immediateChildren];
+
+        for (const childName of immediateChildren) {
+          const childrenOfChild = getAllAffectedVariables(childName, visited);
+          allChildren.push(...childrenOfChild);
+        }
+
+        return Array.from(new Set(allChildren));
+      };
+
+      // Get all affected variables in dependency order
+      const affectedVariables = getAllAffectedVariables(currentVariable.name);
+
+      // Reset and mark all affected variables for update
+      const variablesToUpdate = variablesData.values.filter((v: any) =>
+        affectedVariables.includes(v.name),
       );
 
-      // Set loading state for immediate children
-      childrenToUpdate.forEach((variable: any) => {
+      // Reset all affected variables
+      variablesToUpdate.forEach((variable: any) => {
         variable.isVariableLoadingPending = true;
-        // Reset the value of dependent variables when parent changes
+        variable.isLoading = true;
         if (variable.multiSelect) {
           variable.value = [];
         } else {
@@ -957,14 +976,13 @@ export default defineComponent({
         }
       });
 
-      // Load data for immediate children
-      try {
-        await Promise.all(
-          childrenToUpdate.map((variable: any) =>
-            loadSingleVariableDataByName(variable),
-          ),
-        );
-      } catch (error) {}
+      // Load variables in dependency order
+      for (const varName of affectedVariables) {
+        const variable = variablesData.values.find((v: any) => v.name === varName);
+        if (variable) {
+          await loadSingleVariableDataByName(variable);
+        }
+      }
 
       // Emit updated data
       emitVariablesData();
