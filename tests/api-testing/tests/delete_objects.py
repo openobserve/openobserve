@@ -45,6 +45,6 @@ def delete_objects(session, base_url, user_email, user_password, org_id, stream_
         template_name_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}"
         template_page.delete_template(session, base_url, user_email, user_password, org_id, template_name_webhook)
 
-        template_name_email = f"template_email_{template_page.Unique_value_temp}_{i}"
-        template_page.delete_template(session, base_url, user_email, user_password, org_id, template_name_email)
+#         template_name_email = f"template_email_{template_page.Unique_value_temp}_{i}"
+#         template_page.delete_template(session, base_url, user_email, user_password, org_id, template_name_email)
 

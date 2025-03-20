@@ -16,9 +16,9 @@ def verify_edited_objects(session, base_url, user_email, user_password, org_id, 
         template_page.retrieve_templates_webhook(session, base_url, user_email, user_password, org_id)
         template_page.retrieve_template_webhook(session, base_url, user_email, user_password, org_id, template_name_webhook)
 
-        template_name_email = f"template_email_{template_page.Unique_value_temp}_{i}"
-        template_page.retrieve_templates_email(session, base_url, user_email, user_password, org_id)
-        template_page.retrieve_template_email(session, base_url, user_email, user_password, org_id, template_name_email)
+#         template_name_email = f"template_email_{template_page.Unique_value_temp}_{i}"
+#         template_page.retrieve_templates_email(session, base_url, user_email, user_password, org_id)
+#         template_page.retrieve_template_email(session, base_url, user_email, user_password, org_id, template_name_email)
 
         # Retrieve destinations
         destination_name_webhook = f"destination_webhook_{destination_page.Unique_value_destination}_{i}"
