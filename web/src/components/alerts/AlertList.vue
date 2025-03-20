@@ -623,7 +623,10 @@ export default defineComponent({
       }
     }
     const activeFolderToMove = ref("default");
-    const columns: any = ref<QTableProps["columns"]>([
+    
+
+    const columns = computed(() => {
+      const baseColumns: any = [
           {
             name: "#",
             label: "#",
@@ -686,7 +689,19 @@ export default defineComponent({
             style: "width: 150px",
     
           },
-        ]);
+        ];
+        if(searchAcrossFolders.value && searchQuery.value != ''){
+          baseColumns.splice(2,0,{
+            name: "folder_name",
+            field: "folder_name",
+            label: 'Folder',
+            align: "center",
+            sortable: true,
+            style: "width: 150px",
+          })
+        }
+        return baseColumns;
+    })
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
@@ -792,20 +807,6 @@ export default defineComponent({
                   },
                 };
               });
-    
-              if(searchAcrossFolders.value && columns.value.length < 7){
-                columns.value.splice(2,0,{
-                  name: "folder_name",
-                  field: "folder_name",
-                  label: 'Folder',
-                  align: "center",
-                  sortable: true,
-                  style: "width: 150px",
-                })
-              }
-              else if (columns.value.length == 7){
-                columns.value.splice(2,1);
-              }
               alertsRows.value.forEach((alert: AlertListItem) => {
                 alertStateLoadingMap.value[alert.uuid as string] = false;
               });
@@ -908,11 +909,6 @@ export default defineComponent({
         filteredResults.value = [];
       }
     });
-    watch(searchAcrossFolders, async (newVal) => {
-      if(!newVal && columns.value.length == 7){
-        columns.value.splice(2,1);
-      }
-    })
     watch(
       () => router.currentRoute.value.query.action,
       (action) => {
@@ -1341,6 +1337,7 @@ const updateActiveFolderId = (newVal: any) => {
       activeFolderId.value = newVal;
       selected.value = [];
       allSelected.value = false;
+      filterQuery.value = "";
       alertsRows.value.forEach((alert: any) => {
         alert.selected = false;
       }); 
