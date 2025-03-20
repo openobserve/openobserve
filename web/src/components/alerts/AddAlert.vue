@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 data-test="add-alert-name-input"
                 class="alert-name-input o2-input"
-                style="padding-top: 12px"
+                style="padding-top: 12px;"
               >
                 <q-input
                   v-model="formData.name"
@@ -1658,13 +1658,6 @@ export default defineComponent({
 
   .q-field--dark .q-field__control {
     background-color: rgba(255, 255, 255, 0.07) !important;
-  }
-}
-.alert-select-folder-dropdown-list {
-  :deep(.q-field--labeled.showLabelOnTop) {
-    padding-top: 12px; /* Example override */
-    height: 10px !important;
-    background-color: red;
   }
 }
 </style>
