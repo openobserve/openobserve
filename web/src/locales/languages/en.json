@@ -1124,15 +1124,16 @@
     "save": "Save",
     "name": "Action Name",
     "header": "Actions",
-    "add": "Create Action",
+    "add": "Add Action",
     "deleteTitle": "Delete",
     "deleteText": "Are you sure you want to delete file ?",
-    "uploadCodeZip": "Upload Code Zip",
+    "uploadCodeZip": "Upload Code ZIP File",
     "update":"Update Action",
     "type":"Execution Type",
     "serviceAccount":"Service Account",
-    "search": "Search Actions",
-    "timezone": "Timezone"
+    "search": "Search Action",
+    "timezone": "Timezone",
+    "zipFileRequired": "ZIP File is required!"
   },
   "cipherKey": {
     "header": "Cipher Keys",
