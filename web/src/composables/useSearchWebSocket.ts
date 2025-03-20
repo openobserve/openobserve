@@ -241,7 +241,7 @@ const useSearchWebSocket = () => {
   const sendSearchMessageBasedOnRequestId = (data: any) => {
     try {
       
-      if(!traces[data.traceId].isActive && inactiveSocketId.value) {
+      if(!traces[data.content.traceId]?.isActive && inactiveSocketId.value) {
         webSocket.sendMessage(inactiveSocketId.value as string, JSON.stringify(data));
         return;
       }
