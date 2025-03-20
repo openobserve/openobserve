@@ -21,7 +21,6 @@ use config::{
     get_config,
     meta::websocket::{SearchEventReq, SearchResultType},
 };
-use dashmap::DashMap;
 use futures::StreamExt;
 use infra::errors::{self, Error};
 #[cfg(feature = "enterprise")]
@@ -29,7 +28,6 @@ use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, WsMeta},
     infra::config::get_config as get_o2_config,
 };
-use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
 

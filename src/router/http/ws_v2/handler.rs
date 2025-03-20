@@ -100,9 +100,9 @@ impl WsHandler {
                             );
                             let err_msg = ErrorMessage::new(e.into(), None, None);
                             let should_disconnect = err_msg.should_disconnect;
-                            if let Err(_) = error_tx.send(Some(err_msg)).await {
+                            if let Err(e) = error_tx.send(Some(err_msg)).await {
                                 log::error!(
-                                    "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                    "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                 );
                             };
                             if should_disconnect {

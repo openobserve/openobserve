@@ -52,9 +52,6 @@ pub enum WsError {
     #[error("Querier WS url error: {0}")]
     QuerierWSUrlError(String),
 
-    #[error("Querier connection closed: {0}")]
-    QuerierConnectionClosed(String),
-
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -70,7 +67,6 @@ impl ResponseError for WsError {
             WsError::QuerierUrlInvalid(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::QuerierWSUrlError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::QuerierNotAvailable(_) => StatusCode::SERVICE_UNAVAILABLE,
-            WsError::QuerierConnectionClosed(_) => StatusCode::SERVICE_UNAVAILABLE,
             WsError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::ResponseChannelNotFound(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::ResponseChannelClosed(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -80,10 +76,7 @@ impl ResponseError for WsError {
 
 impl WsError {
     pub fn should_client_retry(&self) -> bool {
-        match self {
-            WsError::QuerierConnectionClosed(_) => true,
-            _ => false,
-        }
+        false
     }
 }
 
@@ -98,13 +91,15 @@ pub struct ErrorMessage {
 impl ErrorMessage {
     // TODO: confirm what request_id is?
     pub fn new(ws_error: WsError, trace_id: Option<String>, request_id: Option<String>) -> Self {
+        let should_client_retry = ws_error.should_client_retry();
+        let should_disconnect = ws_error.should_disconnect();
         Self {
             ws_server_events: ws_error.into_ws_server_events(
                 trace_id,
                 request_id,
-                ws_error.should_client_retry(),
+                should_client_retry,
             ),
-            should_disconnect: ws_error.should_disconnect(),
+            should_disconnect,
         }
     }
 
@@ -136,7 +131,7 @@ impl WsError {
     }
 
     pub fn into_ws_server_events(
-        &self,
+        self,
         trace_id: Option<String>,
         request_id: Option<String>,
         should_client_retry: bool,

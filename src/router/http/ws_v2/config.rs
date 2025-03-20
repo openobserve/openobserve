@@ -13,38 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
-
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WsConfig {
-    pub pool_size: usize,
-    pub connection_timeout_secs: u64,
-    pub max_connections_per_querier: usize,
-    pub retry_config: RetryConfig,
-    pub circuit_breaker_config: CircuitBreakerConfig,
+    pool_size: usize,
+    connection_timeout_secs: u64,
+    max_connections_per_querier: usize,
+    retry_config: RetryConfig,
+    circuit_breaker_config: CircuitBreakerConfig,
     pub health_check_config: HealthCheckConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RetryConfig {
-    pub max_retries: u32,
-    pub initial_retry_delay_ms: u64,
-    pub max_retry_delay_ms: u64,
+    max_retries: u32,
+    initial_retry_delay_ms: u64,
+    max_retry_delay_ms: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CircuitBreakerConfig {
-    pub failure_threshold: u32,
-    pub reset_timeout_secs: u64,
-    pub half_open_timeout_secs: u64,
+    failure_threshold: u32,
+    reset_timeout_secs: u64,
+    half_open_timeout_secs: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct HealthCheckConfig {
     pub interval_secs: u64,
-    pub timeout_secs: u64,
+    timeout_secs: u64,
 }
 
 impl Default for WsConfig {

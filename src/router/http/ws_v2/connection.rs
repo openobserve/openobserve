@@ -56,7 +56,6 @@ pub trait Connection: Send + Sync {
     async fn disconnect(&self);
     async fn send_message(&self, message: WsClientEvents) -> WsResult<()>;
     async fn is_connected(&self) -> bool;
-    fn get_name(&self) -> &QuerierName;
 }
 
 #[derive(Debug)]
@@ -416,10 +415,6 @@ impl Connection for QuerierConnection {
 
     async fn is_connected(&self) -> bool {
         self.is_connected.load(Ordering::SeqCst) && self.write.lock().await.is_some()
-    }
-
-    fn get_name(&self) -> &QuerierName {
-        &self.querier_name
     }
 }
 

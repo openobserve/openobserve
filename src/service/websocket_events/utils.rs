@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::{meta::websocket::SearchEventReq, utils::json};
+use config::meta::websocket::SearchEventReq;
 use infra::errors;
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::tungstenite;

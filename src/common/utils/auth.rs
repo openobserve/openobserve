@@ -871,9 +871,9 @@ pub async fn extract_auth_expiry_and_user_id(
 
     // TODO: handle basic auth, bearer token
 
-    let (mut exp, mut user_id) = (None, None);
+    let mut user_id = None;
 
-    exp = if auth_str.starts_with("session ") {
+    let exp = if auth_str.starts_with("session ") {
         let session_key = auth_str.strip_prefix("session ").unwrap();
         match crate::service::db::session::get(session_key).await {
             Ok(bearer_token) => {

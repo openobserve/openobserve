@@ -221,7 +221,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     {
                         user_id = if get_config().common.local_mode {
                             // single node mode, use user_id from the http request header
-                            &user_id
+                            user_id
                         } else {
                             // cluster mode, use user_id from the ws event added by the router
                             if let Some(user_id) = &search_req.user_id {
