@@ -104,7 +104,11 @@ pub async fn save_folder(
     }
 
     let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
-    set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
+    let folder_type_ofga = match folder_type {
+        FolderType::Dashboards => "folders",
+        FolderType::Alerts => "alert_folders",
+    };
+    set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::infra::config::get_config()
@@ -240,7 +244,11 @@ pub async fn delete_folder(
     }
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
-    remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
+    let folder_type_ofga = match folder_type {
+        FolderType::Dashboards => "folders",
+        FolderType::Alerts => "alert_folders",
+    };
+    remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::infra::config::get_config()
