@@ -407,9 +407,6 @@ impl FromRequest for AuthExtractor {
             // Handle /v2 alert apis
             if path_columns[0].eq(V2_API_PREFIX) {
                 if path_columns[2].eq("alerts") {
-                    if method.eq("PATCH") {
-                        method = "PUT".to_string();
-                    }
                     format!(
                         "{}:{}",
                         OFGA_MODELS
@@ -660,6 +657,17 @@ impl FromRequest for AuthExtractor {
                 }));
             }
 
+            if method.eq("PATCH") && object_type.eq("alert:move") {
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method: "".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    bypass_check: true, // bypass check permissions
+                    parent_id: folder,
+                }));
+            }
+
             return ready(Ok(AuthExtractor {
                 auth: auth_str.to_owned(),
                 method,
@@ -811,6 +819,7 @@ pub async fn check_permissions(
     user_id: &str,
     object_type: &str,
     method: &str,
+    parent_id: &str,
 ) -> bool {
     if !is_root_user(user_id) {
         let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
@@ -838,7 +847,7 @@ pub async fn check_permissions(
                 ),
                 org_id: org_id.to_string(),
                 bypass_check: false,
-                parent_id: "".to_string(),
+                parent_id: parent_id.to_string(),
             },
             user.role,
             user.is_external,
