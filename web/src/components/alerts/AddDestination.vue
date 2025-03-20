@@ -390,7 +390,7 @@ const apiHeaders: Ref<
 const tabs = computed(() => {
   let tabs = [
     {
-      label: "Web Hook",
+      label: t("alerts.webhook"),
       value: "http",
       style: {
         width: "fit-content",
@@ -401,7 +401,7 @@ const tabs = computed(() => {
       },
     },
     {
-      label: "Email",
+      label: t("alerts.email"),
       value: "email",
       style: {
         width: "fit-content",
@@ -418,7 +418,7 @@ const tabs = computed(() => {
     store.state.zoConfig.actions_enabled
   ) {
     tabs.push({
-      label: "Action",
+      label: t("alerts.action"),
       value: "action",
       style: {
         width: "fit-content",
