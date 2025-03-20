@@ -276,7 +276,7 @@ impl WsHandler {
                                     if err_msg.should_disconnect {
                                         // TODO: special handling for unauthorized error message
                                         // shouldn't close directly but wait for all ongoing requests to finish
-                                        if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Error))).await {
+                                        if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Normal))).await {
                                             log::error!("Error closing websocket session: {}", e);
                                         };
                                         return Ok(());
