@@ -93,6 +93,48 @@ impl From<RatelimitError> for HttpResponse {
 struct RatelimitList {
     pub api_group_info: HashMap<String, HashMap<ApiGroupOperation, ApiGroup>>,
 }
+
+/// listApiModule
+///
+/// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"list"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Ratelimit",
+    operation_id = "listApiModule",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization Name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/ratelimit/api_module")]
+pub async fn api_module(path: web::Path<String>) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        if RATELIMIT_API_MAPPING.read().await.is_empty() {
+            let openapi_info = crate::handler::http::router::openapi::openapi_info().await;
+            o2_ratelimit::dataresource::default_rules::init_ratelimit_api_mapping(openapi_info)
+                .await;
+        }
+
+        let info = get_ratelimit_global_default_api_info().await;
+        let all_group = info.get_all_groups();
+
+        Ok(HttpResponse::Ok().json(all_group))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(path);
+        Ok(HttpResponse::Forbidden().json("Not Supported"))
+    }
+}
+
 /// listModuleRatelimitRule
 ///
 /// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"list"}#
