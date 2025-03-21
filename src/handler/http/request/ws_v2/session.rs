@@ -32,9 +32,10 @@ use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
 
 #[cfg(feature = "enterprise")]
-use crate::service::self_reporting::audit;
-#[cfg(feature = "enterprise")]
-use crate::service::websocket_events::handle_cancel;
+use crate::service::{
+    self_reporting::audit,
+    websocket_events::{handle_cancel, search_registry_utils},
+};
 use crate::{
     common::infra::config::WS_SEARCH_REGISTRY,
     // router::http::ws_v2::types::StreamMessage,
