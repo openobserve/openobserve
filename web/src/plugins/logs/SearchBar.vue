@@ -90,11 +90,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-reset-filters-btn"
           :title="t('search.resetFilters')"
           no-caps
-          size="sm"
+          size="13px"
           icon="restart_alt"
           class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
           @click="resetFilters"
         />
+        <syntax-guide
+          data-test="logs-search-bar-sql-mode-toggle-btn"
+          :sqlmode="searchObj.meta.sqlMode"
+        ></syntax-guide>
         <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
@@ -369,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <q-btn-group
-          v-if="config.isEnterprise == 'true'"
+          v-if="config.isEnterprise == 'true' && false"
           class="no-outline q-pa-none no-border"
         >
           <q-btn-dropdown
@@ -413,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </q-btn-dropdown>
         </q-btn-group>
-        <q-btn-group class="no-outline q-pa-none no-border">
+        <q-btn-group v-if="false" class="no-outline q-pa-none no-border">
           <q-btn-dropdown
             data-test="logs-search-bar-reset-function-btn"
             class="q-mr-xs download-logs-btn q-px-xs"
@@ -464,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-share-link-btn"
           class="q-mr-xs download-logs-btn q-px-sm"
           size="sm"
-          icon="history"
+          icon="menu"
           :title="'Search History'"
           @click="showSearchHistoryfn"
         ></q-btn>
