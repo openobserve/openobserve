@@ -108,7 +108,7 @@ impl super::Db for MysqlDb {
     }
 
     async fn stats(&self) -> Result<super::Stats> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let keys_count: i64 =
             sqlx::query_scalar(r#"SELECT CAST(COUNT(*) AS SIGNED) AS num FROM meta;"#)
@@ -123,7 +123,7 @@ impl super::Db for MysqlDb {
 
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let query = format!(
             "SELECT value FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' ORDER BY start_dt DESC;",
@@ -542,7 +542,7 @@ impl super::Db for MysqlDb {
         }
         sql = format!("{} ORDER BY start_dt ASC", sql);
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -572,7 +572,7 @@ impl super::Db for MysqlDb {
         }
 
         sql = format!("{} ORDER BY start_dt ASC", sql);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -621,7 +621,7 @@ impl super::Db for MysqlDb {
             sql, min_dt, max_dt
         );
         sql = format!("{} ORDER BY start_dt ASC", sql);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -644,7 +644,7 @@ impl super::Db for MysqlDb {
         if !key2.is_empty() {
             sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
         }
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
         Ok(count)

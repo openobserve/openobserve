@@ -25,7 +25,7 @@ use super::{
 use crate::{
     db::{
         self, IndexStatement,
-        mysql::{CLIENT, create_index},
+        mysql::{CLIENT, CLIENT_RO, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
     /// The count of jobs for the given module (Report/Alert etc.)
     async fn len_module(&self, module: TriggerModule) -> usize {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -566,7 +566,7 @@ WHERE id IN ({});",
     }
 
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -591,7 +591,7 @@ WHERE id IN ({});",
     }
 
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -610,7 +610,7 @@ WHERE id IN ({});",
 
     /// List all the jobs for the given module and organization
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -685,7 +685,7 @@ WHERE status = ? AND end_time <= ?
     }
 
     async fn len(&self) -> usize {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
