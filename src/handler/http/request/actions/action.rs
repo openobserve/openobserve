@@ -604,26 +604,24 @@ pub async fn upload_zipped_action(
             return Ok(HttpResponse::BadRequest().body("Missing mandatory fields"));
         }
 
-
-    // If action ID is present as field then we know its an update request
-    // Hence we treat it as a PUT request and check for permissions
-    let method = match action.id {
-        Some(_) => "PUT",
-        None => "POST",
-    };
-    if !check_permissions(
-        action.id.map(|ksuid| ksuid.to_string()),
-        &org_id,
-        &user_email.user_id,
-        "actions",
-        method,
-        "",
-    )
-    .await
-    {
-        return Ok(HttpResponse::Forbidden().body("Unauthorized Access"));
-    }
-
+        // If action ID is present as field then we know its an update request
+        // Hence we treat it as a PUT request and check for permissions
+        let method = match action.id {
+            Some(_) => "PUT",
+            None => "POST",
+        };
+        if !check_permissions(
+            action.id.map(|ksuid| ksuid.to_string()),
+            &org_id,
+            &user_email.user_id,
+            "actions",
+            method,
+            "",
+        )
+        .await
+        {
+            return Ok(HttpResponse::Forbidden().body("Unauthorized Access"));
+        }
 
         if file_data.is_empty() {
             return Ok(HttpResponse::BadRequest().body("Uploaded file is empty"));

@@ -112,8 +112,8 @@ struct RatelimitList {
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/ratelimit/api_module")]
-pub async fn api_module(path: web::Path<String>) -> Result<HttpResponse, Error> {
+#[get("/{org_id}/ratelimit/api_modules")]
+pub async fn api_modules(_path: web::Path<String>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
