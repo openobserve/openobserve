@@ -859,65 +859,65 @@ pub async fn check_permissions(
 
 #[cfg(feature = "enterprise")]
 pub async fn extract_auth_expiry_and_user_id(
-    req: &HttpRequest,
+    auth_str: &str,
 ) -> (Option<chrono::DateTime<chrono::Utc>>, Option<String>) {
     use crate::handler::http::auth::validator::get_user_email_from_auth_str;
 
-    let auth_str = extract_auth_str(req);
-
-    if auth_str.is_empty() {
-        return (None, None);
-    }
-
-    // TODO: handle basic auth, bearer token
-
-    let mut user_id = None;
-
-    let exp = if auth_str.starts_with("session ") {
-        let session_key = auth_str.strip_prefix("session ").unwrap();
-        match crate::service::db::session::get(session_key).await {
-            Ok(bearer_token) => {
-                let bearer_full_token = format!("Bearer {}", bearer_token);
-                user_id = get_user_email_from_auth_str(&bearer_full_token).await;
-
-                let keys = get_dex_jwks().await;
-                match jwt::verify_decode_token(
-                    &bearer_token,
-                    &keys,
-                    &o2_dex::config::get_config().client_id,
-                    true,
-                    true,
-                )
-                .await
-                {
-                    Ok((_, Some(token_data))) => {
-                        // Extract exp from claims and convert to DateTime<Utc>
-                        token_data
-                            .claims
-                            .get("exp")
-                            .and_then(|exp| exp.as_i64())
-                            .and_then(|exp_ts| chrono::DateTime::from_timestamp(exp_ts, 0))
-                    }
-                    Ok(_) => {
-                        log::debug!("No token data returned");
-                        None
-                    }
-                    Err(e) => {
-                        log::error!("Error verifying token: {}", e);
-                        None
-                    }
-                }
+    let decode = async |token: &str| {
+        let keys = get_dex_jwks().await;
+        match jwt::verify_decode_token(
+            token,
+            &keys,
+            &o2_dex::config::get_config().client_id,
+            true,
+            true,
+        )
+        .await
+        {
+            Ok((_, Some(token_data))) => {
+                // Extract exp from claims and convert to DateTime<Utc>
+                token_data
+                    .claims
+                    .get("exp")
+                    .and_then(|exp| exp.as_i64())
+                    .and_then(|exp_ts| chrono::DateTime::from_timestamp(exp_ts, 0))
+            }
+            Ok(_) => {
+                log::debug!("No token data returned");
+                None
             }
             Err(e) => {
-                log::error!("Error getting session: {}", e);
+                log::error!("Error verifying token: {}", e);
                 None
             }
         }
-    } else {
-        None
     };
 
-    (exp, user_id)
+    if auth_str.is_empty() {
+        return (None, None);
+    } else if auth_str.starts_with("Basic") {
+        let user_id = get_user_email_from_auth_str(&auth_str).await;
+        return (None, user_id);
+    } else if auth_str.starts_with("Bearer") {
+        let user_id = get_user_email_from_auth_str(&auth_str).await;
+        let stripped_bearer_token = auth_str.strip_prefix("Bearer ").unwrap();
+        let exp = decode(&stripped_bearer_token).await;
+        return (exp, user_id);
+    } else if auth_str.starts_with("session ") {
+        let session_key = auth_str.strip_prefix("session ").unwrap();
+        let stripped_bearer_token = match crate::service::db::session::get(session_key).await {
+            Ok(bearer_token) => bearer_token,
+            Err(e) => {
+                log::error!("Error getting session: {}", e);
+                return (None, None);
+            }
+        };
+        let exp = decode(&stripped_bearer_token).await;
+        let bearer_full_token = format!("Bearer {}", stripped_bearer_token);
+        let user_id = get_user_email_from_auth_str(&bearer_full_token).await;
+        return (exp, user_id);
+    }
+    (None, None)
 }
 
 #[cfg(test)]
@@ -997,5 +997,21 @@ mod tests {
             "http://localhost:5080/auth/login?request_time={}&exp_in={}&auth={}",
             time, exp_in, auth
         );
+    }
+
+    #[tokio::test]
+    async fn test_extract_auth_expiry_and_user_id_with_bearer_token() {
+        let auth_str = "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImYwY2ZlYjgxNTlkNDJmOWE4MmQ2ZDk4OTM4Y2NiNDM2OWIzYzg1MjMifQ.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjU1NTYvZGV4Iiwic3ViIjoiQ2lWMWFXUTlkWE5sY2pFc2IzVTlkWE5sY25Nc1pHTTllbWx1WTJ4aFluTXNaR005WTI5dEVnUnNaR0Z3IiwiYXVkIjoiZXhhbXBsZS1hcHAiLCJleHAiOjE3NDI1MTk0NzksImlhdCI6MTc0MjUxNzY3OSwiYXRfaGFzaCI6IkhGQjRIZUs5YTk1TUY5aHplanZ2MUEiLCJlbWFpbCI6InVzZXIxQHppbmNsYWJzLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJncm91cHMiOlsiY249YWRtaW4sb3U9dGVhbTEsb3U9dGVhbXMsZGM9emluY2xhYnMsZGM9Y29tIiwiY249YWRtaW4sb3U9dGVhbTMsb3U9dGVhbXMsZGM9emluY2xhYnMsZGM9Y29tIl0sIm5hbWUiOiJVc2VyIE9uZSJ9.nNEkavuzLnH0mmc2YAgSbzfXbIC-Hil7rTIXQy-ehQUBt_IsQtbzkhDqmHtPWSdGzrZSlJFbt92yjYdXxtji_ZaLFtugTT4wdmPL6J3AtHQ5wvEi9JfX2jZ22BBXIDJ5qxc9jhquWe6brGYiDEgWQRJaxLw9ZlMRv8DUHHsUk_NaaxZhZvwR-jU0UZELQ-VPX6WXrgt_5eYz-lVm_dKFgdLyMBGDKlPr3dUFegeC8vRU1v68IpQN1bM0XtB-cuZ4MkB2EcQDgBYmYyxM_5Sqv7jnkb2_rw6buyujAPzigXT3xMDKZs9DnmbSVd73oZIqQcbgXnKEtf-Z94gLwNaqJw";
+        let (exp, user_id) = extract_auth_expiry_and_user_id(&auth_str).await;
+        assert!(exp.is_some());
+        assert_eq!(user_id, Some("user1@zinclabs.com".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_extract_auth_expiry_and_user_id_with_basic_auth() {
+        let auth_str = "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=";
+        let (exp, user_id) = extract_auth_expiry_and_user_id(&auth_str).await;
+        assert_eq!(exp, None);
+        assert_eq!(user_id, Some("root@example.com".to_string()));
     }
 }
