@@ -94,7 +94,7 @@ class DashboardPage:
                             "queryType": "sql",
                             "queries": [
                                 {
-                                    "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_namespace_name) as \"y_axis_1\", kubernetes_labels_name as \"breakdown_1\"  FROM \"{stream_name}\"  GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC",
+                                    "query": f"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_namespace_name) as \"y_axis_1\", kubernetes_labels_name as \"breakdown_1\"  FROM \"{stream_name}\"  GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC",
                                     "vrlFunctionQuery": "",
                                     "customQuery": False,
                                     "fields": {
