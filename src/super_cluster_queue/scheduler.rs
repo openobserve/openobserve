@@ -19,7 +19,7 @@ use infra::{
     scheduler,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-
+use crate::service::db::alerts::alert;
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
         MessageType::SchedulerPush => {
@@ -136,7 +136,7 @@ async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
     let alert_name = parts[4];
 
     // get alert id from alert name
-    let alert_id = db::alerts::alert::get_by_name(org, stream_type, stream_name, alert_name).await?;
+    let alert_id = alert::get_by_name(org, stream_type, stream_name, alert_name).await?;
     trigger.module_key = format!("{}", alert_id);
     Ok(())
 }

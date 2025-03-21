@@ -37,6 +37,7 @@ use config::{
 };
 use cron::Schedule;
 use infra::scheduler::get_scheduler_max_retries;
+use infra::db::{ORM_CLIENT, connect_to_orm};
 use proto::cluster_rpc;
 
 use crate::service::{
@@ -87,16 +88,11 @@ async fn handle_alert_triggers(
         "[SCHEDULER trace_id {trace_id}] Inside handle_alert_triggers: processing trigger: {}",
         &trigger.module_key
     );
-    let columns = trigger.module_key.split('/').collect::<Vec<&str>>();
-    let org_id = trigger.org.clone();
-    let stream_type: StreamType = columns[0].into();
-    let stream_name = columns[1];
-    
-    // here it can be alert id or alert name
 
-    let alert = if let Ok(alert_id) = Ksuid::from_str(columns[2]) {
+    // here it can be alert id or alert name
+    let alert = if let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) {
         let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-        match db::alerts::alert::get_by_id(&client, &org_id, alert_id).await {
+        match db::alerts::alert::get_by_id(client, &trigger.org, alert_id).await {
             Ok(Some((_, alert))) => {
                 alert
             }
@@ -106,23 +102,12 @@ async fn handle_alert_triggers(
             }
             Err(e) => {
                 log::error!("[SCHEDULER trace_id {trace_id}] Error getting alert by id: {}", e);
-                return Err(e);
+                return Err(anyhow::anyhow!("Error getting alert by id: {}", e));
             }
         }
     } else {
-        match db::alerts::alert::get_by_name(&org_id, stream_type, stream_name, columns[2]).await {
-            Ok(Some(alert)) => {
-                alert
-            }
-            Ok(None) => {
-                log::error!("[SCHEDULER trace_id {trace_id}] Alert not found for module_key: {}", trigger.module_key);
-                return Err(anyhow::anyhow!("Alert not found"));
-            }
-            Err(e) => {
-                log::error!("[SCHEDULER trace_id {trace_id}] Error getting alert by name: {}", e);
-                return Err(e);
-            }
-        }
+        log::error!("[SCHEDULER trace_id {trace_id}] Alert id is not a valid ksuid: {}", trigger.module_key);
+        return Err(anyhow::anyhow!("Alert id is not a valid ksuid: {}", trigger.module_key));
     };
 
     
@@ -134,7 +119,7 @@ async fn handle_alert_triggers(
     if is_realtime && is_silenced {
         log::debug!(
             "[SCHEDULER trace_id {trace_id}] Realtime alert need wakeup, {}/{}",
-            org_id,
+            &trigger.org,
             &trigger.module_key
         );
         // wakeup the trigger
@@ -224,7 +209,7 @@ async fn handle_alert_triggers(
         if delay > get_max_considerable_delay(alert.trigger_condition.frequency) {
             publish_triggers_usage(TriggerData {
                 _timestamp: triggered_at - 1,
-                org: org_id.clone(),
+                org: trigger.org.clone(),
                 module: TriggerDataType::Alert,
                 key: trigger.module_key.clone(),
                 next_run_at: triggered_at,
@@ -328,12 +313,14 @@ async fn handle_alert_triggers(
                 // It has been tried the maximum time, just disable the alert
                 // and show the error.
                 if let Some(mut alert) =
-                    get_by_name(&org_id, stream_type, stream_name, alert_name).await?
+                    get_by_name(&trigger.org, alert.stream_type, &alert.stream_name, &alert.name).await?
                 {
                     alert.enabled = false;
-                    if let Err(e) = set_without_updating_trigger(&org_id, alert).await {
+                    if let Err(e) = set_without_updating_trigger(&trigger.org, alert).await {
                         log::error!(
-                            "[SCHEDULER trace_id {trace_id}] Failed to update alert: {alert_name} after trigger: {e}"
+                            "[SCHEDULER trace_id {trace_id}] Failed to update alert: {}/{} after trigger: {e}",
+                            &trigger.org,
+                            &trigger.module_key
                         );
                     }
                 }

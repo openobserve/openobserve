@@ -16,6 +16,7 @@
 //! Removes the alert_name unique constraint
 
 use sea_orm_migration::prelude::*;
+use sea_orm::{Statement};
 
 use super::m20250109_092400_recreate_tables_with_ksuids::ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX;
 
@@ -39,42 +40,59 @@ impl MigrationTrait for Migration {
     }
 }
 
+#[derive(DeriveIden)]
+enum ScheduledJobs {
+    Table,
+    Org,
+    Module,
+    ModuleKey,
+}
+
+#[derive(DeriveIden)]
+enum Alerts {
+    Table,
+    Id,
+    Org,
+    StreamType,
+    StreamName,
+    Name,
+}
+
 /// This function updates the scheduled triggers to such that the trigger module_key which previously
 /// has stream_type/stream_name/alert_name as the key, now will have alert_id as the key.
 async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     // Query the alerts and scheduled jobs tables
     let db = manager.get_connection();
+    let backend = db.get_database_backend();
     
+    let select_query = Query::select()
+        .column(ScheduledJobs::ModuleKey)
+        .column(ScheduledJobs::Org)
+        .from(ScheduledJobs::Table)
+        .and_where(Expr::col(ScheduledJobs::Module).eq(1))
+        .to_owned();
+    
+    let (sql, values) = match backend {
+        sea_orm::DatabaseBackend::MySql => select_query.build(MysqlQueryBuilder),
+        sea_orm::DatabaseBackend::Postgres => select_query.build(PostgresQueryBuilder),
+        sea_orm::DatabaseBackend::Sqlite => select_query.build(SqliteQueryBuilder),
+    };
+    let statement = Statement::from_sql_and_values(backend, sql, values);
+
     // 1. Get all alert triggers from the scheduled jobs table
     let triggers_result = db
-        .query_all(
-            r#"
-            SELECT 
-                org, 
-                module_key, 
-                next_run_at, 
-                is_realtime, 
-                is_silenced, 
-                status, 
-                start_time, 
-                end_time, 
-                retries, 
-                data
-            FROM scheduled_jobs
-            WHERE module = 1 -- Module = Alert
-            "#,
-        )
+        .query_all(statement)
         .await
-        .map_err(|e| DbErr::Query(format!("Failed to query scheduled jobs: {}", e)))?;
+        .map_err(|e| DbErr::Custom(format!("Failed to query scheduled jobs: {}", e)))?;
 
     // 2. For each trigger
     for trigger_row in triggers_result {
         let org = trigger_row.try_get::<String>("", "org")
-            .map_err(|e| DbErr::Query(format!("Failed to get org: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to get org: {}", e)))?;
         
         let module_key = trigger_row.try_get::<String>("", "module_key")
-            .map_err(|e| DbErr::Query(format!("Failed to get module_key: {}", e)))?;
-        
+            .map_err(|e| DbErr::Custom(format!("Failed to get module_key: {}", e)))?;
+
         // Skip if the module_key doesn't match the expected pattern
         let parts: Vec<&str> = module_key.split('/').collect();
         if parts.len() != 3 {
@@ -86,47 +104,50 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
         let alert_name = parts[2];
         
         // Query the corresponding alert to get its ID
+        let alert_query = Query::select()
+            .column(Alerts::Id)
+            .from(Alerts::Table)
+            .and_where(Expr::col(Alerts::Org).eq(org.clone()))
+            .and_where(Expr::col(Alerts::StreamType).eq(stream_type))
+            .and_where(Expr::col(Alerts::StreamName).eq(stream_name))
+            .and_where(Expr::col(Alerts::Name).eq(alert_name))
+            .to_owned();
+            
+        let backend = db.get_database_backend();
+        let (sql, values) = match backend {
+            sea_orm::DatabaseBackend::MySql => alert_query.build(MysqlQueryBuilder),
+            sea_orm::DatabaseBackend::Postgres => alert_query.build(PostgresQueryBuilder),
+            sea_orm::DatabaseBackend::Sqlite => alert_query.build(SqliteQueryBuilder),
+        };
+        let statement = Statement::from_sql_and_values(backend, sql, values);
         let alert_result = db
-            .query_one(
-                r#"
-                SELECT id 
-                FROM alerts 
-                WHERE org = ? AND stream_type = ? AND stream_name = ? AND name = ?
-                "#,
-            )
-            .bind(org.clone())
-            .bind(stream_type)
-            .bind(stream_name)
-            .bind(alert_name)
+            .query_one(statement)
             .await
-            .map_err(|e| DbErr::Query(format!("Failed to query alert: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to query alert: {}", e)))?;
         
         // If we found the alert
         if let Some(alert_row) = alert_result {
             let alert_id = alert_row.try_get::<String>("", "id")
-                .map_err(|e| DbErr::Query(format!("Failed to get alert ID: {}", e)))?;
-            
-            // Create the new module_key with alert_id
-            let new_module_key = format!("{}/{}/{}", stream_type, stream_name, alert_id);
-            
-            // Skip update if the keys are the same (shouldn't happen, but just in case)
-            if module_key == new_module_key {
-                continue;
-            }
+                .map_err(|e| DbErr::Custom(format!("Failed to get alert ID: {}", e)))?;
             
             // Update the trigger module_key
-            db.execute(
-                r#"
-                UPDATE scheduled_jobs
-                SET module_key = ?
-                WHERE org = ? AND module = 1 AND module_key = ?
-                "#,
-            )
-            .bind(new_module_key)
-            .bind(org)
-            .bind(module_key)
-            .await
-            .map_err(|e| DbErr::Query(format!("Failed to update scheduled job: {}", e)))?;
+            let update_query = Query::update()
+                .table(ScheduledJobs::Table)
+                .value(ScheduledJobs::ModuleKey, alert_id)
+                .and_where(Expr::col(ScheduledJobs::Org).eq(org))
+                .and_where(Expr::col(ScheduledJobs::Module).eq(1))
+                .and_where(Expr::col(ScheduledJobs::ModuleKey).eq(module_key))
+                .to_owned();
+                
+            let (sql, values) = match backend {
+                sea_orm::DatabaseBackend::MySql => update_query.build(MysqlQueryBuilder),
+                sea_orm::DatabaseBackend::Postgres => update_query.build(PostgresQueryBuilder),
+                sea_orm::DatabaseBackend::Sqlite => update_query.build(SqliteQueryBuilder),
+            };
+            let statement = Statement::from_sql_and_values(backend, sql, values); 
+            db.execute(statement)
+                .await
+                .map_err(|e| DbErr::Custom(format!("Failed to update scheduled job: {}", e)))?;
         }
     }
     

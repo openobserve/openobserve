@@ -207,7 +207,7 @@ pub async fn get_stream_alerts(
             .iter()
             .filter(|alert| alert.enabled && alert.is_real_time)
             .filter(|alert| {
-                let key = format!("{}/{}", key, alert.name);
+                let key = format!("{}/{}", stream.org_id, alert.id.unwrap().to_string());
                 match triggers_cache.get(&key) {
                     Some(v) => !v.is_silenced,
                     None => true,
