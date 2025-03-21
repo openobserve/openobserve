@@ -36,8 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-right tw-flex tw-justify-center tw-items-center reset-filters no-border no-outline !tw-rounded-r-none"
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none"
                 :title="t('common.search')"
+                style="height: 32px;"
               />
             </div>
             <div>
@@ -48,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'selected'
                     : ''
                 "
-                class="button button-right tw-flex tw-justify-center tw-items-center reset-filters no-border no-outline !tw-rounded-l-none"
+                class="button button-right tw-flex tw-justify-center tw-items-center  no-border no-outline !tw-rounded-l-none"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disabled="isVisualizeToggleDisabled"
                 :title="[
@@ -58,8 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ]"
                 no-caps
                 size="sm"
-                icon="bar_chart"
-              />
+                style="height: 32px;"
+              >
+                <img src="../../assets/images/common/visualize_icon.svg" alt="Visualize" style="width: 20px; height: 20px; ">
+              </q-btn>
             </div>
           </div>
         </div>
@@ -72,7 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-close-popup
         >
 
-          <img src="../../assets/images/common/histogram_image.svg" alt="Histogram" style="width: 20px; height: 20px;">
+        <img src="../../assets/images/common/bar_chart_histogram.svg" alt="Visualize" style="width: 20px; height: 20px; ">
+
         </q-toggle>
         </div>
         <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
