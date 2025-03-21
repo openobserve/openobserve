@@ -244,7 +244,7 @@ arrow-flight = "53.2.0"
 arrow-json = "53.2.0"
 arrow-schema = { version = "53.2.0", features = ["serde"] }
 parquet = { version = "53.2.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.11.0", features = ["aws", "azure", "gcp"] }
+object_store = { version = "0.11.2", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.51.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.1"
 dotenvy = "0.15.7"
