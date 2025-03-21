@@ -462,18 +462,19 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     await page.locator('[data-test="clone-alert-submit-btn"]').click();
     await page.getByText('Alert Cloned Successfully').click();
-  
-  
-  
-    // Delete the cloned alert
-    await page.getByRole('cell', { name: clonedAlertName }).click();
-    await page.locator(`[data-test="alert-list-${clonedAlertName}-delete-alert"]`).click();
+
+    await page.locator('[data-test="alert-list-search-input"]').fill(clonedAlertName);
+    await page.waitForTimeout(2000);
+    await page.locator(`[data-test="alert-list-${clonedAlertName}-more-options"]`).click();
+    await page.getByText('Delete',{exact:true}).click();
     await page.locator('[data-test="confirm-button"]').click();
+
   
     // Delete the original alert
     await page.locator('[data-test="alert-list-search-input"]').fill(alertName);
     await page.waitForTimeout(500); // Ensure input is registered
-    await page.locator(`[data-test="alert-list-${alertName}-delete-alert"]`).click();
+    await page.locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
+    await page.getByText('Delete',{exact:true}).click();
     await page.locator('[data-test="confirm-button"]').click();
   
     // Delete the destination
