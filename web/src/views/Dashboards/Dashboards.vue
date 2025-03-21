@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
                 <div class="hover-actions">
                   <q-btn
-                    v-if="index"
+                    v-if="index || (folderSearchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
                     dense
                     flat
                     no-caps
