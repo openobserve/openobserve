@@ -999,6 +999,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_extract_auth_expiry_and_user_id_with_bearer_token() {
         let auth_str = "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImYwY2ZlYjgxNTlkNDJmOWE4MmQ2ZDk4OTM4Y2NiNDM2OWIzYzg1MjMifQ.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjU1NTYvZGV4Iiwic3ViIjoiQ2lWMWFXUTlkWE5sY2pFc2IzVTlkWE5sY25Nc1pHTTllbWx1WTJ4aFluTXNaR005WTI5dEVnUnNaR0Z3IiwiYXVkIjoiZXhhbXBsZS1hcHAiLCJleHAiOjE3NDI1MTk0NzksImlhdCI6MTc0MjUxNzY3OSwiYXRfaGFzaCI6IkhGQjRIZUs5YTk1TUY5aHplanZ2MUEiLCJlbWFpbCI6InVzZXIxQHppbmNsYWJzLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJncm91cHMiOlsiY249YWRtaW4sb3U9dGVhbTEsb3U9dGVhbXMsZGM9emluY2xhYnMsZGM9Y29tIiwiY249YWRtaW4sb3U9dGVhbTMsb3U9dGVhbXMsZGM9emluY2xhYnMsZGM9Y29tIl0sIm5hbWUiOiJVc2VyIE9uZSJ9.nNEkavuzLnH0mmc2YAgSbzfXbIC-Hil7rTIXQy-ehQUBt_IsQtbzkhDqmHtPWSdGzrZSlJFbt92yjYdXxtji_ZaLFtugTT4wdmPL6J3AtHQ5wvEi9JfX2jZ22BBXIDJ5qxc9jhquWe6brGYiDEgWQRJaxLw9ZlMRv8DUHHsUk_NaaxZhZvwR-jU0UZELQ-VPX6WXrgt_5eYz-lVm_dKFgdLyMBGDKlPr3dUFegeC8vRU1v68IpQN1bM0XtB-cuZ4MkB2EcQDgBYmYyxM_5Sqv7jnkb2_rw6buyujAPzigXT3xMDKZs9DnmbSVd73oZIqQcbgXnKEtf-Z94gLwNaqJw";
@@ -1007,6 +1008,7 @@ mod tests {
         assert_eq!(user_id, Some("user1@zinclabs.com".to_string()));
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_extract_auth_expiry_and_user_id_with_basic_auth() {
         let auth_str = "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=";

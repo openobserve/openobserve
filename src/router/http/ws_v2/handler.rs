@@ -17,9 +17,7 @@ use std::sync::Arc;
 
 use actix_web::{Error, HttpRequest, HttpResponse, web};
 use actix_ws::{CloseCode, CloseReason};
-#[cfg(feature = "enterprise")]
-use config::get_config;
-use config::{meta::cluster::RoleGroup, utils::json};
+use config::{get_config, meta::cluster::RoleGroup, utils::json};
 use futures_util::StreamExt;
 
 use super::{
@@ -59,10 +57,11 @@ impl WsHandler {
         stream: web::Payload,
         client_id: ClientId,
     ) -> Result<HttpResponse, Error> {
+        let cfg = get_config();
+
         // Client -> Router connection
         let (response, mut ws_session, mut msg_stream) = actix_ws::handle(&req, stream)?;
 
-        let cfg = get_config();
         // Create session by registering the client & extract the user_id from the auth
         #[cfg(feature = "enterprise")]
         let (mut cookie_expiry, user_id) =
@@ -150,7 +149,6 @@ impl WsHandler {
                                                 Ok(mut message) => {
                                                     // check if cookie is valid for each client event only
                                                     // for enterprise
-                                                    #[cfg(feature = "enterprise")]
                                                     if cfg.websocket.check_cookie_expiry
                                                         && !session_manager
                                                             .is_client_cookie_valid(&client_id)
