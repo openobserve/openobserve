@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-step
               data-test="add-action-script-step-1"
               :name="1"
-              title="Upload Script Zip"
+              title="Upload Zip File"
               :icon="outlinedDashboard"
               :done="step > 1"
             >
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="primary"
                   filled
                   v-model="formData.codeZip"
-                  :label="t('actions.uploadCodeZip')"
+                  :label="t('actions.zipFile') + ' *'"
                   bg-color="input-bg"
                   class="tw-w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
                   stack-label
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-bold text-grey-8 q-mb-sm"
                   data-test="add-action-script-frequency-title"
                 >
-                  Frequency
+                  {{ t("actions.frequency") }} *
                 </div>
                 <div
                   style="
