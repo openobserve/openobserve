@@ -38,8 +38,7 @@ use crate::service::websocket_events::handle_cancel;
 use crate::{
     common::infra::config::WS_SEARCH_REGISTRY,
     service::websocket_events::{
-        WsClientEvents, WsServerEvents, handle_search_request,
-        search_registry_utils::{self, SearchState},
+        WsClientEvents, WsServerEvents, handle_search_request, search_registry_utils::SearchState,
         sessions_cache_utils,
     },
 };

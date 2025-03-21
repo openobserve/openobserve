@@ -17,7 +17,9 @@ use std::sync::Arc;
 
 use actix_web::{Error, HttpRequest, HttpResponse, web};
 use actix_ws::{CloseCode, CloseReason};
-use config::{get_config, meta::cluster::RoleGroup, utils::json};
+#[cfg(feature = "enterprise")]
+use config::get_config;
+use config::{meta::cluster::RoleGroup, utils::json};
 use futures_util::StreamExt;
 
 use super::{
@@ -27,11 +29,8 @@ use super::{
     session::SessionManager,
 };
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::extract_auth_expiry_and_user_id;
-use crate::{
-    common::utils::auth::extract_auth_str,
-    service::websocket_events::{WsClientEvents, WsServerEvents},
-};
+use crate::common::utils::auth::{extract_auth_expiry_and_user_id, extract_auth_str};
+use crate::service::websocket_events::{WsClientEvents, WsServerEvents};
 
 pub type SessionId = String;
 pub type ClientId = String;
@@ -64,8 +63,8 @@ impl WsHandler {
         // Client -> Router connection
         let (response, mut ws_session, mut msg_stream) = actix_ws::handle(&req, stream)?;
 
+        #[cfg(feature = "enterprise")]
         let cfg = get_config();
-
         // Create session by registering the client & extract the user_id from the auth
         #[cfg(feature = "enterprise")]
         let auth_str = extract_auth_str(&req);
@@ -139,6 +138,7 @@ impl WsHandler {
                                                 break;
                                             }
                                         }
+                                        #[allow(unused_mut)]
                                         Ok(mut message) => {
                                             // check if cookie is valid for each client event only
                                             // for enterprise
