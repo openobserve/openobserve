@@ -604,7 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 >{{ t("search.runQuery") }}</q-btn
               >
-              <q-btn
+              <!-- <q-btn
                 v-if="
                   config.isEnterprise == 'true' &&
                   !!searchObj.data.searchRequestTraceIds.length &&
@@ -621,7 +621,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="negative"
               >
                 <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
-              </q-btn>
+              </q-btn> -->
             </div>
           </div>
         </div>
