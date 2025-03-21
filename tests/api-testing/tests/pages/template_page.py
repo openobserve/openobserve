@@ -10,10 +10,10 @@ class TemplatePage:
         self.base_url = base_url
         self.org_id = org_id
 
-    def create_template_webhook(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, template_name):
+    def create_template_webhook(self, session, base_url, user_email, user_password, org_id, template_name):
         """Create a Webhook template."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)
+        session.auth = HTTPBasicAuth(user_email, user_password)
         payload = {
             "name": template_name,
             "body": '{\n  \"text\": \"{alert_name} is active\"\n}',
@@ -24,10 +24,10 @@ class TemplatePage:
         assert response.status_code == 200, f"Failed to create template: {response.content}"
         return response
 
-    def create_template_email(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, template_name):
+    def create_template_email(self, session, base_url, user_email, user_password, org_id, template_name):
         """Create an Email template."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)
+        session.auth = HTTPBasicAuth(user_email, user_password)
         payload = {
             "name": template_name,
             "body": '{"text": "For stream {stream_name} of organization {org} alert {alert_name} of type {alert_type} is active"}',
@@ -38,9 +38,9 @@ class TemplatePage:
         assert response.status_code == 200, f"Failed to create template: {response.content}"
         return response 
 
-    def retrieve_templates_webhook(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id):
+    def retrieve_templates_webhook(self, session, base_url, user_email, user_password, org_id):
         """Retrieve templates and extract information about all templates matching the specified criteria."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)
+        session.auth = HTTPBasicAuth(user_email, user_password)
         response = session.get(f"{base_url}api/{org_id}/alerts/templates")
         assert response.status_code == 200, f"Failed to validate templates: {response.content}"
 
@@ -62,9 +62,9 @@ class TemplatePage:
             "templates": webhook_templates
         }
 
-    def retrieve_template_webhook(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, template_name):
+    def retrieve_template_webhook(self, session, base_url, user_email, user_password, org_id, template_name):
         """Retrieve the template webhook and assert the body."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)
+        session.auth = HTTPBasicAuth(user_email, user_password)
         response = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
         assert response.status_code == 200, f"Failed to validate template: {response.content}"
 
@@ -78,9 +78,9 @@ class TemplatePage:
             "body_template_webhook": template_webhook["body"]
         }
 
-    def retrieve_templates_email(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id):
+    def retrieve_templates_email(self, session, base_url, user_email, user_password, org_id):
         """Retrieve templates and extract the first template name containing 'template_email' with title 'email_title'."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)
+        session.auth = HTTPBasicAuth(user_email, user_password)
         response = session.get(f"{base_url}api/{org_id}/alerts/templates")
         assert response.status_code == 200, f"Failed to validate templates: {response.content}"
 
@@ -102,9 +102,9 @@ class TemplatePage:
             "templates": email_templates
         }
 
-    def retrieve_template_email(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, template_name):
+    def retrieve_template_email(self, session, base_url, user_email, user_password, org_id, template_name):
         """Retrieve the template email and assert the title."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)
+        session.auth = HTTPBasicAuth(user_email, user_password)
         response = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
         assert response.status_code == 200, f"Failed to validate template: {response.content}"
 
@@ -117,10 +117,10 @@ class TemplatePage:
             "title_template_email": template_email["title"]
         }
 
-    def update_template_webhook(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, template_name):
+    def update_template_webhook(self, session, base_url, user_email, user_password, org_id, template_name):
         """Update an Webhook template."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)
+        session.auth = HTTPBasicAuth(user_email, user_password)
         payload = {
             "name": template_name,
             "body": '{"text": "For stream {stream_name} of organization {org} alert {alert_name} of type {alert_type} is active"}',
@@ -132,10 +132,10 @@ class TemplatePage:
         template_webhook = response.json()
         assert isinstance(template_webhook, dict), "Response is not a valid template object"
 
-    def update_template_email(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, template_name):
+    def update_template_email(self, session, base_url, user_email, user_password, org_id, template_name):
         """Update an Email template."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)
+        session.auth = HTTPBasicAuth(user_email, user_password)
         payload = {
             "name": template_name,
             "body": '{"text": "For stream {stream_name} of organization {org} alert {alert_name} of type {alert_type} is active"}',
@@ -147,9 +147,9 @@ class TemplatePage:
         template_email = response.json()
         assert isinstance(template_email, dict), "Response is not a valid template object"
 
-    def delete_template(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, template_name):
+    def delete_template(self, session, base_url, user_email, user_password, org_id, template_name):
         """Delete templates of a specified type."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)
+        session.auth = HTTPBasicAuth(user_email, user_password)
 
         resp_delete_template = session.delete(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
         assert resp_delete_template.status_code == 200, f"Failed to delete template {template_name}: {resp_delete_template.content}"
@@ -163,9 +163,9 @@ class TemplatePage:
 
         return resp_delete_template  # Return the list of deleted template names for verification if needed
 
-    def validate_deleted_template_webhook(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, template_name):
+    def validate_deleted_template_webhook(self, session, base_url, user_email, user_password, org_id, template_name):
         """Running an E2E test for validating deleted templates in SC."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)         
+        session.auth = HTTPBasicAuth(user_email, user_password)         
         # Retrieve all templates
         response = session.get(f"{base_url}api/{org_id}/alerts/templates")
         assert response.status_code == 200, f"Failed to retrieve templates: {response.content}"
@@ -184,9 +184,9 @@ class TemplatePage:
             print(f"Templates found of type '{template_name}': {[template['name'] for template in webhook_templates]}")
         return webhook_templates
 
-    def validate_deleted_template_email(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, template_name):
+    def validate_deleted_template_email(self, session, base_url, user_email, user_password, org_id, template_name):
         """Running an E2E test for validating deleted templates in SC."""
-        session.auth = HTTPBasicAuth(USER_EMAIL, USER_PASSWORD)         
+        session.auth = HTTPBasicAuth(user_email, user_password)         
         # Retrieve all templates
         response = session.get(f"{base_url}api/{org_id}/alerts/templates")
         assert response.status_code == 200, f"Failed to retrieve templates: {response.content}"
