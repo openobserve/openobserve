@@ -16,12 +16,20 @@
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import actionService from "@/services/action_scripts";
+import config from "@/aws-exports";
+import { computed } from "vue";
 
 const useActions = () => {
   const store = useStore();
+
+  const isActionsEnabled = computed(() => {
+    return (config.isEnterprise == "true" || config.isCloud == "true") && store.state.zoConfig.actions_enabled;
+  });
   
   const getAllActions = async () => {
     try {
+      if (!isActionsEnabled.value) return Promise.resolve([]);
+
       return await actionService.list(
         store.state.selectedOrganization.identifier
       )
@@ -37,7 +45,7 @@ const useActions = () => {
     }
   };
 
-  return { getAllActions };
+  return { getAllActions, isActionsEnabled };
 };
 
 export default useActions;

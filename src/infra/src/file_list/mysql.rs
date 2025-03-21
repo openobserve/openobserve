@@ -34,7 +34,7 @@ use sqlx::{Executor, MySql, QueryBuilder, Row};
 use crate::{
     db::{
         IndexStatement,
-        mysql::{CLIENT, create_index},
+        mysql::{CLIENT, CLIENT_RO, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -261,7 +261,7 @@ impl super::FileList for MysqlFileList {
     }
 
     async fn get(&self, file: &str) -> Result<FileMeta> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS.with_label_values(&["get", "file_list"]).inc();
@@ -285,7 +285,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
     }
 
     async fn contains(&self, file: &str) -> Result<bool> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS
@@ -349,7 +349,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["query", "file_list"])
             .inc();
@@ -417,7 +417,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["query_by_date", "file_list"])
             .inc();
@@ -459,7 +459,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             return Ok(Vec::default());
         }
         let mut ret = Vec::new();
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
 
         for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
             if chunk.is_empty() {
@@ -538,7 +538,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         for (time_start, time_end) in day_partitions {
             let stream_key = stream_key.clone();
             tasks.push(tokio::task::spawn(async move {
-                let pool = CLIENT.clone();
+                let pool = CLIENT_RO.clone();
                 DB_QUERY_NUMS
                 .with_label_values(&["query_ids", "file_list"])
                 .inc();
@@ -588,7 +588,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["query_old_data_hours", "file_list"])
             .inc();
@@ -632,7 +632,7 @@ SELECT date
         if time_max == 0 {
             return Ok(Vec::new());
         }
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
@@ -655,7 +655,7 @@ SELECT date
     }
 
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
@@ -682,7 +682,7 @@ SELECT date
     ) -> Result<i64> {
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
@@ -697,7 +697,7 @@ SELECT date
     }
 
     async fn get_max_pk_value(&self) -> Result<i64> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
@@ -708,7 +708,7 @@ SELECT date
     }
 
     async fn get_min_pk_value(&self) -> Result<i64> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
@@ -765,7 +765,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
                 }
             }
         };
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let op_name = if deleted { "stats_deleted" } else { "stats" };
         DB_QUERY_NUMS
             .with_label_values(&[op_name, "file_list"])
@@ -800,7 +800,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
         } else {
             format!("SELECT * FROM stream_stats WHERE org = '{}';", org_id)
         };
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "stream_stats"])
             .inc();
@@ -986,7 +986,7 @@ UPDATE stream_stats
     }
 
     async fn len(&self) -> usize {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();

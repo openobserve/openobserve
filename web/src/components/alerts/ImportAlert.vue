@@ -80,17 +80,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="editor-container-url"
           >
             <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md">
-                <q-input
-                  data-test="alert-import-url-input"
-                  v-model="url"
-                  :label="t('dashboard.addURL')"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  filled
-                  label-slot
-                />
+              <div 
+              style="width: calc(100% - 10px)"
+              class="q-mb-md flex">
+                <div style="width: calc(69%)" class="q-pr-sm">
+                  <q-input
+                    data-test="alert-import-url-input"
+                    v-model="url"
+                    :label="t('dashboard.addURL')"
+                    color="input-border"
+                    bg-color="input-bg"
+                    stack-label
+                    filled
+                    label-slot
+                  />
+                </div>
+                
+                <div
+                    style="width: calc(30%)"
+                    class="alert-folder-dropdown"
+                    data-test="alert-folder-dropdown"
+                  >
+                    <SelectFolderDropDown
+                      :type="'alerts'"
+                      @folder-selected="updateActiveFolderId"
+                      :activeFolderId="activeFolderId"
+                    />
+                  </div>
               </div>
               <query-editor
                 data-test="alert-import-sql-editor"
@@ -116,9 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="activeTab == 'import_json_file'"
             class="editor-container-json"
           >
+
             <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md">
-                <q-file
+              <div style="width: calc(100% - 10px)" class="q-mb-md flex">
+                <div style="width: calc(69%)" class="q-pr-sm">
+                  <q-file
                   data-test="alert-import-json-file-input"
                   v-model="jsonFiles"
                   filled
@@ -139,6 +157,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-slot:hint> .json files only </template>
                 </q-file>
+                </div>
+                <div style="width: calc(30%)" class=" alert-folder-dropdown">
+                  <SelectFolderDropDown
+                    :type="'alerts'"
+                    @folder-selected="updateActiveFolderId"
+                    :activeFolderId="activeFolderId"
+                  />
+                </div>
+
               </div>
               <query-editor
                 data-test="alert-import-sql-editor"
@@ -429,6 +456,9 @@ import destinationService from "@/services/alert_destination";
 import AppTabs from "../common/AppTabs.vue";
 import { error } from "console";
 
+import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
+import store from "@/test/unit/helpers/store";
+
 export default defineComponent({
   name: "ImportAlert",
   props: {
@@ -489,6 +519,9 @@ export default defineComponent({
     const splitterModel = ref(60);
     const filteredDestinations = ref<string[]>([]);
     const streamTypes = ["logs", "metrics", "traces"];
+    const selectedFolderId = ref<any>(router.currentRoute.value.query.folder || "default");
+    const activeFolderId = ref(router.currentRoute.value.query.folder || router.currentRoute.value.query?.folderId);
+    const activeFolderAlerts = ref<any>([]);
     const getFormattedDestinations: any = computed(() => {
       return props.destinations.map((destination: any) => {
         return destination.name;
@@ -623,7 +656,10 @@ export default defineComponent({
       jsonArrayOfObj.value = [{}];
     };
 
-    onMounted(() => {});
+    onMounted(() => {
+      activeFolderId.value = router.currentRoute.value.query?.folder || router.currentRoute.value.query?.folderId;
+      getActiveFolderAlerts(activeFolderId.value as string);
+    });
 
     const importJson = async () => {
       alertErrorsToDisplay.value = [];
@@ -685,7 +721,7 @@ export default defineComponent({
         }
 
         if (alertErrorsToDisplay.value.length === 0 && isValidAlert) {
-          return await createAlert(jsonObj, index);
+          return await createAlert(jsonObj, index , selectedFolderId.value);
         }
       } catch (e: any) {
         q.notify({
@@ -713,8 +749,7 @@ export default defineComponent({
           field: "alert_name",
         });
       }
-
-      if (checkAlertsInList(props.alerts, input.name)) {
+      if (checkAlertsInList(activeFolderAlerts.value, input.name)) {
         alertErrors.push({
           message: `Alert - ${index}: "${input.name}" already exists`,
           field: "alert_name",
@@ -875,6 +910,8 @@ export default defineComponent({
           `Alert - ${index}: Operator should be one of: '=', '!=', '>=', '<=', '>', '<', 'Contains', 'NotContains'.`,
         );
       }
+      console.log(input,'input')
+
 
       if (
         isNaN(Number(triggerCondition.frequency)) ||
@@ -970,6 +1007,14 @@ export default defineComponent({
         }
       });
 
+      //this condition is added to avoid the error when the updated_at is a number 
+      //with the new alert api the updated_at is a nummer 
+      if( typeof input.updated_at == 'number'){
+        input.updated_at = null;
+      }
+
+
+
       // Log all alert errors at the end
       if (alertErrors.length > 0) {
         alertErrorsToDisplay.value.push(alertErrors);
@@ -990,11 +1035,10 @@ export default defineComponent({
     };
 
     const checkAlertsInList = (alerts: any, alertName: any) => {
-      const alertsList = alerts.map((alert: any) => alert.name);
-      return alertsList.includes(alertName);
+      return alerts.includes(alertName);
     };
 
-    const createAlert = async (input: any, index: any) => {
+    const createAlert = async (input: any, index: any, folderId: any) => {
       if(!input.hasOwnProperty('context_attributes')){
         input.context_attributes = {};
       }
@@ -1004,12 +1048,12 @@ export default defineComponent({
       if(!input.trigger_condition.hasOwnProperty("tolerance_in_secs")){
         input.trigger_condition.tolerance_in_secs = null;
       }
+      input.folder_id = folderId;
       try {
-        await alertsService.create(
+        await alertsService.create_by_alert_id(
           store.state.selectedOrganization.identifier,
-          input.stream_name,
-          input.stream_type,
           input,
+          folderId
         );
 
         // Success
@@ -1017,10 +1061,9 @@ export default defineComponent({
           message: `Alert - ${index}: "${input.name}" created successfully \nNote: please remove the created alert object ${input.name} from the json file`,
           success: true,
         });
-
         // Emit update after each successful creation
-        emit("update:alerts");
-        
+        emit("update:alerts",store,selectedFolderId.value);
+        getActiveFolderAlerts(selectedFolderId.value);
         return true;
       } catch (error: any) {
         // Failure
@@ -1100,6 +1143,32 @@ export default defineComponent({
         );
       });
     };
+    const updateActiveFolderId = (newVal: any) => {
+      selectedFolderId.value = newVal.value;
+      getActiveFolderAlerts(selectedFolderId.value);
+    }
+
+    const getActiveFolderAlerts = async (folderId: string) => {
+      if(!store.state.organizationData.allAlertsListByNames[folderId]){
+      const response: any = await alertsService.listByFolderId(
+          1,
+          1000,
+          "name",
+          false,
+          "",
+          store.state.selectedOrganization.identifier,
+          folderId,
+          ""
+      );
+
+          store.dispatch("setAllAlertsListByNames", {
+            ...store.state.organizationData.allAlertsListByNames,
+            [folderId]: response.data.list.map((alert: any) => alert.name)
+            }) 
+      }
+        activeFolderAlerts.value = store.state.organizationData.allAlertsListByNames[folderId];
+      
+    }
 
     return {
       t,
@@ -1141,11 +1210,18 @@ export default defineComponent({
       filteredTimezone,
       updateTimezone,
       timezoneFilterFn,
+      activeFolderId,
+      updateActiveFolderId,
+      selectedFolderId,
+      getActiveFolderAlerts,
+      activeFolderAlerts,
+      store
     };
   },
   components: {
     QueryEditor,
     AppTabs,
+    SelectFolderDropDown,
   },
 });
 </script>
@@ -1155,6 +1231,12 @@ export default defineComponent({
   background-image: url("../../assets/images/common/query-editor.png");
   background-repeat: no-repeat;
   background-size: 115px;
+}
+
+.alert-folder-dropdown {
+  :deep(.q-field--labeled.showLabelOnTop) {
+    padding-top: 12px; /* Example override */
+  }
 }
 
 .empty-function .monaco-editor-background {
@@ -1174,7 +1256,7 @@ export default defineComponent({
 }
 .editor-container-json {
   .monaco-editor {
-    height: calc(68vh - 20px) !important; /* Total editor height */
+    height: calc(70vh - 22px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }

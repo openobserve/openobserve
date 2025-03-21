@@ -930,6 +930,7 @@
     "edit": "Edit",
     "clone": "Clone alert",
     "search": "Search alert",
+    "move": "Move alert",
     "name": "Name",
     "save": "Save",
     "actions": "Actions",
@@ -984,7 +985,10 @@
     "lastSuccessfulAt":"Last Successfull At",
     "status":"Status",
     "numOfEvents": "Number of Events",
-    "view":"View"
+    "view":"View",
+    "webhook":"Web Hook",
+    "email":"Email",
+    "action":"Action"
   },
   "alert_templates": {
     "header": "Templates",

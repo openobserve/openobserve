@@ -23,7 +23,7 @@ use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_m
 use crate::{
     db::{
         self, IndexStatement,
-        postgres::{CLIENT, create_index},
+        postgres::{CLIENT, CLIENT_RO, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
     /// The count of jobs for the given module (Report/Alert etc.)
     async fn len_module(&self, module: TriggerModule) -> usize {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -422,7 +422,7 @@ RETURNING *;"#;
     }
 
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -448,7 +448,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     }
 
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -467,7 +467,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
 
     /// List all the jobs for the given module and organization
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -543,7 +543,7 @@ WHERE status = $2 AND end_time <= $3;
     }
 
     async fn len(&self) -> usize {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();

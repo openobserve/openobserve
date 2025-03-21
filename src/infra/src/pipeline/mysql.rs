@@ -23,7 +23,7 @@ use config::{
 };
 
 use crate::{
-    db::mysql::CLIENT,
+    db::mysql::{CLIENT, CLIENT_RO},
     errors::{DbError, Error, Result},
 };
 
@@ -253,7 +253,7 @@ UPDATE pipeline
     }
 
     async fn get_by_stream(&self, stream_params: &StreamParams) -> Result<Pipeline> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let query = r#"
 SELECT * FROM pipeline WHERE org = ? AND source_type = ? AND stream_org = ? AND stream_name = ? AND stream_type = ?;
         "#;
@@ -269,7 +269,7 @@ SELECT * FROM pipeline WHERE org = ? AND source_type = ? AND stream_org = ? AND 
     }
 
     async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let query = r#"SELECT * FROM pipeline WHERE id = ?;"#;
         let pipeline = match sqlx::query_as::<_, Pipeline>(query)
             .bind(pipeline_id)
@@ -286,7 +286,7 @@ SELECT * FROM pipeline WHERE org = ? AND source_type = ? AND stream_org = ? AND 
     }
 
     async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Pipeline> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let similar_pipeline = match &pipeline.source {
             PipelineSource::Realtime(stream_params) => {
                 sqlx::query_as::<_, Pipeline>(
@@ -312,7 +312,7 @@ SELECT * FROM pipeline
     }
 
     async fn list(&self) -> Result<Vec<Pipeline>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let query = r#"SELECT * FROM pipeline ORDER BY id;"#;
         match sqlx::query_as::<_, Pipeline>(query).fetch_all(&pool).await {
             Ok(pipelines) => Ok(pipelines),
@@ -324,7 +324,7 @@ SELECT * FROM pipeline
     }
 
     async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let query = r#"SELECT * FROM pipeline WHERE org = ? ORDER BY id;"#;
         match sqlx::query_as::<_, Pipeline>(query)
             .bind(org)
@@ -340,7 +340,7 @@ SELECT * FROM pipeline
     }
 
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let query = r#"
 SELECT * FROM pipeline WHERE org = ? AND source_type = ? ORDER BY id;
         "#;

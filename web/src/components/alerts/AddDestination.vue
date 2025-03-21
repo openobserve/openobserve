@@ -333,6 +333,7 @@ import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import actionService from "@/services/action_scripts";
 import config from "@/aws-exports";
+import useActions from "@/composables/useActions";
 
 const props = defineProps({
   templates: {
@@ -374,6 +375,8 @@ const actionOptions = ref<{ value: string; label: string; type: string }[]>([]);
 
 const filteredActions = ref<any[]>([]);
 
+const { getAllActions } = useActions();
+
 // TODO OK: Use UUID package instead of this and move this method in utils
 const getUUID = () => {
   return (Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100).toString();
@@ -390,7 +393,7 @@ const apiHeaders: Ref<
 const tabs = computed(() => {
   let tabs = [
     {
-      label: "Web Hook",
+      label: t("alerts.webhook"),
       value: "http",
       style: {
         width: "fit-content",
@@ -401,7 +404,7 @@ const tabs = computed(() => {
       },
     },
     {
-      label: "Email",
+      label: t("alerts.email"),
       value: "email",
       style: {
         width: "fit-content",
@@ -418,7 +421,7 @@ const tabs = computed(() => {
     store.state.zoConfig.actions_enabled
   ) {
     tabs.push({
-      label: "Action",
+      label: t("alerts.action"),
       value: "action",
       style: {
         width: "fit-content",
@@ -484,20 +487,29 @@ const isValidDestination = computed(
     (props.isAlerts ? formData.value.template : true),
 );
 
+const updateActionOptions = () => {
+  actionOptions.value = [];
+  store.state.organizationData.actions.forEach((action: any) => {
+    if (action.execution_details_type === "service")
+      actionOptions.value.push({
+        value: action.id,
+        label: action.name,
+        type: action.execution_details_type,
+      });
+  });
+  filteredActions.value = actionOptions.value;
+};
+
 const getActionOptions = async () => {
   try {
     isLoadingActions.value = true;
-    const actions = await actionService.list(
-      store.state.selectedOrganization.identifier,
-    );
-    actions.data.forEach((action: any) => {
-      if (action.execution_details_type === "service")
-        actionOptions.value.push({
-          value: action.id,
-          label: action.name,
-          type: action.execution_details_type,
-        });
-    });
+    // Update action options with existing actions
+    updateActionOptions();
+
+    // Get all actions from the server and update the action options
+    await getAllActions();
+    isLoadingActions.value = false;
+    updateActionOptions();
   } catch (err) {
     console.error(err);
   } finally {
@@ -535,9 +547,9 @@ const saveDestination = () => {
 
   if (formData.value.type === "email") {
     payload["type"] = "email";
-    payload["emails"] =
-      formData.value?.emails ||
-      "".split(/[;,]/).map((email: string) => email.trim());
+    payload["emails"] = (formData.value?.emails || "")
+      .split(/[;,]/)
+      .map((email: string) => email.trim());
   }
 
   if (formData.value.type === "action") {
@@ -648,7 +660,6 @@ const filterColumns = (options: any[], val: String, update: Function) => {
 };
 
 const filterActions = (val: string, update: any) => {
-  console.log(val, "val");
   filteredActions.value = filterColumns(actionOptions.value, val, update);
 };
 </script>

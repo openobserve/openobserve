@@ -807,6 +807,8 @@ export default defineComponent({
       langList.find((l) => l.code == getLocale()) || langList[0];
 
     const filterMenus = () => {
+      updateActionsMenu();
+
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
           ?.split(",")
@@ -1139,8 +1141,6 @@ export default defineComponent({
 
           store.dispatch("setConfig", res.data);
           await nextTick();
-
-          updateActionsMenu();
 
           filterMenus();
           // if rum enabled then setUser to capture session details.

@@ -1255,9 +1255,11 @@ export default defineComponent({
     };
 
     const handleChartApiError = (errorMessage: any) => {
-      const errorList = errorData.errors;
+      const errorList = errorData.errors ?? [];
       errorList.splice(0);
-      errorList.push(errorMessage);
+      if (errorMessage) {
+        errorList.push(errorMessage);
+      }
     };
 
     const onDataZoom = (event: any) => {

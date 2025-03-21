@@ -135,6 +135,7 @@
             resize: vertical;
             border: 1px solid;
             border-radius: 4px;
+            padding: 2px;
           "
           v-model="drilldownData.data.url"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
