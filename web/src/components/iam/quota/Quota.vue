@@ -721,8 +721,8 @@ export default defineComponent ({
         const fileListToDisplay = ref<string>("");
         const uploadingRules = ref<boolean>(false);
         const uploadError = ref<string>("");
-        const focusedInputId = ref(null);
-        const expandedRow = ref<string>("");
+        const focusedInputId = ref<any>(null);
+        const expandedRow = ref<any>("");
         const roleLimitRows = ref<any[]>([]);
         const roleLevelModuleRows = ref<any[]>([]);
         const roleLevelLoading = ref<boolean>(false);
