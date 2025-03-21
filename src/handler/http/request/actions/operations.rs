@@ -66,6 +66,7 @@ pub async fn test_action(
         &user_email.user_id,
         "actions",
         "POST",
+        "",
     )
     .await
     {

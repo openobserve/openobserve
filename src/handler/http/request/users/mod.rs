@@ -29,9 +29,11 @@ use serde::Serialize;
 use strum::IntoEnumIterator;
 #[cfg(feature = "enterprise")]
 use {
+    crate::common::utils::auth::check_permissions,
     crate::service::self_reporting::audit,
     o2_dex::config::get_config as get_dex_config,
     o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol},
+    o2_openfga::config::get_config as get_openfga_config,
 };
 
 use crate::{
@@ -68,9 +70,26 @@ pub mod service_accounts;
     )
 )]
 #[get("/{org_id}/users")]
-pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    users::list_users(&org_id, None, None).await
+    let mut _user_list_from_rbac = None;
+
+    #[cfg(feature = "enterprise")]
+    // Check if user has access to get users
+    if get_openfga_config().enabled
+        && check_permissions(
+            Some(format!("_all_{}", org_id)),
+            &org_id,
+            &user_email.user_id,
+            "users",
+            "GET",
+            "",
+        )
+        .await
+    {
+        _user_list_from_rbac = Some(vec![]);
+    }
+    users::list_users(&user_email.user_id, &org_id, None, _user_list_from_rbac).await
 }
 
 /// CreateUser

@@ -15,6 +15,7 @@
 
 mod migrations;
 
+use config::meta::folder::DEFAULT_FOLDER;
 use hashbrown::HashSet;
 use infra::dist_lock;
 use o2_enterprise::enterprise::{
@@ -24,7 +25,7 @@ use o2_enterprise::enterprise::{
 use o2_openfga::{
     authorizer::authz::{
         add_tuple_for_pipeline, get_index_creation_tuples, get_org_creation_tuples,
-        get_ownership_all_org_tuple, get_user_role_tuple, update_tuples,
+        get_ownership_all_org_tuple, get_ownership_tuple, get_user_role_tuple, update_tuples,
     },
     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
 };
@@ -258,6 +259,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_alert_folders_migration {
                         get_ownership_all_org_tuple(org_name, "alert_folders", &mut tuples);
+                        get_ownership_tuple(org_name, "alert_folders", DEFAULT_FOLDER, &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {

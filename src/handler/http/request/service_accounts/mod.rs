@@ -54,16 +54,17 @@ use crate::{
     )
 )]
 #[get("/{org_id}/service_accounts")]
-pub async fn list(org_id: web::Path<String>, _req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+    let user_id = req.headers().get("user_id").unwrap();
+    let user_id = user_id.to_str().unwrap();
     let mut _user_list_from_rbac = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = _req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            user_id.to_str().unwrap(),
+            user_id,
             "GET",
             "service_accounts",
         )
@@ -81,6 +82,7 @@ pub async fn list(org_id: web::Path<String>, _req: HttpRequest) -> Result<HttpRe
         // Get List of allowed objects ends
     }
     users::list_users(
+        user_id,
         &org_id,
         Some(UserRole::ServiceAccount),
         _user_list_from_rbac,
