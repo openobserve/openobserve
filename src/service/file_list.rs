@@ -194,5 +194,9 @@ pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<()> 
 }
 
 pub async fn update_compressed_size(key: &str, size: i64) -> Result<()> {
-    file_list::update_compressed_size(key, size).await
+    file_list::update_compressed_size(key, size).await?;
+    file_list::LOCAL_CACHE
+        .update_compressed_size(key, size)
+        .await?;
+    Ok(())
 }

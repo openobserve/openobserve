@@ -66,11 +66,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                         data_len,
                                     );
                                     // update database
-                                    if let Err(e) = infra::file_list::update_compressed_size(
-                                        &file,
-                                        data_len as i64,
-                                    )
-                                    .await
+                                    if let Err(e) =
+                                        crate::service::file_list::update_compressed_size(
+                                            &file,
+                                            data_len as i64,
+                                        )
+                                        .await
                                     {
                                         log::error!(
                                             "[trace_id {trace_id}] search->storage: update file size for file {} err: {}",
