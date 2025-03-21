@@ -4451,9 +4451,15 @@ dependencies = [
 
 [[package]]
 name = "handlebars"
+<<<<<<< Updated upstream
 version = "6.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d752747ddabc4c1a70dd28e72f2e3c218a816773e0d7faf67433f1acfa6cba7c"
+=======
+version = "6.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "759e2d5aea3287cb1190c8ec394f42866cb5bf74fcbf213f354e3c856ea26098"
+>>>>>>> Stashed changes
 dependencies = [
  "derive_builder",
  "log",
@@ -10503,7 +10509,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.26.1",
  "tokio-util",
- "webpki-roots",
+ "webpki-roots 0.26.7",
 ]
 
 [[package]]
