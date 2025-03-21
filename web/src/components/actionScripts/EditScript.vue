@@ -122,6 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
+              :disable="isEditingActionScript"
+              :readonly="isEditingActionScript"
             />
           </div>
 
@@ -252,6 +254,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-px-lg visual-selection-btn"
                       style="padding-top: 4px; padding-bottom: 4px"
                       @click="frequency.type = visual.value"
+                      :disable="isEditingActionScript"
+                      :readonly="isEditingActionScript"
                     >
                       {{ visual.label }}</q-btn
                     >
@@ -329,6 +333,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         debounce="300"
                         style="width: 100%"
                         @update:model-value="validateFrequency(frequency.cron)"
+                        :disable="isEditingActionScript"
+                        :readonly="isEditingActionScript"
                       />
                     </div>
                     <q-select
