@@ -32,11 +32,6 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
         folder_id = folder_page.create_folder(session, base_url, user_email, user_password, org_id, folder_name)
 
         dashboard_name = f"dashboard_{dashboard_page.Unique_value_dashboard}_{i}"
-        dashboard_id = dashboard_page.create_dashboard(session, base_url, user_email, user_password, org_id, folder_id, dashboard_name)
-
-        panel_name = f"panel_{dashboard_page.Unique_value_panel}_{i}"
-        panel_id = dashboard_page.create_panel(session, base_url, user_email, user_password, org_id, stream_name, folder_id, panel_name)
-
+        dashboard_id = dashboard_page.create_dashboard(session, base_url, user_email, user_password, org_id, stream_name, folder_id, dashboard_name)
 
         
-       

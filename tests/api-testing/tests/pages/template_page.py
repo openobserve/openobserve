@@ -3,7 +3,7 @@ import time
 from requests.auth import HTTPBasicAuth
 
 class TemplatePage:
-    Unique_value_temp = f"d4m20_{random.randint(100000, 999999)}"  # Class variable
+    Unique_value_temp = f"d4m21_{random.randint(100000, 999999)}"  # Class variable
 
     def __init__(self, session, base_url, org_id):
         self.session = session
@@ -90,7 +90,7 @@ class TemplatePage:
 
         email_templates = [
             template for template in templates 
-             if template["name"].startswith(f"template_email_{TemplatePage.Unique_value_temp}")
+                if template["name"].startswith(f"template_email_{TemplatePage.Unique_value_temp}")
     ] 
 
         # Assert that there are templates matching the criteria
@@ -180,11 +180,8 @@ class TemplatePage:
         # Check if any templates of the specified type exist
         if len(webhook_templates) == 0:
             print(f"No templates found of type '{template_name}'")
-            # Optionally, you can choose to skip the assertion or handle it differently
         else:
-            assert len(webhook_templates) > 0, f"No templates found of type '{template_name}'"
             print(f"Templates found of type '{template_name}': {[template['name'] for template in webhook_templates]}")
-
         return webhook_templates
 
     def validate_deleted_template_email(self, session, base_url, USER_EMAIL, USER_PASSWORD, org_id, template_name):
