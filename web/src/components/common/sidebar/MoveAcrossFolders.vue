@@ -149,7 +149,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             await moveModuleToAnotherFolder(
               store,
               data,
-              props.type
+              props.type,
+              props.activeFolderId
             );
 
             showPositiveNotification(`${props.type} Moved successfully`, {

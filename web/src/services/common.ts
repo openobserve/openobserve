@@ -20,8 +20,12 @@ const common = {
   get_Folder: (organization: string, folder_type: string, folderId: any) => {
     return http().get(`/api/v2/${organization}/folders/${folder_type}/${folderId}`);
   },
-  move_across_folders: (organization: string, type: string, data: any) => {
-    return http().patch(`/api/v2/${organization}/${type}/move`, data);
+  move_across_folders: (organization: string, type: string, data: any,folder_id?: any) => {
+    let url = `/api/v2/${organization}/${type}/move`;
+    if(folder_id){
+      url += `?folder=${folder_id}`;
+    }
+    return http().patch(url, data);
   }
 };
 

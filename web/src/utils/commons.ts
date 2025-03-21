@@ -960,13 +960,16 @@ export const moveModuleToAnotherFolder = async (
   store: any,
   data: any,
   type: any,
+  folder_id?: any
 ) => {
   try {
-    //move dashboard
+    //move alerts
     await commonService.move_across_folders(
       store.state.selectedOrganization.identifier,
       type,
-      data
+      data,
+      folder_id
+
     );
 
   } catch (error) {

@@ -1540,6 +1540,7 @@ export default defineComponent({
           callAlert = alertsService.update_by_alert_id(
             this.store.state.selectedOrganization.identifier,
             payload,
+            this.activeFolderId
           );
           callAlert
             .then((res: { data: any }) => {

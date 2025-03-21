@@ -137,38 +137,62 @@ const alerts = {
   update_by_alert_id: (
     org_identifier: string,
     data: any,
+    folder_id?: any
   ) => { 
+    let url = `/api/v2/${org_identifier}/alerts/${data.id}`;
+    if(folder_id){
+      url += `?folder=${folder_id}`;
+    }
     return http().put(
-      `/api/v2/${org_identifier}/alerts/${data.id}`,
+      url,
       data
     );
   },
   delete_by_alert_id: (
     org_identifier: string,
-    alert_id: string
+    alert_id: string,
+    folder_id?: any
   ) => {
-    return http().delete(`/api/v2/${org_identifier}/alerts/${alert_id}`);
+    let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
+    if(folder_id){
+      url += `?folder=${folder_id}`;
+    }
+    return http().delete(url);
   },
   toggle_state_by_alert_id: (
     org_identifier: string,
     alert_id: string,
-    enable: boolean
+    enable: boolean,
+    folder_id?: any
   ) => {
-    return http().patch(`/api/v2/${org_identifier}/alerts/${alert_id}/enable?value=${enable}`);
+    let url = `/api/v2/${org_identifier}/alerts/${alert_id}/enable?value=${enable}`;
+    if(folder_id){
+      url += `&folder=${folder_id}`;
+    }
+    return http().patch(url);
   },
   get_by_alert_id: (
     org_identifier: string,
-    alert_id: string
+    alert_id: string,
+    folder_id?: any
   ) => {
-    return http().get(
-      `/api/v2/${org_identifier}/alerts/${alert_id}`
-    );
+    let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
+    if(folder_id){
+      url += `?folder=${folder_id}`;
+    }
+    return http().get(url);
   },
+  //this endpoint is not used as we are using the common service to move the alerts across folders
   move_to_another_folder: (
     org_identifier: string,
-    data: any
+    data: any,
+    folder_id?: any
   ) => {
-    return http().patch(`/api/v2/${org_identifier}/alerts/move`, data);
+    let url = `/api/v2/${org_identifier}/alerts/move`;
+    if(folder_id){
+      url += `?folder=${folder_id}`;
+    }
+    return http().patch(url, data);
   }
 };
 

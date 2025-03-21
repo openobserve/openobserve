@@ -1151,7 +1151,8 @@ export default defineComponent({
           alertsService
             .delete_by_alert_id(
               store.state.selectedOrganization.identifier,
-              selectedDelete.value.alert_id
+              selectedDelete.value.alert_id,
+              activeFolderId.value
             )
             .then((res: any) => {
               if (res.data.code == 200) {
@@ -1253,7 +1254,8 @@ export default defineComponent({
             .toggle_state_by_alert_id(
               store.state.selectedOrganization.identifier,
               row.alert_id,
-              !row?.enabled
+              !row?.enabled,
+              activeFolderId.value
             )
             .then((res: any) => {
               const isEnabled = res.data.enabled;
