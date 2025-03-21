@@ -95,13 +95,16 @@ impl WsHandler {
                 loop {
                     tokio::select! {
                         _ = tokio::time::sleep(tokio::time::Duration::from_secs(cfg.websocket.session_idle_timeout_secs as _ )) => {
-                            log::info!("[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown");
-                            if let Err(e) = error_tx.send(None).await {
-                                log::error!(
-                                    "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
-                                );
-                            };
-                            break;
+                            // check if idle_time not updated by the outgoing thread
+                            if session_manager.reached_max_idle_time(&client_id).await {
+                                log::info!("[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown");
+                                if let Err(e) = error_tx.send(None).await {
+                                    log::error!(
+                                        "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
+                                    );
+                                };
+                                break;
+                            }
                         }
                         Some(msg) = msg_stream.next() => {
                             match msg {
@@ -290,6 +293,9 @@ impl WsHandler {
                             if let Err(e) = ws_session.text(message_str).await {
                                 log::error!("Error sending message to client: {}", e);
                                 break;
+                            }
+                            if matches!(message, WsServerEvents::End {..}) {
+                                session_manager.update_session_activity(&client_id).await;
                             }
                         }
                         // interruption from handling_incoming thread

@@ -15,7 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use config::RwAHashMap;
 
 use super::{
@@ -33,6 +33,7 @@ pub struct SessionManager {
 pub struct SessionInfo {
     pub querier_mappings: HashMap<TraceId, QuerierName>,
     pub cookie_expiry: Option<DateTime<Utc>>,
+    pub last_active: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -50,6 +51,7 @@ impl SessionManager {
         let session_info = SessionInfo {
             querier_mappings: HashMap::default(),
             cookie_expiry,
+            last_active: now,
             created_at: now,
         };
 
@@ -57,6 +59,25 @@ impl SessionManager {
         if !write_guard.contains_key(client_id) {
             write_guard.insert(client_id.clone(), session_info.clone());
         }
+    }
+
+    pub async fn update_session_activity(&self, client_id: &ClientId) {
+        let mut write_guard = self.sessions.write().await;
+        if let Some(session_info) = write_guard.get_mut(client_id) {
+            session_info.last_active = chrono::Utc::now();
+        }
+    }
+
+    pub async fn reached_max_idle_time(&self, client_id: &ClientId) -> bool {
+        self.sessions
+            .read()
+            .await
+            .get(client_id)
+            .is_none_or(|session_info| {
+                let idle_timeout =
+                    Duration::seconds(config::get_config().websocket.session_idle_timeout_secs);
+                Utc::now().signed_duration_since(session_info.last_active) > idle_timeout
+            })
     }
 
     pub async fn unregister_client(&self, client_id: &ClientId) {
