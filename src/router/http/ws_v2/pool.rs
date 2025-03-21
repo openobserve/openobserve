@@ -89,7 +89,7 @@ impl QuerierConnectionPool {
                 self.remove_querier_connection(&querier).await;
             }
 
-            tokio::time::sleep(std::time::Duration::from_secs(
+            tokio::time::sleep(tokio::time::Duration::from_secs(
                 // TODO: need to use another env to set the interval
                 self.config.health_check_config.interval_secs,
             ))

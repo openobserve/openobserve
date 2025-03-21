@@ -20,7 +20,7 @@ use config::RwAHashMap;
 
 use super::{
     error::*,
-    handler::{ClientId, QuerierName, SessionId, TraceId},
+    handler::{ClientId, QuerierName, TraceId},
 };
 
 #[derive(Debug, Default)]
@@ -31,11 +31,9 @@ pub struct SessionManager {
 
 #[derive(Debug, Clone)]
 pub struct SessionInfo {
-    pub session_id: SessionId,
     pub querier_mappings: HashMap<TraceId, QuerierName>,
+    pub cookie_expiry: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
-    pub last_active: DateTime<Utc>,
-    pub expires_datetime: Option<DateTime<Utc>>,
 }
 
 impl SessionManager {
@@ -45,29 +43,19 @@ impl SessionManager {
         cookie_expiry: Option<DateTime<Utc>>,
     ) {
         if self.sessions.read().await.get(client_id).is_some() {
-            self.update_session_activity(client_id).await;
             return;
         }
 
         let now = Utc::now();
         let session_info = SessionInfo {
-            session_id: client_id.clone(),
             querier_mappings: HashMap::default(),
+            cookie_expiry,
             created_at: now,
-            last_active: now,
-            expires_datetime: cookie_expiry,
         };
 
         let mut write_guard = self.sessions.write().await;
         if !write_guard.contains_key(client_id) {
             write_guard.insert(client_id.clone(), session_info.clone());
-        }
-    }
-
-    pub async fn update_session_activity(&self, client_id: &ClientId) {
-        let mut write_guard = self.sessions.write().await;
-        if let Some(session_info) = write_guard.get_mut(client_id) {
-            session_info.last_active = chrono::Utc::now();
         }
     }
 
@@ -86,10 +74,9 @@ impl SessionManager {
     pub async fn is_client_cookie_valid(&self, client_id: &ClientId) -> bool {
         match self.sessions.read().await.get(client_id) {
             Some(session_info) => session_info
-                .expires_datetime
-                // default true: authorized if cookie expiry wasn't present
+                .cookie_expiry
                 .is_none_or(|expiry| expiry > Utc::now()),
-            None => false,
+            None => false, // not set is treated as unauthenticated
         }
     }
 
@@ -120,6 +107,7 @@ impl SessionManager {
                 session_info
                     .querier_mappings
                     .retain(|tid, _| !trace_ids.contains(tid));
+                session_info.querier_mappings.shrink_to_fit();
             }
         }
     }
