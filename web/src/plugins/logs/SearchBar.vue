@@ -63,19 +63,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <q-toggle
+
+        <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
+          <q-toggle
           data-test="logs-search-bar-show-histogram-toggle-btn"
           v-model="searchObj.meta.showHistogram"
-          :label="t('search.showHistogramLabel')"
           size="32px"
           v-close-popup
-        />
+        >
+
+          <img src="../../assets/images/common/histogram_image.svg" alt="Histogram" style="width: 20px; height: 20px;">
+        </q-toggle>
+        </div>
+        <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
 
         <q-toggle
           data-test="logs-search-bar-sql-mode-toggle-btn"
           v-model="searchObj.meta.sqlMode"
-          :label="t('search.sqlModeLabel')"
-        />
+          >
+          <img src="../../assets/images/common/hugeicons_sql.svg" alt="Histogram" style="width: 20px; height: 20px;">
+
+        </q-toggle>
+        </div>
+        
         <q-btn
           data-test="logs-search-bar-reset-filters-btn"
           :title="t('search.resetFilters')"
@@ -85,10 +95,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
           @click="resetFilters"
         />
-        <syntax-guide
-          data-test="logs-search-bar-sql-mode-toggle-btn"
-          :sqlmode="searchObj.meta.sqlMode"
-        ></syntax-guide>
         <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
@@ -325,14 +331,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </q-btn-dropdown>
         </q-btn-group>
-        <q-toggle
+        <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
+          <q-toggle
           data-test="logs-search-bar-quick-mode-toggle-btn"
           v-model="searchObj.meta.quickMode"
-          :label="t('search.quickModeLabel')"
           @click="handleQuickMode"
           size="32px"
           v-close-popup
-        />
+        >
+          <img src="../../assets/images/common/quick_mode.svg" alt="Histogram" style="width: 20px; height: 20px;">
+        </q-toggle>
+        </div>
       </div>
       
 
@@ -1129,6 +1138,7 @@ import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
+import histogram_svg from "../../assets/images/common/histogram_image.svg";
 
 const defaultValue: any = () => {
   return {
@@ -3317,6 +3327,7 @@ export default defineComponent({
       actionEditorQuery,
       isActionsEnabled,
       showFunctionEditor,
+      histogram_svg
     };
   },
   computed: {
