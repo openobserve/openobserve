@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-folder-tab-${tab.folderId}`"
             >
               <div class="folder-item full-width row justify-between no-wrap">
-                <span class="folder-name" :title="tab.name">{{
+                <span class="folder-name text-truncate" :title="tab.name">{{
                   tab.name
                 }}</span>
                 <div class="hover-actions">
@@ -1051,7 +1051,6 @@ export default defineComponent({
       this.routeToViewD(row);
     },
   },
-
 });
 </script>
 
@@ -1129,6 +1128,9 @@ export default defineComponent({
 }
 
 .folder-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-transform: none !important;
 }
 </style>
