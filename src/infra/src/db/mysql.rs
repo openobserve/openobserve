@@ -32,13 +32,21 @@ use tokio::sync::{OnceCell, mpsc};
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;
 
-pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(connect);
+pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(|| connect(false));
+pub static CLIENT_RO: Lazy<Pool<MySql>> = Lazy::new(|| connect(true));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
-fn connect() -> Pool<MySql> {
+fn connect(readonly: bool) -> Pool<MySql> {
+    let mut dsn = if readonly {
+        config::get_config().common.meta_mysql_ro_dsn.clone()
+    } else {
+        config::get_config().common.meta_mysql_dsn.clone()
+    };
+    if dsn.is_empty() {
+        dsn = config::get_config().common.meta_mysql_dsn.clone();
+    }
     let cfg = config::get_config();
-    let db_opts = MySqlConnectOptions::from_str(&cfg.common.meta_mysql_dsn)
-        .expect("mysql connect options create failed");
+    let db_opts = MySqlConnectOptions::from_str(&dsn).expect("mysql connect options create failed");
 
     let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);

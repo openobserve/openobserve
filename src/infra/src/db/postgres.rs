@@ -32,13 +32,21 @@ use tokio::sync::{OnceCell, mpsc};
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;
 
-pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
+pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false));
+pub static CLIENT_RO: Lazy<Pool<Postgres>> = Lazy::new(|| connect(true));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
-fn connect() -> Pool<Postgres> {
+fn connect(readonly: bool) -> Pool<Postgres> {
     let cfg = config::get_config();
-    let db_opts = PgConnectOptions::from_str(&cfg.common.meta_postgres_dsn)
-        .expect("postgres connect options create failed");
+    let mut dsn = if readonly {
+        cfg.common.meta_postgres_ro_dsn.clone()
+    } else {
+        cfg.common.meta_postgres_dsn.clone()
+    };
+    if dsn.is_empty() {
+        dsn = cfg.common.meta_postgres_dsn.clone();
+    }
+    let db_opts = PgConnectOptions::from_str(&dsn).expect("postgres connect options create failed");
 
     let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
