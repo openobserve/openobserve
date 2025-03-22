@@ -15,11 +15,10 @@
 
 //! Removes the alert_name unique constraint
 
+use sea_orm::Statement;
 use sea_orm_migration::prelude::*;
-use sea_orm::{Statement};
 
 use super::m20250109_092400_recreate_tables_with_ksuids::ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX;
-
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -27,7 +26,13 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.drop_index(Index::drop().name(ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX).to_owned()).await?;
+        manager
+            .drop_index(
+                Index::drop()
+                    .name(ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX)
+                    .to_owned(),
+            )
+            .await?;
 
         update_scheduled_triggers(manager).await?;
 
@@ -58,20 +63,20 @@ enum Alerts {
     Name,
 }
 
-/// This function updates the scheduled triggers to such that the trigger module_key which previously
-/// has stream_type/stream_name/alert_name as the key, now will have alert_id as the key.
+/// This function updates the scheduled triggers to such that the trigger module_key which
+/// previously has stream_type/stream_name/alert_name as the key, now will have alert_id as the key.
 async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     // Query the alerts and scheduled jobs tables
     let db = manager.get_connection();
     let backend = db.get_database_backend();
-    
+
     let select_query = Query::select()
         .column(ScheduledJobs::ModuleKey)
         .column(ScheduledJobs::Org)
         .from(ScheduledJobs::Table)
         .and_where(Expr::col(ScheduledJobs::Module).eq(1))
         .to_owned();
-    
+
     let (sql, values) = match backend {
         sea_orm::DatabaseBackend::MySql => select_query.build(MysqlQueryBuilder),
         sea_orm::DatabaseBackend::Postgres => select_query.build(PostgresQueryBuilder),
@@ -87,10 +92,12 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
 
     // 2. For each trigger
     for trigger_row in triggers_result {
-        let org = trigger_row.try_get::<String>("", "org")
+        let org = trigger_row
+            .try_get::<String>("", "org")
             .map_err(|e| DbErr::Custom(format!("Failed to get org: {}", e)))?;
-        
-        let module_key = trigger_row.try_get::<String>("", "module_key")
+
+        let module_key = trigger_row
+            .try_get::<String>("", "module_key")
             .map_err(|e| DbErr::Custom(format!("Failed to get module_key: {}", e)))?;
 
         // Skip if the module_key doesn't match the expected pattern
@@ -98,11 +105,11 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
         if parts.len() != 3 {
             continue;
         }
-        
+
         let stream_type = parts[0];
         let stream_name = parts[1];
         let alert_name = parts[2];
-        
+
         // Query the corresponding alert to get its ID
         let alert_query = Query::select()
             .column(Alerts::Id)
@@ -112,7 +119,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
             .and_where(Expr::col(Alerts::StreamName).eq(stream_name))
             .and_where(Expr::col(Alerts::Name).eq(alert_name))
             .to_owned();
-            
+
         let backend = db.get_database_backend();
         let (sql, values) = match backend {
             sea_orm::DatabaseBackend::MySql => alert_query.build(MysqlQueryBuilder),
@@ -124,12 +131,13 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
             .query_one(statement)
             .await
             .map_err(|e| DbErr::Custom(format!("Failed to query alert: {}", e)))?;
-        
+
         // If we found the alert
         if let Some(alert_row) = alert_result {
-            let alert_id = alert_row.try_get::<String>("", "id")
+            let alert_id = alert_row
+                .try_get::<String>("", "id")
                 .map_err(|e| DbErr::Custom(format!("Failed to get alert ID: {}", e)))?;
-            
+
             // Update the trigger module_key
             let update_query = Query::update()
                 .table(ScheduledJobs::Table)
@@ -138,18 +146,18 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
                 .and_where(Expr::col(ScheduledJobs::Module).eq(1))
                 .and_where(Expr::col(ScheduledJobs::ModuleKey).eq(module_key))
                 .to_owned();
-                
+
             let (sql, values) = match backend {
                 sea_orm::DatabaseBackend::MySql => update_query.build(MysqlQueryBuilder),
                 sea_orm::DatabaseBackend::Postgres => update_query.build(PostgresQueryBuilder),
                 sea_orm::DatabaseBackend::Sqlite => update_query.build(SqliteQueryBuilder),
             };
-            let statement = Statement::from_sql_and_values(backend, sql, values); 
+            let statement = Statement::from_sql_and_values(backend, sql, values);
             db.execute(statement)
                 .await
                 .map_err(|e| DbErr::Custom(format!("Failed to update scheduled job: {}", e)))?;
         }
     }
-    
+
     Ok(())
 }

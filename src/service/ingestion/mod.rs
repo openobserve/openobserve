@@ -43,7 +43,8 @@ use vrl::{
 };
 
 use super::{
-    db::pipeline, pipeline::batch_execution::ExecutablePipeline,
+    db::{alerts::alert, pipeline},
+    pipeline::batch_execution::ExecutablePipeline,
     self_reporting::publish_triggers_usage,
 };
 use crate::{
@@ -52,7 +53,11 @@ use crate::{
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::functions::get_vrl_compiler_config,
     },
-    service::{alerts::alert::AlertExt, db, logs::bulk::TRANSFORM_FAILED},
+    service::{
+        alerts::alert::AlertExt,
+        db::{self, alerts::alert::scheduler_key},
+        logs::bulk::TRANSFORM_FAILED,
+    },
 };
 
 pub mod grpc;
@@ -188,32 +193,38 @@ pub async fn get_stream_alerts(
     stream_alerts_map: &mut HashMap<String, Vec<Alert>>,
 ) {
     for stream in streams {
-        let key = format!(
-            "{}/{}/{}",
-            stream.org_id, stream.stream_type, stream.stream_name
-        );
+        let key = alert::cache_stream_key(&stream.org_id, stream.stream_type, &stream.stream_name);
         if stream_alerts_map.contains_key(&key) {
             return;
         }
 
-        let alerts_cacher = STREAM_ALERTS.read().await;
-        let alerts_list = alerts_cacher.get(&key);
-        if alerts_list.is_none() {
+        let stream_alerts_cacher = STREAM_ALERTS.read().await;
+        let alerts_id_list = stream_alerts_cacher.get(&key);
+        if alerts_id_list.is_none() {
             return;
         }
+        let mut alerts_list = vec![];
+        for alert_id in alerts_id_list.unwrap().iter() {
+            if let Some((_, alert)) = alert::get_alert_from_cache(&stream.org_id, alert_id).await {
+                alerts_list.push(alert);
+            }
+        }
+
         let triggers_cache = REALTIME_ALERT_TRIGGERS.read().await;
         let alerts = alerts_list
-            .unwrap()
-            .iter()
+            .into_iter()
             .filter(|alert| alert.enabled && alert.is_real_time)
             .filter(|alert| {
-                let key = format!("{}/{}", stream.org_id, alert.id.unwrap().to_string());
+                let key = format!(
+                    "{}/{}",
+                    stream.org_id,
+                    alert.id.as_ref().unwrap().to_string()
+                );
                 match triggers_cache.get(&key) {
                     Some(v) => !v.is_silenced,
                     None => true,
                 }
             })
-            .cloned()
             .collect::<Vec<_>>();
         if alerts.is_empty() {
             return;
@@ -229,16 +240,13 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     log::debug!("Evaluating triggers: {:?}", triggers);
     let mut trigger_usage_reports = vec![];
     for (alert, val) in triggers.iter() {
-        let module_key = format!(
-            "{}/{}/{}",
-            &alert.stream_type, &alert.stream_name, &alert.name
-        );
+        let module_key = scheduler_key(alert.id.clone());
         let now = Utc::now().timestamp_micros();
         let mut trigger_data_stream = TriggerData {
             _timestamp: now,
             org: alert.org_id.to_string(),
             module: TriggerDataType::Alert,
-            key: module_key.clone(),
+            key: format!("{}/{module_key}", alert.name),
             next_run_at: now,
             is_realtime: true,
             is_silenced: false,

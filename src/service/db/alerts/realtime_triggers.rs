@@ -21,15 +21,17 @@ use crate::{common::infra::config::REALTIME_ALERT_TRIGGERS, service::db};
 
 // Parses the item key from the event key and extracts org_id and module_key
 fn parse_item_key(key_prefix: &str, event_key: &str) -> (String, String, String) {
-    let item_key = event_key.strip_prefix(key_prefix).map_or_else(String::new, |s| s.to_string());
+    let item_key = event_key
+        .strip_prefix(key_prefix)
+        .map_or_else(String::new, |s| s.to_string());
     let (org_id, module_key) = item_key.split_once('/').map_or_else(
         || ("".to_string(), "".to_string()),
-        |(org, module)| (org.to_string(), module.to_string())
+        |(org, module)| (org.to_string(), module.to_string()),
     );
     (item_key, org_id, module_key)
 }
 
-// Handles old format conversion if needed
+// Handles old format to new format conversion if needed
 async fn handle_format_conversion(
     mut item_key: String,
     org_id: &str,
@@ -42,8 +44,10 @@ async fn handle_format_conversion(
             let stream_type = parts[0];
             let stream_name = parts[1];
             let alert_name = parts[2];
-            
-            let alert = db::alerts::alert::get_by_name(org_id, stream_type.into(), stream_name, alert_name).await?;
+
+            let alert =
+                db::alerts::alert::get_by_name(org_id, stream_type.into(), stream_name, alert_name)
+                    .await?;
             if let Some(alert) = alert {
                 if let Some(id) = alert.id {
                     let alert_id = id.to_string();
@@ -68,7 +72,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     );
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(&key).await?;
-    let events = Arc::get_mut(&mut events).ok_or_else(|| anyhow::anyhow!("Failed to get mutable reference to events"))?;
+    let events = Arc::get_mut(&mut events)
+        .ok_or_else(|| anyhow::anyhow!("Failed to get mutable reference to events"))?;
     log::info!("Start watching alert realtime triggers");
     loop {
         let ev = match events.recv().await {
@@ -83,40 +88,44 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Put(ev) => {
                 // Parse the item key and extract components
                 let (mut item_key, org_id, module_key) = parse_item_key(&key, &ev.key);
-                
+
                 // Handle format conversion
-                let (updated_item_key, alert_id) = match handle_format_conversion(item_key, &org_id, &module_key).await {
-                    Ok(result) => result,
-                    Err(e) => {
-                        log::error!("Error handling format conversion: {}", e);
-                        continue;
-                    }
-                };
+                let (updated_item_key, alert_id) =
+                    match handle_format_conversion(item_key, &org_id, &module_key).await {
+                        Ok(result) => result,
+                        Err(e) => {
+                            log::error!("Error handling format conversion: {}", e);
+                            continue;
+                        }
+                    };
                 item_key = updated_item_key;
-                
+
                 // Get or parse the trigger value
-                let item_value: db::scheduler::Trigger = if ev.value.is_none() || ev.value.as_ref().unwrap().is_empty() {
-                    match db::scheduler::get(
-                        &org_id,
-                        config::meta::triggers::TriggerModule::Alert,
-                        &alert_id,
-                    ).await {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
+                let item_value: db::scheduler::Trigger =
+                    if ev.value.is_none() || ev.value.as_ref().unwrap().is_empty() {
+                        match db::scheduler::get(
+                            &org_id,
+                            config::meta::triggers::TriggerModule::Alert,
+                            &alert_id,
+                        )
+                        .await
+                        {
+                            Ok(val) => val,
+                            Err(e) => {
+                                log::error!("Error getting value: {}", e);
+                                continue;
+                            }
                         }
-                    }
-                } else {
-                    match json::from_slice(&ev.value.unwrap()) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error parsing trigger value: {}", e);
-                            continue;
+                    } else {
+                        match json::from_slice(&ev.value.unwrap()) {
+                            Ok(val) => val,
+                            Err(e) => {
+                                log::error!("Error parsing trigger value: {}", e);
+                                continue;
+                            }
                         }
-                    }
-                };
-                
+                    };
+
                 REALTIME_ALERT_TRIGGERS
                     .write()
                     .await
@@ -125,17 +134,21 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Delete(ev) => {
                 // Parse the item key and extract components
                 let (item_key, org_id, module_key) = parse_item_key(&key, &ev.key);
-                
+
                 // Handle format conversion
-                let (updated_item_key, _) = match handle_format_conversion(item_key, &org_id, &module_key).await {
-                    Ok(result) => result,
-                    Err(e) => {
-                        log::error!("Error handling format conversion: {}", e);
-                        continue;
-                    }
-                };
-                
-                REALTIME_ALERT_TRIGGERS.write().await.remove(&updated_item_key);
+                let (updated_item_key, _) =
+                    match handle_format_conversion(item_key, &org_id, &module_key).await {
+                        Ok(result) => result,
+                        Err(e) => {
+                            log::error!("Error handling format conversion: {}", e);
+                            continue;
+                        }
+                    };
+
+                REALTIME_ALERT_TRIGGERS
+                    .write()
+                    .await
+                    .remove(&updated_item_key);
             }
             db::Event::Empty => {}
         }

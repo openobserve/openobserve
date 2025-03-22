@@ -19,6 +19,7 @@ use infra::{
     scheduler,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
+
 use crate::service::db::alerts::alert;
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
@@ -128,15 +129,20 @@ async fn delete(msg: Message) -> Result<()> {
 }
 
 async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
-    let module_key = trigger.module_key.clone();
-    let parts = module_key.split("/").collect::<Vec<&str>>();
-    let org = parts[1];
-    let stream_type = parts[2];
-    let stream_name = parts[3];
-    let alert_name = parts[4];
+    // Return if the module_key is in new format (alert_id only)
+    if !trigger.module_key.contains("/") {
+        return Ok(());
+    }
+    let parts = trigger.module_key.split("/").collect::<Vec<&str>>();
+    let stream_type = parts[0];
+    let stream_name = parts[1];
+    let alert_name = parts[2];
 
     // get alert id from alert name
-    let alert_id = alert::get_by_name(org, stream_type, stream_name, alert_name).await?;
-    trigger.module_key = format!("{}", alert_id);
+    if let Some(alert) =
+        alert::get_by_name(&trigger.org, stream_type.into(), stream_name, alert_name).await?
+    {
+        trigger.module_key = alert.get_unique_key();
+    }
     Ok(())
 }

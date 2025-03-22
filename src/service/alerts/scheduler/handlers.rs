@@ -36,13 +36,15 @@ use config::{
     },
 };
 use cron::Schedule;
-use infra::scheduler::get_scheduler_max_retries;
-use infra::db::{ORM_CLIENT, connect_to_orm};
+use infra::{
+    db::{ORM_CLIENT, connect_to_orm},
+    scheduler::get_scheduler_max_retries,
+};
 use proto::cluster_rpc;
 
 use crate::service::{
     alerts::{
-        alert::{AlertExt, get_alert_start_end_time, get_by_name, get_row_column_map},
+        alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
         derived_streams::DerivedStreamExt,
     },
     dashboards::reports::SendReport,
@@ -93,24 +95,33 @@ async fn handle_alert_triggers(
     let alert = if let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) {
         let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
         match db::alerts::alert::get_by_id(client, &trigger.org, alert_id).await {
-            Ok(Some((_, alert))) => {
-                alert
-            }
+            Ok(Some((_, alert))) => alert,
             Ok(None) => {
-                log::error!("[SCHEDULER trace_id {trace_id}] Alert not found for module_key: {}", trigger.module_key);
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] Alert not found for module_key: {}",
+                    trigger.module_key
+                );
                 return Err(anyhow::anyhow!("Alert not found"));
             }
             Err(e) => {
-                log::error!("[SCHEDULER trace_id {trace_id}] Error getting alert by id: {}", e);
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] Error getting alert by id: {}",
+                    e
+                );
                 return Err(anyhow::anyhow!("Error getting alert by id: {}", e));
             }
         }
     } else {
-        log::error!("[SCHEDULER trace_id {trace_id}] Alert id is not a valid ksuid: {}", trigger.module_key);
-        return Err(anyhow::anyhow!("Alert id is not a valid ksuid: {}", trigger.module_key));
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] Alert id is not a valid ksuid: {}",
+            trigger.module_key
+        );
+        return Err(anyhow::anyhow!(
+            "Alert id is not a valid ksuid: {}",
+            trigger.module_key
+        ));
     };
 
-    
     let is_realtime = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
     let triggered_at = trigger.start_time.unwrap_or_default();
@@ -211,7 +222,7 @@ async fn handle_alert_triggers(
                 _timestamp: triggered_at - 1,
                 org: trigger.org.clone(),
                 module: TriggerDataType::Alert,
-                key: trigger.module_key.clone(),
+                key: format!("{}/{}", alert.name, trigger.module_key),
                 next_run_at: triggered_at,
                 is_realtime: trigger.is_realtime,
                 is_silenced: trigger.is_silenced,
@@ -265,9 +276,9 @@ async fn handle_alert_triggers(
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
     let mut trigger_data_stream: TriggerData = TriggerData {
         _timestamp: triggered_at,
-        org: trigger.org,
+        org: trigger.org.clone(),
         module: TriggerDataType::Alert,
-        key: trigger.module_key.clone(),
+        key: format!("{}/{}", alert.name, trigger.module_key),
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
@@ -312,17 +323,14 @@ async fn handle_alert_triggers(
             if get_config().limit.pause_alerts_on_retries {
                 // It has been tried the maximum time, just disable the alert
                 // and show the error.
-                if let Some(mut alert) =
-                    get_by_name(&trigger.org, alert.stream_type, &alert.stream_name, &alert.name).await?
-                {
-                    alert.enabled = false;
-                    if let Err(e) = set_without_updating_trigger(&trigger.org, alert).await {
-                        log::error!(
-                            "[SCHEDULER trace_id {trace_id}] Failed to update alert: {}/{} after trigger: {e}",
-                            &trigger.org,
-                            &trigger.module_key
-                        );
-                    }
+                let mut alert_curr = get_by_id_db(&trigger.org, alert.id.unwrap()).await?;
+                alert_curr.enabled = false;
+                if let Err(e) = set_without_updating_trigger(&trigger.org, alert_curr).await {
+                    log::error!(
+                        "[SCHEDULER trace_id {trace_id}] Failed to update alert: {}/{} after trigger: {e}",
+                        &trigger.org,
+                        &trigger.module_key
+                    );
                 }
             }
             // This didn't work, update the next_run_at to the next expected trigger time

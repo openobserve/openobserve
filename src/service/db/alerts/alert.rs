@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use config::meta::{
     alerts::alert::{Alert, ListAlertsParams},
     folder::Folder,
@@ -26,7 +28,10 @@ use infra::{
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
-use crate::{common::infra::config::STREAM_ALERTS, service::db};
+use crate::{
+    common::infra::config::{ALERTS, STREAM_ALERTS},
+    service::db,
+};
 
 /// Gets the alert and its parent folder.
 pub async fn get_by_id<C: ConnectionTrait>(
@@ -34,8 +39,12 @@ pub async fn get_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<Option<(Folder, Alert)>, infra::errors::Error> {
-    // We cannot check the cache because the cache stores alerts by stream type
-    // and stream name which are currently unknown.
+    if let Some(alert_folder) = ALERTS.read().await.get(&cache_alert_key(
+        org_id,
+        &scheduler_key(Some(alert_id.clone())),
+    )) {
+        return Ok(Some(alert_folder.to_owned()));
+    }
     let folder_and_alert = table::get_by_id(conn, org_id, alert_id).await?;
     Ok(folder_and_alert)
 }
@@ -46,28 +55,14 @@ pub async fn get_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, infra::errors::Error> {
-    let stream_key = cache_stream_key(org_id, stream_type, stream_name);
-    let mut value: Option<Alert> = if let Some(v) = STREAM_ALERTS.read().await.get(&stream_key) {
-        v.iter().find(|x| x.name.eq(name)).cloned()
-    } else {
-        None
-    };
-    if value.is_none() {
-        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-        let alert =
-            table::get_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
-        value = alert.map(|(_f, a)| a);
-    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let alert =
+        table::get_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
+    let value = alert.map(|(_f, a)| a);
     Ok(value)
 }
 
-pub async fn set(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    alert: Alert,
-    create: bool,
-) -> Result<Alert, infra::errors::Error> {
+pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infra::errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match table::put(client, org_id, "default", alert).await {
         Ok(alert) => {
@@ -79,7 +74,7 @@ pub async fn set(
                 super_cluster::emit_update_event(org_id, None, alert.clone()).await?;
             }
 
-            let schedule_key = scheduler_key(stream_type, stream_name, &alert.name);
+            let schedule_key = scheduler_key(alert.id.clone());
             // Get the trigger from scheduler
             let mut trigger = db::scheduler::Trigger {
                 org: org_id.to_string(),
@@ -150,12 +145,12 @@ pub async fn create<C: TransactionTrait>(
     alert: Alert,
 ) -> Result<Alert, infra::errors::Error> {
     let alert = table::create(conn, org_id, folder_id, alert, false).await?;
+    let schedule_key = scheduler_key(alert.id.clone());
 
     cluster::emit_put_event(org_id, &alert, Some(folder_id.to_string())).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_create_event(org_id, folder_id, alert.clone()).await?;
 
-    let schedule_key = scheduler_key(alert.stream_type, &alert.stream_name, &alert.name);
     let trigger = db::scheduler::Trigger {
         org: org_id.to_string(),
         module_key: schedule_key.clone(),
@@ -180,12 +175,12 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     alert: Alert,
 ) -> Result<Alert, infra::errors::Error> {
     let alert = table::update(conn, org_id, folder_id, alert).await?;
+    let schedule_key = scheduler_key(alert.id.clone());
 
     cluster::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string())).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
 
-    let schedule_key = scheduler_key(alert.stream_type, &alert.stream_name, &alert.name);
     let mut trigger = db::scheduler::Trigger {
         org: org_id.to_string(),
         module_key: schedule_key.clone(),
@@ -218,25 +213,25 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), infra::errors::Error> {
-    let Some((_folder, alert)) = table::get_by_id(conn, org_id, alert_id).await? else {
+    let Some((_folder, _alert)) = table::get_by_id(conn, org_id, alert_id).await? else {
         return Ok(());
     };
+    let alert_id_str = alert_id.to_string();
 
     table::delete_by_id(conn, org_id, alert_id).await?;
-    cluster::emit_delete_event(org_id, alert.stream_type, &alert.stream_name, &alert.name).await?;
+    cluster::emit_delete_event(org_id, &alert_id_str).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(
         org_id,
-        alert.stream_type,
-        &alert.stream_name,
-        &alert.name,
+        _alert.stream_type,
+        &_alert.stream_name,
+        &_alert.name,
         alert_id,
     )
     .await?;
 
-    let schedule_key = scheduler_key(alert.stream_type, &alert.stream_name, &alert.name);
     if let Err(e) =
-        db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await
+        db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
     {
         log::error!("Failed to delete trigger: {}", e);
     };
@@ -251,7 +246,6 @@ pub async fn delete_by_name(
 ) -> Result<(), infra::errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    #[cfg(feature = "enterprise")]
     let Some(alert_id) =
         table::get_by_name(client, org_id, "default", stream_type, stream_name, name)
             .await?
@@ -259,16 +253,16 @@ pub async fn delete_by_name(
     else {
         return Ok(());
     };
+    let alert_id_str = alert_id.to_string();
 
     table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
-    cluster::emit_delete_event(org_id, stream_type, stream_name, name).await?;
+    cluster::emit_delete_event(org_id, &alert_id_str).await?;
 
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(org_id, stream_type, stream_name, name, alert_id).await?;
 
-    let schedule_key = scheduler_key(stream_type, stream_name, name);
     if let Err(e) =
-        db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await
+        db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
     {
         log::error!("Failed to delete trigger: {}", e);
     };
@@ -315,7 +309,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let mut cacher = STREAM_ALERTS.write().await;
         let stream_key = cache_stream_key(&alert.org_id, alert.stream_type, &alert.stream_name);
         let group = cacher.entry(stream_key.to_string()).or_default();
-        group.push(alert);
+        group.push(alert.id.map_or("".to_string(), |id| id.to_string()));
     }
     log::info!("Alerts Cached");
     Ok(())
@@ -328,23 +322,16 @@ pub async fn reset() -> Result<(), anyhow::Error> {
 
 async fn put_into_cache(
     org: String,
-    stream_type: StreamType,
-    stream_name: String,
-    alert_name: String,
-    folder_id: Option<String>,
+    alert_id: String,
+    _folder_id: Option<String>,
 ) -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let item_value: Alert = match table::get_by_name(
-        client,
-        &org,
-        folder_id.unwrap_or("default".to_string()).as_str(),
-        stream_type,
-        &stream_name,
-        &alert_name,
-    )
-    .await
-    {
-        Ok(Some(val)) => val.1,
+    let Ok(alert_id_ksuid) = svix_ksuid::Ksuid::from_str(&alert_id) else {
+        log::error!("Error parsing alert id into Ksuid while putting the alert into cache");
+        return Ok(());
+    };
+    let item_value = match table::get_by_id(client, &org, alert_id_ksuid).await {
+        Ok(Some(val)) => val,
         Ok(None) => {
             log::error!("Tried to get alert that does not exist in DB");
             return Ok(());
@@ -354,43 +341,74 @@ async fn put_into_cache(
             return Ok(());
         }
     };
-    let mut cacher = STREAM_ALERTS.write().await;
-    let stream_key = cache_stream_key(&org, stream_type, &stream_name);
-    let group = cacher.entry(stream_key.to_string()).or_default();
-    if group.contains(&item_value) {
-        let idx = group.iter().position(|x| x.eq(&item_value)).unwrap();
-        let _ = std::mem::replace(&mut group[idx], item_value);
-    } else {
-        group.push(item_value);
+    // Put into the Stream Alerts cache if the alert is a realtime alert
+    // For realtime alerts, while processing ingestion requests, we need
+    // alerts by the stream-type and stream name, hence we are using two
+    // different caches - 1. STREAM_ALERTS to store alert ids grouped by
+    // stream name, and 2. ALERTS to store the whole alert body with key
+    // of `org/alert_id`
+    if item_value.1.is_real_time {
+        let mut stream_alerts_id_cacher = STREAM_ALERTS.write().await;
+        let stream_key =
+            cache_stream_key(&org, item_value.1.stream_type, &item_value.1.stream_name);
+        let group = stream_alerts_id_cacher
+            .entry(stream_key.to_string())
+            .or_default();
+        if !group.contains(&alert_id) {
+            group.push(alert_id.clone());
+        }
     }
+    // Store the alert in the ALERTS cache as well with the  alert body
+    let mut alerts_cacher = ALERTS.write().await;
+    let alert_cache_key = cache_alert_key(&org, &alert_id);
+    alerts_cacher.insert(alert_cache_key, item_value);
     Ok(())
 }
 
-async fn delete_from_cache(
-    org: String,
-    stream_type: StreamType,
-    stream_name: String,
-    alert_name: String,
-) -> Result<(), anyhow::Error> {
-    let mut cacher = STREAM_ALERTS.write().await;
-    let stream_key = cache_stream_key(&org, stream_type, &stream_name);
-    let group = match cacher.get_mut(&stream_key) {
-        Some(v) => v,
-        None => return Ok(()),
-    };
-    group.retain(|v| !v.name.eq(&alert_name));
+async fn delete_from_cache(org: String, alert_id: String) -> Result<(), anyhow::Error> {
+    // First delete from the alerts cache and then from stream_alerts cache if required
+    let mut alerts_cacher = ALERTS.write().await;
+    let alert_cache_key = cache_alert_key(&org, &alert_id);
+    let removed_item = alerts_cacher.remove(&alert_cache_key);
+    if let Some(removed_alert) = removed_item {
+        // Remove the alert from STREAM_ALERTS cache if it is required
+        let mut cacher = STREAM_ALERTS.write().await;
+        let stream_key = cache_stream_key(
+            &org,
+            removed_alert.1.stream_type,
+            &removed_alert.1.stream_name,
+        );
+        let group = match cacher.get_mut(&stream_key) {
+            Some(v) => v,
+            None => return Ok(()),
+        };
+        group.retain(|v| v.ne(&alert_id));
+    }
+
     Ok(())
 }
 
-/// Returns the key used to store alerts in the in-memory cache, grouped by
+pub async fn get_alert_from_cache(org_id: &str, alert_id: &str) -> Option<(Folder, Alert)> {
+    let alerts_cacher = ALERTS.read().await;
+    alerts_cacher
+        .get(&cache_alert_key(org_id, alert_id))
+        .cloned()
+}
+
+/// Returns the key used to store stream (real-time) alerts in the in-memory cache, grouped by
 /// stream.
-fn cache_stream_key(org: &str, stream_type: StreamType, stream_name: &str) -> String {
+pub fn cache_stream_key(org: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("{org}/{stream_type}/{stream_name}")
 }
 
+/// Returns key used to store all the alerts in the in-memory cache
+pub fn cache_alert_key(org: &str, alert_id: &str) -> String {
+    format!("{org}/{alert_id}")
+}
+
 /// Returns the key used to schedule a trigger for the alert.
-fn scheduler_key(stream_type: StreamType, stream_name: &str, alert_name: &str) -> String {
-    format!("{stream_type}/{stream_name}/{alert_name}")
+pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
+    alert_id.map_or("".to_string(), |id| id.to_string())
 }
 
 /// Helper functions for sending events to the super cluster queue.
