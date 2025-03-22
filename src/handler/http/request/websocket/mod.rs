@@ -13,15 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod search;
 pub mod session;
-pub mod sort;
-pub mod utils;
 
 use actix_web::{Error, HttpRequest, HttpResponse, get, web};
 use config::{cluster::LOCAL_NODE, get_config};
 use session::WsSession;
-use utils::sessions_cache_utils;
+
+use crate::service::websocket_events::sessions_cache_utils;
 
 #[get("{org_id}/ws/{request_id}")]
 pub async fn websocket(

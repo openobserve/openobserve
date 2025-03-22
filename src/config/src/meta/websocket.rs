@@ -36,4 +36,21 @@ pub struct SearchEventReq {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
     pub fallback_order_by_col: Option<String>,
+    // TODO: modify this once v1 is deprecated
+    pub org_id: String,
+    // TODO: is it PII safe?
+    pub user_id: Option<String>,
+}
+
+impl SearchEventReq {
+    pub fn is_valid(&self) -> bool {
+        // TODO: add event payload validation in the future
+        if self.trace_id.is_empty() {
+            return false;
+        }
+        if self.org_id.is_empty() {
+            return false;
+        }
+        true
+    }
 }

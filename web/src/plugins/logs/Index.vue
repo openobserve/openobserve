@@ -18,7 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <q-page class="logPage q-my-xs" id="logPage">
-    <div v-show="!showSearchHistory && !showSearchScheduler" id="secondLevel" class="full-height">
+    <div
+      v-show="!showSearchHistory && !showSearchScheduler"
+      id="secondLevel"
+      class="full-height"
+    >
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -302,7 +306,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @closeSearchHistory="closeSearchHistoryfn"
         :isClicked="showSearchHistory"
       />
-      <div v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled " style="height: 200px">
+      <div
+        v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
+        style="height: 200px"
+      >
         <div style="height: 80vh" class="text-center q-pa-md flex flex-center">
           <div>
             <div>
@@ -344,16 +351,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-     
     </div>
     <div v-show="showSearchScheduler">
-        <SearchSchedulersList
+      <SearchSchedulersList
         ref="searchSchedulerRef"
         @closeSearchHistory="closeSearchSchedulerFn"
         :isClicked="showSearchScheduler"
-         />
-      </div>
-
+      />
+    </div>
   </q-page>
 </template>
 
@@ -371,6 +376,7 @@ import {
   defineAsyncComponent,
   provide,
   onMounted,
+  onBeforeUnmount,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -460,11 +466,9 @@ export default defineComponent({
         if (this.searchObj.meta.jobId == "") {
           await this.getQueryData(false);
           this.refreshHistogramChart();
-        }
-        else{
+        } else {
           await this.getJobData(false);
         }
-
 
         if (config.isCloud == "true") {
           segment.track("Button Click", {
@@ -487,12 +491,10 @@ export default defineComponent({
         // this.searchObj.data.resultGrid.currentPage =
         //   this.searchObj.data.resultGrid.currentPage + 1;
         this.searchObj.loading = true;
-        if(this.searchObj.meta.jobId == ""){
+        if (this.searchObj.meta.jobId == "") {
           await this.getQueryData(true);
           this.refreshHistogramChart();
-
-        }
-        else{
+        } else {
           await this.getJobData(false);
         }
 
@@ -581,6 +583,7 @@ export default defineComponent({
       buildWebSocketPayload,
       initializeWebSocketConnection,
       addRequestId,
+      sendCancelSearchMessage,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -660,13 +663,17 @@ export default defineComponent({
         router.currentRoute.value.query.hasOwnProperty("action") &&
         router.currentRoute.value.query.action == "search_scheduler"
       ) {
-        if(config.isEnterprise == 'true'){
+        if (config.isEnterprise == "true") {
           showSearchScheduler.value = true;
-        }
-        else{
+        } else {
           router.back();
         }
       }
+    });
+
+    onBeforeUnmount(() => {
+      // Cancel all the search queries
+      cancelOnGoingSearchQueries();
     });
 
     onActivated(() => {
@@ -711,12 +718,11 @@ export default defineComponent({
           router.currentRoute.value.query.hasOwnProperty("action") &&
           router.currentRoute.value.query.action == "search_scheduler"
         ) {
-          if(config.isEnterprise == 'true'){
+          if (config.isEnterprise == "true") {
             showSearchScheduler.value = true;
+          } else {
+            router.back();
           }
-          else{
-          router.back();
-        }
         }
       },
       // (action) => {
@@ -799,7 +805,6 @@ export default defineComponent({
         await getQueryData();
         refreshHistogramChart();
         showJobScheduler.value = true;
-
       } catch (e) {
         console.log(e);
       }
@@ -1543,6 +1548,12 @@ export default defineComponent({
     );
 
     // [END] cancel running queries
+
+    const cancelOnGoingSearchQueries = () => {
+      sendCancelSearchMessage(
+        searchObj.data.searchWebSocketRequestIdsAndTraceIds,
+      );
+    };
 
     return {
       t,

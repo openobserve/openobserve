@@ -514,6 +514,7 @@ import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
+import useSearchWebSocket from "@/composables/useSearchWebSocket";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -564,6 +565,8 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
+      this.closeSocket();
+
       if (config.isEnterprise == "true") {
         invlidateLoginData();
       }
@@ -596,6 +599,7 @@ export default defineComponent({
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
     const { getStreams, resetStreams } = useStreams();
+    const { closeSocket } = useSearchWebSocket();
 
     const isMonacoEditorLoaded = ref(false);
 
@@ -1237,6 +1241,7 @@ export default defineComponent({
       slackIcon: markRaw(SlackIcon),
       openSlack,
       outlinedSettings,
+      closeSocket,
     };
   },
   computed: {

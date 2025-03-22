@@ -4,7 +4,7 @@ import { onBeforeUnmount } from "vue";
 
 type MessageHandler = (event: MessageEvent) => void;
 type OpenHandler = (event: Event) => void;
-type CloseHandler = (event: CloseEvent) => void;
+type CloseHandler = (event: CloseEvent, socketId: string) => void;
 type ErrorHandler = (event: Event) => void;
 
 type WebSocketHandler =
@@ -71,7 +71,7 @@ const onClose = (socketId: string, event: CloseEvent) => {
   delete pingIntervals[socketId];
   delete sockets[socketId];
 
-  closeHandlers[socketId]?.forEach((handler) => handler(event));
+  closeHandlers[socketId]?.forEach((handler) => handler(event, socketId));
 };
 
 const onError = (socketId: string, event: Event) => {
@@ -132,14 +132,17 @@ const closeSocket = (socketId: string) => {
 const useWebSocket = () => {
   onBeforeUnmount(() => {
     for (const socketId in sockets) {
-      const socket = sockets[socketId];
-      if (socket) {
-        cleanupSocket(socketId, socket);
-      }
+      cleanupSocket(socketId);
     }
   });
 
-  const cleanupSocket = (socketId: string, socket: WebSocket) => {
+  const cleanupSocket = (socketId: string) => {
+    const socket = sockets[socketId];
+
+    if(!socket) {
+      console.error("Cleanup socket failed, socket not found", socketId);
+      return;
+    }
     // Remove all event listeners
     socket.onopen = null;
     socket.onmessage = null;
@@ -169,6 +172,7 @@ const useWebSocket = () => {
     connect,
     sendMessage,
     closeSocket,
+    cleanupSocket,
     getWebSocketBasedOnSocketId,
     addMessageHandler: (socketId: string, handler: MessageHandler) =>
       addHandler(messageHandlers, socketId, handler),
