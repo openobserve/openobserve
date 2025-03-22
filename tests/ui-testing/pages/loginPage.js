@@ -75,6 +75,18 @@ export class LoginPage {
     });  
   }
 
+  async loginMultipleUsers(userId, password) {
+    await this.userIdInput.fill(userId);
+    console.log(`entered userId: ${userId}`);
+    await this.passwordInput.fill(password);
+    console.log(`entered password: ${password}`);
+    await this.loginButton.click();
+    console.log(`clicked login button`);
+    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
+      waitUntil: "networkidle",
+    });
+  }
 
+  
 
 }
