@@ -132,7 +132,6 @@ test.describe("Sanity testcases", () => {
   test("should display pagination when histogram is off and clicking and closing the result", async ({
     page,
   }) => {
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)
@@ -147,13 +146,12 @@ test.describe("Sanity testcases", () => {
   test("should display pagination when only SQL is on clicking and closing the result", async ({
     page,
   }) => {
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)
       .click();
-    await page.getByLabel("SQL Mode").locator("div").first().click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+      await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+      await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-1-_timestamp"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
@@ -170,7 +168,7 @@ test.describe("Sanity testcases", () => {
           y: 66,
         },
       });
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     // await page.getByRole('heading', { name: 'Error while fetching' }).click();
 
@@ -197,7 +195,7 @@ test.describe("Sanity testcases", () => {
         "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines"
       )
       .click();
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page
       .locator(
@@ -457,9 +455,12 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
   });
   test.skip('should verify search history displayed and user navigates to logs', async ({ page, context }) => {
     // Step 1: Click on the "Share Link" button
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByRole('button', { name: 'Search History' }).click();
+    await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="search-history-item-btn"]').click();
+    // await page.getByText('Search History').click();    
     await page.locator('[data-test="search-history-date-time"]').click();
     await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
     await page.getByRole('button', { name: 'Get History' }).click();
@@ -478,10 +479,12 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
 
   test('should verify logs page displayed on click back button on search history page', async ({ page, context }) => {
     // Step 1: Click on the "Share Link" button
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByRole('button', { name: 'Search History' }).click();
+    await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="search-history-item-btn"]').click();
+    // await page.getByText('Search History').click();
     await page.locator('[data-test="search-history-date-time"]').click();
     await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
     await page.locator('[data-test="search-history-alert-back-btn"]').click();
@@ -498,7 +501,9 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByRole('button', { name: 'Search History' }).click();
+    await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="search-history-item-btn"]').click();
     await page.locator('[data-test="add-alert-title"]').click();
     await page.getByText('arrow_back_ios_new').first().click()
     await page.waitForTimeout(1000);

@@ -36,8 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-right tw-flex tw-justify-center tw-items-center reset-filters no-border no-outline !tw-rounded-r-none"
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm"
                 :title="t('common.search')"
+                style="height: 32px;"
               />
             </div>
             <div>
@@ -48,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'selected'
                     : ''
                 "
-                class="button button-right tw-flex tw-justify-center tw-items-center reset-filters no-border no-outline !tw-rounded-l-none"
+                class="button button-right tw-flex tw-justify-center tw-items-center  no-border no-outline !tw-rounded-l-none q-px-sm"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disabled="isVisualizeToggleDisabled"
                 :title="[
@@ -58,22 +59,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ]"
                 no-caps
                 size="sm"
-                icon="bar_chart"
-              />
+                style="height: 32px;"
+              >
+                <img :src="visualizeIcon" alt="Visualize" style="width: 20px; height: 20px; ">
+              </q-btn>
             </div>
           </div>
         </div>
 
+        <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
+          <q-toggle
+          data-test="logs-search-bar-show-histogram-toggle-btn"
+          v-model="searchObj.meta.showHistogram"
+        >
+
+        <img :src="histogramIcon" alt="Histogram" style="width: 20px; height: 20px; ">
+        </q-toggle>
+        </div>
+        <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
+
         <q-toggle
           data-test="logs-search-bar-sql-mode-toggle-btn"
           v-model="searchObj.meta.sqlMode"
-          :label="t('search.sqlModeLabel')"
-        />
+          >
+          <img :src="sqlIcon" alt="SQL Mode" style="width: 20px; height: 20px;">
+        </q-toggle>
+        </div>
+        
         <q-btn
           data-test="logs-search-bar-reset-filters-btn"
           :title="t('search.resetFilters')"
           no-caps
-          size="sm"
+          size="13px"
           icon="restart_alt"
           class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
           @click="resetFilters"
@@ -318,35 +335,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </q-btn-dropdown>
         </q-btn-group>
-        <q-btn-dropdown
-          icon="more_vert"
-          class="no-outline saved-views-dropdown tw-normal-case download-logs-btn q-pl-xs q-ml-xs q-pr-xs"
-          size="12px"
-          data-test="logs-search-bar-more-options-dropdown"
+        <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
+          <q-toggle
+          data-test="logs-search-bar-quick-mode-toggle-btn"
+          v-model="searchObj.meta.quickMode"
+          @click="handleQuickMode"
         >
-          <q-list>
-            <q-item class="!tw-py-1">
-              <q-toggle
-                data-test="logs-search-bar-show-histogram-toggle-btn"
-                v-model="searchObj.meta.showHistogram"
-                :label="t('search.showHistogramLabel')"
-                size="32px"
-                v-close-popup
-              />
-            </q-item>
-            <q-item class="!tw-py-1">
-              <q-toggle
-                data-test="logs-search-bar-quick-mode-toggle-btn"
-                v-model="searchObj.meta.quickMode"
-                :label="t('search.quickModeLabel')"
-                @click="handleQuickMode"
-                size="32px"
-                v-close-popup
-              />
-            </q-item>
-          </q-list>
-        </q-btn-dropdown>
+          <img :src="quickModeIcon" alt="Quick Mode" style="width: 20px; height: 20px;">
+        </q-toggle>
+        </div>
       </div>
+      
+
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
@@ -369,62 +369,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select:function="populateFunctionImplementation"
           @save:function="fnSavedFunctionDialog"
         />
+        <q-btn
+          data-test="logs-search-bar-share-link-btn"
+          class="q-mr-xs download-logs-btn q-px-sm"
+          size="sm"
+          icon="share"
+          :title="t('search.shareLink')"
+          @click="shareLink.execute()"
+          :loading="shareLink.isLoading.value"
+        ></q-btn>
 
-        <q-btn-group
-          v-if="config.isEnterprise == 'true'"
-          class="no-outline q-pa-none no-border"
-        >
-          <q-btn-dropdown
-            data-test="search-scheduler-dropdown-btn-group"
-            class="q-mr-xs download-logs-btn q-px-xs"
-            size="sm"
-            icon="schedule_send"
-            :title="t('search.exportLogs')"
-          >
-            <q-list>
-              <q-item
-                data-test="search-scheduler-create-new-btn"
-                class="q-pa-sm saved-view-item"
-                clickable
-                v-close-popup
-                @click="createScheduleJob"
-              >
-                <q-item-section v-close-popup>
-                  <q-item-label data-test="search-scheduler-create-new-label">
-                    <q-icon name="save" />
-                    Create Scheduled Search</q-item-label
+        <q-btn
+              data-test="logs-search-bar-more-options-btn"
+              class="q-mr-xs download-logs-btn q-px-sm"
+              size="sm"
+              icon="menu"
+              :title="'More Actions'"
+            >
+            <q-menu>
+ 
+              <q-list>
+                <q-item data-test="search-history-item-btn" class="q-pa-sm saved-view-item" clickable v-close-popup>
+                <q-item-section
+                  @click.stop="showSearchHistoryfn"
                   >
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                    <img :src="searchHistoryIcon" alt="Search History"  style="width: 20px; height: 20px;" />
+
+                    Search History</q-item-label>
                 </q-item-section>
               </q-item>
               <q-separator />
               <q-item
-                data-test="search-scheduler-list-btn"
-                class="q-pa-sm saved-view-item"
-                clickable
-                v-close-popup
-                @click="routeToSearchSchedule"
-              >
-                <q-item-section v-close-popup>
-                  <q-item-label data-test="search-scheduler-list-label">
-                    <q-icon name="list" />
-
-                    List Scheduled Search</q-item-label
-                  >
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-        </q-btn-group>
-        <q-btn-group class="no-outline q-pa-none no-border">
-          <q-btn-dropdown
-            data-test="logs-search-bar-reset-function-btn"
-            class="q-mr-xs download-logs-btn q-px-xs"
-            size="sm"
-            icon="download"
-            :title="t('search.exportLogs')"
-          >
-            <q-list>
-              <q-item
+              style="min-width: 150px;"
                 class="q-pa-sm saved-view-item"
                 clickable
                 v-close-popup
@@ -438,38 +415,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="downloadLogs(searchObj.data.queryResults.hits)"
                   v-close-popup
                 >
-                  <q-item-label>{{ t("search.downloadTable") }}</q-item-label>
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                   <img :src="downloadTableIcon" alt="Download Table" style="width: 20px; height: 20px;" />
+                    {{ t("search.downloadTable") }}</q-item-label>
                 </q-item-section>
               </q-item>
-              <q-separator />
-              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item" style="min-width: 150px;" clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
                 >
-                  <q-item-label>{{ t("search.customRange") }}</q-item-label>
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                    <img :src="customRangeIcon" alt="Custom Range" style="width: 20px; height: 20px;" />
+
+                    {{ t("search.customRange") }}</q-item-label>
                 </q-item-section>
               </q-item>
+              <q-separator />
+              <q-item
+               v-if="config.isEnterprise == 'true'"
+                data-test="search-scheduler-create-new-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                @click="createScheduleJob"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2" data-test="search-scheduler-create-new-label">
+                    <img :src="createScheduledSearchIcon" alt="Create Scheduled Search" style="width: 20px; height: 20px;" />
+                    Create Scheduled Search</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-item
+                v-if="config.isEnterprise == 'true'"
+                data-test="search-scheduler-list-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                @click="routeToSearchSchedule"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2" data-test="search-scheduler-list-label">
+                    <img :src="listScheduledSearchIcon" alt="List Scheduled Search" style=" width: 20px; height: 20px;" />
+
+                    List Scheduled Search</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+
             </q-list>
-          </q-btn-dropdown>
-        </q-btn-group>
-        <q-btn
-          data-test="logs-search-bar-share-link-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
-          size="sm"
-          icon="share"
-          :title="t('search.shareLink')"
-          @click="shareLink.execute()"
-          :loading="shareLink.isLoading.value"
-        ></q-btn>
-        <q-btn
-          data-test="logs-search-bar-share-link-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
-          size="sm"
-          icon="history"
-          :title="'Search History'"
-          @click="showSearchHistoryfn"
-        ></q-btn>
+            </q-menu>
+
+        </q-btn>
         <div class="float-left">
           <date-time
             ref="dateTimeRef"
@@ -1140,6 +1138,8 @@ import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
+import histogram_svg from "../../assets/images/common/histogram_image.svg";
+
 
 const defaultValue: any = () => {
   return {
@@ -3211,6 +3211,34 @@ export default defineComponent({
         searchObj.config.fnSplitterModel = 99.5;
       }
     };
+    const visualizeIcon = computed(() => {
+      return searchObj.meta.logsVisualizeToggle === 'visualize' ? getImageURL('images/common/visualize_icon_light.svg') : getImageURL('images/common/visualize_icon_dark.svg')
+    });
+    const histogramIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/bar_chart_histogram_light.svg') : getImageURL('images/common/bar_chart_histogram.svg')
+    });
+    const sqlIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/hugeicons_sql_light.svg') : getImageURL('images/common/hugeicons_sql.svg')
+    });
+    const quickModeIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/quick_mode_light.svg') : getImageURL('images/common/quick_mode.svg')
+    });
+    const searchHistoryIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/search_history_light.svg') : getImageURL('images/common/search_history.svg')
+    });
+    const downloadTableIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/download_table_light.svg') : getImageURL('images/common/download_table.svg')
+    });
+    const customRangeIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/custom_range_light.svg') : getImageURL('images/common/custom_range.svg')
+    });
+    const createScheduledSearchIcon = computed(() => {
+      return store.state.theme === 'dark'   ? getImageURL('images/common/create_scheduled_search_light.svg') : getImageURL('images/common/create_scheduled_search.svg')
+    });
+    const listScheduledSearchIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/list_scheduled_search_light.svg') : getImageURL('images/common/list_scheduled_search.svg')
+    });
+    
 
     // [END] cancel running queries
 
@@ -3328,6 +3356,16 @@ export default defineComponent({
       actionEditorQuery,
       isActionsEnabled,
       showFunctionEditor,
+      histogram_svg,
+      visualizeIcon,
+      histogramIcon,
+      sqlIcon,
+      quickModeIcon,
+      searchHistoryIcon,
+      downloadTableIcon,
+      customRangeIcon,
+      createScheduledSearchIcon,
+      listScheduledSearchIcon
     };
   },
   computed: {
