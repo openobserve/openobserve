@@ -2650,8 +2650,8 @@ const useLogs = () => {
             }
 
             if (
-              searchObj.data?.queryResults?.aggs?.length == 0 &&
-              res.data?.hits?.length > 0
+              searchObj.data.queryResults.aggs.length == 0 &&
+              res.data.hits.length > 0
             ) {
               for (const partition of partitions) {
                 if (
