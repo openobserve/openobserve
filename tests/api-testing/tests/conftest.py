@@ -6,8 +6,12 @@ import string
 from pathlib import Path
 
 BASE_URL = os.environ["ZO_BASE_URL"]
+BASE_URL_SC = os.environ["ZO_BASE_URL_SC"]
+BASE_URL_SC2 = os.environ["ZO_BASE_URL_SC2"]
+
 root_dir = Path(__file__).parent.parent.parent
 
+unique_value = f"u_{random.randint(100000, 999999)}"
 
 def random_string(length: int):
     # ascii_letters consist of alphabets for 'a' to 'z' and 'A' to 'Z'
@@ -48,6 +52,13 @@ def base_url():
     """Return the base URL."""
     return BASE_URL
 
+@pytest.fixture
+def supercluster_base_urls():
+    """Return the base URL."""
+    return [BASE_URL_SC, BASE_URL_SC2]
+
+
+
 
 @pytest.fixture(scope="session", autouse=True)
 def ingest_data():
@@ -58,9 +69,37 @@ def ingest_data():
     with open(root_dir / "test-data/logs_data.json") as f:
         data = f.read()
 
-    stream_name = "stream_pytest_data"
-    org = "org_pytest_data"
+    stream_name = "default"
+    org = "default"
     url = f"{BASE_URL}api/{org}/{stream_name}/_json"
     resp = session.post(url, data=data, headers={"Content-Type": "application/json"})
     print("Data ingested successfully, status code: ", resp.status_code)
     return resp.status_code == 200
+
+
+@pytest.fixture
+def ingest_logs(session, base_url, org, stream_name):
+    """Ingest logs."""
+    payload = [
+        {
+            "Athlete": "newtemp",
+            "log": "200",
+            "City": "Athens",
+            "Country": "HUN",
+            "Discipline": "Swimming",
+            "Sport": "Aquatics",
+            "Year": 1896,
+        },
+        {
+            "Athlete": "HERSCHMANN",
+            "log": "404",  # Add a non-matching record for negative testing
+            "City": "Athens",
+            "Country": "CHN",
+            "Discipline": "Swimming",
+            "Sport": "Aquatics",
+            "Year": 1896,
+        },
+    ]
+    response = session.post(f"{base_url}api/{org}/{stream_name}/_json", json=payload)
+    assert response.status_code == 200, f"Failed to ingest logs: {response.content}"
+    return response

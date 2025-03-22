@@ -732,4 +732,3 @@ def test_delete_alertnew(create_session, base_url):
     # Verify alert is deleted
         resp_verify = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_verify.status_code == 404, f"Expected 404 for deleted alert, got {resp_verify.status_code}"
-
