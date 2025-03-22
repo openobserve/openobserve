@@ -39,10 +39,11 @@ pub async fn get_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<Option<(Folder, Alert)>, infra::errors::Error> {
-    if let Some(alert_folder) = ALERTS.read().await.get(&cache_alert_key(
-        org_id,
-        &scheduler_key(Some(alert_id.clone())),
-    )) {
+    if let Some(alert_folder) = ALERTS
+        .read()
+        .await
+        .get(&cache_alert_key(org_id, &scheduler_key(Some(alert_id))))
+    {
         return Ok(Some(alert_folder.to_owned()));
     }
     let folder_and_alert = table::get_by_id(conn, org_id, alert_id).await?;
@@ -74,7 +75,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                 super_cluster::emit_update_event(org_id, None, alert.clone()).await?;
             }
 
-            let schedule_key = scheduler_key(alert.id.clone());
+            let schedule_key = scheduler_key(alert.id);
             // Get the trigger from scheduler
             let mut trigger = db::scheduler::Trigger {
                 org: org_id.to_string(),
@@ -145,7 +146,7 @@ pub async fn create<C: TransactionTrait>(
     alert: Alert,
 ) -> Result<Alert, infra::errors::Error> {
     let alert = table::create(conn, org_id, folder_id, alert, false).await?;
-    let schedule_key = scheduler_key(alert.id.clone());
+    let schedule_key = scheduler_key(alert.id);
 
     cluster::emit_put_event(org_id, &alert, Some(folder_id.to_string())).await?;
     #[cfg(feature = "enterprise")]
@@ -175,7 +176,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     alert: Alert,
 ) -> Result<Alert, infra::errors::Error> {
     let alert = table::update(conn, org_id, folder_id, alert).await?;
-    let schedule_key = scheduler_key(alert.id.clone());
+    let schedule_key = scheduler_key(alert.id);
 
     cluster::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string())).await?;
     #[cfg(feature = "enterprise")]

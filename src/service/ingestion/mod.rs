@@ -215,11 +215,7 @@ pub async fn get_stream_alerts(
             .into_iter()
             .filter(|alert| alert.enabled && alert.is_real_time)
             .filter(|alert| {
-                let key = format!(
-                    "{}/{}",
-                    stream.org_id,
-                    alert.id.as_ref().unwrap().to_string()
-                );
+                let key = format!("{}/{}", stream.org_id, alert.id.as_ref().unwrap());
                 match triggers_cache.get(&key) {
                     Some(v) => !v.is_silenced,
                     None => true,
@@ -240,7 +236,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     log::debug!("Evaluating triggers: {:?}", triggers);
     let mut trigger_usage_reports = vec![];
     for (alert, val) in triggers.iter() {
-        let module_key = scheduler_key(alert.id.clone());
+        let module_key = scheduler_key(alert.id);
         let now = Utc::now().timestamp_micros();
         let mut trigger_data_stream = TriggerData {
             _timestamp: now,
