@@ -223,7 +223,7 @@ test.describe("Sanity testcases", () => {
   });
 
   test("should only display 5 result if limit 5 added", async ({ page }) => {
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
       .getByRole("code")
