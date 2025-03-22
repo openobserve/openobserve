@@ -27,9 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-panel-name"
             v-model="dashboardPanelData.data.title"
             :label="t('panel.name') + '*'"
-            class="q-ml-xl"
+            class="q-ml-xl dynamic-input"
             filled
             dense
+            :style="inputStyle"
           />
         </div>
       </div>
@@ -331,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <CustomHTMLEditor
           v-model="dashboardPanelData.data.htmlContent"
-          style="width: 100%; height: 100%;"
+          style="width: 100%; height: 100%"
           class="col"
           :initialVariableValues="updatedVariablesData"
         />
@@ -438,56 +439,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="layout-panel-container col"
                       style="height: 100%"
                     >
-                    <q-splitter
-                      class="query-editor-splitter"
-                      v-model="splitterModel"    
-                      style="height: 100%"
-                      @update:model-value="layoutSplitterUpdated"
-                    >
-                    <template #before>
-                      <CustomChartEditor
-                        v-model="dashboardPanelData.data.customChartContent"
-                        style="width: 100%; height: 100%"
-                      />
-                    </template>
-                    <template #separator>
-                      <div class="splitter-vertical splitter-enabled"></div>
-                      <q-avatar
-                        color="primary"
-                        text-color="white"
-                        size="20px"
-                        icon="drag_indicator"
-                        style="top: 10px; left: 3.5px"
-                        data-test="dashboard-markdown-editor-drag-indicator"
-                      />
-                    </template>
-                    <template #after>
-                      <PanelSchemaRenderer
-                          v-if="chartData"
-                          @metadata-update="metaDataValue"
-                          :key="dashboardPanelData.data.type"
-                          :panelSchema="chartData"
-                          :dashboard-id="queryParams?.dashboard"
-                          :folder-id="queryParams?.folder"
-                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="updatedVariablesData"
-                          :width="6"
-                          @error="handleChartApiError"
-                          @updated:data-zoom="onDataZoom"
-                          @updated:vrlFunctionFieldList="
-                            updateVrlFunctionFieldList
-                          "
-                          @last-triggered-at-update="
-                            handleLastTriggeredAtUpdate
-                          "
-                          searchType="dashboards"
-                        />
-
-                    </template>
-                     </q-splitter>
-                      
-
-                     
+                      <q-splitter
+                        class="query-editor-splitter"
+                        v-model="splitterModel"
+                        style="height: 100%"
+                        @update:model-value="layoutSplitterUpdated"
+                      >
+                        <template #before>
+                          <CustomChartEditor
+                            v-model="dashboardPanelData.data.customChartContent"
+                            style="width: 100%; height: 100%"
+                          />
+                        </template>
+                        <template #separator>
+                          <div class="splitter-vertical splitter-enabled"></div>
+                          <q-avatar
+                            color="primary"
+                            text-color="white"
+                            size="20px"
+                            icon="drag_indicator"
+                            style="top: 10px; left: 3.5px"
+                            data-test="dashboard-markdown-editor-drag-indicator"
+                          />
+                        </template>
+                        <template #after>
+                          <PanelSchemaRenderer
+                            v-if="chartData"
+                            @metadata-update="metaDataValue"
+                            :key="dashboardPanelData.data.type"
+                            :panelSchema="chartData"
+                            :dashboard-id="queryParams?.dashboard"
+                            :folder-id="queryParams?.folder"
+                            :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                            :variablesData="updatedVariablesData"
+                            :width="6"
+                            @error="handleChartApiError"
+                            @updated:data-zoom="onDataZoom"
+                            @updated:vrlFunctionFieldList="
+                              updateVrlFunctionFieldList
+                            "
+                            @last-triggered-at-update="
+                              handleLastTriggeredAtUpdate
+                            "
+                            searchType="dashboards"
+                          />
+                        </template>
+                      </q-splitter>
                       <DashboardErrorsComponent
                         :errors="errorData"
                         class="col-auto"
@@ -977,13 +974,12 @@ export default defineComponent({
         // console.time("runQuery");
         if (!isValid(true, true)) {
           // do not return if query is not valid
-        // allow to fire query
-        // return;
+          // allow to fire query
+          // return;
         }
         // if (dashboardPanelData.data.type === "custom_chart") {
         //   runJavaScriptCode();
         // }
-
 
         // Also update variables data
         Object.assign(
@@ -993,7 +989,6 @@ export default defineComponent({
 
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-
 
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
@@ -1150,7 +1145,10 @@ export default defineComponent({
     };
 
     const savePanelChangesToDashboard = async (dashId: string) => {
-      if(dashboardPanelData.data.type === 'custom_chart' && errorData.errors.length > 0){
+      if (
+        dashboardPanelData.data.type === "custom_chart" &&
+        errorData.errors.length > 0
+      ) {
         showErrorNotification(
           "There are some errors, please fix them and try again",
         );
@@ -1548,6 +1546,19 @@ export default defineComponent({
     };
 
     // [END] cancel running queries
+
+    const inputStyle = computed(() => {
+      if (!dashboardPanelData.data.title) {
+        return { width: "200px" };
+      }
+
+      const contentWidth = Math.min(
+        dashboardPanelData.data.title.length * 8 + 60,
+        400,
+      );
+      return { width: `${contentWidth}px` };
+    });
+
     return {
       t,
       updateDateTime,
@@ -1591,6 +1602,7 @@ export default defineComponent({
       config,
       collapseFieldList,
       splitterModel,
+      inputStyle,
     };
   },
   methods: {
@@ -1627,5 +1639,11 @@ export default defineComponent({
 
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
+}
+
+.dynamic-input {
+  min-width: 200px;
+  max-width: 500px;
+  transition: width 0.2s ease;
 }
 </style>
