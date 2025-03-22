@@ -71,12 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-toggle
           data-test="logs-search-bar-show-histogram-toggle-btn"
           v-model="searchObj.meta.showHistogram"
-          size="32px"
-          v-close-popup
         >
 
         <img :src="histogramIcon" alt="Histogram" style="width: 20px; height: 20px; ">
-
         </q-toggle>
         </div>
         <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
@@ -85,8 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-sql-mode-toggle-btn"
           v-model="searchObj.meta.sqlMode"
           >
-          <img :src="sqlIcon" alt="Histogram" style="width: 20px; height: 20px;">
-
+          <img :src="sqlIcon" alt="SQL Mode" style="width: 20px; height: 20px;">
         </q-toggle>
         </div>
         
@@ -344,10 +340,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-quick-mode-toggle-btn"
           v-model="searchObj.meta.quickMode"
           @click="handleQuickMode"
-          size="32px"
-          v-close-popup
         >
-          <img :src="quickModeIcon" alt="Histogram" style="width: 20px; height: 20px;">
+          <img :src="quickModeIcon" alt="Quick Mode" style="width: 20px; height: 20px;">
         </q-toggle>
         </div>
       </div>
@@ -400,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="showSearchHistoryfn"
                   >
                   <q-item-label class="tw-flex tw-items-center tw-gap-2">
-                    <img :src="searchHistoryIcon" style="width: 20px; height: 20px;" />
+                    <img :src="searchHistoryIcon" alt="Search History"  style="width: 20px; height: 20px;" />
 
                     Search History</q-item-label>
                 </q-item-section>
@@ -422,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-close-popup
                 >
                   <q-item-label class="tw-flex tw-items-center tw-gap-2">
-                   <img :src="downloadTableIcon" style="width: 20px; height: 20px;" />
+                   <img :src="downloadTableIcon" alt="Download Table" style="width: 20px; height: 20px;" />
                     {{ t("search.downloadTable") }}</q-item-label>
                 </q-item-section>
               </q-item>
@@ -432,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-close-popup
                 >
                   <q-item-label class="tw-flex tw-items-center tw-gap-2">
-                    <img :src="customRangeIcon" style="width: 20px; height: 20px;" />
+                    <img :src="customRangeIcon" alt="Custom Range" style="width: 20px; height: 20px;" />
 
                     {{ t("search.customRange") }}</q-item-label>
                 </q-item-section>
@@ -448,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section v-close-popup>
                   <q-item-label class="tw-flex tw-items-center tw-gap-2" data-test="search-scheduler-create-new-label">
-                    <img :src="createScheduledSearchIcon" style="width: 20px; height: 20px;" />
+                    <img :src="createScheduledSearchIcon" alt="Create Scheduled Search" style="width: 20px; height: 20px;" />
                     Create Scheduled Search</q-item-label
                   >
                 </q-item-section>
@@ -463,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section v-close-popup>
                   <q-item-label class="tw-flex tw-items-center tw-gap-2" data-test="search-scheduler-list-label">
-                    <img :src="listScheduledSearchIcon"  style=" width: 20px; height: 20px;" />
+                    <img :src="listScheduledSearchIcon" alt="List Scheduled Search" style=" width: 20px; height: 20px;" />
 
                     List Scheduled Search</q-item-label
                   >
