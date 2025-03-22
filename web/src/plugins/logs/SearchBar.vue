@@ -389,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-menu>
  
               <q-list>
-                <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
+                <q-item data-test="search-history-item-btn" class="q-pa-sm saved-view-item" clickable v-close-popup>
                 <q-item-section
                   @click.stop="showSearchHistoryfn"
                   >
