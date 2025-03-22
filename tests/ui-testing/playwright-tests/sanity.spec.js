@@ -127,7 +127,7 @@ test.describe("Sanity testcases", () => {
       .locator(
         '[data-test="log-search-index-list-interesting-job-field-btn"]'
       ).first().click();
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+      await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
