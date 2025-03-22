@@ -23,6 +23,7 @@ use config::{
         destinations::{Destination, Template},
         function::Transform,
         promql::ClusterLeader,
+        ratelimit::CachedUserRoles,
         stream::StreamParams,
     },
 };
@@ -92,3 +93,5 @@ pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::d
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
 // TODO: Implement rate limiting for maximum number of sessions
 pub static WS_SESSIONS: Lazy<RwHashMap<String, WsSession>> = Lazy::new(DashMap::default);
+pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
+    Lazy::new(Default::default);

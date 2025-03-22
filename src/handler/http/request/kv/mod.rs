@@ -21,6 +21,8 @@ use hashbrown::HashMap;
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
 
 /// GetValue
+///
+/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -51,6 +53,8 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
 }
 
 /// SetValue
+///
+/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -89,6 +93,8 @@ pub async fn set(
 }
 
 /// RemoveValue
+///
+/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -119,6 +125,8 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 }
 
 /// ListKeys
+///
+/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
