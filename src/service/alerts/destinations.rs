@@ -17,7 +17,7 @@ use config::meta::destinations::{Destination, DestinationType, Module, Template}
 
 use crate::{
     common::{
-        infra::config::STREAM_ALERTS,
+        infra::config::ALERTS,
         meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
@@ -144,12 +144,10 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
-    let cacher = STREAM_ALERTS.read().await;
-    for (stream_key, alerts) in cacher.iter() {
-        for alert in alerts.iter() {
-            if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
-                return Err(DestinationError::UsedByAlert(alert.name.to_string()));
-            }
+    let cacher = ALERTS.read().await;
+    for (stream_key, (_, alert)) in cacher.iter() {
+        if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
+            return Err(DestinationError::UsedByAlert(alert.name.to_string()));
         }
     }
     drop(cacher);

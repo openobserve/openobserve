@@ -65,13 +65,14 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
             infra::cluster_coordinator::alerts::emit_put_event(&org_id, &alert, folder_id).await?;
         }
         AlertMessage::Delete { org_id, alert_id } => {
-            if let Some((_, alert)) = table::alerts::get_by_id(conn, &org_id, alert_id).await? {
+            if table::alerts::get_by_id(conn, &org_id, alert_id)
+                .await?
+                .is_some()
+            {
                 table::alerts::delete_by_id(conn, &org_id, alert_id).await?;
                 infra::cluster_coordinator::alerts::emit_delete_event(
                     &org_id,
-                    alert.stream_type,
-                    &alert.stream_name,
-                    &alert.name,
+                    &alert_id.to_string(),
                 )
                 .await?;
             }

@@ -41,7 +41,11 @@ use config::{
     },
 };
 use cron::Schedule;
-use infra::{schema::unwrap_stream_settings, table};
+use infra::{
+    db::{ORM_CLIENT, connect_to_orm},
+    schema::unwrap_stream_settings,
+    table,
+};
 use itertools::Itertools;
 use lettre::{AsyncTransport, Message, message::MultiPart};
 #[cfg(feature = "enterprise")]
@@ -185,7 +189,7 @@ pub async fn save(
 
     // save the alert
     // TODO: Get the folder id
-    match db::alerts::alert::set(org_id, alert.stream_type, stream_name, alert, create).await {
+    match db::alerts::alert::set(org_id, alert, create).await {
         Ok(alert) => {
             if name.is_empty() {
                 set_ownership(
@@ -592,6 +596,14 @@ pub async fn get_by_id<C: ConnectionTrait>(
     }
 }
 
+pub async fn get_by_id_db(org_id: &str, alert_id: Ksuid) -> Result<Alert, AlertError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some((_f, a)) => Ok(a),
+        None => Err(AlertError::AlertNotFound),
+    }
+}
+
 pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
@@ -747,7 +759,7 @@ pub async fn enable_by_name(
             }
         };
     alert.enabled = value;
-    db::alerts::alert::set(org_id, stream_type, stream_name, alert, false).await?;
+    db::alerts::alert::set(org_id, alert, false).await?;
     Ok(())
 }
 
