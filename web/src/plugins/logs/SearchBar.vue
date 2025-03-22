@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></q-btn>
 
         <q-btn
-              data-test="logs-search-bar-share-link-btn"
+              data-test="logs-search-bar-more-options-btn"
               class="q-mr-xs download-logs-btn q-px-sm"
               size="sm"
               icon="menu"

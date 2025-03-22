@@ -477,7 +477,6 @@ test.describe("Logs UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
     });
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
   });
 

@@ -90,7 +90,6 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should display quick mode toggle button", async ({ page }) => {
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await expect(
       page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]')
     ).toBeVisible();

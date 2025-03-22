@@ -90,8 +90,6 @@ test.describe("Logs Quickmode testcases", () => {
     await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
  
     await applyQueryButton(page);
-    await page.waitForSelector('[data-test="logs-search-bar-more-options-dropdown"]');
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
 
     // Get the toggle button element
     const toggleButton = await page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
@@ -126,7 +124,6 @@ test.describe("Logs Quickmode testcases", () => {
     ).toBeVisible();
   });
   test("should display quick mode toggle button", async ({ page }) => {
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await expect(
       page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]')
     ).toBeVisible();

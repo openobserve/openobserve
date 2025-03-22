@@ -132,7 +132,6 @@ test.describe("Sanity testcases", () => {
   test("should display pagination when histogram is off and clicking and closing the result", async ({
     page,
   }) => {
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)
@@ -147,7 +146,6 @@ test.describe("Sanity testcases", () => {
   test("should display pagination when only SQL is on clicking and closing the result", async ({
     page,
   }) => {
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)
@@ -459,6 +457,7 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
     // Step 1: Click on the "Share Link" button
     await page.getByLabel('SQL Mode').locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
     await page.getByRole('button', { name: 'Search History' }).click();
     await page.locator('[data-test="search-history-date-time"]').click();
     await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
