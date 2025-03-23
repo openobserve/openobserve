@@ -19,7 +19,7 @@ export class LogsPage {
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
 
-    this.sqlModeToggle = this.page.getByLabel('SQL Mode').locator('div').nth(2);
+    this.sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2)
 
     this.absoluteTab = absoluteTabLocator;
 
@@ -228,7 +228,7 @@ export class LogsPage {
 
   async clearAndRunQuery() {
     await this.page.locator(this.queryButton).click();
-    await this.page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await this.page.locator(this.queryEditor).click();
     await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
     await this.page.keyboard.press("Backspace");
@@ -325,10 +325,6 @@ export class LogsPage {
 
   async clickQuickModeToggle() {
 
-    await this.page.waitForSelector(
-      '[data-test="logs-search-bar-more-options-dropdown"]'
-    );
-    await this.page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     // Get the toggle button element
     const toggleButton = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
     // Evaluate the class attribute to determine if the toggle is in the off state
@@ -453,8 +449,6 @@ export class LogsPage {
 }
 
 async toggleHistogram() {
-  await this.page.waitForSelector('[data-test="logs-search-bar-more-options-dropdown"]');
-  await this.page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
   await this.page.waitForSelector('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
   await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
 }
