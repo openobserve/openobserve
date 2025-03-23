@@ -1106,7 +1106,7 @@ export default defineComponent({
     //validate the data
     const isValid = (onlyChart = false, isFieldsValidationRequired = true) => {
       const errors = errorData.errors;
-      // errors.splice(0);
+      errors.splice(0);
       const dashboardData = dashboardPanelData;
 
       // check if name of panel is there
