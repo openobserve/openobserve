@@ -222,7 +222,7 @@ await page.waitForTimeout(1000);
       .click({
         force: true,
       });
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);
     await page
         .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
