@@ -2965,7 +2965,7 @@ mod tests {
                 cookie_same_site_lax: bool::default(),
                 cookie_secure_only: bool::default(),
                 ext_auth_salt: String::default(),
-                script_server_token: String::default(),
+                action_server_token: String::default(),
             },
             report_server: config::ReportServer {
                 enable_report_server: bool::default(),
