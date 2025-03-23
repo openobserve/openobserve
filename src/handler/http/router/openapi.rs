@@ -144,7 +144,6 @@ use crate::{common::meta, handler::http::request};
         request::ratelimit::list_module_ratelimit,
         request::ratelimit::list_role_ratelimit,
         request::ratelimit::update_ratelimit,
-        request::ratelimit::download_ratelimit_template,
         request::service_accounts::list,
         request::service_accounts::save,
         request::service_accounts::update,
@@ -337,8 +336,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::promql::Metadata,
             config::meta::promql::MetricType,
             // Functions
-            // Ratelimit
-            config::meta::ratelimit::RatelimitRule,
          ),
     ),
     modifiers(&SecurityAddon),

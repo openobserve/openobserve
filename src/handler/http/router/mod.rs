@@ -556,7 +556,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ratelimit::list_module_ratelimit)
         .service(ratelimit::list_role_ratelimit)
         .service(ratelimit::update_ratelimit)
-        .service(ratelimit::download_ratelimit_template)
         .service(ratelimit::api_modules)
         .service(actions::operations::test_action);
 

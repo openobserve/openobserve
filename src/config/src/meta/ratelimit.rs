@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use anyhow::Context;
 use bytes::Bytes;
@@ -49,6 +49,39 @@ impl TryFrom<&Bytes> for RatelimitRule {
 
     fn try_from(bytes: &Bytes) -> Result<Self, Self::Error> {
         serde_json::from_slice(bytes).context("Failed to deserialize RatelimitRule")
+    }
+}
+
+pub type RatelimitRuleUpdater = HashMap<String, HashMap<String, i32>>;
+
+impl RatelimitRule {
+    pub fn from_updater(
+        org: &str,
+        role: &str,
+        updater: &RatelimitRuleUpdater,
+    ) -> Vec<RatelimitRule> {
+        let org = match org {
+            "_meta" => ".*",
+            _ => org,
+        };
+
+        updater
+            .iter()
+            .flat_map(|(group_name, operations)| {
+                operations
+                    .iter()
+                    .map(|(operation, threshold)| RatelimitRule {
+                        org: org.to_string(),
+                        rule_type: Some(RatelimitRuleType::Exact.to_string()),
+                        rule_id: Some(crate::ider::generate()),
+                        user_role: Some(role.to_string()),
+                        user_id: Some(".*".to_string()),
+                        api_group_name: Some(group_name.clone()),
+                        api_group_operation: Some(operation.clone().to_lowercase()),
+                        threshold: *threshold,
+                    })
+            })
+            .collect()
     }
 }
 
