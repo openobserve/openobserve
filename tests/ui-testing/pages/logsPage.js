@@ -19,7 +19,7 @@ export class LogsPage {
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
 
-    this.sqlModeToggle = this.page.getByLabel('SQL Mode').locator('div').nth(2);
+    this.sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
 
     this.absoluteTab = absoluteTabLocator;
 
@@ -228,7 +228,7 @@ export class LogsPage {
 
   async clearAndRunQuery() {
     await this.page.locator(this.queryButton).click();
-    await this.page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await this.page.locator(this.queryEditor).click();
     await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
     await this.page.keyboard.press("Backspace");
