@@ -19,7 +19,7 @@ export class LogsPage {
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
 
-    this.sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+    this.sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2)
 
     this.absoluteTab = absoluteTabLocator;
 
