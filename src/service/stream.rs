@@ -359,6 +359,12 @@ pub async fn update_stream_settings(
 
             // check for user defined schema
             if !new_settings.defined_schema_fields.add.is_empty() {
+                if !cfg.common.allow_user_defined_schemas {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true".to_string(),
+                    )));
+                }
                 settings.defined_schema_fields =
                     if let Some(mut schema_fields) = settings.defined_schema_fields {
                         schema_fields.extend(new_settings.defined_schema_fields.add);

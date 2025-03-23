@@ -95,7 +95,6 @@ test.describe("Sanity testcases", () => {
   });
 
   test("should display quick mode toggle button", async ({ page }) => {
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await expect(
       page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]')
     ).toBeVisible();
@@ -103,11 +102,8 @@ test.describe("Sanity testcases", () => {
     test("should click on interesting fields icon and display query in editor", async ({
     page,
   }) => {
-    await page.waitForSelector(
-      '[data-test="logs-search-bar-more-options-dropdown"]'
-    );
 
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
+
 
     // Get the toggle button element
     const toggleButton = await page.$(
@@ -131,7 +127,7 @@ test.describe("Sanity testcases", () => {
       .locator(
         '[data-test="log-search-index-list-interesting-job-field-btn"]'
       ).first().click();
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+      await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
@@ -150,7 +146,6 @@ test.describe("Sanity testcases", () => {
   test("should not display chart if histogram off and display again when toggle is on", async ({
     page,
   }) => {
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
       .click();
@@ -160,7 +155,6 @@ test.describe("Sanity testcases", () => {
         .locator('[data-test="logs-search-result-bar-chart"]')
         .isVisible()
     ).toBe(false);
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)
@@ -229,7 +223,7 @@ test.describe("Sanity testcases", () => {
   });
 
   test("should only display 5 result if limit 5 added", async ({ page }) => {
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
       .getByRole("code")
@@ -462,18 +456,19 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     await page.locator('[data-test="clone-alert-submit-btn"]').click();
     await page.getByText('Alert Cloned Successfully').click();
-  
-  
-  
-    // Delete the cloned alert
-    await page.getByRole('cell', { name: clonedAlertName }).click();
-    await page.locator(`[data-test="alert-list-${clonedAlertName}-delete-alert"]`).click();
+
+    await page.locator('[data-test="alert-list-search-input"]').fill(clonedAlertName);
+    await page.waitForTimeout(2000);
+    await page.locator(`[data-test="alert-list-${clonedAlertName}-more-options"]`).click();
+    await page.getByText('Delete',{exact:true}).click();
     await page.locator('[data-test="confirm-button"]').click();
+
   
     // Delete the original alert
     await page.locator('[data-test="alert-list-search-input"]').fill(alertName);
     await page.waitForTimeout(500); // Ensure input is registered
-    await page.locator(`[data-test="alert-list-${alertName}-delete-alert"]`).click();
+    await page.locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
+    await page.getByText('Delete',{exact:true}).click();
     await page.locator('[data-test="confirm-button"]').click();
   
     // Delete the destination

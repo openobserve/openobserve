@@ -652,8 +652,12 @@ pub struct Common {
     pub meta_store: String,
     #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
+    #[env_config(name = "ZO_META_POSTGRES_RO_DSN", default = "")]
+    pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
     #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
+    #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
+    pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
