@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
+use std::{collections::HashSet, str::FromStr};
 
 use config::meta::{
     alerts::alert::{Alert, ListAlertsParams},
@@ -304,13 +304,35 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let alerts = table::list_all(client).await?;
+    let mut alerts: Vec<(Folder, Alert)> = Vec::new();
+    let r = infra::schema::STREAM_SCHEMAS.read().await;
+    let mut orgs = HashSet::new();
+    for key in r.keys() {
+        if !key.contains('/') {
+            continue;
+        }
+        let split_key = key.split('/').collect::<Vec<&str>>();
+        let org_name = split_key[0];
+        orgs.insert(org_name);
+    }
+    for org_name in orgs {
+        let alerts_in_orgs = table::list(client, ListAlertsParams::new(&org_name)).await?;
+        alerts.extend(alerts_in_orgs);
+    }
 
     for alert in alerts {
-        let mut cacher = STREAM_ALERTS.write().await;
-        let stream_key = cache_stream_key(&alert.org_id, alert.stream_type, &alert.stream_name);
-        let group = cacher.entry(stream_key.to_string()).or_default();
-        group.push(alert.id.map_or("".to_string(), |id| id.to_string()));
+        let alert_id = alert.1.id.map_or("".to_string(), |id| id.to_string());
+        if alert.1.is_real_time {
+            let mut cacher = STREAM_ALERTS.write().await;
+            let stream_key =
+                cache_stream_key(&alert.1.org_id, alert.1.stream_type, &alert.1.stream_name);
+            let group = cacher.entry(stream_key.to_string()).or_default();
+            group.push(alert_id.clone());
+        }
+
+        let mut cacher = ALERTS.write().await;
+        let alert_cache_key = cache_alert_key(&alert.1.org_id, &alert_id);
+        cacher.insert(alert_cache_key, alert);
     }
     log::info!("Alerts Cached");
     Ok(())
