@@ -90,7 +90,6 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should display quick mode toggle button", async ({ page }) => {
-    await page.locator('[data-test="logs-search-bar-more-options-dropdown"]').click();
     await expect(
       page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]')
     ).toBeVisible();
@@ -259,7 +258,7 @@ test.describe("Logs Queries testcases", () => {
     await page.click('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
     await page.keyboard.type('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate"  Group by _timestamp ORDER BY _timestamp DESC');
     await page.waitForTimeout(4000);
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await expect(page.locator(
       '[data-cy="search-bar-refresh-button"] > .q-btn__content')).toBeVisible(); await page.waitForTimeout(
         3000); await page.locator(
