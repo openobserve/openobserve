@@ -195,13 +195,13 @@ pub async fn get_stream_alerts(
     for stream in streams {
         let key = alert::cache_stream_key(&stream.org_id, stream.stream_type, &stream.stream_name);
         if stream_alerts_map.contains_key(&key) {
-            return;
+            continue;
         }
 
         let stream_alerts_cacher = STREAM_ALERTS.read().await;
         let alerts_id_list = stream_alerts_cacher.get(&key);
         if alerts_id_list.is_none() {
-            return;
+            continue;
         }
         let mut alerts_list = vec![];
         for alert_id in alerts_id_list.unwrap().iter() {

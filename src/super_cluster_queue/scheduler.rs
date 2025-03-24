@@ -134,6 +134,13 @@ async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
         return Ok(());
     }
     let parts = trigger.module_key.split("/").collect::<Vec<&str>>();
+
+    if parts.len() != 3 {
+        return Err(Error::Message(format!(
+            "Invalid module_key format: {}",
+            trigger.module_key
+        )));
+    }
     let stream_type = parts[0];
     let stream_name = parts[1];
     let alert_name = parts[2];
