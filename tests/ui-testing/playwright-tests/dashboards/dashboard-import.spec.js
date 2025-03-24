@@ -6,110 +6,16 @@ import importdata1 from "../../../test-data/dashboard1-import.json";
 import importdata2 from "../../../test-data/dashboard2-import.json";
 import importdata3 from "../../../test-data/dashboardV3-import.json";
 import importdata4 from "../../../test-data/dashboardAzure.json";
+import { login } from "../utils/dashLogin";
+import { ingestion } from "../utils/dashIngestion";
+import { waitForDashboardPage } from "../utils/dashCreation";
 
-
+const randomDashboardName =
+  "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
 
-async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "networkidle" });
-
-  if (await page.getByText("Login as internal user").isVisible()) {
-    await page.getByText("Login as internal user").click();
-  }
-
-  await page.waitForTimeout(1000);
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-
-  // wait for login api response
-  const waitForLogin = page.waitForResponse(
-    (response) =>
-      response.url().includes("/auth/login") && response.status() === 200
-  );
-
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-
-  await waitForLogin;
-
-  await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
-    waitUntil: "networkidle",
-  });
-  await page
-    .locator('[data-test="navbar-organizations-select"]')
-    .getByText("arrow_drop_down")
-    .click();
-  await page.getByRole("option", { name: "default", exact: true }).click();
-}
-
-async function ingestion(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-
-  const headers = {
-    Authorization: `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const fetchResponse = await fetch(
-    `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
-    {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(logsdata),
-    }
-  );
-  const response = await fetchResponse.json();
-  console.log(response);
-}
-
-async function waitForDashboardPage(page) {
-  const dashboardListApi = page.waitForResponse(
-    (response) =>
-      /\/api\/.+\/dashboards/.test(response.url()) && response.status() === 200
-  );
-
-  await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/dashboards**");
-
-  await page.waitForSelector(`text="Please wait while loading dashboards..."`, {
-    state: "hidden",
-  });
-  await dashboardListApi;
-  await page.waitForTimeout(500);
-}
-
-test.describe("dashboard import testcases", () => {
-  // let logData;
-  // function removeUTFCharacters(text) {
-  //   // console.log(text, "tex");
-  //   // Remove UTF characters using regular expression
-  //   return text.replace(/[^\x00-\x7F]/g, " ");
-  // }
-  async function applyQueryButton(page) {
-    // click on the run query button
-    // Type the value of a variable into an input field
-    const search = page.waitForResponse(logData.applyQuery);
-    await page.waitForTimeout(3000);
-    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-      force: true,
-    });
-    // get the data from the search variable
-    await expect.poll(async () => (await search).status()).toBe(200);
-    // await search.hits.FIXME_should("be.an", "array");
-  }
-  // tebefore(async function () {
-  //   // logData("log");
-  //   // const data = page;
-  //   // logData = data;
-
-  //   console.log("--logData--", logData);
-  // });
+test.describe("dashboard Import testcases", () => {
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
     await login(page);
@@ -117,11 +23,9 @@ test.describe("dashboard import testcases", () => {
     await ingestion(page);
     await page.waitForTimeout(2000);
 
-    // just to make sure org is set
     const orgNavigation = page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-
     await orgNavigation;
   });
 
@@ -162,7 +66,6 @@ test.describe("dashboard import testcases", () => {
       .fill(
         "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json"
       );
-      
 
     await page.waitForTimeout(2000);
     // await page.waitForSelector('.table-row'); // adjust selector as needed
@@ -414,7 +317,9 @@ test.describe("dashboard import testcases", () => {
     console.log(`Successfully deleted folder via UI: ${folderName}`);
   });
 
-  test("Should import the Version 3 dashboard successfully", async ({ page }) => {
+  test("Should import the Version 3 dashboard successfully", async ({
+    page,
+  }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-import"]').click();
@@ -439,7 +344,6 @@ test.describe("dashboard import testcases", () => {
       .locator('[data-test="dashboard-delete"]')
       .click();
     await page.locator('[data-test="confirm-button"]').click();
-
   });
   test("Should import the Azure dashboard without errors", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -466,11 +370,9 @@ test.describe("dashboard import testcases", () => {
       .locator('[data-test="dashboard-delete"]')
       .click();
     await page.locator('[data-test="confirm-button"]').click();
-
   });
 
-  test.skip("123should import the dashbaord using URL import", async ({ page }) => {
-
+  test("123should import the dashbaord using URL import", async ({ page }) => {
     // Set up listener to catch console errors
     let errorMessage = "";
     page.on("console", (msg) => {
@@ -488,7 +390,7 @@ test.describe("dashboard import testcases", () => {
       .fill(
         "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Azure/Azure%20Loadblancer.dashboard.json"
       );
-      
+
     await page.waitForTimeout(2000);
     // await page.waitForSelector('.table-row'); // adjust selector as needed
     await expect(
@@ -502,6 +404,7 @@ test.describe("dashboard import testcases", () => {
     //is used for setting the file to be importedad
     await page.getByRole("button", { name: "Import" }).click();
 
+
     await expect(
       page.getByRole("cell", { name: "Azure Loadblancer" }).first()
     ).toBeVisible();
@@ -512,8 +415,53 @@ test.describe("dashboard import testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
 
     // Assert no error occurred
- expect(errorMessage).toBe("");  
+    expect(errorMessage).toBe("");
   });
-  
+
+  test("should import the 'Kubernetes _ Compute Resources _ Cluster' dashbaord using URL import", async ({ page }) => {
+    // Set up listener to catch console errors
+    let errorMessage = "";
+    page.on("console", (msg) => {
+      if (msg.type() === "error") {
+        errorMessage += msg.text() + "\n";
+      }
+    });
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-import"]').click();
+    await page.locator('[data-test="tab-import_json_url"]').click();
+    await page.getByLabel("Add your url").click();
+    await page
+      .getByLabel("Add your url")
+      .fill(
+        "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Kubernetes(kube-prometheus-stack)/Kubernetes%20_%20Compute%20Resources%20_%20Cluster.dashboard.json"
+      );
+
+    await page.waitForTimeout(5000);
+    await page.waitForSelector('.table-row'); // adjust selector as needed
+    await expect(
+      page
+        .getByRole("code")
+        .locator("div")
+        .filter({ hasText: '"dashboardId": "' })
+        .nth(4)
+    ).toBeVisible();
+
+    //is used for setting the file to be importedad
+    await page.getByRole("button", { name: "Import" }).click();
+    await page.waitForTimeout(5000);
+
+
+    await expect(
+      page.getByRole("cell", { name: "Kubernetes / Compute Resources / Cluster" }).first()
+    ).toBeVisible();
+    await page
+      .getByRole("row", { name: "01 Kubernetes / Compute Resources / Cluster" })
+      .locator('[data-test="dashboard-delete"]')
+      .click();
+    await page.locator('[data-test="confirm-button"]').click();
+
+    // Assert no error occurred
+    expect(errorMessage).toBe("");
   });
-  
+});
