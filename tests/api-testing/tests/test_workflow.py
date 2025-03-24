@@ -1,6 +1,12 @@
 import os
 from create_objects import create_objects
 
+from verify_objects import verify_objects
+from edit_objects import edit_objects
+from delete_objects import delete_objects
+from verifydeleted_objects import verify_deleted_objects       
+from verifyedited_objects import verify_edited_objects
+
 
 
 # Constants for WebSocket URL and user credentials
@@ -18,3 +24,8 @@ stream_name = "default"
 def test_workflow(create_session, base_url):
 
    create_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, total_count)
+   verify_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, total_count)
+   edit_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, total_count)
+   verify_edited_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, total_count)
+   delete_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, total_count)
+   verify_deleted_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, total_count)

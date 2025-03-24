@@ -66,9 +66,10 @@ class DestinationPage:
         assert response.status_code == 200, f"Failed to create destination: {response.content}"
         return response
 
-    def retrieve_destinations_webhook(self, session, base_url, org_id, user_email, user_password):
+    def retrieve_destinations_webhook(self, session, base_url, user_email, user_password, org_id):
         """Retrieve a webhook destination."""
         session.auth = HTTPBasicAuth(user_email, user_password)
+        
         response = session.get(f"{base_url}api/{org_id}/alerts/destinations")
         assert response.status_code == 200, f"Failed to validate destination: {response.content}"
         destinations = response.json()
