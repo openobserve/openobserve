@@ -22,7 +22,7 @@ pub async fn validator(
     credentials: BasicAuth,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let cfg = get_config();
-    if !credentials.user_id().eq(&cfg.auth.script_server_token) {
+    if !credentials.user_id().eq(&cfg.auth.action_server_token) {
         return Err((actix_web::error::ErrorUnauthorized("auth incorrect"), req));
     }
     Ok(req)

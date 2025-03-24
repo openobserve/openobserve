@@ -150,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="getLogStream(true)"
             />
             <q-btn
+              v-if="isSchemaUDSEnabled"
               data-test="log-stream-add-stream-btn"
               class="q-ml-md q-mb-xs text-bold no-border"
               padding="sm lg"
@@ -308,6 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import {
+  computed,
   defineComponent,
   ref,
   onActivated,
@@ -487,6 +489,10 @@ export default defineComponent({
         });
         return;
       }
+    });
+
+    const isSchemaUDSEnabled = computed(() => {
+      return store.state.zoConfig.user_defined_schemas_enabled;
     });
 
     // As filter data don't gets called when search input is cleared.
@@ -900,6 +906,7 @@ export default defineComponent({
       showIndexSchemaDialog,
       changeMaxRecordToReturn,
       outlinedDelete,
+      isSchemaUDSEnabled,
       filterQuery,
       filterData,
       getImageURL,

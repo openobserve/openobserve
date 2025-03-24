@@ -64,7 +64,7 @@ class UnflattenedPage {
     }
 
     get sqlModeToggle() {
-        return this.page.locator('[aria-label="SQL Mode"] > .q-toggle__inner');
+        return this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2)
     }
 
     get logsSearchBarQueryEditor() {

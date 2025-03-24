@@ -848,6 +848,9 @@ export const usePanelDataLoader = (
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
+      // remove past error detail
+      state.errorDetail = "";
+      
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
         // Iterate through each query in the panel schema
