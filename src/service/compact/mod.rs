@@ -26,7 +26,7 @@ use infra::{
     file_list as infra_file_list,
     schema::{get_settings, unwrap_partition_time_level},
 };
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::mpsc;
 
 use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 
@@ -35,6 +35,7 @@ pub mod flatten;
 pub mod merge;
 pub mod retention;
 pub mod stats;
+pub mod worker;
 
 /// compactor retention run steps:
 pub async fn run_retention() -> Result<(), anyhow::Error> {
@@ -237,9 +238,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
 }
 
 /// compactor merging
-pub async fn run_merge(
-    worker_tx: mpsc::Sender<(merge::MergeSender, merge::MergeBatch)>,
-) -> Result<(), anyhow::Error> {
+pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let mut jobs =
         infra_file_list::get_pending_jobs(&LOCAL_NODE.uuid, cfg.compact.batch_size).await?;
@@ -276,7 +275,7 @@ pub async fn run_merge(
     if !need_release_ids.is_empty() {
         // release those jobs
         if let Err(e) = infra_file_list::set_job_pending(&need_release_ids).await {
-            log::error!("[COMPACT] set_job_pending failed: {}", e);
+            log::error!("[COMPACTOR] set_job_pending failed: {}", e);
         }
         jobs.retain(|job| !need_release_ids.contains(&job.id));
     }
@@ -296,20 +295,18 @@ pub async fn run_merge(
             tokio::select! {
                 _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
                 _ = rx.recv() => {
-                    log::debug!("[COMPACT] update_running_jobs done");
+                    log::debug!("[COMPACTOR] update_running_jobs done");
                     return;
                 }
             }
             for id in job_ids.iter() {
                 if let Err(e) = infra_file_list::update_running_jobs(*id).await {
-                    log::error!("[COMPACT] update_job_status failed: {}", e);
+                    log::error!("[COMPACTOR] update_job_status failed: {}", e);
                 }
             }
         }
     });
 
-    let mut tasks = Vec::with_capacity(jobs.len());
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut min_offset = i64::MAX;
     for job in jobs {
         if job.offsets == 0 {
@@ -337,35 +334,24 @@ pub async fn run_merge(
             continue;
         }
 
-        let org_id = org_id.clone();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let worker_tx = worker_tx.clone();
-        let task = tokio::task::spawn(async move {
-            if let Err(e) = merge::merge_by_stream(
-                worker_tx,
-                &org_id,
+        if let Err(e) = job_tx
+            .send(worker::MergeJob {
+                org_id: org_id.to_string(),
                 stream_type,
-                &stream_name,
-                job.id,
-                job.offsets,
-            )
+                stream_name: stream_name.to_string(),
+                job_id: job.id,
+                offset: job.offsets,
+            })
             .await
-            {
-                log::error!(
-                    "[COMPACTOR] merge_by_stream [{}/{}/{}] error: {}",
-                    org_id,
-                    stream_type,
-                    stream_name,
-                    e
-                );
-            }
-            drop(permit);
-        });
-        tasks.push(task);
-    }
-
-    for task in tasks {
-        task.await?;
+        {
+            log::error!(
+                "[COMPACTOR] send merge job to worker failed [{}/{}/{}] error: {}",
+                org_id,
+                stream_type,
+                stream_name,
+                e
+            );
+        }
     }
 
     Ok(())

@@ -56,6 +56,7 @@ use tokio::{
     task::JoinHandle,
 };
 
+use super::worker::{MergeBatch, MergeSender};
 use crate::{
     common::infra::cluster::get_node_by_uuid,
     job::files::parquet::{create_tantivy_index, generate_index_on_compactor},
@@ -66,23 +67,6 @@ use crate::{
         stream,
     },
 };
-
-#[derive(Clone)]
-pub struct MergeBatch {
-    pub batch_id: usize,
-    pub org_id: String,
-    pub stream_type: StreamType,
-    pub stream_name: String,
-    pub prefix: String,
-    pub files: Vec<FileKey>,
-}
-
-pub struct MergeResult {
-    pub batch_id: usize,
-    pub new_file: FileKey,
-}
-
-pub type MergeSender = mpsc::Sender<Result<(usize, FileKey), anyhow::Error>>;
 
 /// Generate merging job by stream
 /// 1. get offset from db
@@ -174,7 +158,7 @@ pub async fn generate_job_by_stream(
     // generate merging job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[COMPACT] add file_list_jobs failed: {}",
+            "[COMPACTOR] add file_list_jobs failed: {}",
             e
         ));
     }
@@ -293,7 +277,7 @@ pub async fn generate_old_data_job_by_stream(
         );
         if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
             return Err(anyhow::anyhow!(
-                "[COMPACT] add file_list_jobs for old data failed: {}",
+                "[COMPACTOR] add file_list_jobs for old data failed: {}",
                 e
             ));
         }
@@ -393,7 +377,7 @@ pub async fn merge_by_stream(
     if files.is_empty() {
         // update job status
         if let Err(e) = infra_file_list::set_job_done(job_id).await {
-            log::error!("[COMPACT] set_job_done failed: {e}");
+            log::error!("[COMPACTOR] set_job_done failed: {e}");
         }
         return Ok(());
     }
@@ -483,7 +467,7 @@ pub async fn merge_by_stream(
             let (inner_tx, mut inner_rx) = mpsc::channel(batch_group_len);
             for batch in batch_groups.iter() {
                 if let Err(e) = worker_tx.send((inner_tx.clone(), batch.clone())).await {
-                    log::error!("[COMPACT] send batch to worker failed: {}", e);
+                    log::error!("[COMPACTOR] send batch to worker failed: {}", e);
                     return Err(anyhow::Error::msg("send batch to worker failed"));
                 }
             }
@@ -498,7 +482,7 @@ pub async fn merge_by_stream(
                 let (batch_id, mut new_file) = match ret {
                     Ok(v) => v,
                     Err(e) => {
-                        log::error!("[COMPACT] merge files failed: {}", e);
+                        log::error!("[COMPACTOR] merge files failed: {}", e);
                         last_error = Some(e);
                         continue;
                     }
@@ -545,7 +529,7 @@ pub async fn merge_by_stream(
                             .await
                             {
                                 log::error!(
-                                    "[COMPACT] set_stream_stats failed: {}, err: {}",
+                                    "[COMPACTOR] set_stream_stats failed: {}, err: {}",
                                     stream_key,
                                     e
                                 );
@@ -553,7 +537,7 @@ pub async fn merge_by_stream(
                         }
                     }
                     Err(e) => {
-                        log::error!("[COMPACT] write file list failed: {}", e);
+                        log::error!("[COMPACTOR] write file list failed: {}", e);
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
@@ -574,7 +558,7 @@ pub async fn merge_by_stream(
 
     // update job status
     if let Err(e) = infra_file_list::set_job_done(job_id).await {
-        log::error!("[COMPACT] set_job_done failed: {e}");
+        log::error!("[COMPACTOR] set_job_done failed: {e}");
     }
 
     // metrics
@@ -948,7 +932,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
             if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
             {
                 log::error!(
-                    "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
+                    "[COMPACTOR] batch_add_deleted to external db failed, retrying: {}",
                     e
                 );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -956,7 +940,10 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
             }
         }
         if let Err(e) = infra_file_list::batch_add(&put_items).await {
-            log::error!("[COMPACT] batch_add to external db failed, retrying: {}", e);
+            log::error!(
+                "[COMPACTOR] batch_add to external db failed, retrying: {}",
+                e
+            );
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
@@ -964,7 +951,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
             let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
             if let Err(e) = infra_file_list::batch_remove(&del_files).await {
                 log::error!(
-                    "[COMPACT] batch_delete to external db failed, retrying: {}",
+                    "[COMPACTOR] batch_delete to external db failed, retrying: {}",
                     e
                 );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -974,7 +961,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         // send broadcast to other nodes
         if get_config().memory_cache.cache_latest_files {
             if let Err(e) = db::file_list::broadcast::send(events, None).await {
-                log::error!("[COMPACT] send broadcast for file_list failed: {}", e);
+                log::error!("[COMPACTOR] send broadcast for file_list failed: {}", e);
             }
         }
         // broadcast success
@@ -1097,7 +1084,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                 Ok(data_len) => {
                     if data_len > 0 && data_len != file_size as usize {
                         log::warn!(
-                            "[COMPACT] download file {} found size mismatch, expected: {}, actual: {}, will update it",
+                            "[COMPACTOR] download file {} found size mismatch, expected: {}, actual: {}, will update it",
                             file_name,
                             file_size,
                             data_len,
@@ -1106,7 +1093,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                             file_list::update_compressed_size(&file_name, data_len as i64).await
                         {
                             log::error!(
-                                "[COMPACT] update file size for file {} err: {}",
+                                "[COMPACTOR] update file size for file {} err: {}",
                                 file_name,
                                 e
                             );
@@ -1120,15 +1107,15 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                     {
                         // delete file from file list
                         log::error!(
-                            "[COMPACT] found invalid file: {}, will delete it",
+                            "[COMPACTOR] found invalid file: {}, will delete it",
                             file_name
                         );
                         if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                            log::error!("[COMPACT] delete from file_list err: {}", e);
+                            log::error!("[COMPACTOR] delete from file_list err: {}", e);
                         }
                         Some(file_name)
                     } else {
-                        log::error!("[COMPACT] download file to cache err: {}", e);
+                        log::error!("[COMPACTOR] download file to cache err: {}", e);
                         // remove downloaded file
                         let _ = file_data::disk::remove("", &file_name).await;
                         None
@@ -1150,7 +1137,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                 }
             }
             Err(e) => {
-                log::error!("[COMPACT] load file task err: {}", e);
+                log::error!("[COMPACTOR] load file task err: {}", e);
             }
         }
     }

@@ -1158,7 +1158,7 @@ pub(crate) async fn generate_index_on_compactor(
     .await?;
 
     log::info!(
-        "[COMPACT:JOB] generated parquet index file: {}, index files: {:?}, took: {} ms",
+        "[COMPACTOR:JOB] generated parquet index file: {}, index files: {:?}, took: {} ms",
         new_file_key,
         files.iter().map(|(k, _)| k).collect::<Vec<_>>(),
         start.elapsed().as_millis(),

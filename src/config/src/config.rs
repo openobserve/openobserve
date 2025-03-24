@@ -1137,9 +1137,9 @@ pub struct Limit {
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
     pub request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
-    pub keep_alive: u64,
+    pub http_keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE_DISABLED", default = false)]
-    pub keep_alive_disabled: bool,
+    pub http_keep_alive_disabled: bool,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 5)] // seconds
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
