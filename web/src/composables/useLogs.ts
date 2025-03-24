@@ -1648,6 +1648,7 @@ const useLogs = () => {
 
         delete searchObj.data.histogramQuery.query.quick_mode;
         delete searchObj.data.histogramQuery.query.from;
+        if(searchObj.data.histogramQuery.query.action_id) delete searchObj.data.histogramQuery.query.action_id;
 
         // Removing sql_mode from histogram query, as it is not required
         //delete searchObj.data.histogramQuery.query.sql_mode;
@@ -2119,6 +2120,8 @@ const useLogs = () => {
         queryReq.query.size = 0;
         delete queryReq.query.from;
         delete queryReq.query.quick_mode;
+        if(queryReq.query.action_id) delete queryReq.query.action_id;
+
         queryReq.query["sql_mode"] = "full";
   
         queryReq.query.track_total_hits = true;
@@ -4847,6 +4850,7 @@ const useLogs = () => {
       delete searchObj.data.histogramQuery.query.from;
       delete searchObj.data.histogramQuery.aggs;
       delete queryReq.aggs;
+      if(searchObj.data.histogramQuery.query.action_id) delete searchObj.data.histogramQuery.query.action_id;
 
       searchObj.data.customDownloadQueryObj = JSON.parse(
         JSON.stringify(queryReq),
@@ -5641,6 +5645,8 @@ const useLogs = () => {
     queryReq.query.size = 0;
     delete queryReq.query.from;
     delete queryReq.query.quick_mode;
+    if(delete queryReq.query.action_id) delete queryReq.query.action_id;
+
     queryReq.query["sql_mode"] = "full";
 
     queryReq.query.track_total_hits = true;
