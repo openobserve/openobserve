@@ -14,24 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::{alerts::alert as meta_alerts, folder as meta_folders, triggers::Trigger};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
 use super::{Alert, QueryCondition, TriggerCondition};
 
 /// HTTP response body for `GetAlert` endpoint.
-#[derive(Clone, Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct GetAlertResponseBody(pub Alert);
 
 /// HTTP response body for `ListAlerts` endpoint.
-#[derive(Clone, Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListAlertsResponseBody {
     pub list: Vec<ListAlertsResponseBodyItem>,
 }
 
 /// An item in the list returned by the `ListDashboards` endpoint.
-#[derive(Clone, Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ListAlertsResponseBodyItem {
     pub alert_id: Ksuid,
     pub folder_id: String,

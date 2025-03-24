@@ -897,7 +897,7 @@ async fn write_traces(
                         org_id,
                         StreamType::Traces,
                         stream_name,
-                        alert.name
+                        alert.get_unique_key()
                     );
                     // check if alert already evaluated
                     if evaluated_alerts.contains(&key) {
