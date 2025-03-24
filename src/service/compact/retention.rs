@@ -19,7 +19,7 @@ use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
-    meta::stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamType, TimeRange},
+    meta::stream::{FileKey, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange},
     utils::time::{BASE_TIME, hour_micros},
 };
 use infra::{cache, dist_lock, file_list as infra_file_list};
@@ -273,25 +273,6 @@ pub async fn delete_all(
             tokio::fs::remove_dir_all(path).await?;
         }
         log::info!("deleted all files: {:?}", path);
-    } else {
-        // delete files from s3
-        // first fetch file list from local cache
-        let files = file_list::query(
-            org_id,
-            stream_name,
-            stream_type,
-            PartitionTimeLevel::Unset,
-            start_time,
-            end_time,
-        )
-        .await?;
-        if cfg.compact.data_retention_history {
-            // only store the file_list into history, don't delete files
-            if let Err(e) = infra_file_list::batch_add_history(&files).await {
-                log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
-                return Err(e.into());
-            }
-        }
     }
 
     // delete from file list
@@ -376,7 +357,6 @@ pub async fn delete_by_date(
         )
     };
 
-    let cfg = get_config();
     if is_local_disk_storage() {
         let dirs_to_delete =
             generate_local_dirs(org_id, stream_type, stream_name, date_start, date_end);
@@ -387,25 +367,6 @@ pub async fn delete_by_date(
             delete_tasks.push(tokio::fs::remove_dir_all(dir));
         }
         futures::future::try_join_all(delete_tasks).await?;
-    } else {
-        // delete files from s3
-        // first fetch file list from local cache
-        let files = file_list::query(
-            org_id,
-            stream_name,
-            stream_type,
-            PartitionTimeLevel::Unset,
-            time_range.0,
-            time_range.1,
-        )
-        .await?;
-        if cfg.compact.data_retention_history {
-            // only store the file_list into history, don't delete files
-            if let Err(e) = infra_file_list::batch_add_history(&files).await {
-                log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
-                return Err(e.into());
-            }
-        }
     }
 
     // delete from file list
@@ -473,24 +434,15 @@ async fn delete_from_file_list(
     }
 
     let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
-    for file in files {
-        let index_size = file.meta.index_size;
-        let file_name = file.key.clone();
-        let columns: Vec<_> = file_name.split('/').collect();
+    for mut file in files {
+        let columns: Vec<_> = file.key.split('/').collect();
         let hour_key = format!(
             "{}/{}/{}/{}",
             columns[4], columns[5], columns[6], columns[7]
         );
         let entry = hours_files.entry(hour_key).or_default();
-        entry.push(FileKey {
-            key: file_name,
-            meta: FileMeta {
-                index_size,
-                ..Default::default()
-            },
-            deleted: true,
-            segment_ids: None,
-        });
+        file.deleted = true;
+        entry.push(file);
     }
 
     // write file list to storage
@@ -499,51 +451,51 @@ async fn delete_from_file_list(
     Ok(())
 }
 
+// write file list to db, all the files should be deleted
 async fn write_file_list(
     org_id: &str,
     hours_files: &HashMap<String, Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     for events in hours_files.values() {
-        let put_items = events
-            .iter()
-            .filter(|v| !v.deleted)
-            .map(|v| v.to_owned())
-            .collect::<Vec<_>>();
-        let del_items = events
-            .iter()
-            .filter(|v| v.deleted)
-            .map(|v| FileListDeleted {
-                file: v.key.clone(),
-                index_file: v.meta.index_size > 0,
-                flattened: v.meta.flattened,
-            })
-            .collect::<Vec<_>>();
-        // set to db
-        // retry 5 times
+        // set to db, retry 5 times
         let mut success = false;
         let created_at = Utc::now().timestamp_micros();
         for _ in 0..5 {
-            if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
-            {
-                log::error!(
-                    "[COMPACTOR] batch_add_deleted to db failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-            if let Err(e) = infra_file_list::batch_add(&put_items).await {
-                log::error!("[COMPACTOR] batch_add to db failed, retrying: {}", e);
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-            if !del_items.is_empty() {
-                let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
-                if let Err(e) = infra_file_list::batch_remove(&del_files).await {
-                    log::error!("[COMPACTOR] batch_delete to db failed, retrying: {}", e);
+            if cfg.compact.data_retention_history {
+                // only store the file_list into history, don't delete files
+                let del_items = events.to_vec();
+                if let Err(e) = infra_file_list::batch_add_history(&del_items).await {
+                    log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
+                    return Err(e.into());
+                }
+            } else {
+                // store to file_list_deleted table, pending delete
+                let del_items = events
+                    .iter()
+                    .map(|v| FileListDeleted {
+                        file: v.key.clone(),
+                        index_file: v.meta.index_size > 0,
+                        flattened: v.meta.flattened,
+                    })
+                    .collect::<Vec<_>>();
+                if let Err(e) =
+                    infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
+                {
+                    log::error!(
+                        "[COMPACTOR] batch_add_deleted to db failed, retrying: {}",
+                        e
+                    );
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
+            }
+            // delete from file_list table
+            let del_items = events.iter().map(|v| v.key.clone()).collect::<Vec<_>>();
+            if let Err(e) = infra_file_list::batch_remove(&del_items).await {
+                log::error!("[COMPACTOR] batch_delete to db failed, retrying: {}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
             }
             success = true;
             break;
