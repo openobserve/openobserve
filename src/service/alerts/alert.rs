@@ -82,6 +82,9 @@ pub enum AlertError {
     #[error("Error creating default alerts folder")]
     CreateDefaultFolderError,
 
+    #[error("Alert ID is required")]
+    AlertIdMissing,
+
     #[error("Alert name is required")]
     AlertNameMissing,
 
@@ -242,22 +245,24 @@ async fn prepare_alert(
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
-    match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, &alert.name).await {
-        Ok(Some(old_alert)) => {
-            if create {
-                return Err(AlertError::CreateAlreadyExists);
+    if alert.id.is_none() && !create {
+        return Err(AlertError::AlertIdMissing);
+    }
+
+    if let Some(alert_id) = alert.id {
+        match get_by_id_db(org_id, alert_id).await {
+            Ok(old_alert) => {
+                if create {
+                    return Err(AlertError::CreateAlreadyExists);
+                }
+                alert.owner = old_alert.owner;
             }
-            alert.set_last_triggered_at(old_alert.get_last_triggered_at_from_table());
-            alert.set_last_satisfied_at(old_alert.get_last_satisfied_at_from_table());
-            alert.owner = old_alert.owner;
-        }
-        Ok(None) => {
-            if !create {
-                return Err(AlertError::AlertNotFound);
+            Err(AlertError::AlertNotFound) => {
+                if !create {
+                    return Err(AlertError::AlertNotFound);
+                }
             }
-        }
-        Err(e) => {
-            return Err(AlertError::InfraError(e));
+            Err(e) => return Err(e),
         }
     }
 
