@@ -125,7 +125,7 @@
     "legendLabel":"Legends",
     "logs": "Logs",
     "enrichmentTables": "Enrichment Tables",
-    "savedViewsLabel": "Save View",
+    "savedViewsLabel": "Saved View",
     "savedViewsNotFound": "Saved view not found!",
     "savedViewAction": "Create/Update Saved View",
     "savedViewDropdownLabel": "Saved Views",
@@ -162,7 +162,8 @@
     "visualize": "Visualize",
     "visualizeDisabledForMultiStream": "Visualization is disabled for multi stream",
     "transformType": "Transform Type",
-    "saveActionDisabled": "Saving Action is currently unavailable"
+    "saveActionDisabled": "Saving Action is currently unavailable",
+    "moreActions": "More Actions"
   },
   "menu": {
     "home": "Home",
