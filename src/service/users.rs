@@ -192,8 +192,25 @@ pub async fn update_user(
     user: UpdateUser,
 ) -> Result<HttpResponse, Error> {
     let mut allow_password_update = false;
+    let is_email_root = is_root_user(email);
 
-    let existing_user = if is_root_user(email) {
+    // Only root user can update root user
+    if is_email_root && !self_update {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Root user cannot be updated".to_string(),
+        )));
+    }
+
+    // Nobody can update role to root user role
+    if !is_email_root && user.role.is_some() && user.role.as_ref().unwrap().eq(&UserRole::Root) {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Root user role cannot be updated".to_string(),
+        )));
+    }
+
+    let existing_user = if is_email_root {
         db::user::get(None, email).await
     } else {
         db::user::get(Some(org_id), email).await
@@ -783,20 +800,6 @@ pub async fn root_user_exists() -> bool {
         local_users.is_empty()
     } else {
         db::user::root_user_exists().await
-    }
-}
-
-pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
-    if orgs.is_empty() {
-        (false, UserOrg::default())
-    } else {
-        let mut local_orgs = orgs;
-        local_orgs.retain(|org| !org.name.eq(&org_id.to_string()));
-        if local_orgs.is_empty() {
-            (false, UserOrg::default())
-        } else {
-            (true, local_orgs.first().unwrap().clone())
-        }
     }
 }
 
