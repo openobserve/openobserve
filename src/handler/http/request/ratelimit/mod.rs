@@ -17,7 +17,7 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{HttpResponse, get, put, web};
-use config::meta::ratelimit::{RatelimitRule, RatelimitRuleUpdater};
+use config::meta::ratelimit::RatelimitRuleUpdater;
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
@@ -39,11 +39,16 @@ use {
     std::io::Write,
 };
 
+#[cfg(feature = "enterprise")]
 #[derive(Debug, Clone, Deserialize)]
 struct UpdateQueryParams {
     update_type: String,
     user_role: Option<String>,
 }
+
+#[cfg(not(feature = "enterprise"))]
+#[derive(Debug, Clone, Deserialize)]
+struct UpdateQueryParams();
 
 #[cfg(feature = "enterprise")]
 async fn validate_ratelimit_updater(rules: &RatelimitRuleUpdater) -> Result<(), anyhow::Error> {
@@ -128,7 +133,6 @@ pub async fn api_modules(_path: web::Path<String>) -> Result<HttpResponse, Error
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(path);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
@@ -330,7 +334,8 @@ pub async fn update_ratelimit(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        drop(rules);
+        let _ = query;
+        drop(updater);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
@@ -452,6 +457,7 @@ pub async fn upload_org_ratelimit(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
+        let _ = query;
         let _ = payload;
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
