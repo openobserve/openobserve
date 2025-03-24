@@ -117,11 +117,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               bg-color="input-bg"
               class="showLabelOnTop no-case tw-w-[400px]"
               stack-label
+              map-options
               emit-value
               outlined
               filled
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
+              :disable="isEditingActionScript"
+              :readonly="isEditingActionScript"
             />
           </div>
 
@@ -136,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-step
               data-test="add-action-script-step-1"
               :name="1"
-              title="Upload Script Zip"
+              :title="t('actions.uploadCodeZip')"
               :icon="outlinedDashboard"
               :done="step > 1"
             >
@@ -150,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="primary"
                   filled
                   v-model="formData.codeZip"
-                  :label="t('actions.uploadCodeZip')"
+                  :label="t('actions.zipFile') + ' *'"
                   bg-color="input-bg"
                   class="tw-w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
                   stack-label
@@ -232,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-bold text-grey-8 q-mb-sm"
                   data-test="add-action-script-frequency-title"
                 >
-                  Frequency
+                  {{ t("actions.frequency") }} *
                 </div>
                 <div
                   style="
@@ -252,6 +255,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-px-lg visual-selection-btn"
                       style="padding-top: 4px; padding-bottom: 4px"
                       @click="frequency.type = visual.value"
+                      :disable="isEditingActionScript"
+                      :readonly="isEditingActionScript"
                     >
                       {{ visual.label }}</q-btn
                     >
@@ -329,6 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         debounce="300"
                         style="width: 100%"
                         @update:model-value="validateFrequency(frequency.cron)"
+                        :disable="isEditingActionScript"
+                        :readonly="isEditingActionScript"
                       />
                     </div>
                     <q-select
@@ -672,7 +679,7 @@ const actionTypes = [
     value: "scheduled",
   },
   {
-    label: "Service",
+    label: "Real Time",
     value: "service",
   },
 ];
@@ -983,6 +990,11 @@ const validateActionScriptData = async () => {
 
   if (formData.value.execution_details === "repeat" && cronError.value) {
     step.value = 2;
+    return;
+  }
+
+  if (!formData.value.service_account) {
+    step.value = 3;
     return;
   }
 
