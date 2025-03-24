@@ -263,14 +263,12 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
 
     let mut rt_alerts = 0;
     let mut scheduled_alerts = 0;
-    let alert_cacher = STREAM_ALERTS.read().await;
-    for (_, alerts) in alert_cacher.iter() {
-        for alert in alerts.iter() {
-            if alert.is_real_time {
-                rt_alerts += 1
-            } else {
-                scheduled_alerts += 1
-            }
+    let alert_cacher = ALERTS.read().await;
+    for (_, (_, alert)) in alert_cacher.iter() {
+        if alert.is_real_time {
+            rt_alerts += 1
+        } else {
+            scheduled_alerts += 1
         }
     }
     drop(alert_cacher);

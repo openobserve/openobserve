@@ -1043,8 +1043,11 @@ export default defineComponent({
       toBeClonedAlert.value.stream_name = toBeClonestreamName.value;
       toBeClonedAlert.value.stream_type = toBeClonestreamType.value;
       toBeClonedAlert.value.folder_id = activeFolderId.value;
-
       try {
+        //removed id from the alert payload
+        if(toBeClonedAlert.value?.id){
+          delete toBeClonedAlert.value?.id;
+        }
         alertsService
           .create_by_alert_id(
             store.state.selectedOrganization.identifier,
