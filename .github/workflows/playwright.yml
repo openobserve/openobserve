@@ -33,6 +33,7 @@ env:
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
   ZO_WEBSOCKET_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
+  ZO_SMTP_ENABLED: true
 
 jobs:
   build_binary:
@@ -164,6 +165,7 @@ jobs:
           echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
+          echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
 
