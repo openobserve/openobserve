@@ -91,7 +91,7 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
         serviceaccount_page.create_service_account(session, base_url, user_email, user_password, org_id, email_address_serviceaccount)
 
         # Create alerts
-        alert_webhook = f"alert_webhook_{alert_page.Unique_value_alert}_{i}"
+        alert_webhook = f"standard_{alert_page.Unique_value_alert}_{i}"
         alert_page.create_standard_alert(session, base_url, user_email, user_password, org_id, stream_name, template_name_webhook, destination_name_webhook, alert_webhook) 
 
         alert_email = f"alert_email_{alert_page.Unique_value_alert}_{i}"  
