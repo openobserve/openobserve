@@ -557,8 +557,8 @@ pub struct Auth {
     pub cookie_secure_only: bool,
     #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
     pub ext_auth_salt: String,
-    #[env_config(name = "O2_SCRIPT_SERVER_TOKEN")]
-    pub script_server_token: String,
+    #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
+    pub action_server_token: String,
 }
 
 #[derive(EnvConfig)]
@@ -651,8 +651,12 @@ pub struct Common {
     pub meta_store: String,
     #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
+    #[env_config(name = "ZO_META_POSTGRES_RO_DSN", default = "")]
+    pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
     #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
+    #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
+    pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(

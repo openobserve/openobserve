@@ -2965,7 +2965,7 @@ mod tests {
                 cookie_same_site_lax: bool::default(),
                 cookie_secure_only: bool::default(),
                 ext_auth_salt: String::default(),
-                script_server_token: String::default(),
+                action_server_token: String::default(),
             },
             report_server: config::ReportServer {
                 enable_report_server: bool::default(),
@@ -3019,7 +3019,9 @@ mod tests {
                 queue_store: String::default(),
                 meta_store: String::default(),
                 meta_postgres_dsn: String::default(),
+                meta_postgres_ro_dsn: String::default(),
                 meta_mysql_dsn: String::default(),
+                meta_mysql_ro_dsn: String::default(),
                 node_role: String::default(),
                 node_role_group: String::default(),
                 cluster_name: String::default(),
