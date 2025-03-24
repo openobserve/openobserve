@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     flat
     class="q-ml-xs q-pa-xs syntax-guide-button"
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-    :title="t('search.syntaxGuideLabel')"
     icon="help"
   >
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
@@ -179,6 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
       </q-card>
     </q-menu>
+    <q-tooltip :delay="300">
+      {{ t('search.syntaxGuideLabel') }}
+    </q-tooltip>
   </q-btn>
 </template>
 
