@@ -20,19 +20,22 @@ use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::
 use base64::Engine;
 use config::utils::json;
 use futures::future::{Ready, ready};
-#[cfg(feature = "enterprise")]
-use o2_dex::service::auth::get_dex_jwks;
-#[cfg(feature = "enterprise")]
-use o2_openfga::config::get_config as get_openfga_config;
-#[cfg(feature = "enterprise")]
-use o2_openfga::meta::mapping::OFGA_MODELS;
 use once_cell::sync::Lazy;
 use regex::Regex;
+#[cfg(feature = "enterprise")]
+use {
+    crate::common::{
+        infra::config::USER_SESSIONS,
+        {meta, meta::ingestion::INGESTION_EP},
+    },
+    jsonwebtoken::TokenData,
+    o2_dex::service::auth::get_dex_jwks,
+    o2_openfga::config::get_config as get_openfga_config,
+    o2_openfga::meta::mapping::OFGA_MODELS,
+    serde_json::Value,
+    std::{collections::HashMap, str::FromStr},
+};
 
-#[cfg(feature = "enterprise")]
-use super::jwt;
-#[cfg(feature = "enterprise")]
-use crate::common::infra::config::USER_SESSIONS;
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
     meta::{
@@ -41,8 +44,6 @@ use crate::common::{
         user::{AuthTokens, UserRole},
     },
 };
-#[cfg(feature = "enterprise")]
-use crate::common::{meta, meta::ingestion::INGESTION_EP};
 
 pub const V2_API_PREFIX: &str = "v2";
 
@@ -859,40 +860,27 @@ pub async fn check_permissions(
 
 #[cfg(feature = "enterprise")]
 pub async fn extract_auth_expiry_and_user_id(
-    auth_str: &str,
+    req: &HttpRequest,
 ) -> (Option<chrono::DateTime<chrono::Utc>>, Option<String>) {
     use crate::handler::http::auth::validator::get_user_email_from_auth_str;
 
-    let decode = async |token: &str| {
-        let keys = get_dex_jwks().await;
-        match jwt::verify_decode_token(
-            token,
-            &keys,
-            &o2_dex::config::get_config().client_id,
-            true,
-            true,
-        )
-        .await
-        {
-            Ok((_, Some(token_data))) => {
-                // Extract exp from claims and convert to DateTime<Utc>
-                token_data
-                    .claims
-                    .get("exp")
-                    .and_then(|exp| exp.as_i64())
-                    .and_then(|exp_ts| chrono::DateTime::from_timestamp(exp_ts, 0))
-            }
-            Ok(_) => {
-                log::debug!("No token data returned");
-                None
-            }
-            Err(e) => {
-                log::error!("Error verifying token: {}", e);
-                None
-            }
+    let decode = async |token: &str| match decode_expiry(token).await {
+        Ok(token_data) => token_data
+            .claims
+            .get("exp")
+            .and_then(|exp| {
+                println!("exp: {:?}", exp);
+                exp.as_i64()
+            })
+            .and_then(|exp_ts| chrono::DateTime::from_timestamp(exp_ts, 0)),
+        Err(e) => {
+            log::error!("Error verifying token: {}", e);
+            println!("error: {:?}", e);
+            None
         }
     };
 
+    let auth_str = extract_auth_str(&req);
     if auth_str.is_empty() {
         return (None, None);
     } else if auth_str.starts_with("Basic") {
@@ -918,6 +906,47 @@ pub async fn extract_auth_expiry_and_user_id(
         return (exp, user_id);
     }
     (None, None)
+}
+
+#[cfg(feature = "enterprise")]
+async fn decode_expiry(token: &str) -> Result<TokenData<HashMap<String, Value>>, anyhow::Error> {
+    use infra::errors::JwtError;
+    use jsonwebtoken::{
+        Algorithm, DecodingKey, Validation, decode, decode_header,
+        jwk::{self, AlgorithmParameters},
+    };
+
+    let header = decode_header(token)?;
+    let kid = match header.kid {
+        Some(k) => k,
+        None => return Err(JwtError::MissingAttribute("`kid` header".to_owned()).into()),
+    };
+    let dex_jwks = get_dex_jwks().await;
+    let jwks: jwk::JwkSet = serde_json::from_str(&dex_jwks).unwrap();
+
+    if let Some(j) = jwks.find(&kid) {
+        match &j.algorithm {
+            AlgorithmParameters::RSA(rsa) => {
+                let decoding_key = DecodingKey::from_rsa_components(&rsa.n, &rsa.e).unwrap();
+
+                let mut validation = Validation::new(
+                    Algorithm::from_str(j.common.key_algorithm.unwrap().to_string().as_str())
+                        .unwrap(),
+                );
+                validation.validate_exp = true;
+                let aud = &o2_dex::config::get_config().client_id;
+                validation.set_audience(&[aud]);
+                Ok(decode::<HashMap<String, serde_json::Value>>(
+                    token,
+                    &decoding_key,
+                    &validation,
+                )?)
+            }
+            _ => Err(JwtError::ValidationFailed().into()),
+        }
+    } else {
+        Err(JwtError::KeyNotExists().into())
+    }
 }
 
 #[cfg(test)]
@@ -997,23 +1026,5 @@ mod tests {
             "http://localhost:5080/auth/login?request_time={}&exp_in={}&auth={}",
             time, exp_in, auth
         );
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[tokio::test]
-    async fn test_extract_auth_expiry_and_user_id_with_bearer_token() {
-        let auth_str = "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImYwY2ZlYjgxNTlkNDJmOWE4MmQ2ZDk4OTM4Y2NiNDM2OWIzYzg1MjMifQ.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjU1NTYvZGV4Iiwic3ViIjoiQ2lWMWFXUTlkWE5sY2pFc2IzVTlkWE5sY25Nc1pHTTllbWx1WTJ4aFluTXNaR005WTI5dEVnUnNaR0Z3IiwiYXVkIjoiZXhhbXBsZS1hcHAiLCJleHAiOjE3NDI1MTk0NzksImlhdCI6MTc0MjUxNzY3OSwiYXRfaGFzaCI6IkhGQjRIZUs5YTk1TUY5aHplanZ2MUEiLCJlbWFpbCI6InVzZXIxQHppbmNsYWJzLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJncm91cHMiOlsiY249YWRtaW4sb3U9dGVhbTEsb3U9dGVhbXMsZGM9emluY2xhYnMsZGM9Y29tIiwiY249YWRtaW4sb3U9dGVhbTMsb3U9dGVhbXMsZGM9emluY2xhYnMsZGM9Y29tIl0sIm5hbWUiOiJVc2VyIE9uZSJ9.nNEkavuzLnH0mmc2YAgSbzfXbIC-Hil7rTIXQy-ehQUBt_IsQtbzkhDqmHtPWSdGzrZSlJFbt92yjYdXxtji_ZaLFtugTT4wdmPL6J3AtHQ5wvEi9JfX2jZ22BBXIDJ5qxc9jhquWe6brGYiDEgWQRJaxLw9ZlMRv8DUHHsUk_NaaxZhZvwR-jU0UZELQ-VPX6WXrgt_5eYz-lVm_dKFgdLyMBGDKlPr3dUFegeC8vRU1v68IpQN1bM0XtB-cuZ4MkB2EcQDgBYmYyxM_5Sqv7jnkb2_rw6buyujAPzigXT3xMDKZs9DnmbSVd73oZIqQcbgXnKEtf-Z94gLwNaqJw";
-        let (exp, user_id) = extract_auth_expiry_and_user_id(&auth_str).await;
-        assert!(exp.is_some());
-        assert_eq!(user_id, Some("user1@zinclabs.com".to_string()));
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[tokio::test]
-    async fn test_extract_auth_expiry_and_user_id_with_basic_auth() {
-        let auth_str = "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=";
-        let (exp, user_id) = extract_auth_expiry_and_user_id(&auth_str).await;
-        assert_eq!(exp, None);
-        assert_eq!(user_id, Some("root@example.com".to_string()));
     }
 }

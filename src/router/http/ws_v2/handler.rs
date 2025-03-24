@@ -27,7 +27,7 @@ use super::{
     session::SessionManager,
 };
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::{extract_auth_expiry_and_user_id, extract_auth_str};
+use crate::common::utils::auth::extract_auth_expiry_and_user_id;
 use crate::service::websocket_events::{WsClientEvents, WsServerEvents};
 
 pub type ClientId = String;
@@ -64,8 +64,7 @@ impl WsHandler {
 
         // Create session by registering the client & extract the user_id from the auth
         #[cfg(feature = "enterprise")]
-        let (mut cookie_expiry, user_id) =
-            extract_auth_expiry_and_user_id(&extract_auth_str(&req)).await;
+        let (mut cookie_expiry, user_id) = extract_auth_expiry_and_user_id(&req).await;
 
         #[cfg(feature = "enterprise")]
         {

@@ -52,15 +52,18 @@ pub struct WsSession {
     last_activity_ts: i64,
     // Utc timestamp in microseconds
     created_ts: i64,
+    // Utc timestamp in microseconds
+    cookie_expiry: Option<i64>,
 }
 
 impl WsSession {
-    pub fn new(inner: Session) -> Self {
+    pub fn new(inner: Session, cookie_expiry: Option<i64>) -> Self {
         let now = chrono::Utc::now().timestamp_micros();
         Self {
             inner: Some(inner),
             last_activity_ts: now,
             created_ts: now,
+            cookie_expiry,
         }
     }
 
@@ -78,6 +81,11 @@ impl WsSession {
         // 2. if the session has exceeded the max lifetime
         (now - self.last_activity_ts) > idle_timeout_micros
             || (now - self.created_ts) > max_lifetime_micros
+    }
+
+    pub fn is_client_cookie_valid(&self) -> bool {
+        let now = chrono::Utc::now().timestamp_micros();
+        self.cookie_expiry.is_none_or(|expiry| expiry > now)
     }
 
     /// Send a text message to the client
@@ -130,9 +138,13 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
     loop {
         tokio::select! {
             Some(msg) = msg_stream.next() => {
-                // Update activity on any message
+                // Update activity and check cookie_expiry on any message
                 if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
                     session.update_activity();
+                    if !session.is_client_cookie_valid() {
+                        log::error!("[WS_HANDLER]: Session cookie expired");
+                        break;
+                    }
                 }
 
                 match msg {

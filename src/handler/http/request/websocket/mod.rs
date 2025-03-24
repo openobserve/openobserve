@@ -54,7 +54,7 @@ pub async fn websocket(
 
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
-    let ws_session = WsSession::new(session);
+    let ws_session = WsSession::new(session, None);
     sessions_cache_utils::insert_session(&request_id, ws_session);
     log::info!(
         "[WS_HANDLER]: Node Role: {} Got websocket request for request_id: {}",
