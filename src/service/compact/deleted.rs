@@ -33,11 +33,18 @@ pub async fn delete(
     let files_num = files.values().flatten().count() as i64;
 
     // delete files from storage
+    let local_mode = config::get_config().common.local_mode;
     if let Err(e) = storage::del(
         &files
             .values()
             .flatten()
-            .map(|file| file.file.as_str())
+            .filter_map(|file| {
+                if !ingester::is_wal_file(local_mode, &file.file) {
+                    Some(file.file.as_str())
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>(),
     )
     .await
