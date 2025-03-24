@@ -993,6 +993,11 @@ const validateActionScriptData = async () => {
     return;
   }
 
+  if (!formData.value.service_account) {
+    step.value = 3;
+    return;
+  }
+
   if (!formData.value.execution_details) {
     step.value = 2;
     return;
