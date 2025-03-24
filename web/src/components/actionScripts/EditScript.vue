@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-step
               data-test="add-action-script-step-1"
               :name="1"
-              title="Upload Zip File"
+              :title="t('actions.uploadCodeZip')"
               :icon="outlinedDashboard"
               :done="step > 1"
             >
