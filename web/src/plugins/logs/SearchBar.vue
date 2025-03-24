@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm"
                 style="height: 32px;"
               >
-                <q-tooltip :delay="300">
+                <q-tooltip>
                   {{ t('common.search') }}
                 </q-tooltip>
               </q-btn>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 style="height: 32px;"
               >
-              <q-tooltip :delay="300">
+              <q-tooltip>
                 {{ 
                   isVisualizeToggleDisabled
                     ? t('search.visualizeDisabledForMultiStream')
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
 
         <img :src="histogramIcon" alt="Histogram" style="width: 20px; height: 20px; ">
-        <q-tooltip :delay="300"> 
+        <q-tooltip> 
           {{ t('search.showHistogramLabel') }}
         </q-tooltip>
         </q-toggle>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="searchObj.meta.sqlMode"
           >
           <img :src="sqlIcon" alt="SQL Mode" style="width: 20px; height: 20px;">
-          <q-tooltip :delay="300">
+          <q-tooltip>
             {{ t('search.sqlModeLabel') }}
           </q-tooltip>
         </q-toggle>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
           @click="resetFilters"
         >
-          <q-tooltip :delay="300">
+          <q-tooltip>
             {{ t('search.resetFilters') }}
           </q-tooltip>
         </q-btn>
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
 
           </q-btn-dropdown>
-          <q-tooltip :delay="300">
+          <q-tooltip>
               {{ t('search.savedViewsLabel') }}
             </q-tooltip>
         </q-btn-group>
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="handleQuickMode"
           >
           <img :src="quickModeIcon" alt="Quick Mode" style="width: 20px; height: 20px;">
-          <q-tooltip :delay="300">
+          <q-tooltip>
             {{ t('search.quickModeLabel') }}
           </q-tooltip>
         </q-toggle>
@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="float-left"
           size="32px"
         >
-          <q-tooltip :delay="300">
+          <q-tooltip>
             {{ t('search.messageWrapContent') }}
           </q-tooltip>
         </q-toggle>
@@ -401,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="shareLink.execute()"
           :loading="shareLink.isLoading.value"
         >
-          <q-tooltip :delay="300">
+          <q-tooltip>
             {{ t('search.shareLink') }}
           </q-tooltip>
         </q-btn>
@@ -492,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </q-list>
             </q-menu>
-            <q-tooltip style="width: 80px;" :delay="300" >
+            <q-tooltip style="width: 80px;" >
               {{ t('search.moreActions') }}
             </q-tooltip>
 
