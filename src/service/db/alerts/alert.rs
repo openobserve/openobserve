@@ -30,7 +30,7 @@ use svix_ksuid::Ksuid;
 
 use crate::{
     common::infra::config::{ALERTS, STREAM_ALERTS},
-    service::db,
+    service::{alerts::alert::get_folder_alert_by_id_db, db},
 };
 
 /// Gets the alert and its parent folder.
@@ -128,13 +128,17 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
 
 pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let alert = table::put(client, org_id, "default", alert).await?;
+    let Some(alert_id) = alert.id else {
+        return Err(anyhow::anyhow!("Alert ID is required"));
+    };
+    let (_f, _) = get_folder_alert_by_id_db(org_id, alert_id).await?;
+    let alert = table::update(client, org_id, None, alert).await?;
     cluster::emit_put_event(org_id, &alert, None).await?;
     #[cfg(feature = "enterprise")]
     if alert.id.is_some() {
         super_cluster::emit_update_event(org_id, None, alert.clone()).await?;
     } else {
-        super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
+        super_cluster::emit_create_event(org_id, &_f.folder_id, alert.clone()).await?;
     }
     Ok(())
 }
@@ -316,7 +320,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         orgs.insert(org_name);
     }
     for org_name in orgs {
-        let alerts_in_orgs = table::list(client, ListAlertsParams::new(&org_name)).await?;
+        let alerts_in_orgs = table::list(client, ListAlertsParams::new(org_name)).await?;
         alerts.extend(alerts_in_orgs);
     }
 

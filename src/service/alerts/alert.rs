@@ -609,6 +609,17 @@ pub async fn get_by_id_db(org_id: &str, alert_id: Ksuid) -> Result<Alert, AlertE
     }
 }
 
+pub async fn get_folder_alert_by_id_db(
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(Folder, Alert), AlertError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some(f_a) => Ok(f_a),
+        None => Err(AlertError::AlertNotFound),
+    }
+}
+
 pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
