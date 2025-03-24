@@ -26,6 +26,7 @@ use {
         service::{ratelimit, ratelimit::rule::RatelimitError},
     },
     actix_web::http,
+    config::meta::ratelimit::RatelimitRule,
     futures_util::{StreamExt, TryStreamExt},
     infra::table::ratelimit::RuleEntry,
     o2_ratelimit::dataresource::{
