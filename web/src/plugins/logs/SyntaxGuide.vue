@@ -40,16 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   in query editor. Search terms are case-insensitive.
                 </li>
                 <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight">match_all_raw('error')</span>
-                </li>
-                <li>
-                  For case-insensitive full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >match_all_raw_ignore_case('error')</span
-                  >
-                </li>
-                <li>
                   For column search of value 'error' use
                   <span class="bg-highlight"
                     >str_match(<b>fieldname</b>, 'error')</span
@@ -107,20 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                   in query editor. Search terms are case-insensitive.
-                </li>
-                <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all_raw('error')</span
-                  >
-                </li>
-                <li>
-                  For case-insensitive full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all_raw_ignore_case('error')</span
-                  >
                 </li>
                 <li>
                   For column search of value 'error' use
