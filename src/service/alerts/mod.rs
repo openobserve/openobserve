@@ -392,7 +392,11 @@ impl QueryConditionExt for QueryCondition {
             }
             Err(e) => {
                 if let infra::errors::Error::ErrorCode(e) = e {
-                    return Err(anyhow::anyhow!("{}", e.get_error_detail()));
+                    return Err(anyhow::anyhow!(
+                        "{} {}",
+                        e.get_message(),
+                        e.get_inner_message()
+                    ));
                 } else {
                     return Err(anyhow::anyhow!("{}", e));
                 }
