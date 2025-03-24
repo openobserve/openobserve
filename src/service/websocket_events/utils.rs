@@ -94,7 +94,7 @@ pub mod sessions_cache_utils {
     use super::search_registry_utils::SearchState;
     use crate::{
         common::infra::config::{WS_SEARCH_REGISTRY, WS_SESSIONS},
-        handler::http::request::websocket::session::WsSession,
+        handler::http::request::ws_v2::session::WsSession,
     };
 
     pub async fn run_gc_ws_sessions() {
@@ -437,22 +437,6 @@ impl From<WsClientEvents> for tungstenite::protocol::Message {
         tungstenite::protocol::Message::Text(payload.to_string())
     }
 }
-
-// impl TryFrom<tungstenite::protocol::Message> for WsServerEvents {
-//     type Error = String;
-
-//     fn try_from(value: tungstenite::protocol::Message) -> Result<Self, String> {
-//         match value {
-//             tungstenite::protocol::Message::Text(text) => {
-//                 let event: WsServerEvents = json::from_str(&text).map_err(|e| e.to_string())?;
-//                 Ok(event)
-//             }
-//             _ => {
-//                 todo!("Convert `tungstenite::protocol::Message` to `WsServerEvents`")
-//             }
-//         }
-//     }
-// }
 
 impl From<WsServerEvents> for tungstenite::protocol::Message {
     fn from(event: WsServerEvents) -> Self {

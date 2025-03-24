@@ -4,7 +4,7 @@ use actix_web::{Error, HttpRequest, HttpResponse, get, web};
 use config::get_config;
 
 use crate::{
-    handler::http::request::websocket::session::WsSession,
+    handler::http::request::ws_v2::session::WsSession,
     service::websocket_events::sessions_cache_utils,
 };
 

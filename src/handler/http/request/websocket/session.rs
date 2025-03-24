@@ -16,7 +16,7 @@
 use std::time::Duration;
 
 use actix_http::ws::{CloseCode, CloseReason};
-use actix_ws::{MessageStream, Session};
+use actix_ws::MessageStream;
 use config::{
     get_config,
     meta::websocket::{SearchEventReq, SearchResultType},
@@ -43,82 +43,6 @@ use crate::{
         sessions_cache_utils,
     },
 };
-
-// Do not clone the session, instead use a reference to the session
-pub struct WsSession {
-    inner: Option<Session>,
-    // Utc timestamp in microseconds
-    last_activity_ts: i64,
-    // Utc timestamp in microseconds
-    created_ts: i64,
-}
-
-impl WsSession {
-    pub fn new(inner: Session) -> Self {
-        let now = chrono::Utc::now().timestamp_micros();
-        Self {
-            inner: Some(inner),
-            last_activity_ts: now,
-            created_ts: now,
-        }
-    }
-
-    pub fn update_activity(&mut self) {
-        self.last_activity_ts = chrono::Utc::now().timestamp_micros();
-    }
-
-    pub fn is_expired(&self) -> bool {
-        let cfg = get_config();
-        let now = chrono::Utc::now().timestamp_micros();
-        let idle_timeout_micros = cfg.websocket.session_idle_timeout_secs * 1_000_000;
-        let max_lifetime_micros = cfg.websocket.session_max_lifetime_secs * 1_000_000;
-
-        // 1. if the session has been idle for too long
-        // 2. if the session has exceeded the max lifetime
-        (now - self.last_activity_ts) > idle_timeout_micros
-            || (now - self.created_ts) > max_lifetime_micros
-    }
-
-    /// Send a text message to the client
-    pub async fn text(&mut self, msg: String) -> Result<(), actix_ws::Closed> {
-        self.update_activity();
-        if let Some(ref mut session) = self.inner {
-            session.text(msg).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-
-    /// Close the session with a reason
-    pub async fn close(&mut self, reason: Option<CloseReason>) -> Result<(), actix_ws::Closed> {
-        self.update_activity();
-        if let Some(session) = self.inner.take() {
-            session.close(reason).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-
-    /// Send a pong response
-    pub async fn pong(&mut self, payload: &[u8]) -> Result<(), actix_ws::Closed> {
-        self.update_activity();
-        if let Some(ref mut session) = self.inner {
-            session.pong(payload).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-
-    /// Send a ping request
-    pub async fn ping(&mut self, payload: &[u8]) -> Result<(), actix_ws::Closed> {
-        self.update_activity();
-        if let Some(ref mut session) = self.inner {
-            session.ping(payload).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-}
 
 pub async fn run(
     mut msg_stream: MessageStream,

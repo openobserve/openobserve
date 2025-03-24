@@ -17,9 +17,11 @@ pub mod session;
 
 use actix_web::{Error, HttpRequest, HttpResponse, get, web};
 use config::{cluster::LOCAL_NODE, get_config};
-use session::WsSession;
 
-use crate::service::websocket_events::sessions_cache_utils;
+use crate::{
+    handler::http::request::ws_v2::session::WsSession,
+    service::websocket_events::sessions_cache_utils,
+};
 
 #[get("{org_id}/ws/{request_id}")]
 pub async fn websocket(
