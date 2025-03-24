@@ -74,12 +74,6 @@ impl ResponseError for WsError {
     }
 }
 
-impl WsError {
-    pub fn should_client_retry(&self) -> bool {
-        false
-    }
-}
-
 pub type WsResult<T> = Result<T, WsError>;
 
 #[derive(Debug)]
@@ -125,7 +119,15 @@ impl WsError {
     pub fn should_disconnect(&self) -> bool {
         match self {
             WsError::ProtocolError(_) => true,
-            // TODO: fill out with the rest
+            WsError::QuerierNotAvailable(_) => true,
+            // TODO: verify other error types that need to be disconnected
+            _ => false,
+        }
+    }
+
+    pub fn should_client_retry(&self) -> bool {
+        match self {
+            WsError::SerdeError(_) => true,
             _ => false,
         }
     }
