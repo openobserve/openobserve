@@ -29,14 +29,23 @@ impl MigrationTrait for Migration {
         log::debug!(
             "[SCHEDULED_TRIGGERS_MIGRATION] dropping alerts_org_stream_type_stream_name_name_idx_2 index"
         );
-        manager
-            .drop_index(
-                Index::drop()
-                    .name(ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX)
-                    .table(Alerts::Table)
-                    .to_owned(),
+        // drop the index only if it exists
+        let index_exists = manager
+            .has_index(
+                Alerts::Table.to_string().as_str(),
+                ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX,
             )
             .await?;
+        if index_exists {
+            manager
+                .drop_index(
+                    Index::drop()
+                        .name(ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX)
+                        .table(Alerts::Table)
+                        .to_owned(),
+                )
+                .await?;
+        }
 
         log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] updating scheduled triggers");
         update_scheduled_triggers(manager).await?;
