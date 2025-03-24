@@ -1,39 +1,68 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 
-let parser: any;
+let parser = await import("@/composables/useParser");
 let parserInitialized = false;
 
 const importSqlParser = async () => {
+  console.log("importSqlParser: Checking if parser is initialized");
   if (!parserInitialized) {
-    const useSqlParser: any = await import("@/composables/useParser");
-    const { sqlParser }: any = useSqlParser.default();
-    parser = await sqlParser();
-    parserInitialized = true;
+    console.log("importSqlParser: Parser not initialized. Importing useSqlParser");
+    try {
+      const useSqlParser: any = parser;
+      console.log("importSqlParser: useSqlParser imported. Getting sqlParser");
+      const { sqlParser }: any = useSqlParser.default();
+      console.log("importSqlParser: sqlParser obtained. Initializing parser");
+      parser = await sqlParser();
+      console.log("importSqlParser: Parser initialized");
+      parserInitialized = true;
+    } catch (error) {
+      console.error("importSqlParser: Error initializing sqlParser", error);
+      throw error;
+    }
+  } else {
+    console.log("importSqlParser: Parser already initialized");
   }
+  console.log("importSqlParser: Returning parser");
   return parser;
 };
 
 export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
-  await importSqlParser();
+  console.log("addLabelsToSQlQuery: Start");
+  console.log("addLabelsToSQlQuery: originalQuery:", originalQuery);
+  console.log("addLabelsToSQlQuery: labels:", labels);
+
+  try {
+    console.log("addLabelsToSQlQuery: Importing sqlParser");
+    await importSqlParser();
+    console.log("addLabelsToSQlQuery: sqlParser imported");
+  } catch (error) {
+    console.log("addLabelsToSQlQuery: Error while importing sqlParser:", error);
+  }
 
   let dummyQuery = "select * from 'default'";
+  console.log("addLabelsToSQlQuery: initial dummyQuery:", dummyQuery);
 
   for (let i = 0; i < labels.length; i++) {
     const label = labels[i];
+    console.log("addLabelsToSQlQuery: Processing label:", label);
     dummyQuery = await addLabelToSQlQuery(
       dummyQuery,
       label.name,
       label.value,
       label.operator,
     );
+    console.log("addLabelsToSQlQuery: Updated dummyQuery:", dummyQuery);
   }
 
   try {
     const astOfOriginalQuery: any = parser.astify(originalQuery);
-    const astOfDummy: any = parser.astify(dummyQuery);
+    console.log("addLabelsToSQlQuery: astOfOriginalQuery:", astOfOriginalQuery);
 
-    // if ast already has a where clause
+    const astOfDummy: any = parser.astify(dummyQuery);
+    console.log("addLabelsToSQlQuery: astOfDummy:", astOfDummy);
+
     if (astOfOriginalQuery.where) {
+      console.log("addLabelsToSQlQuery: Original query has WHERE clause");
       const newWhereClause = {
         type: "binary_expr",
         operator: "AND",
@@ -46,24 +75,32 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
           parentheses: true,
         },
       };
+      console.log("addLabelsToSQlQuery: newWhereClause:", newWhereClause);
       const newAst = {
         ...astOfOriginalQuery,
         where: newWhereClause,
       };
+      console.log("addLabelsToSQlQuery: newAst with combined WHERE:", newAst);
       const sql = parser.sqlify(newAst);
+      console.log("addLabelsToSQlQuery: Generated SQL:", sql);
       const quotedSql = sql.replace(/`/g, '"');
+      console.log("addLabelsToSQlQuery: Quoted SQL:", quotedSql);
       return quotedSql;
     } else {
+      console.log("addLabelsToSQlQuery: Original query has no WHERE clause");
       const newAst = {
         ...astOfOriginalQuery,
         where: astOfDummy.where,
       };
+      console.log("addLabelsToSQlQuery: newAst with new WHERE:", newAst);
       const sql = parser.sqlify(newAst);
+      console.log("addLabelsToSQlQuery: Generated SQL:", sql);
       const quotedSql = sql.replace(/`/g, '"');
+      console.log("addLabelsToSQlQuery: Quoted SQL:", quotedSql);
       return quotedSql;
     }
   } catch (error: any) {
-    console.error("There was an error generating query:", error);
+    console.error("addLabelsToSQlQuery: Error generating query:", error);
   }
 };
 

@@ -232,10 +232,11 @@ export default defineComponent({
       );
     };
 
-    const rejectAllPromises = () => {
+    const rejectAllPromises = (source: string) => {
+      console.log("Rejecting all promises", source);
       Object.keys(currentlyExecutingPromises).forEach((key) => {
         if (currentlyExecutingPromises[key])
-          currentlyExecutingPromises[key](false);
+          currentlyExecutingPromises[key]("from reject all promises");
       });
     };
 
@@ -244,7 +245,7 @@ export default defineComponent({
       initializeVariablesData();
 
       // reject all promises
-      rejectAllPromises();
+      rejectAllPromises("mounted");
 
       // load all variables
       loadAllVariablesData(true);
@@ -257,7 +258,7 @@ export default defineComponent({
         initializeVariablesData();
 
         // reject all promises
-        rejectAllPromises();
+        rejectAllPromises(" variable config watcher");
         skipAPILoad.value = false;
         // load all variables
         loadAllVariablesData(true);
@@ -269,7 +270,7 @@ export default defineComponent({
       () => props.selectedTimeDate,
       () => {
         // reject all promises
-        rejectAllPromises();
+        rejectAllPromises("selected date time");
 
         loadAllVariablesData(false);
         skipAPILoad.value = true;
@@ -294,20 +295,29 @@ export default defineComponent({
     const changeInitialVariableValues = async (
       newInitialVariableValues: any,
     ) => {
+      console.log("Starting changeInitialVariableValues");
+
       // reject all promises
-      rejectAllPromises();
+      console.log("Rejecting all promises");
+      rejectAllPromises("change intitial variable values");
 
       // NOTE: need to re-initialize variables data
+      console.log("Resetting variables data");
       resetVariablesData();
 
       // set initial variables values
+      console.log("Setting new initial variable values", newInitialVariableValues);
       props.initialVariableValues.value = newInitialVariableValues;
 
       // make list of variables using variables config list
+      console.log("Initializing variables data");
       initializeVariablesData();
 
       // load all variables
-      loadAllVariablesData();
+      console.log("Loading all variables");
+      await loadAllVariablesData(true);
+
+      console.log("Completed changeInitialVariableValues");
     };
 
     /**
@@ -516,45 +526,49 @@ export default defineComponent({
      * @returns {Promise<boolean>} - true if the variable was loaded successfully, false if it was not
      */
     const loadSingleVariableDataByName = async (variableObject: any) => {
+      console.log(`${variableObject.name} - loadSingleVariableDataByName started`);
       return new Promise(async (resolve, reject) => {
         const { name } = variableObject;
 
         if (!name || !variableObject) {
-          return resolve(false);
+          console.log(`${variableObject.name} - loadSingleVariableDataByName cancelled, variableObject is null or name is null`);
+          reject("variableObject is null or name is null");
         }
+        console.log(`${variableObject.name} - Variable object and name are valid`);
 
-        // If the variable is already being processed
         if (currentlyExecutingPromises[name]) {
-          currentlyExecutingPromises[name](false);
+          console.log(`${variableObject.name} - loadSingleVariableDataByName cancelled, already being processed`);
+          currentlyExecutingPromises[name]("loadSingleVariableDataByName cancelled, already being processed");
         }
         currentlyExecutingPromises[name] = reject;
+        console.log(`${variableObject.name} - Set currently executing promise`);
 
-        // Check if this variable has any dependencies
-        const hasParentVariables =
-          variablesDependencyGraph[name]?.parentVariables?.length > 0;
+        const hasParentVariables = variablesDependencyGraph[name]?.parentVariables?.length > 0;
+        console.log(`${variableObject.name} - Checking for parent variables: ${hasParentVariables}`);
 
-        // Check dates for all query_values type
         if (variableObject.type === "query_values") {
-          if (
-            isInvalidDate(props.selectedTimeDate?.start_time) ||
-            isInvalidDate(props.selectedTimeDate?.end_time)
-          ) {
-            return resolve(false);
+          if (isInvalidDate(props.selectedTimeDate?.start_time) || isInvalidDate(props.selectedTimeDate?.end_time)) {
+            console.log(`${variableObject.name} - loadSingleVariableDataByName cancelled, invalid date`);
+            reject("invalid date");
           }
+          console.log(`${variableObject.name} - Dates are valid`);
         }
 
-        // For variables with dependencies, check if dependencies are loaded
         if (hasParentVariables && isDependentVariableLoading(variableObject)) {
-          return resolve(false);
+          console.log(`${variableObject.name} - loadSingleVariableDataByName cancelled, dependencies are not loaded`);
+          reject("dependencies are not loaded");
         }
+        console.log(`${variableObject.name} - Dependencies are loaded or not required`);
 
         try {
           const success = await handleVariableType(variableObject);
+          console.log(`${variableObject.name} - loadSingleVariableDataByName success: ${success}`);
           await finalizeVariableLoading(variableObject, success);
-          resolve(success);
+          resolve("success" + success);
         } catch (error) {
-          finalizeVariableLoading(variableObject, false);
-          resolve(false);
+          console.log(`${variableObject.name} - loadSingleVariableDataByName error: ${error.message}`);
+          await finalizeVariableLoading(variableObject, false);
+          reject("error from single variable" + error);
         }
       });
     };
@@ -565,32 +579,50 @@ export default defineComponent({
      * @returns {Promise<boolean>} - true if the variable was handled successfully, false if it was not
      */
     const handleVariableType = async (variableObject: any) => {
+      console.log(`${variableObject.name} - Handling variable type: ${variableObject.type}`);
       switch (variableObject.type) {
         case "query_values": {
+          console.log(`${variableObject.name} - Handling query values`);
           try {
             const queryContext: any = await buildQueryContext(variableObject);
-            const response = await fetchFieldValues(
+            console.log(`${variableObject.name} - Query context: ${queryContext}`);
+            let response = fetchFieldValues(
               variableObject,
               queryContext,
             );
+
+            response = await response.then((response: any) => {
+              console.log(`${variableObject.name} - Response: ${JSON.stringify(response)}`);
+              return response
+            }).catch((error: any) => {
+              console.log(`${variableObject.name} - Error: ${error.message}`);
+            })
+            console.log(`${variableObject.name} - Updating variable options`);
             updateVariableOptions(variableObject, response.data.hits);
+            console.log(`${variableObject.name} - Returning true`);
             return true;
           } catch (error) {
+            console.log(`${variableObject.name} - Error handling query values: ${error.message}`);
             resetVariableState(variableObject);
-            return false;
+            console.log(`${variableObject.name} - Returning false`);
+            return " handleVariable - false";
           }
         }
         case "custom": {
+          console.log(`${variableObject.name} - Handling custom variable`);
           handleCustomVariable(variableObject);
+          console.log(`${variableObject.name} - Returning true`);
           return true;
         }
         case "constant":
         case "textbox":
         case "dynamic_filters": {
+          console.log(`${variableObject.name} - Returning true`);
           return true;
         }
         default: {
-          return false;
+          console.log(`${variableObject.name} - Returning false`);
+          return "handleVariable - false";
         }
       }
     };
@@ -601,9 +633,10 @@ export default defineComponent({
      * @returns The query context as a string.
      */
     const buildQueryContext = async (variableObject: any) => {
-      const timestamp_column =
-        store.state.zoConfig.timestamp_column || "_timestamp";
+      console.log(`Building query context for variable: ${variableObject.name}`);
+      const timestamp_column = store.state.zoConfig.timestamp_column || "_timestamp";
       let dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
+      console.log(`Initial dummy query: ${dummyQuery}`);
 
       // Construct the filter from the query data
       const constructedFilter = (variableObject.query_data.filter || []).map(
@@ -613,17 +646,18 @@ export default defineComponent({
           value: condition.value,
         }),
       );
+      console.log(`Constructed filter: ${JSON.stringify(constructedFilter)}`);
 
       // Add labels to the dummy query
       let queryContext = await addLabelsToSQlQuery(
         dummyQuery,
         constructedFilter,
       );
+      console.log(`Query context after adding labels: ${queryContext}`);
 
       // Replace variable placeholders with actual values
       for (const variable of variablesData.values) {
         if (!variable.isLoading && !variable.isVariableLoadingPending) {
-          // Replace array values
           if (Array.isArray(variable.value)) {
             const arrayValues = variable.value
               .map((value: any) => `'${escapeSingleQuotes(value)}'`)
@@ -632,18 +666,21 @@ export default defineComponent({
               `'$${variable.name}'`,
               arrayValues,
             );
+            console.log(`Replaced array value for variable ${variable.name}: ${arrayValues}`);
           } else if (variable.value !== null && variable.value !== undefined) {
-            // Replace single values
             queryContext = queryContext.replace(
               `$${variable.name}`,
               escapeSingleQuotes(variable.value),
             );
+            console.log(`Replaced single value for variable ${variable.name}: ${variable.value}`);
           }
         }
       }
 
       // Base64 encode the query context
-      return b64EncodeUnicode(queryContext);
+      const encodedQueryContext = b64EncodeUnicode(queryContext);
+      console.log(`Encoded query context: ${encodedQueryContext}`);
+      return encodedQueryContext;
     };
 
     /**
@@ -656,25 +693,44 @@ export default defineComponent({
       variableObject: any,
       queryContext: string,
     ) => {
-      // Prepare the request payload for fetching field values
-      const payload = {
-        org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
-        stream_name: variableObject.query_data.stream, // Name of the stream
-        start_time: new Date(
-          props.selectedTimeDate?.start_time?.toISOString(),
-        ).getTime(), // Start time in milliseconds
-        end_time: new Date(
-          props.selectedTimeDate?.end_time?.toISOString(),
-        ).getTime(), // End time in milliseconds
-        fields: [variableObject.query_data.field], // Fields to fetch
-        size: variableObject.query_data.max_record_size || 10, // Maximum number of records
-        type: variableObject.query_data.stream_type, // Type of the stream
-        query_context: queryContext, // Encoded query context
-        no_count: true, // Flag to omit count
-      };
+      console.log(
+        `Fetching field values for variable "${variableObject.name}" with query context: ${queryContext}`,
+      );
 
-      // Fetch field values from the stream service
-      return await streamService.fieldValues(payload);
+      try {
+        // Prepare the request payload for fetching field values
+        const payload = {
+          org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
+          stream_name: variableObject.query_data.stream, // Name of the stream
+          start_time: new Date(
+            props.selectedTimeDate?.start_time?.toISOString(),
+          ).getTime(), // Start time in milliseconds
+          end_time: new Date(
+            props.selectedTimeDate?.end_time?.toISOString(),
+          ).getTime(), // End time in milliseconds
+          fields: [variableObject.query_data.field], // Fields to fetch
+          size: variableObject.query_data.max_record_size || 10, // Maximum number of records
+          type: variableObject.query_data.stream_type, // Type of the stream
+          query_context: queryContext, // Encoded query context
+          no_count: true, // Flag to omit count
+        };
+
+        console.log(`Payload for fetching field values: ${JSON.stringify(payload)}`);
+
+        // Fetch field values from the stream service
+        const response = await streamService.fieldValues(payload);
+
+        console.log(
+          `Fetched field values for variable "${variableObject.name}" with response: ${JSON.stringify(response.data)}`,
+        );
+
+        return response;
+      } catch (error) {
+        console.error(
+          `Failed to fetch field values for variable "${variableObject.name}" with error: ${error.message}`,
+        );
+        throw error;
+      }
     };
 
     /**
@@ -775,6 +831,7 @@ export default defineComponent({
         emitVariablesData();
       } else {
         variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
       }
     };
 
@@ -788,7 +845,7 @@ export default defineComponent({
       await loadSingleVariableDataByName(variableObject);
     };
 
-    let isLoading = false;
+    let isLoadingWeDontKnow = false;
     const skipAPILoad = ref(false);
 
     /**
@@ -799,21 +856,25 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when all variables data has been loaded.
      */
     const loadAllVariablesData = async (isInitialLoad = false) => {
-      if (isLoading) {
+      if (isLoadingWeDontKnow) {
+        console.log("skip loading all variables data as it's already loading");
         return;
       }
 
       if (!isInitialLoad && skipAPILoad.value) {
+        console.log("skip loading all variables data as skipAPILoad is true");
         return;
       }
 
-      isLoading = true;
+      isLoadingWeDontKnow = true;
+      console.log("starting to load all variables data");
 
       if (
         isInvalidDate(props.selectedTimeDate?.start_time) ||
         isInvalidDate(props.selectedTimeDate?.end_time)
       ) {
-        isLoading = false;
+        console.log("skip loading all variables data as selected time is invalid");
+        isLoadingWeDontKnow = false;
         return;
       }
 
@@ -821,6 +882,8 @@ export default defineComponent({
       variablesData.values.forEach((variable: any) => {
         variable.isVariableLoadingPending = true;
       });
+
+      console.log("independent and dependent variables classification start");
 
       // Find all independent variables (variables with no dependencies)
       const independentVariables = variablesData.values.filter(
@@ -834,14 +897,34 @@ export default defineComponent({
           variablesDependencyGraph[variable.name]?.parentVariables?.length > 0,
       );
 
+      console.log(
+        "independent variables",
+        independentVariables.map((v) => v.name),
+      );
+      console.log(
+        "dependent variables",
+        dependentVariables.map((v) => v.name),
+      );
+
       try {
         // Load all independent variables
-        await Promise.all(
-          independentVariables.map((variable: any) =>
-            loadSingleVariableDataByName(variable),
-          ),
-        );
-      } catch (error) {}
+        console.log("loading independent variables");
+        for (const variable of independentVariables) {
+          try {
+            const res = await loadSingleVariableDataByName(variable);
+            console.log("loaded independent variable", variable.name, res);
+          } catch (error) {
+            console.error(`Error loading variable ${variable.name}`, error);
+            await finalizeVariableLoading(variable, false);
+          }
+        }
+        console.log("independent variables loaded");
+      } catch (error) {
+        for (const variable of independentVariables) {
+          await finalizeVariableLoading(variable, false);
+        }
+        console.error("Error loading independent variables", error);
+      }
 
       const loadDependentVariables = async () => {
         for (const variable of dependentVariables) {
@@ -865,13 +948,19 @@ export default defineComponent({
 
           // If all parent variables are loaded, load the current variable
           if (areParentsLoaded) {
+            console.log("loading dependent variable", variable.name);
             await loadSingleVariableDataByName(variable);
+          } else {
+            console.log(
+              `skipping loading of ${variable.name} as parents are not loaded`,
+            );
           }
         }
       };
 
       // Attempt to load dependent variables up to 3 times
       for (let attempt = 0; attempt < 3; attempt++) {
+        console.log(`attempt ${attempt + 1} to load dependent variables`);
         await loadDependentVariables();
 
         // Check if all variables are loaded
@@ -881,12 +970,19 @@ export default defineComponent({
         );
 
         // If all variables are loaded, break the loop
-        if (allLoaded) break;
+        if (allLoaded) {
+          console.log("all variables are loaded");
+          break;
+        }
+
+        console.log(
+          `not all variables loaded after attempt ${attempt + 1}, retrying`,
+        );
       }
 
-      isLoading = false;
+      isLoadingWeDontKnow = false;
+      console.log("finished loading all variables data");
     };
-
     /**
      * Sets the loading state for a variable and all its child nodes recursively.
      * @param {string} currentVariable - The name of the current variable.

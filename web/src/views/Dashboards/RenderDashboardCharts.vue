@@ -19,124 +19,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
-    <span
-      v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
-      id="dashboardVariablesAndPanelsDataLoaded"
-      style="display: none"
-    >
+    <span v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue" id="dashboardVariablesAndPanelsDataLoaded"
+      style="display: none">
     </span>
-    <VariablesValueSelector
-      :variablesConfig="dashboardData?.variables"
-      :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
-      :selectedTimeDate="currentTimeObj['__global']"
-      :initialVariableValues="initialVariableValues"
-      @variablesData="variablesDataUpdated"
-      ref="variablesValueSelectorRef"
-    />
-    <TabList
-      v-if="showTabs && selectedTabId !== null"
-      class="q-mt-sm"
-      :dashboardData="dashboardData"
-      :viewOnly="viewOnly"
-      @refresh="refreshDashboard"
-    />
+    <VariablesValueSelector :variablesConfig="dashboardData?.variables"
+      :showDynamicFilters="dashboardData.variables?.showDynamicFilters" :selectedTimeDate="currentTimeObj['__global']"
+      :initialVariableValues="initialVariableValues" @variablesData="variablesDataUpdated"
+      ref="variablesValueSelectorRef" />
+    <TabList v-if="showTabs && selectedTabId !== null" class="q-mt-sm" :dashboardData="dashboardData"
+      :viewOnly="viewOnly" @refresh="refreshDashboard" />
     <slot name="before_panels" />
     <div class="displayDiv">
-      <div
-        v-if="
-          store.state.printMode &&
-          panels.length === 1 &&
-          panels[0].type === 'table'
-        "
-        style="height: 100%; width: 100%"
-      >
-        <PanelContainer
-          @onDeletePanel="onDeletePanel"
-          @onViewPanel="onViewPanel"
-          :viewOnly="viewOnly"
-          :data="panels[0] || {}"
-          :dashboardId="dashboardData.dashboardId"
-          :folderId="folderId"
-          :reportId="folderId"
-          :selectedTimeDate="
-            (panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
+      <div v-if="
+        store.state.printMode &&
+        panels.length === 1 &&
+        panels[0].type === 'table'
+      " style="height: 100%; width: 100%">
+        <PanelContainer @onDeletePanel="onDeletePanel" @onViewPanel="onViewPanel" :viewOnly="viewOnly"
+          :data="panels[0] || {}" :dashboardId="dashboardData.dashboardId" :folderId="folderId" :reportId="folderId"
+          :selectedTimeDate="(panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
             currentTimeObj['__global'] ||
             {}
-          "
-          :variablesData="
-            currentVariablesDataRef[panels[0].id] ||
-            currentVariablesDataRef['__global']
-          "
-          :forceLoad="forceLoad"
-          :searchType="searchType"
-          @updated:data-zoom="$emit('updated:data-zoom', $event)"
-          @onMovePanel="onMovePanel"
-          @refreshPanelRequest="refreshPanelRequest"
-          @refresh="refreshDashboard"
-          @update:initial-variable-values="updateInitialVariableValues"
-          @onEditLayout="openEditLayout"
-          style="height: 100%; width: 100%"
-        />
+            " :variablesData="currentVariablesDataRef[panels[0].id] ||
+              currentVariablesDataRef['__global']
+              " :forceLoad="forceLoad" :searchType="searchType" @updated:data-zoom="$emit('updated:data-zoom', $event)"
+          @onMovePanel="onMovePanel" @refreshPanelRequest="refreshPanelRequest" @refresh="refreshDashboard"
+          @update:initial-variable-values="updateInitialVariableValues" @onEditLayout="openEditLayout"
+          style="height: 100%; width: 100%" />
       </div>
-      <grid-layout
-        v-else
-        ref="gridLayoutRef"
-        v-if="panels.length > 0"
-        :layout.sync="getDashboardLayout(panels)"
-        :col-num="48"
-        :row-height="30"
-        :is-draggable="!viewOnly && !saveDashboardData.isLoading.value"
-        :is-resizable="!viewOnly && !saveDashboardData.isLoading.value"
-        :vertical-compact="true"
-        :autoSize="true"
-        :restore-on-drag="true"
-        :use-css-transforms="false"
-        :margin="[4, 4]"
-      >
-        <grid-item
-          class="gridBackground"
-          :class="store.state.theme == 'dark' ? 'dark' : ''"
-          v-for="item in panels"
-          :key="item.id"
-          :x="getPanelLayout(item, 'x')"
-          :y="getPanelLayout(item, 'y')"
-          :w="getPanelLayout(item, 'w')"
-          :h="getPanelLayout(item, 'h')"
-          :i="getPanelLayout(item, 'i')"
-          :minH="getMinimumHeight(item.type)"
-          :minW="getMinimumWidth(item.type)"
-          @resized="resizedEvent"
-          @moved="movedEvent"
-          drag-allow-from=".drag-allow"
-        >
+      <grid-layout v-else ref="gridLayoutRef" v-if="panels.length > 0" :layout.sync="getDashboardLayout(panels)"
+        :col-num="48" :row-height="30" :is-draggable="!viewOnly && !saveDashboardData.isLoading.value"
+        :is-resizable="!viewOnly && !saveDashboardData.isLoading.value" :vertical-compact="true" :autoSize="true"
+        :restore-on-drag="true" :use-css-transforms="false" :margin="[4, 4]">
+        <grid-item class="gridBackground" :class="store.state.theme == 'dark' ? 'dark' : ''" v-for="item in panels"
+          :key="item.id" :x="getPanelLayout(item, 'x')" :y="getPanelLayout(item, 'y')" :w="getPanelLayout(item, 'w')"
+          :h="getPanelLayout(item, 'h')" :i="getPanelLayout(item, 'i')" :minH="getMinimumHeight(item.type)"
+          :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent" drag-allow-from=".drag-allow">
           <div style="height: 100%">
-            <PanelContainer
-              @onDeletePanel="onDeletePanel"
-              @onViewPanel="onViewPanel"
-              :viewOnly="viewOnly"
-              :data="item"
-              :dashboardId="dashboardData.dashboardId"
-              :folderId="folderId"
-              :reportId="reportId"
-              :selectedTimeDate="
-                currentTimeObj[item.id] || currentTimeObj['__global'] || {}
-              "
-              :variablesData="
-                currentVariablesDataRef[item.id] ||
-                currentVariablesDataRef['__global']
-              "
-              :currentVariablesData="variablesData"
-              :width="getPanelLayout(item, 'w')"
-              :height="getPanelLayout(item, 'h')"
-              :forceLoad="forceLoad"
-              :searchType="searchType"
-              @updated:data-zoom="$emit('updated:data-zoom', $event)"
-              @onMovePanel="onMovePanel"
-              @refreshPanelRequest="refreshPanelRequest"
-              @refresh="refreshDashboard"
-              @update:initial-variable-values="updateInitialVariableValues"
-              @onEditLayout="openEditLayout"
-            >
+            <PanelContainer @onDeletePanel="onDeletePanel" @onViewPanel="onViewPanel" :viewOnly="viewOnly" :data="item"
+              :dashboardId="dashboardData.dashboardId" :folderId="folderId" :reportId="reportId" :selectedTimeDate="currentTimeObj[item.id] || currentTimeObj['__global'] || {}
+                " :variablesData="currentVariablesDataRef[item.id] ||
+                  currentVariablesDataRef['__global']
+                  " :currentVariablesData="variablesData" :width="getPanelLayout(item, 'w')"
+              :height="getPanelLayout(item, 'h')" :forceLoad="forceLoad" :searchType="searchType"
+              @updated:data-zoom="$emit('updated:data-zoom', $event)" @onMovePanel="onMovePanel"
+              @refreshPanelRequest="refreshPanelRequest" @refresh="refreshDashboard"
+              @update:initial-variable-values="updateInitialVariableValues" @onEditLayout="openEditLayout">
             </PanelContainer>
           </div>
         </grid-item>
@@ -144,24 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- view panel dialog -->
-    <q-dialog
-      v-model="showViewPanel"
-      :no-route-dismiss="true"
-      full-height
-      full-width
-    >
+    <q-dialog v-model="showViewPanel" :no-route-dismiss="true" full-height full-width>
       <q-card style="overflow: hidden">
-        <ViewPanel
-          :folderId="folderId"
-          :dashboardId="dashboardData.dashboardId"
-          :panelId="viewPanelId"
-          :selectedDateForViewPanel="selectedDateForViewPanel"
-          :initialVariableValues="variablesData"
-          :searchType="searchType"
-          @close-panel="() => (showViewPanel = false)"
+        <ViewPanel :folderId="folderId" :dashboardId="dashboardData.dashboardId" :panelId="viewPanelId"
+          :selectedDateForViewPanel="selectedDateForViewPanel" :initialVariableValues="variablesData"
+          :searchType="searchType" @close-panel="() => (showViewPanel = false)"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-          @update:initial-variable-values="updateInitialVariableValues"
-        />
+          @update:initial-variable-values="updateInitialVariableValues" />
       </q-card>
     </q-dialog>
     <div v-if="!panels.length">
@@ -269,8 +186,8 @@ export default defineComponent({
     const panels: any = computed(() => {
       return selectedTabId.value !== null
         ? (props.dashboardData?.tabs?.find(
-            (it: any) => it.tabId === selectedTabId.value,
-          )?.panels ?? [])
+          (it: any) => it.tabId === selectedTabId.value,
+        )?.panels ?? [])
         : [];
     });
 
@@ -279,8 +196,8 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
-    const refreshDashboard = () => {
-      emit("refresh");
+    const refreshDashboard = (onlyIfRequired = false) => {
+      emit("refresh", onlyIfRequired);
     };
 
     const onMovePanel = (panelId: any, newTabId: any) => {
@@ -459,8 +376,8 @@ export default defineComponent({
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
-              error?.message ??
-              "Dashboard update failed",
+            error?.message ??
+            "Dashboard update failed",
           );
         } else {
           showErrorNotification(error?.message ?? "Dashboard update failed", {
@@ -559,16 +476,22 @@ export default defineComponent({
       showViewPanel.value = false;
 
       // first, refresh the dashboard
-      refreshDashboard();
+      refreshDashboard(true);
 
       // NOTE: after variables in variables feature, it works without changing the initial variable values
       // then, update the initial variable values
       await variablesValueSelectorRef.value.changeInitialVariableValues(
         ...args,
       );
+
+      // set currnet variables ref
+      currentVariablesDataRef.value = {
+        __global: JSON.parse(JSON.stringify(variablesData.value)),
+      }
     };
 
     const refreshPanelRequest = (panelId) => {
+      console.log("refreshPanelRequest received", panelId);
       emit("refreshPanelRequest", panelId);
 
       currentVariablesDataRef.value = {
@@ -688,8 +611,7 @@ export default defineComponent({
   height: 20px;
   top: 0;
   left: 0;
-  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle cx='5' cy='5' r='5' fill='#999999'/></svg>")
-    no-repeat;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle cx='5' cy='5' r='5' fill='#999999'/></svg>") no-repeat;
   background-position: bottom right;
   padding: 0 8px 8px 0;
   background-repeat: no-repeat;

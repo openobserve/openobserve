@@ -70,9 +70,9 @@ export const usePanelDataLoader = (
   reportId: any,
 ) => {
   const log = (...args: any[]) => {
-    // if (true) {
-    //   console.log(panelSchema?.value?.title + ": ", ...args);
-    // }
+    if (true) {
+      console.log(panelSchema?.value?.title + ": ", ...args);
+    }
   };
   let runCount = 0;
 
@@ -312,6 +312,7 @@ export const usePanelDataLoader = (
           resolve(res);
         })
         .catch((error) => {
+          console.error("Error in callWithAbortController:", error);
           reject(error);
         });
     });
@@ -565,6 +566,7 @@ export const usePanelDataLoader = (
         }
       }
     } catch (error) {
+      console.error("Error in loadHistogramData", error);
       // Process API error for "sql"
       processApiError(error, "sql");
       return { result: null, metadata: metadata };
@@ -632,6 +634,7 @@ export const usePanelDataLoader = (
         state.isOperationCancelled = false;
       }
     } catch (error: any) {
+      console.error("Error in handleSearchResponse", error);
       // set loading to false
       state.loading = false;
       state.isOperationCancelled = false;
@@ -803,6 +806,7 @@ export const usePanelDataLoader = (
 
       addRequestId(requestId, traceId);
     } catch (e: any) {
+      console.error(e, "error");
       state.errorDetail = e?.message || e;
       state.loading = false;
       state.isOperationCancelled = false;
@@ -939,6 +943,7 @@ export const usePanelDataLoader = (
               state.errorDetail = "";
               return { result: res.data.data, metadata: metadata };
             } catch (error) {
+              console.error("Error fetching data:", error);
               processApiError(error, "promql");
               return { result: null, metadata: metadata };
             } finally {
@@ -1176,6 +1181,7 @@ export const usePanelDataLoader = (
                   removeTraceId(traceId);
                 }
               } catch (error) {
+                console.error("Error fetching data:", error);
                 // Process API error for "sql"
                 processApiError(error, "sql");
                 return { result: null, metadata: null };
@@ -1254,6 +1260,7 @@ export const usePanelDataLoader = (
         }
       }
     } catch (error: any) {
+      console.error(error, "error");
       if (
         error.name === "AbortError" ||
         error.message === "Aborted waiting for loading"
@@ -1267,9 +1274,27 @@ export const usePanelDataLoader = (
 
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
-    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad?.value],
+    () => [panelSchema?.value],
     async () => {
-      log("PanelSchema/Time Wather: called");
+      log("PanelSchema Wather: called");
+      loadData(); // Loading the data
+    },
+  );
+
+  watch(
+    // Watching for changes in panelSchema, selectedTimeObj and forceLoad
+    () => [selectedTimeObj?.value],
+    async () => {
+      log("selectedTimeObj?.value Wather: called");
+      loadData(); // Loading the data
+    },
+  );
+
+  watch(
+    // Watching for changes in panelSchema, selectedTimeObj and forceLoad
+    () => [ forceLoad?.value],
+    async () => {
+      log("forceLoad?.value Wather: called");
       loadData(); // Loading the data
     },
   );
@@ -1556,7 +1581,7 @@ export const usePanelDataLoader = (
       // if (!panelSchema.value.queries?.length) {
       //   return;
       // }
-      log("Variables Watcher: starting...");
+      log("Variables Watcher: starting...", JSON.stringify(variablesData?.value, null, 2));
 
       const newDependentVariablesData = getDependentVariablesData();
       const newDynamicVariablesData = getDynamicVariablesData();
@@ -1714,6 +1739,8 @@ export const usePanelDataLoader = (
     // STEP 1: Check if there are any dynamic variables that are still loading
     log("Step1: checking if dynamic variables are loading, starting...");
     const newDynamicVariablesData = getDynamicVariablesData();
+
+    log("Step1: newDynamicVariablesData...", JSON.stringify(variablesData?.value, null, 2));
 
     if (areDynamicVariablesStillLoading()) {
       log("Step1: dynamic variables still loading..., returning false");

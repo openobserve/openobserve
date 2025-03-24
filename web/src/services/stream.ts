@@ -80,7 +80,7 @@ const stream = {
     return http().post(url, data);
   },
 
-  fieldValues: ({
+  fieldValues: async ({
     org_identifier,
     stream_name,
     fields,
@@ -104,7 +104,16 @@ const stream = {
     if (type) url += "&type=" + type;
     if (regions) url += "&regions=" + regions;
     if (clusters) url += "&clusters=" + clusters;
-    return http().get(url);
+    try {
+      console.log(`fieldValues url: ${url}`);
+      const response = await http().get(url);
+      console.log(`fieldValues returning: ${response}`, response);
+      return response
+
+    } catch (error) {
+      console.log(`fieldValues error: ${error}`);
+      // throw error;
+    }
   },
 
   // Thia API is just used for service_name and operation_name fields

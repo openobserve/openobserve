@@ -15,159 +15,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    style="width: 100%; height: 100%"
-    @mouseleave="hidePopupsAndOverlays"
-    @mouseenter="showPopupsAndOverlays"
-  >
-    <div
-      ref="chartPanelRef"
-      style="height: 100%; position: relative"
-      :class="chartPanelClass"
-    >
-      <div
-        v-if="!errorDetail"
-        :style="{ height: chartPanelHeight, width: '100%' }"
-      >
-        <MapsRenderer
-          v-if="panelSchema.type == 'maps'"
-          :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
-        ></MapsRenderer>
-        <GeoMapRenderer
-          v-else-if="panelSchema.type == 'geomap'"
-          :data="
-            panelData.chartType == 'geomap'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
-        />
-        <TableRenderer
-          v-else-if="panelSchema.type == 'table'"
-          :data="
-            panelData.chartType == 'table'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
-          :value-mapping="panelSchema?.config?.mappings ?? []"
-          @row-click="onChartClick"
-          ref="tableRendererRef"
-          :wrap-cells="panelSchema.config?.wrap_table_cells"
-        />
-        <div
-          v-else-if="panelSchema.type == 'html'"
-          class="col column"
-          style="width: 100%; height: 100%; flex: 1"
-        >
-          <HTMLRenderer
-            :htmlContent="panelSchema.htmlContent"
-            style="width: 100%; height: 100%"
-            class="col"
-            :variablesData="variablesData"
-          />
+  <div style="width: 100%; height: 100%" @mouseleave="hidePopupsAndOverlays" @mouseenter="showPopupsAndOverlays">
+    <div ref="chartPanelRef" style="height: 100%; position: relative" :class="chartPanelClass">
+      <div v-if="!errorDetail" :style="{ height: chartPanelHeight, width: '100%' }">
+        <MapsRenderer v-if="panelSchema.type == 'maps'"
+          :data="panelData.chartType == 'maps' ? panelData : { options: {} }"></MapsRenderer>
+        <GeoMapRenderer v-else-if="panelSchema.type == 'geomap'" :data="panelData.chartType == 'geomap'
+            ? panelData
+            : { options: { backgroundColor: 'transparent' } }
+          " />
+        <TableRenderer v-else-if="panelSchema.type == 'table'" :data="panelData.chartType == 'table'
+            ? panelData
+            : { options: { backgroundColor: 'transparent' } }
+          " :value-mapping="panelSchema?.config?.mappings ?? []" @row-click="onChartClick" ref="tableRendererRef"
+          :wrap-cells="panelSchema.config?.wrap_table_cells" />
+        <div v-else-if="panelSchema.type == 'html'" class="col column" style="width: 100%; height: 100%; flex: 1">
+          <HTMLRenderer :htmlContent="panelSchema.htmlContent" style="width: 100%; height: 100%" class="col"
+            :variablesData="variablesData" />
         </div>
-        <div
-          v-else-if="panelSchema.type == 'markdown'"
-          class="col column"
-          style="width: 100%; height: 100%; flex: 1"
-        >
-          <MarkdownRenderer
-            :markdownContent="panelSchema.markdownContent"
-            style="width: 100%; height: 100%"
-            class="col"
-            :variablesData="variablesData"
-          />
+        <div v-else-if="panelSchema.type == 'markdown'" class="col column" style="width: 100%; height: 100%; flex: 1">
+          <MarkdownRenderer :markdownContent="panelSchema.markdownContent" style="width: 100%; height: 100%" class="col"
+            :variablesData="variablesData" />
         </div>
 
-        <CustomChartRenderer
-          v-else-if="panelSchema.type == 'custom_chart'"
-          :data="panelData"
-          style="width: 100%; height: 100%"
-          class="col"
-          @error="errorDetail = $event"
-        />
-        <ChartRenderer
-          v-else
-          :data="
-            panelSchema.queryType === 'promql' ||
+        <CustomChartRenderer v-else-if="panelSchema.type == 'custom_chart'" :data="panelData"
+          style="width: 100%; height: 100%" class="col" @error="errorDetail = $event" />
+        <ChartRenderer v-else :data="panelSchema.queryType === 'promql' ||
             (data.length &&
               data[0]?.length &&
               panelData.chartType != 'geomap' &&
               panelData.chartType != 'table' &&
               panelData.chartType != 'maps')
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
-          :height="chartPanelHeight"
-          @updated:data-zoom="onDataZoom"
-          @error="errorDetail = $event"
-          @click="onChartClick"
-        />
+            ? panelData
+            : { options: { backgroundColor: 'transparent' } }
+          " :height="chartPanelHeight" @updated:data-zoom="onDataZoom" @error="errorDetail = $event"
+          @click="onChartClick" />
       </div>
-      <div
-        v-if="
-          !errorDetail &&
-          panelSchema.type != 'geomap' &&
-          panelSchema.type != 'maps'
-        "
-        class="noData"
-        data-test="no-data"
-      >
+      <div v-if="
+        !errorDetail &&
+        panelSchema.type != 'geomap' &&
+        panelSchema.type != 'maps'
+      " class="noData" data-test="no-data">
         {{ noData }}
       </div>
-      <div
-        v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling"
-        class="errorMessage"
-      >
+      <div v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling" class="errorMessage">
         <q-icon size="md" name="warning" />
         <div style="height: 80%; width: 100%">Error Loading Data</div>
       </div>
-      <div
-        v-if="
-          errorDetail &&
-          panelSchema?.error_config?.custom_error_handeling &&
-          !panelSchema?.error_config?.default_data_on_error &&
-          panelSchema?.error_config?.custom_error_message
-        "
-        class="customErrorMessage"
-      >
+      <div v-if="
+        errorDetail &&
+        panelSchema?.error_config?.custom_error_handeling &&
+        !panelSchema?.error_config?.default_data_on_error &&
+        panelSchema?.error_config?.custom_error_message
+      " class="customErrorMessage">
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
-      <div
-        v-if="loading"
-        class="row"
-        style="position: absolute; top: 0px; width: 100%; z-index: 999"
-      >
-        <q-spinner-dots
-          color="primary"
-          size="40px"
-          style="margin: 0 auto; z-index: 999"
-        />
+      <div v-if="loading" class="row" style="position: absolute; top: 0px; width: 100%; z-index: 999">
+        <q-spinner-dots color="primary" size="40px" style="margin: 0 auto; z-index: 999" />
       </div>
-      <div
-        v-if="allowAnnotationsAdd && isCursorOverPanel"
-        style="position: absolute; top: 0px; right: 0px; z-index: 9"
-        @click.stop
-      >
-        <q-btn
-          v-if="
-            [
-              'area',
-              'area-stacked',
-              'bar',
-              'h-bar',
-              'line',
-              'scatter',
-              'stacked',
-              'h-stacked',
-            ].includes(panelSchema.type) && checkIfPanelIsTimeSeries === true
-          "
-          color="primary"
-          :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
-          round
-          outline
-          size="sm"
-          @click="toggleAddAnnotationMode"
-        >
+      <div v-if="allowAnnotationsAdd && isCursorOverPanel" style="position: absolute; top: 0px; right: 0px; z-index: 9"
+        @click.stop>
+        <q-btn v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(panelSchema.type) && checkIfPanelIsTimeSeries === true
+        " color="primary" :icon="isAddAnnotationMode ? 'cancel' : 'edit'" round outline size="sm"
+          @click="toggleAddAnnotationMode">
           <q-tooltip anchor="top middle" self="bottom right">
             {{
               isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
@@ -175,8 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
       </div>
-      <div
-        style="
+      <div style="
           border: 1px solid gray;
           border-radius: 4px;
           padding: 3px;
@@ -186,33 +105,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           display: none;
           text-wrap: nowrap;
           z-index: 9999999;
-        "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        ref="drilldownPopUpRef"
-        @mouseleave="hidePopupsAndOverlays"
-      >
-        <div
-          v-for="(drilldown, index) in drilldownArray"
-          :key="JSON.stringify(drilldown)"
-          class="drilldown-item q-px-sm q-py-xs"
-          style="
+        " :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'" ref="drilldownPopUpRef"
+        @mouseleave="hidePopupsAndOverlays">
+        <div v-for="(drilldown, index) in drilldownArray" :key="JSON.stringify(drilldown)"
+          class="drilldown-item q-px-sm q-py-xs" style="
             display: flex;
             flex-direction: row;
             align-items: center;
             position: relative;
-          "
-        >
-          <div
-            @click="openDrilldown(index)"
-            style="cursor: pointer; display: flex; align-items: center"
-          >
+          ">
+          <div @click="openDrilldown(index)" style="cursor: pointer; display: flex; align-items: center">
             <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
             <span>{{ drilldown.name }}</span>
           </div>
         </div>
       </div>
-      <div
-        style="
+      <div style="
           border: 1px solid gray;
           border-radius: 4px;
           padding: 3px;
@@ -225,33 +133,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           word-wrap: break-word;
           overflow-wrap: break-word;
           z-index: 9999999;
-        "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        ref="annotationPopupRef"
-      >
-        <div
-          class="q-px-sm q-py-xs"
-          style="
+        " :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'" ref="annotationPopupRef">
+        <div class="q-px-sm q-py-xs" style="
             display: flex;
             flex-direction: row;
             align-items: center;
             position: relative;
             word-break: break-word;
-          "
-        >
+          ">
           <span style="word-break: break-word">{{
             selectedAnnotationData.text
           }}</span>
         </div>
       </div>
       <!-- Annotation Dialog -->
-      <AddAnnotation
-        v-if="isAddAnnotationDialogVisible"
-        :dashboardId="dashboardId"
-        :annotation="annotationToAddEdit"
-        @close="closeAddAnnotation"
-        :panelsList="panelsList"
-      />
+      <AddAnnotation v-if="isAddAnnotationDialogVisible" :dashboardId="dashboardId" :annotation="annotationToAddEdit"
+        @close="closeAddAnnotation" :panelsList="panelsList" />
     </div>
   </div>
 </template>
@@ -1051,8 +948,8 @@ export default defineComponent({
     ): string => {
       let whereClause = ast?.where
         ? parser
-            .sqlify({ type: "select", where: ast.where })
-            .slice("SELECT".length)
+          .sqlify({ type: "select", where: ast.where })
+          .slice("SELECT".length)
         : "";
 
       if (breakdownColumn && breakdownValue) {
@@ -1310,8 +1207,8 @@ export default defineComponent({
                   : drilldownParams[0].seriesName,
                 __value: Array.isArray(drilldownParams[0].value)
                   ? drilldownParams[0].value[
-                      drilldownParams[0].value.length - 1
-                    ]
+                  drilldownParams[0].value.length - 1
+                  ]
                   : drilldownParams[0].value,
               };
             }
@@ -1344,8 +1241,8 @@ export default defineComponent({
           const currentUrl =
             pos > -1
               ? window.location.origin +
-                window.location.pathname.slice(0, pos) +
-                "/web"
+              window.location.pathname.slice(0, pos) +
+              "/web"
               : window.location.origin;
 
           const logsUrl = constructLogsUrl(
@@ -1402,8 +1299,8 @@ export default defineComponent({
           "";
         drilldownVariables.query_encoded = b64EncodeUnicode(
           metadata?.value?.queries[0]?.query ??
-            panelSchema?.value?.queries[0]?.query ??
-            "",
+          panelSchema?.value?.queries[0]?.query ??
+          "",
         );
 
         // if chart type is 'table' then we need to pass the table name
@@ -1469,7 +1366,7 @@ export default defineComponent({
               replacePlaceholders(drilldownData.data.url, drilldownVariables),
               drilldownData.targetBlank ? "_blank" : "_self",
             );
-          } catch (error) {}
+          } catch (error) { }
         } else if (drilldownData.type == "logs") {
           try {
             navigateToLogs();
@@ -1537,8 +1434,8 @@ export default defineComponent({
             let currentUrl: any =
               pos > -1
                 ? window.location.origin +
-                  window.location.pathname.slice(0, pos) +
-                  "/web"
+                window.location.pathname.slice(0, pos) +
+                "/web"
                 : window.location.origin;
 
             // always, go to view dashboard page
@@ -1556,7 +1453,7 @@ export default defineComponent({
               if (variable?.name?.trim() && variable?.value?.trim()) {
                 url.searchParams.set(
                   "var-" +
-                    replacePlaceholders(variable.name, drilldownVariables),
+                  replacePlaceholders(variable.name, drilldownVariables),
                   replacePlaceholders(variable.value, drilldownVariables),
                 );
               }
@@ -1566,6 +1463,8 @@ export default defineComponent({
             url.searchParams.set("folder", folderId);
             url.searchParams.set("tab", tabId);
             currentUrl = url.toString();
+
+            console.log("drilldown: currentUrl: ", currentUrl);
 
             window.open(currentUrl, "_blank");
           } else {
@@ -1580,21 +1479,27 @@ export default defineComponent({
               if (variable?.name?.trim() && variable?.value?.trim()) {
                 oldParams[
                   "var-" +
-                    replacePlaceholders(variable.name, drilldownVariables)
+                  replacePlaceholders(variable.name, drilldownVariables)
                 ] = replacePlaceholders(variable.value, drilldownVariables);
               }
             });
 
+
+            const queryParams = {
+              ...oldParams,
+              org_identifier: store.state.selectedOrganization.identifier,
+              dashboard: dashboardData.dashboardId,
+              folder: folderId,
+              tab: tabId,
+            }
+
+            console.log("drilldown: oldParams: ", queryParams);
+
+
             // make changes in router
             await router.push({
               path: "/dashboards/view",
-              query: {
-                ...oldParams,
-                org_identifier: store.state.selectedOrganization.identifier,
-                dashboard: dashboardData.dashboardId,
-                folder: folderId,
-                tab: tabId,
-              },
+              query: queryParams,
             });
 
             // ======= [START] default variable values

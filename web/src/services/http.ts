@@ -39,106 +39,101 @@ const http = ({ headers } = {} as any) => {
       return response;
     },
     function (error) {
+      console.log("axios error", error);
       if (error && error.response && error.response.status) {
-        switch (error.response.status) {
-          case 400:
-            console.log(
-              JSON.stringify(error.response.data["error"] || "Bad Request")
-            );
-            break;
-          case 401:
-            console.log(
-              JSON.stringify(
-                error.response.data["error"] || "Invalid credentials"
-              )
-            );
-            if (
-              config.isCloud == "true" &&
-              !error.request.responseURL.includes("/auth/login")
-            ) {
+        console.log(
+          JSON.stringify(
+            error.response.data["error"] ||
+              "Error occurred while making request"
+          )
+        );
+        segment?.track("Error occurred while making request", {
+          error: error.response.data["error"],
+          status: error.response.status,
+        });
+      } else {
+        console.log(
+          JSON.stringify({ error: "Error occurred while making request" })
+        );
+        segment?.track("Error occurred while making request");
+      }
+      switch (error.response?.status) {
+        case 400:
+          break;
+        case 401:
+          if (
+            config.isCloud == "true" &&
+            !error.request.responseURL.includes("/auth/login")
+          ) {
+            store.dispatch("logout");
+            useLocalCurrentUser("", true);
+            useLocalUserInfo("", true);
+            sessionStorage.clear();
+            window.location.reload();
+          }
+          // Check if the failing request is not the login or refresh token request
+          else if (
+            config.isEnterprise == "true" &&
+            (store.state as any).zoConfig.sso_enabled &&
+            !error.config.url.includes("/config/dex_login") &&
+            !error.config.url.includes("/config/dex_refresh") &&
+            !error.config.url.includes("/auth/login")
+          ) {
+            // Modify the request to include the refresh token
+            return instance
+              .get("/config/dex_refresh", {
+                //headers: { Authorization: `${refreshToken}` },
+              })
+              .then((res) => {
+                if (res.status === 200) {
+                  // Token refreshed successfully, retry the original request
+                  return instance.request(error.config);
+                }
+              })
+              .catch((refreshError) => {
+                instance.get("/config/logout", {}).then((res) => {
+                  store.dispatch("logout");
+                  useLocalCurrentUser("", true);
+                  useLocalUserInfo("", true);
+                  sessionStorage.clear();
+                  window.location.reload();
+                  return Promise.reject(refreshError);
+                });
+              });
+          } else {
+            if (!error.request.responseURL.includes("/login")) {
               store.dispatch("logout");
               useLocalCurrentUser("", true);
               useLocalUserInfo("", true);
               sessionStorage.clear();
               window.location.reload();
             }
-            // Check if the failing request is not the login or refresh token request
-            else if (
-              config.isEnterprise == "true" &&
-              (store.state as any).zoConfig.sso_enabled &&
-              !error.config.url.includes("/config/dex_login") &&
-              !error.config.url.includes("/config/dex_refresh") &&
-              !error.config.url.includes("/auth/login")
-            ) {
-              // Modify the request to include the refresh token
-              return instance
-                .get("/config/dex_refresh", {
-                  //headers: { Authorization: `${refreshToken}` },
-                })
-                .then((res) => {
-                  if (res.status === 200) {
-                    // Token refreshed successfully, retry the original request
-                    return instance.request(error.config);
-                  }
-                })
-                .catch((refreshError) => {
-                  instance.get("/config/logout", {}).then((res) => {
-                    store.dispatch("logout");
-                    useLocalCurrentUser("", true);
-                    useLocalUserInfo("", true);
-                    sessionStorage.clear();
-                    window.location.reload();
-                    return Promise.reject(refreshError);
-                  });
-                });
-            } else {
-              if (!error.request.responseURL.includes("/login")) {
-                store.dispatch("logout");
-                useLocalCurrentUser("", true);
-                useLocalUserInfo("", true);
-                sessionStorage.clear();
-                window.location.reload();
-              }
-            }
-            break;
-          case 403:
-            if (config.isEnterprise == "true" || config.isCloud == "true") {
-              Notify.create({
-                message:
-                  "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.",
-                timeout: 0, // This ensures the notification does not close automatically
-                color: "negative", // Customize color as needed
-                position: "top",
-                actions: [
-                  {
-                    color: "white",
-                    icon: "close",
-                    size: "sm",
-                  },
-                ],
-              });
-            }
-            console.log(
-              JSON.stringify(
-                error.response.data["error"] || "Unauthorized Access"
-              )
-            );
-            break;
-          case 404:
-            console.log(
-              JSON.stringify(error.response.data["error"] || "Not Found")
-            );
-            break;
-          case 500:
-            console.log(
-              JSON.stringify(
-                error.response.data["error"] || "Invalid ServerError"
-              )
-            );
-            break;
-          default:
+          }
+          break;
+        case 403:
+          if (config.isEnterprise == "true" || config.isEnterprise == "true") {
+            Notify.create({
+              message:
+                "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.",
+              timeout: 0, // This ensures the notification does not close automatically
+              color: "negative", // Customize color as needed
+              position: "top",
+              actions: [
+                {
+                  color: "white",
+                  icon: "close",
+                  size: "sm",
+                },
+              ],
+            });
+          }
+          break;
+        case 404:
+          break;
+        case 500:
+          break;
+        default:
           // noop
-        }
       }
       return Promise.reject(error);
     }

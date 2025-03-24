@@ -245,6 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <RenderDashboardCharts
+        :key="currentDashboardData.data?.dashboardId"
         v-if="selectedDate"
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
@@ -584,18 +585,47 @@ export default defineComponent({
                   `;
     };
 
-    const loadDashboard = async () => {
+    const loadDashboard = async (onlyIfRequired = false) => {
+      console.log(
+        `[ViewDashboard] loading dashboard with route.query: ${JSON.stringify(
+          route.query
+        ), onlyIfRequired}`,
+      );
+
+      // check if drilldown or soft-refresh request
+      if(onlyIfRequired) {
+
+        console.log(
+          `[ViewDashboard] current dashboard data: ${JSON.stringify(
+            currentDashboardData.data,
+          )}`,
+        );
+        // if current dashboard id and folder is same,  skip loading
+        if (
+          currentDashboardData?.data?.dashboardId ===
+            route.query.dashboard && 
+            // check for tab
+            selectedTabId.value === route.query.tab
+        ) {
+          console.log(
+            `[ViewDashboard] dashboard data is same, skipping loading dashboard data`)
+          return;
+        }
+      }
+
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
         route.query.folder ?? "default",
       );
+      console.log(`[ViewDashboard] loaded dashboard data:`, currentDashboardData.data);
 
       if (
         !currentDashboardData?.data ||
         typeof currentDashboardData.data !== "object" ||
         !Object.keys(currentDashboardData.data).length
       ) {
+        console.log("[ViewDashboard] dashboard data is empty, going back to dashboard list");
         goBackToDashboardList();
         return;
       }
@@ -604,10 +634,12 @@ export default defineComponent({
       const selectedTab = currentDashboardData?.data?.tabs?.find(
         (tab: any) => tab.tabId === route.query.tab,
       );
+      console.log("[ViewDashboard] selected tab:", selectedTab);
 
       selectedTabId.value = selectedTab
         ? selectedTab.tabId
         : currentDashboardData?.data?.tabs?.[0]?.tabId;
+      console.log("[ViewDashboard] selected tabId:", selectedTabId.value);
 
       // if variables data is null, set it to empty list
       if (
@@ -616,6 +648,7 @@ export default defineComponent({
           currentDashboardData.data?.variables?.list.length
         )
       ) {
+        console.log("[ViewDashboard] variables data is empty, setting to empty list");
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
@@ -623,11 +656,13 @@ export default defineComponent({
       // check if route has time related query params
       // if not, take dashboard default time settings
       if (!((route.query.from && route.query.to) || route.query.period)) {
+        console.log("[ViewDashboard] no route time related query params, taking default from dashboard");
         // if dashboard has relative time settings
         if (
           (currentDashboardData.data?.defaultDatetimeDuration?.type ??
             "relative") === "relative"
         ) {
+          console.log("[ViewDashboard] dashboard has relative time settings");
           selectedDate.value = {
             valueType: "relative",
             relativeTimePeriod:
@@ -636,6 +671,7 @@ export default defineComponent({
           };
         } else {
           // else, dashboard will have absolute time settings
+          console.log("[ViewDashboard] dashboard has absolute time settings");
           selectedDate.value = {
             valueType: "absolute",
             startTime:
@@ -645,6 +681,7 @@ export default defineComponent({
           };
         }
       } else {
+        console.log("[ViewDashboard] taking route time related query params");
         // take route time related query params
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
