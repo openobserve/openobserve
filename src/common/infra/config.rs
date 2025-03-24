@@ -21,6 +21,7 @@ use config::{
         alerts::alert::Alert,
         dashboards::reports,
         destinations::{Destination, Template},
+        folder::Folder,
         function::Transform,
         promql::ClusterLeader,
         stream::StreamParams,
@@ -58,7 +59,9 @@ pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
-pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<Alert>>> = Lazy::new(Default::default);
+pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<String>>> = Lazy::new(Default::default);
+pub static ALERTS: Lazy<RwAHashMap<String, (Folder, Alert)>> = Lazy::new(Default::default);
+// Key for realtime alert triggers cache is org/alert_id
 pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigger>> =
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);

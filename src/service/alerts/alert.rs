@@ -41,7 +41,11 @@ use config::{
     },
 };
 use cron::Schedule;
-use infra::{schema::unwrap_stream_settings, table};
+use infra::{
+    db::{ORM_CLIENT, connect_to_orm},
+    schema::unwrap_stream_settings,
+    table,
+};
 use itertools::Itertools;
 use lettre::{AsyncTransport, Message, message::MultiPart};
 #[cfg(feature = "enterprise")]
@@ -77,6 +81,9 @@ pub enum AlertError {
 
     #[error("Error creating default alerts folder")]
     CreateDefaultFolderError,
+
+    #[error("Alert ID is required")]
+    AlertIdMissing,
 
     #[error("Alert name is required")]
     AlertNameMissing,
@@ -185,7 +192,7 @@ pub async fn save(
 
     // save the alert
     // TODO: Get the folder id
-    match db::alerts::alert::set(org_id, alert.stream_type, stream_name, alert, create).await {
+    match db::alerts::alert::set(org_id, alert, create).await {
         Ok(alert) => {
             if name.is_empty() {
                 set_ownership(
@@ -238,22 +245,24 @@ async fn prepare_alert(
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
-    match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, &alert.name).await {
-        Ok(Some(old_alert)) => {
-            if create {
-                return Err(AlertError::CreateAlreadyExists);
+    if alert.id.is_none() && !create {
+        return Err(AlertError::AlertIdMissing);
+    }
+
+    if let Some(alert_id) = alert.id {
+        match get_by_id_db(org_id, alert_id).await {
+            Ok(old_alert) => {
+                if create {
+                    return Err(AlertError::CreateAlreadyExists);
+                }
+                alert.owner = old_alert.owner;
             }
-            alert.set_last_triggered_at(old_alert.get_last_triggered_at_from_table());
-            alert.set_last_satisfied_at(old_alert.get_last_satisfied_at_from_table());
-            alert.owner = old_alert.owner;
-        }
-        Ok(None) => {
-            if !create {
-                return Err(AlertError::AlertNotFound);
+            Err(AlertError::AlertNotFound) => {
+                if !create {
+                    return Err(AlertError::AlertNotFound);
+                }
             }
-        }
-        Err(e) => {
-            return Err(AlertError::InfraError(e));
+            Err(e) => return Err(e),
         }
     }
 
@@ -592,6 +601,25 @@ pub async fn get_by_id<C: ConnectionTrait>(
     }
 }
 
+pub async fn get_by_id_db(org_id: &str, alert_id: Ksuid) -> Result<Alert, AlertError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some((_f, a)) => Ok(a),
+        None => Err(AlertError::AlertNotFound),
+    }
+}
+
+pub async fn get_folder_alert_by_id_db(
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(Folder, Alert), AlertError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some(f_a) => Ok(f_a),
+        None => Err(AlertError::AlertNotFound),
+    }
+}
+
 pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
@@ -747,7 +775,7 @@ pub async fn enable_by_name(
             }
         };
     alert.enabled = value;
-    db::alerts::alert::set(org_id, stream_type, stream_name, alert, false).await?;
+    db::alerts::alert::set(org_id, alert, false).await?;
     Ok(())
 }
 
