@@ -286,7 +286,7 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
             LogicalPlan::TableScan(scan) => {
                 let schema = scan.source.schema();
                 let timestamp_idx = schema.index_of(TIMESTAMP_COL_NAME)?;
-                let mut projection = scan.projection.clone().unwrap();
+                let mut projection = scan.projection.clone().unwrap_or_default();
                 projection.push(timestamp_idx);
                 let mut table_scan = TableScan::try_new(
                     scan.table_name,
