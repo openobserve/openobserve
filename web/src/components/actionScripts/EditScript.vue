@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               bg-color="input-bg"
               class="showLabelOnTop no-case tw-w-[400px]"
               stack-label
+              map-options
               emit-value
               outlined
               filled
@@ -678,7 +679,7 @@ const actionTypes = [
     value: "scheduled",
   },
   {
-    label: "Service",
+    label: "Real Time",
     value: "service",
   },
 ];
