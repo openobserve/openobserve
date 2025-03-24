@@ -160,7 +160,7 @@ test.describe("Sanity testcases", () => {
       .nth(2)
       .click();
     await page.waitForTimeout(2000);
-    await page.waitForSelector('[data-test="logs-search-result-bar-chart"]');
+    await expect(page.getByRole('heading', { name: 'No data found for histogram.' })).toBeVisible();
   });
 
 
