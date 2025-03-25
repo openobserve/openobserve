@@ -468,5 +468,18 @@ async selectIndexStreamDefault() {
 
 }
 
+async clearAndFillQueryEditor(query) {
+  const editor = this.page.locator('[data-test="logs-search-bar-query-editor"]').getByLabel('Editor content;Press Alt+F1');
+  await editor.fill(''); // Clear the editor
+  await this.page.waitForTimeout(1000); // Optional: adjust or remove as per your needs
+  await editor.fill(query); // Fill with the new query
+}
+
+async waitForSearchResultAndCheckText(expectedText) {
+  const locator = this.page.locator('[data-test="logs-search-search-result"]').getByRole('heading');
+  await locator.waitFor(); // Wait for the element to be visible
+  await expect(locator).toContainText(expectedText);
+}
+
 
 }
