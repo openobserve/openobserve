@@ -207,7 +207,7 @@ impl FromRequest for AuthExtractor {
     #[cfg(feature = "enterprise")]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         use actix_web::web;
-        use config::meta::stream::StreamType;
+        use config::{get_config, meta::stream::StreamType};
         use hashbrown::HashMap;
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
@@ -577,6 +577,26 @@ impl FromRequest for AuthExtractor {
                 path_columns[2]
             )
         };
+
+        // Check if the ws request is using internal grpc token
+        if path.contains("/ws") {
+            if let Some(auth_header) = req.headers().get("Authorization") {
+                if auth_header
+                    .to_str()
+                    .unwrap()
+                    .eq(&get_config().grpc.internal_grpc_token)
+                {
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_header.to_str().unwrap().to_string(),
+                        method: "".to_string(),
+                        o2_type: "".to_string(),
+                        org_id: "".to_string(),
+                        bypass_check: true,
+                        parent_id: "".to_string(),
+                    }));
+                }
+            }
+        }
 
         let auth_str = extract_auth_str(req);
 

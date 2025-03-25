@@ -20,7 +20,6 @@ use std::sync::{
 
 use actix_http::StatusCode;
 use async_trait::async_trait;
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use config::{RwAHashMap, get_config, utils::json};
 use futures_util::{
     SinkExt, StreamExt,
@@ -456,18 +455,11 @@ fn get_default_querier_request(http_url: &str) -> WsResult<tungstenite::http::Re
         .into_client_request()
         .map_err(|e| WsError::ConnectionError(e.to_string()))?;
 
-    let cfg = config::get_config();
-    // TODO: confirm it's okay use root user cred and can always be accepted by querier
-    let credentials = format!(
-        "{}:{}",
-        &cfg.auth.root_user_email, &cfg.auth.root_user_password
-    );
-    let auth_header = format!("Basic {}", BASE64.encode(credentials));
-
     // additional headers to the req
+    let token = get_config().grpc.internal_grpc_token.clone();
     ws_req.headers_mut().insert(
         HeaderName::from_static("authorization"),
-        HeaderValue::from_str(&auth_header).map_err(|e| WsError::ConnectionError(e.to_string()))?,
+        HeaderValue::from_str(&token).map_err(|e| WsError::ConnectionError(e.to_string()))?,
     );
     // Add hearder upgrade websocket
     ws_req.headers_mut().insert(
