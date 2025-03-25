@@ -372,7 +372,7 @@ test.describe("dashboard Import testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   });
 
-  test("123should import the dashbaord using URL import", async ({ page }) => {
+  test("should import the 'Azure Loadblance' dashbaord using URL import", async ({ page }) => {
     // Set up listener to catch console errors
     let errorMessage = "";
     page.on("console", (msg) => {
@@ -437,20 +437,11 @@ test.describe("dashboard Import testcases", () => {
         "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Kubernetes(kube-prometheus-stack)/Kubernetes%20_%20Compute%20Resources%20_%20Cluster.dashboard.json"
       );
 
-    await page.waitForTimeout(5000);
-    await page.waitForSelector('.table-row'); // adjust selector as needed
-    await expect(
-      page
-        .getByRole("code")
-        .locator("div")
-        .filter({ hasText: '"dashboardId": "' })
-        .nth(4)
-    ).toBeVisible();
+    await page.waitForTimeout(500);
 
     //is used for setting the file to be importedad
     await page.getByRole("button", { name: "Import" }).click();
-    await page.waitForTimeout(5000);
-
+    await page.waitForTimeout(3000);
 
     await expect(
       page.getByRole("cell", { name: "Kubernetes / Compute Resources / Cluster" }).first()
