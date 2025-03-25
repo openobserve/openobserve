@@ -599,6 +599,7 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    // TODO: confirm if this has any side effect
     // Check if the ws request is using internal grpc token
     if get_config().websocket.enabled && auth_info.auth.eq(&get_config().grpc.internal_grpc_token) {
         return Ok(req);
