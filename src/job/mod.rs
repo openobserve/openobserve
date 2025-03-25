@@ -32,6 +32,7 @@ mod alert_manager;
 mod cipher;
 mod compactor;
 mod file_downloader;
+mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
@@ -213,6 +214,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { promql::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
     tokio::task::spawn(async move { file_downloader::run().await });
+
+    if LOCAL_NODE.is_compactor() {
+        tokio::task::spawn(async move { file_list_dump::run().await });
+    }
 
     // load metrics disk cache
     tokio::task::spawn(async move { crate::service::promql::search::init().await });

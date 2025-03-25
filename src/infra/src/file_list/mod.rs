@@ -169,6 +169,8 @@ pub trait FileList: Sync + Send + 'static {
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
+    async fn get_entries_in_range(&self, start_time: i64, end_time: i64)
+    -> Result<Vec<FileRecord>>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -458,6 +460,11 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
     CLIENT.clean_done_jobs(before_date).await
 }
 
+#[inline]
+pub async fn get_entries_in_range(start_time: i64, end_time: i64) -> Result<Vec<FileRecord>> {
+    CLIENT.get_entries_in_range(start_time, end_time).await
+}
+
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
         let cfg = config::get_config();
@@ -506,6 +513,8 @@ fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
 pub struct FileRecord {
     #[sqlx(default)]
     pub id: i64,
+    #[sqlx(default)]
+    pub org: String,
     #[sqlx(default)]
     pub stream: String,
     pub date: String,

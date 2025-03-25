@@ -1146,6 +1146,60 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         }
         Ok(job_status)
     }
+
+    async fn get_entries_in_range(
+        &self,
+        time_start: i64,
+        time_end: i64,
+    ) -> Result<Vec<super::FileRecord>> {
+        if time_start == 0 && time_end == 0 {
+            return Ok(Vec::new());
+        }
+
+        let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
+            || time_end - time_start > DAY_MICRO_SECS * 30
+            || !get_config().limit.file_list_multi_thread
+        {
+            vec![(time_start, time_end)]
+        } else {
+            let mut partitions = Vec::new();
+            let mut start = time_start;
+            while start < time_end {
+                let end_of_day = std::cmp::min(end_of_the_day(start), time_end);
+                partitions.push((start, end_of_day));
+                start = end_of_day + 1; // next day, use end_of_day + 1 microsecond
+            }
+            partitions
+        };
+
+        let mut tasks = Vec::with_capacity(day_partitions.len());
+
+        for (time_start, time_end) in day_partitions {
+            tasks.push(tokio::task::spawn(async move {
+                let pool = CLIENT_RO.clone();
+                let query = "SELECT * FROM file_list WHERE  max_ts >= $1 AND min_ts <= $2;";
+                sqlx::query_as::<_, super::FileRecord>(query)
+                    .bind(time_start)
+                    .bind(time_end)
+                    .fetch_all(&pool)
+                    .await
+            }));
+        }
+
+        let mut rets = Vec::new();
+        for task in tasks {
+            match task.await {
+                Ok(Ok(r)) => rets.extend(r.into_iter().filter(|r| !r.deleted)),
+                Ok(Err(e)) => {
+                    return Err(e.into());
+                }
+                Err(e) => {
+                    return Err(Error::Message(e.to_string()));
+                }
+            };
+        }
+        Ok(rets)
+    }
 }
 
 impl SqliteFileList {
