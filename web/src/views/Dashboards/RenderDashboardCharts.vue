@@ -570,11 +570,11 @@ export default defineComponent({
         ...args,
       );
 
-      // Set current variables ref
-      // NOTE: we are using JSON.parse(JSON.stringify()) to create a deep copy of the variables data
-      // This is needed because the variables data is an object and we need to update the reference
-      // to the object every time the initial variable values are updated
-      // This is a workaround for the fact that the vue reactivity system doesn't work with objects
+      // Create a new reference for the variables data to ensure reactivity
+      // This is necessary because:
+      // 1. We need a deep copy to prevent reference sharing between dashboard panels
+      // 2. The __global key is used as a shared state that all panels can fall back to
+      // 3. This ensures that when variables change, all components using this data will be updated
       currentVariablesDataRef.value = {
         __global: JSON.parse(JSON.stringify(variablesData.value)),
       };
