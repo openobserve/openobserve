@@ -137,3 +137,81 @@ async fn run() -> errors::Result<()> {
     log::info!("[INGESTER:MEM] immutable persist is stopped");
     Ok(())
 }
+
+// wal file format:
+// files/{org}/{stype}/{stream}/{thread_id}/{year}/{month}/{day}/{hour}/{schema_key}/{file_name}
+pub fn is_wal_file(local_mode: bool, file: &str) -> bool {
+    // not local mode, directly return false
+    if !local_mode {
+        return false;
+    }
+
+    // local mode, check the file name format
+    let columns = file.split('/').collect::<Vec<_>>();
+    !(columns.len() < 11
+        // thread_id is impossible over 1000
+        || columns[4].len() == 4
+        // schema_key is 16 bytes, and not contains "="
+        || columns[9].len() != 16
+        || columns[9].contains("="))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_wal_file_wal_file() {
+        assert_eq!(
+            is_wal_file(
+                true,
+                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
+            ),
+            true
+        );
+        assert_eq!(
+            is_wal_file(
+                true,
+                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/a=b/file.parquet"
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn test_is_wal_file_storage_file() {
+        assert_eq!(
+            is_wal_file(true, "files/org/stype/stream/2025/03/24/00/file.parquet"),
+            false
+        );
+        assert_eq!(
+            is_wal_file(
+                true,
+                "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn test_is_wal_file_not_local_mode() {
+        assert_eq!(
+            is_wal_file(
+                false,
+                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
+            ),
+            false
+        );
+        assert_eq!(
+            is_wal_file(false, "files/org/stype/stream/2025/03/24/00/file.parquet"),
+            false
+        );
+        assert_eq!(
+            is_wal_file(
+                false,
+                "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
+            ),
+            false
+        );
+    }
+}

@@ -1141,7 +1141,9 @@
     "serviceAccount":"Service Account",
     "search": "Search Action",
     "timezone": "Timezone",
-    "zipFileRequired": "ZIP File is required!"
+    "zipFileRequired": "ZIP File is required!",
+    "zipFile": "ZIP File",
+    "frequency": "Frequency"
   },
   "cipherKey": {
     "header": "Cipher Keys",

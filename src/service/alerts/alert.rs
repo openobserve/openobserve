@@ -18,6 +18,7 @@ use std::{
     str::FromStr,
 };
 
+
 use async_trait::async_trait;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
@@ -41,9 +42,15 @@ use config::{
     },
 };
 use cron::Schedule;
-use infra::{schema::unwrap_stream_settings, table};
+use infra::{
+    db::{ORM_CLIENT, connect_to_orm},
+    schema::unwrap_stream_settings,
+    table,
+};
 use itertools::Itertools;
 use lettre::{AsyncTransport, Message, message::MultiPart};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::actions::meta::{TriggerActionRequest, TriggerSource};
 #[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
@@ -51,6 +58,17 @@ use o2_openfga::{
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
+
+#[cfg(feature = "enterprise")]
+use actix_http::header::HeaderMap;
+#[cfg(feature = "enterprise")]
+use tracing::{Level, span};
+#[cfg(feature = "enterprise")]
+use crate::{
+    common::utils::{
+        http::get_or_create_trace_id,
+    },
+};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
@@ -77,6 +95,9 @@ pub enum AlertError {
 
     #[error("Error creating default alerts folder")]
     CreateDefaultFolderError,
+
+    #[error("Alert ID is required")]
+    AlertIdMissing,
 
     #[error("Alert name is required")]
     AlertNameMissing,
@@ -185,7 +206,7 @@ pub async fn save(
 
     // save the alert
     // TODO: Get the folder id
-    match db::alerts::alert::set(org_id, alert.stream_type, stream_name, alert, create).await {
+    match db::alerts::alert::set(org_id, alert, create).await {
         Ok(alert) => {
             if name.is_empty() {
                 set_ownership(
@@ -238,22 +259,24 @@ async fn prepare_alert(
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
-    match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, &alert.name).await {
-        Ok(Some(old_alert)) => {
-            if create {
-                return Err(AlertError::CreateAlreadyExists);
+    if alert.id.is_none() && !create {
+        return Err(AlertError::AlertIdMissing);
+    }
+
+    if let Some(alert_id) = alert.id {
+        match get_by_id_db(org_id, alert_id).await {
+            Ok(old_alert) => {
+                if create {
+                    return Err(AlertError::CreateAlreadyExists);
+                }
+                alert.owner = old_alert.owner;
             }
-            alert.set_last_triggered_at(old_alert.get_last_triggered_at_from_table());
-            alert.set_last_satisfied_at(old_alert.get_last_satisfied_at_from_table());
-            alert.owner = old_alert.owner;
-        }
-        Ok(None) => {
-            if !create {
-                return Err(AlertError::AlertNotFound);
+            Err(AlertError::AlertNotFound) => {
+                if !create {
+                    return Err(AlertError::AlertNotFound);
+                }
             }
-        }
-        Err(e) => {
-            return Err(AlertError::InfraError(e));
+            Err(e) => return Err(e),
         }
     }
 
@@ -592,6 +615,25 @@ pub async fn get_by_id<C: ConnectionTrait>(
     }
 }
 
+pub async fn get_by_id_db(org_id: &str, alert_id: Ksuid) -> Result<Alert, AlertError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some((_f, a)) => Ok(a),
+        None => Err(AlertError::AlertNotFound),
+    }
+}
+
+pub async fn get_folder_alert_by_id_db(
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(Folder, Alert), AlertError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some(f_a) => Ok(f_a),
+        None => Err(AlertError::AlertNotFound),
+    }
+}
+
 pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
@@ -747,7 +789,7 @@ pub async fn enable_by_name(
             }
         };
     alert.enabled = value;
-    db::alerts::alert::set(org_id, stream_type, stream_name, alert, false).await?;
+    db::alerts::alert::set(org_id, alert, false).await?;
     Ok(())
 }
 
@@ -948,7 +990,38 @@ async fn send_notification(
     }
 }
 
-async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+async fn send_http_notification(
+    endpoint: &Endpoint,
+    msg: String,
+) -> Result<String, anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    let msg = if endpoint.action_id.is_some() {
+        let incoming_msg = serde_json::from_str::<serde_json::Value>(&msg)
+            .map_err(|e| anyhow::anyhow!("Message should be valid JSON for actions: {e}"))?;
+        let inputs = if incoming_msg.is_object() {
+            vec![incoming_msg]
+        } else if incoming_msg.is_array() {
+            incoming_msg.as_array().unwrap().to_vec()
+        } else {
+            return Err(anyhow::anyhow!(
+                "Unsupported message format for actions: {}",
+                msg
+            ));
+        };
+
+        let trace_id = get_or_create_trace_id(&HeaderMap::new(), &span!(Level::TRACE, "action_destinations"));
+
+        let req = TriggerActionRequest {
+            inputs,
+            trigger_source: TriggerSource::Alerts,
+            trace_id,
+        };
+        serde_json::to_string(&req)
+            .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?
+    } else {
+        msg
+    };
+
     let client = if endpoint.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -1352,6 +1425,8 @@ async fn process_dest_template(
         }
     };
 
+    let evaluation_timestamp_millis = evaluation_timestamp / 1000;
+    let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
     let mut resp = tpl
         .replace("{org_name}", &alert.org_id)
         .replace("{stream_type}", alert.stream_type.as_str())
@@ -1375,6 +1450,14 @@ async fn process_dest_template(
         .replace("{alert_end_time}", &alert_end_time_str)
         .replace("{alert_url}", &alert_url)
         .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
+        .replace(
+            "{alert_trigger_time_millis}",
+            &evaluation_timestamp_millis.to_string(),
+        )
+        .replace(
+            "{alert_trigger_time_seconds}",
+            &evaluation_timestamp_seconds.to_string(),
+        )
         .replace("{alert_trigger_time_str}", &evaluation_timestamp_str);
 
     if let Some(contidion) = &alert.query_condition.promql_condition {

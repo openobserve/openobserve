@@ -1043,8 +1043,11 @@ export default defineComponent({
       toBeClonedAlert.value.stream_name = toBeClonestreamName.value;
       toBeClonedAlert.value.stream_type = toBeClonestreamType.value;
       toBeClonedAlert.value.folder_id = activeFolderId.value;
-
       try {
+        //removed id from the alert payload
+        if(toBeClonedAlert.value?.id){
+          delete toBeClonedAlert.value?.id;
+        }
         alertsService
           .create_by_alert_id(
             store.state.selectedOrganization.identifier,
@@ -1259,9 +1262,14 @@ export default defineComponent({
             )
             .then((res: any) => {
               const isEnabled = res.data.enabled;
-              alertsRows.value.forEach((alert) => {
+              alertsList.value.forEach((alert: any) => {
                 alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
               });
+              if(searchAcrossFolders.value && searchQuery.value != ""){
+                store.state.organizationData.allAlertsListByFolderId[row.folder_name.id].forEach((alert: any) => {
+                  alert?.alert_id === row?.alert_id ? (alert.enabled = isEnabled) : null;
+                });
+              }  
               $q.notify({
                 type: "positive",
                 message: isEnabled ? "Alert Resumed Successfully" : "Alert Paused Successfully",
@@ -1304,6 +1312,10 @@ export default defineComponent({
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id)
+
+      if(alertToBeExported.hasOwnProperty('id')){
+        delete alertToBeExported.id;
+      }
 
       // Ensure that the alert exists before proceeding
       if (alertToBeExported) {
@@ -1486,6 +1498,9 @@ const updateActiveFolderId = (newVal: any) => {
         const alertsData = await Promise.all(
           selectedAlerts.map(async (alertId: string) => {
             const alertData = await getAlertById(alertId);
+            if(alertData.hasOwnProperty('id')){
+              delete alertData.id;
+            }
             return alertData;
           })
         );

@@ -77,6 +77,7 @@ impl From<AlertError> for HttpResponse {
             AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
             AlertError::PermissionDenied => MetaHttpResponse::forbidden("Unauthorized access"),
             AlertError::UserNotFound => MetaHttpResponse::forbidden("Unauthorized access"),
+            AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
         }
     }
 }
@@ -187,11 +188,12 @@ pub async fn update_alert(
     req_body: web::Json<UpdateAlertRequestBody>,
     user_email: UserEmail,
 ) -> HttpResponse {
-    let (org_id, _alert_id) = path.into_inner();
+    let (org_id, alert_id) = path.into_inner();
     let req_body = req_body.into_inner();
 
     let mut alert: MetaAlert = req_body.into();
     alert.last_edited_by = Some(user_email.user_id);
+    alert.id = Some(alert_id);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::update(client, &org_id, None, alert).await {
