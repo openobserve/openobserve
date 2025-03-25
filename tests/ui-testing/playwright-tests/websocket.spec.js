@@ -190,4 +190,18 @@ test.describe("Websocket for logs", () => {
 
     });
 
+    test("No Histogram should be displayed if Data is not available", async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexStreamDefault();
+        await logsPage.enableSQLMode();
+        await page.locator('[data-test="logs-search-bar-query-editor"]').getByLabel('Editor content;Press Alt+F1').fill('');
+        await page.waitForTimeout(1000);
+        await page.locator('[data-test="logs-search-bar-query-editor"]').getByLabel('Editor content;Press Alt+F1').fill('SELECT count(_timestamp)  FROM "default" where code = 201');
+        await page.waitForTimeout(1000);
+        await logsPage.selectRunQuery();
+        await expect(page.locator('[data-test="logs-search-search-result"]').getByRole('heading')).toContainText('warning No data found for histogram.');
+        
+    });
+
 });
