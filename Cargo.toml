@@ -110,7 +110,7 @@ jsonwebtoken = "9.3"
 log.workspace = true
 maxminddb = "0.25"
 memchr.workspace = true
-mimalloc = { version = "0.1", default-features = false, optional = true }
+mimalloc = { version = "0.1.43", default-features = false, optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true

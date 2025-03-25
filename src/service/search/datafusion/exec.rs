@@ -92,13 +92,13 @@ pub async fn merge_parquet_files(
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
     metadata: &FileMeta,
-    _is_ingester: bool,
+    is_ingester: bool,
 ) -> Result<(Arc<Schema>, MergeParquetResult)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
     #[cfg(feature = "enterprise")]
-    if stream_type == StreamType::Metrics && !_is_ingester {
+    if stream_type == StreamType::Metrics && !is_ingester {
         let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
         if let Some(rule) = rule {
             return merge_parquet_files_with_downsampling(
@@ -154,7 +154,19 @@ pub async fn merge_parquet_files(
 
     // write result to parquet file
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true);
+    let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
+        Some("none")
+    } else {
+        None
+    };
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        &schema,
+        bloom_filter_fields,
+        metadata,
+        true,
+        compression,
+    );
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     loop {
         match batch_stream.try_next().await {
@@ -226,7 +238,14 @@ pub async fn merge_parquet_files_with_downsampling(
 
     let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
     let mut file_meta = FileMeta::default();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, &metadata, false);
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        &schema,
+        bloom_filter_fields,
+        &metadata,
+        false,
+        None,
+    );
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     loop {
         match batch_stream.try_next().await {
@@ -253,6 +272,7 @@ pub async fn merge_parquet_files_with_downsampling(
                         bloom_filter_fields,
                         &metadata,
                         false,
+                        None,
                     );
                 }
                 if let Err(e) = writer.write(&batch).await {
