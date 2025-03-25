@@ -435,8 +435,15 @@ export default defineComponent({
             },
           );
           actionsScriptRows.value = alerts.value.map((data: any) => {
-            if (data.execution_details_type == "repeat")
+            if (data.execution_details_type === "repeat")
               data.execution_details_type = "Cron Job";
+
+            if (data.execution_details_type === "service")
+              data.execution_details_type = "Real Time";
+
+            if (data.execution_details_type === "once")
+              data.execution_details_type = "Once";
+
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.id,
