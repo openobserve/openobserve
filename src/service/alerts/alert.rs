@@ -1425,6 +1425,8 @@ async fn process_dest_template(
         }
     };
 
+    let evaluation_timestamp_millis = evaluation_timestamp / 1000;
+    let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
     let mut resp = tpl
         .replace("{org_name}", &alert.org_id)
         .replace("{stream_type}", alert.stream_type.as_str())
@@ -1448,6 +1450,14 @@ async fn process_dest_template(
         .replace("{alert_end_time}", &alert_end_time_str)
         .replace("{alert_url}", &alert_url)
         .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
+        .replace(
+            "{alert_trigger_time_millis}",
+            &evaluation_timestamp_millis.to_string(),
+        )
+        .replace(
+            "{alert_trigger_time_seconds}",
+            &evaluation_timestamp_seconds.to_string(),
+        )
         .replace("{alert_trigger_time_str}", &evaluation_timestamp_str);
 
     if let Some(contidion) = &alert.query_condition.promql_condition {
