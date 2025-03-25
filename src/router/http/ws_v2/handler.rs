@@ -283,8 +283,9 @@ impl WsHandler {
                                 log::error!("Error sending message to client: {}", e);
                                 break;
                             }
-                            if matches!(message, WsServerEvents::End {..}) {
+                            if let Some(trace_id) = message.should_clean_trace_id() {
                                 session_manager.update_session_activity(&client_id).await;
+                                session_manager.remove_trace_id(&client_id, &trace_id).await;
                             }
                         }
                         // interruption from handling_incoming thread
@@ -331,7 +332,7 @@ impl WsHandler {
         Ok(response)
     }
 
-    pub async fn remove_querier_connection(&self, querier_name: &QuerierName) {
+    pub async fn remove_querier_connection(&self, querier_name: &str) {
         self.connection_pool
             .remove_querier_connection(querier_name)
             .await;

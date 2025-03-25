@@ -129,7 +129,10 @@ impl QuerierConnection {
     }
 
     pub async fn unregister_request(&self, trace_id: &TraceId) {
-        self.response_router.routes.write().await.remove(trace_id);
+        let mut write_guard = self.response_router.routes.write().await;
+        write_guard.remove(trace_id);
+        write_guard.shrink_to_fit();
+        log::debug!("[WS::Connection] removed trace_id {trace_id} from response_router-routes");
     }
 
     async fn listen_to_querier_response(
@@ -196,11 +199,7 @@ impl QuerierConnection {
                                             }
                                         }
                                     };
-                                    let remove_trace_id = match &svr_event {
-                                        WsServerEvents::End { trace_id } => trace_id.clone(),
-                                        WsServerEvents::Error {trace_id, ..} => trace_id.clone(),
-                                        _ => None,
-                                    };
+                                    let remove_trace_id = svr_event.should_clean_trace_id();
                                     if let Err(e) = self.response_router.route_response(svr_event).await {
                                         // scenario 2 where the trace_id & sender are not cleaned up -> left for clean job
                                         log::error!(

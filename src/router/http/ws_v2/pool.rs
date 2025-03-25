@@ -57,7 +57,7 @@ impl QuerierConnectionPool {
         Ok(conn)
     }
 
-    pub async fn remove_querier_connection(&self, querier_name: &QuerierName) {
+    pub async fn remove_querier_connection(&self, querier_name: &str) {
         if let Some(conn) = self.connections.write().await.remove(querier_name) {
             log::warn!("[WS::ConnectionPool] removing connection to querier {querier_name}");
             conn.disconnect().await;
@@ -81,7 +81,7 @@ impl QuerierConnectionPool {
             // Remove connections that failed to reconnect
             for querier in to_remove {
                 log::warn!(
-                    "[WS::ConnectionPoll] Removing disconnected connection to querier: {}",
+                    "[WS::ConnectionPool] Removing disconnected connection to querier: {}",
                     querier
                 );
                 self.remove_querier_connection(&querier).await;

@@ -65,6 +65,34 @@ impl SessionManager {
         }
     }
 
+    pub async fn remove_trace_id(&self, client_id: &str, trace_id: &str) {
+        let querier_name = {
+            let mut session_write = self.sessions.write().await;
+            session_write
+                .get_mut(client_id)
+                .and_then(|session_info| session_info.querier_mappings.remove(trace_id))
+        };
+
+        if let Some(querier_name) = querier_name {
+            log::debug!(
+                "[WS::Session] removed querier {querier_name} from sessions-session_info-querier_mappings"
+            );
+            let mut mapping_write = self.mapped_queriers.write().await;
+            if let Some(trace_ids) = mapping_write.get_mut(&querier_name) {
+                trace_ids.remove(trace_id);
+                log::debug!(
+                    "[WS::Session] removed trace_id {trace_id} from mapped_queriers-trace_ids"
+                );
+                if trace_ids.is_empty() {
+                    log::debug!(
+                        "[WS::Session] no more trace_id's mapped to querier {querier_name}. removing querier from mapped_queriers"
+                    );
+                    mapping_write.remove(&querier_name);
+                }
+            }
+        }
+    }
+
     pub async fn reached_max_idle_time(&self, client_id: &ClientId) -> bool {
         self.sessions
             .read()
@@ -103,7 +131,7 @@ impl SessionManager {
         }
     }
 
-    pub async fn remove_querier_connection(&self, querier_name: &QuerierName) {
+    pub async fn remove_querier_connection(&self, querier_name: &str) {
         let client_ids = {
             let (mapped_read, sessions_read) =
                 tokio::join!(self.mapped_queriers.read(), self.sessions.read());

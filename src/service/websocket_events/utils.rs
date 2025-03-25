@@ -421,12 +421,24 @@ impl WsServerEvents {
 
     // TODO: what to do when there's no trace_id? @Loaki07
     pub fn get_trace_id(&self) -> String {
-        match &self {
+        match self {
             Self::SearchResponse { trace_id, .. } => trace_id.to_string(),
             #[cfg(feature = "enterprise")]
             Self::CancelResponse { trace_id, .. } => trace_id.to_string(),
             Self::Error { trace_id, .. } => trace_id.clone().unwrap_or_default(),
             Self::End { trace_id } => trace_id.clone().unwrap_or_default(),
+        }
+    }
+
+    pub fn should_clean_trace_id(&self) -> Option<String> {
+        match self {
+            Self::CancelResponse {
+                trace_id,
+                is_success,
+            } if *is_success => Some(trace_id.to_owned()),
+            Self::Error { trace_id, .. } => trace_id.to_owned(),
+            Self::End { trace_id } => trace_id.to_owned(),
+            _ => None,
         }
     }
 }

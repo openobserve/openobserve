@@ -44,7 +44,7 @@ pub async fn get_ws_handler() -> Arc<WsHandler> {
     handler
 }
 
-pub async fn remove_querier_from_handler(querier_name: &String) {
+pub async fn remove_querier_from_handler(querier_name: &str) {
     get_ws_handler()
         .await
         .remove_querier_connection(querier_name)

@@ -780,7 +780,7 @@ pub(crate) async fn check_permissions(
 
     let object_str = auth_info.o2_type;
     let obj_str = if object_str.contains("##user_id##") {
-    object_str.replace("##user_id##", user_id)
+        object_str.replace("##user_id##", user_id)
     } else {
         object_str
     };
