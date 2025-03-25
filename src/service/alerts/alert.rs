@@ -953,8 +953,6 @@ async fn send_notification(
     )
     .await;
 
-    dbg!(&msg);
-
     let email_subject = if let TemplateType::Email { title } = &template.template_type {
         process_dest_template(
             title,
