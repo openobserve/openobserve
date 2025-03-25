@@ -570,11 +570,8 @@ export default defineComponent({
         ...args,
       );
 
-      // Create a new reference for the variables data to ensure reactivity
-      // This is necessary because:
-      // 1. We need a deep copy to prevent reference sharing between dashboard panels
-      // 2. The __global key is used as a shared state that all panels can fall back to
-      // 3. This ensures that when variables change, all components using this data will be updated
+      // This is necessary to ensure that panels refresh automatically based on the drilldown
+      // without requiring the user to click on refresh to load the panel/whole dashboard
       currentVariablesDataRef.value = {
         __global: JSON.parse(JSON.stringify(variablesData.value)),
       };
