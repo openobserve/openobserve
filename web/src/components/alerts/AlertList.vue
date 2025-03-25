@@ -1265,6 +1265,11 @@ export default defineComponent({
               alertsList.value.forEach((alert: any) => {
                 alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
               });
+              if(searchAcrossFolders.value && searchQuery.value != ""){
+                store.state.organizationData.allAlertsListByFolderId[row.folder_name.id].forEach((alert: any) => {
+                  alert?.alert_id === row?.alert_id ? (alert.enabled = isEnabled) : null;
+                });
+              }  
               $q.notify({
                 type: "positive",
                 message: isEnabled ? "Alert Resumed Successfully" : "Alert Paused Successfully",
