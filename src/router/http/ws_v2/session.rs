@@ -15,7 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use config::RwAHashMap;
 
 use super::{
@@ -26,7 +26,7 @@ use super::{
 #[derive(Debug, Default)]
 pub struct SessionManager {
     sessions: RwAHashMap<ClientId, SessionInfo>,
-    mapped_queriers: RwAHashMap<QuerierName, Vec<TraceId>>,
+    mapped_queriers: RwAHashMap<QuerierName, HashSet<TraceId>>,
 }
 
 #[derive(Debug, Clone)]
@@ -34,7 +34,6 @@ pub struct SessionInfo {
     pub querier_mappings: HashMap<TraceId, QuerierName>,
     pub cookie_expiry: Option<DateTime<Utc>>,
     pub last_active: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
 }
 
 impl SessionManager {
@@ -47,12 +46,10 @@ impl SessionManager {
             return;
         }
 
-        let now = Utc::now();
         let session_info = SessionInfo {
             querier_mappings: HashMap::default(),
             cookie_expiry,
-            last_active: now,
-            created_at: now,
+            last_active: Utc::now(),
         };
 
         let mut write_guard = self.sessions.write().await;
@@ -74,9 +71,10 @@ impl SessionManager {
             .await
             .get(client_id)
             .is_none_or(|session_info| {
-                let idle_timeout =
-                    Duration::seconds(config::get_config().websocket.session_idle_timeout_secs);
-                Utc::now().signed_duration_since(session_info.last_active) > idle_timeout
+                Utc::now()
+                    .signed_duration_since(session_info.last_active)
+                    .num_seconds()
+                    > config::get_config().websocket.session_idle_timeout_secs
             })
     }
 
@@ -85,8 +83,12 @@ impl SessionManager {
             let mut mapped_querier_write = self.mapped_queriers.write().await;
 
             for (trace_id, querier_name) in session_info.querier_mappings {
-                if let Some(trace_ids) = mapped_querier_write.get_mut(&querier_name) {
+                if let Some(mut trace_ids) = mapped_querier_write.remove(&querier_name) {
                     trace_ids.retain(|tid| tid != &trace_id);
+                    if !trace_ids.is_empty() {
+                        trace_ids.shrink_to_fit();
+                        mapped_querier_write.insert(querier_name.to_string(), trace_ids);
+                    }
                 }
             }
         }
@@ -118,7 +120,6 @@ impl SessionManager {
             .write()
             .await
             .remove(querier_name)
-            .map(|ids| ids.into_iter().collect::<HashSet<_>>())
             .unwrap(); // existence validated
 
         // Batch update sessions
@@ -139,16 +140,11 @@ impl SessionManager {
         trace_id: &TraceId,
         querier_name: &QuerierName,
     ) -> WsResult<()> {
-        // sessions
-        // let mut write_guard = self.sessions.write().await;
         self.sessions
             .write()
             .await
             .get_mut(client_id)
-            .ok_or(WsError::SessionNotFound(format!(
-                "[WS::SessionManager]: client_id {} not found",
-                client_id
-            )))?
+            .ok_or(WsError::SessionNotFound(format!("client_id {}", client_id)))?
             .querier_mappings
             .insert(trace_id.clone(), querier_name.clone());
 
@@ -157,8 +153,8 @@ impl SessionManager {
             .write()
             .await
             .entry(querier_name.clone())
-            .or_insert_with(Vec::new)
-            .push(trace_id.clone());
+            .or_insert_with(HashSet::new)
+            .insert(trace_id.clone());
         Ok(())
     }
 
@@ -172,10 +168,7 @@ impl SessionManager {
             .read()
             .await
             .get(client_id)
-            .ok_or(WsError::SessionNotFound(format!(
-                "[WS::SessionManager]: client_id {} not found",
-                client_id
-            )))?
+            .ok_or(WsError::SessionNotFound(format!("client_id {}", client_id)))?
             .querier_mappings
             .get(trace_id)
             .cloned())

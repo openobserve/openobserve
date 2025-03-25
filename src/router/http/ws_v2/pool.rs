@@ -15,10 +15,9 @@
 
 use std::sync::Arc;
 
-use config::RwAHashMap;
+use config::{RwAHashMap, get_config};
 
 use super::{
-    config::*,
     connection::{Connection, QuerierConnection},
     error::*,
     handler::QuerierName,
@@ -27,14 +26,12 @@ use super::{
 #[derive(Debug)]
 pub struct QuerierConnectionPool {
     connections: RwAHashMap<QuerierName, Arc<QuerierConnection>>,
-    config: WsConfig,
 }
 
 impl QuerierConnectionPool {
-    pub fn new(config: WsConfig) -> Self {
+    pub fn new() -> Self {
         Self {
             connections: RwAHashMap::default(),
-            config,
         }
     }
 
@@ -68,6 +65,7 @@ impl QuerierConnectionPool {
     }
 
     pub async fn maintain_connections(&self) {
+        let cfg = get_config();
         loop {
             let mut to_remove = Vec::new();
 
@@ -90,14 +88,13 @@ impl QuerierConnectionPool {
             }
 
             tokio::time::sleep(tokio::time::Duration::from_secs(
-                // TODO: need to use another env to set the interval
-                self.config.health_check_config.interval_secs,
+                cfg.websocket.health_check_interval as _,
             ))
             .await;
         }
     }
 
-    pub async fn shutdown(&self) {
+    pub async fn _shutdown(&self) {
         let mut writer_guard = self.connections.write().await;
         for (querier_name, conn) in writer_guard.drain() {
             log::warn!(

@@ -21,7 +21,7 @@ use std::sync::{
 use actix_http::StatusCode;
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
-use config::{RwAHashMap, utils::json};
+use config::{RwAHashMap, get_config, utils::json};
 use futures_util::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
@@ -236,8 +236,10 @@ impl QuerierConnection {
     }
 
     async fn health_check(&self) {
-        // TODO: configurable duration interval
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+        let cfg = get_config();
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+            cfg.websocket.health_check_interval as _,
+        ));
 
         loop {
             interval.tick().await;
@@ -373,10 +375,8 @@ impl Connection for QuerierConnection {
     async fn disconnect(&self) {
         let mut write_guard = self.write.lock().await;
         if let Some(write) = write_guard.as_mut() {
-            // TODO: when closing a websocket connection, is it okay to just close the sink side of
-            // the connection? or we need to send close frame?
-
-            // no need to concern/handle close error since it's being removed
+            let close_frame = tungstenite::protocol::Message::Close(None);
+            let _ = write.send(close_frame).await;
             _ = write.close().await;
             *write_guard = None;
         }
@@ -414,7 +414,11 @@ impl Connection for QuerierConnection {
     }
 
     async fn is_connected(&self) -> bool {
-        self.is_connected.load(Ordering::SeqCst) && self.write.lock().await.is_some()
+        if self.write.lock().await.is_some() {
+            self.is_connected.load(Ordering::SeqCst)
+        } else {
+            false
+        }
     }
 }
 
@@ -446,7 +450,6 @@ fn get_default_querier_request(http_url: &str) -> WsResult<tungstenite::http::Re
     }
 
     // TODO: v2 ws endpoint should be agnostic from `org` and `12345678`
-    // let parsed_url = parsed_url.to_string() + "api/ws/v2";
     let parsed_url = parsed_url.to_string() + "api/default/ws/v2/12345678";
 
     let mut ws_req = parsed_url

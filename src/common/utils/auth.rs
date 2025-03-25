@@ -880,7 +880,7 @@ pub async fn extract_auth_expiry_and_user_id(
         }
     };
 
-    let auth_str = extract_auth_str(&req);
+    let auth_str = extract_auth_str(req);
     if auth_str.is_empty() {
         return (None, None);
     } else if auth_str.starts_with("Basic") {
@@ -889,7 +889,7 @@ pub async fn extract_auth_expiry_and_user_id(
     } else if auth_str.starts_with("Bearer") {
         let user_id = get_user_email_from_auth_str(&auth_str).await;
         let stripped_bearer_token = auth_str.strip_prefix("Bearer ").unwrap();
-        let exp = decode(&stripped_bearer_token).await;
+        let exp = decode(stripped_bearer_token).await;
         return (exp, user_id);
     } else if auth_str.starts_with("session ") {
         let session_key = auth_str.strip_prefix("session ").unwrap();

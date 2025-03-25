@@ -15,6 +15,7 @@
 
 use actix_http::ws::ProtocolError;
 use actix_web::{error::ResponseError, http::StatusCode};
+use actix_ws::CloseReason;
 use serde_json::error::Error as SerdeError;
 use thiserror::Error;
 
@@ -77,13 +78,18 @@ impl ResponseError for WsError {
 pub type WsResult<T> = Result<T, WsError>;
 
 #[derive(Debug)]
+pub enum DisconnectMessage {
+    Error(ErrorMessage),
+    Close(Option<CloseReason>),
+}
+
+#[derive(Debug)]
 pub struct ErrorMessage {
     pub ws_server_events: WsServerEvents,
     pub should_disconnect: bool,
 }
 
 impl ErrorMessage {
-    // TODO: confirm what request_id is?
     pub fn new(ws_error: WsError, trace_id: Option<String>, request_id: Option<String>) -> Self {
         let should_client_retry = ws_error.should_client_retry();
         let should_disconnect = ws_error.should_disconnect();
@@ -117,19 +123,17 @@ impl ErrorMessage {
 impl WsError {
     /// Disconnect the ws conn to client from router
     pub fn should_disconnect(&self) -> bool {
-        match self {
-            WsError::ProtocolError(_) => true,
-            WsError::QuerierNotAvailable(_) => true,
-            // TODO: verify other error types that need to be disconnected
-            _ => false,
-        }
+        matches!(
+            self,
+            WsError::ProtocolError(_) | WsError::QuerierNotAvailable(_)
+        )
     }
 
     pub fn should_client_retry(&self) -> bool {
-        match self {
-            WsError::SerdeError(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            WsError::ConnectionError(_) | WsError::ConnectionDisconnected
+        )
     }
 
     pub fn into_ws_server_events(
@@ -138,10 +142,11 @@ impl WsError {
         request_id: Option<String>,
         should_client_retry: bool,
     ) -> WsServerEvents {
+        let code = self.status_code();
         WsServerEvents::Error {
-            code: self.status_code().as_u16(),
-            message: self.to_string(),
-            error_detail: None,
+            code: code.as_u16(),
+            message: code.to_string(),
+            error_detail: Some(self.to_string()),
             trace_id,
             request_id,
             should_client_retry,

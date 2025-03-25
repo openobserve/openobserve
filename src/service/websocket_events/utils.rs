@@ -340,10 +340,10 @@ impl WsClientEvents {
 
     // Append `user_id` to the ws client events when run in cluster mode to handle stream
     // permissions
+    #[cfg(feature = "enterprise")]
     pub fn append_user_id(&mut self, user_id: Option<String>) {
         match self {
             Self::Search(req) => req.user_id = user_id,
-            #[cfg(feature = "enterprise")]
             Self::Cancel { user_id: uid, .. } => *uid = user_id,
             _ => {}
         }

@@ -15,13 +15,11 @@
 
 use std::sync::Arc;
 
-use config::WsConfig;
 use handler::WsHandler;
 use once_cell::sync::OnceCell;
 use pool::QuerierConnectionPool;
 use session::SessionManager;
 
-mod config;
 mod connection;
 mod error;
 mod handler;
@@ -54,9 +52,8 @@ pub async fn remove_querier_from_handler(querier_name: &String) {
 }
 
 async fn init() -> Arc<WsHandler> {
-    let config = WsConfig::default();
     let session_manager = Arc::new(SessionManager::default());
-    let connection_pool = Arc::new(QuerierConnectionPool::new(config));
+    let connection_pool = Arc::new(QuerierConnectionPool::new());
     let handler = Arc::new(WsHandler::new(session_manager, connection_pool.clone()));
 
     // Start connection maintenance task

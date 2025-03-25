@@ -81,9 +81,9 @@ impl WsHandler {
             .await;
 
         // Setup message channels
-        // TODO: decide the buffer size for the channel
-        let (response_tx, mut response_rx) = tokio::sync::mpsc::channel::<WsServerEvents>(32);
-        let (error_tx, mut error_rx) = tokio::sync::mpsc::channel::<Option<ErrorMessage>>(1);
+        let (response_tx, mut response_rx) = tokio::sync::mpsc::channel::<WsServerEvents>(100);
+        let (disconnect_tx, mut disconnect_rx) =
+            tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
 
@@ -94,10 +94,10 @@ impl WsHandler {
                 loop {
                     tokio::select! {
                         _ = tokio::time::sleep(tokio::time::Duration::from_secs(cfg.websocket.session_idle_timeout_secs as _ )) => {
-                            // check if idle_time not updated by the outgoing thread
+                            // check if last_active time is updated by the outgoing thread
                             if session_manager.reached_max_idle_time(&client_id).await {
                                 log::info!("[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown");
-                                if let Err(e) = error_tx.send(None).await {
+                                if let Err(e) = disconnect_tx.send(None).await {
                                     log::error!(
                                         "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                     );
@@ -113,7 +113,7 @@ impl WsHandler {
                                     );
                                     let err_msg = ErrorMessage::new(e.into(), None, None);
                                     let should_disconnect = err_msg.should_disconnect;
-                                    if let Err(e) = error_tx.send(Some(err_msg)).await {
+                                    if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Error(err_msg))).await {
                                         log::error!(
                                             "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                         );
@@ -122,154 +122,144 @@ impl WsHandler {
                                         break;
                                     }
                                 }
-                                Ok(msg) => {
-                                    match msg {
-                                        actix_ws::Message::Text(text) => {
-                                            match json::from_str::<WsClientEvents>(&text) {
+                                Ok(actix_ws::Message::Text(text)) => {
+                                    match json::from_str::<WsClientEvents>(&text) {
+                                        Err(e) => {
+                                            log::error!(
+                                                "[WS::Router::Handler] received invalid request message: {:?}",
+                                                e
+                                            );
+                                            let trace_id = json::from_str::<json::Value>(&text)
+                                                .ok()
+                                                .and_then(|val| val.get("trace_id").cloned())
+                                                .map(|v| v.to_string());
+                                            let err_msg =
+                                                ErrorMessage::new(e.into(), trace_id, None);
+                                            let should_disconnect = err_msg.should_disconnect;
+                                            if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Error(err_msg))).await {
+                                                log::error!(
+                                                    "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
+                                                );
+                                            }
+                                            if should_disconnect {
+                                                break;
+                                            }
+                                        }
+                                        #[allow(unused_mut)]
+                                        Ok(mut message) => {
+                                            // check if cookie is valid for each client event only
+                                            // for enterprise
+                                            if cfg.websocket.check_cookie_expiry
+                                                && !session_manager
+                                                    .is_client_cookie_valid(&client_id)
+                                                    .await
+                                            {
+                                                log::info!(
+                                                    "[WS::Router::Handler] Client cookie expired. Disconnect..."
+                                                );
+                                                let err_msg = ErrorMessage::new_unauthorized(
+                                                    Some(message.get_trace_id()),
+                                                );
+                                                if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Error(err_msg))).await
+                                                {
+                                                    log::error!(
+                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
+                                                    );
+                                                };
+                                                log::debug!(
+                                                    "[WS::Router::Handler] Stop handle_incoming"
+                                                );
+                                                break;
+                                            }
+                                            // end of cookie check
+
+                                            // Append `user_id` to the ws client events when run in
+                                            // cluster mode to handle stream permissions
+                                            #[cfg(feature = "enterprise")]
+                                            {
+                                                message.append_user_id(user_id.clone());
+                                            }
+
+                                            log::debug!(
+                                                "[WS::Router::Handler] received message: {:?}",
+                                                message
+                                            );
+                                            let trace_id = message.get_trace_id();
+                                            let role_group =
+                                                if let WsClientEvents::Search(req) = &message {
+                                                    Some(RoleGroup::from(req.search_type))
+                                                } else {
+                                                    None
+                                                };
+                                            let querier_conn = match get_querier_connection(
+                                                session_manager.clone(),
+                                                connection_pool.clone(),
+                                                &client_id,
+                                                &trace_id,
+                                                role_group,
+                                            )
+                                            .await
+                                            {
                                                 Err(e) => {
                                                     log::error!(
-                                                        "[WS::Router::Handler] received invalid request message: {:?}",
-                                                        e
+                                                        "[WS::Router::Handler] error getting querier_conn: {e}"
                                                     );
-                                                    let trace_id = json::from_str::<json::Value>(&text)
-                                                        .ok()
-                                                        .and_then(|val| val.get("trace_id").cloned())
-                                                        .map(|v| v.to_string());
-                                                    let err_msg =
-                                                        ErrorMessage::new(e.into(), trace_id, None);
-                                                    let should_disconnect = err_msg.should_disconnect;
-                                                    if let Err(e) = error_tx.send(Some(err_msg)).await {
+                                                    let err_msg = ErrorMessage::new(e, Some(trace_id), None);
+                                                    let should_disconnect =
+                                                        err_msg.should_disconnect;
+                                                    if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Error(err_msg))).await
+                                                    {
                                                         log::error!(
                                                             "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                                         );
                                                     }
                                                     if should_disconnect {
                                                         break;
+                                                    } else {
+                                                        continue;
                                                     }
                                                 }
-                                                #[allow(unused_mut)]
-                                                Ok(mut message) => {
-                                                    // check if cookie is valid for each client event only
-                                                    // for enterprise
-                                                    if cfg.websocket.check_cookie_expiry
-                                                        && !session_manager
-                                                            .is_client_cookie_valid(&client_id)
-                                                            .await
-                                                    {
-                                                        log::info!(
-                                                            "[WS::Router::Handler] Client cookie expired. Disconnect..."
-                                                        );
-                                                        let error_msg = ErrorMessage::new_unauthorized(
-                                                            Some(message.get_trace_id()),
-                                                        );
-                                                        if let Err(e) = error_tx.send(Some(error_msg)).await
-                                                        {
-                                                            log::error!(
-                                                                "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
-                                                            );
-                                                        };
-                                                        log::info!(
-                                                            "[WS::Router::Handler] Stop handle_incoming"
-                                                        );
-                                                        break;
-                                                    }
-                                                    // end of cookie check
+                                                Ok(querier_conn) => querier_conn,
+                                            };
+                                            querier_conn
+                                                .register_request(
+                                                    trace_id.clone(),
+                                                    response_tx.clone(),
+                                                )
+                                                .await;
 
-                                                    // Append `user_id` to the ws client events when run in
-                                                    // cluster mode to handle stream permissions
-                                                    #[cfg(feature = "enterprise")]
-                                                    {
-                                                        message.append_user_id(user_id.clone());
-                                                    }
-
-                                                    log::debug!(
-                                                        "[WS::Router::Handler] received message: {:?}",
-                                                        message
+                                            if let Err(e) = querier_conn.send_message(message).await
+                                            {
+                                                log::error!(
+                                                    "[WS::Router::Handler] error forwarding client message via selected querier connection: {e}"
+                                                );
+                                                let err_msg = ErrorMessage::new(e, Some(trace_id), None);
+                                                let should_disconnect = err_msg.should_disconnect;
+                                                if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Error(err_msg))).await {
+                                                    log::error!(
+                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                                     );
-                                                    let trace_id = message.get_trace_id();
-                                                    let role_group =
-                                                        if let WsClientEvents::Search(req) = &message {
-                                                            Some(RoleGroup::from(req.search_type))
-                                                        } else {
-                                                            None
-                                                        };
-                                                    let querier_conn = match get_querier_connection(
-                                                        session_manager.clone(),
-                                                        connection_pool.clone(),
-                                                        &client_id,
-                                                        &trace_id,
-                                                        role_group,
-                                                    )
-                                                    .await
-                                                    {
-                                                        Err(e) => {
-                                                            log::error!(
-                                                                "[WS::Router::Handler] error getting querier_conn: {e}"
-                                                            );
-                                                            let err_msg =
-                                                                ErrorMessage::new(e, Some(trace_id), None);
-                                                            let should_disconnect =
-                                                                err_msg.should_disconnect;
-                                                            if let Err(e) =
-                                                                error_tx.send(Some(err_msg)).await
-                                                            {
-                                                                log::error!(
-                                                                    "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
-                                                                );
-                                                            }
-                                                            if should_disconnect {
-                                                                break;
-                                                            } else {
-                                                                continue;
-                                                            }
-                                                        }
-                                                        Ok(querier_conn) => querier_conn,
-                                                    };
-                                                    querier_conn
-                                                        .register_request(
-                                                            trace_id.clone(),
-                                                            response_tx.clone(),
-                                                        )
-                                                        .await;
-
-                                                    if let Err(e) = querier_conn.send_message(message).await
-                                                    {
-                                                        log::error!(
-                                                            "[WS::Router::Handler] error forwarding client message via selected querier connection: {e}"
-                                                        );
-                                                        let err_msg =
-                                                            ErrorMessage::new(e, Some(trace_id), None);
-                                                        let should_disconnect = err_msg.should_disconnect;
-                                                        if let Err(e) = error_tx.send(Some(err_msg)).await {
-                                                            log::error!(
-                                                                "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
-                                                            );
-                                                        }
-                                                        if should_disconnect {
-                                                            break;
-                                                        } else {
-                                                            continue;
-                                                        }
-                                                    }
+                                                }
+                                                if should_disconnect {
+                                                    break;
                                                 }
                                             }
                                         }
-                                        actix_ws::Message::Close(_) => {
-                                            log::info!(
-                                                "[WS::Router::Handler] disconnect signal received from client."
-                                            );
-                                            if let Err(e) = error_tx.send(None).await {
-                                                log::error!(
-                                                    "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
-                                                );
-                                            };
-                                            log::info!("[WS::Router::Handler] Stop handle_incoming");
-                                            break;
-                                        }
-                                        // TODO: other message types?
-                                        _ => {}
                                     }
                                 }
+                                Ok(actix_ws::Message::Close(close_reason)) => {
+                                    log::info!(
+                                        "[WS::Router::Handler] disconnect signal received from client."
+                                    );
+                                    if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Close(close_reason))).await {
+                                        log::error!(
+                                            "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
+                                        );
+                                    };
+                                    log::debug!("[WS::Router::Handler] Stop handle_incoming");
+                                    break;
+                                }
+                                Ok(_) => {}
                             }
                         }
                     }
@@ -298,7 +288,7 @@ impl WsHandler {
                             }
                         }
                         // interruption from handling_incoming thread
-                        Some(msg) = error_rx.recv() => {
+                        Some(msg) = disconnect_rx.recv() => {
                             match msg {
                                 None => {
                                     // proper disconnecting
@@ -307,21 +297,23 @@ impl WsHandler {
                                     );
                                     break;
                                 }
-                                Some(err_msg) => {
+                                Some(DisconnectMessage::Error(err_msg)) => {
                                     _ = ws_session.text(err_msg.ws_server_events.to_json()).await;
                                     if err_msg.should_disconnect {
-                                        // TODO: special handling for unauthorized error message
-                                        // shouldn't close directly but wait for all ongoing requests to finish
-                                        if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Normal))).await {
-                                            log::error!("Error closing websocket session: {}", e);
-                                        };
-                                        return Ok(());
+                                        break;
                                     }
+                                }
+                                Some(DisconnectMessage::Close(close_reason)) => {
+                                    if let Err(e) = ws_session.close(close_reason).await {
+                                        log::error!("[WS::Handler]: Error closing websocket session: {}", e);
+                                    };
+                                    return Ok(());
                                 }
                             }
                         }
                     }
                 }
+
                 _ = ws_session
                     .close(Some(CloseReason::from(CloseCode::Normal)))
                     .await;
@@ -350,7 +342,7 @@ impl WsHandler {
 
     pub async fn _shutdown(&self) {
         // just need to disconnect all the ws_conns in connection_pool
-        self.connection_pool.shutdown().await;
+        self.connection_pool._shutdown().await;
     }
 }
 
@@ -361,11 +353,8 @@ pub async fn get_querier_connection(
     trace_id: &TraceId,
     role_group: Option<RoleGroup>,
 ) -> WsResult<Arc<QuerierConnection>> {
-    // TODO: better handle of this retries?
     // Retry max of 3 times to get a valid querier connection
-    let max_retries = 1;
-    let mut retries = 0;
-    loop {
+    for _ in 0..3 {
         // Get or assign querier for this trace_id included in message
         let querier_name = match session_manager
             .get_querier_for_trace(client_id, trace_id)
@@ -373,7 +362,6 @@ pub async fn get_querier_connection(
         {
             Some(querier_name) => querier_name,
             None => {
-                // loop exited directly when this function fails
                 let querier_name = select_querier(trace_id, role_group).await?;
                 session_manager
                     .set_querier_for_trace(client_id, trace_id, &querier_name)
@@ -392,37 +380,24 @@ pub async fn get_querier_connection(
                 session_manager
                     .remove_querier_connection(&querier_name)
                     .await;
-                retries += 1;
-                if retries >= max_retries {
-                    return Err(WsError::QuerierNotAvailable(format!(
-                        "No querier connection available after {} retries",
-                        max_retries
-                    )));
-                }
             }
         }
     }
+
+    Err(WsError::QuerierNotAvailable(
+        "Reached maximum retries of 3".to_string(),
+    ))
 }
 
-// TODO: potentially where load balancing can be applied to select least busy querier
 async fn select_querier(trace_id: &str, role_group: Option<RoleGroup>) -> WsResult<QuerierName> {
     use crate::common::infra::cluster;
 
-    // use consistent hashing to select querier
-    // CONFIRM: map all messages with the same trace_id to the same querier
-    // CONFIRM: is it too expensive to call for every single request?
-    // CONFIRM: can multiple queriers have the same node?
     let node = cluster::get_node_from_consistent_hash(
         trace_id,
         &config::meta::cluster::Role::Querier,
         role_group,
     )
     .await
-    .ok_or_else(|| {
-        WsError::QuerierNotAvailable(format!(
-            "No querier node returned from consistent hash for trace_id {}",
-            trace_id
-        ))
-    })?;
+    .ok_or_else(|| WsError::QuerierNotAvailable(format!("for trace_id {}", trace_id)))?;
     Ok(node)
 }
