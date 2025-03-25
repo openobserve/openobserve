@@ -95,19 +95,19 @@ pub async fn save_enrichment_data(
     }
 
     let stats = stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables);
-    let max_enrichment_table_size = cfg.limit.max_enrichment_table_size;
+    let enrichment_table_max_size = cfg.limit.enrichment_table_max_size;
     log::info!(
         "enrichment table [{stream_name}] saving stats: {:?} vs max_table_size {}",
         stats,
-        max_enrichment_table_size
+        enrichment_table_max_size
     );
-    if (stats.storage_size / SIZE_IN_MB) > max_enrichment_table_size as f64 {
+    if (stats.storage_size / SIZE_IN_MB) > enrichment_table_max_size as f64 {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 format!(
                     "enrichment table [{stream_name}] storage size {} exceeds max storage size {}",
-                    stats.storage_size, max_enrichment_table_size
+                    stats.storage_size, enrichment_table_max_size
                 ),
             )),
         );
