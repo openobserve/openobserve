@@ -105,11 +105,10 @@ async fn validate_ratelimit_updater(
             }
 
             let compare_threshold = org_level_thresholds
-                .get(&(api_group_name.to_string(), operation))
-                .unwrap();
-            if *compare_threshold < *threshold {
+                .get(&(api_group_name.to_string(), operation));
+            if compare_threshold.is_some() && *compare_threshold.unwrap() < *threshold {
                 return Err(anyhow::anyhow!(
-                    "{}:{} threshold must be lower than or equal to {}, got {}",
+                    "{}:{} threshold must be lower than or equal to {:?}, got {}",
                     api_group_name,
                     operation.as_str(),
                     compare_threshold,
