@@ -16,38 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-      <q-page class="q-px-sm quota-page text-left"
+      <q-page class=" quota-page text-left"
         :class="store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'"
        style="min-height: inherit">
         <div :style="{ height: '100%', marginTop: 0 }" class="app-table-container" >
-            <q-table
-            :rows="apiLimitsRows"
-            :columns="generateColumns()"
-            row-key="name"
-            :pagination="pagination"
-            :filter="searchQuery"
-            :filter-method="filteredData"
-            v-if="activeTab == 'api-limits'"
-            dense
-
-        >
-        <template v-slot:header="props">
-        <q-tr :props="props" class="thead-sticky">
-          <q-th
-            v-for="col in props.cols"
-            :key="col.name"
-            :props="props"
-            :style="col.style"
-          >
-            {{ col.label }}
-          </q-th>
-        </q-tr>
-      </template>
-        <template #no-data></template>
-
-            <template #top="scope">
+            <div class="q-mx-md">
                 <div
-                    class="q-table__title full-width"
+                    class="q-table__title full-width "
                     data-test="user-title-text"
                 >
                     {{ t("quota.header") }}
@@ -62,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :popup-content-style="{ textTransform: 'lowercase' }"
                     color="input-border"
                     bg-color="input-bg"
-                    class="q-py-sm no-case q-mr-md input-width"
+                    class="q-py-sm no-case q-mr-md input-width org-select"
                     stack-label
                     outlined
                     filled
@@ -78,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="quota-tabs">
                         <q-tabs
                         data-test="quota-tabs"
-                        v-model="activeTab"
+                        :model-value="activeTab"
                         no-caps
                         outside-arrows
                         size="sm"
@@ -99,21 +74,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-tabs>
                     </div>
                     </div>
-                    <div class="flex items-center" v-if="selectedOrganization">
+                    <div  class="flex items-center" v-if="selectedOrganization">
+                     <!-- this is bulk update and it is deprecated feature not needed -->
+
                         <q-btn
                             data-test="bulk-update-btn"
                             label="Bulk Update"
                             class="border q-ml-md title-height"
                             no-caps
                             @click="bulkUpdate"
+                            v-if="false"
                         >
                         <q-icon name="cached" style="font-weight: 200; opacity: 0.7;"  class="q-ml-sm"/>
                     </q-btn>
+
+                       
+
+                    <!-- this is edit quota and it is needed -->
                         <q-btn
                         v-if="!editTable"
                             data-test="edit-table-btn"
-                            label="Edit Table"
-                            class="border q-ml-md title-height"
+                            label="Edit Quota"
+                            class="border q-mr-md title-height"
                             no-caps
 
                             @click="editTableWithInput"
@@ -121,16 +103,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-icon name="edit" style="font-weight: 200; opacity: 0.7;"  class="q-ml-sm"/>
                     </q-btn>
 
+
                     </div>
+
                 </div>
-                <div v-if="selectedOrganization" class="flex items-center justify-between full-width ">
+                <div class="flex items-center justify-between full-width q-mb-sm">
+                <div v-if="selectedOrganization && activeType == 'table'" class="flex items-center ">
                     <q-input
                         data-test="pipeline-list-search-input"
                         v-model="searchQuery"
                         borderless
                         filled
                         dense
-                        class=" q-mb-xs no-border input-width"
+                        class=" no-border input-width"
                         :placeholder="{
                             'api-limits': t('quota.api-search'),
                             'role-limits': t('quota.role-search')
@@ -140,18 +125,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-icon name="search" class="cursor-pointer" />
                         </template>
                     </q-input>
-                    <div v-if="selectedOrganization">
-                        <q-table-pagination
-                            :scope="scope"
-                            :position="'top'"
-                            :resultTotal="resultTotal"
-                            :perPageOptions="perPageOptions"
-                            @update:changeRecordPerPage="changePagination"
+                    <q-select
+                        v-if="activeTab == 'role-limits'"
+                        :loading="isRoleModulesLoading"
+                        v-model="selectedRole"
+                        :options="rolesToBeDisplayed"
+                        placeholder="Select Api Category"
+                        color="input-border"
+                        style="padding: 0px;"
+                        bg-color="input-bg"
+                        class=" no-case q-mr-md input-width q-ml-md category-select"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input                    
+                        clearable
+                        @update:model-value="updateSelectedRole()"
+                  >
+                    </q-select>
+                 </div>
+                 <div class="quota-tabs float-right q-ml-auto">
+                        <q-tabs
+                        data-test="table-json-type-selection-tabs"
+                        :model-value="activeType"
+                        no-caps
+                        outside-arrows
+                        size="sm"
+                        mobile-arrows
+                        class="bg-white text-primary"
+                        @update:model-value="updateActiveType"
+                        >
+                        <q-tab
+                        data-test="table-json-type-selection-tab"
+                        name="table"
+                        :label="t('quota.table')"
                         />
+                        <q-tab
+                        data-test="table-json-type-selection-tab"
+                        name="json"
+                        :label="t('quota.json')"
+                        />
+                    </q-tabs>
                     </div>
                 </div>
-                
-            </template>
+            </div>
+
+            <q-table
+            :rows="apiLimitsRows"
+            :columns="generateColumns()"
+            row-key="name"
+            :pagination="pagination"
+            :filter="searchQuery"
+            :filter-method="filteredData"
+            v-if="activeTab == 'api-limits' && activeType == 'table'"
+            dense
+        >
+        <template v-slot:header="props">
+            <q-tr  :props="props" class="thead-sticky ">
+            <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :style="col.style"
+            >
+                {{ col.label }}
+            </q-th>
+            </q-tr>
+        </template>
+        <template #no-data></template>
 
             <template #bottom="scope">
                 <q-table-pagination
@@ -164,53 +208,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template v-slot:body-cell="props">
-            <q-td :props="props" 
-                  v-if="editTable" 
-                  :class="{
-                      'editable-cell': editTable && props.col.name !== 'module_name',
-                      'edited-cell': isEdited(props.row.module_name, props.col.name)
-                  }">
-                    <q-input
-                        v-if="props.row[props.col.name] != '-' && props.col.name != 'module_name'"
-                        :model-value="changedValues[props.row.module_name]?.[props.col.name]?.threshold ?? props.row[props.col.name].threshold"
-                        @update:model-value="(val) => handleInputChange(props.row.module_name , props.row[props.col.name], props.col.name, val)"
-                        :class="{
-                        'edited-input': isEdited(props.row.module_name, props.col.name),
-                        'focused-input': focusedInputId === generateUniqueId(props.row[props.col.name])
-                        }"
-                        input-class="text-center"
-                        class="title-height full-width cursor-text editable-input"
-                        type="number"
-                        dense
-                        stack-label
-                        borderless
-                        hide-bottom-space
-                        :min="0"
-                        :rules="[
-                            val => val >= 0 || 'Value must be greater than or equal to 0'
-                        ]"
-                        @focus="onFocus(props.row[props.col.name])"
-                        @blur="onBlur"
-                    />
-                <q-input
-                v-else-if="props.row[ props.col.name ] == '-' && props.col.name != 'module_name' "
-                v-model="props.row[ props.col.name ]"
-                input-class="text-center"
-                type="text"
-                :disable="true"
-                flat
-                dense
-                borderless
-                />
-
-                <div v-else>
-                    
+            <q-td  :props="props" v-if="editTable" 
+             >
+                <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'" contenteditable="true"
+                debounce="500"
+                :class="{
+                    'editable-cell': editTable && props.col.name !== 'module_name',
+                    'edited-input': isEdited(props.row.module_name, props.col.name)
+                }"
+                @input="(event: any) => handleInputChange(props.row.module_name , props.row[props.col.name], props.col.name, event.target.innerText)"
+                 @keypress="restrictToNumbers"
+                @paste="preventNonNumericPaste"
+                >
+                    {{ changedValues[props.row.module_name]?.[props.col.name] ?? props.row[props.col.name]}}
+                </div>
+                    <div v-else-if="props.col.name == 'module_name'"> 
                     {{ props.row[ props.col.name ] }}
                 </div>
+                <div
+                 :disabled="true" v-else-if="props.row[props.col.name] == '-'">
+                   -
+                </div>
             </q-td>
-            <q-td :props="props" v-else>
+            <q-td  :props="props" v-else>
                 <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'">
-                    {{ props.row[ props.col.name ].threshold }}
+                    {{ props.row[ props.col.name ] }}
                 </div>
                     <div v-else-if="props.col.name == 'module_name'"> 
                     {{ props.row[ props.col.name ] }}
@@ -220,18 +242,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
             </q-td>
             </template>
-
         </q-table>
+        <div class="q-mt-md" v-if="activeTab == 'api-limits'  && activeType == 'json'" style="height: calc(100vh - 190px); ">
+           <!-- here add the queryeditor -->
+           <query-editor
+                data-test="json-view-roles-editor"
+                ref="queryEditorRef"
+                editor-id="json-view-roles-editor"
+                class="monaco-editor"
+                :debounceTime="300"
+                v-model:query="jsonStrToDisplay"
+                language="json"
+                style="height: 100%;"
+                :read-only="!editTable"
+              />
+        </div>
         <q-table
-          :rows="rolesRows"
+          :rows="rolesLimitRows"
           :columns="roleLimitsColumns"
           row-key="name"
           :pagination="pagination"
           :filter="searchQuery"
           :filter-method="filteredData"
           dense
-          v-if="activeTab == 'role-limits'"
-
+          v-if="activeTab == 'role-limits' && activeType == 'table'"
       >
       <template v-slot:header="props">
       <q-tr :props="props" class="thead-sticky">
@@ -246,114 +280,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tr>
     </template>
       <template #no-data></template>
-
-          <template #top="scope">
-              <div
-                  class="q-table__title full-width"
-                  data-test="user-title-text"
-              >
-                  {{ t("quota.header") }}
-              </div>
-              <div class="flex items-center justify-between full-width q-mb-sm">
-                  <div class="flex items-center ">
-                  <q-select
-                  :loading="isOrgLoading"
-                  v-model="selectedOrganization"
-                  :options="organizations"
-                  placeholder="Select Org"
-                  :popup-content-style="{ textTransform: 'lowercase' }"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="q-py-sm no-case q-mr-md input-width"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  use-input
-                  hide-selected
-                  fill-input                    
-                  @update:model-value="updateOrganization()"
-                  :rules="[(val: any) => !!val || 'Field is required!']"
-                 
-                >
-                  </q-select>
-                  <div class="quota-tabs">
-                      <q-tabs
-                      data-test="quota-tabs"
-                      v-model="activeTab"
-                      no-caps
-                      outside-arrows
-                      size="sm"
-                      mobile-arrows
-                      class="bg-white text-primary"
-                      @update:model-value="updateActiveTab"
-                       >
-                      <q-tab
-                      data-test="quota-api-limit-tab"
-                      name="api-limits"
-                      :label="t('quota.api-limits')"
-                      />
-                      <q-tab
-                      data-test="quota-role-limit-tab"
-                      name="role-limits"
-                      :label="t('quota.role-limits')"
-                      />
-                  </q-tabs>
-                  </div>
-                  </div>
-                  <div class="flex items-center" v-if="selectedOrganization">
-                      <q-btn
-                          data-test="bulk-update-btn"
-                          label="Bulk Update"
-                          class="border q-ml-md title-height"
-                          no-caps
-                          @click="bulkUpdate"
-                      >
-                      <q-icon name="cached" style="font-weight: 200; opacity: 0.7;"  class="q-ml-sm"/>
-                  </q-btn>
-                      <q-btn
-                      v-if="!editTable"
-                          data-test="edit-table-btn"
-                          label="Edit Table"
-                          class="border q-ml-md title-height"
-                          no-caps
-
-                          @click="editTableWithInput"
-                      >
-                      <q-icon name="edit" style="font-weight: 200; opacity: 0.7;"  class="q-ml-sm"/>
-                  </q-btn>
-
-                  </div>
-              </div>
-              <div v-if="selectedOrganization" class="flex items-center justify-between full-width ">
-                  <q-input
-                      data-test="pipeline-list-search-input"
-                      v-model="searchQuery"
-                      borderless
-                      filled
-                      dense
-                      class=" q-mb-xs no-border input-width"
-                      :placeholder="{
-                          'api-limits': t('quota.api-search'),
-                          'role-limits': t('quota.role-search')
-                      }[activeTab]"
-                  >
-                      <template #prepend>
-                      <q-icon name="search" class="cursor-pointer" />
-                      </template>
-                  </q-input>
-                  <div v-if="selectedOrganization">
-                      <q-table-pagination
-                          :scope="scope"
-                          :position="'top'"
-                          :resultTotal="resultTotal"
-                          :perPageOptions="perPageOptions"
-                          @update:changeRecordPerPage="changePagination"
-                      />
-                  </div>
-              </div>
-              
-          </template>
 
           <template #bottom="scope">
               <q-table-pagination
@@ -392,10 +318,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           
       </q-td>
       </q-tr>
-      <q-tr v-if="!editTable && !roleLevelLoading" v-for="(row,index) in roleLevelModuleRows" data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.uuid" :props="props" >
-          <q-td v-for="col in props.cols" :key="col.name" :props="props" style="padding-left:50px;">
+      <q-tr v-if="!editTable && !roleLevelLoading" v-for="(row,index) in filteredRoleLevelModuleRows" data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.uuid" :props="props" >
+          <q-td v-for="col in props.cols" :key="col.name" :props="props">
            <template v-if="col.name == 'role_name'">
-            {{ row['module_name'] }}
+            <div style="padding-left: 20px;">
+                {{ row['module_name'] }}
+            </div>
            </template>
            <template v-else-if="col.name == '#'"> 
             {{}}
@@ -404,69 +332,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             -
         </template>
            <template v-else> 
-            {{ row[col.name]?.threshold }}
+            {{ row[col.name] }}
            </template>
 
           </q-td>
      </q-tr>
-     <q-tr v-if="editTable && !roleLevelLoading" v-for="(row,index) in roleLevelModuleRows" data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.uuid" :props="props" >
+     <q-tr v-if="editTable && !roleLevelLoading" v-for="(row,index) in filteredRoleLevelModuleRows" data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.uuid" :props="props" >
             <q-td :props="props" 
-                 v-for="col in props.cols" :key="col.name"  style="padding-left:50px;"
-                  v-if="editTable" 
-                  :class="{
-                      'editable-cell': editTable && col.name !== 'role_name',
-                      'edited-cell': isEdited(row.module_name, col.name)
-                  }">
-
-                    <q-input
-                        v-if="row[col.name] != '-' && col.name != 'role_name'"
-                        :model-value="changedValues[row.module_name]?.[col.name]?.threshold ?? row[col.name]?.threshold"
-                        @update:model-value="(val) => handleRoleInputChange( props.row.role_name, row.module_name , row[col.name], col.name, val)"
-                        :class="{
-                        'edited-input': isEdited(row.module_name, col.name),
-                        'focused-input': focusedInputId === generateUniqueId(row[col.name])
-                        }"
-                        input-class="text-center"
-                        class="title-height full-width cursor-text editable-input"
-                        type="number"
-                        dense
-                        stack-label
-                        borderless
-                        hide-bottom-space
-                        :min="0"
-                        :rules="[
-                            val => val >= 0 || 'Value must be greater than or equal to 0'
-                        ]"
-                        @focus="onFocus(row[col.name])"
-                        @blur="onBlur"
-                    />
-                    <q-input
-                    v-else-if="row[col.name] == '-' && col.name != 'role_name'"
-                    v-model="row[col.name]"
-                    input-class="text-center"
-                    type="text"
-                    :disable="true"
-                    flat
-                    dense
-                    borderless
-                    />
-                    <div v-else-if="col.name == 'role_name'">
+                 v-for="col in props.cols" :key="col.name" 
+                  v-if="editTable"
+                  style="padding-left: 8px ;">
+                   <template v-if="col.name == 'role_name'">
+                    <div style="padding-left: 20px;">
                         {{ row['module_name'] }}
                     </div>
+                </template>
+                <template v-else-if="col.name == '#'"> 
+                    {{}}
+                </template>
+                <template v-else-if="row[col.name] == '-'">
+                    -
+                </template>
+                <template v-else> 
+                    <div
+                    contenteditable="true"
+                    debounce="500"
+                    :class="{
+                        'editable-cell': editTable && col.name !== 'module_name',
+                        'edited-input': isEdited(row.module_name, col.name)
+                    }"
+                    @input="(event: any) => handleRoleInputChange(props.row.role_name , row.module_name , row[col.name], col.name, event.target.innerText)"
+                    @keypress="restrictToNumbers"
+                    @paste="preventNonNumericPaste"
+                    >
+                    {{ row[col.name] }}
+                    </div>
+                 
+                </template>
             </q-td>
      </q-tr>
 
     </template>
 
       </q-table>
-        <div v-if="loading && !rolesRows.length" class="flex justify-center items-center">
+      <div class="q-mt-md" v-if="activeTab == 'role-limits' && activeType == 'json'" style="height: calc(100vh - 140px);">
+           <!-- here add the queryeditor -->
+           <query-editor
+                data-test="json-view-roles-editor"
+                ref="queryEditorRef"
+                editor-id="json-view-roles-editor"
+                class="monaco-editor"
+                :debounceTime="300"
+                v-model:query="jsonStrToDisplay"
+                language="json"
+                style="height: 100%;"
+                :read-only="!editTable"
+              />
+        </div>
+        <div v-if=" activeTab == 'api-limits' && loading && !apiLimitsRows.length" class="flex justify-center items-center">
             <q-spinner-hourglass color="primary" size="lg" />
         </div>
-        <div v-else-if="!loading && !rolesRows.length">
+        <div v-else-if=" activeTab == 'api-limits' && !loading && !apiLimitsRows.length">
+
+            <NoOrganizationSelected />
+        </div>
+        <div v-if=" activeTab == 'role-limits' && loading && !rolesLimitRows.length" class="flex justify-center items-center">  
+            <q-spinner-hourglass color="primary" size="lg" />
+        </div>
+        <div v-else-if=" activeTab == 'role-limits' && !loading && !rolesLimitRows.length">
             <NoOrganizationSelected />
         </div>
         <div class="flex justify-end w-full tw-ml-auto floating-buttons  q-pr-md"
-            v-if="editTable"
+            v-if="editTable && activeType == 'table'"
             >
             <q-btn
             label="Cancel"
@@ -477,13 +414,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
             label="Save Changes"
             class="text-bold no-border q-ml-md"
-                :color="Object.keys(changedValues).length > 0 ? 'secondary' : 'grey'"
-                :disable="Object.keys(changedValues).length === 0"
+                :color="(Object.keys(changedValues).length > 0) ? 'secondary' : 'grey'"
+                :disable="(Object.keys(changedValues).length === 0) "
                 padding="sm md"
                 no-caps
             @click="saveChanges"
             />
         </div>
+        <div class="flex justify-end w-full tw-ml-auto floating-buttons  q-pr-md"
+            v-if="editTable && activeType == 'json'"
+            >
+            <q-btn
+            label="Cancel"
+            class="border q-ml-md title-height"
+            no-caps
+            @click="cancelJsonChanges"
+            />
+            <q-btn
+            label="Save Changes"
+            class="text-bold no-border q-ml-md"
+                color="secondary"
+                padding="sm md"
+                no-caps
+            @click="saveJsonChanges"
+            />
+        </div>
+        
 
         <q-dialog v-model="isBulkUpdate">   
             <q-card style="height: 394px !important; width: 500px;"> 
@@ -555,6 +511,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-dialog>
         </div>
 
+        <ConfirmDialog
+            title="UnSaved Changes Detected"
+            message="save changes before switching tabs"
+            @update:ok="saveChangesAndTabSwitch"
+            @update:cancel="discardChangesTabSwitch"
+            v-model="showConfirmDialogTabSwitch"
+            />
+            <ConfirmDialog
+            title="UnSaved Changes Detected"
+            message="save changes before expanding another row"
+            @update:ok="saveChangesAndRoleSwitch"
+            @update:cancel="discardChangesRoleSwitch"
+            v-model="showConfirmDialogRowSwitch"
+            />
+            <ConfirmDialog
+            title="UnSaved Changes Detected"
+            message="save changes before switching Type"
+            @update:ok="saveChangesAndTypeSwitch"
+            @update:cancel="discardChangesTypeSwitch"
+            v-model="showConfirmDialogTypeSwitch"
+            />
       </q-page>
       
 
@@ -562,7 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { useI18n } from "vue-i18n";
-import { defineComponent, onMounted, ref, watch } from "vue";
+import { defineComponent, onMounted, reactive, ref, watch } from "vue";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
 import { useStore } from "vuex";
 import organizationsService from "@/services/organizations";
@@ -573,6 +550,8 @@ import ratelimitService from "@/services/rate_limit";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 import {
   outlinedDelete,
   outlinedPause,
@@ -589,6 +568,8 @@ export default defineComponent ({
         NoOrganizationSelected ,
         AppTabs,
         QTablePagination,
+        ConfirmDialog,
+        QueryEditor
     },
     setup() {
         const { t } = useI18n();
@@ -600,10 +581,11 @@ export default defineComponent ({
         const resultTotal = ref<number>(0);
         const perPageOptions = ref<number[]>([10, 20, 50, 100]);
         const pagination: any = ref({
-            rowsPerPage: 10,
+            rowsPerPage: 20,
             });
-        const rolesRows = ref<any[]>([]);
+        const rolesLimitRows = ref<any[]>([]);
         const rolesColumns = ref<any[]>([]);
+        const activeType = ref<string>("table");
         const tabs = ref<any[]>([
             {
                 label: "API Limits",
@@ -626,36 +608,41 @@ export default defineComponent ({
                 name: "list",
                 field: "list",
                 label: t("quota.listLimit"),
-                align: "left",
+                align: "center",
                 sortable: true,
+                style: 'width: 200px !important; '
             },
             {
                 name: "get",
                 field: "get",
                 label: t("quota.getLimit"),
-                align: "left",
+                align: "center",
                 sortable: true,
+                style: 'width: 200px !important; '
             },
             {
                 name: "create",
                 field: "create",
                 label: t("quota.createLimit"),
-                align: "left",
+                align: "center",
                 sortable: true,
+                style: 'width: 200px !important; '
             },
             {
                 name: "update",
                 field: "update",
                 label: t("quota.updateLimit"),
-                align: "left",
+                align: "center",
                 sortable: true,
+                style: 'width: 200px !important; '
             },
             {
                 name: "delete",
                 field: "delete",
                 label: t("quota.deleteLimit"),
-                align: "left",
+                align: "center",
                 sortable: true,
+                style: 'width: 200px !important; '
             }
             ];
             const roleLimitsColumns: any = [
@@ -671,9 +658,9 @@ export default defineComponent ({
                 name: "list",
                 field: "list",
                 label: t("quota.listLimit"),
-                align: "left",
+                align: "center",
                 sortable: true,
-                style: 'width: 200px !important; padding-left: 40px !important;'
+                style: 'width: 200px !important; '
             },
             {
                 name: "get",
@@ -681,7 +668,7 @@ export default defineComponent ({
                 label: t("quota.getLimit"),
                 align: "center",
                 sortable: true,
-                style: 'width: 200px !important; padding-left: 40px !important;'
+                style: 'width: 200px !important; '
             },
             {
                 name: "create",
@@ -689,7 +676,7 @@ export default defineComponent ({
                 label: t("quota.createLimit"),
                 align: "center",
                 sortable: true,
-                style: 'width: 200px !important; padding-left: 40px !important;'
+                style: 'width: 200px !important; '
 
             },
             {
@@ -698,7 +685,7 @@ export default defineComponent ({
                 label: t("quota.updateLimit"),
                 align: "center",
                 sortable: true,
-                style: 'width: 200px !important; padding-left: 40px !important;'
+                style: 'width: 200px !important; '
             },
             {
                 name: "delete",
@@ -706,7 +693,7 @@ export default defineComponent ({
                 label: t("quota.deleteLimit"),
                 align: "center",
                 sortable: true,
-                style: 'width: 200px !important; padding-left: 40px !important;'
+                style: 'width: 200px !important; '
             }
             ];
         const activeTab = ref<string>("api-limits");
@@ -723,9 +710,22 @@ export default defineComponent ({
         const uploadError = ref<string>("");
         const focusedInputId = ref<any>(null);
         const expandedRow = ref<any>("");
-        const roleLimitRows = ref<any[]>([]);
         const roleLevelModuleRows = ref<any[]>([]);
         const roleLevelLoading = ref<boolean>(false);
+
+        const openedRole = ref<string>("");
+        const selectedRole = ref<any>(null);
+        const rolesToBeDisplayed = ref<any[]>([]);
+        const isRoleModulesLoading = ref<boolean>(false);
+        const filteredRoleLevelModuleRows = ref<any[]>([]);
+        const expandedRole = ref<string>("");
+        const showConfirmDialogTabSwitch = ref(false);
+        const showConfirmDialogRowSwitch = ref(false);
+        const nextTab = ref<string | null>(null);
+        const toBeExpandedRow = ref<any>(null);
+        const jsonStrToDisplay = ref<string>("");
+        const nextType = ref<string | null>(null);
+        const showConfirmDialogTypeSwitch = ref(false);
 
 
         onMounted(async ()=>{
@@ -768,7 +768,12 @@ export default defineComponent ({
                     quota_org: selectedOrganization.value.value
                 }
             })
-            getApiLimitsByOrganization();
+            if(activeTab.value === "api-limits"){
+                getApiLimitsByOrganization();
+            }
+            else{
+                getRoleLimitsByOrganization(openedRole.value);
+            }
         }
         const getOrganizations = async () => {
             if(store.state.organizations.length === 0){
@@ -796,15 +801,51 @@ export default defineComponent ({
                 }));
             }
         }
-        const updateActiveTab = async (tab: string) => {
-            activeTab.value = tab;
-            if(activeTab.value === "role-limits"){
-                await getRolesByOrganization();
+        const updateActiveTab = (tab: string) => {
+            let isChanged = Object.keys(changedValues.value).length > 0;
+
+            if (isChanged) {
+                nextTab.value = tab; // Store the tab user wants to switch to
+                showConfirmDialogTabSwitch.value = true; // Show confirmation dialog
+            } else {
+                switchTab(tab);
             }
-            if(activeTab.value === "api-limits"){
+        };
+
+        const switchTab = async (tab: string) => {
+            activeTab.value = tab;
+
+            // Load data if needed
+            if (tab === "role-limits" && roleLevelModuleRows.value.length === 0 && rolesLimitRows.value.length === 0) {
+                await getRolesByOrganization();
+                await getModulesToDisplay();
+            }
+            if (tab === "api-limits" && apiLimitsRows.value.length === 0) {
                 await getApiLimitsByOrganization();
             }
+        };
+
+    const saveChangesAndTabSwitch = async () => {
+        await saveChanges();
+        changedValues.value = {};
+        editTable.value = false;
+        if (nextTab.value) {
+            switchTab(nextTab.value);
+            nextTab.value = null;
         }
+        showConfirmDialogTabSwitch.value = false;
+    };
+
+    const discardChangesTabSwitch = () => {
+        changedValues.value = {};
+        editTable.value = false;
+        if (nextTab.value) {
+            switchTab(nextTab.value);
+            nextTab.value = null;
+        }
+        showConfirmDialogTabSwitch.value = false;
+    };
+
 
         const bulkUpdate = () => {
             isBulkUpdate.value = true;
@@ -828,7 +869,7 @@ export default defineComponent ({
         const getRolesByOrganization = async () => {
             try{
                 const response = await getRoles(selectedOrganization.value.value);
-                rolesRows.value = response.data.map((role: any) => ({
+                rolesLimitRows.value = response.data.map((role: any) => ({
                     role_name: role,
                     uuid: getUUID(),
                     list: 10,
@@ -837,7 +878,7 @@ export default defineComponent ({
                     update: 10,
                     delete: 10
                 }));
-                console.log(rolesRows.value,'rolesRows');
+                console.log(rolesLimitRows.value,'rolesLimitRows');
             }
             catch(error){
                 console.log(error);
@@ -852,10 +893,10 @@ export default defineComponent ({
                 let transformedData: any = [];
 
             //predefined operation that we get from the api
-            const operations = ['List', 'Get', 'Create', 'Update', 'Delete'];
+            const operations = ['list', 'get', 'create', 'update', 'delete'];
             // Iterate over each module in api_group_info
-            Object.keys(response.data.api_group_info).forEach((moduleName) => {
-                const module = response.data.api_group_info[moduleName];
+            Object.keys(response.data).forEach((moduleName) => {
+                const module = response.data[moduleName];
 
                 // Create an object to store the threshold values for each operation
                 let moduleThresholds: any = {
@@ -864,9 +905,9 @@ export default defineComponent ({
 
                 operations.forEach((operation) => {
                     // Check if the operation exists for the current module
-                    if (module[operation]) {
+                    if (module[operation.toLowerCase()] !== undefined) {
                         // If the operation exists, get the threshold value
-                        moduleThresholds[operation.toLowerCase()] =  module[operation];
+                        moduleThresholds[operation.toLowerCase()] =  module[operation.toLowerCase()];
                     } else {
                         // If the operation doesn't exist, set it as '--'
                         moduleThresholds[operation.toLowerCase()] = '-';
@@ -876,7 +917,7 @@ export default defineComponent ({
                 transformedData.push(moduleThresholds);
 
             });
-            console.log(transformedData,'transformeddata');
+            transformedData.sort((a: any, b: any) => a.module_name.localeCompare(b.module_name));
             apiLimitsRows.value = transformedData;
             resultTotal.value = transformedData.length;
             loading.value = false;
@@ -897,10 +938,10 @@ export default defineComponent ({
                 let transformedData: any = [];
 
             //predefined operation that we get from the api
-            const operations = ['List', 'Get', 'Create', 'Update', 'Delete'];
+            const operations = ['list', 'get', 'create', 'update', 'delete'];
             // Iterate over each module in api_group_info
-            Object.keys(response.data.api_group_info).forEach((moduleName) => {
-                const module = response.data.api_group_info[moduleName];
+            Object.keys(response.data).forEach((moduleName) => {
+                const module = response.data[moduleName];
 
                 // Create an object to store the threshold values for each operation
                 let moduleThresholds: any = {
@@ -909,9 +950,9 @@ export default defineComponent ({
 
                 operations.forEach((operation) => {
                     // Check if the operation exists for the current module
-                    if (module[operation]) {
+                    if (module[operation.toLowerCase()] !== undefined) {
                         // If the operation exists, get the threshold value
-                        moduleThresholds[operation.toLowerCase()] =  module[operation];
+                        moduleThresholds[operation.toLowerCase()] =  module[operation.toLowerCase()];
                     } else {
                         // If the operation doesn't exist, set it as '--'
                         moduleThresholds[operation.toLowerCase()] = '-';
@@ -921,8 +962,14 @@ export default defineComponent ({
                 transformedData.push(moduleThresholds);
 
             });
-            console.log(transformedData,'transformeddata');
+            transformedData.sort((a: any, b: any) => a.module_name.localeCompare(b.module_name));
             roleLevelModuleRows.value = transformedData;
+            if(selectedRole.value?.value){
+                filteredRoleLevelModuleRows.value = transformedData.filter((row: any) => row.module_name.toLowerCase() === selectedRole.value?.value.toLowerCase());
+            }
+            else{
+                filteredRoleLevelModuleRows.value = transformedData;
+            }
             resultTotal.value = transformedData.length;
             roleLevelLoading.value = false;
         } catch (error) {
@@ -937,99 +984,167 @@ export default defineComponent ({
         
 
     const handleInputChange = (moduleName: string, row: any, operation: string, value: any) => {
-        if (!changedValues.value[moduleName]) {
-            changedValues.value[moduleName] = {};
-        }
-        if(row.rule){
-            const rowRule = row.rule;
-            rowRule.threshold = parseInt(value);
-            changedValues.value[moduleName][operation] = {
-                ...rowRule
-            };
-        }
-        else{
-            //handle the case where the rules are not there in the row
-            delete row.rule;
-            delete row.api_set
-            delete row.global_default_rule
-            row.rule_type = 'exact'
-            row.user_role = ".*"
-            row.user_id = ".*"
-            row.threshold = parseInt(value);
-            row.org = selectedOrganization.value.value;
-            changedValues.value[moduleName][operation] = {
-                ...row
-            };
+                    // Remove non-numeric characters except "."
+            let cleanedValue = value.replace(/[^0-9.]/g, "");
 
+            // Prevent multiple dots
+            const parts = cleanedValue.split(".");
+            if (parts.length > 2) {
+            cleanedValue = parts[0] + "." + parts.slice(1).join("");
+            }
+
+            // Ensure empty string is stored instead of NaN
+            if (cleanedValue === ".") {
+            cleanedValue = "";
+            }
+
+            // Update value in changedValues
+            if (!changedValues.value[moduleName]) {
+            changedValues.value[moduleName] = reactive ({});
+            }
+            changedValues.value[moduleName][operation] = cleanedValue;
+
+            let valueToUpdate ;
+
+            if(isNaN(parseInt(value))){
+                valueToUpdate = ""
+            }
+        else{
+            valueToUpdate = parseInt(value);
         }
+        changedValues.value[moduleName][operation] = valueToUpdate;
+
+        //this is deprecated code 
+        // if(row.rule){
+        //     const rowRule = row.rule;
+        //     rowRule.threshold = parseInt(value);
+        //     changedValues.value[moduleName][operation] = {
+        //         ...rowRule
+        //     };
+        // }
+        // else{
+        //     //handle the case where the rules are not there in the row
+        //     delete row.rule;
+        //     delete row.api_set
+        //     delete row.global_default_rule
+        //     row.rule_type = 'exact'
+        //     row.user_role = ".*"
+        //     row.user_id = ".*"
+        //     row.threshold = parseInt(value);
+        //     row.org = selectedOrganization.value.value;
+        //     changedValues.value[moduleName][operation] = {
+        //         ...row
+        //     };
+
+        // }
 
     };
+    const restrictToNumbers = (event) => {
+    const char = String.fromCharCode(event.keyCode);
+
+    // Allow numbers, backspace, delete, tab, enter, and decimal point
+    if (!/[0-9.]/.test(char) && ![8, 46, 9, 13].includes(event.keyCode)) {
+        event.preventDefault();
+    }
+    };
     const handleRoleInputChange =  (roleName: any, moduleName: string, row: any, operation: string, value: any) => {
-        if (!changedValues.value[moduleName]) {
-            changedValues.value[moduleName] = {};
-        }
-        row.user_role = roleName;
-        if(row.rule){
-            const rowRule = row.rule;
-            rowRule.threshold = parseInt(value);
-            changedValues.value[moduleName][operation] = {
-                ...rowRule
-            };
-        }
-        else{
-            //handle the case where the rules are not there in the row
-            delete row.rule;
-            delete row.api_set
-            delete row.global_default_rule
-            row.rule_type = 'exact'
-            row.user_id = ".*"
-            row.threshold = parseInt(value);
-            row.org = selectedOrganization.value.value;
-            changedValues.value[moduleName][operation] = {
-                ...row
-            };
-        }
+        let cleanedValue = value.replace(/[^0-9.]/g, "");
+
+            // Prevent multiple dots
+            const parts = cleanedValue.split(".");
+            if (parts.length > 2) {
+            cleanedValue = parts[0] + "." + parts.slice(1).join("");
+            }
+
+            // Ensure empty string is stored instead of NaN
+            if (cleanedValue === ".") {
+            cleanedValue = "";
+            }
+
+            // Update value in changedValues
+            if (!changedValues.value[moduleName]) {
+            changedValues.value[moduleName] = reactive ({});
+            }
+            changedValues.value[moduleName][operation] = cleanedValue;
+
+            let valueToUpdate ;
+
+            if(isNaN(parseInt(value))){
+                valueToUpdate = ""
+            }
+            else{
+            valueToUpdate = parseInt(value);
+            }
+            changedValues.value[moduleName][operation] = valueToUpdate;
+
+        // row.user_role = roleName;
+        // if(row.rule){
+        //     const rowRule = row.rule;
+        //     rowRule.threshold = parseInt(value);
+        //     changedValues.value[moduleName][operation] = {
+        //         ...rowRule
+        //     };
+        // }
+        // else{
+        //     //handle the case where the rules are not there in the row
+        //     delete row.rule;
+        //     delete row.api_set
+        //     delete row.global_default_rule
+        //     row.rule_type = 'exact'
+        //     row.user_id = ".*"
+        //     row.threshold = parseInt(value);
+        //     row.org = selectedOrganization.value.value;
+        //     changedValues.value[moduleName][operation] = {
+        //         ...row
+        //     };
+        // }
 
     };
 
     const saveChanges = async () => {
         try {
+            if(!validateChanges(changedValues.value)){
+                return;
+            }
+            let payload: any = {};
+            payload = {...changedValues.value};
+            let user_role = expandedRole.value;
+            let response  = null;
+            if(activeTab.value === "api-limits"){
+                response = await ratelimitService.update_batch(selectedOrganization.value.value, payload,"module");
+            }
+            else{
+                response = await ratelimitService.update_batch(selectedOrganization.value.value, payload,"role",user_role);
+            }
             // Here you would call your API to save the changes
-                 let leafArray = [];
-
-                // Iterate through the top-level keys and extract the leaf values
-                for (let category in changedValues.value) {
-                    for (let operation in changedValues.value[category]) {
-                        leafArray.push(changedValues.value[category][operation]);
-                    }
-                }
-
-                console.log(leafArray,'leafArray');
-
-                const response = await ratelimitService.update_batch(selectedOrganization.value.value, leafArray);
-                if(response.status === 200){
-                    uploadError.value = '';
-                    uploadedRules.value = [];
-                    isBulkUpdate.value = false;
-                    $q.notify({
-                        type: "positive",
-                        message: response.data.message,
-                        timeout: 3000,
-                    })
-                }
-            
-            // After successful save, refresh the data
-            await getApiLimitsByOrganization();
-            editTable.value = false;
-            changedValues.value = {};
-        } catch (error: any) {
-            $q.notify({
-                type: "negative",
-                message: error.response.data.message || "Error while updating rate limits rule",
-                timeout: 3000,
-            })
-            console.error('Error saving changes:', error);
-        }
+            if(response.status === 200){
+                uploadError.value = '';
+                uploadedRules.value = [];
+                isBulkUpdate.value = false;
+                $q.notify({
+                    type: "positive",
+                    message: response.data.message,
+                    timeout: 3000,
+                })
+            }
+        
+        // After successful save, refresh the data
+        editTable.value = false;
+        if(activeTab.value === "api-limits"){
+                await getApiLimitsByOrganization();
+            }
+            else{
+                await getRoleLimitsByOrganization(openedRole.value);
+            }
+        changedValues.value = {};
+    } catch (error: any) {
+        $q.notify({
+            type: "negative",
+            message: error.response.data.message || "Error while updating rate limits rule",
+            timeout: 3000,
+        })
+        console.error('Error saving changes:', error);
+    }
     };
 
     const cancelChanges = () => {
@@ -1037,8 +1152,51 @@ export default defineComponent ({
         editTable.value = false;
     };
 
+    const cancelJsonChanges = () => {
+        editTable.value = false;
+    };
+
+    const saveJsonChanges = async () => {
+        try {
+            let user_role = expandedRole.value;
+            const payload = JSON.parse(jsonStrToDisplay.value);
+            let response  = null;
+            if(activeTab.value === "api-limits"){
+                response = await ratelimitService.update_batch(selectedOrganization.value.value, payload,"module");
+            }
+            else{
+                response = await ratelimitService.update_batch(selectedOrganization.value.value, payload,"role",user_role);
+            }
+            // Here you would call your API to save the changes
+            if(response.status === 200){
+                $q.notify({
+                    type: "positive",
+                    message: response.data.message,
+                    timeout: 3000,
+                })
+            }
+        
+        // After successful save, refresh the data
+        editTable.value = false;
+        if(activeTab.value === "api-limits"){
+                await getApiLimitsByOrganization();
+            }
+            else{
+                // await getRoleLimitsByOrganization(openedRole.value);
+            }
+    } catch (error: any) {
+        $q.notify({
+            type: "negative",
+            message: error.response.data.message || "Error while updating rate limits rule",
+            timeout: 3000,
+        })
+        console.error('Error saving changes:', error);
+    }
+
+    };
+
     const isEdited = (moduleName: string, operation: string) => {
-        return changedValues.value[moduleName] && changedValues.value[moduleName][operation]?.threshold !== undefined;
+        return changedValues.value[moduleName] && changedValues.value[moduleName][operation] !== undefined;
     };
 
     const generateColumns = () => {
@@ -1087,6 +1245,7 @@ export default defineComponent ({
             uploadingRules.value = false;
             isBulkUpdate.value = false;
             uploadedRules.value = null;
+            await getApiLimitsByOrganization();
             dismiss();
         }
         catch(error){
@@ -1138,7 +1297,6 @@ export default defineComponent ({
         uploadError.value = '';
     }
     const onFocus = (row: any) => {
-        console.log('focus', generateUniqueId(row));
         focusedInputId.value = generateUniqueId(row);
     };
 
@@ -1153,26 +1311,160 @@ export default defineComponent ({
     const filteredData = (rows: any, terms: any) => {
         var filtered = [];
         terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-            if(rows[i].module_name.toLowerCase().includes(terms)){
-                filtered.push(rows[i]);
+        if(activeTab.value === "api-limits"){
+            for (var i = 0; i < rows.length; i++) {
+                if(rows[i].module_name.toLowerCase().includes(terms)){
+                    filtered.push(rows[i]);
+                }
             }
         }
+        else{
+            for (var i = 0; i < rows.length; i++) {
+                if(rows[i].role_name.toLowerCase().includes(terms)){
+                    filtered.push(rows[i]);
+                }
+            }
+        }
+
         return filtered;
       }
       const triggerExpand = async (props : any) =>{
+        if(Object.keys(changedValues.value).length > 0){
+            showConfirmDialogRowSwitch.value = true;
+            toBeExpandedRow.value = props.row;
+            return;
+        }
+        expandedRole.value = props.row.role_name;
         if (expandedRow.value === props.row.uuid) {
             expandedRow.value = null;
+            openedRole.value = null;
             } 
         else {
+            openedRole.value = props.row.role_name;
             await getRoleLimitsByOrganization(props.row.role_name);
-            console.log(props.row,'props rowww')
         // Otherwise, expand the clicked row and collapse any other row
             expandedRow.value = props.row.uuid;
         }
-}
+    }
+    const updateSelectedRole = () => {
+        if(selectedRole.value?.value){
+            filteredRoleLevelModuleRows.value = roleLevelModuleRows.value.filter((row: any) => row.module_name.toLowerCase() === selectedRole.value?.value.toLowerCase());
+        }
+        else{
+            filteredRoleLevelModuleRows.value = roleLevelModuleRows.value;
+        }
+    }   
 
-        
+    const getModulesToDisplay = async () => {
+        try {
+            isRoleModulesLoading.value = true;
+        const response = await ratelimitService.getModules(selectedOrganization.value.value);
+
+        rolesToBeDisplayed.value = response.data.map((role: any) => ({
+                label: role,
+                value: role
+            }));
+            isRoleModulesLoading.value = false;
+        } catch (error) {
+            isRoleModulesLoading.value = false;
+        }
+
+
+    }
+    const preventNonNumericPaste = (event: any) => {
+        const clipboardData = event.clipboardData.getData("text");
+
+        // Allow only positive integers (no negatives, no decimals)
+        if (!/^\d+$/.test(clipboardData)) {
+            event.preventDefault();
+        }
+    };
+
+    const validateChanges = (changedValues: any) => {
+        let isEmpty = false;
+        Object.keys(changedValues).forEach((moduleName: any) => {
+            Object.keys(changedValues[moduleName]).forEach((operation: any) => {
+                if(changedValues[moduleName][operation] == ""){
+                    $q.notify({
+                        type: "negative",
+                        message: "some values are empty please check",
+                        timeout: 3000,
+                    })
+                    isEmpty = true;
+                }
+            })
+        })
+        if(isEmpty){
+            return false;
+        }
+        return true;
+    }
+    const saveChangesAndRoleSwitch = async () => {
+        await saveChanges();
+        showConfirmDialogRowSwitch.value = false;
+        if(toBeExpandedRow.value){
+            console.log(toBeExpandedRow.value,'toBeExpandedRow')
+            const index = rolesLimitRows.value.findIndex((row: any) => row.role_name === toBeExpandedRow.value.role_name);
+            console.log(index,'index')
+            console.log(rolesLimitRows.value[index],'row')
+            expandedRow.value = rolesLimitRows.value[index].uuid;
+            toBeExpandedRow.value = null;
+        }
+    }
+    const discardChangesRoleSwitch = () => {
+        showConfirmDialogRowSwitch.value = false;
+    }
+    const transformData = (data: any) => {
+        return data.reduce((acc: any, item: any) => {
+            // Convert module_name to snake_case
+            const key = item.module_name
+
+        // Remove keys with "-" values
+        const filteredItem = Object.fromEntries(
+            Object.entries(item).filter(([k, v]) => k !== "module_name" && v !== "-")
+        );
+
+        // Assign the cleaned object to the transformed key
+        acc[key] = filteredItem;
+        return acc;
+    }, {});
+};
+    const updateActiveType = (type: string) => {
+        let isChanged = Object.keys(changedValues.value).length > 0;
+        if(isChanged){
+            nextType.value = type.toLowerCase();
+            showConfirmDialogTypeSwitch.value = true;
+        }
+        else{
+            activeType.value = type.toLowerCase();
+            editTable.value = false
+            populateJsonStr();
+        }
+    }
+
+    const populateJsonStr = () => {
+        if(activeTab.value == 'api-limits'){
+            jsonStrToDisplay.value = JSON.stringify(transformData(apiLimitsRows.value), null, 2);
+        }
+        else{
+            jsonStrToDisplay.value = JSON.stringify(transformData(roleLevelModuleRows.value), null, 2);
+        }
+    }
+    const saveChangesAndTypeSwitch = async () => {
+        await saveChanges();
+        editTable.value = false
+        populateJsonStr();
+        showConfirmDialogTypeSwitch.value = false;
+        activeType.value = nextType.value;
+        nextType.value = null;
+    }
+    const discardChangesTypeSwitch = () => {
+        showConfirmDialogTypeSwitch.value = false;
+        activeType.value = nextType.value;
+        nextType.value = null;
+        editTable.value = false
+        populateJsonStr();
+    }
         return {
             t,
             selectedOrganization,
@@ -1188,7 +1480,7 @@ export default defineComponent ({
             changePagination,
             resultTotal,
             perPageOptions,
-            rolesRows,
+            rolesLimitRows,
             rolesColumns,
             apiLimitsRows,
             apiLimitsColumns,
@@ -1222,11 +1514,35 @@ export default defineComponent ({
             roleLimitsColumns,
             triggerExpand,
             expandedRow,
-            roleLimitRows,
             handleRoleInputChange,
             roleLevelModuleRows,
             roleLevelLoading,
-            getRoleLimitsByOrganization
+            getRoleLimitsByOrganization,
+            selectedRole,
+            rolesToBeDisplayed,
+            isRoleModulesLoading,
+            updateSelectedRole,
+            filteredRoleLevelModuleRows,
+            restrictToNumbers,
+            preventNonNumericPaste,
+            expandedRole,
+            showConfirmDialogTabSwitch,
+            showConfirmDialogRowSwitch,
+            nextTab,
+            saveChangesAndTabSwitch,
+            discardChangesTabSwitch,
+            saveChangesAndRoleSwitch,
+            discardChangesRoleSwitch,
+            toBeExpandedRow,
+            activeType,
+            updateActiveType,
+            jsonStrToDisplay,
+            nextType,
+            showConfirmDialogTypeSwitch,
+            saveChangesAndTypeSwitch,
+            discardChangesTypeSwitch,
+            saveJsonChanges,
+            cancelJsonChanges,
         }
     }
 })
@@ -1257,8 +1573,8 @@ export default defineComponent ({
   }
 
   .q-tab {
-    height: 40px;
-    min-height: 40px;
+    height: 30px;
+    min-height: 30px;
   }
 }
 .title-height {
@@ -1289,15 +1605,21 @@ export default defineComponent ({
 .light-theme-page {
     .editable-cell {
         padding: 0px 10px;
-        background-color: #F9F9F8;
+        background-color: #ebebe6;
     }
     .edited-cell {
-        background-color: #EBECF6; // light blue color
+        background-color: #EBECF6;
+        padding-left: 8px !important; // light blue color
     }
     .edited-input {
+        background-color: #bfc3f4;
+        color: black; // blue text color for edited values
+        font-weight: 500;
+    }
+    .edited-input-role-level {
         color: #2196F3; // blue text color for edited values
         font-weight: 500;
-        padding: 0px !important;
+        
     }
 }
 
@@ -1308,11 +1630,18 @@ export default defineComponent ({
     }
     .edited-cell {
         background-color: #777883; // light blue color
+        padding-left: 8px !important;
     }
     .edited-input {
-        color: #64B5F6; // lighter blue text color for dark theme
+        background-color: #f6f6f6;
+        color: black;
         font-weight: 500;
         padding: 0px !important;
+    }
+    .edited-input-role-level {
+        color: #64B5F6; // lighter blue text color for dark theme
+        font-weight: 500;
+        width: 100% !important;
     }
 }
 .file-upload-input {
@@ -1341,6 +1670,7 @@ export default defineComponent ({
 .focused-input {
   border: 1px solid #007bff; /* Customize the border color */
   box-shadow: 0 0 5px rgba(0, 123, 255, 0.5); /* Optional: Add shadow for better focus effect */
+  width: 100% !important;
 }
 
 .expanded-content {
@@ -1388,6 +1718,21 @@ export default defineComponent ({
       padding-bottom: 0;
     }
   }
+}
+
+.editable-input{
+    height: 10px !important;
+}
+
+.category-select{
+    .q-placeholder{
+        font-size: 14px !important;
+    }
+}
+.org-select{
+    .q-placeholder{
+        font-size: 14px !important;
+    }
 }
 
 

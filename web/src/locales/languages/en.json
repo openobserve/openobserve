@@ -1182,6 +1182,8 @@
     "getLimit": "Get (Req/s)",
     "createLimit": "Create (Req/s)",
     "updateLimit": "Update (Req/s)",
-    "deleteLimit": "Delete (Req/s)"
+    "deleteLimit": "Delete (Req/s)",
+    "table": "Table",
+    "json": "JSON"
   }
 }

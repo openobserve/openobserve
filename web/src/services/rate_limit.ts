@@ -9,8 +9,16 @@ const rate_limit = {
         const url = `/api/${org_identifier}/ratelimit/role_list/${role_name}`;
         return http().get(url);
     },
-    update_batch: (org_identifier: string, data: any) => {
-        const url = `/api/${org_identifier}/ratelimit/update`;
+    update_batch: (org_identifier: string, data: any, update_type?: string, user_role?: string) => {
+        console.log(update_type,'update_type')
+        console.log(user_role,'user_role')
+        let url = `/api/${org_identifier}/ratelimit/update`;
+        if(update_type){
+            url += `?update_type=${update_type}`;
+        }
+        if(user_role){
+            url += `&user_role=${user_role}`;
+        }
         return http().put(url, data);
     },
     download_template: (org_identifier: string) => {
@@ -26,6 +34,10 @@ const rate_limit = {
                 'Content-Type': 'multipart/form-data',
             }
         });
+    },
+    getModules: (org_identifier: string) => {
+        const url = `/api/${org_identifier}/ratelimit/api_modules`;
+        return http().get(url);
     }
     
 }
