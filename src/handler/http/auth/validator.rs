@@ -611,9 +611,20 @@ async fn oo_validator_internal(
             // Need to add scheme to host before parsing, only for `req.host`
             // &host == "192.168.1.4:5070"
             // &node.http_addr == "http://192.168.1.4:5080"
-            let host_url =
-                Url::parse(&format!("http://{}", host)).expect("Failed to parse host URL");
-            let node_url = Url::parse(&node.http_addr).expect("Failed to parse node URL");
+            let host_url = match Url::parse(&format!("http://{}", host)) {
+                Ok(host_url) => host_url,
+                Err(e) => {
+                    log::error!("Failed to parse host URL: {}", e);
+                    return false;
+                }
+            };
+            let node_url = match Url::parse(&node.http_addr) {
+                Ok(node_url) => node_url,
+                Err(e) => {
+                    log::error!("Failed to parse node URL: {}", e);
+                    return false;
+                }
+            };
             host_url.host() == node_url.host()
         });
         if router_node.is_none() {
