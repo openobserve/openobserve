@@ -21,19 +21,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-font-bold tw-pt-6 tw-pb-2">
         Check further documentation at:
       </div>
-      <div
-        v-for="awsService in awsServiceLinks"
-        :key="awsService.name"
-        class="tw-py-2"
-      >
-        <a
-          :href="awsService.link"
-          class="hover:tw-underline text-primary"
-          target="_blank"
-          rel="noopener noreferrer"
-          >{{ awsService.name }}</a
+      <ol class="tw-list-decimal tw-pl-[27px]">
+        <li
+          v-for="awsService in awsServiceLinks"
+          :key="awsService.name"
+          class="tw-py-2"
         >
-      </div>
+          <a
+            :href="awsService.link"
+            class="hover:tw-underline"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{ awsService.name }}</a
+          >
+        </li>
+      </ol>
     </div>
   </div>
 </template>
