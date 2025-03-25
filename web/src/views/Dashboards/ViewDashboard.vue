@@ -588,7 +588,7 @@ export default defineComponent({
     const loadDashboard = async (onlyIfRequired = false) => {
       // check if drilldown or soft-refresh request
       if (onlyIfRequired) {
-        // if current dashboard id and folder is same,  skip loading
+        // if current dashboard id and tab is same,  skip loading
         if (
           currentDashboardData?.data?.dashboardId === route.query.dashboard &&
           // check for tab
