@@ -307,7 +307,7 @@ export default defineComponent({
       initializeVariablesData();
 
       // load all variables
-      loadAllVariablesData();
+      await loadAllVariablesData(true);
     };
 
     /**
@@ -553,7 +553,7 @@ export default defineComponent({
           await finalizeVariableLoading(variableObject, success);
           resolve(success);
         } catch (error) {
-          finalizeVariableLoading(variableObject, false);
+          await finalizeVariableLoading(variableObject, false);
           resolve(false);
         }
       });
@@ -775,6 +775,7 @@ export default defineComponent({
         emitVariablesData();
       } else {
         variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
       }
     };
 
@@ -841,7 +842,13 @@ export default defineComponent({
             loadSingleVariableDataByName(variable),
           ),
         );
-      } catch (error) {}
+      } catch (error) {
+        await Promise.all(
+          independentVariables.map((variable: any) =>
+            finalizeVariableLoading(variable, false),
+          ),
+        );
+      }
 
       const loadDependentVariables = async () => {
         for (const variable of dependentVariables) {
@@ -978,7 +985,9 @@ export default defineComponent({
 
       // Load variables in dependency order
       for (const varName of affectedVariables) {
-        const variable = variablesData.values.find((v: any) => v.name === varName);
+        const variable = variablesData.values.find(
+          (v: any) => v.name === varName,
+        );
         if (variable) {
           await loadSingleVariableDataByName(variable);
         }

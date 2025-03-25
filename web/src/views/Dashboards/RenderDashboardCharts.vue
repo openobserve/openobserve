@@ -279,8 +279,8 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
-    const refreshDashboard = () => {
-      emit("refresh");
+    const refreshDashboard = (onlyIfRequired = false) => {
+      emit("refresh", onlyIfRequired);
     };
 
     const onMovePanel = (panelId: any, newTabId: any) => {
@@ -559,13 +559,18 @@ export default defineComponent({
       showViewPanel.value = false;
 
       // first, refresh the dashboard
-      refreshDashboard();
+      refreshDashboard(true);
 
       // NOTE: after variables in variables feature, it works without changing the initial variable values
       // then, update the initial variable values
       await variablesValueSelectorRef.value.changeInitialVariableValues(
         ...args,
       );
+
+      // set currnet variables ref
+      currentVariablesDataRef.value = {
+        __global: JSON.parse(JSON.stringify(variablesData.value)),
+      };
     };
 
     const refreshPanelRequest = (panelId) => {
