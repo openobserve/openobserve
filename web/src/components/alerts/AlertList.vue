@@ -1262,7 +1262,7 @@ export default defineComponent({
             )
             .then((res: any) => {
               const isEnabled = res.data.enabled;
-              alertsRows.value.forEach((alert) => {
+              alertsList.value.forEach((alert: any) => {
                 alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
               });
               $q.notify({
