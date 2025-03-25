@@ -49,6 +49,8 @@ use infra::{
 use itertools::Itertools;
 use lettre::{AsyncTransport, Message, message::MultiPart};
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::actions::meta::{TriggerActionRequest, TriggerSource};
+#[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
     config::get_config as get_openfga_config,
@@ -951,6 +953,8 @@ async fn send_notification(
     )
     .await;
 
+    dbg!(&msg);
+
     let email_subject = if let TemplateType::Email { title } = &template.template_type {
         process_dest_template(
             title,
@@ -976,7 +980,34 @@ async fn send_notification(
     }
 }
 
-async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+async fn send_http_notification(
+    endpoint: &Endpoint,
+    mut msg: String,
+) -> Result<String, anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    if endpoint.action_id.is_some() {
+        let incoming_msg = serde_json::from_str::<serde_json::Value>(&msg)
+            .map_err(|e| anyhow::anyhow!("Message should be valid JSON for actions: {e}"))?;
+        let inputs = if incoming_msg.is_object() {
+            vec![incoming_msg]
+        } else if incoming_msg.is_array() {
+            incoming_msg.as_array().unwrap().to_vec()
+        } else {
+            return Err(anyhow::anyhow!(
+                "Unsupported message format for actions: {}",
+                msg
+            ));
+        };
+
+        let req = TriggerActionRequest {
+            inputs,
+            trigger_source: TriggerSource::Alerts,
+            trace_id: "actions".to_string(),
+        };
+        msg = serde_json::to_string(&req)
+            .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?;
+    };
+
     let client = if endpoint.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
