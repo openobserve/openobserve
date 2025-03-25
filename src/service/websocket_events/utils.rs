@@ -432,6 +432,7 @@ impl WsServerEvents {
 
     pub fn should_clean_trace_id(&self) -> Option<String> {
         match self {
+            #[cfg(feature = "enterprise")]
             Self::CancelResponse {
                 trace_id,
                 is_success,
