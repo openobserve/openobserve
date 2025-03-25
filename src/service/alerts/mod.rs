@@ -24,6 +24,7 @@ use config::{
             AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition,
             TriggerEvalResults,
         },
+        cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -35,7 +36,7 @@ use config::{
 };
 
 use super::promql;
-use crate::service::search as SearchService;
+use crate::service::{search as SearchService, self_reporting::http_report_metrics};
 
 pub mod alert;
 pub mod derived_streams;
@@ -248,6 +249,7 @@ impl QueryConditionExt for QueryCondition {
         };
         let trace_id = ider::uuid();
 
+        let req_start = std::time::Instant::now();
         let resp = if self.multi_time_range.is_some()
             && !self.multi_time_range.as_ref().unwrap().is_empty()
         {
@@ -377,12 +379,22 @@ impl QueryConditionExt for QueryCondition {
                 search_type,
                 search_event_context,
                 use_cache: None,
+                local_mode: None,
             };
             log::debug!(
                 "evaluate_scheduled begin to call SearchService::search, {:?}",
                 req
             );
-            SearchService::search(&trace_id, org_id, stream_type, None, &req).await
+            // SearchService::search(&trace_id, org_id, stream_type, None, &req).await
+            SearchService::grpc_search::grpc_search(
+                &trace_id,
+                org_id,
+                stream_type,
+                None,
+                &req,
+                Some(RoleGroup::Background),
+            )
+            .await
         };
 
         // Resp hits can be of two types -
@@ -390,15 +402,32 @@ impl QueryConditionExt for QueryCondition {
         // 2. Vec<Vec<Map<String, Value>>> - for multi_time_range alert
         let resp = match resp {
             Ok(v) => {
+                // the search request doesn't via cache layer, so need report usage separately
+                http_report_metrics(
+                    req_start,
+                    org_id,
+                    stream_type,
+                    "200",
+                    "_search",
+                    &SearchEventType::Alerts.to_string(),
+                    "",
+                );
                 if v.is_partial {
-                    return Err(anyhow::anyhow!("Partial response: {}", v.function_error));
+                    return Err(anyhow::anyhow!(
+                        "Partial response: {}",
+                        v.function_error.join(", ")
+                    ));
                 } else {
                     v
                 }
             }
             Err(e) => {
                 if let infra::errors::Error::ErrorCode(e) = e {
-                    return Err(anyhow::anyhow!("{}", e.get_error_detail()));
+                    return Err(anyhow::anyhow!(
+                        "{} {}",
+                        e.get_message(),
+                        e.get_inner_message()
+                    ));
                 } else {
                     return Err(anyhow::anyhow!("{}", e));
                 }

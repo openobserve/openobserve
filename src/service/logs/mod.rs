@@ -424,7 +424,7 @@ async fn write_logs(
                         org_id,
                         StreamType::Logs,
                         alert.stream_name,
-                        alert.name
+                        alert.get_unique_key()
                     );
                     // For one alert, only one trigger per request
                     // Trigger for this alert is already added.

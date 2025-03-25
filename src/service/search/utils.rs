@@ -132,7 +132,17 @@ pub fn conjunction(exprs: Vec<&Expr>) -> Option<Expr> {
             expr = Expr::BinaryOp {
                 left: Box::new(expr),
                 op: BinaryOperator::And,
-                right: Box::new(Expr::Nested(Box::new(e.clone()))),
+                right: if matches!(
+                    e,
+                    Expr::BinaryOp {
+                        op: BinaryOperator::Or,
+                        ..
+                    }
+                ) {
+                    Box::new(Expr::Nested(Box::new(e.clone())))
+                } else {
+                    Box::new(e.clone())
+                },
             }
         }
         Some(expr)

@@ -110,12 +110,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <template #before>
                             <!-- fieldlist section -->
+                <span @click.stop="expandState.buildQuery = !expandState.buildQuery">
                 <FullViewContainer
                   name="query"
                   v-model:is-expanded="expandState.buildQuery"
                   label="Build Query"
                   class="tw-mt-1"
                 />
+              </span>
               <div class="q-pt-sm" v-show="expandState.buildQuery"  >
                 
               <div >
@@ -175,12 +177,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }"
                     :hideIncludeExlcude="true"
                     :hideCopyValue="false"
+                    :hideAddSearchTerm="true"
                 />
                
                 
               </div>
             </template>
             <template #after>
+              <span @click.stop="expandState.setVariables = !expandState.setVariables">
+
               <!-- set variables part -->
               <FullViewContainer
                   name="query"
@@ -188,6 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label="Set Variables"
                   class="tw-mt-1"
                 />
+              </span>
               <div v-show="expandState.setVariables"  class="flex justify-between q-pl-sm full-height" style="overflow-y: auto !important;">
               <div>
               <div
@@ -683,7 +689,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         type="number"
                         dense
                         filled
-                        min="1"
+                        :min="
+                          Math.ceil(
+                            store.state?.zoConfig?.min_auto_refresh_interval / 60,
+                          ) || 1
+                        "
                         style="background: none"
                         @update:model-value="updateFrequency"
                       />
@@ -888,43 +898,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              
               <div class="full-width" style="height: calc(100vh - 140px) !important;" >
               <div class="query-editor-container scheduled-pipelines">
+                <span @click.stop="expandState.query = !expandState.query">
                 <FullViewContainer
                   name="query"
                   v-model:is-expanded="expandState.query"
                   :label="tab === 'sql' ? 'Sql Query' : 'PromQL Query'"
                   class="tw-mt-1"
                 />
+                </span>
                 <query-editor
-                v-show="expandState.query"
-                data-test="scheduled-pipeline-sql-editor"
-                ref="pipelineEditorRef"
-                editor-id="pipeline-query-editor"
-                class="monaco-editor"
-                v-model:query="query"
-                :class="query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
-                @update:query="updateQueryValue"
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="onBlurQueryEditor"
-                style="height: calc(100vh - 190px) !important;"
+                  v-show="expandState.query"
+                  data-test="scheduled-pipeline-sql-editor"
+                  ref="pipelineEditorRef"
+                  editor-id="pipeline-query-editor"
+                  :debounceTime="300"
+                  class="monaco-editor"
+                  v-model:query="query"
+                  :class="query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
+                  @update:query="updateQueryValue"
+                  @focus="focusQueryEditor"
+                  @blur="onBlurQueryEditor"
+                  style="height: calc(100vh - 190px) !important;"
               />
               
              
               </div>
+
               <div>
+                <span @click.stop="expandState.output = !expandState.output">
                 <FullViewContainer
                   name="output"
                   v-model:is-expanded="expandState.output"
                   label="Output"
                   class="tw-mt-1"
                 />
+                </span>
                   <TenstackTable
-                    v-if="rows.length > 0 && tab == 'sql'"
                     style="height: calc(100vh - 190px) !important;"
-                    v-show="expandState.output"
+                    v-show="expandState.output && rows.length > 0 && tab == 'sql'"
                     ref="searchTableRef"
                     :columns="getColumns"
                     :rows="rows"
                     :jsonpreviewStreamName="selectedStreamName"
+                    :expandedRows="expandedLogs"
+                    @expand-row="expandLog"
+                    @copy="copyLogToClipboard"
+
+
                   />
                   <div v-if="loading" style="height: calc(100vh - 190px) !important;" class="flex justify-center items-center" >
                     <q-spinner-hourglass color="primary" size="lg" />
@@ -980,13 +1000,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-btn
                   data-test="stream-routing-query-save-btn"
-                  :label="t('alerts.save')"
+                  :label="validatingSqlQuery ? 'Validating...' : 'Validate and Close'"
                   class="text-bold no-border q-ml-md"
                   color="secondary"
                   padding="sm xl"
                   no-caps
                   type="submit"
                   @click="$emit('submit:form')"
+                  :disable="validatingSqlQuery"
                 />
                 <q-btn
                   v-if="pipelineObj.isEditNode"
@@ -1032,6 +1053,7 @@ import {
   defineAsyncComponent,
   nextTick,
   onMounted,
+  onBeforeMount,
 } from "vue";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
@@ -1050,7 +1072,7 @@ import {
 } from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { useQuasar } from "quasar";
+import { useQuasar, copyToClipboard } from "quasar";
 import cronParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import IndexList from "@/plugins/logs/IndexList.vue";
@@ -1092,7 +1114,8 @@ const props = defineProps([
   "disableVrlFunction",
   "disableQueryTypeSelection",
   "showTimezoneWarning",
-  "streamType"
+  "streamType",
+  "validatingSqlQuery"
 ]);
 
 const emits = defineEmits([
@@ -1120,6 +1143,7 @@ const emits = defineEmits([
 const {  pipelineObj } = useDragAndDrop();
 const { searchObj } = useLogs();
 const { getStream, getStreams } = useStreams ();
+let parser: any;
 
 const selectedStreamName = ref("");
 
@@ -1193,6 +1217,7 @@ const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 const  pipelineEditorRef : any = ref(null);
+const expandedLogs = ref<any[]>([]);
 const cursorPosition = ref(-1);
 const splitterModel = ref(30);
 const step = ref(1);
@@ -1231,38 +1256,45 @@ watch(()=> splitterModel.value ,  (val)=>{
 })
 
 watch(()=> selectedStreamName.value, (val)=>{
-  console.log(val, "selectedStreamName");
   searchObj.data.stream.pipelineQueryStream = [val];
+})
+watch(()=>triggerData.value.frequency_type, (val)=>{
+  if(val == 'minutes'){
+    triggerData.value.period = Number(triggerData.value.frequency) || 15
+  }else{
+    const periodValue = convertCronToMinutes(triggerData.value.cron) 
+    triggerData.value.period = periodValue > 0 ? periodValue : Number(triggerData.value.frequency) || 15
+  }
+})
+
+
+
+onBeforeMount(async ()=>{
+  await importSqlParser();
 })
 
 
 
 
 onMounted(async ()=>{
-  getStreamList();
+  await getStreamList();
+
+  setTimeout(() => {
+    if(tab.value === 'sql' && query.value != ""){
+    const parsedQuery = parser?.parse(query.value);
+    selectedStreamName.value = parsedQuery.ast.from[0].table;
+
+    getStreamFields();
+  }
+  }, 200);
+  
 })
-const standardOutput = ref(`
-{
-  "data": {
-    "results": [
-      {
-        "event": {
-          "_timestamp": 1735128523652186,
-          "job": "test",
-          "level": "info",
-          "log": "test message for openobserve",
-        },
-      },
-      {
-        "event": {
-          "log": "test message for openobserve",
-        },
-        "message": "Error in event",
-      },
-    ],
-  },
-}
-`)
+
+const importSqlParser = async () => {
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    parser = await sqlParser();
+  };
 
 const filteredTimezone: any = ref([]);
 const expandState =ref( {
@@ -1376,7 +1408,7 @@ const currentTimezone =
 const browserTimezone = ref(currentTimezone);
 const streamTypes = ["logs", "metrics", "traces"];
 
-const rows = ref([ ])
+const rows = ref([])
 
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
@@ -1418,6 +1450,7 @@ const updateQueryValue = (value: string) => {
 };
 
 const updateTrigger = () => {
+
   emits("update:trigger", triggerData.value);
   emits("input:update", "period", triggerData.value);
 };
@@ -1636,8 +1669,6 @@ const filterFunctionOptions = (val: string, update: any) => {
 
 const onBlurQueryEditor = () => {
   queryEditorPlaceholderFlag.value = true;
-
-  // emits("validate-sql");
 };
 
 const validateInputs = (notify: boolean = true) => {
@@ -1732,7 +1763,7 @@ const validateFrequency = () => {
 
     if (triggerData.value.frequency < intervalInMins) {
       cronJobError.value =
-        "Frequency should be greater than " + (intervalInMins - 1);
+        "Minimum frequency should be " + (intervalInMins) + " minutes";
       return;
     }
   }
@@ -1756,10 +1787,10 @@ const getStreamFields = () => {
         });
       })
       .finally(() => {
-        if(tab.value === 'sql'){
+        if(tab.value === 'sql' && query.value == ""){
           query.value = `SELECT * FROM "${selectedStreamName.value}"`;
         }
-        else if (tab.value === 'promql'){
+        else if (tab.value === 'promql' && query.value == ""){
           query.value = `${selectedStreamName.value}{}`;
         }
         expandState.value.query = true;
@@ -1856,7 +1887,6 @@ const handleSidebarEvent = (event: string, value: any) => {
       if(cursorPosition.value != -1){
         cursorPosition.value += valueToInsert.length;
       } 
-      console.log("newQuery Cursor Position", newQuery, cursorPosition.value);
 
     // Set the new value
     pipelineEditorRef.value.setValue(newQuery);
@@ -1890,7 +1920,7 @@ const runQuery = async () => {
           org_identifier: store.state.selectedOrganization.identifier,
             query: {query: queryReq},
             page_type: selectedStreamType.value,
-  }
+  }, "derived_stream"
   ).then((res: any) => {
     if(res.data.hits.length > 0){
     rows.value = res.data.hits
@@ -1907,16 +1937,7 @@ const runQuery = async () => {
 }
 else if(tab.value == 'promql'){
   previewPromqlQueryRef.value.refreshData();
-  // searchService.metrics_query_range({
-  //   org_identifier: store.state.selectedOrganization.identifier,
-  //   query: query.value,
-  //   start_time: dateTime.value.startTime,
-  //   end_time: dateTime.value.endTime,
-  // }).then((res: any) => {
-  //   console.log(res, 'res')
-  // }).catch((err: any) => {
-  //   console.log(err, 'err')
-  // })
+
 }
 }
 
@@ -1936,6 +1957,26 @@ watch(() => q.fullscreen.isActive, (val) => {
   emits('update:fullscreen', val);
 });
 
+const focusQueryEditor = () => {
+  queryEditorPlaceholderFlag.value = false;
+}
+
+const expandLog = (index: any) => {
+  if (expandedLogs.value.includes(index))
+    expandedLogs.value = expandedLogs.value.filter((item) => item != index);
+  else expandedLogs.value.push(index);
+}
+const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
+  const copyData = copyAsJson ? JSON.stringify(log) : log;
+  copyToClipboard(copyData).then(() =>
+    q.notify({
+      type: "positive",
+      message: "Content Copied Successfully!",
+      timeout: 1000,
+    }),
+  );
+};
+
 defineExpose({
   tab,
   validateInputs,
@@ -1946,7 +1987,6 @@ defineExpose({
   collapseFieldList,
   collapseFields,
   expandState,
-  standardOutput,
   streamFields,
   getStreamFields,
   selectedStreamName,
@@ -1962,6 +2002,10 @@ defineExpose({
   sideBarSplitterModel,
   previewPromqlQueryRef,
   cursorPosition,
+  focusQueryEditor,
+  expandedLogs,
+  copyLogToClipboard,
+  copyToClipboard,
 });
 
 </script>
@@ -2027,6 +2071,11 @@ defineExpose({
     &.icon-dark {
       filter: none !important;
     }
+  }
+  .empty-query .monaco-editor-background {
+    background-image: url("@/assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
   }
 }
 .field-list-collapse-btn {

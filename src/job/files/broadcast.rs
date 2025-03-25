@@ -15,7 +15,7 @@
 
 use config::cluster;
 
-use crate::service::db::file_list::{broadcast, local::BROADCAST_QUEUE};
+use crate::service::db::file_list::broadcast;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     loop {
@@ -24,7 +24,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         let files = {
-            let mut q = BROADCAST_QUEUE.write().await;
+            let mut q = broadcast::BROADCAST_QUEUE.write().await;
             if q.is_empty() {
                 continue;
             }

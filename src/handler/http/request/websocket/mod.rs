@@ -19,7 +19,7 @@ pub mod sort;
 pub mod utils;
 
 use actix_web::{Error, HttpRequest, HttpResponse, get, web};
-use config::get_config;
+use config::{cluster::LOCAL_NODE, get_config};
 use session::WsSession;
 use utils::sessions_cache_utils;
 
@@ -71,6 +71,8 @@ pub async fn websocket(
 /// Initialize the job init for websocket
 pub async fn init() -> Result<(), anyhow::Error> {
     // Run the garbage collector for websocket sessions
-    sessions_cache_utils::run_gc_ws_sessions().await;
+    if !LOCAL_NODE.is_compactor() && !LOCAL_NODE.is_alert_manager() {
+        sessions_cache_utils::run_gc_ws_sessions().await;
+    }
     Ok(())
 }

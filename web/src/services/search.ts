@@ -34,7 +34,7 @@ const search = {
       dashboard_id?: string;
       folder_id?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -71,6 +71,8 @@ const search = {
     clusters,
     is_multistream,
     traceparent,
+    body,
+    action_id,
   }: {
     org_identifier: string;
     index: string;
@@ -83,6 +85,8 @@ const search = {
     clusters: string;
     is_multistream: boolean;
     traceparent: string;
+    body: any;
+    action_id: string;
   }) => {
     // let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     let url: string = "";
@@ -95,6 +99,10 @@ const search = {
       url = url + `&query_fn=${query_fn}`;
     }
 
+    if (action_id.trim() != "") {
+      url = url + `&action_id=${action_id}`;
+    }
+
     if (regions.trim() != "") {
       url = url + `&regions=${regions}`;
     }
@@ -102,7 +110,7 @@ const search = {
     if (clusters.trim() != "") {
       url = url + `&clusters=${clusters}`;
     }
-    return http({ headers: { traceparent } }).get(url);
+    return http({ headers: { traceparent } }).post(url, body);
   },
   metrics_query_range: ({
     org_identifier,
@@ -237,7 +245,7 @@ const search = {
       page_type: string;
       traceparent?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -257,7 +265,7 @@ const search = {
       jobId: string;
       traceparent?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -277,7 +285,7 @@ const search = {
       jobId: string;
       traceparent?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -297,7 +305,7 @@ const search = {
       jobId: string;
       traceparent?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -317,7 +325,7 @@ const search = {
       page_type: string;
       traceparent?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -341,7 +349,7 @@ const search = {
       traceparent?: string;
       query: any;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const { size, from } = query.query;

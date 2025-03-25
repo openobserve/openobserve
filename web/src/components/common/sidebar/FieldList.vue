@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="field_label ellipsis">
                       {{ props.row.name }}
                     </div>
-                    <div class="field_overlay">
+                    <div v-if="!hideAddSearchTerm" class="field_overlay">
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
@@ -88,6 +88,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="q-mr-sm"
                         @click.stop="addSearchTerm(`${props.row.name}=''`)"
                         round
+                      />
+                    </div>
+                    <div v-if="!hideCopyValue" style="background-color: #E8E8E8;"  class="field_overlay">
+                      <q-btn
+                        :data-test="`log-search-index-list-filter-${props.row.name}-copy-btn`"
+                        icon="content_copy"
+                        size="10px"
+                        class="q-mr-sm"
+                        @click.stop="copyContentValue(props.row.name)"
+                        round
+                        flat
+                        dense
                       />
                     </div>
                   </div>
@@ -192,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               "
                             >
                               <q-btn
-                                class="q-ml-sm"
+                                class="q-ml-md"
                                 size="8px"
                                 title="Copy Value"
                                 round
@@ -285,6 +297,10 @@ export default defineComponent({
     hideCopyValue:{
       type: Boolean,
       default: true,
+    },
+    hideAddSearchTerm:{
+      type: Boolean,
+      default: false,
     }
   },
   emits: ["event-emitted"],

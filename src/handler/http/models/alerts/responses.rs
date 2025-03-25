@@ -14,24 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::{alerts::alert as meta_alerts, folder as meta_folders, triggers::Trigger};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
-use super::{Alert, QueryCondition};
+use super::{Alert, QueryCondition, TriggerCondition};
 
 /// HTTP response body for `GetAlert` endpoint.
-#[derive(Clone, Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct GetAlertResponseBody(pub Alert);
 
 /// HTTP response body for `ListAlerts` endpoint.
-#[derive(Clone, Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListAlertsResponseBody {
     pub list: Vec<ListAlertsResponseBodyItem>,
 }
 
 /// An item in the list returned by the `ListDashboards` endpoint.
-#[derive(Clone, Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ListAlertsResponseBodyItem {
     pub alert_id: Ksuid,
     pub folder_id: String,
@@ -40,6 +40,7 @@ pub struct ListAlertsResponseBodyItem {
     pub owner: Option<String>,
     pub description: Option<String>,
     pub condition: QueryCondition,
+    pub trigger_condition: TriggerCondition,
     pub enabled: bool,
     pub last_triggered_at: Option<i64>,
     pub last_satisfied_at: Option<i64>,
@@ -96,6 +97,7 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             owner: alert.owner,
             description: Some(alert.description).filter(|d| !d.is_empty()),
             condition: alert.query_condition.into(),
+            trigger_condition: alert.trigger_condition.into(),
             enabled: alert.enabled,
             last_triggered_at,
             last_satisfied_at,

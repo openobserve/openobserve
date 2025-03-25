@@ -491,15 +491,7 @@ impl Engine {
                 })
                 .collect::<Vec<_>>();
             let exemplars = if self.ctx.query_exemplars {
-                metric.exemplars.as_ref().map(|v| {
-                    v.iter()
-                        .filter(|e| {
-                            let modified_ts = e.timestamp + offset_modifier;
-                            modified_ts >= start && modified_ts <= eval_ts
-                        })
-                        .cloned()
-                        .collect::<Vec<_>>()
-                })
+                metric.exemplars.clone()
             } else {
                 None
             };
@@ -1139,6 +1131,14 @@ async fn selector_load_data_from_datafusion(
         None => return Ok(HashMap::default()),
     }
 
+    // check if exemplars field is exists
+    if query_exemplars {
+        let schema: Schema = df_group.schema().into();
+        if schema.field_with_name(EXEMPLARS_LABEL).is_err() {
+            return Ok(HashMap::default());
+        }
+    }
+
     let label_cols = df_group
         .schema()
         .fields()
@@ -1329,7 +1329,7 @@ async fn selector_load_data_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] load samples took: {:?}",
+        "[trace_id: {trace_id}] load data took: {:?}",
         start_time.elapsed()
     );
 
@@ -1441,16 +1441,22 @@ async fn load_samples_from_datafusion(
 }
 
 async fn load_exemplars_from_datafusion(
-    _trace_id: &str,
+    trace_id: &str,
     hash_field_type: &DataType,
     metrics: &mut HashMap<HashLabelValue, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
+    let start_time = std::time::Instant::now();
     let streams = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
         .execute_stream_partitioned()
         .await?;
+
+    log::info!(
+        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
+        start_time.elapsed()
+    );
 
     let mut tasks = Vec::new();
     for mut stream in streams {
@@ -1559,6 +1565,11 @@ async fn load_exemplars_from_datafusion(
             }
         }
     }
+
+    log::info!(
+        "[trace_id: {trace_id}] group batches took: {:?}",
+        start_time.elapsed()
+    );
 
     Ok(())
 }

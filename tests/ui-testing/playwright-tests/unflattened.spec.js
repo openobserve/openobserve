@@ -24,9 +24,7 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 async function toggleQuickModeIfOff(page) {
-  await page.waitForSelector(
-    '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
-  );
+  
   const toggleButton = await page.$(
     '[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner'
   );
@@ -119,9 +117,11 @@ test.describe("Unflattened testcases", () => {
     await unflattenedPage.searchStreamInput.waitFor(); // Wait for the search input to be ready
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(1000);
   
     await unflattenedPage.streamDetailButton.waitFor(); // Ensure the stream detail button is visible
     await unflattenedPage.streamDetailButton.click();
+    await page.waitForTimeout(1000);
   
     // Toggle 'Store Original Data' and update schema
     await unflattenedPage.storeOriginalDataToggle.waitFor(); // Wait for the toggle to be visible
@@ -186,9 +186,11 @@ test.describe("Unflattened testcases", () => {
     await unflattenedPage.searchStreamInput.waitFor();
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(1000);
     
     await unflattenedPage.streamDetailButton.waitFor();
     await unflattenedPage.streamDetailButton.click();
+    await page.waitForTimeout(1000);
 
     // Toggle 'Store Original Data' and update schema
     await unflattenedPage.storeOriginalDataToggle.waitFor();
@@ -281,9 +283,11 @@ test.describe("Unflattened testcases", () => {
     await unflattenedPage.searchStreamInput.waitFor();
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(1000);
     
     await unflattenedPage.streamDetailButton.waitFor();
     await unflattenedPage.streamDetailButton.click();
+    await page.waitForTimeout(1000);
     
     await unflattenedPage.storeOriginalDataToggle.waitFor();
     await unflattenedPage.storeOriginalDataToggle.click();

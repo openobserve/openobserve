@@ -172,7 +172,7 @@ const getDefaultField = () => {
 };
 
 
-const isSchemaEvolutionEnabled = computed(() => {
+const isSchemaUDSEnabled = computed(() => {
   return store.state.zoConfig.user_defined_schemas_enabled;
 });
 
@@ -323,7 +323,7 @@ const getStreamPayload = () => {
       }
     });
 
-    if (isSchemaEvolutionEnabled.value)
+    if (isSchemaUDSEnabled.value)
       settings.defined_schema_fields.push(field.name);
   });
 

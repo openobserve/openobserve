@@ -21,6 +21,7 @@ use config::{
     ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         inverted_index::InvertedIndexOptimizeMode,
+        search::SearchEventType,
         sql::{OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
@@ -42,8 +43,8 @@ use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
         FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
-        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut,
-        VisitorMut, helpers::attached_token::AttachedToken,
+        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, Value,
+        VisitMut, VisitorMut, helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -58,7 +59,7 @@ use super::{
     },
     index::{IndexCondition, get_index_condition_from_expr},
     request::Request,
-    utils::{is_field, is_value, split_conjunction, trim_quotes},
+    utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
@@ -95,18 +96,23 @@ pub struct Sql {
 
 impl Sql {
     pub async fn new_from_req(req: &Request, query: &SearchQuery) -> Result<Sql, Error> {
-        Self::new(query, &req.org_id, req.stream_type).await
+        let search_event_type = req
+            .search_event_type
+            .as_ref()
+            .and_then(|s| SearchEventType::try_from(s.as_str()).ok());
+        Self::new(query, &req.org_id, req.stream_type, search_event_type).await
     }
 
     pub async fn new(
         query: &SearchQuery,
         org_id: &str,
         stream_type: StreamType,
+        search_event_type: Option<SearchEventType>,
     ) -> Result<Sql, Error> {
         let cfg = get_config();
         let sql = query.sql.clone();
-        let limit = query.size as i64;
         let offset = query.from as i64;
+        let mut limit = query.size as i64;
 
         // 1. get table name
         let stream_names =
@@ -165,6 +171,13 @@ impl Sql {
             && order_by[0].1 == OrderBy::Desc;
         let use_inverted_index = column_visitor.use_inverted_index;
 
+        // check if need exact limit and offset
+        if limit == -1 || limit == 0 {
+            if let Some(n) = column_visitor.limit {
+                limit = n;
+            }
+        }
+
         // 4. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         statement.visit(&mut match_visitor);
@@ -196,6 +209,7 @@ impl Sql {
                 has_original_column,
                 query.quick_mode || cfg.limit.quick_mode_force_enabled,
                 cfg.limit.quick_mode_num_fields,
+                &search_event_type,
             );
         } else {
             for (stream, schema) in total_schemas.iter() {
@@ -231,7 +245,7 @@ impl Sql {
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             statement.visit(&mut add_timestamp_visitor);
-            if o2_id_is_needed(&used_schemas) {
+            if o2_id_is_needed(&used_schemas, &search_event_type) {
                 let mut add_o2_id_visitor = AddO2IdVisitor::new();
                 statement.visit(&mut add_o2_id_visitor);
             }
@@ -332,6 +346,7 @@ fn generate_select_star_schema(
     has_original_column: HashMap<TableReference, bool>,
     quick_mode: bool,
     quick_mode_num_fields: usize,
+    search_event_type: &Option<SearchEventType>,
 ) -> HashMap<TableReference, Arc<SchemaCache>> {
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
@@ -341,8 +356,10 @@ fn generate_select_star_schema(
         // check if it is user defined schema
         if defined_schema_fields.is_empty() || defined_schema_fields.len() > quick_mode_num_fields {
             let quick_mode = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
-            let skip_original_column =
-                !has_original_column && schema.contains_field(ORIGINAL_DATA_COL_NAME);
+            // don't automatically skip _original for scheduled pipeline searches
+            let skip_original_column = !has_original_column
+                && !matches!(search_event_type, Some(SearchEventType::DerivedStream))
+                && schema.contains_field(ORIGINAL_DATA_COL_NAME);
             if quick_mode || skip_original_column {
                 let fields = if quick_mode {
                     let mut columns = columns.get(&name).cloned();
@@ -553,6 +570,8 @@ struct ColumnVisitor<'a> {
     schemas: &'a HashMap<TableReference, Arc<SchemaCache>>,
     group_by: Vec<String>,
     order_by: Vec<(String, OrderBy)>, // field_name, order_by
+    offset: Option<i64>,
+    limit: Option<i64>,
     is_wildcard: bool,
     is_distinct: bool,
     has_agg_function: bool,
@@ -567,6 +586,8 @@ impl<'a> ColumnVisitor<'a> {
             schemas,
             group_by: Vec::new(),
             order_by: Vec::new(),
+            offset: None,
+            limit: None,
             is_wildcard: false,
             is_distinct: false,
             has_agg_function: false,
@@ -678,6 +699,18 @@ impl VisitorMut for ColumnVisitor<'_> {
                 }
             }
         }
+        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref() {
+            if let Ok(num) = n.to_string().parse::<i64>() {
+                self.limit = Some(num);
+            }
+        }
+        if let Some(offset) = query.offset.as_ref() {
+            if let Expr::Value(Value::Number(n, _)) = &offset.value {
+                if let Ok(num) = n.to_string().parse::<i64>() {
+                    self.offset = Some(num);
+                }
+            }
+        }
         ControlFlow::Continue(())
     }
 }
@@ -726,11 +759,16 @@ impl VisitorMut for IndexVisitor {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
                 self.index_condition = index;
+                let can_remove_filter = self
+                    .index_condition
+                    .as_ref()
+                    .map(|v| v.can_remove_filter())
+                    .unwrap_or(true);
                 // make sure all filter in where clause can be used in inverted index
-                if other_expr.is_none() && select.selection.is_some() {
+                if other_expr.is_none() && select.selection.is_some() && can_remove_filter {
                     self.can_optimize = true;
                 }
-                if self.is_remove_filter {
+                if self.is_remove_filter && can_remove_filter {
                     select.selection = other_expr;
                 }
             }
@@ -1577,11 +1615,16 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
     Ok(Some(where_str))
 }
 
-fn o2_id_is_needed(schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> bool {
-    schemas.values().any(|schema| {
-        let stream_setting = unwrap_stream_settings(schema.schema());
-        stream_setting.is_some_and(|setting| setting.store_original_data)
-    })
+fn o2_id_is_needed(
+    schemas: &HashMap<TableReference, Arc<SchemaCache>>,
+    search_event_type: &Option<SearchEventType>,
+) -> bool {
+    // avoid automatically adding _o2_id for pipeline queries
+    !matches!(search_event_type, Some(SearchEventType::DerivedStream))
+        && schemas.values().any(|schema| {
+            let stream_setting = unwrap_stream_settings(schema.schema());
+            stream_setting.is_some_and(|setting| setting.store_original_data)
+        })
 }
 
 #[cfg(feature = "enterprise")]
@@ -1716,6 +1759,94 @@ impl VisitorMut for AddOrderingTermVisitor {
     }
 }
 
+pub fn add_new_filters_with_and_operator(
+    sql: &str,
+    filters: HashMap<String, String>,
+) -> infra::errors::Result<String> {
+    if sql.is_empty() || filters.is_empty() {
+        return Ok(sql.to_string());
+    }
+
+    let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|e| Error::Message(e.to_string()))?
+        .pop()
+        .unwrap();
+    if is_complex_query(&mut statement) {
+        return Ok(sql.to_string());
+    }
+    let mut visitor = AddNewFiltersWithAndOperatorVisitor::new(filters);
+    statement.visit(&mut visitor);
+    Ok(statement.to_string())
+}
+
+struct AddNewFiltersWithAndOperatorVisitor {
+    filters: HashMap<String, String>,
+}
+
+impl AddNewFiltersWithAndOperatorVisitor {
+    fn new(filters: HashMap<String, String>) -> Self {
+        Self { filters }
+    }
+
+    fn build_selection(&mut self) -> Option<Expr> {
+        if self.filters.is_empty() {
+            return None;
+        }
+        let mut exprs = Vec::with_capacity(self.filters.len());
+        let mut keys = self.filters.keys().collect::<Vec<_>>();
+        keys.sort();
+        for key in keys {
+            let value = self.filters.get(key).unwrap();
+            exprs.push(Expr::BinaryOp {
+                left: Box::new(Expr::Identifier(Ident::new(key.to_string()))),
+                op: BinaryOperator::Eq,
+                right: Box::new(Expr::Value(Value::SingleQuotedString(value.to_string()))),
+            });
+        }
+        let exprs = exprs.iter().collect();
+        conjunction(exprs)
+    }
+}
+
+impl VisitorMut for AddNewFiltersWithAndOperatorVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        let Some(filter_exprs) = self.build_selection() else {
+            return ControlFlow::Break(());
+        };
+        match query.body.as_mut() {
+            SetExpr::Select(statement) => match statement.selection.as_mut() {
+                None => {
+                    statement.selection = Some(filter_exprs);
+                }
+                Some(selection) => {
+                    statement.selection = Some(Expr::BinaryOp {
+                        left: if matches!(
+                            selection,
+                            Expr::BinaryOp {
+                                op: BinaryOperator::Or,
+                                ..
+                            }
+                        ) {
+                            Box::new(Expr::Nested(Box::new(selection.clone())))
+                        } else {
+                            Box::new(selection.clone())
+                        },
+                        op: BinaryOperator::And,
+                        // the right side must be AND so don't need to check
+                        right: Box::new(filter_exprs),
+                    });
+                }
+            },
+            _ => {
+                return ControlFlow::Break(());
+            }
+        };
+        ControlFlow::Continue(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -1755,7 +1886,7 @@ mod tests {
         let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
         statement.visit(&mut index_visitor);
         let expected = "";
-        let expected_sql = "SELECT * FROM t WHERE name IS NOT NULL AND (age > 1) AND (match_all('foo') OR abs(age) = 2)";
+        let expected_sql = "SELECT * FROM t WHERE name IS NOT NULL AND age > 1 AND (match_all('foo') OR abs(age) = 2)";
         assert_eq!(
             index_visitor
                 .index_condition
@@ -1823,7 +1954,7 @@ mod tests {
         let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
         statement.visit(&mut index_visitor);
         let expected = "((_all:good AND _all:bar) OR (_all:foo AND name=c))";
-        let expected_sql = "SELECT * FROM t WHERE (foo = 'b' OR foo = 'c') AND (foo = 'd')";
+        let expected_sql = "SELECT * FROM t WHERE (foo = 'b' OR foo = 'c') AND foo = 'd'";
         assert_eq!(
             index_visitor.index_condition.clone().unwrap().to_query(),
             expected
@@ -2156,5 +2287,194 @@ mod tests {
             convert_histogram_interval_to_seconds("1000000 seconds").unwrap(),
             1000000
         );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_empty_sql() {
+        // Test adding filters to an empty SQL string
+        let sql = "";
+        let filters = HashMap::from([
+            ("column1".to_string(), "'value1'".to_string()),
+            ("column2".to_string(), "10".to_string()),
+        ]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should create a basic WHERE clause with the filters
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_simple_select() {
+        // Test adding filters to a simple SELECT statement
+        let sql = "SELECT * FROM table1";
+        let filters = HashMap::from([
+            ("column1".to_string(), "value1".to_string()),
+            ("column2".to_string(), "10".to_string()),
+        ]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add a WHERE clause
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE column1 = 'value1' AND column2 = '10'"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_existing_where() {
+        // Test adding filters to a query that already has a WHERE clause
+        let sql = "SELECT * FROM table1 WHERE column3 < 5";
+        let filters = HashMap::from([
+            ("column1".to_string(), "value1".to_string()),
+            ("column2".to_string(), "10".to_string()),
+        ]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add to the existing WHERE clause with AND
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE column3 < 5 AND column1 = 'value1' AND column2 = '10'"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_multiple_filters_and_or_condition() {
+        // Test adding filters to a query with multiple filters and OR condition
+        let sql = "SELECT * FROM table1 WHERE column1 = 'value1' OR column2 = 'value2'";
+        let filters = HashMap::from([("column3".to_string(), "value3".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add WHERE before ORDER BY
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE (column1 = 'value1' OR column2 = 'value2') AND column3 = 'value3'"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_multiple_filters_and_and_condition() {
+        // Test adding filters to a query with multiple filters and AND condition
+        let sql = "SELECT * FROM table1 WHERE column1 = 'value1' AND column2 = 'value2'";
+        let filters = HashMap::from([("column3".to_string(), "value3".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add WHERE before ORDER BY
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE column1 = 'value1' AND column2 = 'value2' AND column3 = 'value3'"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_empty_filters() {
+        // Test with empty filters array
+        let sql = "SELECT * FROM table1";
+        let filters: HashMap<String, String> = HashMap::new();
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should return the original SQL unchanged
+        assert_eq!(result, sql);
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_group_by() {
+        // Test adding filters to a query with GROUP BY
+        let sql = "SELECT column1, COUNT(*) FROM table1 GROUP BY column1";
+        let filters = HashMap::from([("column2".to_string(), "value2".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add WHERE before GROUP BY
+        assert_eq!(result, sql.to_string());
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_order_by() {
+        // Test adding filters to a query with ORDER BY
+        let sql = "SELECT * FROM table1 ORDER BY column1 DESC";
+        let filters = HashMap::from([("column2".to_string(), "value2".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add WHERE before ORDER BY
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE column2 = 'value2' ORDER BY column1 DESC"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_limit() {
+        // Test adding filters to a query with LIMIT
+        let sql = "SELECT * FROM table1 LIMIT 10";
+        let filters = HashMap::from([("column1".to_string(), "value1".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // Should add WHERE before LIMIT
+        assert_eq!(
+            result,
+            "SELECT * FROM table1 WHERE column1 = 'value1' LIMIT 10"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_complex_query() {
+        // Test adding filters to a complex query
+        let sql = "SELECT t1.column1, t2.column2 FROM table1 t1 JOIN table2 t2 ON t1.id = t2.id WHERE t1.status = 'active' GROUP BY t1.column1 ORDER BY t2.column2 LIMIT 20";
+        let filters = HashMap::from([
+            ("t1.region".to_string(), "west".to_string()),
+            ("t2.value".to_string(), "100".to_string()),
+        ]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // the function don't add WHERE for the aggregation query
+        assert_eq!(result, sql.to_string());
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_having() {
+        // Test adding filters to a query with HAVING
+        let sql = "SELECT department, AVG(salary) FROM employees GROUP BY department HAVING AVG(salary) > 50000";
+        let filters = HashMap::from([("department".to_string(), "'HR'".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // the function don't add WHERE for the aggregation query
+        assert_eq!(result, sql.to_string());
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_subquery() {
+        // Test adding filters to a query with a subquery
+        let sql = "SELECT * FROM (SELECT id, name FROM users) AS u";
+        let filters = HashMap::from([("u.id".to_string(), "100".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // we support subquery
+        assert_eq!(
+            result,
+            "SELECT * FROM (SELECT id, name FROM users WHERE u.id = '100') AS u WHERE u.id = '100'"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_with_and_operator_with_field_in_subquery() {
+        // Test adding filters to a query with a subquery
+        let sql = "SELECT * FROM users WHERE id IN (SELECT id FROM users)";
+        let filters = HashMap::from([("id".to_string(), "100".to_string())]);
+
+        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
+
+        // we support this type of query
+        assert_eq!(result, sql.to_string());
     }
 }

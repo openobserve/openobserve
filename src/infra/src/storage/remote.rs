@@ -87,7 +87,7 @@ impl ObjectStore for Remote {
                 })
             }
             Err(err) => {
-                log::error!("s3 File upload error: {:?}", err);
+                log::error!("[STORAGE] put_opts remote file: {}, error: {:?}", file, err);
                 Err(err)
             }
         }
@@ -106,7 +106,11 @@ impl ObjectStore for Remote {
         {
             Ok(r) => Ok(r),
             Err(err) => {
-                log::error!("s3 multipart File upload error: {:?}", err);
+                log::error!(
+                    "[STORAGE] put_multipart_opts remote file: {}, error: {:?}",
+                    file,
+                    err
+                );
                 Err(err)
             }
         }
@@ -115,7 +119,14 @@ impl ObjectStore for Remote {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
-        let result = self.client.get(&(format_key(&file, true).into())).await?;
+        let result = self
+            .client
+            .get(&(format_key(&file, true).into()))
+            .await
+            .map_err(|e| {
+                log::error!("[STORAGE] get remote file: {}, error: {:?}", file, e);
+                e
+            })?;
 
         // metrics
         let data_len = result.meta.size;
@@ -143,7 +154,11 @@ impl ObjectStore for Remote {
         let result = self
             .client
             .get_opts(&(format_key(&file, true).into()), options)
-            .await?;
+            .await
+            .map_err(|e| {
+                log::error!("[STORAGE] get_opts remote file: {}, error: {:?}", file, e);
+                e
+            })?;
 
         // metrics
         let data_len = result.meta.size;
@@ -157,7 +172,7 @@ impl ObjectStore for Remote {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "remote"])
                 .inc_by(time);
         }
 
@@ -169,8 +184,17 @@ impl ObjectStore for Remote {
         let file = location.to_string();
         let data = self
             .client
-            .get_range(&(format_key(&file, true).into()), range)
-            .await?;
+            .get_range(&(format_key(&file, true).into()), range.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[STORAGE] get_range remote file: {}, range: {:?}, error: {:?}",
+                    file,
+                    range,
+                    e
+                );
+                e
+            })?;
 
         // metrics
         let data_len = data.len();
@@ -184,7 +208,7 @@ impl ObjectStore for Remote {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
                 .inc_by(time);
         }
 

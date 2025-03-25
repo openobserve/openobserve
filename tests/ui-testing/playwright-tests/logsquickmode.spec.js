@@ -90,7 +90,7 @@ test.describe("Logs Quickmode testcases", () => {
     await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
  
     await applyQueryButton(page);
-    await page.waitForSelector('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+
     // Get the toggle button element
     const toggleButton = await page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
     // Evaluate the class attribute to determine if the toggle is in the off state
@@ -114,7 +114,7 @@ test.describe("Logs Quickmode testcases", () => {
       )
       .first()
       .click();
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);
     await expect(
       page
@@ -185,7 +185,7 @@ test.describe("Logs Quickmode testcases", () => {
       )
       .first()
       .click();
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForSelector('[data-test="logs-search-bar-query-editor"]');
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate"')
@@ -220,7 +220,7 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click({
@@ -265,7 +265,7 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click({
@@ -299,7 +299,7 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')

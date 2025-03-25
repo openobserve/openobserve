@@ -125,6 +125,7 @@ struct ConfigResponse<'a> {
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
+    actions_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -214,6 +215,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let rbac_enabled = false;
 
     #[cfg(feature = "enterprise")]
+    let actions_enabled = o2cfg.actions.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let actions_enabled = false;
+
+    #[cfg(feature = "enterprise")]
     let super_cluster_enabled = o2cfg.super_cluster.enabled;
     #[cfg(not(feature = "enterprise"))]
     let super_cluster_enabled = false;
@@ -256,10 +262,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let build_type = "opensource";
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
-        version: VERSION.to_string(),
+        version: config::VERSION.to_string(),
         instance: get_instance_id(),
-        commit_hash: COMMIT_HASH.to_string(),
-        build_date: BUILD_DATE.to_string(),
+        commit_hash: config::COMMIT_HASH.to_string(),
+        build_date: config::BUILD_DATE.to_string(),
         build_type: build_type.to_string(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
@@ -309,6 +315,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
+        actions_enabled,
     }))
 }
 

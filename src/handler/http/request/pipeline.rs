@@ -60,7 +60,7 @@ pub async fn save_pipeline(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let mut pipeline = pipeline.into_inner();
-    pipeline.name = pipeline.name.trim().to_string();
+    pipeline.name = pipeline.name.trim().to_lowercase();
     pipeline.org = org_id;
     pipeline.id = ider::generate();
     match pipeline::save_pipeline(pipeline).await {

@@ -24,3 +24,19 @@ pub fn get_os_version() -> String {
 pub fn get_hostname() -> String {
     sysinfo::System::host_name().unwrap_or("unknown".to_string())
 }
+
+#[cfg(target_os = "linux")]
+pub fn get_open_fds() -> usize {
+    match std::fs::read_dir("/proc/self/fd") {
+        Ok(entries) => entries.count(),
+        Err(e) => {
+            log::warn!("Failed to read open file descriptors: {}", e);
+            0
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn get_open_fds() -> usize {
+    0
+}

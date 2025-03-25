@@ -46,7 +46,7 @@ pub fn new_parquet_writer<'a>(
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
-        .set_compression(Compression::ZSTD(Default::default()))
+        .set_compression(get_parquet_compression(&cfg.common.parquet_compression))
         .set_column_dictionary_enabled(
             TIMESTAMP_COL_NAME.into(),
             false,
@@ -55,6 +55,10 @@ pub fn new_parquet_writer<'a>(
             TIMESTAMP_COL_NAME.into(),
             Encoding::DELTA_BINARY_PACKED,
         );
+    if cfg.common.timestamp_compression_disabled {
+        writer_props = writer_props
+            .set_column_compression(TIMESTAMP_COL_NAME.into(), Compression::UNCOMPRESSED);
+    }
     if write_metadata {
         writer_props = writer_props.set_key_value_metadata(Some(vec![
             KeyValue::new("min_ts".to_string(), metadata.min_ts.to_string()),

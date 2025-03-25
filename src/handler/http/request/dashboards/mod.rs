@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put, web};
+use hashbrown::HashMap;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::models::dashboards::{
         CreateDashboardRequestBody, CreateDashboardResponseBody, GetDashboardResponseBody,
         ListDashboardsQuery, ListDashboardsResponseBody, MoveDashboardRequestBody,
@@ -97,13 +96,18 @@ pub async fn create_dashboard(
     path: web::Path<String>,
     req_body: web::Json<CreateDashboardRequestBody>,
     req: HttpRequest,
+    user_email: UserEmail,
 ) -> impl Responder {
     let org_id = path.into_inner();
     let folder = get_folder(req);
-    let dashboard = match req_body.into_inner().try_into() {
+    let mut dashboard: config::meta::dashboards::Dashboard = match req_body.into_inner().try_into()
+    {
         Ok(dashboard) => dashboard,
         Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
     };
+
+    set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
+
     let saved = match dashboards::create_dashboard(&org_id, &folder, dashboard).await {
         Ok(saved) => saved,
         Err(err) => return err.into(),
@@ -139,16 +143,21 @@ async fn update_dashboard(
     path: web::Path<(String, String)>,
     req_body: web::Json<UpdateDashboardRequestBody>,
     req: HttpRequest,
+    user_email: UserEmail,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
 
-    let dashboard = match req_body.into_inner().try_into() {
+    let mut dashboard: config::meta::dashboards::Dashboard = match req_body.into_inner().try_into()
+    {
         Ok(dashboard) => dashboard,
         Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
     };
+
+    set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
+
     let saved = match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash)
         .await
     {
@@ -328,7 +337,7 @@ async fn move_dashboards(
     }
 }
 
-fn get_folder(req: HttpRequest) -> String {
+pub fn get_folder(req: HttpRequest) -> String {
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     crate::common::utils::http::get_folder(&query)
 }
@@ -339,4 +348,20 @@ fn get_user_id(req: HttpRequest) -> Option<String> {
         .get("user_id")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
+}
+
+fn set_dashboard_owner_if_empty(
+    dashboard: &mut config::meta::dashboards::Dashboard,
+    user_email: &str,
+) {
+    match dashboard.owner() {
+        Some(owner) => {
+            if owner.is_empty() {
+                dashboard.set_owner(user_email.to_string());
+            }
+        }
+        None => {
+            dashboard.set_owner(user_email.to_string());
+        }
+    }
 }

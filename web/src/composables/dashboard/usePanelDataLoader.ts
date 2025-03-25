@@ -457,7 +457,7 @@ export const usePanelDataLoader = (
                   dashboard_id: dashboardId?.value,
                   folder_id: folderId?.value,
                 },
-                searchType.value ?? "Dashboards",
+                searchType.value ?? "dashboards",
               ),
             abortControllerRef.signal,
           );
@@ -661,7 +661,7 @@ export const usePanelDataLoader = (
           ),
         },
         stream_type: payload.pageType,
-        search_type: "dashboards",
+        search_type: searchType.value ?? "dashboards",
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
@@ -894,6 +894,9 @@ export const usePanelDataLoader = (
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
+      // remove past error detail
+      state.errorDetail = "";
+      
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
         // Iterate through each query in the panel schema
@@ -1098,7 +1101,7 @@ export const usePanelDataLoader = (
                           dashboard_id: dashboardId?.value,
                           folder_id: folderId?.value,
                         },
-                        searchType.value ?? "Dashboards",
+                        searchType.value ?? "dashboards",
                       ),
                     abortControllerRef.signal,
                   );

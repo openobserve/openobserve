@@ -64,7 +64,7 @@
     "vue": "^3.5.13",
     "vue-drag-resize": "^1.5.4",
     "vue-draggable-next": "^2.2.1",
-    "vue-i18n": "^11.0.1",
+    "vue-i18n": "^11.1.2",
     "vue-router": "^4.5.0",
     "vue3-grid-layout": "^1.0.0",
     "vuex": "^4.1.0"
@@ -116,7 +116,7 @@
     "start-server-and-test": "^2.0.4",
     "tailwindcss": "^3.4.4",
     "typescript": "~5.5.3",
-    "vite": "^5.4.14",
+    "vite": "^6.2.2",
     "vite-plugin-istanbul": "^6.0.2",
     "vite-plugin-monaco-editor": "^1.1.0",
     "vitest": "^3.0.5",

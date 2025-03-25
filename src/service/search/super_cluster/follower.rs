@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use config::{
+    cluster::LOCAL_NODE,
     meta::{
         cluster::{IntoArcVec, RoleGroup},
         search::{ScanStats, SearchEventType},
@@ -159,7 +160,13 @@ pub async fn search(
                 .map(RoleGroup::from)
         })
         .unwrap_or(None);
-    let nodes = get_online_querier_nodes(&trace_id, node_group).await?;
+    let mut nodes = get_online_querier_nodes(&trace_id, node_group).await?;
+
+    // local mode, only use local node as querier for the query
+    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
+        nodes = vec![LOCAL_NODE.clone()];
+    }
+
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");

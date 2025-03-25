@@ -16,6 +16,7 @@
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use config::{
     meta::{
+        cluster::RoleGroup,
         search::{self, Response, SearchPartitionRequest},
         stream::StreamType,
     },
@@ -167,6 +168,7 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
         &job.org_id,
         stream_type,
         &partition_req,
+        Some(RoleGroup::Interactive),
         true,
     )
     .await?;
@@ -216,6 +218,7 @@ async fn run_partition_job(
         stream_type,
         Some(job.user_id.clone()),
         &req,
+        Some(RoleGroup::Interactive),
     )
     .await;
     if let Err(e) = res {
@@ -411,7 +414,7 @@ pub async fn merge_response(
         resp.idx_scan_size += r.idx_scan_size;
         resp.scan_records += r.scan_records;
         if !r.function_error.is_empty() {
-            resp.function_error = format!("{} \n {}", resp.function_error, r.function_error);
+            resp.function_error.extend(r.function_error);
             resp.is_partial = true;
         }
     }

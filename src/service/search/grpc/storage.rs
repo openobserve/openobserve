@@ -191,6 +191,7 @@ pub async fn search(
             scan_stats.records += file.meta.records;
             scan_stats.original_size += file.meta.original_size;
             scan_stats.compressed_size += file.meta.compressed_size;
+            scan_stats.idx_scan_size += file.meta.index_size;
             // check schema version
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
@@ -323,11 +324,14 @@ async fn cache_files(
     file_type: &str,
 ) -> Result<file_data::CacheType, Error> {
     // check how many files already cached
+    let mut cached_files = HashSet::with_capacity(files.len());
     for file in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
+            cached_files.insert(file);
         } else if file_data::disk::exist(file).await {
             scan_stats.querier_disk_cached_files += 1;
+            cached_files.insert(file);
         }
     }
     let files_num = files.len() as i64;
@@ -355,7 +359,16 @@ async fn cache_files(
     };
 
     let trace_id = trace_id.to_string();
-    let files = files.iter().map(|f| f.to_string()).collect_vec();
+    let files = files
+        .iter()
+        .filter_map(|f| {
+            if cached_files.contains(f) {
+                None
+            } else {
+                Some(f.to_string())
+            }
+        })
+        .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
         let files = files.iter().map(|f| f.as_str()).collect_vec();

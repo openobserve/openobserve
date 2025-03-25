@@ -18,7 +18,9 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
-    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT, get_config,
+    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
@@ -136,7 +138,13 @@ pub async fn search(
                 .map(RoleGroup::from)
         })
         .unwrap_or(None);
-    let nodes = get_online_querier_nodes(trace_id, node_group).await?;
+    let mut nodes = get_online_querier_nodes(trace_id, node_group).await?;
+
+    // local mode, only use local node as querier for the query
+    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
+        nodes = vec![LOCAL_NODE.clone()];
+    }
+
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");
@@ -346,6 +354,10 @@ pub async fn run_datafusion(
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
+    log::info!(
+        "[trace_id {trace_id}] flight->search: datafusion context created with target_partitions: {}",
+        ctx.state().config().target_partitions(),
+    );
 
     register_table(&ctx, &sql).await?;
 
@@ -971,7 +983,7 @@ pub async fn get_inverted_index_file_list(
     req.stream_type = StreamType::Index;
     query.sql = sql;
     query.from = 0;
-    query.size = QUERY_WITH_NO_LIMIT;
+    query.size = QUERY_WITH_NO_LIMIT as i32;
     query.track_total_hits = false;
     query.uses_zo_fn = false;
     query.query_fn = "".to_string();

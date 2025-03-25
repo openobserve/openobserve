@@ -21,13 +21,16 @@ use config::{
 };
 
 pub mod broadcast;
-pub mod idx;
+mod idx;
 pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_ingester() {
         return Ok(()); // not an ingester, no need to init job
     }
+
+    // load pending delete files to memory cache
+    crate::service::db::file_list::local::load_pending_delete().await?;
 
     tokio::task::spawn(async move { parquet::run().await });
     tokio::task::spawn(async move { broadcast::run().await });

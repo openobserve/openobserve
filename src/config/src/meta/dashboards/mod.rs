@@ -101,6 +101,37 @@ impl Dashboard {
         }
     }
 
+    pub fn set_owner(&mut self, owner: String) {
+        match self {
+            Self {
+                version: 1,
+                v1: Some(inner),
+                ..
+            } => inner.owner = owner,
+            Self {
+                version: 2,
+                v2: Some(inner),
+                ..
+            } => inner.owner = owner,
+            Self {
+                version: 3,
+                v3: Some(inner),
+                ..
+            } => inner.owner = owner,
+            Self {
+                version: 4,
+                v4: Some(inner),
+                ..
+            } => inner.owner = owner,
+            Self {
+                version: 5,
+                v5: Some(inner),
+                ..
+            } => inner.owner = owner,
+            _ => {}
+        };
+    }
+
     pub fn title(&self) -> Option<&str> {
         match self.version {
             1 => self.v1.as_ref().map(|inner| inner.title.as_str()),
