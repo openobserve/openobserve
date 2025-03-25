@@ -18,6 +18,7 @@ use std::{
     str::FromStr,
 };
 
+
 use async_trait::async_trait;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
@@ -57,6 +58,17 @@ use o2_openfga::{
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
+
+#[cfg(feature = "enterprise")]
+use actix_http::header::HeaderMap;
+#[cfg(feature = "enterprise")]
+use tracing::{Level, span};
+#[cfg(feature = "enterprise")]
+use crate::{
+    common::utils::{
+        http::get_or_create_trace_id,
+    },
+};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
@@ -997,10 +1009,12 @@ async fn send_http_notification(
             ));
         };
 
+        let trace_id = get_or_create_trace_id(&HeaderMap::new(), &span!(Level::TRACE, "action_destinations"));
+
         let req = TriggerActionRequest {
             inputs,
             trigger_source: TriggerSource::Alerts,
-            trace_id: "actions".to_string(),
+            trace_id,
         };
         serde_json::to_string(&req)
             .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?
