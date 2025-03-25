@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-font-bold tw-pt-6 tw-pb-2">
         Check further documentation at:
       </div>
-      <ol style="list-style: decimal;" class="q-pl-md">
+      <ol class="tw-list-decimal q-pl-md">
         <li class="tw-py-2">
           <a
             href="https://openobserve.ai/blog/send-gcp-logs-to-openobserve"

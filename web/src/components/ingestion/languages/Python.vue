@@ -32,12 +32,12 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
     <div class="tw-text-[16px]">
       <CopyContent class="q-mt-sm" :content="content" />
       <div class="tw-font-bold tw-pt-6 tw-pb-2">Check further documentation at:</div>
-      <ol style="list-style: decimal;" class="q-pl-md">
+      <ol class="tw-list-decimal q-pl-md">
         <li class="tw-py-2">
-          <a :href="docURL" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">Python</a>
+          <a :href="docURL" target="_blank" class="text-blue-500 hover:tw-underline">Python</a>
         </li>
         <li class="tw-py-2">
-          <a :href="docURLFastAPI" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">FastAPI</a>
+          <a :href="docURLFastAPI" target="_blank" class="text-blue-500 hover:tw-underline">FastAPI</a>
         </li>
       </ol>
     </div>

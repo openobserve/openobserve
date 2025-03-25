@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-font-bold tw-pt-6 tw-pb-2">
         Check further documentation at:
       </div>
-      <ol style="tw-list-decimal tw-pl-[27px]">
+      <ol class="tw-list-decimal tw-pl-[27px]">
         <li
           v-for="awsService in awsServiceLinks"
           :key="awsService.name"
