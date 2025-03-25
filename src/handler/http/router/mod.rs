@@ -552,7 +552,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(actions::action::update_action_details)
         .service(actions::action::serve_action_zip)
         .service(actions::action::delete_action)
-        .service(ratelimit::upload_org_ratelimit)
         .service(ratelimit::list_module_ratelimit)
         .service(ratelimit::list_role_ratelimit)
         .service(ratelimit::update_ratelimit)

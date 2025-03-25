@@ -140,7 +140,6 @@ use crate::{common::meta, handler::http::request};
         request::clusters::list_clusters,
         request::short_url::shorten,
         request::short_url::retrieve,
-        request::ratelimit::upload_org_ratelimit,
         request::ratelimit::list_module_ratelimit,
         request::ratelimit::list_role_ratelimit,
         request::ratelimit::update_ratelimit,

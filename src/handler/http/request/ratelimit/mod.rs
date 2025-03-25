@@ -15,7 +15,6 @@
 
 use std::io::Error;
 
-use actix_multipart::Multipart;
 use actix_web::{HttpResponse, get, put, web};
 use config::meta::ratelimit::RatelimitRuleUpdater;
 use serde::Deserialize;
@@ -27,17 +26,16 @@ use {
     },
     actix_web::http,
     config::meta::ratelimit::RatelimitRule,
-    futures_util::{StreamExt, TryStreamExt},
     infra::table::ratelimit::RuleEntry,
     o2_ratelimit::dataresource::{
         default_rules::{
-            ApiGroupOperation, DEFAULT_GLOBAL_ORG_IDENTIFIER, DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER,
+            ApiGroupOperation, DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER,
             DEFAULT_THRESHOLD_NO_LIMIT_FRONTEND, RATELIMIT_API_MAPPING,
             get_ratelimit_global_default_api_info, has_group_name_and_operation,
         },
         default_rules_provider::get_default_rules,
     },
-    std::io::Write,
+    std::collections::HashMap,
 };
 
 #[cfg(feature = "enterprise")]
@@ -52,7 +50,30 @@ struct UpdateQueryParams {
 struct UpdateQueryParams();
 
 #[cfg(feature = "enterprise")]
-async fn validate_ratelimit_updater(rules: &RatelimitRuleUpdater) -> Result<(), anyhow::Error> {
+async fn validate_ratelimit_updater(
+    org_id: &str,
+    rules: &RatelimitRuleUpdater,
+) -> Result<(), anyhow::Error> {
+    let global_default_rules = get_default_rules().await.unwrap();
+
+    // module-level is org-level
+    let org_level_rules = infra::table::ratelimit::fetch_rules(
+        global_default_rules.clone(),
+        Some(org_id.to_string()),
+        Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
+    )
+    .await
+    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+    let org_level_thresholds: HashMap<(String, ApiGroupOperation), i32> = org_level_rules
+        .into_iter()
+        .filter_map(|rule| {
+            let group_name = rule.api_group_name?;
+            let operation = ApiGroupOperation::try_from(rule.api_group_operation?.as_str()).ok()?;
+            Some(((group_name, operation), rule.threshold))
+        })
+        .collect();
+
     for (api_group_name, operations) in rules.iter() {
         for (operation, threshold) in operations.iter() {
             // Validate operation format
@@ -79,6 +100,19 @@ async fn validate_ratelimit_updater(rules: &RatelimitRuleUpdater) -> Result<(), 
                 return Err(anyhow::anyhow!(
                     "threshold must be greater than or equal to {}, got {}",
                     DEFAULT_THRESHOLD_NO_LIMIT_FRONTEND,
+                    threshold
+                ));
+            }
+
+            let compare_threshold = org_level_thresholds
+                .get(&(api_group_name.to_string(), operation))
+                .unwrap();
+            if *compare_threshold < *threshold {
+                return Err(anyhow::anyhow!(
+                    "{}:{} threshold must be lower than or equal to {}, got {}",
+                    api_group_name,
+                    operation.as_str(),
+                    compare_threshold,
                     threshold
                 ));
             }
@@ -170,8 +204,8 @@ pub async fn list_module_ratelimit(path: web::Path<String>) -> Result<HttpRespon
         let global_default_rules = get_default_rules()
             .await
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        // module-level is org-level, we first look for the custom org-level rules
-        let mut all_rules = infra::table::ratelimit::fetch_rules(
+        // module-level is org-level
+        let all_rules = infra::table::ratelimit::fetch_rules(
             global_default_rules.clone(),
             Some(org_id.clone()),
             Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
@@ -179,20 +213,8 @@ pub async fn list_module_ratelimit(path: web::Path<String>) -> Result<HttpRespon
         .await
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-        // if we have no custom org-level, look for the global org-level
-        if all_rules.is_empty() {
-            all_rules = infra::table::ratelimit::fetch_rules(
-                global_default_rules,
-                Some(DEFAULT_GLOBAL_ORG_IDENTIFIER.to_string()),
-                Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
-            )
-            .await
-            .unwrap();
-        }
-
         let info = get_ratelimit_global_default_api_info().await;
         let api_group_info = info.api_groups(Some(org_id.as_str()), all_rules).await;
-        // let res = RatelimitList { api_group_info };
 
         Ok(HttpResponse::Ok().json(api_group_info))
     }
@@ -235,17 +257,28 @@ pub async fn list_role_ratelimit(path: web::Path<(String, String)>) -> Result<Ht
         }
 
         let global_default_rules = get_default_rules().await.unwrap();
-        let all_rules = infra::table::ratelimit::fetch_rules(
-            global_default_rules,
+
+        // module-level is org-level
+        let org_level_rules = infra::table::ratelimit::fetch_rules(
+            global_default_rules.clone(),
+            Some(org_id.clone()),
+            Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
+        )
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+        let role_level_rules = infra::table::ratelimit::fetch_rules(
+            org_level_rules,
             Some(org_id.clone()),
             Some(user_role),
         )
         .await
-        .unwrap();
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         let info = get_ratelimit_global_default_api_info().await;
-        let api_group_info = info.api_groups(Some(org_id.as_str()), all_rules).await;
-        // let res = RatelimitList { api_group_info };
+        let api_group_info = info
+            .api_groups(Some(org_id.as_str()), role_level_rules)
+            .await;
 
         Ok(HttpResponse::Ok().json(api_group_info))
     }
@@ -296,7 +329,7 @@ pub async fn update_ratelimit(
                 .await;
         }
 
-        if let Err(e) = validate_ratelimit_updater(&updater).await {
+        if let Err(e) = validate_ratelimit_updater(org_id.as_str(), &updater).await {
             return Ok(MetaHttpResponse::bad_request(format!(
                 "validate ratelimit updater error: {}",
                 e,
@@ -337,129 +370,6 @@ pub async fn update_ratelimit(
         drop(path);
         let _ = query;
         drop(updater);
-        Ok(HttpResponse::Forbidden().json("Not Supported"))
-    }
-}
-
-/// UploadRatelimitRule
-///
-/// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"update"}#
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Ratelimit",
-    operation_id = "UploadRatelimitRule",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("update_type" = String, Query, description = "Update Type"),
-        ("user_role" = Option<String>, Query, description = "UserRole name"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-    )
-)]
-#[put("/{org_id}/ratelimit/upload")]
-pub async fn upload_org_ratelimit(
-    path: web::Path<String>,
-    query: web::Query<UpdateQueryParams>,
-    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))] mut payload: Multipart,
-) -> Result<HttpResponse, Error> {
-    #[cfg(feature = "enterprise")]
-    {
-        let org_id = path.into_inner();
-
-        if RATELIMIT_API_MAPPING.read().await.is_empty() {
-            let openapi_info = crate::handler::http::router::openapi::openapi_info().await;
-            o2_ratelimit::dataresource::default_rules::init_ratelimit_api_mapping(openapi_info)
-                .await;
-        }
-
-        let user_role = match query.update_type.as_str() {
-            "module" => DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string(),
-            "role" => {
-                if query.user_role.is_none() {
-                    return Ok(MetaHttpResponse::bad_request(
-                        "user_role param is required when update_type=role".to_string(),
-                    ));
-                } else {
-                    query.user_role.clone().unwrap()
-                }
-            }
-            _ => {
-                return Ok(MetaHttpResponse::bad_request(format!(
-                    "update_type is incorrect: {}, only support module or role",
-                    query.update_type,
-                )));
-            }
-        };
-
-        // Process multipart payload
-        while let Ok(Some(mut field)) = payload.try_next().await {
-            // Check if this is the JSON field
-            if field.name() == Some("rules") {
-                // Collect field data
-                let mut json_data = Vec::new();
-                while let Some(chunk) = field.next().await {
-                    let data = chunk.unwrap();
-                    json_data.write_all(&data)?;
-                }
-
-                // Parse JSON data into RatelimitRuleUpdater
-                match serde_json::from_slice::<RatelimitRuleUpdater>(&json_data) {
-                    Ok(updater) => {
-                        // Validate updater
-                        if let Err(e) = validate_ratelimit_updater(&updater).await {
-                            return Ok(MetaHttpResponse::bad_request(format!(
-                                "validate ratelimit updater error: {}",
-                                e,
-                            )));
-                        }
-
-                        let rules = RatelimitRule::from_updater(
-                            org_id.as_str(),
-                            user_role.as_str(),
-                            &updater,
-                        );
-                        // Save rules
-                        match ratelimit::rule::save_batch(RuleEntry::UpsertBatch(rules)).await {
-                            Ok(_) => {
-                                return Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                                    http::StatusCode::OK.into(),
-                                    "Ratelimit rule uploaded successfully".to_string(),
-                                )));
-                            }
-                            Err(e) => {
-                                return Ok(MetaHttpResponse::internal_error(format!(
-                                    "Failed to save ratelimit rules: {}",
-                                    e
-                                )));
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        return Ok(MetaHttpResponse::internal_error(format!(
-                            "Ratelimit rule upload error {:?}",
-                            e
-                        )));
-                    }
-                }
-            }
-        }
-
-        // If we get here, we didn't find the expected JSON field
-        Ok(MetaHttpResponse::bad_request(
-            "Ratelimit rule missing".to_string(),
-        ))
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    {
-        drop(path);
-        let _ = query;
-        let _ = payload;
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
