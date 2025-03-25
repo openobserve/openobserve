@@ -38,7 +38,6 @@ const useSearchWebSocket = () => {
   const onOpen = (response: any) => {
     isCreatingSocket.value = false;
     Object.keys(traces).forEach((traceId) => {
-      console.log("on open", traceId, traces[traceId]?.open?.length);
       if(traces[traceId].isActive) {
         traces[traceId].isInitiated = true;
         traces[traceId].open.forEach((handler: any) => handler(response));
@@ -187,7 +186,6 @@ const useSearchWebSocket = () => {
       reset: (data: any, response: any) => void;
     }  
   ) => {
-    console.log("fetchQueryDataWithWebSocket", data.traceId, traces, socketId.value);
     try {
       traces[data.traceId] = {
         open: [],
@@ -207,7 +205,6 @@ const useSearchWebSocket = () => {
       traces[data.traceId].open.push(handlers.open.bind(null, data));
       traces[data.traceId].reset.push(handlers.reset.bind(null, data));
 
-      console.log("isInDrainMode", isInDrainMode.value);
       if (isInDrainMode.value) {
         return data.traceId;
       }
@@ -315,7 +312,6 @@ const useSearchWebSocket = () => {
   }
 
   const retryActiveTrace = (traceId: string, response: any) => {
-    console.log("retryActiveTrace", traceId, response);
     traces[traceId]?.close.forEach((handler: any) => handler(response));
     traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data));
     cleanUpListeners(traceId);   
@@ -324,13 +320,9 @@ const useSearchWebSocket = () => {
   const resetAuthToken = () => {
     authService.refresh_token().then((res: any) => {
       isInDrainMode.value = false;
-      console.log("resetAuthToken", res);
       // Retry the request
-      console.log("traces", Object.keys(traces));
       Object.keys(traces).forEach((traceId) => {
-        console.log("reset request closed by 401", traces[traceId], traces[traceId].isInitiated);
         if(!traces[traceId].isInitiated) {
-          console.log("initiateSocketConnection", traces[traceId].data);
           initiateSocketConnection(traces[traceId].data, {
             open: traces[traceId].open[0],
             message: traces[traceId].message[0],
