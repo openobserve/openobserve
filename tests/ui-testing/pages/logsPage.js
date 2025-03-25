@@ -468,5 +468,46 @@ async selectIndexStreamDefault() {
 
 }
 
+async selectStreamDefault() {
+  await this.page.waitForSelector('[data-test="logs-search-index-list"]');
+  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.waitForSelector('[data-test="log-search-index-list-stream-toggle-default"] div');
+  await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
+  
+}
+
+async selectQueryDefault() {
+  await this.page
+    .locator('[data-test="logs-search-bar-query-editor"]')
+    .getByLabel("Editor content;Press Alt+F1")
+    .fill('SELECT * FROM "default"');
+  await this.page.waitForTimeout(5000);
+}
+
+async selectQuery1DayTime() {
+  await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+  await this.page.locator(this.dateTimeButton).click();
+  await this.page.waitForSelector('[data-test="date-time-relative-1-d-btn"]');
+  await this.page.locator('[data-test="date-time-relative-1-d-btn"]').click();
+  await this.page.waitForTimeout(5000);
+}
+
+async selectQuery4DaysTime() {
+  await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+  await this.page.locator(this.dateTimeButton).click();
+  await this.page.waitForSelector('[data-test="date-time-relative-4-d-btn"]');
+  await this.page.locator('[data-test="date-time-relative-4-d-btn"]').click();
+  
+}
+
+async logsPageOtlpOrg() {
+
+  await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+  await this.page.waitForTimeout(2000);
+  await this.page.getByRole('option', { name: 'otlp-production' }).locator('div').nth(2).click();
+
+
+
+}
 
 }
