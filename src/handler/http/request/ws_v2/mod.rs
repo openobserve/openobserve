@@ -1,7 +1,7 @@
 pub mod session;
 
 use actix_web::{Error, HttpRequest, HttpResponse, get, web};
-use config::get_config;
+use config::{cluster::LOCAL_NODE, get_config};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::extract_auth_expiry_and_user_id;
@@ -69,6 +69,8 @@ pub async fn websocket(
 /// Initialize the job init for websocket
 pub async fn init() -> Result<(), anyhow::Error> {
     // Run the garbage collector for websocket sessions
-    sessions_cache_utils::run_gc_ws_sessions().await;
+    if LOCAL_NODE.is_querier() {
+        sessions_cache_utils::run_gc_ws_sessions().await;
+    }
     Ok(())
 }

@@ -81,6 +81,7 @@ impl WsHandler {
             .await;
 
         // Setup message channels
+        // TODO: add env variable for this for channel size
         let (response_tx, mut response_rx) = tokio::sync::mpsc::channel::<WsServerEvents>(100);
         let (disconnect_tx, mut disconnect_rx) =
             tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
@@ -89,6 +90,9 @@ impl WsHandler {
 
         // Spawn message handling tasks between client and router
         actix_web::rt::spawn(async move {
+            let mut ping_interval = tokio::time::interval(tokio::time::Duration::from_secs(
+                cfg.websocket.ping_interval_secs as _,
+            ));
             // Handle incoming messages from client
             let handle_incoming = async {
                 loop {
@@ -104,6 +108,9 @@ impl WsHandler {
                                 };
                                 break;
                             }
+                        }
+                        _ = ping_interval.tick() => {
+                            let _ = response_tx.send(WsServerEvents::Ping(vec![])).await;
                         }
                         Some(msg) = msg_stream.next() => {
                             match msg {
@@ -259,6 +266,12 @@ impl WsHandler {
                                     log::debug!("[WS::Router::Handler] Stop handle_incoming");
                                     break;
                                 }
+                                Ok(actix_ws::Message::Ping(ping)) => {
+                                    let _ = response_tx.send(WsServerEvents::Ping(ping.to_vec())).await;
+                                }
+                                Ok(actix_ws::Message::Pong(pong)) => {
+                                    log::debug!("[WS::Router::Handler]: Pong received from client : {:?}", pong);
+                                }
                                 Ok(_) => {}
                             }
                         }
@@ -273,7 +286,17 @@ impl WsHandler {
                     tokio::select! {
                         // response from querier
                         Some(message) = response_rx.recv() => {
-                            let Ok(message_str) = serde_json::to_string(&message) else {
+                            match message {
+                                WsServerEvents::Ping(ping) => {
+                                    if let Err(e) = ws_session.pong(&ping).await {
+                                        log::error!("[WS::Router::Handler]: Error sending pong: {}", e);
+                                    }
+                                }
+                                WsServerEvents::Pong(pong) => {
+                                    log::debug!("[WS::Router::Handler]: Pong received from client : {:?}", pong);
+                                }
+                                _ => {
+                                    let Ok(message_str) = serde_json::to_string(&message) else {
                                 log::error!(
                                     "[WS::Handler]: error convert WsServerEvents to string before sending back to client "
                                 );
@@ -286,6 +309,8 @@ impl WsHandler {
                             if let Some(trace_id) = message.should_clean_trace_id() {
                                 session_manager.update_session_activity(&client_id).await;
                                 session_manager.remove_trace_id(&client_id, &trace_id).await;
+                                    }
+                                }
                             }
                         }
                         // interruption from handling_incoming thread

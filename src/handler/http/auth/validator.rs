@@ -25,9 +25,11 @@ use config::{get_config, utils::base64};
 use o2_dex::config::get_config as get_dex_config;
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
+use url::Url;
 
 use crate::{
     common::{
+        infra::cluster,
         meta::{
             ingestion::INGESTION_EP,
             user::{
@@ -599,10 +601,24 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    // TODO: confirm if this has any side effect
     // Check if the ws request is using internal grpc token
-    // TODO: get nodes in cluster for role router and check if the ip is matching the request ip
     if get_config().websocket.enabled && auth_info.auth.eq(&get_config().grpc.internal_grpc_token) {
+        let router_nodes = cluster::get_cached_online_router_nodes()
+            .await
+            .unwrap_or_default();
+        let host = req.connection_info().host().to_string();
+        let router_node = router_nodes.iter().find(|node| {
+            // Need to add scheme to host before parsing, only for `req.host`
+            // &host == "192.168.1.4:5070"
+            // &node.http_addr == "http://192.168.1.4:5080"
+            let host_url =
+                Url::parse(&format!("http://{}", host)).expect("Failed to parse host URL");
+            let node_url = Url::parse(&node.http_addr).expect("Failed to parse node URL");
+            host_url.host() == node_url.host()
+        });
+        if router_node.is_none() {
+            return Err((ErrorUnauthorized("Unauthorized Access"), req));
+        }
         return Ok(req);
     }
 
