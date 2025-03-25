@@ -155,3 +155,63 @@ pub fn is_wal_file(local_mode: bool, file: &str) -> bool {
         || columns[9].len() != 16
         || columns[9].contains("="))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_wal_file_wal_file() {
+        assert_eq!(
+            is_wal_file(
+                true,
+                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
+            ),
+            true
+        );
+        assert_eq!(
+            is_wal_file(
+                true,
+                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/a=b/file.parquet"
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn test_is_wal_file_sotrage_file() {
+        assert_eq!(
+            is_wal_file(true, "files/org/stype/stream/2025/03/24/00/file.parquet"),
+            false
+        );
+        assert_eq!(
+            is_wal_file(
+                true,
+                "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn test_is_wal_file_not_local_mode() {
+        assert_eq!(
+            is_wal_file(
+                false,
+                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
+            ),
+            false
+        );
+        assert_eq!(
+            is_wal_file(false, "files/org/stype/stream/2025/03/24/00/file.parquet"),
+            false
+        );
+        assert_eq!(
+            is_wal_file(
+                false,
+                "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
+            ),
+            false
+        );
+    }
+}
