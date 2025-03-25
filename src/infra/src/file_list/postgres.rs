@@ -1609,6 +1609,9 @@ CREATE TABLE IF NOT EXISTS stream_stats
     let data_type = "BOOLEAN default false not null";
     add_column("file_list_deleted", column, data_type).await?;
 
+    // create col dumped for file_list_jobs for version <=0.14.0
+    add_column("file_list_jobs", "dumped", "BOOLEAN default false not null").await?;
+
     Ok(())
 }
 
