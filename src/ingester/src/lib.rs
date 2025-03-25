@@ -179,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_wal_file_sotrage_file() {
+    fn test_is_wal_file_storage_file() {
         assert_eq!(
             is_wal_file(true, "files/org/stype/stream/2025/03/24/00/file.parquet"),
             false
