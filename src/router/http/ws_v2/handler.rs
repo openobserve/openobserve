@@ -93,6 +93,8 @@ impl WsHandler {
             let mut ping_interval = tokio::time::interval(tokio::time::Duration::from_secs(
                 cfg.websocket.ping_interval_secs as _,
             ));
+            ping_interval.tick().await; // first tick is immediate
+
             // Handle incoming messages from client
             let handle_incoming = async {
                 loop {
@@ -110,7 +112,11 @@ impl WsHandler {
                             }
                         }
                         _ = ping_interval.tick() => {
-                            let _ = response_tx.send(WsServerEvents::Ping(vec![])).await;
+                            if let Err(e) = response_tx.send(WsServerEvents::Ping(vec![])).await {
+                                log::error!("[WS::Router::Handler] error sending ping to outgoing thread via response channel: {}", e);
+                                _ = disconnect_tx.send(None).await;
+                                break;
+                            }
                         }
                         Some(msg) = msg_stream.next() => {
                             match msg {
@@ -288,6 +294,7 @@ impl WsHandler {
                         Some(message) = response_rx.recv() => {
                             match message {
                                 WsServerEvents::Ping(ping) => {
+                                    log::debug!("[WS::Router::Handler]: pinging client");
                                     if let Err(e) = ws_session.pong(&ping).await {
                                         log::error!("[WS::Router::Handler]: Error sending pong: {}", e);
                                     }
@@ -297,18 +304,18 @@ impl WsHandler {
                                 }
                                 _ => {
                                     let Ok(message_str) = serde_json::to_string(&message) else {
-                                log::error!(
-                                    "[WS::Handler]: error convert WsServerEvents to string before sending back to client "
-                                );
-                                continue;
-                            };
-                            if let Err(e) = ws_session.text(message_str).await {
-                                log::error!("Error sending message to client: {}", e);
-                                break;
-                            }
-                            if let Some(trace_id) = message.should_clean_trace_id() {
-                                session_manager.update_session_activity(&client_id).await;
-                                session_manager.remove_trace_id(&client_id, &trace_id).await;
+                                        log::error!(
+                                            "[WS::Handler]: error convert WsServerEvents to string before sending back to client "
+                                        );
+                                        continue;
+                                    };
+                                    if let Err(e) = ws_session.text(message_str).await {
+                                        log::error!("Error sending message to client: {}", e);
+                                        break;
+                                    }
+                                    if let Some(trace_id) = message.should_clean_trace_id() {
+                                        session_manager.update_session_activity(&client_id).await;
+                                        session_manager.remove_trace_id(&client_id, &trace_id).await;
                                     }
                                 }
                             }
