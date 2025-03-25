@@ -181,7 +181,7 @@ const useSearchWebSocket = () => {
         error: [],
         reset: [],
         data: data,
-        isActive: true, //  True if the trace id is on current active socket. If false, 
+        isActive: true, //  True if the trace id is on current active socket. If false, If we receive 401, we will initiate a new socket and mark the old socket traas inactive
         socketId: socketId.value, // Track which socket this search was initiated on
         isInitiated: false, // True if the search was initiated on the current socket
       };
