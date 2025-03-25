@@ -55,8 +55,6 @@ const useSearchWebSocket = () => {
       return;
     }
 
-    closeDrainingSocket();
-
     traces[response.content.trace_id]?.message?.forEach((handler: any) =>
       handler(response),
     );
@@ -129,22 +127,11 @@ const useSearchWebSocket = () => {
       }
     }
 
-    closeDrainingSocket();
-
     traces[response.content.trace_id]?.error?.forEach((handler: any) =>
       handler(response),
     );
     // cleanUpListeners(response.traceId)
   };
-
-  const closeDrainingSocket = () => {
-    const areAllTraceIdsActive = Object.keys(traces).every((traceId) => traces[traceId].isActive);
-    // close the inactive socket if there are no any traces with isActive false
-    if(areAllTraceIdsActive && inactiveSocketId.value) {
-      webSocket.closeSocket(inactiveSocketId.value as string);
-      inactiveSocketId.value = null;
-    }
-  }
 
   const createSocketConnection = (org_id: string) => {
     isCreatingSocket.value = true;
