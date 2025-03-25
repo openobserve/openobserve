@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-font-bold tw-pt-6 tw-pb-2">
         Check further documentation at:
       </div>
-      <ol style="list-style: decimal; padding-left: 27px;">
+      <ol style="tw-list-decimal tw-pl-[27px]">
         <li
           v-for="awsService in awsServiceLinks"
           :key="awsService.name"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <a
             :href="awsService.link"
-            class="hover:tw-underline "
+            class="hover:tw-underline"
             target="_blank"
             rel="noopener noreferrer"
             >{{ awsService.name }}</a
