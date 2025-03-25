@@ -37,7 +37,7 @@ async function createUser(page, email, password) {
     const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/users`;
     const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
     const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
+      "Authorization": `Basic Z29kQG1haW4uYWk6S2luZ3BpbiM0NTE=`,
       "Content-Type": "application/json",
     };
 
@@ -54,10 +54,17 @@ async function createUser(page, email, password) {
       data: payload,
       headers: headers,
     });
+    console.log(basicAuthCredentials);
+    console.log(process.env["ZO_ROOT_USER_EMAIL"]);
+    console.log(process.env["ZO_ROOT_USER_PASSWORD"]);
+    console.log(headers);
 
     console.log(`created user: ${email}`);
     console.log(orgId);
     console.log(url);
+    console.log(response.status());
+    console.log(response.body());
+    console.log(payload);
     if (response.status() !== 200) {
         throw new Error(`Failed to create user ${email}. Status: ${response.status()}`);
     }
@@ -107,18 +114,82 @@ test.describe("Websocket for UI Load Testing", () => {
             await logsPage.selectStreamDefault();
             await logsPage.selectQueryDefault();
             await logsPage.enableSQLMode();
-            await logsPage.selectQuery6DaysTime();
+
+            await logsPage.selectQuery4DaysTime();
+
             await logsPage.selectRunQuery();
+            await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+
             await dashboardPage.navigateToDashboards();
             await dashboardPage.navigateToDashboardFolder();
-            await dashboardPage.selectQuery2DayTime();
+            await page.locator('[data-test="dashboard-tab-69221-name"]').click();
+            await dashboardPage.selectQuery4DayTime();
+
             await dashboardPage.refreshDashboard();
+            await expect(page.locator('[data-test="dashboard-refresh-btn"]')).toBeVisible();
+
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '02 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
             await logsPage.navigateToLogs();
             await logsPage.selectStreamDefault();
             await logsPage.selectQueryDefault();
             await logsPage.enableSQLMode();
-            await logsPage.selectQuery6DaysTime();
+            await logsPage.selectQuery4DaysTime();
             await logsPage.selectRunQuery();
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+            await page.locator('[data-test="dashboard-tab-69221-name"]').click();
+            await dashboardPage.selectQuery4DayTime();
+            await dashboardPage.refreshDashboard();
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '02 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+
+            // 2nd times
+
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+
+            await logsPage.selectQuery4DaysTime();
+
+            await logsPage.selectRunQuery();
+            await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+            await page.locator('[data-test="dashboard-tab-69221-name"]').click();
+            await dashboardPage.selectQuery4DayTime();
+
+            await dashboardPage.refreshDashboard();
+            await expect(page.locator('[data-test="dashboard-refresh-btn"]')).toBeVisible();
+
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '02 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+            await logsPage.selectQuery4DaysTime();
+            await logsPage.selectRunQuery();
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+            await page.locator('[data-test="dashboard-tab-69221-name"]').click();
+            await dashboardPage.selectQuery4DayTime();
+            await dashboardPage.refreshDashboard();
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '02 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+
+
+
         });
     }
 });
