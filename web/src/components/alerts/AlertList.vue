@@ -1313,6 +1313,10 @@ export default defineComponent({
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id)
 
+      if(alertToBeExported.hasOwnProperty('id')){
+        delete alertToBeExported.id;
+      }
+
       // Ensure that the alert exists before proceeding
       if (alertToBeExported) {
 
@@ -1494,6 +1498,9 @@ const updateActiveFolderId = (newVal: any) => {
         const alertsData = await Promise.all(
           selectedAlerts.map(async (alertId: string) => {
             const alertData = await getAlertById(alertId);
+            if(alertData.hasOwnProperty('id')){
+              delete alertData.id;
+            }
             return alertData;
           })
         );
