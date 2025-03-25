@@ -24,9 +24,7 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 async function toggleQuickModeIfOff(page) {
-  await page.waitForSelector(
-    '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
-  );
+  
   const toggleButton = await page.$(
     '[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner'
   );

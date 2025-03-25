@@ -242,7 +242,7 @@ class="indexDetailsContainer" style="height: 100vh">
             <div class="flex justify-between items-center full-width q-mb-md">
               <div>
                 <app-tabs
-                  v-if="isSchemaEvolutionEnabled"
+                  v-if="isSchemaUDSEnabled"
                   class="schema-fields-tabs"
                   style="
                     border: 1px solid #8a8a8a;
@@ -272,6 +272,7 @@ class="indexDetailsContainer" style="height: 100vh">
                   </template>
                 </q-input>
                 <q-btn
+                  v-if="isSchemaUDSEnabled"
                   color="primary"
                   data-test="schema-add-fields-title"
                   @click="openDialog"
@@ -569,7 +570,7 @@ class="indexDetailsContainer" style="height: 100vh">
                 >
                 <q-btn
                   v-if="
-                    isSchemaEvolutionEnabled &&
+                    isSchemaUDSEnabled &&
                     activeMainTab == 'schemaSettings'
                   "
                   data-test="schema-add-field-button"
@@ -834,7 +835,7 @@ export default defineComponent({
       approxPartition.value = false;
     });
 
-    const isSchemaEvolutionEnabled = computed(() => {
+    const isSchemaUDSEnabled = computed(() => {
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
 
@@ -1616,7 +1617,7 @@ export default defineComponent({
       activeTab,
       updateActiveTab,
       hasUserDefinedSchema,
-      isSchemaEvolutionEnabled,
+      isSchemaUDSEnabled,
       updateDefinedSchemaFields,
       selectedFields,
       allFieldsName,

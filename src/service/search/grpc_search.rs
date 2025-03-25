@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{
-    meta::{search, stream::StreamType},
+    meta::{cluster::RoleGroup, search, stream::StreamType},
     utils::json,
 };
 use infra::errors::{Error, ErrorCodes};
@@ -35,8 +35,9 @@ pub async fn grpc_search(
     stream_type: StreamType,
     user_id: Option<String>,
     in_req: &search::Request,
+    node_group: Option<RoleGroup>,
 ) -> Result<search::Response, Error> {
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
         Some(nodes) => nodes,
         None => {
             log::error!("search->grpc: no querier node online");
@@ -105,9 +106,10 @@ pub async fn grpc_search_partition(
     org_id: &str,
     stream_type: StreamType,
     in_req: &search::SearchPartitionRequest,
+    node_group: Option<RoleGroup>,
     skip_max_query_range: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
         Some(nodes) => nodes,
         None => {
             log::error!("search->grpc: no querier node online");

@@ -520,14 +520,14 @@ mod new_dashboards {
     }
 }
 
+pub const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
+    "alerts_org_stream_type_stream_name_name_idx_2";
 mod new_alerts {
     use sea_orm::QueryOrder;
 
     use super::*;
     use crate::table::migration::get_text_type;
     const ALERTS_FOLDERS_FK: &str = "alerts_folders_fk_2";
-    const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
-        "alerts_org_stream_type_stream_name_name_idx_2";
     const ALERTS_FOLDER_ID_IDX: &str = "alerts_folder_id_idx_2";
 
     /// Identifiers used in queries on the alerts table.

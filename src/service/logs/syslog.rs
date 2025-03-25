@@ -372,6 +372,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             metric_rpt_status_code,
             org_id,
             StreamType::Logs.as_str(),
+            "",
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -380,6 +382,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             metric_rpt_status_code,
             org_id,
             StreamType::Logs.as_str(),
+            "",
+            "",
         ])
         .inc();
 

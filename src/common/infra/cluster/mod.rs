@@ -590,6 +590,9 @@ async fn set_node_status_metrics(node: &Node) {
 fn update_node_status_metrics() -> NodeMetrics {
     let node_status = get_node_metrics();
 
+    config::metrics::NODE_UP
+        .with_label_values(&[config::VERSION])
+        .set(1);
     config::metrics::NODE_CPU_TOTAL
         .with_label_values(&[])
         .set(node_status.cpu_total as i64);

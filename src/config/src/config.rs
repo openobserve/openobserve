@@ -76,7 +76,7 @@ pub const FILE_EXT_TANTIVY_FOLDER: &str = ".mmap";
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
-pub const QUERY_WITH_NO_LIMIT: i32 = -999;
+pub const QUERY_WITH_NO_LIMIT: i64 = -999;
 
 pub const MINIMUM_DB_CONNECTIONS: u32 = 2;
 pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
@@ -557,8 +557,8 @@ pub struct Auth {
     pub cookie_secure_only: bool,
     #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
     pub ext_auth_salt: String,
-    #[env_config(name = "O2_SCRIPT_SERVER_TOKEN")]
-    pub script_server_token: String,
+    #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
+    pub action_server_token: String,
 }
 
 #[derive(EnvConfig)]
@@ -651,8 +651,12 @@ pub struct Common {
     pub meta_store: String,
     #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
+    #[env_config(name = "ZO_META_POSTGRES_RO_DSN", default = "")]
+    pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
     #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
+    #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
+    pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
@@ -1183,8 +1187,6 @@ pub struct Limit {
     pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
-    pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
     pub http_request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
@@ -1338,7 +1340,7 @@ pub struct Limit {
         default = 256,
         help = "Maximum size of a single enrichment table in mb"
     )]
-    pub max_enrichment_table_size: usize,
+    pub enrichment_table_max_size: usize,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
     #[env_config(
@@ -2315,6 +2317,12 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && !cfg.common.metrics_cache_enabled
     {
         cfg.disk_cache.enabled = false;
+    }
+
+    // disable result cache and metrics cache if disk cache is disabled
+    if !cfg.disk_cache.enabled {
+        cfg.common.result_cache_enabled = false;
+        cfg.common.metrics_cache_enabled = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();

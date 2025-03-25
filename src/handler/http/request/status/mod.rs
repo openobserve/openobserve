@@ -125,6 +125,7 @@ struct ConfigResponse<'a> {
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
+    actions_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -212,6 +213,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let rbac_enabled = openfga_cfg.enabled;
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
+
+    #[cfg(feature = "enterprise")]
+    let actions_enabled = o2cfg.actions.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let actions_enabled = false;
 
     #[cfg(feature = "enterprise")]
     let super_cluster_enabled = o2cfg.super_cluster.enabled;
@@ -309,6 +315,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
+        actions_enabled,
     }))
 }
 

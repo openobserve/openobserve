@@ -118,7 +118,8 @@ pub async fn config_paths(
     method = "GET",
     method = "POST",
     method = "PUT",
-    method = "DELETE"
+    method = "DELETE",
+    method = "PATCH"
 )]
 pub async fn api(
     req: HttpRequest,

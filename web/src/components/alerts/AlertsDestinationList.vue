@@ -165,11 +165,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else>
       <ImportDestination
-      :destinations="destinations"
-      :templates="templates"
-      @update:destinations="getDestinations"
-       />
-
+        :destinations="destinations"
+        :templates="templates"
+        @update:destinations="getDestinations"
+      />
     </div>
 
     <ConfirmDialog
@@ -182,7 +181,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts">
-import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted } from "vue"; 
+import {
+  ref,
+  onBeforeMount,
+  onActivated,
+  watch,
+  defineComponent,
+  onMounted,
+} from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableProps } from "quasar";
@@ -200,6 +206,7 @@ import type { Template } from "@/ts/interfaces/index";
 
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportDestination from "./ImportDestination.vue";
+import useActions from "@/composables/useActions";
 
 interface ConformDelete {
   visible: boolean;
@@ -207,13 +214,20 @@ interface ConformDelete {
 }
 export default defineComponent({
   name: "PageAlerts",
-  components: { AddDestination, NoData, ConfirmDialog, QTablePagination ,ImportDestination},
+  components: {
+    AddDestination,
+    NoData,
+    ConfirmDialog,
+    QTablePagination,
+    ImportDestination,
+  },
   setup() {
     const qTable = ref();
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18n();
     const q = useQuasar();
+    const { getAllActions } = useActions();
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -283,21 +297,39 @@ export default defineComponent({
     onBeforeMount(() => {
       getDestinations();
       getTemplates();
+      getActions();
     });
 
     watch(
       () => router.currentRoute.value.query.action,
       (action) => {
         if (!action) {
-          showDestinationEditor.value = false
-          showImportDestination.value = false
-        };
-      }
+          showDestinationEditor.value = false;
+          showImportDestination.value = false;
+        }
+      },
     );
 
-    onMounted(()=>{
+    onMounted(() => {
       updateRoute();
-    })
+    });
+
+    const getActions = async () => {
+      const dismiss = q.notify({
+        spinner: true,
+        message: "Please wait while loading actions...",
+      });
+      if (store.state.organizationData.actions.length == 0) {
+        await getAllActions()
+          .catch(() => {
+            q.notify({
+              type: "negative",
+              message: "Error while loading actions.",
+            });
+          })
+          .finally(() => dismiss());
+      }
+    };
 
     const getDestinations = () => {
       const dismiss = q.notify({
@@ -316,7 +348,9 @@ export default defineComponent({
         .then((res) => {
           res.data = res.data.filter(
             (destination: any) =>
-              destination.type == "http" || destination.type == "email",
+              destination.type == "http" ||
+              destination.type == "email" ||
+              destination.type === "action",
           );
           resultTotal.value = res.data.length;
           destinations.value = res.data.map((data: any, index: number) => ({
@@ -326,7 +360,7 @@ export default defineComponent({
           updateRoute();
         })
         .catch((err) => {
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             q.notify({
               type: "negative",
               message: "Error while pulling destinations.",
@@ -349,14 +383,14 @@ export default defineComponent({
         editDestination(null);
       if (router.currentRoute.value.query.action === "update")
         editDestination(
-          getDestinationByName(router.currentRoute.value.query.name as string)
+          getDestinationByName(router.currentRoute.value.query.name as string),
         );
-      if(router.currentRoute.value.query.action === "import")
+      if (router.currentRoute.value.query.action === "import")
         showImportDestination.value = true;
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find(
-        (destination) => destination.name === name
+        (destination) => destination.name === name,
       );
     };
     const editDestination = (destination: any) => {
@@ -459,28 +493,27 @@ export default defineComponent({
       });
     };
 
-    const exportDestination = (row: any) =>{
-
+    const exportDestination = (row: any) => {
       const findDestination: any = getDestinationByName(row.name);
-      const destinationByName = {...findDestination}
-      if(destinationByName.hasOwnProperty("#")) delete destinationByName["#"];
-      const destinationJson = JSON.stringify(destinationByName,null,2);
-      const blob = new Blob([destinationJson], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        // Create an anchor element to trigger the download
-        const link = document.createElement('a');
-        link.href = url;
+      const destinationByName = { ...findDestination };
+      if (destinationByName.hasOwnProperty("#")) delete destinationByName["#"];
+      const destinationJson = JSON.stringify(destinationByName, null, 2);
+      const blob = new Blob([destinationJson], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      // Create an anchor element to trigger the download
+      const link = document.createElement("a");
+      link.href = url;
 
-        // Set the filename of the download
-        link.download = `${destinationByName.name}.json`;
+      // Set the filename of the download
+      link.download = `${destinationByName.name}.json`;
 
-        // Trigger the download by simulating a click
-        link.click();
+      // Trigger the download by simulating a click
+      link.click();
 
-        // Clean up the URL object after download
-        URL.revokeObjectURL(url);
-    }
-    const importDestination = () =>{
+      // Clean up the URL object after download
+      URL.revokeObjectURL(url);
+    };
+    const importDestination = () => {
       showImportDestination.value = true;
       router.push({
         name: "alertDestinations",
@@ -489,7 +522,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-    }
+    };
 
     return {
       t,

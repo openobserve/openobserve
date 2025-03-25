@@ -616,6 +616,13 @@ export default defineComponent({
       "/ingestion/",
     ];
 
+    const isActionsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig.actions_enabled
+      );
+    });
+
     const orgOptions = ref([{ label: Number, value: String }]);
     let slackURL = "https://short.openobserve.ai/community";
     if (
@@ -676,13 +683,6 @@ export default defineComponent({
         icon: outlinedReportProblem,
         link: "/alerts",
         name: "alertList",
-      },
-      {
-        title: t("menu.actions"),
-        icon: outlinedCode,
-        link: "/action-scripts",
-        name: "actionScripts",
-        hide: config.isEnterprise == "true" ? false : true
       },
       {
         title: t("menu.ingestion"),
@@ -807,17 +807,21 @@ export default defineComponent({
       langList.find((l) => l.code == getLocale()) || langList[0];
 
     const filterMenus = () => {
+      updateActionsMenu();
+
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
           ?.split(",")
           ?.filter((val: string) => val?.trim()) || [],
       );
+
       store.dispatch("setHiddenMenus", disableMenus);
 
-      linksList.value = linksList.value.filter((link) => {
-          const hide = link.hide === undefined ? false : link.hide; // Handle unknown hide values
-          return !disableMenus.has(link.name) && !hide;
-        });
+      linksList.value = linksList.value.filter((link: any) => {
+        const hide = link.hide === undefined ? false : link.hide;
+
+        return !disableMenus.has(link.name) && !hide;
+      });
     };
 
     // additional links based on environment and conditions
@@ -1133,10 +1137,12 @@ export default defineComponent({
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
-            filterMenus();
           }
+
           store.dispatch("setConfig", res.data);
           await nextTick();
+
+          filterMenus();
           // if rum enabled then setUser to capture session details.
           if (res.data.rum.enabled) {
             setRumUser();
@@ -1182,6 +1188,27 @@ export default defineComponent({
 
     const openSlack = () => {
       window.open(slackURL, "_blank");
+    };
+
+    const updateActionsMenu = () => {
+      if (isActionsEnabled.value) {
+        const alertIndex = linksList.value.findIndex(
+          (link) => link.name === "alertList",
+        );
+
+        const actionExists = linksList.value.some(
+          (link) => link.name === "actionScripts",
+        );
+
+        if (alertIndex !== -1 && !actionExists) {
+          linksList.value.splice(alertIndex + 1, 0, {
+            title: t("menu.actions"),
+            icon: outlinedCode,
+            link: "/actions",
+            name: "actionScripts",
+          });
+        }
+      }
     };
 
     return {
@@ -1303,7 +1330,7 @@ export default defineComponent({
     margin-left: 0.5rem;
     margin-right: 0;
     width: 150px;
-    max-width: 150px; 
+    max-width: 150px;
     max-height: 31px;
     cursor: pointer;
 

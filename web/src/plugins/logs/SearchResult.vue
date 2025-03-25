@@ -107,12 +107,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-if="searchObj.data?.histogram?.errorMsg == ''">
         <ChartRenderer
-          v-if="searchObj.meta.showHistogram"
+          v-if="searchObj.meta.showHistogram && searchObj.data?.queryResults?.aggs?.length > 0"
           data-test="logs-search-result-bar-chart"
           :data="plotChart"
           style="max-height: 100px"
           @updated:dataZoom="onChartUpdate"
         />
+        <div v-else-if="searchObj.meta.showHistogram && searchObj.data?.queryResults?.aggs?.length == 0">
+          <h3
+            class="text-center"
+            style="margin: 30px 0px"
+          >
+            <q-icon name="warning" color="warning" size="xs"></q-icon> No data found for histogram.
+          </h3>
+        </div>
         <div
           class="q-pb-lg"
           style="top: 50px; position: absolute; left: 45%"

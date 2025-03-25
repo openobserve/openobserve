@@ -15,70 +15,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="logs-search-bar-component" id="searchBarComponent">
+  <div
+    :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
+    class="logs-search-bar-component"
+    id="searchBarComponent"
+  >
     <div class="row">
       <div class="float-right col q-mb-xs flex">
         <div class="button-group logs-visualize-toggle q-ml-xs">
           <div class="row">
             <div>
-              <button
+              <q-btn
                 data-test="logs-logs-toggle"
                 :class="
                   searchObj.meta.logsVisualizeToggle === 'logs'
                     ? 'selected'
                     : ''
                 "
-                class="button button-left"
                 @click="onLogsVisualizeToggleUpdate('logs')"
+                no-caps
+                size="sm"
+                icon="search"
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm"
+                style="height: 32px;"
               >
-                Search
-              </button>
+                <q-tooltip>
+                  {{ t('common.search') }}
+                </q-tooltip>
+              </q-btn>
             </div>
             <div>
-              <button
+              <q-btn
                 data-test="logs-visualize-toggle"
                 :class="
                   searchObj.meta.logsVisualizeToggle === 'visualize'
                     ? 'selected'
                     : ''
                 "
-                class="button button-right"
+                class="button button-right tw-flex tw-justify-center tw-items-center  no-border no-outline !tw-rounded-l-none q-px-sm"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disabled="isVisualizeToggleDisabled"
-                :title="[
-                  isVisualizeToggleDisabled
-                    ? 'Visualization is disabled for multi stream'
-                    : '',
-                ]"
+                no-caps
+                size="sm"
+                style="height: 32px;"
               >
-                Visualize
-              </button>
+              <q-tooltip>
+                {{ 
+                  isVisualizeToggleDisabled
+                    ? t('search.visualizeDisabledForMultiStream')
+                    : t('search.visualize')
+                }}
+              </q-tooltip>
+                <img :src="visualizeIcon" alt="Visualize" style="width: 20px; height: 20px; ">
+              </q-btn>
             </div>
           </div>
         </div>
-        <q-toggle
+
+        <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
+          <q-toggle
           data-test="logs-search-bar-show-histogram-toggle-btn"
           v-model="searchObj.meta.showHistogram"
-          :label="t('search.showHistogramLabel')"
-        />
+        >
+
+        <img :src="histogramIcon" alt="Histogram" style="width: 20px; height: 20px; ">
+        <q-tooltip> 
+          {{ t('search.showHistogramLabel') }}
+        </q-tooltip>
+        </q-toggle>
+        </div>
+        <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
+
         <q-toggle
           data-test="logs-search-bar-sql-mode-toggle-btn"
           v-model="searchObj.meta.sqlMode"
-          :label="t('search.sqlModeLabel')"
-        />
+          >
+          <img :src="sqlIcon" alt="SQL Mode" style="width: 20px; height: 20px;">
+          <q-tooltip>
+            {{ t('search.sqlModeLabel') }}
+          </q-tooltip>
+        </q-toggle>
+        </div>
+        
         <q-btn
           data-test="logs-search-bar-reset-filters-btn"
-          :title="t('search.resetFilters')"
           no-caps
-          size="sm"
+          size="13px"
           icon="restart_alt"
           class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
           @click="resetFilters"
-        />
+        >
+          <q-tooltip>
+            {{ t('search.resetFilters') }}
+          </q-tooltip>
+        </q-btn>
         <syntax-guide
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
-        ></syntax-guide>
+        >
+      </syntax-guide>
         <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
@@ -86,7 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="12px"
             icon="save"
             icon-right="saved_search"
-            :title="t('search.savedViewsLabel')"
             @click="fnSavedView"
             @show="loadSavedView"
             split
@@ -192,9 +226,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                           >
                             <q-btn
-                              :icon="favoriteViews.includes(props.row.view_id)
+                              :icon="
+                                favoriteViews.includes(props.row.view_id)
                                   ? 'favorite'
-                                  : 'favorite_border'"
+                                  : 'favorite_border'
+                              "
                               :title="t('common.favourite')"
                               class="logs-saved-view-icon"
                               padding="xs"
@@ -311,149 +347,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
             </q-list>
+
           </q-btn-dropdown>
+          <q-tooltip>
+              {{ t('search.savedViewsLabel') }}
+            </q-tooltip>
         </q-btn-group>
-        <q-toggle
+        <div style="border: 1px solid #c4c4c4; border-radius: 5px ;" class="q-pr-xs q-ml-xs">
+          <q-toggle
           data-test="logs-search-bar-quick-mode-toggle-btn"
           v-model="searchObj.meta.quickMode"
-          :label="t('search.quickModeLabel')"
           @click="handleQuickMode"
-        />
+          >
+          <img :src="quickModeIcon" alt="Quick Mode" style="width: 20px; height: 20px;">
+          <q-tooltip>
+            {{ t('search.quickModeLabel') }}
+          </q-tooltip>
+        </q-toggle>
+        </div>
       </div>
+      
+
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
           v-model="searchObj.meta.toggleSourceWrap"
           icon="wrap_text"
-          :title="t('search.messageWrapContent')"
           class="float-left"
           size="32px"
-        />
-        <q-toggle
-          data-test="logs-search-bar-show-query-toggle-btn"
-          v-model="searchObj.meta.toggleFunction"
-          :icon="functionToggleIcon"
-          title="Toggle Function Editor"
-          class="float-left"
-          size="32px"
-        />
-        <q-btn-group
-          class="no-outline q-pa-none no-border float-left q-mr-xs"
-          :disable="!searchObj.meta.toggleFunction"
         >
-          <q-btn-dropdown
-            data-test="logs-search-bar-function-dropdown"
-            v-model="functionModel"
-            size="12px"
-            icon="save"
-            :icon-right="iconRight"
-            :title="t('search.functionPlaceholder')"
-            split
-            class="no-outline saved-views-dropdown no-border btn-function"
-            @click="fnSavedFunctionDialog"
-          >
-            <q-list data-test="logs-search-saved-function-list">
-              <!-- Search Input -->
-              <div>
-                <q-input
-                  v-model="searchTerm"
-                  dense
-                  filled
-                  borderless
-                  clearable
-                  debounce="300"
-                  :placeholder="t('search.searchSavedFunction')"
-                  data-test="function-search-input"
-                >
-                  <template #prepend>
-                    <q-icon name="search" />
-                  </template>
-                </q-input>
-              </div>
+          <q-tooltip>
+            {{ t('search.messageWrapContent') }}
+          </q-tooltip>
+        </q-toggle>
 
-              <div v-if="filteredFunctionOptions.length">
-                <q-item
-                  class="tw-border-b saved-view-item"
-                  clickable
-                  v-for="(item, i) in filteredFunctionOptions"
-                  :key="'saved-view-' + i"
-                  v-close-popup
-                >
-                  <q-item-section
-                    @click.stop="populateFunctionImplementation(item, true)"
-                    v-close-popup
+        <transform-selector
+          v-if="isActionsEnabled"
+          :function-options="functionOptions"
+          @select:function="populateFunctionImplementation"
+          @save:function="fnSavedFunctionDialog"
+        />
+        <function-selector
+          v-else
+          :function-options="functionOptions"
+          @select:function="populateFunctionImplementation"
+          @save:function="fnSavedFunctionDialog"
+        />
+        <q-btn
+          data-test="logs-search-bar-share-link-btn"
+          class="q-mr-xs download-logs-btn q-px-sm"
+          size="sm"
+          icon="share"
+          @click="shareLink.execute()"
+          :loading="shareLink.isLoading.value"
+        >
+          <q-tooltip>
+            {{ t('search.shareLink') }}
+          </q-tooltip>
+        </q-btn>
+
+        <q-btn
+              data-test="logs-search-bar-more-options-btn"
+              class="q-mr-xs download-logs-btn q-px-sm"
+              size="sm"
+              icon="menu"
+            >
+            <q-menu>
+ 
+              <q-list>
+                <q-item data-test="search-history-item-btn" class="q-pa-sm saved-view-item" clickable v-close-popup>
+                <q-item-section
+                  @click.stop="showSearchHistoryfn"
                   >
-                    <q-item-label>{{ item.name }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </div>
-              <div v-else>
-                <q-item>
-                  <q-item-section>
-                    <q-item-label>{{
-                      t("search.savedFunctionNotFound")
-                    }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </div>
-            </q-list>
-          </q-btn-dropdown>
-        </q-btn-group>
-        <q-btn-group v-if="config.isEnterprise == 'true'" class=" no-outline q-pa-none no-border">
-          <q-btn-dropdown
-            data-test="search-scheduler-dropdown-btn-group"
-            class="q-mr-xs download-logs-btn q-px-xs "
-            size="sm"
-            icon="schedule_send"
-            :title="t('search.exportLogs')"
-          >
-            <q-list>
-              <q-item
-                data-test="search-scheduler-create-new-btn"
-                class="q-pa-sm saved-view-item"
-                clickable
-                v-close-popup
-                @click="createScheduleJob"
-              >
-                <q-item-section v-close-popup>
-                  <q-item-label data-test="search-scheduler-create-new-label"
-                  >
-                    <q-icon name="save" />
-                    Create Scheduled Search</q-item-label
-                  >
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                    <img :src="searchHistoryIcon" alt="Search History"  style="width: 20px; height: 20px;" />
+
+                    Search History</q-item-label>
                 </q-item-section>
               </q-item>
               <q-separator />
               <q-item
-                data-test="search-scheduler-list-btn"
-
-                class="q-pa-sm saved-view-item"
-                clickable
-                v-close-popup
-                @click="routeToSearchSchedule"
-              >
-                <q-item-section v-close-popup>
-                  <q-item-label data-test="search-scheduler-list-label"
-                  >
-                    <q-icon name="list" />
-
-                    List Scheduled Search</q-item-label
-                  >
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-        </q-btn-group>
-        <q-btn-group class="no-outline q-pa-none no-border">
-          <q-btn-dropdown
-            data-test="logs-search-bar-reset-function-btn"
-            class="q-mr-xs download-logs-btn q-px-xs"
-            size="sm"
-            icon="download"
-            :title="t('search.exportLogs')"
-          >
-            <q-list>
-              <q-item
+              style="min-width: 150px;"
                 class="q-pa-sm saved-view-item"
                 clickable
                 v-close-popup
@@ -467,38 +441,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="downloadLogs(searchObj.data.queryResults.hits)"
                   v-close-popup
                 >
-                  <q-item-label>{{ t("search.downloadTable") }}</q-item-label>
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                   <img :src="downloadTableIcon" alt="Download Table" style="width: 20px; height: 20px;" />
+                    {{ t("search.downloadTable") }}</q-item-label>
                 </q-item-section>
               </q-item>
-              <q-separator />
-              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item" style="min-width: 150px;" clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
                 >
-                  <q-item-label>{{ t("search.customRange") }}</q-item-label>
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                    <img :src="customRangeIcon" alt="Custom Range" style="width: 20px; height: 20px;" />
+
+                    {{ t("search.customRange") }}</q-item-label>
                 </q-item-section>
               </q-item>
+              <q-separator />
+              <q-item
+               v-if="config.isEnterprise == 'true'"
+                data-test="search-scheduler-create-new-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                @click="createScheduleJob"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2" data-test="search-scheduler-create-new-label">
+                    <img :src="createScheduledSearchIcon" alt="Create Scheduled Search" style="width: 20px; height: 20px;" />
+                    Create Scheduled Search</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-item
+                v-if="config.isEnterprise == 'true'"
+                data-test="search-scheduler-list-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                @click="routeToSearchSchedule"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2" data-test="search-scheduler-list-label">
+                    <img :src="listScheduledSearchIcon" alt="List Scheduled Search" style=" width: 20px; height: 20px;" />
+
+                    List Scheduled Search</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+
             </q-list>
-          </q-btn-dropdown>
-        </q-btn-group>
-        <q-btn
-          data-test="logs-search-bar-share-link-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
-          size="sm"
-          icon="share"
-          :title="t('search.shareLink')"
-          @click="shareLink.execute()"
-          :loading="shareLink.isLoading.value"
-        ></q-btn>
-        <q-btn
-          data-test="logs-search-bar-share-link-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
-          size="sm"
-          icon="history"
-          :title="'Search History'"
-          @click="showSearchHistoryfn"
-        ></q-btn>
+            </q-menu>
+            <q-tooltip style="width: 80px;" >
+              {{ t('search.moreActions') }}
+            </q-tooltip>
+
+        </q-btn>
         <div class="float-left">
           <date-time
             ref="dateTimeRef"
@@ -679,26 +677,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="logs-vrl-function-editor"
-              v-show="searchObj.meta.toggleFunction"
+              v-show="searchObj.data.transformType"
               style="width: 100%; height: 100%"
             >
-              <query-editor
-                data-test="logs-vrl-function-editor"
-                ref="fnEditorRef"
-                editor-id="fnEditor"
-                class="monaco-editor"
-                v-model:query="searchObj.data.tempFunctionContent"
-                :class="
-                  searchObj.data.tempFunctionContent == '' &&
-                  searchObj.meta.functionEditorPlaceholderFlag
-                    ? 'empty-function'
-                    : ''
-                "
-                @keydown.ctrl.enter="handleRunQueryFn"
-                language="vrl"
-                @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
-                @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
-              />
+              <template v-if="showFunctionEditor">
+                <query-editor
+                  data-test="logs-vrl-function-editor"
+                  ref="fnEditorRef"
+                  editor-id="fnEditor"
+                  class="monaco-editor"
+                  v-model:query="searchObj.data.tempFunctionContent"
+                  :class="
+                    searchObj.data.tempFunctionContent == '' &&
+                    searchObj.meta.functionEditorPlaceholderFlag
+                      ? 'empty-function'
+                      : ''
+                  "
+                  @keydown.ctrl.enter="handleRunQueryFn"
+                  language="vrl"
+                  @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
+                  @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
+                />
+              </template>
+              <template v-else-if="searchObj.data.transformType === 'action'">
+                <query-editor
+                  data-test="logs-vrl-function-editor"
+                  ref="fnEditorRef"
+                  editor-id="fnEditor"
+                  class="monaco-editor"
+                  :query="actionEditorQuery"
+                  read-only
+                  language="markdown"
+                />
+              </template>
             </div>
           </template>
         </q-splitter>
@@ -1006,23 +1017,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="q-pt-none">
           <div>
             <div class="text-left q-mb-xs">
-                No of Records:
-                <q-icon
-            name="info"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-
-          >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-            >
-              <span style="font-size: 14px"
-                >Number of records can be specified eg: if the no. of records is 1000 then user can get maximum of 1000 records</span
-              >
-            </q-tooltip>
-          </q-icon>
+              No of Records:
+              <q-icon name="info" size="17px" class="q-ml-xs cursor-pointer">
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                >
+                  <span style="font-size: 14px"
+                    >Number of records can be specified eg: if the no. of
+                    records is 1000 then user can get maximum of 1000
+                    records</span
+                  >
+                </q-tooltip>
+              </q-icon>
             </div>
             <q-input
               type="number"
@@ -1038,20 +1046,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               tabindex="0"
               min="100"
-          />
-          
+            />
           </div>
           <div class="text-left">
             Maximum 100000 events can be returned in schedule job
           </div>
-          <div style="opacity: 0.8;" class="text-left mapping-warning-msg q-mt-md">
-                    <q-icon name="warning" color="red" class="q-mr-sm" />
-                    <span>Histogram will be disabled for the schedule job</span>
-                    </div>
+          <div
+            style="opacity: 0.8"
+            class="text-left mapping-warning-msg q-mt-md"
+          >
+            <q-icon name="warning" color="red" class="q-mr-sm" />
+            <span>Histogram will be disabled for the schedule job</span>
+          </div>
         </q-card-section>
-           
 
-        <q-card-actions align="right" class=" text-teal">
+        <q-card-actions align="right" class="text-teal">
           <q-btn
             data-test="search-scheduler-max-records-cancel-btn"
             unelevated
@@ -1060,10 +1069,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('confirmDialog.cancel')"
             color="secondary"
             v-close-popup
-            @click="{
-              searchSchedulerJob = false;
-              searchObj.meta.showSearchScheduler = false;
-            }"
+            @click="
+              {
+                searchSchedulerJob = false;
+                searchObj.meta.showSearchScheduler = false;
+              }
+            "
           />
           <q-btn
             data-test="search-scheduler-max-records-submit-btn"
@@ -1154,6 +1165,11 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
+import TransformSelector from "./TransformSelector.vue";
+import FunctionSelector from "./FunctionSelector.vue";
+import histogram_svg from "../../assets/images/common/histogram_image.svg";
+
+
 const defaultValue: any = () => {
   return {
     name: "",
@@ -1170,7 +1186,10 @@ export default defineComponent({
     QueryEditor,
     SyntaxGuide,
     AutoRefreshInterval,
-    ConfirmDialog,  },
+    ConfirmDialog,
+    TransformSelector,
+    FunctionSelector,
+  },
   emits: [
     "searchdata",
     "onChangeInterval",
@@ -1319,11 +1338,17 @@ export default defineComponent({
       setSelectedStreams,
       getJobData,
       routeToSearchSchedule,
+      isActionsEnabled,
     } = useLogs();
     const queryEditorRef = ref(null);
 
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
+
+    const transformsExpandState = ref({
+      actions: false,
+      functions: false,
+    });
 
     const functionModel: string = ref(null);
     const fnEditorRef: any = ref(null);
@@ -1383,15 +1408,53 @@ export default defineComponent({
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
     const savedViewDropdownModel = ref(false);
-    const searchTerm = ref(""); 
+    const moreOptionsDropdownModel = ref(false);
+    const searchTerm = ref("");
+
     const filteredFunctionOptions = computed(() => {
+      if (searchObj.data.transformType !== "function") return [];
       if (!searchTerm.value) return functionOptions.value;
       return functionOptions.value.filter((item) =>
-        item.name.toLowerCase().includes(searchTerm.value.toLowerCase())
+        item.name.toLowerCase().includes(searchTerm.value.toLowerCase()),
       );
     });
+
+    const filteredActionOptions = computed(() => {
+      if (searchObj.data.transformType !== "action") return [];
+      if (!searchTerm.value) return searchObj.data.actions;
+      return searchObj.data.actions.filter((item) =>
+        item.name.toLowerCase().includes(searchTerm.value.toLowerCase()),
+      );
+    });
+
+    const filteredTransformOptions = computed(() => {
+      if (!searchObj.data.transformType) return [];
+
+      if (searchObj.data.transformType === "action")
+        return filteredActionOptions.value;
+
+      if (searchObj.data.transformType === "function")
+        return filteredFunctionOptions.value;
+
+      return [];
+    });
+
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
+
+    const transformTypes = computed(() => {
+      return [
+        { label: "Function", value: "function" },
+        { label: "Action", value: "action" },
+      ];
+    });
+
+    const showFunctionEditor = computed(() => {
+      // IF actions are disabled, we are reverting to the old behavior of function editor
+      if (!isActionsEnabled.value) return searchObj.meta.showTransformEditor;
+
+      return searchObj.data.transformType === "function";
+    });
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,
@@ -1403,7 +1466,7 @@ export default defineComponent({
     watch(
       () => searchObj.meta.showSearchScheduler,
       (showSearchScheduler) => {
-        if(showSearchScheduler){
+        if (showSearchScheduler) {
           searchSchedulerJob.value = true;
         }
       },
@@ -1415,7 +1478,8 @@ export default defineComponent({
         if (
           searchObj.meta.jobId != "" &&
           val == true &&
-          (router.currentRoute.value.query.functionContent || searchObj.data.tempFunctionContent != "")
+          (router.currentRoute.value.query.functionContent ||
+            searchObj.data.tempFunctionContent != "")
         ) {
           if (!checkFnQuery(searchObj.data.tempFunctionContent)) {
             $q.notify({
@@ -1435,18 +1499,16 @@ export default defineComponent({
     watch(
       () => searchObj.meta.showHistogram,
       (val) => {
-        
-        if(val == true && searchObj.meta.jobId != ""  ){
+        if (val == true && searchObj.meta.jobId != "") {
           $q.notify({
-              message: "Histogram is not available for scheduled search",
-              color: "negative",
-              position: "bottom",
-              timeout: 2000,
-            });
-            searchObj.meta.showHistogram = false;
-            searchObj.loadingHistogram = false;
+            message: "Histogram is not available for scheduled search",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          searchObj.meta.showHistogram = false;
+          searchObj.loadingHistogram = false;
         }
-        
       },
       { immediate: true, deep: true },
     );
@@ -1458,7 +1520,6 @@ export default defineComponent({
       { immediate: true, deep: true },
     );
 
-
     onBeforeMount(async () => {
       await importSqlParser();
     });
@@ -1469,6 +1530,34 @@ export default defineComponent({
       parser = await sqlParser();
     };
 
+    const transformsLabel = computed(() => {
+      if (
+        searchObj.data.selectedTransform?.type ===
+          searchObj.data.transformType &&
+        searchObj.data.transformType
+      ) {
+        return searchObj.data.selectedTransform.name;
+      }
+
+      return searchObj.data.transformType === "action"
+        ? "Action"
+        : searchObj.data.transformType === "function"
+          ? "Function"
+          : "Transform";
+    });
+
+    const actionEditorQuery = computed(() => {
+      if (
+        searchObj.data.transformType === "action" &&
+        searchObj.data.selectedTransform?.type === "action" &&
+        searchObj.data.selectedTransform?.name
+      ) {
+        return `${searchObj.data.selectedTransform?.name} action applied successfully. Run Query to see results.`;
+      }
+
+      return "Select an action to apply";
+    });
+
     const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
       autoCompleteData.value.cursorIndex =
@@ -1478,6 +1567,16 @@ export default defineComponent({
         queryEditorRef?.value?.triggerAutoComplete;
       getSuggestions();
     };
+
+    const transformIcon = computed(() => {
+      if (searchObj.data.transformType === "function")
+        return "img:" + getImageURL("images/common/function.svg");
+
+      if (searchObj.data.transformType === "action") return "code";
+
+      if (!searchObj.data.transformType)
+        return "img:" + getImageURL("images/common/transform.svg");
+    });
 
     const getColumnNames = (parsedSQL: any) => {
       const columnData = parsedSQL?.columns;
@@ -1511,7 +1610,6 @@ export default defineComponent({
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
       // }
-
 
       searchObj.data.editorValue = value;
       if (searchObj.meta.quickMode === true) {
@@ -1637,11 +1735,10 @@ export default defineComponent({
             searchObj.data.queryResults.hits = [];
             // getQueryData(false);
           }
-       }
+        }
       } catch (e) {
         console.log(e, "Logs: Error while updating query value");
       }
-
     };
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -1776,18 +1873,22 @@ export default defineComponent({
     };
 
     onMounted(async () => {
+      searchObj.data.transformType =
+        router.currentRoute.value.query.transformType || "function";
+
       if (
-        router.currentRoute.value.query.functionContent ||
-        searchObj.data.tempFunctionContent
+        router.currentRoute.value.query.transformType === "function" &&
+        (router.currentRoute.value.query.functionContent ||
+          searchObj.data.tempFunctionContent)
       ) {
-        searchObj.meta.toggleFunction = true;
         const fnContent = router.currentRoute.value.query.functionContent
           ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
           : searchObj.data.tempFunctionContent;
         fnEditorRef?.value?.setValue(fnContent);
-        fnEditorRef?.value?.resetEditorLayout();
-        searchObj.config.fnSplitterModel = 60;
       }
+
+      updateEditorWidth();
+
       window.addEventListener("keydown", handleEscKey);
     });
 
@@ -1801,21 +1902,23 @@ export default defineComponent({
     onActivated(() => {
       updateQuery();
 
+      updateEditorWidth();
+
       if (
-        router.currentRoute.value.query.functionContent ||
-        searchObj.data.tempFunctionContent
+        (router.currentRoute.value.query.functionContent ||
+          searchObj.data.tempFunctionContent) &&
+        searchObj.data.transformType === "function"
       ) {
-        searchObj.meta.toggleFunction = true;
         const fnContent = router.currentRoute.value.query.functionContent
           ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
           : searchObj.data.tempFunctionContent;
         fnEditorRef?.value?.setValue(fnContent);
         fnEditorRef?.value?.resetEditorLayout();
-        searchObj.config.fnSplitterModel = 60;
         window.removeEventListener("click", () => {
           fnEditorRef?.value?.resetEditorLayout();
         });
       }
+
       fnEditorRef?.value?.resetEditorLayout();
     });
 
@@ -1965,6 +2068,10 @@ export default defineComponent({
       }, 100);
     };
 
+    const applyAction = (actionId) => {
+      searchObj.data.actionId = actionId.id;
+    };
+
     const populateFunctionImplementation = (fnValue, flag = false) => {
       if (flag) {
         $q.notify({
@@ -1973,8 +2080,14 @@ export default defineComponent({
           timeout: 3000,
         });
       }
+      console.log(
+        "fnValue",
+        fnValue,
+        fnEditorRef?.value,
+        showFunctionEditor.value,
+      );
       searchObj.config.fnSplitterModel = 60;
-      fnEditorRef.value.setValue(fnValue.function);
+      fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
     };
@@ -2170,7 +2283,9 @@ export default defineComponent({
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
                 searchObj.meta.functionEditorPlaceholderFlag = false;
-                searchObj.meta.toggleFunction = true;
+                searchObj.data.transformType = "function";
+                if (showFunctionEditor.value)
+                  searchObj.meta.showTransformEditor = true;
               } else {
                 populateFunctionImplementation(
                   {
@@ -2182,6 +2297,7 @@ export default defineComponent({
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
               }
+
               dateTimeRef.value.setSavedDate(searchObj.data.datetime);
               if (searchObj.meta.refreshInterval != "0") {
                 onRefreshIntervalUpdate();
@@ -2295,11 +2411,8 @@ export default defineComponent({
               }
               await updatedLocalLogFilterField();
             }
-            
-            if(searchObj.meta.toggleFunction == false) {
-              searchObj.config.fnSplitterModel = 99.5;
-              resetFunctionContent();
-            }
+
+            updateEditorWidth();
 
             $q.notify({
               message: `${item.view_name} view applied successfully.`,
@@ -2897,6 +3010,8 @@ export default defineComponent({
       emit("handleQuickModeChange");
     };
 
+    const handleHistogramMode = () => {};
+
     const handleRunQueryFn = () => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         emit("handleRunQueryFn");
@@ -2959,13 +3074,13 @@ export default defineComponent({
       const isDarkMode = store.state.theme === "dark";
       return {
         backgroundColor:
-          searchObj.meta.toggleFunction && isFocused.value
+          searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
               ? "#575A5A"
               : "#E0E0E0" // Dark mode: grey, Light mode: yellow (or any color)
             : "",
         borderBottom:
-          searchObj.meta.toggleFunction && isFocused.value
+          searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
               ? "2px solid #575A5A "
               : "2px solid #E0E0E0"
@@ -2975,7 +3090,7 @@ export default defineComponent({
     const editorWidthToggleFunction = computed(() => {
       const isDarkMode = store.state.theme === "dark";
 
-      if (!searchObj.meta.toggleFunction && isFocused.value) {
+      if (!searchObj.data.transformType === "function" && isFocused.value) {
         return {
           width: `calc(100 - ${searchObj.config.fnSplitterModel})%`,
           borderBottom: isDarkMode ? "2px solid #575A5A" : "2px solid #E0E0E0",
@@ -3016,22 +3131,22 @@ export default defineComponent({
       return (
         "img:" +
         getImageURL(
-          searchObj.meta.toggleFunction
+          searchObj.data.transformType === "function"
             ? "images/common/function_dark.svg"
             : "images/common/function.svg",
         )
       );
     });
     const addJobScheduler = async () => {
-
-      try{
+      try {
         // if(searchObj.meta.jobId != ""){
         //   searchObj.meta.jobId = "";
         // }
         if (searchObj.meta.jobId != "") {
           $q.notify({
             type: "negative",
-            message: "Job Already Scheduled , please change some parameters to schedule new job",
+            message:
+              "Job Already Scheduled , please change some parameters to schedule new job",
             timeout: 3000,
           });
           return;
@@ -3052,25 +3167,22 @@ export default defineComponent({
         searchSchedulerJob.value = false;
         searchObj.meta.showSearchScheduler = false;
         await getJobData();
-
+      } catch (e) {
+        if (e.response.status != 403) {
+          $q.notify({
+            type: "negative",
+            message: "Error while adding job",
+            timeout: 3000,
+          });
+          return;
+        }
       }
-      catch (e){
-        if(e.response.status != 403){
-        $q.notify({
-          type: "negative",
-          message: "Error while adding job",
-          timeout: 3000,
-        });
-        return;
-      }
-    }
-
     };
 
     const createScheduleJob = () => {
       searchSchedulerJob.value = true;
       searchObj.meta.jobRecords = 100;
-    }
+    };
 
     const checkQuery = (query) => {
       const jobQuery = router.currentRoute.value.query.query;
@@ -3078,14 +3190,84 @@ export default defineComponent({
         return true;
       }
       return false;
-    }
+    };
     const checkFnQuery = (fnQuery) => {
       const jobFnQuery = router.currentRoute.value.query.functionContent;
       if (jobFnQuery == b64EncodeUnicode(fnQuery)) {
         return true;
       }
       return false;
-    }
+    };
+
+    const updateTransforms = () => {
+      updateEditorWidth();
+    };
+
+    const selectTransform = (item: any, isSelected: boolean) => {
+      console.log("item", item);
+      if (searchObj.data.transformType === "function") {
+        populateFunctionImplementation(item, isSelected);
+      }
+
+      // If action is selected notify the user
+      if (searchObj.data.transformType === "action") {
+        updateActionSelection(item);
+      }
+
+      if (typeof item === "object")
+        searchObj.data.selectedTransform = {
+          ...item,
+          type: searchObj.data.transformType,
+        };
+    };
+
+    const updateActionSelection = (item: any) => {
+      $q.notify({
+        message: `${item?.name} action applied successfully`,
+        timeout: 3000,
+        color: "secondary",
+      });
+    };
+
+    const updateEditorWidth = () => {
+      if (searchObj.data.transformType) {
+        if (searchObj.meta.showTransformEditor) {
+          searchObj.config.fnSplitterModel = 60;
+        } else {
+          searchObj.config.fnSplitterModel = 99.5;
+        }
+      } else {
+        searchObj.config.fnSplitterModel = 99.5;
+      }
+    };
+    const visualizeIcon = computed(() => {
+      return searchObj.meta.logsVisualizeToggle === 'visualize' ? getImageURL('images/common/visualize_icon_light.svg') : getImageURL('images/common/visualize_icon_dark.svg')
+    });
+    const histogramIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/bar_chart_histogram_light.svg') : getImageURL('images/common/bar_chart_histogram.svg')
+    });
+    const sqlIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/hugeicons_sql_light.svg') : getImageURL('images/common/hugeicons_sql.svg')
+    });
+    const quickModeIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/quick_mode_light.svg') : getImageURL('images/common/quick_mode.svg')
+    });
+    const searchHistoryIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/search_history_light.svg') : getImageURL('images/common/search_history.svg')
+    });
+    const downloadTableIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/download_table_light.svg') : getImageURL('images/common/download_table.svg')
+    });
+    const customRangeIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/custom_range_light.svg') : getImageURL('images/common/custom_range.svg')
+    });
+    const createScheduledSearchIcon = computed(() => {
+      return store.state.theme === 'dark'   ? getImageURL('images/common/create_scheduled_search_light.svg') : getImageURL('images/common/create_scheduled_search.svg')
+    });
+    const listScheduledSearchIcon = computed(() => {
+      return store.state.theme === 'dark' ? getImageURL('images/common/list_scheduled_search_light.svg') : getImageURL('images/common/list_scheduled_search.svg')
+    });
+    
 
     // [END] cancel running queries
 
@@ -3135,6 +3317,7 @@ export default defineComponent({
       confirmDelete,
       saveViewLoader,
       savedViewDropdownModel,
+      moreOptionsDropdownModel,
       fnSavedFunctionDialog,
       isSavedFunctionAction,
       savedFunctionName,
@@ -3159,6 +3342,7 @@ export default defineComponent({
       config,
       handleRegionsSelection,
       handleQuickMode,
+      handleHistogramMode,
       regionFilterMethod,
       regionFilterRef,
       regionFilter,
@@ -3184,20 +3368,41 @@ export default defineComponent({
       routeToSearchSchedule,
       createScheduleJob,
       searchTerm,
+      filteredActionOptions,
       filteredFunctionOptions,
       confirmUpdate,
       updateViewObj,
       updateSavedViews,
       checkQuery,
       checkFnQuery,
+      transformsExpandState,
+      transformsLabel,
+      transformIcon,
+      transformTypes,
+      filteredTransformOptions,
+      updateTransforms,
+      selectTransform,
+      actionEditorQuery,
+      isActionsEnabled,
+      showFunctionEditor,
+      histogram_svg,
+      visualizeIcon,
+      histogramIcon,
+      sqlIcon,
+      quickModeIcon,
+      searchHistoryIcon,
+      downloadTableIcon,
+      customRangeIcon,
+      createScheduledSearchIcon,
+      listScheduledSearchIcon
     };
   },
   computed: {
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
     },
-    toggleFunction() {
-      return this.searchObj.meta.toggleFunction;
+    toggleTransformEditor() {
+      return this.searchObj.meta.showTransformEditor;
     },
     confirmMessage() {
       return "Are you sure you want to update the function?";
@@ -3350,13 +3555,13 @@ export default defineComponent({
         }
       }
     },
-    toggleFunction(newVal) {
+    toggleTransformEditor(newVal) {
       if (newVal == false) {
         this.searchObj.config.fnSplitterModel = 99.5;
-        this.resetFunctionContent();
       } else {
         this.searchObj.config.fnSplitterModel = 60;
       }
+
       this.resetEditorLayout();
     },
     resetFunction(newVal) {
@@ -3581,6 +3786,10 @@ export default defineComponent({
     height: 30px;
   }
 
+  .save-transform-btn {
+    height: 31px;
+  }
+
   .query-editor-container {
     height: calc(100% - 35px) !important;
   }
@@ -3629,6 +3838,15 @@ export default defineComponent({
   .body--dark {
     .btn-function {
       filter: brightness(100);
+    }
+  }
+
+  .btn-function {
+    .q-icon {
+      &.on-left {
+        margin-right: 6px !important;
+        font-size: 16px;
+      }
     }
   }
 
@@ -3740,12 +3958,7 @@ export default defineComponent({
   }
 
   .button {
-    display: block;
-    cursor: pointer;
     background-color: #f0eaea;
-    border: none;
-    font-size: 12px;
-    padding: 6px 4px;
   }
 
   .button-left {

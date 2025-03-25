@@ -279,8 +279,8 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
-    const refreshDashboard = () => {
-      emit("refresh");
+    const refreshDashboard = (onlyIfRequired = false) => {
+      emit("refresh", onlyIfRequired);
     };
 
     const onMovePanel = (panelId: any, newTabId: any) => {
@@ -553,19 +553,28 @@ export default defineComponent({
       }
     };
 
-    // update initial variable values using the variable value selector ref
+    /**
+     * Updates the initial variable values using the variable value selector ref
+     * @param args - Any arguments to be passed to `changeInitialVariableValues` method
+     */
     const updateInitialVariableValues = async (...args: any) => {
       // if view panel is open then close it
       showViewPanel.value = false;
 
       // first, refresh the dashboard
-      refreshDashboard();
+      refreshDashboard(true);
 
       // NOTE: after variables in variables feature, it works without changing the initial variable values
       // then, update the initial variable values
       await variablesValueSelectorRef.value.changeInitialVariableValues(
         ...args,
       );
+
+      // This is necessary to ensure that panels refresh automatically based on the drilldown
+      // without requiring the user to click on refresh to load the panel/whole dashboard
+      currentVariablesDataRef.value = {
+        __global: JSON.parse(JSON.stringify(variablesData.value)),
+      };
     };
 
     const refreshPanelRequest = (panelId) => {

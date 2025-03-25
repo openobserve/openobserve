@@ -191,6 +191,7 @@ pub async fn search(
             scan_stats.records += file.meta.records;
             scan_stats.original_size += file.meta.original_size;
             scan_stats.compressed_size += file.meta.compressed_size;
+            scan_stats.idx_scan_size += file.meta.index_size;
             // check schema version
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,

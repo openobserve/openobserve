@@ -123,8 +123,6 @@ pub struct UpdateActionDetailsRequest {
     #[serde(default)]
     pub environment_variables: Option<HashMap<String, String>>,
     #[serde(default)]
-    pub execution_details: Option<ExecutionDetailsType>,
-    #[serde(default)]
     pub cron_expr: Option<String>,
     #[serde(default)]
     pub description: Option<String>,

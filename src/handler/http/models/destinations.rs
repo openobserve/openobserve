@@ -47,8 +47,17 @@ impl From<meta_dest::Destination> for Destination {
                     method: endpoint.method,
                     skip_tls_verify: endpoint.skip_tls_verify,
                     headers: endpoint.headers,
+                    #[cfg(feature = "enterprise")]
+                    destination_type: if endpoint.action_id.is_some() {
+                        DestinationType::Action
+                    } else {
+                        DestinationType::Http
+                    },
+                    #[cfg(not(feature = "enterprise"))]
                     destination_type: DestinationType::Http,
                     template: Some(template),
+                    #[cfg(feature = "enterprise")]
+                    action_id: endpoint.action_id,
                     ..Default::default()
                 },
                 meta_dest::DestinationType::Sns(aws_sns) => Self {
@@ -87,6 +96,7 @@ impl Destination {
                             method: self.method,
                             skip_tls_verify: self.skip_tls_verify,
                             headers: self.headers,
+                            action_id: None,
                         })
                     }
                     DestinationType::Sns => meta_dest::DestinationType::Sns(meta_dest::AwsSns {
@@ -95,18 +105,25 @@ impl Destination {
                     }),
                     #[cfg(feature = "enterprise")]
                     DestinationType::Action => {
-                        let action_endpoint = ActionEndpoint::new(&org_id, &self.action_id)
-                            .map_err(DestinationError::InvalidActionId)?;
-                        meta_dest::DestinationType::Http(meta_dest::Endpoint {
-                            url: action_endpoint.url,
-                            method: if action_endpoint.method == reqwest::Method::POST {
-                                meta_dest::HTTPType::POST
-                            } else {
-                                meta_dest::HTTPType::GET
-                            },
-                            skip_tls_verify: action_endpoint.skip_tls,
-                            headers: None,
-                        })
+                        if let Some(action_id) = self.action_id {
+                            let action_endpoint = ActionEndpoint::new(&org_id, &action_id)
+                                .map_err(DestinationError::InvalidActionId)?;
+                            meta_dest::DestinationType::Http(meta_dest::Endpoint {
+                                url: action_endpoint.url,
+                                method: if action_endpoint.method == reqwest::Method::POST {
+                                    meta_dest::HTTPType::POST
+                                } else {
+                                    meta_dest::HTTPType::GET
+                                },
+                                skip_tls_verify: action_endpoint.skip_tls,
+                                headers: None,
+                                action_id: Some(action_id),
+                            })
+                        } else {
+                            return Err(DestinationError::InvalidActionId(anyhow::anyhow!(
+                                "Action id is required for action destination"
+                            )));
+                        }
                     }
                 };
                 Ok(meta_dest::Destination {
@@ -125,6 +142,7 @@ impl Destination {
                     method: self.method,
                     skip_tls_verify: self.skip_tls_verify,
                     headers: self.headers,
+                    action_id: None,
                 };
                 Ok(meta_dest::Destination {
                     id: None,
@@ -204,8 +222,8 @@ pub struct Destination {
     pub destination_type: DestinationType,
     /// Required when `destination_type` is `Action`
     #[cfg(feature = "enterprise")]
-    #[serde(default)]
-    pub action_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_id: Option<String>,
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]

@@ -62,10 +62,10 @@ pub async fn save_enrichment_table(
         }
     };
     let cfg = config::get_config();
-    if content_length > cfg.limit.enrichment_table_limit as f64 {
+    if content_length > cfg.limit.enrichment_table_max_size as f64 {
         return Ok(MetaHttpResponse::bad_request(format!(
             "exceeds allowed limit of {} mb",
-            cfg.limit.enrichment_table_limit
+            cfg.limit.enrichment_table_max_size
         )));
     }
     match content_type {

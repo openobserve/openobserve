@@ -192,8 +192,25 @@ pub async fn update_user(
     user: UpdateUser,
 ) -> Result<HttpResponse, Error> {
     let mut allow_password_update = false;
+    let is_email_root = is_root_user(email);
 
-    let existing_user = if is_root_user(email) {
+    // Only root user can update root user
+    if is_email_root && !self_update {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Root user cannot be updated".to_string(),
+        )));
+    }
+
+    // Nobody can update role to root user role
+    if !is_email_root && user.role.is_some() && user.role.as_ref().unwrap().eq(&UserRole::Root) {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Root user role cannot be updated".to_string(),
+        )));
+    }
+
+    let existing_user = if is_email_root {
         db::user::get(None, email).await
     } else {
         db::user::get(Some(org_id), email).await
@@ -556,10 +573,31 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
 }
 
 pub async fn list_users(
+    _user_id: &str,
     org_id: &str,
     role: Option<UserRole>,
     permitted: Option<Vec<String>>,
 ) -> Result<HttpResponse, Error> {
+    // If the role is not
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled {
+        let need_check_permission = !matches!(role, Some(UserRole::ServiceAccount));
+
+        if need_check_permission && permitted.is_none() {
+            let mut user_list = vec![];
+            if let Some(user) = USERS.get(&format!("{org_id}/{_user_id}")) {
+                user_list.push(UserResponse {
+                    email: user.value().email.clone(),
+                    role: user.value().role.clone(),
+                    first_name: user.value().first_name.clone(),
+                    last_name: user.value().last_name.clone(),
+                    is_external: user.value().is_external,
+                });
+            }
+            return Ok(HttpResponse::Ok().json(UserList { data: user_list }));
+        }
+    }
+
     let mut user_list: Vec<UserResponse> = USERS
         .iter()
         .filter(|user| user.key().starts_with(&format!("{org_id}/"))) // Filter by organization ID
@@ -765,20 +803,6 @@ pub async fn root_user_exists() -> bool {
     }
 }
 
-pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
-    if orgs.is_empty() {
-        (false, UserOrg::default())
-    } else {
-        let mut local_orgs = orgs;
-        local_orgs.retain(|org| !org.name.eq(&org_id.to_string()));
-        if local_orgs.is_empty() {
-            (false, UserOrg::default())
-        } else {
-            (true, local_orgs.first().unwrap().clone())
-        }
-    }
-}
-
 pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
     let cfg = get_config();
     let salt = ider::uuid();
@@ -827,7 +851,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users() {
         set_up().await;
-        assert!(list_users("dummy", None, None).await.is_ok())
+        assert!(list_users("", "dummy", None, None).await.is_ok())
     }
 
     #[tokio::test]

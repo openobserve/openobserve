@@ -16,7 +16,6 @@
 use actix_web::{HttpRequest, HttpResponse, delete, get, patch, post, put, web};
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
-    folder::DEFAULT_FOLDER,
     triggers::{Trigger, TriggerModule},
 };
 use hashbrown::HashMap;
@@ -25,12 +24,15 @@ use svix_ksuid::Ksuid;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::alerts::{
-        requests::{
-            CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody,
-            UpdateAlertRequestBody,
+    handler::http::{
+        models::alerts::{
+            requests::{
+                CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody,
+                UpdateAlertRequestBody,
+            },
+            responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
         },
-        responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
+        request::dashboards::get_folder,
     },
     service::{
         alerts::alert::{self, AlertError},
@@ -73,6 +75,9 @@ impl From<AlertError> for HttpResponse {
             AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
             AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
             AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
+            AlertError::PermissionDenied => MetaHttpResponse::forbidden("Unauthorized access"),
+            AlertError::UserNotFound => MetaHttpResponse::forbidden("Unauthorized access"),
+            AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
         }
     }
 }
@@ -99,14 +104,12 @@ pub async fn create_alert(
     path: web::Path<String>,
     req_body: web::Json<CreateAlertRequestBody>,
     user_email: UserEmail,
+    req: HttpRequest,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let req_body = req_body.into_inner();
 
-    let folder_id = req_body
-        .folder_id
-        .clone()
-        .unwrap_or(DEFAULT_FOLDER.to_string());
+    let folder_id = get_folder(req);
     let mut alert: MetaAlert = req_body.into();
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
         alert.owner = Some(user_email.user_id.clone());
@@ -179,11 +182,12 @@ pub async fn update_alert(
     req_body: web::Json<UpdateAlertRequestBody>,
     user_email: UserEmail,
 ) -> HttpResponse {
-    let (org_id, _alert_id) = path.into_inner();
+    let (org_id, alert_id) = path.into_inner();
     let req_body = req_body.into_inner();
 
     let mut alert: MetaAlert = req_body.into();
     alert.last_edited_by = Some(user_email.user_id);
+    alert.id = Some(alert_id);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::update(client, &org_id, None, alert).await {
@@ -369,6 +373,7 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 async fn move_alerts(
     path: web::Path<String>,
     req_body: web::Json<MoveAlertsRequestBody>,
+    user_email: UserEmail,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -377,6 +382,7 @@ async fn move_alerts(
         &org_id,
         &req_body.alert_ids,
         &req_body.dst_folder_id,
+        &user_email.user_id,
     )
     .await
     {

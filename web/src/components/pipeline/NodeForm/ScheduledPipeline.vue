@@ -689,7 +689,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         type="number"
                         dense
                         filled
-                        min="1"
+                        :min="
+                          Math.ceil(
+                            store.state?.zoConfig?.min_auto_refresh_interval / 60,
+                          ) || 1
+                        "
                         style="background: none"
                         @update:model-value="updateFrequency"
                       />
@@ -996,13 +1000,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-btn
                   data-test="stream-routing-query-save-btn"
-                  :label="'Validate and Close'"
+                  :label="validatingSqlQuery ? 'Validating...' : 'Validate and Close'"
                   class="text-bold no-border q-ml-md"
                   color="secondary"
                   padding="sm xl"
                   no-caps
                   type="submit"
                   @click="$emit('submit:form')"
+                  :disable="validatingSqlQuery"
                 />
                 <q-btn
                   v-if="pipelineObj.isEditNode"
@@ -1109,7 +1114,8 @@ const props = defineProps([
   "disableVrlFunction",
   "disableQueryTypeSelection",
   "showTimezoneWarning",
-  "streamType"
+  "streamType",
+  "validatingSqlQuery"
 ]);
 
 const emits = defineEmits([
@@ -1252,6 +1258,16 @@ watch(()=> splitterModel.value ,  (val)=>{
 watch(()=> selectedStreamName.value, (val)=>{
   searchObj.data.stream.pipelineQueryStream = [val];
 })
+watch(()=>triggerData.value.frequency_type, (val)=>{
+  if(val == 'minutes'){
+    triggerData.value.period = Number(triggerData.value.frequency) || 15
+  }else{
+    const periodValue = convertCronToMinutes(triggerData.value.cron) 
+    triggerData.value.period = periodValue > 0 ? periodValue : Number(triggerData.value.frequency) || 15
+  }
+})
+
+
 
 onBeforeMount(async ()=>{
   await importSqlParser();
@@ -1434,6 +1450,7 @@ const updateQueryValue = (value: string) => {
 };
 
 const updateTrigger = () => {
+
   emits("update:trigger", triggerData.value);
   emits("input:update", "period", triggerData.value);
 };
@@ -1746,7 +1763,7 @@ const validateFrequency = () => {
 
     if (triggerData.value.frequency < intervalInMins) {
       cronJobError.value =
-        "Frequency should be greater than " + (intervalInMins - 1);
+        "Minimum frequency should be " + (intervalInMins) + " minutes";
       return;
     }
   }
@@ -1903,7 +1920,7 @@ const runQuery = async () => {
           org_identifier: store.state.selectedOrganization.identifier,
             query: {query: queryReq},
             page_type: selectedStreamType.value,
-  }
+  }, "derived_stream"
   ).then((res: any) => {
     if(res.data.hits.length > 0){
     rows.value = res.data.hits

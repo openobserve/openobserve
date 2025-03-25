@@ -149,7 +149,13 @@ pub async fn handle_search_request(
     }
 
     // create new sql query with histogram interval
-    let sql = Sql::new(&req.payload.query.clone().into(), org_id, stream_type).await?;
+    let sql = Sql::new(
+        &req.payload.query.clone().into(),
+        org_id,
+        stream_type,
+        Some(req.search_type),
+    )
+    .await?;
     if let Some(interval) = sql.histogram_interval {
         // modify the sql query statement to include the histogram interval
         let updated_query = update_histogram_interval_in_query(&req.payload.query.sql, interval)?;
@@ -327,12 +333,11 @@ async fn do_search(
 fn handle_partial_response(mut res: Response) -> Response {
     if res.is_partial {
         res.function_error = if res.function_error.is_empty() {
-            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
+            vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]
         } else {
-            format!(
-                "{} \n {}",
-                PARTIAL_ERROR_RESPONSE_MESSAGE, res.function_error
-            )
+            res.function_error
+                .push(PARTIAL_ERROR_RESPONSE_MESSAGE.to_string());
+            res.function_error
         };
     }
     res
@@ -894,9 +899,10 @@ async fn do_partitioned_search(
             if !range_error.is_empty() {
                 search_res.is_partial = true;
                 search_res.function_error = if search_res.function_error.is_empty() {
-                    range_error.clone()
+                    vec![range_error.clone()]
                 } else {
-                    format!("{} \n {}", range_error, search_res.function_error)
+                    search_res.function_error.push(range_error.clone());
+                    search_res.function_error
                 };
                 search_res.new_start_time = Some(modified_start_time);
                 search_res.new_end_time = Some(modified_end_time);
@@ -977,7 +983,7 @@ async fn send_partial_search_resp(
     };
     let s_resp = Response {
         is_partial: true,
-        function_error: error,
+        function_error: vec![error],
         new_start_time: Some(new_start_time),
         new_end_time: Some(new_end_time),
         order_by,
@@ -1032,7 +1038,7 @@ async fn write_results_to_cache(
         }
     }
 
-    let merged_response = cache::merge_response(
+    let mut merged_response = cache::merge_response(
         &c_resp.trace_id,
         &mut cached_responses,
         &mut search_responses,
@@ -1047,12 +1053,22 @@ async fn write_results_to_cache(
     // 2. Super cluster error
     // 3. Range error (max_query_limit)
     // Cache partial results only if there is a range error
-    let skip_cache_results = (merged_response.is_partial
-        && (merged_response.new_start_time.is_none() || merged_response.new_end_time.is_none()))
-        || (!merged_response.function_error.is_empty()
-            && merged_response.function_error.contains("vrl"));
+    // let skip_cache_results = (merged_response.is_partial
+    //     && (merged_response.new_start_time.is_none() || merged_response.new_end_time.is_none()))
+    //     || (!merged_response.function_error.is_empty()
+    //         && merged_response.function_error.contains("vrl"));
 
-    if cfg.common.result_cache_enabled && !skip_cache_results {
+    let mut should_cache_results = merged_response.new_start_time.is_some()
+        || merged_response.new_end_time.is_some()
+        || merged_response.function_error.is_empty();
+
+    merged_response.function_error.retain(|err| {
+        !err.contains("Query duration is modified due to query range restriction of")
+    });
+
+    should_cache_results = should_cache_results && merged_response.function_error.is_empty();
+
+    if cfg.common.result_cache_enabled && should_cache_results {
         cache::write_results_v2(
             &c_resp.trace_id,
             &c_resp.ts_column,

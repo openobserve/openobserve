@@ -98,6 +98,7 @@ impl TreeNodeRewriter for AddSortAndLimit {
             }
             LogicalPlan::Limit(mut limit) => match limit.input.as_ref() {
                 LogicalPlan::Sort(_) => (Transformed::no(LogicalPlan::Limit(limit)), None),
+                LogicalPlan::Projection(_) => (Transformed::no(LogicalPlan::Limit(limit)), None),
                 _ => {
                     if is_complex {
                         (Transformed::no(LogicalPlan::Limit(limit)), None)
@@ -286,12 +287,14 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
             LogicalPlan::TableScan(scan) => {
                 let schema = scan.source.schema();
                 let timestamp_idx = schema.index_of(TIMESTAMP_COL_NAME)?;
-                let mut projection = scan.projection.clone().unwrap();
-                projection.push(timestamp_idx);
+                let projection = scan.projection.clone().map(|mut p| {
+                    p.push(timestamp_idx);
+                    p
+                });
                 let mut table_scan = TableScan::try_new(
                     scan.table_name,
                     scan.source,
-                    Some(projection),
+                    projection,
                     scan.filters,
                     scan.fetch,
                 )?;

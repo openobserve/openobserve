@@ -67,9 +67,12 @@ pub async fn filter_by_pending_delete(mut files: Vec<String>) -> Vec<String> {
 }
 
 pub async fn load_pending_delete() -> Result<()> {
+    let local_mode = config::get_config().common.local_mode;
     let files = infra::file_list::LOCAL_CACHE.list_deleted().await?;
     for file in files {
-        PENDING_DELETE_FILES.write().await.insert(file.file);
+        if ingester::is_wal_file(local_mode, &file.file) {
+            PENDING_DELETE_FILES.write().await.insert(file.file);
+        }
     }
     Ok(())
 }
