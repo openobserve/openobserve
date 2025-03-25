@@ -553,7 +553,10 @@ export default defineComponent({
       }
     };
 
-    // update initial variable values using the variable value selector ref
+    /**
+     * Updates the initial variable values using the variable value selector ref
+     * @param args - Any arguments to be passed to `changeInitialVariableValues` method
+     */
     const updateInitialVariableValues = async (...args: any) => {
       // if view panel is open then close it
       showViewPanel.value = false;
@@ -567,7 +570,11 @@ export default defineComponent({
         ...args,
       );
 
-      // set currnet variables ref
+      // Set current variables ref
+      // NOTE: we are using JSON.parse(JSON.stringify()) to create a deep copy of the variables data
+      // This is needed because the variables data is an object and we need to update the reference
+      // to the object every time the initial variable values are updated
+      // This is a workaround for the fact that the vue reactivity system doesn't work with objects
       currentVariablesDataRef.value = {
         __global: JSON.parse(JSON.stringify(variablesData.value)),
       };
