@@ -60,11 +60,6 @@ impl RatelimitRule {
         role: &str,
         updater: &RatelimitRuleUpdater,
     ) -> Vec<RatelimitRule> {
-        let org = match org {
-            "_meta" => ".*",
-            _ => org,
-        };
-
         updater
             .iter()
             .flat_map(|(group_name, operations)| {

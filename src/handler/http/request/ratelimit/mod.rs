@@ -38,11 +38,28 @@ use {
     std::collections::HashMap,
 };
 
+const QUOTA_PAGE_REQUIRED_ORG: &str = "_meta";
+const QUOTA_PAGE_GLOBAL_RULES_ORG: &str = "GLOBAL_RULES_META";
+
 #[cfg(feature = "enterprise")]
 #[derive(Debug, Clone, Deserialize)]
-struct UpdateQueryParams {
-    update_type: String,
+struct QueryParams {
+    org_id: String,
+    update_type: Option<String>,
     user_role: Option<String>,
+}
+
+impl QueryParams {
+    fn get_org_id(&self) -> String {
+        match self.org_id.as_str() {
+            QUOTA_PAGE_GLOBAL_RULES_ORG => DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string(),
+            _ => self.org_id.to_string(),
+        }
+    }
+
+    fn get_update_type(&self) -> String {
+        self.update_type.clone().unwrap_or_default()
+    }
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -104,15 +121,18 @@ async fn validate_ratelimit_updater(
                 ));
             }
 
-            let compare_threshold = org_level_thresholds
-                .get(&(api_group_name.to_string(), operation));
+            let compare_threshold =
+                org_level_thresholds.get(&(api_group_name.to_string(), operation));
             if compare_threshold.is_some() && *compare_threshold.unwrap() < *threshold {
                 return Err(anyhow::anyhow!(
-                    "{}:{} threshold must be lower than or equal to {:?}, got {}",
+                    "{}:{} threshold must be lower than or equal to {:?}, got {}, because org-level rules limit {}:{} is {:?}",
                     api_group_name,
                     operation.as_str(),
                     compare_threshold,
-                    threshold
+                    threshold,
+                    api_group_name,
+                    operation.as_str(),
+                    compare_threshold,
                 ));
             }
         }
@@ -150,9 +170,17 @@ impl From<RatelimitError> for HttpResponse {
     )
 )]
 #[get("/{org_id}/ratelimit/api_modules")]
-pub async fn api_modules(_path: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
+        let org_id = path.into_inner();
+        if org_id != QUOTA_PAGE_REQUIRED_ORG {
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "org_id: {} has no access",
+                org_id,
+            )));
+        }
+
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
             let openapi_info = crate::handler::http::router::openapi::openapi_info().await;
             o2_ratelimit::dataresource::default_rules::init_ratelimit_api_mapping(openapi_info)
@@ -160,8 +188,8 @@ pub async fn api_modules(_path: web::Path<String>) -> Result<HttpResponse, Error
         }
 
         let info = get_ratelimit_global_default_api_info().await;
-        let all_group = info.get_all_groups();
-
+        let mut all_group = info.get_all_groups();
+        all_group.push(QUOTA_PAGE_GLOBAL_RULES_ORG.to_string());
         Ok(HttpResponse::Ok().json(all_group))
     }
 
@@ -183,6 +211,7 @@ pub async fn api_modules(_path: web::Path<String>) -> Result<HttpResponse, Error
     ),
     params(
         ("org_id" = String, Path, description = "Organization Name"),
+        ("org_id" = String, Query, description = "Organization Name"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
@@ -190,10 +219,22 @@ pub async fn api_modules(_path: web::Path<String>) -> Result<HttpResponse, Error
     )
 )]
 #[get("/{org_id}/ratelimit/module_list")]
-pub async fn list_module_ratelimit(path: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list_module_ratelimit(
+    path: web::Path<String>,
+    query: web::Query<QueryParams>,
+) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let org_id = path.into_inner();
+        if org_id != QUOTA_PAGE_REQUIRED_ORG {
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "org_id: {} has no access",
+                org_id,
+            )));
+        }
+
+        let query = query.into_inner();
+        let org_id = query.get_org_id();
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
             let openapi_info = crate::handler::http::router::openapi::openapi_info().await;
             o2_ratelimit::dataresource::default_rules::init_ratelimit_api_mapping(openapi_info)
@@ -237,18 +278,38 @@ pub async fn list_module_ratelimit(path: web::Path<String>) -> Result<HttpRespon
     ),
     params(
         ("org_id" = String, Path, description = "Organization Name"),
-        ("user_role" = String, Path, description = "User Role Name"),
+        ("org_id" = String, Query, description = "Organization Name"),
+        ("user_role" = String, Query, description = "User Role Name"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/ratelimit/role_list/{user_role}")]
-pub async fn list_role_ratelimit(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+#[get("/{org_id}/ratelimit/role_list")]
+pub async fn list_role_ratelimit(
+    path: web::Path<String>,
+    query: web::Query<QueryParams>,
+) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let (org_id, user_role) = path.into_inner();
+        let org_id = path.into_inner();
+        if org_id != QUOTA_PAGE_REQUIRED_ORG {
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "org_id: {} has no access",
+                org_id,
+            )));
+        }
+
+        let query = query.into_inner();
+        let org_id = query.get_org_id();
+        let user_role = query.user_role.unwrap_or_default();
+        if user_role.is_empty() {
+            return Ok(MetaHttpResponse::bad_request(
+                "user_role param is required".to_string(),
+            ));
+        }
+
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
             let openapi_info = crate::handler::http::router::openapi::openapi_info().await;
             o2_ratelimit::dataresource::default_rules::init_ratelimit_api_mapping(openapi_info)
@@ -301,6 +362,7 @@ pub async fn list_role_ratelimit(path: web::Path<(String, String)>) -> Result<Ht
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("org_id" = String, Query, description = "Organization name"),
         ("update_type" = String, Query, description = "Update Type"),
         ("user_role" = Option<String>, Query, description = "UserRole name"),
     ),
@@ -313,13 +375,21 @@ pub async fn list_role_ratelimit(path: web::Path<(String, String)>) -> Result<Ht
 #[put("/{org_id}/ratelimit/update")]
 pub async fn update_ratelimit(
     path: web::Path<String>,
-    query: web::Query<UpdateQueryParams>,
+    query: web::Query<QueryParams>,
     updater: web::Json<RatelimitRuleUpdater>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let org_id = path.into_inner();
+        if org_id != QUOTA_PAGE_REQUIRED_ORG {
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "org_id: {} has no access",
+                org_id,
+            )));
+        }
+
         let query = query.into_inner();
+        let org_id = query.get_org_id();
 
         let updater = updater.into_inner();
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
@@ -335,10 +405,10 @@ pub async fn update_ratelimit(
             )));
         }
 
-        let user_role = match query.update_type.as_str() {
+        let user_role = match query.get_update_type().as_str() {
             "module" => DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string(),
             "role" => {
-                if query.user_role.is_none() {
+                if query.user_role.is_none() || query.user_role.eq(&Some("".to_string())) {
                     return Ok(MetaHttpResponse::bad_request(
                         "user_role param is required when update_type=role".to_string(),
                     ));
@@ -349,7 +419,7 @@ pub async fn update_ratelimit(
             _ => {
                 return Ok(MetaHttpResponse::bad_request(format!(
                     "update_type is incorrect: {}, only support module or role",
-                    query.update_type,
+                    query.get_update_type(),
                 )));
             }
         };
