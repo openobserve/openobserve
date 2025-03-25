@@ -601,6 +601,7 @@ async fn oo_validator_internal(
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     // TODO: confirm if this has any side effect
     // Check if the ws request is using internal grpc token
+    // TODO: get nodes in cluster for role router and check if the ip is matching the request ip
     if get_config().websocket.enabled && auth_info.auth.eq(&get_config().grpc.internal_grpc_token) {
         return Ok(req);
     }
@@ -779,7 +780,7 @@ pub(crate) async fn check_permissions(
 
     let object_str = auth_info.o2_type;
     let obj_str = if object_str.contains("##user_id##") {
-        object_str.replace("##user_id##", user_id)
+    object_str.replace("##user_id##", user_id)
     } else {
         object_str
     };
