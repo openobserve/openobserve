@@ -188,8 +188,7 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
         }
 
         let info = get_ratelimit_global_default_api_info().await;
-        let mut all_group = info.get_all_groups();
-        all_group.push(QUOTA_PAGE_GLOBAL_RULES_ORG.to_string());
+        let all_group = info.get_all_groups();
         Ok(HttpResponse::Ok().json(all_group))
     }
 
