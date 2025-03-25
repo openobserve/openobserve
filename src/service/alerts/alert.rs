@@ -18,6 +18,7 @@ use std::{
     str::FromStr,
 };
 
+
 use async_trait::async_trait;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
@@ -49,12 +50,25 @@ use infra::{
 use itertools::Itertools;
 use lettre::{AsyncTransport, Message, message::MultiPart};
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::actions::meta::{TriggerActionRequest, TriggerSource};
+#[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
     config::get_config as get_openfga_config,
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
+
+#[cfg(feature = "enterprise")]
+use actix_http::header::HeaderMap;
+#[cfg(feature = "enterprise")]
+use tracing::{Level, span};
+#[cfg(feature = "enterprise")]
+use crate::{
+    common::utils::{
+        http::get_or_create_trace_id,
+    },
+};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
@@ -976,7 +990,38 @@ async fn send_notification(
     }
 }
 
-async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+async fn send_http_notification(
+    endpoint: &Endpoint,
+    msg: String,
+) -> Result<String, anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    let msg = if endpoint.action_id.is_some() {
+        let incoming_msg = serde_json::from_str::<serde_json::Value>(&msg)
+            .map_err(|e| anyhow::anyhow!("Message should be valid JSON for actions: {e}"))?;
+        let inputs = if incoming_msg.is_object() {
+            vec![incoming_msg]
+        } else if incoming_msg.is_array() {
+            incoming_msg.as_array().unwrap().to_vec()
+        } else {
+            return Err(anyhow::anyhow!(
+                "Unsupported message format for actions: {}",
+                msg
+            ));
+        };
+
+        let trace_id = get_or_create_trace_id(&HeaderMap::new(), &span!(Level::TRACE, "action_destinations"));
+
+        let req = TriggerActionRequest {
+            inputs,
+            trigger_source: TriggerSource::Alerts,
+            trace_id,
+        };
+        serde_json::to_string(&req)
+            .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?
+    } else {
+        msg
+    };
+
     let client = if endpoint.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -1380,6 +1425,8 @@ async fn process_dest_template(
         }
     };
 
+    let evaluation_timestamp_millis = evaluation_timestamp / 1000;
+    let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
     let mut resp = tpl
         .replace("{org_name}", &alert.org_id)
         .replace("{stream_type}", alert.stream_type.as_str())
@@ -1403,6 +1450,14 @@ async fn process_dest_template(
         .replace("{alert_end_time}", &alert_end_time_str)
         .replace("{alert_url}", &alert_url)
         .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
+        .replace(
+            "{alert_trigger_time_millis}",
+            &evaluation_timestamp_millis.to_string(),
+        )
+        .replace(
+            "{alert_trigger_time_seconds}",
+            &evaluation_timestamp_seconds.to_string(),
+        )
         .replace("{alert_trigger_time_str}", &evaluation_timestamp_str);
 
     if let Some(contidion) = &alert.query_condition.promql_condition {
