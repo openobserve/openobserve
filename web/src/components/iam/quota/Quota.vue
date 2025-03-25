@@ -585,7 +585,7 @@ export default defineComponent ({
             });
         const rolesLimitRows = ref<any[]>([]);
         const rolesColumns = ref<any[]>([]);
-        const activeType = ref<string>("table");
+        const activeType = ref<any>("table");
         const tabs = ref<any[]>([
             {
                 label: "API Limits",
@@ -713,7 +713,7 @@ export default defineComponent ({
         const roleLevelModuleRows = ref<any[]>([]);
         const roleLevelLoading = ref<boolean>(false);
 
-        const openedRole = ref<string>("");
+        const openedRole = ref<any>("");
         const selectedRole = ref<any>(null);
         const rolesToBeDisplayed = ref<any[]>([]);
         const isRoleModulesLoading = ref<boolean>(false);
@@ -1039,7 +1039,7 @@ export default defineComponent ({
         // }
 
     };
-    const restrictToNumbers = (event) => {
+    const restrictToNumbers = (event: any) => {
     const char = String.fromCharCode(event.keyCode);
 
     // Allow numbers, backspace, delete, tab, enter, and decimal point
