@@ -21,26 +21,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-font-bold tw-pt-6 tw-pb-2">
         Check further documentation at:
       </div>
-      <div class="tw-py-2">
-        <a
-          href="https://openobserve.ai/blog/send-gcp-logs-to-openobserve"
-          class="hover:tw-underline text-primary"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-        {{ t("ingestion.pubsub") }}
-        </a>
-      </div>
-      <div class="tw-py-2">
-        <a
-          href="https://short.openobserve.ai/security/google-workspace"
-          class="hover:tw-underline text-primary"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-        {{ t("ingestion.gworkspace") }}
-        </a>
-      </div>
+      <ol style="list-style: decimal;" class="q-pl-md">
+        <li class="tw-py-2">
+          <a
+            href="https://openobserve.ai/blog/send-gcp-logs-to-openobserve"
+            class="hover:tw-underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+          {{ t("ingestion.pubsub") }}
+          </a>
+        </li>
+        <li class="tw-py-2">
+          <a
+            href="https://short.openobserve.ai/security/google-workspace"
+            class="hover:tw-underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+          {{ t("ingestion.gworkspace") }}
+          </a>
+        </li>
+      </ol>
     </div>
   </div>
 </template>
