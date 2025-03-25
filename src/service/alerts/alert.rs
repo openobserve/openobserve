@@ -980,10 +980,10 @@ async fn send_notification(
 
 async fn send_http_notification(
     endpoint: &Endpoint,
-    mut msg: String,
+    msg: String,
 ) -> Result<String, anyhow::Error> {
     #[cfg(feature = "enterprise")]
-    if endpoint.action_id.is_some() {
+    let msg = if endpoint.action_id.is_some() {
         let incoming_msg = serde_json::from_str::<serde_json::Value>(&msg)
             .map_err(|e| anyhow::anyhow!("Message should be valid JSON for actions: {e}"))?;
         let inputs = if incoming_msg.is_object() {
@@ -1002,8 +1002,10 @@ async fn send_http_notification(
             trigger_source: TriggerSource::Alerts,
             trace_id: "actions".to_string(),
         };
-        msg = serde_json::to_string(&req)
-            .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?;
+        serde_json::to_string(&req)
+            .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?
+    } else {
+        msg
     };
 
     let client = if endpoint.skip_tls_verify {
