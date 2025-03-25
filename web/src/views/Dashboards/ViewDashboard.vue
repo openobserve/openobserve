@@ -245,6 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <RenderDashboardCharts
+        :key="currentDashboardData.data?.dashboardId"
         v-if="selectedDate"
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
@@ -584,7 +585,18 @@ export default defineComponent({
                   `;
     };
 
-    const loadDashboard = async () => {
+    const loadDashboard = async (onlyIfRequired = false) => {
+      // check if drilldown or soft-refresh request
+      if (onlyIfRequired) {
+        // if current dashboard id and tab is same,  skip loading
+        if (
+          currentDashboardData?.data?.dashboardId === route.query.dashboard &&
+          // check for tab
+          selectedTabId.value === route.query.tab
+        ) {
+          return;
+        }
+      }
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
