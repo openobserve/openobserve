@@ -338,10 +338,6 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         report_timeout: i64,
     ) -> Result<Vec<Trigger>> {
         let pool = CLIENT.clone();
-        let (include_max, mut max_retries) = get_scheduler_max_retries();
-        if include_max {
-            max_retries += 1;
-        }
 
         log::debug!("Start pulling scheduled_job");
         let now = chrono::Utc::now().timestamp_micros();
@@ -362,7 +358,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         let job_ids: Vec<TriggerId> = match sqlx::query_as::<_, TriggerId>(
             r#"SELECT id
 FROM scheduled_jobs
-WHERE status = ? AND next_run_at <= ? AND retries < ? AND NOT (is_realtime = ? AND is_silenced = ?)
+WHERE status = ? AND next_run_at <= ? AND NOT (is_realtime = ? AND is_silenced = ?)
 ORDER BY next_run_at
 LIMIT ?
 FOR UPDATE;
@@ -370,7 +366,6 @@ FOR UPDATE;
         )
         .bind(TriggerStatus::Waiting)
         .bind(now)
-        .bind(max_retries)
         .bind(true)
         .bind(false)
         .bind(concurrency)

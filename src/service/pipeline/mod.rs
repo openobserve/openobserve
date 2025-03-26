@@ -53,6 +53,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
             derived_stream.clone(),
             &pipeline.name,
             &pipeline.id,
+            true,
         )
         .await
         {
@@ -125,6 +126,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
             derived_stream.clone(),
             &pipeline.name,
             &pipeline.id,
+            true,
         )
         .await
         {
@@ -184,6 +186,7 @@ pub async fn enable_pipeline(
                 derived_stream.clone(),
                 &pipeline.name,
                 pipeline_id,
+                false,
             )
             .await
             .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
