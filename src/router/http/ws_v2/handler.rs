@@ -346,68 +346,108 @@ impl WsHandler {
                                         match err_msg.ws_server_events {
                                             WsServerEvents::Error { code, .. } if code == <actix_http::StatusCode as Into<u16>>::into(StatusCode::UNAUTHORIZED) => {
                                                 let is_session_drain_complete = Arc::new(AtomicBool::new(false));
-                                            let is_session_drain_complete_clone = is_session_drain_complete.clone();
+                                                let is_session_drain_complete_clone = is_session_drain_complete.clone();
 
-                                            // Clone values before moving into spawn
-                                            let session_manager = session_manager.clone();
-                                            let connection_pool = connection_pool.clone();
-                                            let client_id = client_id.clone();
-                                            let cfg_clone = cfg.clone();
-                                            let cfg_clone2 = cfg_clone.clone();
+                                                // Clone values before moving into spawn
+                                                let session_manager = session_manager.clone();
+                                                let session_manager_clone = session_manager.clone();
+                                                let connection_pool = connection_pool.clone();
+                                                let client_id = client_id.clone();
+                                                let client_id_clone = client_id.clone();
+                                                let cfg_clone = cfg.clone();
 
-                                            let session_drain_task = tokio::spawn(async move {
-                                                let querier_connections = session_manager.get_querier_connections(&client_id).await;
-                                                let trace_ids = session_manager.get_trace_ids(&client_id).await;
-                                                let max_wait_time = cfg_clone.websocket.session_idle_timeout_secs as u64;
-                                                let start_time = std::time::Instant::now();
+                                                // Set a flag to indicate we're in drain mode
+                                                let is_draining = Arc::new(AtomicBool::new(true));
+                                                let is_draining_clone = is_draining.clone();
 
-                                                'outer: loop {
-                                                    // Check if max wait time exceeded
-                                                    if start_time.elapsed().as_secs() > max_wait_time {
-                                                        log::warn!("[WS::Router::Handler]: Session drain timeout reached");
-                                                        break;
-                                                    }
+                                                let _session_drain_task = tokio::spawn(async move {
+                                                    let querier_connections = session_manager_clone.get_querier_connections(&client_id_clone).await;
+                                                    let max_wait_time = cfg_clone.websocket.session_idle_timeout_secs as u64;
+                                                    let start_time = std::time::Instant::now();
 
-                                                    let all_drained = true;
+                                                    'outer: loop {
+                                                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-                                                    // Check each querier connection for active trace IDs
-                                                    for querier_name in &querier_connections {
-                                                        let Some(active_connection) = connection_pool.get_active_connection(querier_name).await else {
-                                                            log::warn!("[WS::Router::Handler]: Connection not found for querier {}", querier_name);
-                                                            continue;
-                                                        };
+                                                        if start_time.elapsed().as_secs() > max_wait_time {
+                                                            log::warn!("[WS::Router::Handler]: Session drain timeout reached");
+                                                            break;
+                                                        }
 
-                                                        for trace_id in &trace_ids {
-                                                            if active_connection.is_active_trace_id(trace_id).await {
-                                                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                                                                continue 'outer;
+                                                        let current_trace_ids = session_manager_clone.get_trace_ids(&client_id_clone).await;
+
+                                                        // If all trace_ids are processed, we're done
+                                                        if current_trace_ids.is_empty() {
+                                                            is_session_drain_complete_clone.store(true, Ordering::Relaxed);
+                                                            log::info!("[WS::Router::Handler]: All trace IDs drained successfully");
+                                                            break;
+                                                        }
+
+                                                        // Log remaining trace IDs for debugging
+                                                        log::debug!(
+                                                            "[WS::Router::Handler]: Waiting for trace IDs to complete: {:?}",
+                                                            current_trace_ids
+                                                        );
+
+                                                        // Check each querier connection for active trace IDs
+                                                        for querier_name in &querier_connections {
+                                                            let Some(active_connection) = connection_pool.get_active_connection(querier_name).await else {
+                                                                continue;
+                                                            };
+
+                                                            for trace_id in &current_trace_ids {
+                                                                if active_connection.is_active_trace_id(trace_id).await {
+                                                                    continue 'outer;
+                                                                }
                                                             }
                                                         }
                                                     }
 
-                                                    if all_drained {
-                                                        is_session_drain_complete_clone.store(true, Ordering::Relaxed);
-                                                        log::info!("[WS::Router::Handler]: All trace IDs drained successfully");
-                                                        break;
-                                                    }
-                                                }
-                                            });
+                                                    // Clear drain mode flag when complete
+                                                    is_draining_clone.store(false, Ordering::Relaxed);
+                                                });
 
-                                            // Wait for either task completion or timeout
-                                            tokio::select! {
-                                                _ = session_drain_task => {
-                                                    if is_session_drain_complete.load(Ordering::Relaxed) {
-                                                        log::info!("[WS::Router::Handler]: Session drain complete. Closing session");
+                                                // Continue processing messages while draining
+                                                while !is_session_drain_complete.load(Ordering::Relaxed) {
+                                                    if let Some(message) = response_rx.recv().await {
+                                                        // Forward all messages to client during drain
+                                                        if let Ok(message_str) = serde_json::to_string(&message) {
+                                                            if let Err(e) = ws_session.text(message_str).await {
+                                                                log::error!("[WS::Router::Handler]: Error sending message during drain: {}", e);
+                                                                break;
+                                                            }
+
+                                                            // Important: Process End messages and clean up trace_ids
+                                                            if let Some(trace_id) = message.should_clean_trace_id() {
+                                                                log::info!(
+                                                                    "[WS::Router::Handler] Cleaning up trace_id during drain: {}, message: {:?}",
+                                                                    trace_id,
+                                                                    message
+                                                                );
+                                                                session_manager.remove_trace_id(&client_id, &trace_id).await;
+
+                                                                // Check if this was the last trace_id
+                                                                let remaining_trace_ids = session_manager.get_trace_ids(&client_id).await;
+                                                                if remaining_trace_ids.is_empty() {
+                                                                    is_session_drain_complete.store(true, Ordering::Relaxed);
+                                                                    // close the session
+                                                                    if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Close(Some(CloseReason::from(CloseCode::Normal))))).await {
+                                                                        log::error!(
+                                                                            "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
+                                                                        );
+                                                                    }
+                                                                    log::info!("[WS::Router::Handler]: All trace IDs drained successfully");
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        // Channel closed, no more messages coming
+                                                        log::warn!("[WS::Router::Handler]: Response channel closed during drain");
                                                         break;
                                                     }
-                                                }
-                                                _ = tokio::time::sleep(tokio::time::Duration::from_secs(cfg_clone2.websocket.session_idle_timeout_secs as _)) => {
-                                                    log::warn!("[WS::Router::Handler]: Session drain timeout while waiting for completion");
-                                                    break;
                                                 }
                                             }
-                                        }
-                                        _ => {}
+                                            _ => {}
                                         }
                                     }
                                 }
@@ -425,7 +465,7 @@ impl WsHandler {
                 _ = ws_session
                     .close(Some(CloseReason::from(CloseCode::Normal)))
                     .await;
-                log::debug!("[WS::Router::Handler]: client ws closed");
+                log::info!("[WS::Router::Handler]: client ws closed: {}", client_id);
                 Ok::<_, Error>(())
             };
 
