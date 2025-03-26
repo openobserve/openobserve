@@ -13,6 +13,53 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! WebSocket v2 Implementation for Router-Querier Communication
+//! 
+//! This module implements a WebSocket-based communication system between clients, routers, and queriers.
+//! It provides connection pooling, session management, and reliable message routing.
+//!
+//! # Architecture
+//!
+//! The system consists of several key components:
+//!
+//! * `WsHandler`: Main handler for client WebSocket connections
+//! * `QuerierConnectionPool`: Manages persistent WebSocket connections to querier nodes
+//! * `SessionManager`: Tracks client sessions and their querier mappings
+//! * `QuerierConnection`: Handles individual WebSocket connections to querier nodes
+//!
+//! # Flow
+//!
+//! 1. Client establishes WebSocket connection with Router
+//! 2. Router creates session and validates authentication
+//! 3. Client sends requests with trace_ids
+//! 4. Router maps trace_ids to querier nodes using consistent hashing
+//! 5. Router maintains persistent connections to queriers
+//! 6. Responses are routed back to clients using trace_ids
+//!
+//! # Features
+//!
+//! * Connection pooling for querier connections
+//! * Session management with idle timeout
+//! * Health checking of querier connections
+//! * Graceful session draining on disconnects
+//! * Request/response routing using trace_ids
+//! * Support for enterprise authentication
+//!
+//! # Components
+//!
+//! ## Handler
+//! Handles the main WebSocket lifecycle and message routing
+//!
+//! ## Connection Pool
+//! Maintains and reuses WebSocket connections to querier nodes
+//!
+//! ## Session Manager
+//! Tracks client sessions, querier mappings, and handles cleanup
+//!
+//! ## Connection
+//! Implements the low-level WebSocket connection handling
+//!
+
 use std::sync::Arc;
 
 use handler::WsHandler;
