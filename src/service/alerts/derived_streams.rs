@@ -34,6 +34,7 @@ pub async fn save(
     mut derived_stream: DerivedStream,
     pipeline_name: &str,
     pipeline_id: &str,
+    needs_validated: bool,
 ) -> Result<(), anyhow::Error> {
     // 1. Start validate DerivedStream
     // checks for query type
@@ -108,23 +109,25 @@ pub async fn save(
             std::cmp::max(1, get_config().limit.derived_stream_schedule_interval / 60);
     }
 
-    // test derived_stream
     let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
-    let test_end_time = Utc::now().timestamp_micros();
-    let test_start_time = test_end_time
-        - chrono::Duration::try_seconds(5)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-    if let Err(e) = &derived_stream
-        .evaluate((Some(test_start_time), test_end_time), &trigger_module_key)
-        .await
-    {
-        return Err(anyhow::anyhow!(
-            "DerivedStream not saved due to failed test run caused by {}",
-            e.to_string()
-        ));
-    };
+    if needs_validated {
+        // test derived_stream
+        let test_end_time = Utc::now().timestamp_micros();
+        let test_start_time = test_end_time
+            - chrono::Duration::try_seconds(5)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        if let Err(e) = &derived_stream
+            .evaluate((Some(test_start_time), test_end_time), &trigger_module_key)
+            .await
+        {
+            return Err(anyhow::anyhow!(
+                "DerivedStream not saved due to failed test run caused by {}",
+                e.to_string()
+            ));
+        };
+    }
 
     // Save the trigger to db
     let next_run_at = Utc::now().timestamp_micros();
