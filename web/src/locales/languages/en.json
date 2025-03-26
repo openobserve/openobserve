@@ -943,7 +943,7 @@
     "alertType": "Alert Type",
     "streamType": "Stream Type",
     "state": "State",
-    "realTime": "Real Time",
+    "realTime": "Real-Time",
     "scheduled": "Scheduled",
     "minutes": "Minutes",
     "hours": "Hours",
