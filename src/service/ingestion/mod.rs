@@ -509,10 +509,11 @@ pub fn get_val_with_type_retained(val: &Value) -> Value {
         Value::Null => Value::Null,
     }
 }
+
 pub async fn get_uds_and_original_data_streams(
     streams: &[StreamParams],
-    user_defined_schema_map: &mut HashMap<String, HashSet<String>>,
-    streams_need_original: &mut HashSet<String>,
+    user_defined_schema_map: &mut HashMap<String, Option<HashSet<String>>>,
+    streams_need_original: &mut HashMap<String, bool>,
 ) {
     for stream in streams {
         if user_defined_schema_map.contains_key(stream.stream_name.as_str()) {
@@ -522,16 +523,19 @@ pub async fn get_uds_and_original_data_streams(
             infra::schema::get_settings(&stream.org_id, &stream.stream_name, stream.stream_type)
                 .await
                 .unwrap_or_default();
-        if stream_settings.store_original_data {
-            streams_need_original.insert(stream.stream_name.to_string());
-        }
+        streams_need_original.insert(
+            stream.stream_name.to_string(),
+            stream_settings.store_original_data,
+        );
         if let Some(fields) = &stream_settings.defined_schema_fields {
             if !fields.is_empty() {
                 let mut fields: HashSet<_> = fields.iter().cloned().collect();
                 if !fields.contains(TIMESTAMP_COL_NAME) {
                     fields.insert(TIMESTAMP_COL_NAME.to_string());
                 }
-                user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
+                user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
+            } else {
+                user_defined_schema_map.insert(stream.stream_name.to_string(), None);
             }
         }
     }
