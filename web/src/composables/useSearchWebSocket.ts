@@ -201,7 +201,7 @@ const useSearchWebSocket = () => {
       reset: (data: any, response: any) => void;
     }  
   ) => {
-      console.log("fetchQueryDataWithWebSocket", data.traceId, socketId.value);
+    console.log("fetchQueryDataWithWebSocket", data.traceId, socketId.value, isInDrainMode.value);
     try {
       traces[data.traceId] = {
         open: [],
@@ -262,7 +262,7 @@ const useSearchWebSocket = () => {
   const sendSearchMessageBasedOnRequestId = (data: any) => {
     try {
 
-      console.log("sendSearchMessageBasedOnRequestId", { ...traces[data.content.traceId]} );
+      console.log("sendSearchMessageBasedOnRequestId",  data.content.traceId, structuredClone(traces[data.content.traceId]) );
       
       if(!traces[data.content.traceId]?.isActive && inactiveSocketId.value) {
         webSocket.sendMessage(inactiveSocketId.value as string, JSON.stringify(data));
@@ -334,7 +334,7 @@ const useSearchWebSocket = () => {
 
   const retryActiveTrace = (traceId: string, response: any) => {
     traces[traceId]?.close.forEach((handler: any) => handler(response));
-    traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data));
+    traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data, traceId));
     cleanUpListeners(traceId);   
   }
 

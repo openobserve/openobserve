@@ -688,8 +688,10 @@ export const usePanelDataLoader = (
     saveCurrentStateToCache();
   };
 
-  const handleSearchReset = (payload: any) => {
+  const handleSearchReset = (payload: any, traceId?: string) => {
     // reset old state data
+    console.log("handleSearchReset", traceId, structuredClone(payload));
+
     state.data = [];
     state.resultMetaData = [];
 
