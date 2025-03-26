@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex q-ml-auto tw-ps-2 alerts-list-tabs">
         <app-tabs
+        v-if="false"
           class="q-mr-md"
           :tabs="tabs"
           v-model:active-tab="activeTab"
