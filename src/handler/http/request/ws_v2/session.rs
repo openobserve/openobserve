@@ -593,15 +593,15 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
     // Send error response
     let err_res = WsServerEvents::error_response(
         e,
-        Some(trace_id.to_string()),
         Some(req_id.to_string()),
+        Some(trace_id.to_string()),
         Default::default(),
     );
     let _ = send_message(req_id, err_res.to_json()).await;
 
     // Close with error
     let close_reason = CloseReason {
-        code: CloseCode::Error,
+        code: CloseCode::Normal,
         description: None,
     };
 

@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! WebSocket v2 Implementation for Router-Querier Communication
-//! 
-//! This module implements a WebSocket-based communication system between clients, routers, and queriers.
-//! It provides connection pooling, session management, and reliable message routing.
+//!
+//! This module implements a WebSocket-based communication system between clients, routers, and
+//! queriers. It provides connection pooling, session management, and reliable message routing.
 //!
 //! # Architecture
 //!
@@ -58,7 +58,6 @@
 //!
 //! ## Connection
 //! Implements the low-level WebSocket connection handling
-//!
 
 use std::sync::Arc;
 

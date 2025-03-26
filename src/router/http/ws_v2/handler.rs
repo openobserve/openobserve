@@ -307,7 +307,7 @@ impl WsHandler {
                                 _ => {
                                     let Ok(message_str) = serde_json::to_string(&message) else {
                                         log::error!(
-                                            "[WS::Handler]: error convert WsServerEvents to string before sending back to client "
+                                            "[WS::Router::Handler]: error convert WsServerEvents to string before sending back to client "
                                         );
                                         continue;
                                     };
@@ -316,6 +316,7 @@ impl WsHandler {
                                         break;
                                     }
                                     if let Some(trace_id) = message.should_clean_trace_id() {
+                                        log::info!("[WS::Router::Handler] Unregistering trace_id: {}, message: {:?}", trace_id, message);
                                         session_manager.update_session_activity(&client_id).await;
                                         session_manager.remove_trace_id(&client_id, &trace_id).await;
                                     }

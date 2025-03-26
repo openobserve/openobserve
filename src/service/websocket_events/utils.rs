@@ -421,7 +421,6 @@ impl WsServerEvents {
         }
     }
 
-    // TODO: what to do when there's no trace_id? @Loaki07
     pub fn get_trace_id(&self) -> String {
         match self {
             Self::SearchResponse { trace_id, .. } => trace_id.to_string(),
