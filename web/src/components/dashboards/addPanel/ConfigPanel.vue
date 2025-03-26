@@ -2074,7 +2074,7 @@ export default defineComponent({
 
     // Add a watch for background type changes
     watch(
-      () => dashboardPanelData.data.config.background.type,
+      () => dashboardPanelData?.data?.config?.background?.type,
       (newType) => {
         if (!newType || newType === "None") {
           dashboardPanelData.data.config.background.value.color = "";
