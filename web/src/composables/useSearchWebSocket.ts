@@ -10,13 +10,21 @@ type OpenHandler = (event: Event) => void;
 type CloseHandler = (event: CloseEvent) => void;
 type ErrorHandler = (event: Event) => void;
 
-type WebSocketHandler = MessageHandler | CloseHandler | ErrorHandler;
-
-type HandlerMap = Record<"message" | "close" | "error", WebSocketHandler[]>;
+type TraceRecord = {
+  open: OpenHandler[];
+  message: MessageHandler[];
+  close: CloseHandler[];
+  error: ErrorHandler[];
+  reset: ((data: any) => void)[];
+  isInitiated: boolean;
+  isActive: boolean;
+  socketId: string | null;
+  data: any;
+};
 
 const webSocket = useWebSocket();
 
-const traces: Record<string, HandlerMap | any> = {};
+const traces: Record<string, TraceRecord> = {};
 // const openHandlers: OpenHandler[] = [];
 const socketId = ref<string | null>(null);
 
