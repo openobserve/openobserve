@@ -605,7 +605,7 @@ async fn oo_validator_internal(
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     // Check if the ws request is using internal grpc token
     if get_config().websocket.enabled && auth_info.auth.eq(&get_config().grpc.internal_grpc_token) {
-        return validate_internal_http(req).await;
+        return validate_http_internal(req).await;
     }
 
     if auth_info.auth.starts_with("Basic") {
@@ -769,7 +769,7 @@ pub async fn validator_proxy_url(
     oo_validator_internal(req, auth_info, path_prefix).await
 }
 
-pub async fn validate_internal_http(
+pub async fn validate_http_internal(
     req: ServiceRequest,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let router_nodes = cluster::get_cached_online_router_nodes()
@@ -817,7 +817,6 @@ pub async fn validate_internal_http(
             }
         };
 
-        dbg!(&host_ip, &node_ip);
         host_ip == node_ip
     });
     if router_node.is_none() {
