@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selection="multiple"
             data-test="alert-list-table"
             ref="qTable"
-            :rows="filteredResults"
+            :rows="filteredResults || []"
             :columns="columns"
             row-key="alert_id"
             :pagination="pagination"
@@ -1089,7 +1089,7 @@ export default defineComponent({
       { label: "All", value: 0 },
     ];
     const resultTotal = computed(function () {
-      return filteredResults.value.length;
+      return filteredResults.value?.length;
     });
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
@@ -1465,8 +1465,9 @@ export default defineComponent({
       selected.value = [];
       allSelected.value = false;
       filterQuery.value = "";
+      searchAcrossFolders.value = false;
       //here we are resetting the selected alerts
-      filteredResults.value.forEach((alert: any) => {
+      filteredResults.value?.forEach((alert: any) => {
         alert.selected = false;
       });
 
@@ -1552,14 +1553,14 @@ export default defineComponent({
         // Select all rows
         selected.value = [...filteredResults.value];
         //this is the filteredResults where we have all the alerts
-        filteredResults.value.forEach((alert: any) => {
+        filteredResults.value?.forEach((alert: any) => {
           alert.selected = true;
         });
       } else {
         // Deselect all rows
         selected.value = [];
         //this is the filteredResults where we have all the alerts
-        filteredResults.value.forEach((alert: any) => {
+        filteredResults.value?.forEach((alert: any) => {
           alert.selected = false;
         });
       }
