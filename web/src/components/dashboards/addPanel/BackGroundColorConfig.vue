@@ -1,38 +1,29 @@
 <template>
-  <div
-    style="display: flex; align-items: center; width: 100%"
-    v-if="['metric'].includes(dashboardPanelData.data.type)"
-  >
+  <div style="display: flex; align-items: center; width: 100%">
     <q-select
       outlined
-      v-model="dashboardPanelData.data.config.background.type"
+      v-model="backgroundType"
       :options="colorModeOptions"
       dense
       :label="t('dashboard.colorMode')"
       class="showLabelOnTop selectedLabel tw-w-full"
       stack-label
       emit-value
-      :display-value="`${
-        dashboardPanelData.data.config.background.type
-          ? colorModeOptions.find(
-              (it: any) =>
-                it.value == dashboardPanelData.data.config.background.type,
-            )?.label
+      :display-value="
+        backgroundType
+          ? colorModeOptions.find((it: any) => it.value === backgroundType)
+              ?.label
           : 'None'
-      }`"
+      "
       data-test="dashboard-config-color-mode"
-    >
-    </q-select>
+    ></q-select>
 
-    <div v-if="dashboardPanelData.data.config.background.type === 'single'">
+    <div v-if="backgroundType === 'single'">
       <div
         class="color-input-wrapper"
         style="margin-top: 36px; margin-left: 5px"
       >
-        <input
-          type="color"
-          v-model="dashboardPanelData.data.config.background.value.color"
-        />
+        <input type="color" v-model="backgroundColor" />
       </div>
     </div>
   </div>
@@ -40,14 +31,7 @@
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import {
-  ref,
-  watch,
-  computed,
-  defineComponent,
-  inject,
-  onBeforeMount,
-} from "vue";
+import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
@@ -58,22 +42,14 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData(
+    const { dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
-
     const { t } = useI18n();
 
-    // Compute color mode options
     const colorModeOptions = [
-      {
-        label: t("dashboard.none"),
-        value: "",
-      },
-      {
-        label: t("dashboard.singleColor"),
-        value: "single",
-      },
+      { label: t("dashboard.none"), value: "" },
+      { label: t("dashboard.singleColor"), value: "single" },
     ];
 
     // Reactive references for background configuration
@@ -105,15 +81,6 @@ export default defineComponent({
       },
     });
 
-    // Computed display value for color mode
-    const displayColorMode = computed(() => {
-      const currentType = backgroundType.value;
-      return currentType === ""
-        ? t("dashboard.none")
-        : colorModeOptions.find((it) => it.value === currentType)?.label;
-    });
-
-    // Watcher for background type changes
     watch(
       backgroundType,
       (newType) => {
@@ -127,7 +94,6 @@ export default defineComponent({
     );
 
     onBeforeMount(() => {
-      // Initialize background config if not exists
       if (!dashboardPanelData.data.config.background) {
         dashboardPanelData.data.config.background = {
           type: "",
@@ -140,8 +106,6 @@ export default defineComponent({
       backgroundType,
       backgroundColor,
       colorModeOptions,
-      displayColorMode,
-      dashboardPanelData,
       t,
     };
   },

@@ -104,12 +104,7 @@ const getDefaultDashboardPanelData: any = () => ({
         fixedColor: ["#53ca53"],
         seriesBy: "last",
       },
-      background: {
-        type: "", // "", single
-        value: {
-          color: "",
-        },
-      },
+      background: null,
     },
     htmlContent: "",
     markdownContent: "",
