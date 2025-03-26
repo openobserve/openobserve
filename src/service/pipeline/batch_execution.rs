@@ -340,7 +340,7 @@ impl ExecutablePipeline {
             .filter_map(|exec_node| {
                 if exec_node.children.is_empty() {
                     if let NodeData::Stream(stream_params) = &exec_node.node_data {
-                        Some(stream_params.clone())
+                        (!stream_params.stream_name.contains("{")).then_some(stream_params.clone())
                     } else {
                         None
                     }
@@ -881,7 +881,7 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
     if haystack.starts_with("{") && haystack.ends_with("}") {
         let field_name = &haystack[1..haystack.len() - 1];
         return match record.get(field_name) {
-            Some(stream_name) => Ok(get_string_value(stream_name)),
+            Some(stream_name) => Ok(get_string_value(stream_name).to_lowercase()),
             None => Err(anyhow!("Field name {field_name} not found in record")),
         };
     }
@@ -905,7 +905,7 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
         last_match = full_match.end();
     }
     result.push_str(&haystack[last_match..]);
-    Ok(result)
+    Ok(result.to_lowercase())
 }
 
 #[cfg(test)]
