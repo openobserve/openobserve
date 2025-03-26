@@ -1499,37 +1499,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardPanelData="dashboardPanelData"
     />
     <div class="space"></div>
-    <q-select
-      v-if="['metric'].includes(dashboardPanelData.data.type)"
-      outlined
-      v-model="dashboardPanelData.data.config.background.type"
-      :options="colorModeOptions"
-      dense
-      :label="t('dashboard.colorMode')"
-      class="showLabelOnTop selectedLabel"
-      stack-label
-      emit-value
-      :display-value="`${
-        dashboardPanelData.data.config.background.type
-          ? colorModeOptions.find(
-              (it: any) =>
-                it.value == dashboardPanelData.data.config.background.type,
-            )?.label
-          : 'None'
-      }`"
-      data-test="dashboard-config-color-mode"
-    >
-    </q-select>
 
-    <div v-if="dashboardPanelData.data.config.background.type === 'single'">
-      <div
-        class="color-input-wrapper"
-        style="margin-top: 30px; margin-left: 5px"
+    <div
+      style="display: flex; align-items: center; width: 100%"
+      v-if="['metric'].includes(dashboardPanelData.data.type)"
+    >
+      <q-select
+        outlined
+        v-model="dashboardPanelData.data.config.background.type"
+        :options="colorModeOptions"
+        dense
+        :label="t('dashboard.colorMode')"
+        class="showLabelOnTop selectedLabel tw-w-full"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.background.type
+            ? colorModeOptions.find(
+                (it: any) =>
+                  it.value == dashboardPanelData.data.config.background.type,
+              )?.label
+            : 'None'
+        }`"
+        data-test="dashboard-config-color-mode"
       >
-        <input
-          type="color"
-          v-model="dashboardPanelData.data.config.background.value.color"
-        />
+      </q-select>
+
+      <div v-if="dashboardPanelData.data.config.background.type === 'single'">
+        <div
+          class="color-input-wrapper"
+          style="margin-top: 36px; margin-left: 5px"
+        >
+          <input
+            type="color"
+            v-model="dashboardPanelData.data.config.background.value.color"
+          />
+        </div>
       </div>
     </div>
   </div>
