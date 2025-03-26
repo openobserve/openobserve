@@ -1500,43 +1500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <div class="space"></div>
 
-    <div
-      style="display: flex; align-items: center; width: 100%"
-      v-if="['metric'].includes(dashboardPanelData.data.type)"
-    >
-      <q-select
-        outlined
-        v-model="dashboardPanelData.data.config.background.type"
-        :options="colorModeOptions"
-        dense
-        :label="t('dashboard.colorMode')"
-        class="showLabelOnTop selectedLabel tw-w-full"
-        stack-label
-        emit-value
-        :display-value="`${
-          dashboardPanelData.data.config.background.type
-            ? colorModeOptions.find(
-                (it: any) =>
-                  it.value == dashboardPanelData.data.config.background.type,
-              )?.label
-            : 'None'
-        }`"
-        data-test="dashboard-config-color-mode"
-      >
-      </q-select>
-
-      <div v-if="dashboardPanelData.data.config.background.type === 'single'">
-        <div
-          class="color-input-wrapper"
-          style="margin-top: 36px; margin-left: 5px"
-        >
-          <input
-            type="color"
-            v-model="dashboardPanelData.data.config.background.value.color"
-          />
-        </div>
-      </div>
-    </div>
+    <BackGroundColorConfig v-if="dashboardPanelData.data.type == 'metric'" />
   </div>
 </template>
 
@@ -1550,6 +1514,7 @@ import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
+import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import OverrideConfig from "./OverrideConfig.vue";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
 import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
@@ -1567,6 +1532,7 @@ export default defineComponent({
     MarkLineConfig,
     CustomDateTimePicker,
     ColorPaletteDropDown,
+    BackGroundColorConfig,
     OverrideConfig,
     LinearIcon,
     NoSymbol,
@@ -1688,21 +1654,6 @@ export default defineComponent({
       // If no step value is set, set it to 0
       if (!dashboardPanelData.data.config.step_value) {
         dashboardPanelData.data.config.step_value = "0";
-      }
-
-      // Initialize background config with default color for single mode
-      if (!dashboardPanelData.data.config.background) {
-        dashboardPanelData.data.config.background = {
-          type: "None",
-          value: {
-            color: "",
-          },
-        };
-      } else if (
-        dashboardPanelData.data.config.background.type === "single" &&
-        !dashboardPanelData.data.config.background.value.color
-      ) {
-        dashboardPanelData.data.config.background.value.color = "#808080";
       }
     });
 
@@ -1935,17 +1886,6 @@ export default defineComponent({
       },
     ];
 
-    const colorModeOptions = [
-      {
-        label: t("dashboard.none"),
-        value: "None",
-      },
-      {
-        label: t("dashboard.singleColor"),
-        value: "single",
-      },
-    ];
-
     const isWeightFieldPresent = computed(() => {
       const layoutFields =
         dashboardPanelData.data.queries[
@@ -2072,21 +2012,6 @@ export default defineComponent({
       );
     });
 
-    // Add a watch for background type changes
-    watch(
-      () => dashboardPanelData?.data?.config?.background?.type,
-      (newType) => {
-        if (!newType || newType === "None") {
-          dashboardPanelData.data.config.background.value.color = "";
-        } else if (
-          newType === "single" &&
-          !dashboardPanelData.data.config.background.value.color
-        ) {
-          dashboardPanelData.data.config.background.value.color = "#808080"; // Default blue color
-        }
-      },
-    );
-
     return {
       t,
       dashboardPanelData,
@@ -2110,7 +2035,6 @@ export default defineComponent({
       removeTimeShift,
       showColorPalette,
       trellisOptions,
-      colorModeOptions,
       showTrellisConfig,
       isBreakdownFieldEmpty,
       hasTimeShifts,
