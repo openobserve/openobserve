@@ -841,7 +841,7 @@ export default defineComponent({
         throw error;
       }
     };
-    const getAlertsFn = async (store: any, folderId: string, query = "") => {
+    const getAlertsFn = async (store: any, folderId: any, query = "") => {
       selected.value = [];
       allSelected.value = false;
       toggleAll();
@@ -1003,11 +1003,14 @@ export default defineComponent({
       } else {
         activeFolderId.value = "default";
       }
-      await getAlertsFn(store, activeFolderId.value);
+      await getAlertsFn(store, router.currentRoute.value.query.folder ?? "default");
     });
     watch(
       () => activeFolderId.value,
       async (newVal) => {
+        if(newVal == router.currentRoute.value.query.folder){
+          return;
+        }
         if (searchAcrossFolders.value) {
           searchAcrossFolders.value = false;
           searchQuery.value = "";
@@ -1561,9 +1564,12 @@ export default defineComponent({
 
     // Add watcher to update allSelected when selected items change
     watch(selected, (newVal) => {
+      if(newVal.length == 0){
+        allSelected.value = false;
+      }
       allSelected.value =
-        newVal.length === filteredResults.value.length &&
-        filteredResults.value.length > 0;
+        newVal.length === filteredResults?.value?.length &&
+        filteredResults?.value?.length > 0;
     });
     watch(filterQuery, (newVal) => {
       if(newVal == ""){
