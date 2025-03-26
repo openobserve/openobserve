@@ -538,7 +538,12 @@ async fn process_node(
                     if destination_stream.stream_name.contains("{") {
                         match resolve_stream_name(&destination_stream.stream_name, &record) {
                             Ok(stream_name) if !stream_name.is_empty() => {
-                                destination_stream.stream_name = stream_name.into();
+                                destination_stream.stream_name =
+                                    if cfg.common.skip_formatting_stream_name {
+                                        stream_name.into()
+                                    } else {
+                                        stream_name.to_lowercase().into()
+                                    }
                             }
                             resolve_res => {
                                 let err_msg = if let Err(e) = resolve_res {
@@ -881,7 +886,7 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
     if haystack.starts_with("{") && haystack.ends_with("}") {
         let field_name = &haystack[1..haystack.len() - 1];
         return match record.get(field_name) {
-            Some(stream_name) => Ok(get_string_value(stream_name).to_lowercase()),
+            Some(stream_name) => Ok(get_string_value(stream_name)),
             None => Err(anyhow!("Field name {field_name} not found in record")),
         };
     }
@@ -905,7 +910,7 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
         last_match = full_match.end();
     }
     result.push_str(&haystack[last_match..]);
-    Ok(result.to_lowercase())
+    Ok(result)
 }
 
 #[cfg(test)]

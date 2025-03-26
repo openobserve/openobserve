@@ -22,6 +22,7 @@ use sqlx::{Decode, Error, FromRow, Row, Type};
 use utoipa::ToSchema;
 
 use crate::{
+    get_config,
     meta::{
         function::VRLResultResolver,
         stream::{StreamParams, StreamType},
@@ -127,6 +128,7 @@ impl Pipeline {
             _ => return Err(anyhow!("Source must be either a StreamNode or QueryNode")),
         };
 
+        let cfg = get_config();
         for node in self.nodes.iter_mut() {
             // ck 4
             if matches!(&node.data, NodeData::Condition(condition_params) if condition_params.conditions.is_empty())
@@ -141,7 +143,9 @@ impl Pipeline {
                         "EnrichmentTables can only be used in Scheduled pipelines"
                     ));
                 }
-                stream_params.stream_name = stream_params.stream_name.to_lowercase().into();
+                if !cfg.common.skip_formatting_stream_name {
+                    stream_params.stream_name = stream_params.stream_name.to_lowercase().into();
+                }
             }
         }
 
