@@ -820,9 +820,9 @@ export default defineComponent({
     const selected: Ref<any> = ref([]);
     const allSelected = ref(false);
 
-    const searchQuery = ref("");
-    const filterQuery = ref("");
-    const searchAcrossFolders = ref(false);
+    const searchQuery = ref<any>("");
+    const filterQuery = ref<any>("");
+    const searchAcrossFolders = ref<any>(false);
     const filteredResults: Ref<any[]> = ref([]);
     const selectedAlertToMove: Ref<any> = ref({});
     const getAlertsByFolderId = async (store: any, folderId: any) => {
