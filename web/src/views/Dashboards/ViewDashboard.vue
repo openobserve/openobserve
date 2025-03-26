@@ -154,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </q-tooltip>
             </q-btn>
+
             <ExportDashboard
               v-if="!isFullscreen"
               class="hideOnPrintMode"
@@ -369,7 +370,6 @@ import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import DashboardJsonEditor from "./DashboardJsonEditor.vue";
-import useSearchWebSocket from "@/composables/useSearchWebSocket.js";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -434,8 +434,6 @@ export default defineComponent({
     const reportId = computed(() => route.query.tab);
 
     const renderDashboardChartsRef = ref(null);
-
-    const { closeSocketWithError } = useSearchWebSocket();
 
     onBeforeMount(async () => {
       await importMoment();
@@ -1164,7 +1162,6 @@ export default defineComponent({
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
-      closeSocketWithError,
     };
   },
 });
