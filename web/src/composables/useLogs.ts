@@ -4985,18 +4985,19 @@ const useLogs = () => {
           errorMsg: "",
           errorDetail: "",
         };
+        
         resetHistogramError();
 
         searchObj.loadingHistogram = true;
 
         if(data.type === "histogram") await generateHistogramSkeleton();
 
-        histogramResults = [];
+        if(data.type === "histogram") histogramResults = [];
 
         const payload = buildWebSocketPayload(
           data.queryReq,
           false,
-          "histogram",
+          data.type,
         );
 
         initializeWebSocketConnection(payload);
