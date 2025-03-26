@@ -71,7 +71,7 @@ pub async fn websocket(
 /// Initialize the job init for websocket
 pub async fn init() -> Result<(), anyhow::Error> {
     // Run the garbage collector for websocket sessions
-    if !LOCAL_NODE.is_compactor() && !LOCAL_NODE.is_alert_manager() {
+    if LOCAL_NODE.is_querier() {
         sessions_cache_utils::run_gc_ws_sessions().await;
     }
     Ok(())
