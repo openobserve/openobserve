@@ -201,4 +201,22 @@ impl SessionManager {
             .get(trace_id)
             .cloned())
     }
+
+    pub async fn get_querier_connections(&self, client_id: &ClientId) -> Vec<QuerierName> {
+        self.sessions
+            .read()
+            .await
+            .get(client_id)
+            .map(|session_info| session_info.querier_mappings.values().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    pub async fn get_trace_ids(&self, client_id: &ClientId) -> Vec<TraceId> {
+        self.sessions
+            .read()
+            .await
+            .get(client_id)
+            .map(|session_info| session_info.querier_mappings.keys().cloned().collect())
+            .unwrap_or_default()
+    }
 }

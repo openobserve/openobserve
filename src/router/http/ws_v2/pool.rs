@@ -103,4 +103,12 @@ impl QuerierConnectionPool {
             conn.disconnect().await;
         }
     }
+
+    pub async fn get_active_connection(
+        &self,
+        querier_name: &QuerierName,
+    ) -> Option<Arc<QuerierConnection>> {
+        let read_guard = self.connections.read().await;
+        read_guard.get(querier_name).cloned()
+    }
 }

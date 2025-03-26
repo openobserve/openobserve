@@ -259,6 +259,14 @@ impl QuerierConnection {
         // flush in case of any remaining trace_ids
         self.response_router.flush().await;
     }
+
+    pub async fn is_active_trace_id(&self, trace_id: &TraceId) -> bool {
+        self.response_router
+            .routes
+            .read()
+            .await
+            .contains_key(trace_id)
+    }
 }
 
 impl ResponseRouter {

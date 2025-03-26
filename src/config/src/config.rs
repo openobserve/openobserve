@@ -435,6 +435,8 @@ pub struct WebSocket {
     pub check_cookie_expiry: bool,
     #[env_config(name = "ZO_WEBSOCKET_HEALTH_CHECK_INTERVAL_SECS", default = 60)]
     pub health_check_interval: i64,
+    #[env_config(name = "ZO_WEBSOCKET_IS_SESSION_DRAIN_ENABLED", default = false)]
+    pub is_session_drain_enabled: bool,
 }
 
 #[derive(EnvConfig)]

@@ -13,8 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
+use actix_http::StatusCode;
 use actix_web::{Error, HttpRequest, HttpResponse, web};
 use actix_ws::{CloseCode, CloseReason};
 use config::{get_config, meta::cluster::RoleGroup, utils::json};
@@ -163,9 +167,7 @@ impl WsHandler {
                                             // check if cookie is valid for each client event only
                                             // for enterprise
                                             if cfg.websocket.check_cookie_expiry
-                                                && !session_manager
-                                                    .is_client_cookie_valid(&client_id)
-                                                    .await
+                                                && !session_manager.is_client_cookie_valid(&client_id).await
                                             {
                                                 log::info!(
                                                     "[WS::Router::Handler] Client cookie expired. Disconnect..."
@@ -331,9 +333,83 @@ impl WsHandler {
                                     break;
                                 }
                                 Some(DisconnectMessage::Error(err_msg)) => {
+                                    // send error message to client first
                                     _ = ws_session.text(err_msg.ws_server_events.to_json()).await;
-                                    if err_msg.should_disconnect {
-                                        break;
+                                    // Experimental feature: `is_session_drain_enabled`
+                                    if !cfg.websocket.is_session_drain_enabled {
+                                        if err_msg.should_disconnect {
+                                            break;
+                                        }
+                                    }
+
+                                    // then drain the session
+                                    if cfg.websocket.is_session_drain_enabled {
+                                        match err_msg.ws_server_events {
+                                            WsServerEvents::Error { code, .. } if code == <actix_http::StatusCode as Into<u16>>::into(StatusCode::UNAUTHORIZED) => {
+                                                let is_session_drain_complete = Arc::new(AtomicBool::new(false));
+                                            let is_session_drain_complete_clone = is_session_drain_complete.clone();
+
+                                            // Clone values before moving into spawn
+                                            let session_manager = session_manager.clone();
+                                            let connection_pool = connection_pool.clone();
+                                            let client_id = client_id.clone();
+                                            let cfg_clone = cfg.clone();
+                                            let cfg_clone2 = cfg_clone.clone();
+
+                                            let session_drain_task = tokio::spawn(async move {
+                                                let querier_connections = session_manager.get_querier_connections(&client_id).await;
+                                                let trace_ids = session_manager.get_trace_ids(&client_id).await;
+                                                let max_wait_time = cfg_clone.websocket.session_idle_timeout_secs as u64;
+                                                let start_time = std::time::Instant::now();
+
+                                                'outer: loop {
+                                                    // Check if max wait time exceeded
+                                                    if start_time.elapsed().as_secs() > max_wait_time {
+                                                        log::warn!("[WS::Router::Handler]: Session drain timeout reached");
+                                                        break;
+                                                    }
+
+                                                    let all_drained = true;
+
+                                                    // Check each querier connection for active trace IDs
+                                                    for querier_name in &querier_connections {
+                                                        let Some(active_connection) = connection_pool.get_active_connection(querier_name).await else {
+                                                            log::warn!("[WS::Router::Handler]: Connection not found for querier {}", querier_name);
+                                                            continue;
+                                                        };
+
+                                                        for trace_id in &trace_ids {
+                                                            if active_connection.is_active_trace_id(trace_id).await {
+                                                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                                                                continue 'outer;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if all_drained {
+                                                        is_session_drain_complete_clone.store(true, Ordering::Relaxed);
+                                                        log::info!("[WS::Router::Handler]: All trace IDs drained successfully");
+                                                        break;
+                                                    }
+                                                }
+                                            });
+
+                                            // Wait for either task completion or timeout
+                                            tokio::select! {
+                                                _ = session_drain_task => {
+                                                    if is_session_drain_complete.load(Ordering::Relaxed) {
+                                                        log::info!("[WS::Router::Handler]: Session drain complete. Closing session");
+                                                        break;
+                                                    }
+                                                }
+                                                _ = tokio::time::sleep(tokio::time::Duration::from_secs(cfg_clone2.websocket.session_idle_timeout_secs as _)) => {
+                                                    log::warn!("[WS::Router::Handler]: Session drain timeout while waiting for completion");
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                        }
                                     }
                                 }
                                 Some(DisconnectMessage::Close(close_reason)) => {
