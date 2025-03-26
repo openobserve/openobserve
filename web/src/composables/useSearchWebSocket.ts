@@ -122,9 +122,11 @@ const useSearchWebSocket = () => {
         socketId.value = null;        
         isInDrainMode.value = true;
 
+        const traceIdToRetry = response.content.trace_id;
+
         // Mark all traces from old socket as inactive
         Object.keys(traces).forEach(traceId => {
-          if (traces[traceId].socketId === inactiveSocketId.value) {
+          if ((traces[traceId].socketId === inactiveSocketId.value) && (traceId !== traceIdToRetry)) {
             traces[traceId].isActive = false;
           }
         }); 
@@ -132,8 +134,6 @@ const useSearchWebSocket = () => {
         await resetAuthToken();
 
         debugger;
-
-        const traceIdToRetry = response.content.trace_id;
 
         if(traceIdToRetry) retryActiveTrace(traceIdToRetry, response);
 
