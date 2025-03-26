@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #after>
           <q-table
-            v-model:selected="selected"
+            v-model:selected="selectedAlerts"
             :selected-rows-label="getSelectedString"
             selection="multiple"
             data-test="alert-list-table"
@@ -150,7 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="props.selected"
                     size="sm"
                     color="secondary"
-                    @update:model-value="handleRowSelection(props.row, $event)"
                   />
                 </q-td>
 
@@ -453,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #bottom="scope">
               <div class="bottom-btn">
                 <q-btn
-                  v-if="selected.length > 0"
+                  v-if="selectedAlerts.length > 0"
                   data-test="alert-list-move-across-folders-btn"
                   class="flex items-center move-btn q-mr-md no-border"
                   color="secondary"
@@ -462,7 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="moveMultipleAlerts"
                 />
                 <q-btn
-                  v-if="selected.length > 0"
+                  v-if="selectedAlerts.length > 0"
                   data-test="alert-list-export-alerts-btn"
                   class="flex items-center export-btn no-border"
                   color="secondary"
@@ -816,8 +815,8 @@ export default defineComponent({
     });
     const destinations = ref([0]);
     const templates = ref([0]);
-    const selected: Ref<any> = ref([]);
-    const allSelected = ref(false);
+    const selectedAlerts: Ref<any> = ref([]);
+    const allSelectedAlerts = ref(false);
 
     const searchQuery = ref<any>("");
     const filterQuery = ref<any>("");
@@ -841,8 +840,8 @@ export default defineComponent({
       }
     };
     const getAlertsFn = async (store: any, folderId: any, query = "", refreshResults = true) => {
-      selected.value = [];
-      allSelected.value = false;
+      selectedAlerts.value = [];
+      allSelectedAlerts.value = false;
       if (query){
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];
@@ -1008,8 +1007,8 @@ export default defineComponent({
     watch(
       () => activeFolderId.value,
       async (newVal) => {
-        selected.value = [];
-        allSelected.value = false;
+        selectedAlerts.value = [];
+        allSelectedAlerts.value = false;
         if(newVal == router.currentRoute.value.query.folder){
           return;
         }
@@ -1032,8 +1031,8 @@ export default defineComponent({
     );
 
     watch(searchQuery, async (newQuery) => {
-      selected.value = [];
-      allSelected.value = false;
+      selectedAlerts.value = [];
+      allSelectedAlerts.value = false;
       if(newQuery == ""){
        filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value];
       }
@@ -1464,8 +1463,8 @@ export default defineComponent({
     const updateActiveFolderId = (newVal: any) => {
       searchQuery.value = "";
       activeFolderId.value = newVal;
-      selected.value = [];
-      allSelected.value = false;
+      selectedAlerts.value = [];
+      allSelectedAlerts.value = false;
       filterQuery.value = "";
       searchAcrossFolders.value = false;
       //here we are resetting the selected alerts
@@ -1496,24 +1495,24 @@ export default defineComponent({
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
       activeFolderToMove.value = "";
-      selected.value = [];
-      allSelected.value = false;
+      selectedAlerts.value = [];
+      allSelectedAlerts.value = false;
     };
 
     const getSelectedString = () => {
-      return selected.value.length === 0
+      return selectedAlerts.value.length === 0
         ? ""
-        : `${selected.value.length} record${
-            selected.value.length > 1 ? "s" : ""
+        : `${selectedAlerts.value.length} record${
+            selectedAlerts.value.length > 1 ? "s" : ""
           } selected`;
     };
 
     const moveMultipleAlerts = () => {
       showMoveAlertDialog.value = true;
-      const selectedAlerts = selected.value.map((alert: any) => {
+      const selectedAlertsToMove = selectedAlerts.value.map((alert: any) => {
         return alert.alert_id;
       });
-      selectedAlertToMove.value = selectedAlerts;
+      selectedAlertToMove.value = selectedAlertsToMove;
       activeFolderToMove.value = activeFolderId.value;
     };
 
@@ -1549,16 +1548,6 @@ export default defineComponent({
       await getAlertsFn(store, activeFolderId.value, query);
     }, 600);
 
-
-    // Add watcher to update allSelected when selected items change
-    watch(selected, (newVal) => {
-      if(newVal.length == 0){
-        allSelected.value = false;
-      }
-      allSelected.value =
-        newVal.length === filteredResults?.value?.length &&
-        filteredResults?.value?.length > 0;
-    });
     watch(filterQuery, (newVal) => {
       if(newVal == ""){
         filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value];
@@ -1570,8 +1559,8 @@ export default defineComponent({
       }
     });
     watch(searchAcrossFolders, (newVal) => {
-      selected.value = [];
-      allSelected.value = false;
+      selectedAlerts.value = [];
+      allSelectedAlerts.value = false;
       if(newVal){
         //here we are setting the searchQuery to null and then setting the filterQuery to the searchQuery
         //this is done because we want to clear the searchQuery and then set the filterQuery to the searchQuery
@@ -1589,17 +1578,6 @@ export default defineComponent({
         searchQuery.value = null;
       }
     });
-
-    const handleRowSelection = (row: any, isSelected: boolean) => {
-      row.selected = isSelected;
-      if (isSelected) {
-        selected.value = [...selected.value, row];
-      } else {
-        selected.value = selected.value.filter(
-          (item: any) => item.alert_id !== row.alert_id,
-        );
-      }
-    };
 
     const copyToClipboard = (text: string, type: string) => {
       navigator.clipboard
@@ -1633,12 +1611,12 @@ export default defineComponent({
         });
 
         const alertToBeExported = [];
-        const selectedAlerts = selected.value.map(
+        const selectedAlertsToExport = selectedAlerts.value.map(
           (alert: any) => alert.alert_id,
         );
 
         const alertsData = await Promise.all(
-          selectedAlerts.map(async (alertId: string) => {
+          selectedAlertsToExport.map(async (alertId: string) => {
             const alertData = await getAlertById(alertId);
             if (alertData.hasOwnProperty("id")) {
               delete alertData.id;
@@ -1662,11 +1640,11 @@ export default defineComponent({
         dismiss();
         $q.notify({
           type: "positive",
-          message: `Successfully exported ${selectedAlerts.length} alert${selectedAlerts.length > 1 ? "s" : ""}`,
+          message: `Successfully exported ${selectedAlertsToExport.length} alert${selectedAlertsToExport.length > 1 ? "s" : ""}`,
           timeout: 2000,
         });
-        selected.value = [];
-        allSelected.value = false;
+        selectedAlerts.value = [];
+        allSelectedAlerts.value = false;
       } catch (error) {
         console.error("Error exporting alerts:", error);
         $q.notify({
@@ -1784,7 +1762,7 @@ export default defineComponent({
       moveAlertToAnotherFolder,
       activeFolderToMove,
       updateAcrossFolders,
-      selected,
+      selectedAlerts,
       getSelectedString,
       moveMultipleAlerts,
       dynamicQueryModel,
@@ -1794,8 +1772,7 @@ export default defineComponent({
       filteredResults,
       expandedRow,
       triggerExpand,
-      allSelected,
-      handleRowSelection,
+      allSelectedAlerts,
       copyToClipboard,
       openMenu,
       outlinedMoreVert,
