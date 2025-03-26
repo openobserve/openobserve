@@ -87,10 +87,10 @@ export default defineComponent({
         if (!newType) {
           backgroundColor.value = "";
         } else if (newType === "single" && !backgroundColor.value) {
-          backgroundColor.value = "#808080"; // Default gray color
+          backgroundColor.value = "#808080"; // Only set default color when explicitly choosing "single"
         }
       },
-      { immediate: true },
+      { immediate: false },
     );
 
     onBeforeMount(() => {
