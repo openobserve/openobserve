@@ -784,9 +784,6 @@ pub async fn validate_http_internal(
         .to_string();
 
     let router_node = router_nodes.iter().find(|node| {
-        // Need to add scheme to host before parsing, only for `req.host`
-        // &host == "192.168.1.4:5070"
-        // &node.http_addr == "http://192.168.1.4:5080"
         let node_url = match Url::parse(&node.http_addr) {
             Ok(node_url) => node_url,
             Err(e) => {
