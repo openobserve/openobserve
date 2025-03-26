@@ -1434,6 +1434,8 @@ pub struct Compact {
     pub job_clean_wait_time: i64,
     #[env_config(name = "ZO_COMPACT_PENDING_JOBS_METRIC_INTERVAL", default = 300)] // seconds
     pub pending_jobs_metric_interval: u64,
+    #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
+    pub max_group_files: usize,
 }
 
 #[derive(EnvConfig)]

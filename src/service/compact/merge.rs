@@ -546,7 +546,9 @@ pub async fn merge_by_stream(
                 let mut new_file_list = Vec::new();
                 let mut new_file_size = 0;
                 for file in files_with_size.iter() {
-                    if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
+                    if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
+                        || (cfg.compact.max_group_files > 0 && new_file_list.len() >= cfg.compact.max_group_files)
+                    {
                         if new_file_list.len() <= 1 {
                             if job_strategy == MergeStrategy::FileSize {
                                 break;
