@@ -1506,7 +1506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
+import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -2092,26 +2092,5 @@ export default defineComponent({
   height: 36px;
   margin-top: 9px;
   width: 100px;
-}
-.color-input-wrapper {
-  height: 25px;
-  width: 25px;
-  overflow: hidden;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  position: relative;
-}
-.color-input-wrapper input[type="color"] {
-  position: absolute;
-  height: 4em;
-  width: 4em;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  overflow: hidden;
-  border: none;
-  margin: 0;
-  padding: 0;
 }
 </style>
