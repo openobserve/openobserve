@@ -336,10 +336,8 @@ impl WsHandler {
                                     // send error message to client first
                                     _ = ws_session.text(err_msg.ws_server_events.to_json()).await;
                                     // Experimental feature: `is_session_drain_enabled`
-                                    if !cfg.websocket.is_session_drain_enabled {
-                                        if err_msg.should_disconnect {
-                                            break;
-                                        }
+                                    if !cfg.websocket.is_session_drain_enabled && err_msg.should_disconnect {
+                                        break;
                                     }
 
                                     // then drain the session

@@ -113,11 +113,7 @@ impl ErrorMessage {
             // client should not retry on the same ws session, only when cookie is expired
             should_client_retry: false,
         };
-        let should_disconnect = if config::get_config().websocket.is_session_drain_enabled {
-            false
-        } else {
-            true
-        };
+        let should_disconnect = !config::get_config().websocket.is_session_drain_enabled; 
         Self {
             ws_server_events,
             should_disconnect,
