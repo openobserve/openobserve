@@ -335,10 +335,6 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         report_timeout: i64,
     ) -> Result<Vec<Trigger>> {
         let pool = CLIENT.clone();
-        let (include_max, mut max_retries) = get_scheduler_max_retries();
-        if include_max {
-            max_retries += 1;
-        }
 
         let now = chrono::Utc::now().timestamp_micros();
         let report_max_time = now
@@ -363,9 +359,9 @@ SET status = $1, start_time = $2,
 WHERE id IN (
     SELECT id
     FROM scheduled_jobs
-    WHERE status = $6 AND next_run_at <= $7 AND retries < $8 AND NOT (is_realtime = $9 AND is_silenced = $10)
+    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9) 
     ORDER BY next_run_at
-    LIMIT $11
+    LIMIT $10
     FOR UPDATE
 )
 RETURNING *;"#;
@@ -379,7 +375,6 @@ RETURNING *;"#;
             .bind(report_max_time)
             .bind(TriggerStatus::Waiting)
             .bind(now)
-            .bind(max_retries)
             .bind(true)
             .bind(false)
             .bind(concurrency)
