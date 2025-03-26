@@ -81,7 +81,7 @@ pub async fn save_enrichment_table(
                     Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
                     None => false,
                 };
-                let json_record = extract_multipart(payload).await?;
+                let json_record = extract_multipart(payload, append_data).await?;
                 save_enrichment_data(&org_id, &table_name, json_record, append_data).await
             } else {
                 Ok(MetaHttpResponse::bad_request(
