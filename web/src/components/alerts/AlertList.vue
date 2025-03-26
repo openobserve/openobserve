@@ -117,12 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selection="multiple"
             data-test="alert-list-table"
             ref="qTable"
-            :rows="alertsList"
+            :rows="filteredResults"
             :columns="columns"
             row-key="alert_id"
             :pagination="pagination"
-            :filter="filterQuery"
-            :filter-method="filterData"
             style="width: 100%"
           >
             <template #header-selection="scope">
@@ -499,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ImportAlert
         :destinations="destinations"
         :templates="templates"
-        :alerts="alerts"
+        :alerts="store.state.organizationData.allAlertsListByFolderId[activeFolderId]"
         @update:alerts="getAlertsFn"
         @update:destinations="refreshDestination"
         @update:templates="getTemplates"
@@ -681,10 +679,6 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const router = useRouter();
-    const alerts: Ref<Alert[]> = ref([]);
-    const alertsRows: Ref<AlertListItem[]> = ref([]);
-    const alertRowsToDisplay: Ref<AlertListItem[]> = ref([]);
-
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<any> = ref({});
     const showAddAlertDialog: any = ref(false);
@@ -832,14 +826,16 @@ export default defineComponent({
     const selectedAlertToMove: Ref<any> = ref({});
     const getAlertsByFolderId = async (store: any, folderId: any) => {
       try {
+        //this is the condition where we are fetching the alerts from the server 
+        // assigning it to the allAlertsListByFolderId in the store
         if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
           await getAlertsFn(store, folderId);
         } else {
-          alertsRows.value =
+          //this is the condition where we are assigning the alerts to the filteredResults so whenever 
+          // we are changing the folder, we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
+          filteredResults.value =
             store.state.organizationData.allAlertsListByFolderId[folderId];
         }
-
-        filterAlertsByTab();
       } catch (error) {
         throw error;
       }
@@ -848,8 +844,9 @@ export default defineComponent({
       selected.value = [];
       allSelected.value = false;
       toggleAll();
-      if (query) {
-        alertsRows.value = [];
+      if (query){
+        //here we reset the filteredResults before fetching the filtered alerts
+        filteredResults.value = [];
       }
       const dismiss = $q.notify({
         spinner: true,
@@ -871,13 +868,16 @@ export default defineComponent({
         )
         .then(async (res) => {
           var counter = 1;
-          alerts.value = res.data.list.map((alert: any) => {
+          //this is the alerts that we use to store
+          let alerts = [];
+          alerts = res.data.list.map((alert: any) => {
             return {
               ...alert,
               uuid: getUUID(),
             };
           });
-          alertsRows.value = alerts.value.map((data: any) => {
+          //general alerts that we use to display (formatting the alerts into the table format)
+          alerts = alerts.map((data: any) => {
             let conditions = "--";
             if (data.condition.conditions?.length) {
               conditions = data.condition.conditions
@@ -926,17 +926,20 @@ export default defineComponent({
               },
             };
           });
-          alertsRows.value.forEach((alert: AlertListItem) => {
+          //this is the condition where we are setting the alertStateLoadingMap
+          alerts.forEach((alert: any) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
+          });    
+          //this is the condition where we are setting the allAlertsListByFolderId in the store
+          store.dispatch("setAllAlertsListByFolderId", {
+            ...store.state.organizationData.allAlertsListByFolderId,
+            [folderId]: alerts,
           });
-          if (query == "" && !searchAcrossFolders.value) {
-            store.dispatch("setAllAlertsListByFolderId", {
-              ...store.state.organizationData.allAlertsListByFolderId,
-              [folderId]: alertsRows.value,
-            });
-          } else {
-            filteredResults.value = alertsRows.value;
-          }
+          //this is the condition where we are setting the filteredResults 
+          //1. If it is search across folders then also we are setting the filteredResults(which contains the filtered alerts)
+          //2. If it is not search across folders then we are setting the filteredResults to the alerts(which contains all the alerts)
+          filteredResults.value = alerts;
+          filterAlertsByTab();
           if (router.currentRoute.value.query.action == "import") {
             showImportAlertDialog.value = true;
           }
@@ -962,9 +965,6 @@ export default defineComponent({
             timeout: 2000,
           });
         });
-    };
-    const getAlertByName = (name: string) => {
-      return alerts.value.find((alert) => alert.name === name);
     };
     const getAlertById = async (id: string) => {
       const dismiss = $q.notify({
@@ -994,7 +994,7 @@ export default defineComponent({
       }
       if (
         router.currentRoute.value.query.folder &&
-        store.state.organizationData.foldersByType.find(
+        store.state.organizationData?.foldersByType?.find(
           (it: any) => it.folderId === router.currentRoute.value.query.folder,
         )
       ) {
@@ -1002,7 +1002,7 @@ export default defineComponent({
       } else {
         activeFolderId.value = "default";
       }
-      getAlertsFn(store, activeFolderId.value);
+      await getAlertsFn(store, activeFolderId.value);
     });
     watch(
       () => activeFolderId.value,
@@ -1026,10 +1026,10 @@ export default defineComponent({
     );
 
     watch(searchQuery, async (newQuery) => {
-      await debouncedSearch(newQuery);
-      if (searchQuery.value == "") {
-        filteredResults.value = [];
+      if(newQuery == ""){
+       filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value];
       }
+      await debouncedSearch(newQuery);
     });
     watch(
       () => router.currentRoute.value.query.action,
@@ -1083,13 +1083,7 @@ export default defineComponent({
       { label: "All", value: 0 },
     ];
     const resultTotal = computed(function () {
-      if (!searchAcrossFolders.value || searchQuery.value == "") {
-        return store.state.organizationData?.allAlertsListByFolderId[
-          activeFolderId.value
-        ]?.length;
-      } else {
-        return filteredResults.value.length;
-      }
+      return filteredResults.value.length;
     });
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
@@ -1381,18 +1375,9 @@ export default defineComponent({
         )
         .then((res: any) => {
           const isEnabled = res.data.enabled;
-          alertsList.value.forEach((alert: any) => {
+          filteredResults.value.forEach((alert: any) => {
             alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
           });
-          if (searchAcrossFolders.value && searchQuery.value != "") {
-            store.state.organizationData.allAlertsListByFolderId[
-              row.folder_name.id
-            ].forEach((alert: any) => {
-              alert?.alert_id === row?.alert_id
-                ? (alert.enabled = isEnabled)
-                : null;
-            });
-          }
           $q.notify({
             type: "positive",
             message: isEnabled
@@ -1474,9 +1459,11 @@ export default defineComponent({
       selected.value = [];
       allSelected.value = false;
       filterQuery.value = "";
-      alertsRows.value.forEach((alert: any) => {
+      //here we are resetting the selected alerts
+      filteredResults.value.forEach((alert: any) => {
         alert.selected = false;
       });
+
     };
 
     const editAlert = async (row: any) => {
@@ -1494,8 +1481,8 @@ export default defineComponent({
       activeFolderId: any,
       selectedFolderId: any,
     ) => {
-      await getAlertsFn(store, activeFolderId);
       await getAlertsFn(store, selectedFolderId);
+      await getAlertsFn(store, activeFolderId);
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
       activeFolderToMove.value = "";
@@ -1530,10 +1517,10 @@ export default defineComponent({
       set(value) {
         if (searchAcrossFolders.value) {
           searchQuery.value = value;
-          filterQuery.value = value;
+          // filterQuery.value = value;
         } else {
           filterQuery.value = value;
-          searchQuery.value = value;
+          // searchQuery.value = value;
         }
       },
     });
@@ -1551,31 +1538,21 @@ export default defineComponent({
       });
       dismiss();
       await getAlertsFn(store, activeFolderId.value, query);
-      filteredResults.value = alertsRows.value;
     }, 600);
-
-    const alertsList = computed(() => {
-      if (searchAcrossFolders.value && searchQuery.value != "") {
-        return filteredResults.value;
-      }
-      return (
-        store.state.organizationData.allAlertsListByFolderId[
-          activeFolderId.value
-        ] ?? []
-      );
-    });
 
     const toggleAll = () => {
       if (allSelected.value) {
         // Select all rows
-        selected.value = [...alertsList.value];
-        alertsRows.value.forEach((alert: any) => {
+        selected.value = [...filteredResults.value];
+        //this is the filteredResults where we have all the alerts
+        filteredResults.value.forEach((alert: any) => {
           alert.selected = true;
         });
       } else {
         // Deselect all rows
         selected.value = [];
-        alertsRows.value.forEach((alert: any) => {
+        //this is the filteredResults where we have all the alerts
+        filteredResults.value.forEach((alert: any) => {
           alert.selected = false;
         });
       }
@@ -1584,8 +1561,36 @@ export default defineComponent({
     // Add watcher to update allSelected when selected items change
     watch(selected, (newVal) => {
       allSelected.value =
-        newVal.length === alertsList.value.length &&
-        alertsList.value.length > 0;
+        newVal.length === filteredResults.value.length &&
+        filteredResults.value.length > 0;
+    });
+    watch(filterQuery, (newVal) => {
+      if(newVal == ""){
+        filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value];
+      }
+      if (newVal) {
+        filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value].filter((alert: any) =>
+          alert.name.toLowerCase().includes(newVal.toLowerCase()),
+        );
+      }
+    });
+    watch(searchAcrossFolders, (newVal) => {
+      if(newVal){
+        //here we are setting the searchQuery to null and then setting the filterQuery to the searchQuery
+        //this is done because we want to clear the searchQuery and then set the filterQuery to the searchQuery
+        searchQuery.value = null;
+        searchQuery.value = filterQuery.value;
+        filterQuery.value = null;
+      }
+      if(!newVal){
+        //here we are setting the filterQuery to null and then setting the searchQuery to the filterQuery
+        //here we are also setting the filteredResults to the allAlertsListByFolderId as we are not searching across folders
+        //this is done because we want to clear the filterQuery and then set the searchQuery to the filterQuery
+        filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value];
+        filterQuery.value = null;
+        filterQuery.value = searchQuery.value;
+        searchQuery.value = null;
+      }
     });
 
     const handleRowSelection = (row: any, isSelected: boolean) => {
@@ -1693,42 +1698,22 @@ export default defineComponent({
       return owner;
     };
 
-    const filterAlertsByTab = async () => {
-      // filter reports based on the selected tab
-      // If reports are cached, show only cached reports
-      // alertsRows.value = (
-      //   store.state.organizationData.allAlertsListByFolderId[
-      //     activeFolderId.value
-      //   ] as any
-      // ).filter((alert: any) => {
-      //   console.log(alert, activeTab.value);
-      //   if (alert.condition.type === "custom" && activeTab.value === "custom") {
-      //     return true;
-      //   } else if (
-      //     alert.condition.type !== "custom" &&
-      //     activeTab.value !== "custom"
-      //   ) {
-      //     return true;
-      //   }
-      //   return false;
-      // });
-      // console.log(filteredResults.value);
-      // filteredResults.value = filteredResults.value.map(
-      //   (report: any, index: number) => {
-      //     return {
-      //       ...report,
-      //       "#": index + 1,
-      //     };
-      //   },
-      // ) as any[];
+    const filterAlertsByTab = () => {
+      // getAlertsByFolderId(store, activeFolderId.value);
+      // filteredResults.value = filteredResults.value
+      //   .filter((alert: any) => alert.type === "custom" && activeTab.value === "scheduled")
+      //   .map((alert: any, index: number) => ({
+      //     ...alert,
+      //     "#": index + 1,
+      //   }));
     };
+
 
     return {
       t,
       qTable,
       store,
       router,
-      alerts,
       columns,
       formData,
       hideForm,
@@ -1784,7 +1769,6 @@ export default defineComponent({
       splitterModel,
       outlinedPause,
       outlinedPlayArrow,
-      alertsRows,
       toggleAlertState,
       alertStateLoadingMap,
       templates,
@@ -1812,7 +1796,6 @@ export default defineComponent({
       searchQuery,
       clearSearchHistory,
       filteredResults,
-      alertsList,
       expandedRow,
       triggerExpand,
       allSelected,
