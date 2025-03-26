@@ -1612,7 +1612,9 @@ pub fn get_alert_start_end_time(
 }
 
 fn format_variable_value(val: String) -> String {
-    val.chars().flat_map(|c| c.escape_default()).collect::<String>()
+    val.chars()
+        .flat_map(|c| c.escape_default())
+        .collect::<String>()
 }
 
 pub(super) fn to_float(val: &Value) -> f64 {
@@ -1779,7 +1781,10 @@ mod tests {
         assert_eq!(format_variable_value("".to_string()), "");
 
         // Test string with no special characters
-        assert_eq!(format_variable_value("Hello World".to_string()), "Hello World");
+        assert_eq!(
+            format_variable_value("Hello World".to_string()),
+            "Hello World"
+        );
     }
 
     #[tokio::test]

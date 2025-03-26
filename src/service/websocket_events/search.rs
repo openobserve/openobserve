@@ -29,7 +29,7 @@ use tracing::Instrument;
 
 use super::sort::order_search_results;
 #[allow(unused_imports)]
-use crate::handler::http::request::websocket::utils::enterprise_utils;
+use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
@@ -40,12 +40,13 @@ use crate::{
             },
         },
     },
-    handler::http::request::websocket::{
-        session::send_message,
-        utils::{TimeOffset, WsServerEvents, search_registry_utils},
-    },
-    service::search::{
-        self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
+    handler::http::request::websocket::session::send_message,
+    service::{
+        search::{
+            self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
+            sql::Sql,
+        },
+        websocket_events::{TimeOffset, WsServerEvents, search_registry_utils},
     },
 };
 
@@ -110,8 +111,9 @@ pub async fn handle_search_request(
                 Error::Message(e.to_string()),
                 Some(req_id.to_string()),
                 Some(trace_id),
+                Default::default(),
             );
-            send_message(req_id, err_res.to_json().to_string()).await?;
+            send_message(req_id, err_res.to_json()).await?;
             return Ok(());
         }
     };
@@ -126,8 +128,9 @@ pub async fn handle_search_request(
                 Error::Message(e),
                 Some(req_id.to_string()),
                 Some(trace_id),
+                Default::default(),
             );
-            send_message(req_id, err_res.to_json().to_string()).await?;
+            send_message(req_id, err_res.to_json()).await?;
             return Ok(());
         }
     }
@@ -231,7 +234,6 @@ pub async fn handle_search_request(
                 cached_resp,
                 deltas,
                 accumulated_results,
-                org_id,
                 user_id,
                 max_query_range,
                 remaining_query_range,
@@ -253,7 +255,6 @@ pub async fn handle_search_request(
                 &mut req,
                 &trace_id,
                 req_size,
-                org_id,
                 user_id,
                 accumulated_results,
                 max_query_range,
@@ -284,7 +285,6 @@ pub async fn handle_search_request(
             &mut req,
             &trace_id,
             req_size,
-            org_id,
             user_id,
             accumulated_results,
             max_query_range,
@@ -297,28 +297,27 @@ pub async fn handle_search_request(
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
-    send_message(req_id, end_res.to_json().to_string()).await?;
+    send_message(req_id, end_res.to_json()).await?;
 
     Ok(())
 }
 
 async fn do_search(
     req: &SearchEventReq,
-    org_id: &str,
     user_id: &str,
     use_cache: bool,
 ) -> Result<Response, Error> {
     let span = tracing::info_span!(
         "src::handler::http::request::websocket::search::do_search",
         trace_id = %req.trace_id,
-        org_id = %org_id,
+        org_id = %req.org_id,
     );
 
     let mut req = req.clone();
     req.payload.use_cache = Some(use_cache);
     let res = SearchService::cache::search(
         &req.trace_id,
-        org_id,
+        &req.org_id,
         req.stream_type,
         Some(user_id.to_string()),
         &req.payload,
@@ -352,7 +351,6 @@ async fn handle_cache_responses_and_deltas(
     mut cached_resp: Vec<CachedQueryResponse>,
     mut deltas: Vec<QueryDelta>,
     accumulated_results: &mut Vec<SearchResultType>,
-    org_id: &str,
     user_id: &str,
     max_query_range: i64,
     remaining_query_range: i64,
@@ -435,7 +433,6 @@ async fn handle_cache_responses_and_deltas(
                     req_size,
                     accumulated_results,
                     &mut curr_res_size,
-                    org_id,
                     user_id,
                     &mut remaining_query_range,
                     cached_search_duration,
@@ -470,7 +467,6 @@ async fn handle_cache_responses_and_deltas(
                 req_size,
                 accumulated_results,
                 &mut curr_res_size,
-                org_id,
                 user_id,
                 &mut remaining_query_range,
                 cached_search_duration,
@@ -515,7 +511,6 @@ async fn process_delta(
     req_size: i64,
     accumulated_results: &mut Vec<SearchResultType>,
     curr_res_size: &mut i64,
-    org_id: &str,
     user_id: &str,
     remaining_query_range: &mut f64,
     cache_req_duration: i64,
@@ -531,7 +526,7 @@ async fn process_delta(
     req.payload.query.start_time = delta.delta_start_time;
     req.payload.query.end_time = delta.delta_end_time;
 
-    let partition_resp = get_partitions(&req, org_id, user_id).await?;
+    let partition_resp = get_partitions(&req, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
@@ -578,7 +573,7 @@ async fn process_delta(
         }
 
         // use cache for delta search
-        let mut search_res = do_search(&req, org_id, user_id, true).await?;
+        let mut search_res = do_search(&req, user_id, true).await?;
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
@@ -643,7 +638,7 @@ async fn process_delta(
                 result_cache_ratio,
                 accumulated_results.len()
             );
-            send_message(req_id, ws_search_res.to_json().to_string()).await?;
+            send_message(req_id, ws_search_res.to_json()).await?;
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -690,7 +685,6 @@ async fn process_delta(
 
 async fn get_partitions(
     req: &SearchEventReq,
-    org_id: &str,
     user_id: &str,
 ) -> Result<SearchPartitionResponse, Error> {
     let search_payload = req.payload.clone();
@@ -708,7 +702,7 @@ async fn get_partitions(
 
     let res = SearchService::search_partition(
         &req.trace_id,
-        org_id,
+        &req.org_id,
         Some(user_id),
         req.stream_type,
         &search_partition_req,
@@ -798,7 +792,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
         accumulated_results.len()
     );
-    send_message(req_id, ws_search_res.to_json().to_string()).await?;
+    send_message(req_id, ws_search_res.to_json()).await?;
 
     Ok(())
 }
@@ -810,7 +804,6 @@ async fn do_partitioned_search(
     req: &mut SearchEventReq,
     trace_id: &str,
     req_size: i64,
-    org_id: &str,
     user_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
     max_query_range: i64, // hours
@@ -837,7 +830,7 @@ async fn do_partitioned_search(
     let modified_start_time = req.payload.query.start_time;
     let modified_end_time = req.payload.query.end_time;
 
-    let partition_resp = get_partitions(req, org_id, user_id).await?;
+    let partition_resp = get_partitions(req, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
@@ -889,7 +882,7 @@ async fn do_partitioned_search(
         }
 
         // do not use cache for partitioned search without cache
-        let mut search_res = do_search(&req, org_id, user_id, false).await?;
+        let mut search_res = do_search(&req, user_id, false).await?;
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
@@ -928,7 +921,7 @@ async fn do_partitioned_search(
                 },
                 streaming_aggs: is_streaming_aggs,
             };
-            send_message(req_id, ws_search_res.to_json().to_string()).await?;
+            send_message(req_id, ws_search_res.to_json()).await?;
         }
 
         // Stop if reached the requested result size
@@ -957,7 +950,7 @@ async fn do_partitioned_search(
             },
             streaming_aggs: is_streaming_aggs,
         };
-        send_message(req_id, ws_search_res.to_json().to_string()).await?;
+        send_message(req_id, ws_search_res.to_json()).await?;
     }
 
     // Remove the streaming_aggs cache
@@ -1005,7 +998,7 @@ async fn send_partial_search_resp(
         trace_id
     );
 
-    send_message(req_id, ws_search_res.to_json().to_string()).await?;
+    send_message(req_id, ws_search_res.to_json()).await?;
 
     Ok(())
 }

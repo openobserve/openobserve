@@ -298,7 +298,7 @@ impl Drop for WsProxySession {
 }
 
 /// Convert actix-web WebSocket message to tungstenite message format
-fn from_actix_message(msg: Message) -> tungstenite::protocol::Message {
+pub fn from_actix_message(msg: Message) -> tungstenite::protocol::Message {
     match msg {
         Message::Text(text) => tungstenite::protocol::Message::Text(text.to_string()),
         Message::Binary(bin) => tungstenite::protocol::Message::Binary(bin.to_vec()),
@@ -324,7 +324,7 @@ fn from_actix_message(msg: Message) -> tungstenite::protocol::Message {
 }
 
 /// Convert tungstenite WebSocket message to actix-web message format
-fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::protocol::Message) -> Message {
+pub fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::protocol::Message) -> Message {
     match msg {
         tungstenite::protocol::Message::Text(text) => {
             log_frame_details("Converting Text ->", &text, false);
