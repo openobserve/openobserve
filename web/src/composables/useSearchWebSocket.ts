@@ -64,14 +64,7 @@ const useSearchWebSocket = () => {
     isCreatingSocket.value = false;
     socketId.value = null;
 
-
-    if(isInDrainMode.value) {
-      console.log("resetting auth token");
-      await resetAuthToken();
-      console.log("auth token reset");
-    }
-
-    const shouldRetry = socketRetryCodes.includes(response.code) && !isInDrainMode.value;
+    const shouldRetry = socketRetryCodes.includes(response.code) || isInDrainMode.value;
     
     if(shouldRetry) socketFailureCount.value++;
 
@@ -80,8 +73,12 @@ const useSearchWebSocket = () => {
     //   inactiveSocketId.value = null;
     // }
 
-    // reset isInDrainMode to false
     if (shouldRetry && socketFailureCount.value < maxSearchRetries) {
+      if(isInDrainMode.value) {
+        await resetAuthToken();
+        return;
+      }
+
       setTimeout(() => {
         Object.keys(traces).forEach((traceId) => {
           if(traces[traceId].isInitiated) {
