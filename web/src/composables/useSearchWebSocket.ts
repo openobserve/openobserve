@@ -60,17 +60,25 @@ const useSearchWebSocket = () => {
     );
   };
 
-  const onClose = (response: any, _socketId: string) => {    
+  const onClose = async (response: any, _socketId: string) => {    
     isCreatingSocket.value = false;
     socketId.value = null;
 
-    const shouldRetry = socketRetryCodes.includes(response.code);
+
+    if(isInDrainMode.value) {
+      console.log("resetting auth token");
+      await resetAuthToken();
+      console.log("auth token reset");
+    }
+
+    const shouldRetry = socketRetryCodes.includes(response.code) && !isInDrainMode.value;
     
     if(shouldRetry) socketFailureCount.value++;
 
-    if(inactiveSocketId.value && _socketId === inactiveSocketId.value) {
-      inactiveSocketId.value = null;
-    }
+
+    // if(inactiveSocketId.value && _socketId === inactiveSocketId.value) {
+    //   inactiveSocketId.value = null;
+    // }
 
     // reset isInDrainMode to false
     if (shouldRetry && socketFailureCount.value < maxSearchRetries) {
@@ -106,11 +114,7 @@ const useSearchWebSocket = () => {
 
       if(response.content.code === 401) {
         // Store the current socketId as inactive and clear it
-        closeSocket();
-        console.log("resetting auth token");
-        await resetAuthToken();
-        console.log("auth token reset");
-        return;
+        isInDrainMode.value = true;
       }
     }
 
@@ -307,9 +311,9 @@ const useSearchWebSocket = () => {
               error: traces[traceId].error[0],
               reset: traces[traceId].reset[0],
             });
-          } else {
+          }else{
             retryActiveTrace(traceId, { code: 1000 });
-          }
+          } 
         });
         resolve(res);
       }).catch((err: any) => {
