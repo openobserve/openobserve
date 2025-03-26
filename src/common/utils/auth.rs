@@ -888,14 +888,10 @@ pub async fn extract_auth_expiry_and_user_id(
         Ok(token_data) => token_data
             .claims
             .get("exp")
-            .and_then(|exp| {
-                println!("exp: {:?}", exp);
-                exp.as_i64()
-            })
+            .and_then(|exp| exp.as_i64())
             .and_then(|exp_ts| chrono::DateTime::from_timestamp(exp_ts, 0)),
         Err(e) => {
             log::error!("Error verifying token: {}", e);
-            println!("error: {:?}", e);
             None
         }
     };
