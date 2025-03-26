@@ -54,7 +54,7 @@ export default defineComponent({
 
     // Reactive references for background configuration
     const backgroundType = computed({
-      get: () => dashboardPanelData.data.config.background?.type || "",
+      get: () => dashboardPanelData.data.config.background?.type ?? "",
       set: (value) => {
         if (!dashboardPanelData.data.config.background) {
           dashboardPanelData.data.config.background = {
@@ -68,7 +68,7 @@ export default defineComponent({
     });
 
     const backgroundColor = computed({
-      get: () => dashboardPanelData.data.config.background?.value?.color || "",
+      get: () => dashboardPanelData.data.config.background?.value?.color ?? "",
       set: (value) => {
         if (!dashboardPanelData.data.config.background) {
           dashboardPanelData.data.config.background = {
