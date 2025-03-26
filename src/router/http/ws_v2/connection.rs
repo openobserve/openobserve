@@ -203,8 +203,9 @@ impl QuerierConnection {
                                     if let Err(e) = self.response_router.route_response(svr_event.clone()).await {
                                         // scenario 2 where the trace_id & sender are not cleaned up -> left for clean job
                                         log::error!(
-                                            "[WS::Router::QuerierConnection] Error routing response from querier back to client socket: {}",
-                                            e
+                                            "[WS::Router::QuerierConnection] Error routing response from querier back to client socket: {}, message: {}",
+                                            e,
+                                            svr_event.to_json()
                                         );
                                     }
                                     if let Some(trace_id) = remove_trace_id {

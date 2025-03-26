@@ -4932,10 +4932,7 @@ const useLogs = () => {
   };
 
 
-  const handleSearchReset = async (data: any, traceId?: string) => {
-
-    console.log("handleSearchReset", traceId, structuredClone(data));
-
+  const handleSearchReset = async (data: any) => {
     // reset query data
     try {
       if(data.type === "search") {

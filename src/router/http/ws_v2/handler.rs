@@ -99,7 +99,6 @@ impl WsHandler {
             ));
             ping_interval.tick().await; // first tick is immediate
 
-            let mut count = 1;
             // Handle incoming messages from client
             let handle_incoming = async {
                 loop {
@@ -167,13 +166,8 @@ impl WsHandler {
                                         Ok(mut message) => {
                                             // check if cookie is valid for each client event only
                                             // for enterprise
-                                            let mut is_cookie_not_valid = !session_manager.is_client_cookie_valid(&client_id).await;
-                                            if cfg.websocket.is_session_drain_enabled{
-                                                if count != 1 && count % 5 == 0 {
-                                                    is_cookie_not_valid = !is_cookie_not_valid;
-                                                }
-                                            }
-                                            if cfg.websocket.check_cookie_expiry && is_cookie_not_valid
+                                            if cfg.websocket.check_cookie_expiry
+                                                && !session_manager.is_client_cookie_valid(&client_id).await
                                             {
                                                 log::info!(
                                                     "[WS::Router::Handler] Client cookie expired. Disconnect..."
@@ -265,7 +259,6 @@ impl WsHandler {
                                                     break;
                                                 }
                                             }
-                                            count += 1;
                                         }
                                     }
                                 }
