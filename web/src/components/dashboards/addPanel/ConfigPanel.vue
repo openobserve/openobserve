@@ -1499,12 +1499,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardPanelData="dashboardPanelData"
     />
     <div class="space"></div>
+    <q-select
+      v-if="['metric'].includes(dashboardPanelData.data.type)"
+      outlined
+      v-model="dashboardPanelData.data.config.background.type"
+      :options="colorModeOptions"
+      dense
+      :label="t('dashboard.colorMode')"
+      class="showLabelOnTop selectedLabel"
+      stack-label
+      emit-value
+      :display-value="`${
+        dashboardPanelData.data.config.background.type
+          ? colorModeOptions.find(
+              (it: any) =>
+                it.value == dashboardPanelData.data.config.background.type,
+            )?.label
+          : 'None'
+      }`"
+      data-test="dashboard-config-color-mode"
+    >
+    </q-select>
+
+    <div v-if="dashboardPanelData.data.config.background.type === 'single'">
+      <div
+        class="color-input-wrapper"
+        style="margin-top: 30px; margin-left: 5px"
+      >
+        <input
+          type="color"
+          v-model="dashboardPanelData.data.config.background.value.color"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount } from "vue";
+import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1650,6 +1683,21 @@ export default defineComponent({
       // If no step value is set, set it to 0
       if (!dashboardPanelData.data.config.step_value) {
         dashboardPanelData.data.config.step_value = "0";
+      }
+
+      // Initialize background config with default color for single mode
+      if (!dashboardPanelData.data.config.background) {
+        dashboardPanelData.data.config.background = {
+          type: "None",
+          value: {
+            color: "",
+          },
+        };
+      } else if (
+        dashboardPanelData.data.config.background.type === "single" &&
+        !dashboardPanelData.data.config.background.value.color
+      ) {
+        dashboardPanelData.data.config.background.value.color = "#808080";
       }
     });
 
@@ -1881,6 +1929,18 @@ export default defineComponent({
         iconComponent: markRaw(StepMiddle),
       },
     ];
+
+    const colorModeOptions = [
+      {
+        label: t("dashboard.none"),
+        value: "None",
+      },
+      {
+        label: t("dashboard.singleColor"),
+        value: "single",
+      },
+    ];
+
     const isWeightFieldPresent = computed(() => {
       const layoutFields =
         dashboardPanelData.data.queries[
@@ -2007,6 +2067,21 @@ export default defineComponent({
       );
     });
 
+    // Add a watch for background type changes
+    watch(
+      () => dashboardPanelData.data.config.background.type,
+      (newType) => {
+        if (!newType || newType === "None") {
+          dashboardPanelData.data.config.background.value.color = "";
+        } else if (
+          newType === "single" &&
+          !dashboardPanelData.data.config.background.value.color
+        ) {
+          dashboardPanelData.data.config.background.value.color = "#808080"; // Default blue color
+        }
+      },
+    );
+
     return {
       t,
       dashboardPanelData,
@@ -2030,6 +2105,7 @@ export default defineComponent({
       removeTimeShift,
       showColorPalette,
       trellisOptions,
+      colorModeOptions,
       showTrellisConfig,
       isBreakdownFieldEmpty,
       hasTimeShifts,
@@ -2087,5 +2163,26 @@ export default defineComponent({
   height: 36px;
   margin-top: 9px;
   width: 100px;
+}
+.color-input-wrapper {
+  height: 25px;
+  width: 25px;
+  overflow: hidden;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+.color-input-wrapper input[type="color"] {
+  position: absolute;
+  height: 4em;
+  width: 4em;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  border: none;
+  margin: 0;
+  padding: 0;
 }
 </style>
