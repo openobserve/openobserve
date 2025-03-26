@@ -841,7 +841,7 @@ export default defineComponent({
         throw error;
       }
     };
-    const getAlertsFn = async (store: any, folderId: any, query = "") => {
+    const getAlertsFn = async (store: any, folderId: any, query = "", refreshResults = true) => {
       selected.value = [];
       allSelected.value = false;
       toggleAll();
@@ -939,7 +939,9 @@ export default defineComponent({
           //this is the condition where we are setting the filteredResults 
           //1. If it is search across folders then also we are setting the filteredResults(which contains the filtered alerts)
           //2. If it is not search across folders then we are setting the filteredResults to the alerts(which contains all the alerts)
-          filteredResults.value = alerts;
+          if(refreshResults){
+            filteredResults.value = alerts;
+          }
           filterAlertsByTab();
           if (router.currentRoute.value.query.action == "import") {
             showImportAlertDialog.value = true;
@@ -1485,8 +1487,9 @@ export default defineComponent({
       activeFolderId: any,
       selectedFolderId: any,
     ) => {
-      await getAlertsFn(store, selectedFolderId);
-      await getAlertsFn(store, activeFolderId);
+      await Promise.all([
+        getAlertsFn(store, selectedFolderId, "", false), // Run first and also dont add the results to the filteredResults
+      ]).then(() => getAlertsFn(store, activeFolderId)); 
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
       activeFolderToMove.value = "";
