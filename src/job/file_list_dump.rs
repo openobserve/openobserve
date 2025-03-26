@@ -95,7 +95,7 @@ async fn generate_cache_file() -> Result<(), anyhow::Error> {
     let start_time = (start_time - start_time % HOUR_IN_MS);
     let end_time = start_time - HOUR_IN_MS;
 
-    // TODO check if we can paginate
+    // TODO(YJDoc2) check if we can paginate
     let entries = infra::file_list::get_entries_in_range(start_time, end_time).await?;
     let batch_size = entries.len();
 
@@ -129,7 +129,7 @@ async fn generate_cache_file() -> Result<(), anyhow::Error> {
         field_flattened.append_value(entry.flattened);
     }
 
-    // TODO extract schema to static arc
+    // TODO(YJDoc2) extract schema to static arc
     let schema = Arc::new(get_schema());
 
     let batch = RecordBatch::try_new(
@@ -157,7 +157,7 @@ async fn generate_cache_file() -> Result<(), anyhow::Error> {
     writer.close().await?;
 
     let ts = chrono::DateTime::from_timestamp_millis(start_time).unwrap();
-    // TODO: add version suffix
+    // TODO(YJDoc2): add version suffix
     let file_key = format!(
         "files/{}/{:04}_{:02}_{:02}_{:02}.parquet",
         FILE_LIST_CACHE_DIR_NAME,
