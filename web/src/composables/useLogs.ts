@@ -4934,9 +4934,11 @@ const useLogs = () => {
     // reset query data
     try {
       if(data.type === "search") {
-        resetQueryData();
-        searchObj.data.queryResults = {};
-    
+        if(!data.isPagination) {
+          resetQueryData();
+          searchObj.data.queryResults = {};
+        }
+
         // reset searchAggData
         searchAggData.total = 0;
         searchAggData.hasAggregation = false;
@@ -4946,20 +4948,22 @@ const useLogs = () => {
       
         searchObj.data.errorCode = 0;
       
-            // Histogram reset
-        searchObj.data.histogram = {
-          xData: [],
-          yData: [],
-          chartParams: {
-            title: "",
-            unparsed_x_data: [],
-            timezone: "",
-          },
-          errorCode: 0,
-          errorMsg: "",
-          errorDetail: "",
-        };
-        resetHistogramError();
+        if(!data.isPagination) {
+          // Histogram reset
+          searchObj.data.histogram = {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: "",
+              unparsed_x_data: [],
+              timezone: "",
+            },
+            errorCode: 0,
+            errorMsg: "",
+            errorDetail: "",
+          };
+          resetHistogramError();
+        }
 
         const payload = buildWebSocketPayload(data.queryReq, data.isPagination, "search");
 
@@ -4967,7 +4971,7 @@ const useLogs = () => {
         addRequestId(payload.traceId);
       }
 
-      if(data.type === "histogram") {
+      if(data.type === "histogram" || data.type === "pageCount") {
         searchObj.data.queryResults.aggs = [];
         searchObj.data.histogram = {
           xData: [],
@@ -4985,7 +4989,7 @@ const useLogs = () => {
 
         searchObj.loadingHistogram = true;
 
-        await generateHistogramSkeleton();
+        if(data.type === "histogram") await generateHistogramSkeleton();
 
         histogramResults = [];
 
