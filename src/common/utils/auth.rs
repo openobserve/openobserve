@@ -579,7 +579,7 @@ impl FromRequest for AuthExtractor {
         };
 
         // Check if the ws request is using internal grpc token
-        if path.contains("/ws") {
+        if method.eq("GET") && path.contains("/ws") {
             if let Some(auth_header) = req.headers().get("Authorization") {
                 if auth_header
                     .to_str()
@@ -588,11 +588,11 @@ impl FromRequest for AuthExtractor {
                 {
                     return ready(Ok(AuthExtractor {
                         auth: auth_header.to_str().unwrap().to_string(),
-                        method: "".to_string(),
-                        o2_type: "".to_string(),
-                        org_id: "".to_string(),
+                        method,
+                        o2_type: format!("stream:{org_id}"),
+                        org_id,
                         bypass_check: true,
-                        parent_id: "".to_string(),
+                        parent_id: folder,
                     }));
                 }
             }

@@ -775,18 +775,20 @@ pub async fn validate_http_internal(
     let router_nodes = cluster::get_cached_online_router_nodes()
         .await
         .unwrap_or_default();
-    let host = req.connection_info().host().to_string();
+
+    // Get the peer address early and own the string
+    let peer = req
+        .connection_info()
+        .peer_addr()
+        .unwrap_or("unknown")
+        .to_string();
+
+    dbg!("Peer address:", &peer);
+
     let router_node = router_nodes.iter().find(|node| {
         // Need to add scheme to host before parsing, only for `req.host`
         // &host == "192.168.1.4:5070"
         // &node.http_addr == "http://192.168.1.4:5080"
-        let host_url = match Url::parse(&format!("http://{}", host)) {
-            Ok(host_url) => host_url,
-            Err(e) => {
-                log::error!("Failed to parse host URL: {}", e);
-                return false;
-            }
-        };
         let node_url = match Url::parse(&node.http_addr) {
             Ok(node_url) => node_url,
             Err(e) => {
@@ -794,14 +796,16 @@ pub async fn validate_http_internal(
                 return false;
             }
         };
-        // If parse fails, return false
-        let host_ip = match host_url
-            .host()
-            .and_then(|h| h.to_string().parse::<IpAddr>().ok())
+
+        // Get IP from peer address (strips port if present)
+        let peer_ip = match peer
+            .split(':')
+            .next()
+            .and_then(|addr| addr.parse::<IpAddr>().ok())
         {
             Some(ip) => ip,
             None => {
-                log::debug!("Failed to parse host IP");
+                log::debug!("Failed to parse peer IP from: {}", peer);
                 return false;
             }
         };
@@ -817,9 +821,10 @@ pub async fn validate_http_internal(
             }
         };
 
-        dbg!(&host_ip, &node_ip);
-        host_ip == node_ip
+        dbg!(&peer_ip, &node_ip);
+        peer_ip == node_ip
     });
+
     if router_node.is_none() {
         return Err((ErrorUnauthorized("Unauthorized Access"), req));
     }
