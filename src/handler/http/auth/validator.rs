@@ -817,6 +817,7 @@ pub async fn validate_http_internal(
             }
         };
 
+        dbg!(&host_ip, &node_ip);
         host_ip == node_ip
     });
     if router_node.is_none() {
