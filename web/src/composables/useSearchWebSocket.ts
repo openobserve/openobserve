@@ -94,7 +94,7 @@ const useSearchWebSocket = () => {
     }
   };
 
-  const onError = (response: any) => {
+  const onError = async (response: any) => {
     if(response.type === 'error'){
       if(response.content.should_client_retry && response.content.trace_id){
         setTimeout(() => {
@@ -106,23 +106,10 @@ const useSearchWebSocket = () => {
 
       if(response.content.code === 401) {
         // Store the current socketId as inactive and clear it
-        inactiveSocketId.value = socketId.value;
-        socketId.value = null;
-        isInDrainMode.value = true;
-
-        const traceIdToRetry = response.content.trace_id;
-
-        if(traceIdToRetry) retryActiveTrace(traceIdToRetry, response);
-
-        // Mark all traces from old socket as inactive
-        Object.keys(traces).forEach(traceId => {
-          if (traces[traceId].socketId === inactiveSocketId.value) {
-            traces[traceId].isActive = false;
-          }
-        });
-
-        resetAuthToken();
-
+        closeSocket();
+        console.log("resetting auth token");
+        await resetAuthToken();
+        console.log("auth token reset");
         return;
       }
     }
@@ -304,26 +291,34 @@ const useSearchWebSocket = () => {
     cleanUpListeners(traceId);   
   }
 
-  const resetAuthToken = () => {
-    authService.refresh_token().then((res: any) => {
-      isInDrainMode.value = false;
-      // Retry the request
-      Object.keys(traces).forEach((traceId) => {
-        if(!traces[traceId].isInitiated) {
-          initiateSocketConnection(traces[traceId].data, {
-            open: traces[traceId].open[0],
-            message: traces[traceId].message[0],
-            close: traces[traceId].close[0],
-            error: traces[traceId].error[0],
-            reset: traces[traceId].reset[0],
-          });
-        }
+  const resetAuthToken = async () => {
+    isInDrainMode.value = true;
+
+    return new Promise(async (resolve, reject) => {
+      authService.refresh_token().then((res: any) => {
+        isInDrainMode.value = false;
+        // Retry the request
+        Object.keys(traces).forEach((traceId) => {
+          if(!traces[traceId].isInitiated) {
+            initiateSocketConnection(traces[traceId].data, {
+              open: traces[traceId].open[0],
+              message: traces[traceId].message[0],
+              close: traces[traceId].close[0],
+              error: traces[traceId].error[0],
+              reset: traces[traceId].reset[0],
+            });
+          } else {
+            retryActiveTrace(traceId, { code: 1000 });
+          }
+        });
+        resolve(res);
+      }).catch((err: any) => {
+        console.error("Error in refreshing auth token", err);
+        reject(err);
+      }).finally(() => {
+        isInDrainMode.value = false;
       });
-    }).catch((err: any) => {
-      console.error("Error in refreshing auth token", err);
-    }).finally(() => {
-      isInDrainMode.value = false;
-    });
+    })
   }
 
   return {
