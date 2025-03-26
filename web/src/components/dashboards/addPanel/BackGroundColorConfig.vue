@@ -93,15 +93,6 @@ export default defineComponent({
       { immediate: false },
     );
 
-    onBeforeMount(() => {
-      if (!dashboardPanelData.data.config.background) {
-        dashboardPanelData.data.config.background = {
-          type: "",
-          value: { color: "" },
-        };
-      }
-    });
-
     return {
       backgroundType,
       backgroundColor,
