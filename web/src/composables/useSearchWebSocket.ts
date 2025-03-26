@@ -122,16 +122,22 @@ const useSearchWebSocket = () => {
         socketId.value = null;        
         isInDrainMode.value = true;
 
+        console.log("-------------------------------- Drain mode --------------------------------");
+
         const traceIdToRetry = response.content.trace_id;
 
+        console.log("traceIdToRetry", traceIdToRetry);
         // Mark all traces from old socket as inactive
         Object.keys(traces).forEach(traceId => {
           if ((traces[traceId].socketId === inactiveSocketId.value) && (traceId !== traceIdToRetry)) {
+            console.log("marking trace as inactive", traceId);
             traces[traceId].isActive = false;
           }
         }); 
 
         await resetAuthToken();
+
+        console.log("-------------------------------- Drain mode end --------------------------------");
 
         debugger;
 
@@ -195,6 +201,7 @@ const useSearchWebSocket = () => {
       reset: (data: any, response: any) => void;
     }  
   ) => {
+      console.log("fetchQueryDataWithWebSocket", data.traceId, socketId.value);
     try {
       traces[data.traceId] = {
         open: [],
@@ -204,7 +211,7 @@ const useSearchWebSocket = () => {
         reset: [],
         data: data,
         isActive: true, //  True if the trace id is on current active socket. If false, If we receive 401, we will initiate a new socket and mark the old socket traas inactive
-        socketId: socketId.value, // Track which socket this search was initiated on
+        socketId: null, // Track which socket this search was initiated on
         isInitiated: false, // True if the search was initiated on the current socket
       };
 
@@ -247,12 +254,15 @@ const useSearchWebSocket = () => {
       createSocketConnection(data.org_id);
     } else if (!isCreatingSocket.value) {
       traces[data.traceId].isInitiated = true;
+      traces[data.traceId].socketId = socketId.value;
       handlers.open(data, null);
     }
   }
 
   const sendSearchMessageBasedOnRequestId = (data: any) => {
     try {
+
+      console.log("sendSearchMessageBasedOnRequestId", { ...traces[data.content.traceId]} );
       
       if(!traces[data.content.traceId]?.isActive && inactiveSocketId.value) {
         webSocket.sendMessage(inactiveSocketId.value as string, JSON.stringify(data));
