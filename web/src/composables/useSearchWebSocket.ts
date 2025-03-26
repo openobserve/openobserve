@@ -28,7 +28,7 @@ const socketRetryCodes = [1001, 1006, 1010, 1011, 1012, 1013];
 
 const socketFailureCount = ref(0);
 
-const maxSearchRetries = 5;
+const maxSearchRetries = 3;
 
 const isInDrainMode = ref(false);
 
