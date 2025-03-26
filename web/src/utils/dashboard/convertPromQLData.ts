@@ -17,6 +17,7 @@ import {
   calculateOptimalFontSize,
   formatDate,
   formatUnitValue,
+  getContrastColor,
   getUnitValue,
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
@@ -682,13 +683,17 @@ export const convertPromQLData = async (
               panelSchema.config?.unit_custom,
               panelSchema.config?.decimals,
             );
-
+            options.backgroundColor =
+              panelSchema.config?.background?.value?.color ?? "";
             const series = [
               {
                 type: "custom",
                 silent: true,
                 coordinateSystem: "polar",
                 renderItem: function (params: any) {
+                  const backgroundColor =
+                    panelSchema.config?.background?.value?.color;
+                  const isDarkTheme = store.state.theme === "dark";
                   return {
                     type: "text",
                     style: {
@@ -702,7 +707,7 @@ export const convertPromQLData = async (
                       verticalAlign: "middle",
                       x: params.coordSys.cx,
                       y: params.coordSys.cy,
-                      fill: store.state.theme === "dark" ? "#fff" : "#000",
+                      fill: getContrastColor(backgroundColor, isDarkTheme),
                     },
                   };
                 },
