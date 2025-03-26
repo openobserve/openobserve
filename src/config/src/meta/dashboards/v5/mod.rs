@@ -213,7 +213,6 @@ pub struct GroupType {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct Background {
     #[serde(rename = "type")]
     pub typ: String,
@@ -221,7 +220,6 @@ pub struct Background {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct BackgroundValue {
     pub color: String,
 }
