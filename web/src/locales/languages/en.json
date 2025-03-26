@@ -800,6 +800,8 @@
     "stepBefore": "Step Before",
     "stepAfter": "Step After",
     "stepMiddle": "Step Middle",
+    "singleColor": "Single Color",
+    "colorMode": "Background Color",
     "searchAcross": "Search Across Folders",
     "searchSelf": "Switch to Search across the current Folder",
     "searchAll": "Switch to Search Across all Folders",
