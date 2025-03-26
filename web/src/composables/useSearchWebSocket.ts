@@ -63,6 +63,8 @@ const useSearchWebSocket = () => {
       return;
     }
 
+    // closeDrainingSocket();
+
     traces[response.content.trace_id]?.message?.forEach((handler: any) =>
       handler(response),
     );
@@ -72,21 +74,15 @@ const useSearchWebSocket = () => {
     isCreatingSocket.value = false;
     socketId.value = null;
 
-    const shouldRetry = socketRetryCodes.includes(response.code) || isInDrainMode.value;
+    const shouldRetry = socketRetryCodes.includes(response.code);
     
     if(shouldRetry) socketFailureCount.value++;
 
-
-    // if(inactiveSocketId.value && _socketId === inactiveSocketId.value) {
-    //   inactiveSocketId.value = null;
-    // }
+    if(inactiveSocketId.value && _socketId === inactiveSocketId.value) {
+      inactiveSocketId.value = null;
+    }
 
     if (shouldRetry && socketFailureCount.value < maxSearchRetries) {
-      if(isInDrainMode.value) {
-        await resetAuthToken();
-        return;
-      }
-
       setTimeout(() => {
         Object.keys(traces).forEach((traceId) => {
           if(traces[traceId].isInitiated) {
@@ -119,16 +115,41 @@ const useSearchWebSocket = () => {
 
       if(response.content.code === 401) {
         // Store the current socketId as inactive and clear it
+        inactiveSocketId.value = socketId.value;
+        socketId.value = null;        
         isInDrainMode.value = true;
+
+        // Mark all traces from old socket as inactive
+        Object.keys(traces).forEach(traceId => {
+          if (traces[traceId].socketId === inactiveSocketId.value) {
+            traces[traceId].isActive = false;
+          }
+        }); 
+
+        await resetAuthToken();
+
+        const traceIdToRetry = response.content.trace_id;
+
+        if(traceIdToRetry) retryActiveTrace(traceIdToRetry, response);
+
+        return;     
       }
     }
+    // closeDrainingSocket();
 
     traces[response.content.trace_id]?.error?.forEach((handler: any) =>
       handler(response),
     );
     // cleanUpListeners(response.traceId)
   };
-
+  // const closeDrainingSocket = () => {
+  //   const areAllTraceIdsActive = Object.keys(traces).every((traceId) => traces[traceId].isActive);
+  //   // close the inactive socket if there are no any traces with isActive false
+  //   if(areAllTraceIdsActive && inactiveSocketId.value) {
+  //     webSocket.closeSocket(inactiveSocketId.value as string);
+  //     inactiveSocketId.value = null;
+  //   }
+  // }
   const createSocketConnection = (org_id: string) => {
     isCreatingSocket.value = true;
 
@@ -316,9 +337,7 @@ const useSearchWebSocket = () => {
               error: traces[traceId].error[0],
               reset: traces[traceId].reset[0],
             });
-          }else{
-            retryActiveTrace(traceId, { code: 1000 });
-          } 
+          }
         });
         resolve(res);
       }).catch((err: any) => {
