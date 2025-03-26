@@ -72,15 +72,18 @@ const useSearchWebSocket = () => {
 
   const onClose = async (response: any, _socketId: string) => {    
     isCreatingSocket.value = false;
-    socketId.value = null;
+    
+    if(socketId.value && (socketId.value === _socketId)) {
+      socketId.value = null;
+    }
+
+    if(inactiveSocketId.value && (_socketId === inactiveSocketId.value)) {
+      inactiveSocketId.value = null;
+    }
 
     const shouldRetry = socketRetryCodes.includes(response.code);
     
     if(shouldRetry) socketFailureCount.value++;
-
-    if(inactiveSocketId.value && _socketId === inactiveSocketId.value) {
-      inactiveSocketId.value = null;
-    }
 
     if (shouldRetry && socketFailureCount.value < maxSearchRetries) {
       setTimeout(() => {
@@ -127,6 +130,8 @@ const useSearchWebSocket = () => {
         }); 
 
         await resetAuthToken();
+
+        debugger;
 
         const traceIdToRetry = response.content.trace_id;
 
@@ -237,6 +242,7 @@ const useSearchWebSocket = () => {
     error: (data: any, response: any) => void;
     reset: (data: any, response: any) => void;
   }) => {
+    console.log("has socket id", socketId.value,  data.traceId);
     if (!socketId.value) {
       createSocketConnection(data.org_id);
     } else if (!isCreatingSocket.value) {
@@ -253,6 +259,7 @@ const useSearchWebSocket = () => {
         return;
       }
 
+      console.log("Sending message to socket", socketId.value, inactiveSocketId.value);
       webSocket.sendMessage(socketId.value as string, JSON.stringify(data));
     } catch (error: any) {
       console.error(
@@ -330,6 +337,7 @@ const useSearchWebSocket = () => {
         // Retry the request
         Object.keys(traces).forEach((traceId) => {
           if(!traces[traceId].isInitiated) {
+            console.log("Initiating new socket after auth token refresh", traceId);
             initiateSocketConnection(traces[traceId].data, {
               open: traces[traceId].open[0],
               message: traces[traceId].message[0],
