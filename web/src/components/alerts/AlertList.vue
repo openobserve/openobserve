@@ -126,13 +126,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #header-selection="scope">
               <q-checkbox
-                v-model="allSelected"
+                v-model="scope.selected"
                 size="sm"
                 color="secondary"
-                @update:model-value="toggleAll"
               />
             </template>
-            <template #body-selection="scope">
+            <template v-slot:body-selection="scope">
               <q-checkbox
                 v-model="scope.selected"
                 size="sm"
@@ -148,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-td>
                   <q-checkbox
-                    v-model="props.row.selected"
+                    v-model="props.selected"
                     size="sm"
                     color="secondary"
                     @update:model-value="handleRowSelection(props.row, $event)"
@@ -844,7 +843,6 @@ export default defineComponent({
     const getAlertsFn = async (store: any, folderId: any, query = "", refreshResults = true) => {
       selected.value = [];
       allSelected.value = false;
-      toggleAll();
       if (query){
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];
@@ -1010,6 +1008,8 @@ export default defineComponent({
     watch(
       () => activeFolderId.value,
       async (newVal) => {
+        selected.value = [];
+        allSelected.value = false;
         if(newVal == router.currentRoute.value.query.folder){
           return;
         }
@@ -1032,6 +1032,8 @@ export default defineComponent({
     );
 
     watch(searchQuery, async (newQuery) => {
+      selected.value = [];
+      allSelected.value = false;
       if(newQuery == ""){
        filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value];
       }
@@ -1496,7 +1498,6 @@ export default defineComponent({
       activeFolderToMove.value = "";
       selected.value = [];
       allSelected.value = false;
-      toggleAll();
     };
 
     const getSelectedString = () => {
@@ -1548,23 +1549,6 @@ export default defineComponent({
       await getAlertsFn(store, activeFolderId.value, query);
     }, 600);
 
-    const toggleAll = () => {
-      if (allSelected.value) {
-        // Select all rows
-        selected.value = [...filteredResults.value];
-        //this is the filteredResults where we have all the alerts
-        filteredResults.value?.forEach((alert: any) => {
-          alert.selected = true;
-        });
-      } else {
-        // Deselect all rows
-        selected.value = [];
-        //this is the filteredResults where we have all the alerts
-        filteredResults.value?.forEach((alert: any) => {
-          alert.selected = false;
-        });
-      }
-    };
 
     // Add watcher to update allSelected when selected items change
     watch(selected, (newVal) => {
@@ -1586,6 +1570,8 @@ export default defineComponent({
       }
     });
     watch(searchAcrossFolders, (newVal) => {
+      selected.value = [];
+      allSelected.value = false;
       if(newVal){
         //here we are setting the searchQuery to null and then setting the filterQuery to the searchQuery
         //this is done because we want to clear the searchQuery and then set the filterQuery to the searchQuery
@@ -1681,7 +1667,6 @@ export default defineComponent({
         });
         selected.value = [];
         allSelected.value = false;
-        toggleAll();
       } catch (error) {
         console.error("Error exporting alerts:", error);
         $q.notify({
@@ -1810,7 +1795,6 @@ export default defineComponent({
       expandedRow,
       triggerExpand,
       allSelected,
-      toggleAll,
       handleRowSelection,
       copyToClipboard,
       openMenu,
