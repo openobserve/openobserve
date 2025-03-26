@@ -1612,9 +1612,7 @@ pub fn get_alert_start_end_time(
 }
 
 fn format_variable_value(val: String) -> String {
-    val.replace('\n', "\\n")
-        .replace('\r', "\\r")
-        .replace('\"', "\\\"")
+    val.chars().flat_map(|c| c.escape_default()).collect::<String>()
 }
 
 pub(super) fn to_float(val: &Value) -> f64 {
@@ -1735,6 +1733,54 @@ async fn permitted_alerts(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_format_variable_value() {
+        // Test common control characters
+        assert_eq!(format_variable_value("\n".to_string()), "\\n");
+        assert_eq!(format_variable_value("\t".to_string()), "\\t");
+        assert_eq!(format_variable_value("\r".to_string()), "\\r");
+        assert_eq!(format_variable_value("\"".to_string()), "\\\"");
+        assert_eq!(format_variable_value("\\".to_string()), "\\\\");
+        assert_eq!(format_variable_value("\0".to_string()), "\\u{0}");
+
+        // Test other control characters
+        assert_eq!(format_variable_value("\x1b".to_string()), "\\u{1b}"); // escape
+        assert_eq!(format_variable_value("\x08".to_string()), "\\u{8}"); // backspace
+        assert_eq!(format_variable_value("\x0c".to_string()), "\\u{c}"); // form feed
+        assert_eq!(format_variable_value("\x0a".to_string()), "\\n"); // line feed
+        assert_eq!(format_variable_value("\x0d".to_string()), "\\r"); // carriage return
+        assert_eq!(format_variable_value("\x09".to_string()), "\\t"); // tab
+        assert_eq!(format_variable_value("\x0b".to_string()), "\\u{b}"); // vertical tab
+
+        // Test mixed content
+        assert_eq!(
+            format_variable_value("Hello\nWorld\tTest\r".to_string()),
+            "Hello\\nWorld\\tTest\\r"
+        );
+
+        // Test string with quotes and backslashes
+        assert_eq!(
+            format_variable_value("Hello \"World\" \\ Test".to_string()),
+            "Hello \\\"World\\\" \\\\ Test"
+        );
+
+        // Test other control characters (should be converted to Unicode escape)
+        assert_eq!(format_variable_value("\x01".to_string()), "\\u{1}");
+        assert_eq!(format_variable_value("\x02".to_string()), "\\u{2}");
+        assert_eq!(format_variable_value("\x1f".to_string()), "\\u{1f}");
+
+        // Test complex string with multiple special characters
+        let complex = "Hello\n\"World\"\t\\Test\r\x1b[31mRed\x1b[0m";
+        let expected = "Hello\\n\\\"World\\\"\\t\\\\Test\\r\\u{1b}[31mRed\\u{1b}[0m";
+        assert_eq!(format_variable_value(complex.to_string()), expected);
+
+        // Test empty string
+        assert_eq!(format_variable_value("".to_string()), "");
+
+        // Test string with no special characters
+        assert_eq!(format_variable_value("Hello World".to_string()), "Hello World");
+    }
 
     #[tokio::test]
     async fn test_alert_create() {
