@@ -214,6 +214,20 @@ pub struct GroupType {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct Background {
+    #[serde(rename = "type")]
+    pub typ: String,
+    pub value: Option<BackgroundValue>, // "", single
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundValue {
+    pub color: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FilterCondition {
     #[serde(rename = "type")]
     pub typ: String,
