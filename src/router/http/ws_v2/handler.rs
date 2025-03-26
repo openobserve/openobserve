@@ -460,8 +460,9 @@ pub async fn get_querier_connection(
     trace_id: &TraceId,
     role_group: Option<RoleGroup>,
 ) -> WsResult<Arc<QuerierConnection>> {
+    let interval = tokio::time::Duration::from_secs(1);
     // Retry max of 3 times to get a valid querier connection
-    for _ in 0..3 {
+    for try_num in 0..3 {
         // Get or assign querier for this trace_id included in message
         let querier_name = match session_manager
             .get_querier_for_trace(client_id, trace_id)
@@ -483,12 +484,14 @@ pub async fn get_querier_connection(
             .await
         {
             Ok(conn) => return Ok(conn),
-            Err(_) => {
+            Err(e) => {
+                log::error!("[WS::Router::Handler] error getting or creating querier connection: {e} try number: {}", try_num);
                 session_manager
                     .remove_querier_connection(&querier_name)
                     .await;
             }
         }
+        tokio::time::sleep(interval).await;
     }
 
     Err(WsError::QuerierNotAvailable(
