@@ -30,6 +30,7 @@ pub mod destinations;
 pub mod distinct_values;
 #[allow(unused_imports)]
 pub mod entity;
+pub mod file_list_dump;
 pub mod folders;
 mod migration;
 pub mod ratelimit;
