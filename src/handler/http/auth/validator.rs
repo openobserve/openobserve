@@ -783,8 +783,6 @@ pub async fn validate_http_internal(
         .unwrap_or("unknown")
         .to_string();
 
-    dbg!("Peer address:", &peer);
-
     let router_node = router_nodes.iter().find(|node| {
         // Need to add scheme to host before parsing, only for `req.host`
         // &host == "192.168.1.4:5070"
@@ -821,7 +819,6 @@ pub async fn validate_http_internal(
             }
         };
 
-        dbg!(&peer_ip, &node_ip);
         peer_ip == node_ip
     });
 
