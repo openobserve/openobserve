@@ -4932,74 +4932,76 @@ const useLogs = () => {
 
   const handleSearchReset = async (data: any) => {
     // reset query data
+    try {
+      if(data.type === "search") {
+        resetQueryData();
+        searchObj.data.queryResults = {};
     
-    if(data.type === "search") {
-      resetQueryData();
-      searchObj.data.queryResults = {};
-   
-      // reset searchAggData
-      searchAggData.total = 0;
-      searchAggData.hasAggregation = false;
-      searchObj.meta.showDetailTab = false;
-      searchObj.meta.searchApplied = true;
-      searchObj.data.functionError = "";
-    
-      searchObj.data.errorCode = 0;
-    
-          // Histogram reset
-      searchObj.data.histogram = {
-        xData: [],
-        yData: [],
-        chartParams: {
-          title: "",
-          unparsed_x_data: [],
-          timezone: "",
-        },
-        errorCode: 0,
-        errorMsg: "",
-        errorDetail: "",
-      };
-      resetHistogramError();
+        // reset searchAggData
+        searchAggData.total = 0;
+        searchAggData.hasAggregation = false;
+        searchObj.meta.showDetailTab = false;
+        searchObj.meta.searchApplied = true;
+        searchObj.data.functionError = "";
+      
+        searchObj.data.errorCode = 0;
+      
+            // Histogram reset
+        searchObj.data.histogram = {
+          xData: [],
+          yData: [],
+          chartParams: {
+            title: "",
+            unparsed_x_data: [],
+            timezone: "",
+          },
+          errorCode: 0,
+          errorMsg: "",
+          errorDetail: "",
+        };
+        resetHistogramError();
 
-      const payload = buildWebSocketPayload(data.queryReq, data.isPagination, "search");
+        const payload = buildWebSocketPayload(data.queryReq, data.isPagination, "search");
 
-      initializeWebSocketConnection(payload);
-      addRequestId(payload.traceId);
+        initializeWebSocketConnection(payload);
+        addRequestId(payload.traceId);
+      }
+
+      if(data.type === "histogram") {
+        searchObj.data.queryResults.aggs = [];
+        searchObj.data.histogram = {
+          xData: [],
+          yData: [],
+          chartParams: {
+            title: "",
+            unparsed_x_data: [],
+            timezone: "",
+          },
+          errorCode: 0,
+          errorMsg: "",
+          errorDetail: "",
+        };
+        resetHistogramError();
+
+        searchObj.loadingHistogram = true;
+
+        await generateHistogramSkeleton();
+
+        histogramResults = [];
+
+        const payload = buildWebSocketPayload(
+          data.queryReq,
+          false,
+          "histogram",
+        );
+
+        initializeWebSocketConnection(payload);
+
+        addRequestId(payload.traceId);
+      }
+    } catch(e: any){
+      console.error("Error while resetting search", e);
     }
-
-    if(data.type === "histogram") {
-      searchObj.data.queryResults.aggs = [];
-      searchObj.data.histogram = {
-        xData: [],
-        yData: [],
-        chartParams: {
-          title: "",
-          unparsed_x_data: [],
-          timezone: "",
-        },
-        errorCode: 0,
-        errorMsg: "",
-        errorDetail: "",
-      };
-      resetHistogramError();
-
-      searchObj.loadingHistogram = true;
-
-      await generateHistogramSkeleton();
-
-      histogramResults = [];
-
-      const payload = buildWebSocketPayload(
-        data.queryReq,
-        false,
-        "histogram",
-      );
-
-      initializeWebSocketConnection(payload);
-
-      addRequestId(payload.traceId);
-    }
-
   };
 
   const sendSearchMessage = (queryReq: any) => {
