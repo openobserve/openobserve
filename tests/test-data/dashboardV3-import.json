@@ -1,0 +1,2580 @@
+{
+  "version": 3,
+  "dashboardId": "7175229380321352248",
+  "title": "AWS VPC Flow Log",
+  "description": "",
+  "role": "",
+  "owner": "",
+  "created": "2024-03-17T20:59:06.248Z",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Default",
+      "panels": [
+        {
+          "id": "Panel_ID29510",
+          "type": "markdown",
+          "title": "Introduction",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 2,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": null,
+              "customQuery": false,
+              "fields": {
+                "stream": "",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 48,
+            "h": 9,
+            "i": 3
+          },
+          "htmlContent": "",
+          "markdownContent": "## AWS VPC Flow log\n\nAWS official documentation:  https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html\n\n\nFor support regarding this dashboard reach out to hello@openobserve.ai"
+        }
+      ]
+    },
+    {
+      "tabId": "62532",
+      "name": "Overall",
+      "panels": [
+        {
+          "id": "Panel_ID9960510",
+          "type": "stacked",
+          "title": "Packets transferred",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", protocol as \"x_axis_2\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1, x_axis_2 ORDER BY x_axis_1 ASC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Protocol",
+                    "alias": "x_axis_2",
+                    "column": "protocol",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets",
+                    "alias": "y_axis_1",
+                    "column": "packets",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 9,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID6268110",
+          "type": "heatmap",
+          "title": "Data transferred (Hourly)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp, '1 hour') as \"x_axis_1\", protocol as \"y_axis_1\", sum(bytes) as \"z_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1, y_axis_1 ORDER BY x_axis_1 ASC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Timestamp",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": "1 hour"
+                      }
+                    ]
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Protocol",
+                    "alias": "y_axis_1",
+                    "column": "protocol",
+                    "color": "#5960b2"
+                  }
+                ],
+                "z": [
+                  {
+                    "label": "Bytes",
+                    "alias": "z_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 9,
+            "w": 24,
+            "h": 9,
+            "i": 3
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID9576010",
+          "type": "line",
+          "title": "Direction",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", flow_direction as \"x_axis_2\", sum(bytes) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1, x_axis_2 ORDER BY x_axis_1 ASC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Flow Direction",
+                    "alias": "x_axis_2",
+                    "column": "flow_direction",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": " ",
+                    "alias": "y_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 9,
+            "w": 24,
+            "h": 9,
+            "i": 4
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID508910",
+          "type": "stacked",
+          "title": "Data transferred",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", protocol as \"x_axis_2\", sum(bytes) as \"y_axis_1\"  FROM \"vpcflowlog\"  GROUP BY x_axis_1, x_axis_2 ORDER BY x_axis_1 ASC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Protocol",
+                    "alias": "x_axis_2",
+                    "column": "protocol",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": " ",
+                    "alias": "y_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 0,
+            "w": 24,
+            "h": 9,
+            "i": 5
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "28478",
+      "name": "Top 20",
+      "panels": [
+        {
+          "id": "Panel_ID5661710",
+          "type": "h-bar",
+          "title": "Top 20 source IP addresses (Packet count)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "right",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT srcaddr as \"x_axis_1\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1 ORDER BY y_axis_1 DESC LIMIT 20",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "srcaddr",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets",
+                    "alias": "y_axis_1",
+                    "column": "packets",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum",
+                    "sortBy": "DESC"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 20,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 13,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID9664310",
+          "type": "h-bar",
+          "title": "Top 20 destination IP addresses (Packet count)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "right",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT dstaddr as \"x_axis_1\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1 ORDER BY y_axis_1 DESC LIMIT 20",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "dstaddr",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets",
+                    "alias": "y_axis_1",
+                    "column": "packets",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum",
+                    "sortBy": "DESC"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 20,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 0,
+            "w": 24,
+            "h": 13,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID8836510",
+          "type": "h-bar",
+          "title": "Top 20 Senders (Volume)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes",
+            "decimals": 1,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT srcaddr as \"x_axis_1\", sum(bytes) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1 ORDER BY y_axis_1 DESC LIMIT 20",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "srcaddr",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": " ",
+                    "alias": "y_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum",
+                    "sortBy": "DESC"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 20,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 13,
+            "w": 24,
+            "h": 13,
+            "i": 3
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID1007410",
+          "type": "h-bar",
+          "title": "Top 20 Receivers (Volume)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes",
+            "decimals": 1,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT dstaddr as \"x_axis_1\", sum(bytes) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1 ORDER BY y_axis_1 DESC LIMIT 20",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "dstaddr",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": " ",
+                    "alias": "y_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum",
+                    "sortBy": "DESC"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 20,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 13,
+            "w": 24,
+            "h": 13,
+            "i": 4
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "3584",
+      "name": "Geo",
+      "panels": [
+        {
+          "id": "Panel_ID1228610",
+          "type": "geomap",
+          "title": "Top sources",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 2,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 5,
+                "max": 50
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT src_city_latitude as latitude, src_city_longitude as longitude, count(account_id) as weight FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id' GROUP BY latitude, longitude",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "latitude": {
+                  "label": "Src City Latitude",
+                  "alias": "latitude",
+                  "column": "src_city_latitude",
+                  "color": "#5960b2"
+                },
+                "longitude": {
+                  "label": "Src City Longitude",
+                  "alias": "longitude",
+                  "column": "src_city_longitude",
+                  "color": "#5960b2"
+                },
+                "weight": {
+                  "label": "Account Id",
+                  "alias": "weight",
+                  "column": "account_id",
+                  "color": "#5960b2",
+                  "aggregationFunction": "count"
+                },
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 17,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID7692510",
+          "type": "geomap",
+          "title": "Top destinations",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 2,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 5,
+                "max": 50
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT dst_city_latitude as latitude, dst_city_longitude as longitude, count(account_id) as weight FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id' GROUP BY latitude, longitude",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "latitude": {
+                  "label": "Dst City Latitude",
+                  "alias": "latitude",
+                  "column": "dst_city_latitude",
+                  "color": "#5960b2"
+                },
+                "longitude": {
+                  "label": "Dst City Longitude",
+                  "alias": "longitude",
+                  "column": "dst_city_longitude",
+                  "color": "#5960b2"
+                },
+                "weight": {
+                  "label": "Account Id",
+                  "alias": "weight",
+                  "column": "account_id",
+                  "color": "#5960b2",
+                  "aggregationFunction": "count"
+                },
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 0,
+            "w": 24,
+            "h": 17,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "76941",
+      "name": "Rejected Traffic",
+      "panels": [
+        {
+          "id": "Panel_ID4022310",
+          "type": "h-bar",
+          "title": "Top 20 IP addresses with rejections",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT srcaddr as \"x_axis_1\", count(account_id) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE action IN ('REJECT') GROUP BY x_axis_1 ORDER BY y_axis_1 DESC LIMIT 20",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "srcaddr",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": " ",
+                    "alias": "y_axis_1",
+                    "column": "account_id",
+                    "color": "#5960b2",
+                    "aggregationFunction": "count",
+                    "sortBy": "DESC"
+                  }
+                ],
+                "z": [],
+                "filter": [
+                  {
+                    "type": "list",
+                    "values": [
+                      "REJECT"
+                    ],
+                    "column": "action",
+                    "operator": null,
+                    "value": null
+                  }
+                ]
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 20,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 13,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID1563710",
+          "type": "donut",
+          "title": "Actions",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 2,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT action as \"x_axis_1\", count(account_id) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Action",
+                    "alias": "x_axis_1",
+                    "column": "action",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Account Id",
+                    "alias": "y_axis_1",
+                    "column": "account_id",
+                    "color": "#5960b2",
+                    "aggregationFunction": "count"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 0,
+            "w": 24,
+            "h": 13,
+            "i": 4
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "82911",
+      "name": "ASN",
+      "panels": [
+        {
+          "id": "Panel_ID7346510",
+          "type": "h-bar",
+          "title": "Top 20 source ASN",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT src_asn_autonomous_system_organization as \"x_axis_1\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1 ORDER BY y_axis_1 DESC LIMIT 20",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "src_asn_autonomous_system_organization",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets",
+                    "alias": "y_axis_1",
+                    "column": "packets",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum",
+                    "sortBy": "DESC"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 20,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 9,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID340010",
+          "type": "h-bar",
+          "title": "Top 20 destination ASN",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT dst_asn_autonomous_system_organization as \"x_axis_2\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_2 ORDER BY y_axis_1 DESC LIMIT 20",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_2",
+                    "column": "dst_asn_autonomous_system_organization",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets ",
+                    "alias": "y_axis_1",
+                    "column": "packets",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum",
+                    "sortBy": "DESC"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 20,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 9,
+            "w": 24,
+            "h": 9,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID8604610",
+          "type": "h-bar",
+          "title": "Top 20 source ASN (Volume)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT src_asn_autonomous_system_organization as \"x_axis_1\", sum(bytes) as \"y_axis_2\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1 ORDER BY y_axis_2 DESC LIMIT 20",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "src_asn_autonomous_system_organization",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": " ",
+                    "alias": "y_axis_2",
+                    "column": "bytes",
+                    "color": "#c23531",
+                    "aggregationFunction": "sum",
+                    "sortBy": "DESC"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 20,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 0,
+            "w": 24,
+            "h": 9,
+            "i": 3
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID4893110",
+          "type": "h-bar",
+          "title": "Top 20 destination ASN (Volume)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT dst_asn_autonomous_system_organization as \"x_axis_1\", sum(bytes) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1 ORDER BY y_axis_1 DESC LIMIT 20",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "dst_asn_autonomous_system_organization",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": " ",
+                    "alias": "y_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum",
+                    "sortBy": "DESC"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 20,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 9,
+            "w": 24,
+            "h": 9,
+            "i": 4
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "98846",
+      "name": "AWS Networking",
+      "panels": [
+        {
+          "id": "Panel_ID3322710",
+          "type": "donut",
+          "title": "overall",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "right",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT interface_id as \"x_axis_1\", sum(bytes) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1 ORDER BY y_axis_1 DESC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Interface Id",
+                    "alias": "x_axis_1",
+                    "column": "interface_id",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Bytes",
+                    "alias": "y_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum",
+                    "sortBy": "DESC"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 9,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID6916210",
+          "type": "line",
+          "title": "AZ traffic",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes",
+            "decimals": 2,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", az_id as \"x_axis_2\", sum(bytes) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1, x_axis_2 ORDER BY x_axis_1 ASC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Az Id",
+                    "alias": "x_axis_2",
+                    "column": "az_id",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": " ",
+                    "alias": "y_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 0,
+            "w": 24,
+            "h": 9,
+            "i": 4
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID26110",
+          "type": "donut",
+          "title": "subnet traffic",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "right",
+            "unit": "bytes",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT subnet_id as \"x_axis_1\", sum(bytes) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Subnet Id",
+                    "alias": "x_axis_1",
+                    "column": "subnet_id",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Bytes",
+                    "alias": "y_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 9,
+            "w": 24,
+            "h": 9,
+            "i": 6
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "20296",
+      "name": "Protocols",
+      "panels": [
+        {
+          "id": "Panel_ID3430110",
+          "type": "stacked",
+          "title": "Packets transferred (TCP)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", protocol as \"x_axis_2\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id' and protocol IN ('TCP') GROUP BY x_axis_1, x_axis_2 ORDER BY x_axis_1 ASC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Protocol",
+                    "alias": "x_axis_2",
+                    "column": "protocol",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets",
+                    "alias": "y_axis_1",
+                    "column": "packets",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": [
+                  {
+                    "type": "list",
+                    "values": [
+                      "TCP"
+                    ],
+                    "column": "protocol",
+                    "operator": null,
+                    "value": null
+                  }
+                ]
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 16,
+            "h": 9,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID2505310",
+          "type": "stacked",
+          "title": "Packets transferred (UDP)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", protocol as \"x_axis_2\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id' and protocol IN ('UDP') GROUP BY x_axis_1, x_axis_2 ORDER BY x_axis_1 ASC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Protocol",
+                    "alias": "x_axis_2",
+                    "column": "protocol",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets",
+                    "alias": "y_axis_1",
+                    "column": "packets",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": [
+                  {
+                    "type": "list",
+                    "values": [
+                      "UDP"
+                    ],
+                    "column": "protocol",
+                    "operator": null,
+                    "value": null
+                  }
+                ]
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 16,
+            "y": 0,
+            "w": 16,
+            "h": 9,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID3493910",
+          "type": "stacked",
+          "title": "Packets transferred (ICMP)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", protocol as \"x_axis_2\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id' and protocol IN ('ICMP') GROUP BY x_axis_1, x_axis_2 ORDER BY x_axis_1 ASC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Protocol",
+                    "alias": "x_axis_2",
+                    "column": "protocol",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets",
+                    "alias": "y_axis_1",
+                    "column": "packets",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": [
+                  {
+                    "type": "list",
+                    "values": [
+                      "ICMP"
+                    ],
+                    "column": "protocol",
+                    "operator": null,
+                    "value": null
+                  }
+                ]
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 32,
+            "y": 0,
+            "w": 16,
+            "h": 9,
+            "i": 3
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID9018910",
+          "type": "stacked",
+          "title": "Packets transferred (Others)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", protocol as \"x_axis_2\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id' and protocol not IN ('TCP', 'UDP', 'ICMP') GROUP BY x_axis_1, x_axis_2 ORDER BY x_axis_1 ASC",
+              "customQuery": true,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "x_axis_1",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Protocol",
+                    "alias": "x_axis_2",
+                    "column": "x_axis_2",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": null,
+                    "aggregationFunction": "count"
+                  }
+                ],
+                "z": [],
+                "filter": [
+                  {
+                    "type": "list",
+                    "values": [
+                      "TCP",
+                      "UDP"
+                    ],
+                    "column": "protocol",
+                    "operator": null,
+                    "value": null
+                  }
+                ]
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 9,
+            "w": 16,
+            "h": 8,
+            "i": 4
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID8416010",
+          "type": "gauge",
+          "title": "Packets transferred",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT protocol as \"x_axis_2\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_2",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Protocol",
+                    "alias": "x_axis_2",
+                    "column": "protocol",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets",
+                    "alias": "y_axis_1",
+                    "column": "packets",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 16,
+            "y": 9,
+            "w": 16,
+            "h": 8,
+            "i": 5
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID5021810",
+          "type": "donut",
+          "title": "Traffic by protocol",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT protocol as \"x_axis_1\", sum(packets) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id' GROUP BY x_axis_1",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Protocol",
+                    "alias": "x_axis_1",
+                    "column": "protocol",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Packets",
+                    "alias": "y_axis_1",
+                    "column": "packets",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": [
+                  {
+                    "type": "condition",
+                    "values": [],
+                    "column": "account_id",
+                    "operator": "=",
+                    "value": "'$account_id'"
+                  },
+                  {
+                    "type": "condition",
+                    "values": [],
+                    "column": "region",
+                    "operator": "=",
+                    "value": "'$region'"
+                  },
+                  {
+                    "type": "condition",
+                    "values": [],
+                    "column": "vpc_id",
+                    "operator": "=",
+                    "value": "'$vpc_id'"
+                  }
+                ]
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 32,
+            "y": 9,
+            "w": 16,
+            "h": 8,
+            "i": 6
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "54370",
+      "name": "AWS services",
+      "panels": [
+        {
+          "id": "Panel_ID2616610",
+          "type": "stacked",
+          "title": "src service",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", pkt_src_aws_service as \"x_axis_2\", sum(bytes) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1, x_axis_2 ORDER BY x_axis_1 ASC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Pkt Src Aws Service",
+                    "alias": "x_axis_2",
+                    "column": "pkt_src_aws_service",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": " ",
+                    "alias": "y_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 9,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID8242410",
+          "type": "stacked",
+          "title": "destination service",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes",
+            "decimals": 0,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "connect_nulls": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", pkt_dst_aws_service as \"x_axis_2\", sum(bytes) as \"y_axis_1\"  FROM \"vpcflowlog\" WHERE account_id = '$account_id' AND region = '$region' AND vpc_id = '$vpc_id'  GROUP BY x_axis_1, x_axis_2 ORDER BY x_axis_1 ASC",
+              "customQuery": false,
+              "fields": {
+                "stream": "vpcflowlog",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": " ",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Pkt Dst Aws Service",
+                    "alias": "x_axis_2",
+                    "column": "pkt_dst_aws_service",
+                    "color": null
+                  }
+                ],
+                "y": [
+                  {
+                    "label": " ",
+                    "alias": "y_axis_1",
+                    "column": "bytes",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum"
+                  }
+                ],
+                "z": [],
+                "filter": []
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 0,
+            "w": 24,
+            "h": 9,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "account_id",
+        "label": "",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "vpcflowlog",
+          "field": "account_id",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      },
+      {
+        "type": "query_values",
+        "name": "region",
+        "label": "",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "vpcflowlog",
+          "field": "region",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      },
+      {
+        "type": "query_values",
+        "name": "vpc_id",
+        "label": "",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "vpcflowlog",
+          "field": "vpc_id",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      }
+    ],
+    "showDynamicFilters": true
+  }
+}
