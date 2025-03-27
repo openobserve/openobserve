@@ -88,21 +88,24 @@ struct URLDetails {
 
 #[inline]
 fn is_querier_route(path: &str) -> bool {
-    let segments = path
-        .split('/')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>();
-
     QUERIER_ROUTES.iter().any(|(route, skip_segments)| {
-        // check if we have enough segments
-        if segments.len() <= *skip_segments {
-            return false;
+        if path.contains(route) {
+            let segments = path
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>();
+            // check if we have enough segments
+            if segments.len() <= *skip_segments {
+                return false;
+            }
+            let route_part = segments[*skip_segments..].join("/");
+            route_part.starts_with(route)
+                && INGESTER_ROUTES
+                    .iter()
+                    .all(|ingest_route| !route_part.ends_with(ingest_route))
+        } else {
+            false
         }
-        let route_part = segments[*skip_segments..].join("/");
-        route_part.starts_with(route)
-            && INGESTER_ROUTES
-                .iter()
-                .all(|ingest_route| !route_part.ends_with(ingest_route))
     })
 }
 
