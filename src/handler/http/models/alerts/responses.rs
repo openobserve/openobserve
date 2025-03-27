@@ -44,6 +44,7 @@ pub struct ListAlertsResponseBodyItem {
     pub enabled: bool,
     pub last_triggered_at: Option<i64>,
     pub last_satisfied_at: Option<i64>,
+    pub is_real_time: bool,
 }
 
 /// HTTP response body for `EnableAlert` endpoint.
@@ -101,6 +102,7 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             enabled: alert.enabled,
             last_triggered_at,
             last_satisfied_at,
+            is_real_time: alert.is_real_time,
         })
     }
 }
