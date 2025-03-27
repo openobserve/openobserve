@@ -188,7 +188,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .long("mode")
                         .required(true)
                         .default_value("file_size")
-                        .help("mode: file_size, file_time, without_sort"),
+                        .help("mode: file_size, file_time, time_range"),
                     clap::Arg::new("stream")
                         .short('s')
                         .long("stream")

@@ -42,7 +42,7 @@ pub async fn file_list(
     let groups = match mode.as_str() {
         "file_size" => group_by_file_size(file_list, group_size),
         "file_time" => group_by_file_time(file_list, group_size),
-        "without_sort" => group_by_without_sort(file_list, group_size),
+        "time_range" => group_by_time_range(file_list, group_size),
         _ => {
             return Err(anyhow::anyhow!("unsupported mode: {mode}"));
         }
@@ -91,7 +91,7 @@ fn group_by_file_time(mut file_list: Vec<FileKey>, group_size: i64) -> Vec<Vec<F
     groups
 }
 
-fn group_by_without_sort(mut file_list: Vec<FileKey>, group_size: i64) -> Vec<Vec<FileKey>> {
+fn group_by_time_range(mut file_list: Vec<FileKey>, group_size: i64) -> Vec<Vec<FileKey>> {
     // first group file by non-overlapping
     file_list.sort_by_key(|f| f.meta.min_ts);
     let mut groups: Vec<Vec<FileKey>> = Vec::new();
