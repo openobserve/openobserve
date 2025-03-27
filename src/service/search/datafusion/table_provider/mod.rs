@@ -342,8 +342,9 @@ impl TableProvider for NewListingTable {
                     partitioned_file_lists = new_groups;
                 }
                 Ordering::Greater => {
-                    partitioned_file_lists =
-                        repartition_sorted_groups(new_groups, self.options.target_partitions);
+                    // partitioned_file_lists =
+                    //     repartition_sorted_groups(new_groups, self.options.target_partitions);
+                    partitioned_file_lists = new_groups;
                 }
                 Ordering::Less => {
                     log::debug!(
@@ -357,6 +358,11 @@ impl TableProvider for NewListingTable {
                 log::debug!("did't set split_file_groups_by_statistics");
             } // no ordering required
         };
+
+        log::debug!(
+            "after partition, file groups: {}",
+            partitioned_file_lists.len()
+        );
 
         // extract types of partition columns
         let table_partition_cols = self

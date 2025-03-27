@@ -1396,7 +1396,7 @@ pub struct Compact {
     pub interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
     pub old_data_interval: u64,
-    #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")] // file_size, file_time
+    #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")] // file_size, file_time, time_range
     pub strategy: String,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
