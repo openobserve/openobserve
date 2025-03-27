@@ -374,7 +374,9 @@ test.describe("dashboard Import testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   });
 
-  test("should import the 'Azure Loadblance' dashbaord using URL import", async ({ page }) => {
+  test("should import the 'Azure Loadblance' dashbaord using URL import", async ({
+    page,
+  }) => {
     // Set up listener to catch console errors
     let errorMessage = "";
     page.on("console", (msg) => {
@@ -406,7 +408,6 @@ test.describe("dashboard Import testcases", () => {
     //is used for setting the file to be importedad
     await page.getByRole("button", { name: "Import" }).click();
 
-
     await expect(
       page.getByRole("cell", { name: "Azure Loadblancer" }).first()
     ).toBeVisible();
@@ -420,7 +421,9 @@ test.describe("dashboard Import testcases", () => {
     expect(errorMessage).toBe("");
   });
 
-  test("should import the 'Kubernetes _ Compute Resources _ Cluster' dashbaord using URL import", async ({ page }) => {
+  test("should import the 'Kubernetes _ Compute Resources _ Cluster' dashbaord using URL import", async ({
+    page,
+  }) => {
     // Set up listener to catch console errors
     let errorMessage = "";
     page.on("console", (msg) => {
@@ -446,7 +449,9 @@ test.describe("dashboard Import testcases", () => {
     await page.waitForTimeout(3000);
 
     await expect(
-      page.getByRole("cell", { name: "Kubernetes / Compute Resources / Cluster" }).first()
+      page
+        .getByRole("cell", { name: "Kubernetes / Compute Resources / Cluster" })
+        .first()
     ).toBeVisible();
     await page
       .getByRole("row", { name: "01 Kubernetes / Compute Resources / Cluster" })
