@@ -27,10 +27,13 @@ use config::{
         stream::StreamType,
     },
     metrics,
-    utils::{base64, json},
+    utils::{
+        base64, json,
+        time::{BASE_TIME, now_micros},
+    },
 };
 use hashbrown::HashMap;
-use infra::{cache::stats, errors};
+use infra::errors;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
@@ -773,14 +776,9 @@ async fn values_v1(
     let size = query
         .get("size")
         .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
-    // If this is a enrichment table, we need to get the start_time and end_time from the stats
-    let stats = if stream_type.eq(&StreamType::EnrichmentTables) {
-        Some(stats::get_stream_stats(org_id, stream_name, stream_type))
-    } else {
-        None
-    };
+    // EnrichmentTable need query without time range
     let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
-        stats.as_ref().unwrap().doc_time_min
+        BASE_TIME.timestamp_micros()
     } else {
         query
             .get("start_time")
@@ -791,7 +789,7 @@ async fn values_v1(
         return Ok(MetaHttpResponse::bad_request("start_time is empty"));
     }
     let end_time = if stream_type.eq(&StreamType::EnrichmentTables) {
-        stats.as_ref().unwrap().doc_time_max
+        now_micros()
     } else {
         query
             .get("end_time")
