@@ -66,15 +66,11 @@ test.describe("dashboard Import testcases", () => {
       );
 
     await page.waitForTimeout(2000);
-    // await page.waitForSelector('.table-row'); // adjust selector as needed
-    await expect(
-      page
-        .getByRole("code")
-        .locator("div")
-        .filter({ hasText: '"dashboardId": "' })
-        .nth(4)
-    ).toBeVisible();
 
+    await expect(
+      page.getByRole("code").filter({ hasText: '"dashboardId": "' })
+    ).toBeVisible();
+  
     //is used for setting the file to be imported
     await page.getByRole("button", { name: "Import" }).click();
 
