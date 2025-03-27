@@ -171,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="t('quota.table')"
                         />
                         <q-tab
+                        :disable=" activeTab == 'role-limits' && !expandedRole"
                         data-test="table-json-type-selection-tab"
                         name="json"
                         :label="t('quota.json')"
@@ -844,6 +845,7 @@ export default defineComponent ({
         };
 
         const switchTab = async (tab: string) => {
+            activeType.value = 'table'
             activeTab.value = tab;
 
             // Load data if needed
