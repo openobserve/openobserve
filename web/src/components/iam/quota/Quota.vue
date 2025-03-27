@@ -769,14 +769,14 @@ export default defineComponent ({
                 ...router.currentRoute.value,
                 query: {
                     ...router.currentRoute.value.query,
-                    quota_org: selectedOrganization.value.value
+                    quota_org: selectedOrganization.value.value.toLowerCase(),
                 }
             })
             if(activeTab.value === "api-limits"){
                 getApiLimitsByOrganization();
             }
             else{
-                getRoleLimitsByOrganization(openedRole.value);
+                getRolesByOrganization();
             }
         }
         const getOrganizations = async () => {
@@ -788,10 +788,6 @@ export default defineComponent ({
                         label: org.name,
                         value: org.identifier
                     }));
-                    organizations.value.unshift({
-                        label: "GLOBAL RULES META",
-                        value: "GLOBAL_RULES_META"
-                    });
                     isOrgLoading.value = false;
                 }
                 catch(error){
@@ -800,6 +796,7 @@ export default defineComponent ({
                 }
                 finally{
                     isOrgLoading.value = false;
+    
                 }
             }
             else{
@@ -807,7 +804,12 @@ export default defineComponent ({
                     label: org.name,
                     value: org.identifier
                 }));
+
             }
+            organizations.value.unshift({
+                label: "GLOBAL RULES META",
+                value: "GLOBAL_RULES_META"
+            });
         }
         const updateActiveTab = (tab: string) => {
             let isChanged = Object.keys(changedValues.value).length > 0;
