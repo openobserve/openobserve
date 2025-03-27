@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-select
         v-model="selectedFolder"
         :label="t('dashboard.selectFolderLabel')"
-        :options="store.state.organizationData.foldersByType[type].map((item: any)=> {return {label: item.name, value: item.folderId}})"
+        :options="store.state.organizationData.foldersByType[type]?.map((item: any)=> {return {label: item.name, value: item.folderId}})"
         :data-test="`${type}-index-dropdown-stream_type`"
         input-debounce="0"
         behavior="menu"
@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import AddFolder from "./AddFolder.vue";
   import { useRoute } from "vue-router";
 import { computed } from "vue";
+import { getFoldersListByType } from "@/utils/commons";
 
   export default defineComponent({
     name: "SelectedFolderDropdown",
@@ -109,7 +110,7 @@ import { computed } from "vue";
         // use activeFolderId if available
         // else use router query if available
         // else use default
-        const activeFolderData = store.state.organizationData.foldersByType[props.type].find(
+        const activeFolderData = store.state.organizationData.foldersByType[props.type]?.find(
           (item: any) =>
             item.folderId === (props.activeFolderId ?? route.query.folder ?? "default")
         );
@@ -136,9 +137,10 @@ import { computed } from "vue";
         return props.style ? props.style : 'height: 42px';
       });
 
-      onActivated(() => {
+      onActivated(async () => {
         // refresh selected folder
         selectedFolder.value = getInitialFolderValue();
+        await getFoldersListByType(store, props.type);
       });
 
       watch(
