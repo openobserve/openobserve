@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="t('quota.table')"
                         />
                         <q-tab
-                        :disable=" activeTab == 'role-limits' && !expandedRole"
+                        :disable=" activeTab == 'role-limits' && !expandedRow"
                         data-test="table-json-type-selection-tab"
                         name="json"
                         :label="t('quota.json')"
@@ -190,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter-method="filteredData"
             v-if="activeTab == 'api-limits' && activeType == 'table'"
             dense
+            class="q-mx-md"
         >
         <template v-slot:header="props">
             <q-tr  :props="props" class="thead-sticky ">
