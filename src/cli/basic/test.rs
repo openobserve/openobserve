@@ -65,6 +65,9 @@ fn group_by_file_size(mut file_list: Vec<FileKey>, group_size: i64) -> Vec<Vec<F
         current_size += file.meta.original_size;
         current_group.push(file);
     }
+    if !current_group.is_empty() {
+        groups.push(current_group);
+    }
     groups
 }
 
@@ -81,6 +84,9 @@ fn group_by_file_time(mut file_list: Vec<FileKey>, group_size: i64) -> Vec<Vec<F
         }
         current_size += file.meta.original_size;
         current_group.push(file);
+    }
+    if !current_group.is_empty() {
+        groups.push(current_group);
     }
     groups
 }
