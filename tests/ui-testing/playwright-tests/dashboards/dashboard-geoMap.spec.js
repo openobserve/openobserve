@@ -1,45 +1,22 @@
 import { test, expect } from "../baseFixtures.js";
 import { login } from "../utils/dashLogin.js";
 import geoMapdata from "../../../test-data/geo_map.json";
-
 import {
   waitForDashboardPage,
   applyQueryButton,
   deleteDashboard,
 } from "../utils/dashCreation.js";
 
-const randomDashboardName =
-  "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
-test.describe.configure({ mode: "parallel" });
-
-test.describe("dashboard filter testcases", () => {
-  test.beforeEach(async ({ page }) => {
-    console.log("running before each");
-    await login(page);
-    await page.waitForTimeout(1000);
-    await ingestion(page);
-    await page.waitForTimeout(2000);
-
-    const orgNavigation = page.goto(
-      `${geoMapdata.geoMapdataUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
-    await orgNavigation;
-  });
-
-
-
-
-  
 // ingestion.js
 
 // Exported function to remove UTF characters
-// const removeUTFCharacters = (text) => {
+const removeUTFCharacters = (text) => {
 
-//     // console.log(text, "tex");
-//    // Remove UTF characters using regular expression
-//  return text.replace(/[^\x00-\x7F]/g, " ");
-// };
+    // console.log(text, "tex");
+   // Remove UTF characters using regular expression
+ return text.replace(/[^\x00-\x7F]/g, " ");
+};
 
 // Function to retrieve authentication token (to be implemented securely)
 const getAuthToken = async () => {
@@ -82,6 +59,27 @@ const ingestion = async (page, streamName = "geojson") => {
    throw error;
  }
 };
+
+
+const randomDashboardName =
+  "Dashboard_" + Math.random().toString(36).substr(2, 9);
+
+test.describe.configure({ mode: "parallel" });
+
+test.describe("dashboard filter testcases", () => {
+  test.beforeEach(async ({ page }) => {
+    console.log("running before each");
+    await login(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page);
+    await page.waitForTimeout(2000);
+
+    const orgNavigation = page.goto(
+      `${geoMapdata.geoMapdataUrl}?org_identifier=${process.env["ORGNAME"]}`
+    );
+    await orgNavigation;
+  });
+
 
 
 
