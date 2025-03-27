@@ -209,6 +209,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:body-cell="props">
             <q-td  :props="props" v-if="editTable" 
+            :style="{
+                    backgroundColor: editTable && props.col.name !== 'module_name' ? store.state.theme === 'dark' ? '#212121' : '#f1f1ee' : 'transparent',
+                    }"
              >
                 <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'" contenteditable="true"
                 debounce="500"
@@ -338,7 +341,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
      </q-tr>
      <q-tr v-if="editTable && !roleLevelLoading" v-for="(row,index) in filteredRoleLevelModuleRows" data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.uuid" :props="props" >
-            <q-td :props="props" 
+            <q-td
+            :style="{
+                    backgroundColor: editTable && col.name !== 'role_name' ? store.state.theme === 'dark' ? '#212121' : '#f1f1ee' : 'transparent',
+                    }"
+
+            
+             :props="props" 
                  v-for="col in props.cols" :key="col.name" 
                   v-if="editTable"
                   style="padding-left: 8px ;">
@@ -830,7 +839,7 @@ export default defineComponent ({
                 await getRolesByOrganization();
                 await getModulesToDisplay();
             }
-            if (tab === "api-limits" && apiLimitsRows.value.length === 0) {
+            if (tab === "api-limits") {
                 await getApiLimitsByOrganization();
             }
         };
@@ -1158,11 +1167,14 @@ export default defineComponent ({
     };
 
     const cancelChanges = () => {
+        console.log('cancelChanges')
         changedValues.value = {};
         editTable.value = false;
     };
 
     const cancelJsonChanges = () => {
+        console.log('cancelJsonChanges')
+        changedValues.value = {};
         editTable.value = false;
     };
 
@@ -1443,15 +1455,29 @@ export default defineComponent ({
     }, {});
 };
     const updateActiveType = (type: string) => {
-        let isChanged = Object.keys(changedValues.value).length > 0;
-        if(isChanged){
-            nextType.value = type.toLowerCase();
-            showConfirmDialogTypeSwitch.value = true;
+        if(type == 'json'){
+            let isChanged = Object.keys(changedValues.value).length > 0;
+            if(isChanged){
+                nextType.value = type.toLowerCase();
+                showConfirmDialogTypeSwitch.value = true;
+            }
+            else{
+                activeType.value = type.toLowerCase();
+                editTable.value = false
+                populateJsonStr();
+            }
         }
         else{
-            activeType.value = type.toLowerCase();
-            editTable.value = false
-            populateJsonStr();
+            let isChanged = jsonDiff(jsonStrToDisplay.value, transformData(apiLimitsRows.value));
+            console.log(isChanged,'isChanged')
+            if(isChanged){
+                nextType.value = type.toLowerCase();
+                showConfirmDialogTypeSwitch.value = true;
+            }
+            else{
+                activeType.value = type.toLowerCase();
+                editTable.value = false
+            }
         }
     }
 
@@ -1470,14 +1496,19 @@ export default defineComponent ({
         showConfirmDialogTypeSwitch.value = false;
         activeType.value = nextType.value;
         nextType.value = null;
+        changedValues.value = {};
     }
     const discardChangesTypeSwitch = () => {
         showConfirmDialogTypeSwitch.value = false;
         activeType.value = nextType.value;
         nextType.value = null;
         editTable.value = false
+        changedValues.value = {};
         populateJsonStr();
     }
+    const jsonDiff = (oldJson: any, newJson: any): boolean => {
+        return JSON.stringify(oldJson) !== JSON.stringify(newJson);
+    };
         return {
             t,
             selectedOrganization,
@@ -1620,10 +1651,9 @@ export default defineComponent ({
 .light-theme-page {
     .editable-cell {
         padding: 0px 10px;
-        background-color: #ebebe6;
+        background-color: #f1f1ee;
     }
     .edited-cell {
-        background-color: #EBECF6;
         padding-left: 8px !important; // light blue color
     }
     .edited-input {
@@ -1641,10 +1671,8 @@ export default defineComponent ({
 .dark-theme-page {
     .editable-cell {
         padding: 0px 10px;
-        background-color: rgba(255, 255, 255, 0.05);
     }
     .edited-cell {
-        background-color: #777883; // light blue color
         padding-left: 8px !important;
     }
     .edited-input {
