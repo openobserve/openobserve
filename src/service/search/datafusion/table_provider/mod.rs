@@ -85,6 +85,7 @@ pub(crate) struct NewListingTable {
     collected_statistics: FileStatisticsCache,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
+    need_optimize_partition: bool,
 }
 
 impl NewListingTable {
@@ -102,6 +103,7 @@ impl NewListingTable {
         rules: HashMap<String, DataType>,
         index_condition: Option<IndexCondition>,
         fst_fields: Vec<String>,
+        need_optimize_partition: bool,
     ) -> Result<Self> {
         let file_schema = config
             .file_schema
@@ -126,6 +128,7 @@ impl NewListingTable {
             collected_statistics: Arc::new(DefaultFileStatisticsCache::default()),
             index_condition,
             fst_fields,
+            need_optimize_partition,
         };
 
         Ok(table)
@@ -342,9 +345,12 @@ impl TableProvider for NewListingTable {
                     partitioned_file_lists = new_groups;
                 }
                 Ordering::Greater => {
-                    // partitioned_file_lists =
-                    //     repartition_sorted_groups(new_groups, self.options.target_partitions);
-                    partitioned_file_lists = new_groups;
+                    if self.need_optimize_partition {
+                        partitioned_file_lists =
+                            repartition_sorted_groups(new_groups, self.options.target_partitions);
+                    } else {
+                        partitioned_file_lists = new_groups;
+                    }
                 }
                 Ordering::Less => {
                     log::debug!(
