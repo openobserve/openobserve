@@ -2,31 +2,41 @@ import http from "./http";
 
 const rate_limit = {
     getApiLimits: (org_identifier: string) => {
-        const url = `/api/${org_identifier}/ratelimit/module_list`;
+        let url = `/api/_meta/ratelimit/module_list`;
+        if(org_identifier){
+            url += `?org_id=${org_identifier}`;
+        }
         return http().get(url);
     },
     getRoleLimits: (org_identifier: string, role_name: string) => {
-        const url = `/api/${org_identifier}/ratelimit/role_list/${role_name}`;
+        let url = `/api/_meta/ratelimit/role_list?user_role=${role_name}&org_id=${org_identifier}`;
         return http().get(url);
     },
     update_batch: (org_identifier: string, data: any, update_type?: string, user_role?: string) => {
-        console.log(update_type,'update_type')
-        console.log(user_role,'user_role')
-        let url = `/api/${org_identifier}/ratelimit/update`;
+        let url = `/api/_meta/ratelimit/update`;
         if(update_type){
             url += `?update_type=${update_type}`;
         }
         if(user_role){
             url += `&user_role=${user_role}`;
         }
+        if(org_identifier){
+            url += `&org_id=${org_identifier}`;
+        }
         return http().put(url, data);
     },
     download_template: (org_identifier: string) => {
-        const url = `/api/${org_identifier}/ratelimit/download_template`;
+        let url = `/api/_meta/ratelimit/download_template`;
+        if(org_identifier){
+            url += `?org_id=${org_identifier}`;
+        }
         return http().get(url);
     },
     upload_template: (org_identifier: string, file: any) => {
-        const url = `/api/${org_identifier}/ratelimit/upload`;
+        let url = `/api/_meta/ratelimit/upload`;
+        if(org_identifier){
+            url += `?org_id=${org_identifier}`;
+        }
         const formData = new FormData();
         formData.append('rules', JSON.stringify(file));
         return http().put(url, formData, {
@@ -36,7 +46,10 @@ const rate_limit = {
         });
     },
     getModules: (org_identifier: string) => {
-        const url = `/api/${org_identifier}/ratelimit/api_modules`;
+        let url = `/api/_meta/ratelimit/api_modules`;
+        if(org_identifier){
+            url += `?org_id=${org_identifier}`;
+        }
         return http().get(url);
     }
     

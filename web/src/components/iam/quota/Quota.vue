@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
             </template>
         </q-table>
-        <div class="q-mt-md" v-if="activeTab == 'api-limits'  && activeType == 'json'" style="height: calc(100vh - 190px); ">
+        <div class="q-mt-md" v-if="activeTab == 'api-limits'  && activeType == 'json'" style="height: calc(100vh - 245px); ">
            <!-- here add the queryeditor -->
            <query-editor
                 data-test="json-view-roles-editor"
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
       </q-table>
-      <div class="q-mt-md" v-if="activeTab == 'role-limits' && activeType == 'json'" style="height: calc(100vh - 140px);">
+      <div class="q-mt-md" v-if="activeTab == 'role-limits' && activeType == 'json'" style="height: calc(100vh - 245px);">
            <!-- here add the queryeditor -->
            <query-editor
                 data-test="json-view-roles-editor"
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="saveChanges"
             />
         </div>
-        <div class="flex justify-end w-full tw-ml-auto floating-buttons  q-pr-md"
+        <div class="flex justify-end w-full tw-ml-auto floating-buttons  q-pr-md q-mt-md"
             v-if="editTable && activeType == 'json'"
             >
             <q-btn
@@ -429,14 +429,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border q-ml-md title-height"
             no-caps
             @click="cancelJsonChanges"
+            :disable="isSavingJson"
             />
             <q-btn
-            label="Save Changes"
+            :label="isSavingJson ? 'Saving Changes...' : 'Save Changes'"
             class="text-bold no-border q-ml-md"
                 color="secondary"
                 padding="sm md"
                 no-caps
             @click="saveJsonChanges"
+            :disable="isSavingJson"
+
             />
         </div>
         
@@ -726,6 +729,7 @@ export default defineComponent ({
         const jsonStrToDisplay = ref<string>("");
         const nextType = ref<string | null>(null);
         const showConfirmDialogTypeSwitch = ref(false);
+        const isSavingJson = ref<boolean>(false);
 
 
         onMounted(async ()=>{
@@ -784,6 +788,10 @@ export default defineComponent ({
                         label: org.name,
                         value: org.identifier
                     }));
+                    organizations.value.unshift({
+                        label: "GLOBAL RULES META",
+                        value: "GLOBAL_RULES_META"
+                    });
                     isOrgLoading.value = false;
                 }
                 catch(error){
@@ -1158,6 +1166,7 @@ export default defineComponent ({
 
     const saveJsonChanges = async () => {
         try {
+            isSavingJson.value = true;
             let user_role = expandedRole.value;
             const payload = JSON.parse(jsonStrToDisplay.value);
             let response  = null;
@@ -1182,9 +1191,11 @@ export default defineComponent ({
                 await getApiLimitsByOrganization();
             }
             else{
-                // await getRoleLimitsByOrganization(openedRole.value);
+                await getRoleLimitsByOrganization(openedRole.value);
             }
+            isSavingJson.value = false;
     } catch (error: any) {
+        isSavingJson.value = false;
         $q.notify({
             type: "negative",
             message: error.response.data.message || "Error while updating rate limits rule",
@@ -1543,7 +1554,9 @@ export default defineComponent ({
             discardChangesTypeSwitch,
             saveJsonChanges,
             cancelJsonChanges,
+            isSavingJson,
         }
+
     }
 })
 </script>
