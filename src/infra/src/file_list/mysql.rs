@@ -163,6 +163,36 @@ impl super::FileList for MysqlFileList {
         Ok(())
     }
 
+    async fn batch_remove_by_ids(&self, ids: &[i64]) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let pool = CLIENT.clone();
+
+        for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
+            if chunk.is_empty() {
+                continue;
+            }
+            let ids = chunk
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(",");
+            let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
+            DB_QUERY_NUMS
+                .with_label_values(&["delete_by_ids", "file_list"])
+                .inc();
+            let start = std::time::Instant::now();
+            let res = sqlx::query(&query_str).fetch_all(&pool).await;
+            let time = start.elapsed().as_secs_f64();
+            DB_QUERY_TIME
+                .with_label_values(&["delete_by_ids", "file_list"])
+                .observe(time);
+            res?;
+        }
+        Ok(())
+    }
+
     async fn batch_add_deleted(
         &self,
         org_id: &str,
@@ -1261,7 +1291,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             .with_label_values(&["update", "file_list_jobs", ""])
             .inc();
         let sql = format!(
-            "UPDATE file_list_jobs SET status = ?, updated_at = ? WHERE id IN ({});",
+            "UPDATE file_list_jobs SET status = ?, updated_at = ?, dumped = ? WHERE id IN ({});",
             ids.iter()
                 .map(|id| id.to_string())
                 .collect::<Vec<_>>()
@@ -1270,6 +1300,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         sqlx::query(&sql)
             .bind(super::FileListJobStatus::Done)
             .bind(config::utils::time::now_micros())
+            .bind(false)
             .execute(&pool)
             .await?;
         Ok(())
@@ -1318,11 +1349,14 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         DB_QUERY_NUMS
             .with_label_values(&["delete", "file_list_jobs", ""])
             .inc();
-        let ret = sqlx::query(r#"DELETE FROM file_list_jobs WHERE status = ? AND updated_at < ?;"#)
-            .bind(super::FileListJobStatus::Done)
-            .bind(before_date)
-            .execute(&pool)
-            .await?;
+        let ret = sqlx::query(
+            r#"DELETE FROM file_list_jobs WHERE status = ? AND updated_at < ? AND dumped  = ?;"#,
+        )
+        .bind(super::FileListJobStatus::Done)
+        .bind(before_date)
+        .bind(true)
+        .execute(&pool)
+        .await?;
         if ret.rows_affected() > 0 {
             log::warn!("[MYSQL] clean done jobs");
         }
@@ -1368,6 +1402,8 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
 
     async fn get_entries_in_range(
         &self,
+        org: &str,
+        stream: &str,
         time_start: i64,
         time_end: i64,
     ) -> Result<Vec<super::FileRecord>> {
@@ -1394,13 +1430,17 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         let mut tasks = Vec::with_capacity(day_partitions.len());
 
         for (time_start, time_end) in day_partitions {
+            let o = org.to_string();
+            let s = stream.to_string();
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT.clone();
-
-                let query = "SELECT * FROM file_list WHERE  max_ts >= ? AND min_ts <= ?;";
+                let query = "SELECT * FROM file_list WHERE  max_ts >= ? AND min_ts <= ? AND org = ? AND stream = ? AND deleted = ?;";
                 sqlx::query_as::<_, super::FileRecord>(query)
                     .bind(time_start)
                     .bind(time_end)
+                    .bind(o)
+                    .bind(s)
+                    .bind(false)
                     .fetch_all(&pool)
                     .await
             }));
@@ -1420,6 +1460,41 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         }
 
         Ok(rets)
+    }
+
+    async fn get_pending_dump_jobs(&self) -> Result<Vec<(i64, String, String, i64)>> {
+        let pool = CLIENT_RO.clone();
+
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "file_list_jobs"])
+            .inc();
+        let ret = sqlx::query_as::<_, (i64,String, String, i64)>(
+            r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = ? AND dumped = ? ORDER BY offsets ASC"#,
+        )
+        .bind(super::FileListJobStatus::Done)
+        .bind(false)
+        .fetch_all(&pool)
+        .await?;
+
+        let mut pending: Vec<(i64, String, String, i64)> = Vec::new();
+
+        for (id, org, stream, offset) in ret.iter() {
+            pending.push((*id, org.to_string(), stream.to_string(), *offset));
+        }
+
+        Ok(pending)
+    }
+    async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()> {
+        let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "file_list_jobs"])
+            .inc();
+        sqlx::query(r#"UPDATE file_list_jobs SET dumped = ? WHERE id = ?;"#)
+            .bind(dumped)
+            .bind(id)
+            .execute(&pool)
+            .await?;
+        Ok(())
     }
 }
 
