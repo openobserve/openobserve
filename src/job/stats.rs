@@ -58,7 +58,7 @@ async fn file_list_update_stats() -> Result<(), anyhow::Error> {
 }
 
 async fn cache_stream_stats() -> Result<(), anyhow::Error> {
-    if !LOCAL_NODE.is_querier() {
+    if !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
 
@@ -67,7 +67,18 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
         300,
         get_config().limit.calculate_stats_interval,
     )));
-    interval.tick().await; // trigger the first run
+
+    #[cfg(feature = "enterprise")]
+    let need_wait_one_around = o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let need_wait_one_around = false;
+    if need_wait_one_around {
+        // wait one around to make sure the dependent models are ready
+        interval.tick().await;
+    }
+
     loop {
         interval.tick().await;
         if let Err(e) = db::file_list::cache_stats().await {

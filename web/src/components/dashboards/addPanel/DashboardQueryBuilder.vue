@@ -716,6 +716,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rules="[(val: any) => val.length > 0 || 'Required']"
                     />
                     <div
+                      style="width: 100%"
+                      class="tw-mb-2"
+                      v-if="dashboardPanelData.data.type != 'heatmap'"
+                    >
+                      <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
+
+                      <q-btn
+                        dense
+                        outline
+                        color="primary"
+                        icon="add"
+                        label="Add"
+                        @click="toggleHavingFilter(index, 'y')"
+                        v-if="!isHavingFilterVisible(index, 'y')"
+                      />
+
+                      <div
+                        class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
+                        v-if="isHavingFilterVisible(index, 'y')"
+                      >
+                        <q-select
+                          dense
+                          filled
+                          v-model="getHavingCondition(index, 'y').operator"
+                          :options="operators"
+                          style="width: 30%"
+                        />
+
+                        <q-input
+                          dense
+                          filled
+                          v-model.number="getHavingCondition(index, 'y').value"
+                          style="width: 50%"
+                          type="number"
+                          placeholder="Value"
+                        />
+
+                        <q-btn
+                          dense
+                          flat
+                          icon="close"
+                          @click="cancelHavingFilter(index, 'y')"
+                        />
+                      </div>
+                    </div>
+                    <div
                       v-if="
                         !dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
@@ -910,6 +956,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :rules="[(val: any) => val.length > 0 || 'Required']"
                       />
+                      <div style="width: 100%" class="tw-mb-2">
+                        <span class="tw-block tw-mb-1 tw-font-bold"
+                          >Having</span
+                        >
+
+                        <q-btn
+                          dense
+                          outline
+                          color="primary"
+                          icon="add"
+                          label="Add"
+                          @click="toggleHavingFilter(index, 'z')"
+                          v-if="!isHavingFilterVisible(index, 'z')"
+                        />
+
+                        <div
+                          class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
+                          v-if="isHavingFilterVisible(index, 'z')"
+                        >
+                          <q-select
+                            dense
+                            filled
+                            v-model="getHavingCondition(index, 'z').operator"
+                            :options="operators"
+                            style="width: 30%"
+                          />
+
+                          <q-input
+                            dense
+                            filled
+                            v-model.number="
+                              getHavingCondition(index, 'z').value
+                            "
+                            style="width: 50%"
+                            type="number"
+                            placeholder="Value"
+                          />
+
+                          <q-btn
+                            dense
+                            flat
+                            icon="close"
+                            @click="cancelHavingFilter(index, 'z')"
+                          />
+                        </div>
+                      </div>
                       <div
                         v-if="
                           !dashboardPanelData.data.queries[
@@ -974,7 +1066,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
+import {
+  defineComponent,
+  ref,
+  reactive,
+  watch,
+  computed,
+  inject,
+  nextTick,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -1389,9 +1489,7 @@ export default defineComponent({
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");
-        case "stacked":
         case "heatmap":
-        case "h-stacked":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.oneOrMoreFieldsMessage");
@@ -1454,6 +1552,53 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
+    const operators = ["=", "<>", ">=", "<=", ">", "<"];
+
+    const isHavingFilterVisible = (index: any, axis: any) => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
+
+      const isVisible = !!currentField?.havingConditions?.length;
+      return isVisible;
+    };
+
+    const toggleHavingFilter = async (index: any, axis: any) => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
+
+      if (!currentField.havingConditions) {
+        currentField.havingConditions = [];
+      }
+
+      if (!currentField.havingConditions.length) {
+        currentField.havingConditions.push({ operator: null, value: null });
+      }
+
+      await nextTick();
+    };
+
+    const cancelHavingFilter = async (index: any, axis: any) => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
+
+      currentField.havingConditions = [];
+
+      await nextTick();
+    };
+
+    const getHavingCondition = (index: any, axis: any) => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
+
+      return (
+        currentField.havingConditions?.[0] || { operator: null, value: null }
+      );
+    };
+
     return {
       showXAxis,
       t,
@@ -1502,6 +1647,11 @@ export default defineComponent({
       onFieldDragStart,
       getHistoramIntervalField,
       onDragEnd,
+      operators,
+      isHavingFilterVisible,
+      toggleHavingFilter,
+      cancelHavingFilter,
+      getHavingCondition,
     };
   },
 });

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,8 @@ pub use config::*;
 pub async fn init() -> Result<(), anyhow::Error> {
     // init ider
     ider::init();
+    // init metrics
+    metrics::init();
 
     // initialize chrome launch options, so that if chrome download is
     // needed, it will happen now and not during serving report API

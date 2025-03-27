@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,8 @@ use std::fmt;
 
 use config::meta::destinations as meta_dest;
 use hashbrown::HashMap;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::actions::action_manager::ActionEndpoint;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -45,8 +47,17 @@ impl From<meta_dest::Destination> for Destination {
                     method: endpoint.method,
                     skip_tls_verify: endpoint.skip_tls_verify,
                     headers: endpoint.headers,
+                    #[cfg(feature = "enterprise")]
+                    destination_type: if endpoint.action_id.is_some() {
+                        DestinationType::Action
+                    } else {
+                        DestinationType::Http
+                    },
+                    #[cfg(not(feature = "enterprise"))]
                     destination_type: DestinationType::Http,
                     template: Some(template),
+                    #[cfg(feature = "enterprise")]
+                    action_id: endpoint.action_id,
                     ..Default::default()
                 },
                 meta_dest::DestinationType::Sns(aws_sns) => Self {
@@ -85,12 +96,35 @@ impl Destination {
                             method: self.method,
                             skip_tls_verify: self.skip_tls_verify,
                             headers: self.headers,
+                            action_id: None,
                         })
                     }
                     DestinationType::Sns => meta_dest::DestinationType::Sns(meta_dest::AwsSns {
                         sns_topic_arn: self.sns_topic_arn.ok_or(DestinationError::InvalidSns)?,
                         aws_region: self.aws_region.ok_or(DestinationError::InvalidSns)?,
                     }),
+                    #[cfg(feature = "enterprise")]
+                    DestinationType::Action => {
+                        if let Some(action_id) = self.action_id {
+                            let action_endpoint = ActionEndpoint::new(&org_id, &action_id)
+                                .map_err(DestinationError::InvalidActionId)?;
+                            meta_dest::DestinationType::Http(meta_dest::Endpoint {
+                                url: action_endpoint.url,
+                                method: if action_endpoint.method == reqwest::Method::POST {
+                                    meta_dest::HTTPType::POST
+                                } else {
+                                    meta_dest::HTTPType::GET
+                                },
+                                skip_tls_verify: action_endpoint.skip_tls,
+                                headers: None,
+                                action_id: Some(action_id),
+                            })
+                        } else {
+                            return Err(DestinationError::InvalidActionId(anyhow::anyhow!(
+                                "Action id is required for action destination"
+                            )));
+                        }
+                    }
                 };
                 Ok(meta_dest::Destination {
                     id: None,
@@ -108,6 +142,7 @@ impl Destination {
                     method: self.method,
                     skip_tls_verify: self.skip_tls_verify,
                     headers: self.headers,
+                    action_id: None,
                 };
                 Ok(meta_dest::Destination {
                     id: None,
@@ -144,6 +179,8 @@ impl Template {
             DestinationType::Email => meta_dest::TemplateType::Email { title: self.title },
             DestinationType::Sns => meta_dest::TemplateType::Sns,
             DestinationType::Http => meta_dest::TemplateType::Http,
+            #[cfg(feature = "enterprise")]
+            DestinationType::Action => meta_dest::TemplateType::Http,
         };
         meta_dest::Template {
             id: None,
@@ -175,7 +212,7 @@ pub struct Destination {
     /// Required when `destination_type` is `Email`
     #[serde(default)]
     pub emails: Vec<String>,
-    // New SNS-specific fields
+    // SNS-specific fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sns_topic_arn: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -183,6 +220,10 @@ pub struct Destination {
     #[serde(rename = "type")]
     #[serde(default)]
     pub destination_type: DestinationType,
+    /// Required when `destination_type` is `Action`
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_id: Option<String>,
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]
@@ -192,6 +233,8 @@ pub enum DestinationType {
     Http,
     Email,
     Sns,
+    #[cfg(feature = "enterprise")]
+    Action,
 }
 
 impl From<&str> for DestinationType {
@@ -199,6 +242,8 @@ impl From<&str> for DestinationType {
         match value.to_lowercase().as_str() {
             "email" => DestinationType::Email,
             "sns" => DestinationType::Sns,
+            #[cfg(feature = "enterprise")]
+            "action" => DestinationType::Action,
             _ => DestinationType::Http,
         }
     }
@@ -210,6 +255,8 @@ impl fmt::Display for DestinationType {
             DestinationType::Email => write!(f, "email"),
             DestinationType::Http => write!(f, "http"),
             DestinationType::Sns => write!(f, "sns"),
+            #[cfg(feature = "enterprise")]
+            DestinationType::Action => write!(f, "action"),
         }
     }
 }

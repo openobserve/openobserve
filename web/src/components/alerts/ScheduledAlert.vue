@@ -1372,7 +1372,7 @@ const validateFrequency = (frequency: {
 
     if (frequency.frequency < intervalInMins) {
       cronJobError.value =
-        "Frequency should be greater than " + (intervalInMins - 1);
+        "Minimum frequency should be " + (intervalInMins) + " minutes";
       return;
     }
   }
@@ -1394,7 +1394,7 @@ defineExpose({
   overflow: hidden;
 }
 </style>
-<style lang="scss">
+<style lang="scss" >
 .scheduled-alert-tabs {
   .q-tab--active {
     background-color: $primary;

@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
@@ -42,7 +40,7 @@ pub struct Session {
     pub target_partitions: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct Request {
     #[schema(value_type = SearchQuery)]
@@ -63,7 +61,10 @@ pub struct Request {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub use_cache: Option<bool>, // used for search job,
+    pub use_cache: Option<bool>, // used for search job
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_mode: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -116,6 +117,8 @@ pub struct Query {
     #[serde(default)]
     pub query_fn: Option<String>,
     #[serde(default)]
+    pub action_id: Option<String>,
+    #[serde(default)]
     pub skip_wal: bool,
     // streaming output
     #[serde(default)]
@@ -141,6 +144,7 @@ impl Default for Query {
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
@@ -196,8 +200,8 @@ pub struct Response {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trace_id: String,
     #[serde(default)]
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub function_error: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub function_error: Vec<String>,
     #[serde(default)]
     pub is_partial: bool,
     #[serde(default)]
@@ -262,7 +266,7 @@ impl Response {
             hits: Vec::new(),
             response_type: "".to_string(),
             trace_id: "".to_string(),
-            function_error: "".to_string(),
+            function_error: Vec::new(),
             is_partial: false,
             histogram_interval: None,
             new_start_time: None,
@@ -354,10 +358,12 @@ impl Response {
 
     pub fn set_partial(&mut self, is_partial: bool, msg: String) {
         self.is_partial = is_partial;
-        if self.function_error.is_empty() {
-            self.function_error = msg;
-        } else {
-            self.function_error = format!("{} \n {}", self.function_error, msg);
+        if !msg.is_empty() {
+            if self.function_error.is_empty() {
+                self.function_error = vec![msg];
+            } else {
+                self.function_error.push(msg);
+            }
         }
     }
 
@@ -438,6 +444,7 @@ pub struct SearchPartitionResponse {
     pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
     pub order_by: OrderBy,
+    pub limit: i64,
     pub streaming_output: bool,
     pub streaming_aggs: bool,
     pub streaming_id: Option<String>,
@@ -494,6 +501,7 @@ impl SearchHistoryRequest {
                 track_total_hits: false,
                 uses_zo_fn: false,
                 query_fn: None,
+                action_id: None,
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,
@@ -505,6 +513,7 @@ impl SearchHistoryRequest {
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
             use_cache: None,
+            local_mode: None,
         };
         Ok(search_req)
     }
@@ -693,6 +702,7 @@ impl From<Query> for cluster_rpc::SearchQuery {
             track_total_hits: query.track_total_hits,
             uses_zo_fn: query.uses_zo_fn,
             query_fn: query.query_fn.unwrap_or_default(),
+            action_id: query.action_id.unwrap_or_default(),
             skip_wal: query.skip_wal,
         }
     }
@@ -762,7 +772,7 @@ impl<'de> Deserialize<'de> for SearchEventType {
             where
                 E: serde::de::Error,
             {
-                SearchEventType::from_str(value).map_err(serde::de::Error::custom)
+                SearchEventType::try_from(value).map_err(serde::de::Error::custom)
             }
         }
 
@@ -786,9 +796,9 @@ impl std::fmt::Display for SearchEventType {
     }
 }
 
-impl FromStr for SearchEventType {
-    type Err = String;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+impl TryFrom<&str> for SearchEventType {
+    type Error = String;
+    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
         let s = s.to_lowercase();
         match s.as_str() {
             "ui" => Ok(SearchEventType::UI),
@@ -1023,6 +1033,7 @@ impl MultiStreamRequest {
                     track_total_hits: self.track_total_hits,
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn,
+                    action_id: None,
                     skip_wal: self.skip_wal,
                     streaming_output: false,
                     streaming_id: None,
@@ -1034,6 +1045,7 @@ impl MultiStreamRequest {
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
                 use_cache: None,
+                local_mode: None,
             });
         }
         res

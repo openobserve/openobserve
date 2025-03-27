@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,15 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod search;
 pub mod session;
-pub mod sort;
-pub mod utils;
 
-use actix_web::{get, web, Error, HttpRequest, HttpResponse};
-use config::get_config;
-use session::WsSession;
-use utils::sessions_cache_utils;
+use actix_web::{Error, HttpRequest, HttpResponse, get, web};
+use config::{cluster::LOCAL_NODE, get_config};
+
+use crate::{
+    handler::http::request::ws_v2::session::WsSession,
+    service::websocket_events::sessions_cache_utils,
+};
 
 #[get("{org_id}/ws/{request_id}")]
 pub async fn websocket(
@@ -32,7 +32,7 @@ pub async fn websocket(
 ) -> Result<HttpResponse, Error> {
     let cfg = get_config();
 
-    if !cfg.common.websocket_enabled {
+    if !cfg.websocket.enabled {
         log::info!(
             "[WS_HANDLER]: Node Role: {} Websocket is disabled",
             cfg.common.node_role
@@ -54,7 +54,7 @@ pub async fn websocket(
 
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
-    let ws_session = WsSession::new(session);
+    let ws_session = WsSession::new(session, None);
     sessions_cache_utils::insert_session(&request_id, ws_session);
     log::info!(
         "[WS_HANDLER]: Node Role: {} Got websocket request for request_id: {}",
@@ -66,4 +66,13 @@ pub async fn websocket(
     actix_web::rt::spawn(session::run(msg_stream, user_id, request_id, org_id, path));
 
     Ok(res)
+}
+
+/// Initialize the job init for websocket
+pub async fn init() -> Result<(), anyhow::Error> {
+    // Run the garbage collector for websocket sessions
+    if LOCAL_NODE.is_querier() {
+        sessions_cache_utils::run_gc_ws_sessions().await;
+    }
+    Ok(())
 }

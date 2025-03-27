@@ -86,9 +86,9 @@ pub async fn set_ofga_model_to_db(mut meta: OFGAModel) -> Result<String, anyhow:
 pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
     let key = "/ofga/model";
     let ret = db::get(key).await?;
-    let loc_value = json::from_slice(&ret).unwrap();
-    let value = Some(loc_value);
-    Ok(value)
+    let mut loc_value: OFGAModel = json::from_slice(&ret).unwrap();
+    loc_value.version = loc_value.version.trim_matches('"').to_string();
+    Ok(Some(loc_value))
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

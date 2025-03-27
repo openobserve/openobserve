@@ -32,6 +32,7 @@ pub mod kv;
 pub mod logs;
 pub mod metadata;
 pub mod metrics;
+pub mod node;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
@@ -39,6 +40,8 @@ pub mod pipeline;
 pub mod promql;
 pub mod schema;
 pub mod search;
+pub mod websocket_events;
+
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
 pub mod self_reporting;

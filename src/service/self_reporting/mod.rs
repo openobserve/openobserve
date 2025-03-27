@@ -14,18 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, Datelike, Timelike};
+#[cfg(feature = "enterprise")]
+use config::META_ORG_ID;
 use config::{
+    SIZE_IN_MB,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
         self_reporting::{
+            ReportingData,
             error::ErrorData,
             usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
-            ReportingData,
         },
         stream::StreamType,
     },
-    metrics, SIZE_IN_MB,
+    metrics,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::auditor;
@@ -78,19 +81,21 @@ pub async fn report_request_usage_stats(
     num_functions: u16,
     timestamp: i64,
 ) {
-    metrics::INGEST_RECORDS
-        .with_label_values(&[org_id, stream_name, stream_type.as_str()])
-        .inc_by(stats.records as u64);
-    metrics::INGEST_BYTES
-        .with_label_values(&[org_id, stream_name, stream_type.as_str()])
-        .inc_by((stats.size * SIZE_IN_MB) as u64);
     let event: UsageEvent = usage_type.into();
-    let now = DateTime::from_timestamp_micros(timestamp).unwrap();
+    if matches!(event, UsageEvent::Ingestion) {
+        metrics::INGEST_RECORDS
+            .with_label_values(&[org_id, stream_type.as_str()])
+            .inc_by(stats.records as u64);
+        metrics::INGEST_BYTES
+            .with_label_values(&[org_id, stream_type.as_str()])
+            .inc_by((stats.size * SIZE_IN_MB) as u64);
+    }
 
     if !get_config().common.usage_enabled {
         return;
     }
 
+    let now = DateTime::from_timestamp_micros(timestamp).unwrap();
     let request_body = stats.request_body.unwrap_or(usage_type.to_string());
     let user_email = stats.user_email.unwrap_or("".to_owned());
 
@@ -133,6 +138,7 @@ pub async fn report_request_usage_stats(
             result_cache_ratio: None,
             is_partial: stats.is_partial,
             work_group: None,
+            node_name: stats.node_name.clone(),
         });
     };
 
@@ -172,6 +178,7 @@ pub async fn report_request_usage_stats(
         result_cache_ratio: stats.result_cache_ratio,
         is_partial: stats.is_partial,
         work_group: stats.work_group,
+        node_name: stats.node_name,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;
@@ -283,7 +290,7 @@ pub async fn run_audit_publish() {
         log::debug!("Audit ingestion loop running");
         audit_interval.tick().await;
         o2_enterprise::enterprise::common::auditor::publish_existing_audits(
-            &get_config().common.usage_org,
+            META_ORG_ID,
             publish_audit,
         )
         .await;
@@ -292,12 +299,12 @@ pub async fn run_audit_publish() {
 
 #[cfg(feature = "enterprise")]
 pub async fn audit(msg: auditor::AuditMessage) {
-    auditor::audit(&get_config().common.usage_org, msg, publish_audit).await;
+    auditor::audit(META_ORG_ID, msg, publish_audit).await;
 }
 
 #[cfg(feature = "enterprise")]
 pub async fn flush_audit() {
-    auditor::flush_audit(&get_config().common.usage_org, publish_audit).await;
+    auditor::flush_audit(META_ORG_ID, publish_audit).await;
 }
 
 #[cfg(feature = "enterprise")]
@@ -312,16 +319,31 @@ pub fn http_report_metrics(
     start: std::time::Instant,
     org_id: &str,
     stream_type: StreamType,
-    stream_name: &str,
     code: &str,
     uri: &str,
+    search_type: &str,
+    search_group: &str,
 ) {
     let time = start.elapsed().as_secs_f64();
     let uri = format!("/api/org/{}", uri);
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[&uri, code, org_id, stream_name, stream_type.as_str()])
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_type.as_str(),
+            search_type,
+            search_group,
+        ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[&uri, code, org_id, stream_name, stream_type.as_str()])
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_type.as_str(),
+            search_type,
+            search_group,
+        ])
         .inc();
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,23 +24,31 @@ use config::{
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
-    mysql::{MySqlConnectOptions, MySqlPoolOptions},
     MySql, Pool,
+    mysql::{MySqlConnectOptions, MySqlPoolOptions},
 };
-use tokio::sync::{mpsc, OnceCell};
+use tokio::sync::{OnceCell, mpsc};
 
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;
 
-pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(connect);
+pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(|| connect(false));
+pub static CLIENT_RO: Lazy<Pool<MySql>> = Lazy::new(|| connect(true));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
-fn connect() -> Pool<MySql> {
+fn connect(readonly: bool) -> Pool<MySql> {
+    let mut dsn = if readonly {
+        config::get_config().common.meta_mysql_ro_dsn.clone()
+    } else {
+        config::get_config().common.meta_mysql_dsn.clone()
+    };
+    if dsn.is_empty() {
+        dsn = config::get_config().common.meta_mysql_dsn.clone();
+    }
     let cfg = config::get_config();
-    let db_opts = MySqlConnectOptions::from_str(&cfg.common.meta_mysql_dsn)
-        .expect("mysql connect options create failed");
+    let db_opts = MySqlConnectOptions::from_str(&dsn).expect("mysql connect options create failed");
 
-    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 30);
+    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
     let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
 
@@ -100,7 +108,7 @@ impl super::Db for MysqlDb {
     }
 
     async fn stats(&self) -> Result<super::Stats> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let keys_count: i64 =
             sqlx::query_scalar(r#"SELECT CAST(COUNT(*) AS SIGNED) AS num FROM meta;"#)
@@ -115,7 +123,7 @@ impl super::Db for MysqlDb {
 
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let query = format!(
             "SELECT value FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' ORDER BY start_dt DESC;",
@@ -534,7 +542,7 @@ impl super::Db for MysqlDb {
         }
         sql = format!("{} ORDER BY start_dt ASC", sql);
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -564,7 +572,7 @@ impl super::Db for MysqlDb {
         }
 
         sql = format!("{} ORDER BY start_dt ASC", sql);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -613,7 +621,7 @@ impl super::Db for MysqlDb {
             sql, min_dt, max_dt
         );
         sql = format!("{} ORDER BY start_dt ASC", sql);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -636,7 +644,7 @@ impl super::Db for MysqlDb {
         if !key2.is_empty() {
             sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
         }
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
         Ok(count)

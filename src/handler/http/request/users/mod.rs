@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,20 +16,20 @@
 use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_web::{
-    cookie, delete, get,
+    HttpRequest, HttpResponse, cookie, delete, get,
     http::{self},
-    post, put, web, HttpRequest, HttpResponse,
+    post, put, web,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
-    get_config,
+    Config, get_config,
     meta::user::UserRole,
     utils::{base64, json},
-    Config,
 };
 use serde::Serialize;
 #[cfg(feature = "enterprise")]
 use {
+    crate::common::utils::auth::check_permissions,
     crate::service::self_reporting::audit,
     o2_dex::config::get_config as get_dex_config,
     o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol},
@@ -41,11 +41,11 @@ use crate::{
         meta::{
             self,
             user::{
-                get_roles, AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser,
-                UpdateUser, UserOrgRole, UserRequest, UserRoleRequest,
+                AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
+                UserOrgRole, UserRequest, UserRoleRequest, get_roles,
             },
         },
-        utils::auth::{generate_presigned_url, UserEmail},
+        utils::auth::{UserEmail, generate_presigned_url},
     },
     service::users,
 };
@@ -68,7 +68,7 @@ pub mod service_accounts;
     )
 )]
 #[get("/{org_id}/users")]
-pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let list_all = match query.get("list_all") {
@@ -76,26 +76,22 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
         None => false,
     };
 
-    let user_id = req.headers().get("user_id").unwrap().to_str().unwrap();
     let mut _user_list_from_rbac = None;
-    // Get List of allowed objects
+
     #[cfg(feature = "enterprise")]
-    {
-        match crate::handler::http::auth::validator::list_objects_for_user(
-            &org_id, user_id, "GET", "user",
+    // Check if user has access to get users
+    if get_openfga_config().enabled
+        && check_permissions(
+            Some(format!("_all_{}", org_id)),
+            &org_id,
+            &user_email.user_id,
+            "users",
+            "GET",
+            "",
         )
         .await
-        {
-            Ok(user_list) => {
-                _user_list_from_rbac = user_list;
-            }
-            Err(e) => {
-                return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                    e.to_string(),
-                ));
-            }
-        }
-        // Get List of allowed objects ends
+    {
+        _user_list_from_rbac = Some(vec![]);
     }
 
     users::list_users(&org_id, user_id, None, _user_list_from_rbac, list_all).await
@@ -740,7 +736,7 @@ pub async fn list_invitations(_user_email: UserEmail) -> Result<HttpResponse, Er
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{test, App};
+    use actix_web::{App, test};
     use actix_web_httpauth::headers::authorization::Basic;
 
     use super::*;

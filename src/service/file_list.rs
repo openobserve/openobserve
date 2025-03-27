@@ -99,6 +99,7 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         .set(ids.len() as i64);
     // 1. first query from local cache
     let (mut files, ids) = if !cfg.common.local_mode {
+        let start = std::time::Instant::now();
         let ids_set: HashSet<_> = ids.iter().cloned().collect();
         let cached_files = match file_list::LOCAL_CACHE.query_by_ids(ids).await {
             Ok(files) => files,
@@ -115,8 +116,9 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
             .map(|(id, ..)| *id)
             .collect::<HashSet<_>>();
         log::info!(
-            "[trace_id {trace_id}] file_list cached_ids: {:?}",
-            cached_ids.len()
+            "[trace_id {trace_id}] file_list get cached_ids: {}, took: {} ms",
+            cached_ids.len(),
+            start.elapsed().as_millis()
         );
 
         FILE_LIST_CACHE_HIT_COUNT
@@ -141,6 +143,7 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
     };
 
     // 2. query from remote db
+    let start = std::time::Instant::now();
     let db_files = file_list::query_by_ids(&ids).await?;
     let db_files = db_files
         .into_iter()
@@ -156,13 +159,24 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
             )
         })
         .collect::<Vec<_>>();
+    log::info!(
+        "[trace_id {trace_id}] file_list query from db: {}, took: {} ms",
+        db_files.len(),
+        start.elapsed().as_millis()
+    );
 
     // 3. set the local cache
     if !cfg.common.local_mode {
+        let start = std::time::Instant::now();
         let db_files: Vec<_> = db_files.iter().map(|(id, f)| (*id, f)).collect();
         if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
             log::error!("[trace_id {trace_id}] file_list set cache failed: {:?}", e);
         }
+        log::info!(
+            "[trace_id {trace_id}] file_list set cached_ids: {}, took: {} ms",
+            db_files.len(),
+            start.elapsed().as_millis()
+        );
     }
 
     // 4. merge the results
@@ -196,6 +210,7 @@ pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats> {
         stats.records += file.meta.records;
         stats.original_size += file.meta.original_size;
         stats.compressed_size += file.meta.compressed_size;
+        stats.idx_scan_size += file.meta.index_size;
     }
     Ok(stats)
 }

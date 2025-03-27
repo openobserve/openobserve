@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,19 +22,18 @@ use actix_web::http;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use flate2::read::GzDecoder;
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
-    common::v1::{any_value::Value, AnyValue, KeyValue},
+    common::v1::{AnyValue, KeyValue, any_value::Value},
     metrics::v1::metric::Data,
 };
 use prost::Message;
@@ -98,14 +97,17 @@ pub async fn ingest(
     }
 
     // Start get user defined schema
-    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut streams_need_original_set: HashSet<String> = HashSet::new();
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
     crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
-        &mut streams_need_original_set,
+        &mut streams_need_original_map,
     )
     .await;
+    // with pipeline, we need to store original if any of the destinations requires original
+    let store_original_when_pipeline_exists =
+        executable_pipeline.is_some() && streams_need_original_map.values().any(|val| *val);
     // End get user defined schema
 
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
@@ -179,35 +181,21 @@ pub async fn ingest(
             // 2. current stream does not have pipeline
             if executable_pipeline.is_none() {
                 // current stream requires original
-                streams_need_original_set
-                    .contains(&stream_name)
+                streams_need_original_map
+                    .get(&stream_name)
+                    .is_some_and(|v| *v)
                     .then_some(item.to_string())
             } else {
                 // 3. with pipeline, storing original as long as streams_need_original_set is not
                 //    empty
                 // because not sure the pipeline destinations
-                (!streams_need_original_set.is_empty()).then_some(item.to_string())
+                store_original_when_pipeline_exists.then_some(item.to_string())
             }
         } else {
             None // `item` won't be flattened, no need to store original
         };
 
         if executable_pipeline.is_some() {
-            // handle record's timestamp fist in case record is sent to remote destination
-            if let Err(e) = handle_timestamp(&mut item, min_ts) {
-                stream_status.status.failed += 1;
-                stream_status.status.error = e.to_string();
-                metrics::INGEST_ERRORS
-                    .with_label_values(&[
-                        org_id,
-                        StreamType::Logs.as_str(),
-                        &stream_name,
-                        TS_PARSE_FAILED,
-                    ])
-                    .inc();
-                log_failed_record(log_ingestion_errors, &item, &e.to_string());
-                continue;
-            };
             // buffer the records, timestamp, and originals for pipeline batch processing
             pipeline_inputs.push(item);
             original_options.push(original_data);
@@ -240,12 +228,16 @@ pub async fn ingest(
                 _ => unreachable!(),
             };
 
-            if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+            if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
                 local_val = crate::service::logs::refactor_map(local_val, fields);
             }
 
             // add `_original` and '_record_id` if required by StreamSettings
-            if streams_need_original_set.contains(&stream_name) && original_data.is_some() {
+            if streams_need_original_map
+                .get(&stream_name)
+                .is_some_and(|v| *v)
+                && original_data.is_some()
+            {
                 local_val.insert(
                     ORIGINAL_DATA_COL_NAME.to_string(),
                     original_data.unwrap().into(),
@@ -272,7 +264,10 @@ pub async fn ingest(
     // batch process records through pipeline
     if let Some(exec_pl) = &executable_pipeline {
         let records_count = pipeline_inputs.len();
-        match exec_pl.process_batch(org_id, pipeline_inputs).await {
+        match exec_pl
+            .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+            .await
+        {
             Err(e) => {
                 log::error!(
                     "[Pipeline] for stream {}/{}: Batch execution error: {}.",
@@ -298,21 +293,52 @@ pub async fn ingest(
                         continue;
                     }
 
+                    let destination_stream = stream_params.stream_name.to_string();
+                    if !user_defined_schema_map.contains_key(&destination_stream) {
+                        // a new dynamically created stream. need to check the two maps again
+                        crate::service::ingestion::get_uds_and_original_data_streams(
+                            &[stream_params],
+                            &mut user_defined_schema_map,
+                            &mut streams_need_original_map,
+                        )
+                        .await;
+                    }
+
                     for (idx, mut res) in stream_pl_results {
+                        // handle timestamp
+                        let timestamp = match handle_timestamp(&mut res, min_ts) {
+                            Ok(ts) => ts,
+                            Err(e) => {
+                                stream_status.status.failed += 1;
+                                stream_status.status.error = e.to_string();
+                                metrics::INGEST_ERRORS
+                                    .with_label_values(&[
+                                        org_id,
+                                        StreamType::Logs.as_str(),
+                                        &stream_name,
+                                        TS_PARSE_FAILED,
+                                    ])
+                                    .inc();
+                                log_failed_record(log_ingestion_errors, &res, &e.to_string());
+                                continue;
+                            }
+                        };
+
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(val) => val,
                             _ => unreachable!(),
                         };
 
-                        if let Some(fields) =
-                            user_defined_schema_map.get(stream_params.stream_name.as_str())
+                        if let Some(Some(fields)) = user_defined_schema_map.get(&destination_stream)
                         {
                             local_val = crate::service::logs::refactor_map(local_val, fields);
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if streams_need_original_set.contains(stream_params.stream_name.as_str())
+                        if streams_need_original_map
+                            .get(&destination_stream)
+                            .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
                             local_val.insert(
@@ -321,7 +347,7 @@ pub async fn ingest(
                             );
                             let record_id = crate::service::ingestion::generate_record_id(
                                 org_id,
-                                &stream_params.stream_name,
+                                &destination_stream,
                                 &StreamType::Logs,
                             );
                             local_val.insert(
@@ -330,27 +356,8 @@ pub async fn ingest(
                             );
                         }
 
-                        let Some(timestamp) = local_val
-                            .get(&cfg.common.column_timestamp)
-                            .and_then(|ts| ts.as_i64())
-                        else {
-                            let err = "record _timestamp inserted before pipeline processing, but missing after pipeline processing";
-                            stream_status.status.failed += 1;
-                            stream_status.status.error = err.to_string();
-                            metrics::INGEST_ERRORS
-                                .with_label_values(&[
-                                    org_id,
-                                    StreamType::Logs.as_str(),
-                                    &stream_name,
-                                    TS_PARSE_FAILED,
-                                ])
-                                .inc();
-                            log_failed_record(log_ingestion_errors, &local_val, err);
-                            continue;
-                        };
-
                         let (ts_data, fn_num) = json_data_by_stream
-                            .entry(stream_params.stream_name.to_string())
+                            .entry(destination_stream.clone())
                             .or_insert_with(|| (Vec::new(), None));
                         ts_data.push((timestamp, local_val));
                         *fn_num = need_usage_report.then_some(function_no);
@@ -369,7 +376,7 @@ pub async fn ingest(
     }
 
     // drop memory-intensive variables
-    drop(streams_need_original_set);
+    drop(streams_need_original_map);
     drop(executable_pipeline);
     drop(original_options);
     drop(user_defined_schema_map);
@@ -406,8 +413,9 @@ pub async fn ingest(
             endpoint,
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.as_str(),
+            "",
+            "",
         ])
         .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -415,8 +423,9 @@ pub async fn ingest(
             endpoint,
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.as_str(),
+            "",
+            "",
         ])
         .inc();
 
@@ -427,11 +436,10 @@ pub async fn ingest(
 }
 
 pub fn handle_timestamp(value: &mut json::Value, min_ts: i64) -> Result<i64, anyhow::Error> {
-    let cfg = get_config();
     let local_val = value
         .as_object_mut()
         .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
-    let timestamp = match local_val.get(&cfg.common.column_timestamp) {
+    let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
         Some(v) => match parse_timestamp_micro_from_value(v) {
             Ok(t) => t,
             Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
@@ -443,7 +451,7 @@ pub fn handle_timestamp(value: &mut json::Value, min_ts: i64) -> Result<i64, any
         return Err(get_upto_discard_error());
     }
     local_val.insert(
-        cfg.common.column_timestamp.clone(),
+        TIMESTAMP_COL_NAME.to_string(),
         json::Value::Number(timestamp.into()),
     );
     Ok(timestamp)
@@ -648,10 +656,7 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                         local_val.insert("message".to_owned(), local_msg.into());
                     }
 
-                    local_val.insert(
-                        get_config().common.column_timestamp.clone(),
-                        event.timestamp.into(),
-                    );
+                    local_val.insert(TIMESTAMP_COL_NAME.to_string(), event.timestamp.into());
 
                     value = local_val.clone().into();
                     events.push(value);
@@ -689,10 +694,7 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                     .insert("metric_dimensions".to_owned(), metric_dimensions.into());
                 local_parsed_metric_value.remove("dimensions");
 
-                local_parsed_metric_value.insert(
-                    get_config().common.column_timestamp.clone(),
-                    timestamp.into(),
-                );
+                local_parsed_metric_value.insert(TIMESTAMP_COL_NAME.to_string(), timestamp.into());
                 local_parsed_metric_value.remove("timestamp");
 
                 value = local_parsed_metric_value.clone().into();
@@ -796,7 +798,7 @@ fn construct_values_from_open_telemetry_v1_metric(
                         "region": resource_attributes.get("cloud.region").unwrap(),
                         "namespace": summary_attributes.get("Namespace").unwrap(),
                         "metric_name": summary_attributes.get("MetricName").unwrap(),
-                        get_config().common.column_timestamp.clone(): std::time::Duration::from_nanos(i_sum.time_unix_nano).as_millis(),
+                        TIMESTAMP_COL_NAME: std::time::Duration::from_nanos(i_sum.time_unix_nano).as_millis(),
                         "unit": m.unit,
                         "count": i_sum.count,
                         "sum": i_sum.sum,

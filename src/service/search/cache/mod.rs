@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use chrono::{TimeZone, Utc};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
@@ -85,11 +87,19 @@ pub async fn search(
         .query_fn
         .as_ref()
         .and_then(|v| base64::decode_url(v).ok());
+    let action = req
+        .query
+        .action_id
+        .as_ref()
+        .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
 
     // calculate hash for the query
     let mut hash_body = vec![origin_sql.to_string()];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
+    }
+    if let Some(action_id) = action {
+        hash_body.push(action_id.to_string());
     }
     if !req.regions.is_empty() {
         hash_body.extend(req.regions.clone());
@@ -122,10 +132,10 @@ pub async fn search(
         .await
     } else {
         let query: SearchQuery = req.query.clone().into();
-        match crate::service::search::Sql::new(&query, org_id, stream_type).await {
+        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
             Ok(v) => {
                 let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, &cfg.common.column_timestamp, is_aggregate)
+                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
                 MultiCachedQueryResponse {
@@ -286,7 +296,22 @@ pub async fn search(
 
     // do search
     let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, org_id, stream_type, "", "200", "_search");
+    let work_group = get_work_group(work_group_set);
+
+    let search_type = req
+        .search_type
+        .map(|t| t.to_string())
+        .unwrap_or("".to_string());
+    let search_group = work_group.clone().unwrap_or("".to_string());
+    http_report_metrics(
+        start,
+        org_id,
+        stream_type,
+        "200",
+        "_search",
+        &search_type,
+        &search_group,
+    );
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 
@@ -298,7 +323,6 @@ pub async fn search(
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
 
-    let work_group = get_work_group(work_group_set);
     let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
@@ -338,17 +362,20 @@ pub async fn search(
     if res.is_partial {
         let partial_err = "Please be aware that the response is based on partial data";
         res.function_error = if res.function_error.is_empty() {
-            partial_err.to_string()
+            vec![partial_err.to_string()]
         } else {
-            format!("{} \n {}", partial_err, res.function_error)
+            res.function_error.push(partial_err.to_string());
+            res.function_error
         };
     }
     if !range_error.is_empty() {
         res.is_partial = true;
+        let range_error_str = range_error.clone();
         res.function_error = if res.function_error.is_empty() {
-            range_error
+            vec![range_error_str]
         } else {
-            format!("{} \n {}", range_error, res.function_error)
+            res.function_error.push(range_error_str);
+            res.function_error
         };
         res.new_start_time = Some(req.query.start_time);
         res.new_end_time = Some(req.query.end_time);
@@ -359,15 +386,20 @@ pub async fn search(
     // 2. Super cluster error
     // 3. Range error (max_query_limit)
     // Cache partial results only if there is a range error
-    let skip_cache_results = (res.is_partial
-        && (res.new_start_time.is_none() || res.new_end_time.is_none()))
-        || (!res.function_error.is_empty() && res.function_error.contains("vrl"));
+
+    let mut should_cache_results =
+        res.new_start_time.is_some() || res.new_end_time.is_some() || res.function_error.is_empty();
+
+    if !res.function_error.is_empty() && !range_error.is_empty() {
+        res.function_error.retain(|err| !err.contains(&range_error));
+        should_cache_results = should_cache_results && res.function_error.is_empty();
+    }
 
     // result cache save changes start
     if cfg.common.result_cache_enabled
         && should_exec_query
         && c_resp.cache_query_response
-        && !skip_cache_results
+        && should_cache_results
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
@@ -406,7 +438,7 @@ pub fn merge_response(
     if cache_responses.is_empty() && search_response.is_empty() {
         return config::meta::search::Response::default();
     }
-    let mut fn_error = String::new();
+    let mut fn_error = vec![];
 
     let mut cache_response = if cache_responses.is_empty() {
         config::meta::search::Response::default()
@@ -424,7 +456,7 @@ pub fn merge_response(
             resp.hits.extend(res.hits.clone());
             resp.histogram_interval = res.histogram_interval;
             if !res.function_error.is_empty() {
-                fn_error = res.function_error.clone();
+                fn_error.extend(res.function_error.clone());
             }
         }
         resp.took = cache_took;
@@ -435,10 +467,8 @@ pub fn merge_response(
         && !search_response.is_empty()
         && search_response
             .first()
-            .map_or(true, |res| res.hits.is_empty())
-        && search_response
-            .last()
-            .map_or(true, |res| res.hits.is_empty())
+            .is_none_or(|res| res.hits.is_empty())
+        && search_response.last().is_none_or(|res| res.hits.is_empty())
     {
         for res in search_response {
             cache_response.total += res.total;
@@ -446,7 +476,7 @@ pub fn merge_response(
             cache_response.took += res.took;
             cache_response.histogram_interval = res.histogram_interval;
             if !res.function_error.is_empty() {
-                fn_error = res.function_error.clone();
+                fn_error.extend(res.function_error.clone());
             }
         }
         cache_response.function_error = fn_error;
@@ -485,7 +515,7 @@ pub fn merge_response(
             res_took.nodes.append(&mut took_details.nodes);
         }
         if !res.function_error.is_empty() {
-            fn_error = res.function_error.clone();
+            fn_error.extend(res.function_error.clone());
         }
 
         cache_response.hits.extend(res.hits.clone());
@@ -514,7 +544,7 @@ pub fn merge_response(
         / ((result_cache_len + cache_hits_len) as f64))
         as usize;
     if !fn_error.is_empty() {
-        cache_response.function_error = fn_error;
+        cache_response.function_error.extend(fn_error);
     }
     cache_response
 }
@@ -797,8 +827,6 @@ pub async fn check_cache_v2(
     in_req: &search::Request,
     use_cache: bool,
 ) -> Result<MultiCachedQueryResponse, Error> {
-    let cfg = get_config();
-
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
     origin_sql = origin_sql.replace('\n', " ");
@@ -856,10 +884,10 @@ pub async fn check_cache_v2(
         resp
     } else {
         let query = req.query.into();
-        match crate::service::search::Sql::new(&query, org_id, stream_type).await {
+        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
             Ok(v) => {
                 let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, &cfg.common.column_timestamp, is_aggregate)
+                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
                 MultiCachedQueryResponse {

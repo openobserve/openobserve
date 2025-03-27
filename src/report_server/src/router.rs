@@ -1,11 +1,11 @@
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{get, http::StatusCode, put, web, HttpRequest, HttpResponse as ActixHttpResponse};
+use actix_web::{HttpRequest, HttpResponse as ActixHttpResponse, get, http::StatusCode, put, web};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     models::{self, ReportType},
-    report::{generate_report, send_email, SMTP_CLIENT},
+    report::{SMTP_CLIENT, generate_report, send_email},
 };
 
 /// HTTP response

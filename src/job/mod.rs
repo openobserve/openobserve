@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -34,6 +34,7 @@ mod alert_manager;
 #[cfg(feature = "enterprise")]
 mod cipher;
 mod compactor;
+mod file_downloader;
 pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
@@ -44,6 +45,7 @@ mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
 
+pub use file_downloader::queue_background_download;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -189,12 +191,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("syslog settings cache failed");
 
-    // cache pipeline
-    db::pipeline::cache().await.expect("Pipeline cache failed");
-
     infra_file_list::create_table_index().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
-    tokio::task::spawn(async move { db::file_list::cache_stats().await });
 
     #[cfg(feature = "enterprise")]
     db::ofga::cache().await.expect("ofga model cache failed");
@@ -221,6 +219,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { promql::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
+    tokio::task::spawn(async move { file_downloader::run().await });
 
     // load metrics disk cache
     tokio::task::spawn(async move { crate::service::promql::search::init().await });
@@ -273,6 +272,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("syslog server run failed");
     }
+
+    Ok(())
+}
+
+/// Additional jobs that init processes should be deferred until the gRPC service
+/// starts in the main thread
+pub async fn init_deferred() -> Result<(), anyhow::Error> {
+    db::schema::cache_enrichment_tables()
+        .await
+        .expect("EnrichmentTables cache failed");
+    // pipelines can potentially depend on enrichment tables, so cached afterwards
+    db::pipeline::cache().await.expect("Pipeline cache failed");
 
     Ok(())
 }

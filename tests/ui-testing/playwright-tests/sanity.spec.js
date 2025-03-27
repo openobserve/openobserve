@@ -102,9 +102,8 @@ test.describe("Sanity testcases", () => {
     test("should click on interesting fields icon and display query in editor", async ({
     page,
   }) => {
-    await page.waitForSelector(
-      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
-    );
+
+
 
     // Get the toggle button element
     const toggleButton = await page.$(
@@ -128,7 +127,7 @@ test.describe("Sanity testcases", () => {
       .locator(
         '[data-test="log-search-index-list-interesting-job-field-btn"]'
       ).first().click();
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+      await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
@@ -161,18 +160,20 @@ test.describe("Sanity testcases", () => {
       .nth(2)
       .click();
     await page.waitForTimeout(2000);
-    await page.waitForSelector('[data-test="logs-search-result-bar-chart"]');
+    await expect(page.getByRole('heading', { name: 'No data found for histogram.' })).toBeVisible();
   });
+
 
   test("should save search, favorite, click on saved search and then delete", async ({
     page,
   }) => {
+    const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
     await page
       .locator("button")
       .filter({ hasText: "savesaved_search" })
       .click();
     await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill("sanitytest");
+    await page.locator('[data-test="add-alert-name-input"]').fill(randomSavedViewName);
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
     await page
       .locator('[data-test="logs-search-saved-views-btn"]')
@@ -183,8 +184,8 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("sanity");
-    await page.getByText("sanitytest").first().click();
+      .fill(randomSavedViewName);
+    await page.getByText(randomSavedViewName).first().click();
     await page
       .locator('[data-test="logs-search-saved-views-btn"]')
       .getByLabel("Expand")
@@ -194,7 +195,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("sanity");
+      .fill(randomSavedViewName);
     await page.getByText("favorite_border").first().click();
     await page.getByText("Favorite Views").click();
     await page.getByLabel('Clear').first().click();
@@ -215,13 +216,14 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("san");
-    await page.getByText("delete").click();
-    await page.locator('[data-test="confirm-button"]').click();
+      .fill(randomSavedViewName);
+    const deleteButtonSelector = `[data-test="logs-search-bar-delete-${randomSavedViewName}-saved-view-btn"]`;
+    await page.locator(deleteButtonSelector).click(); // Click delete
+    await page.locator('[data-test="confirm-button"]').click();;
   });
 
   test("should only display 5 result if limit 5 added", async ({ page }) => {
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
       .getByRole("code")
@@ -454,18 +456,19 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     await page.locator('[data-test="clone-alert-submit-btn"]').click();
     await page.getByText('Alert Cloned Successfully').click();
-  
-  
-  
-    // Delete the cloned alert
-    await page.getByRole('cell', { name: clonedAlertName }).click();
-    await page.locator(`[data-test="alert-list-${clonedAlertName}-delete-alert"]`).click();
+
+    await page.locator('[data-test="alert-list-search-input"]').fill(clonedAlertName);
+    await page.waitForTimeout(2000);
+    await page.locator(`[data-test="alert-list-${clonedAlertName}-more-options"]`).click();
+    await page.getByText('Delete',{exact:true}).click();
     await page.locator('[data-test="confirm-button"]').click();
+
   
     // Delete the original alert
     await page.locator('[data-test="alert-list-search-input"]').fill(alertName);
     await page.waitForTimeout(500); // Ensure input is registered
-    await page.locator(`[data-test="alert-list-${alertName}-delete-alert"]`).click();
+    await page.locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
+    await page.getByText('Delete',{exact:true}).click();
     await page.locator('[data-test="confirm-button"]').click();
   
     // Delete the destination

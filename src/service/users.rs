@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,9 @@
 
 use std::io::Error;
 
-use actix_web::{http, HttpResponse};
+use actix_web::{HttpResponse, http};
 use config::{
-    get_config, ider,
+    META_ORG_ID, get_config, ider,
     meta::user::{DBUser, User, UserOrg, UserRole},
     utils::rand::generate_random_string,
 };
@@ -36,9 +36,9 @@ use crate::{
         infra::config::{ORG_USERS, ROOT_USER, USERS_RUM_TOKEN},
         meta::{
             http::HttpResponse as MetaHttpResponse,
-            organization::{OrgRoleMapping, DEFAULT_ORG},
+            organization::{DEFAULT_ORG, OrgRoleMapping},
             user::{
-                get_default_user_org, UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse,
+                UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, get_default_user_org,
             },
         },
         utils::auth::{get_hash, get_role, is_root_user, is_valid_email},
@@ -251,8 +251,30 @@ pub async fn update_user(
             "Invalid email".to_string(),
         )));
     }
+    let is_email_root = is_root_user(email);
 
-    let existing_user = if is_root_user(email) {
+    // Only root user can update root user
+    if is_email_root && !self_update {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Root user cannot be updated".to_string(),
+        )));
+    }
+
+    // Nobody can update role to root user role
+    if !is_email_root
+        && user
+            .role
+            .as_ref()
+            .is_some_and(|role_req| role_req.role.eq(&UserRole::Root.to_string()))
+    {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Root user role cannot be updated".to_string(),
+        )));
+    }
+
+    let existing_user = if is_email_root {
         db::user::get(None, email).await
     } else {
         db::user::get(Some(org_id), email).await
@@ -502,7 +524,10 @@ pub async fn update_user(
                                     }
                                 });
                                 if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
-                                    log::error!("Error updating custom roles for user {email} in {org_id} org : {}", e);
+                                    log::error!(
+                                        "Error updating custom roles for user {email} in {org_id} org : {}",
+                                        e
+                                    );
                                     return Ok(HttpResponse::InternalServerError().json(
                                         MetaHttpResponse::error(
                                             http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -746,24 +771,25 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
 }
 
 pub async fn list_users(
+    _user_id: &str,
     org_id: &str,
     _initiator_id: &str,
     role: Option<UserRole>,
     permitted: Option<Vec<String>>,
     list_all: bool,
 ) -> Result<HttpResponse, Error> {
-    let cfg = get_config();
     let mut user_list: Vec<UserResponse> = vec![];
-    let is_list_all = list_all & org_id.eq(cfg.common.usage_org.as_str());
+    let is_list_all = list_all & org_id.eq(META_ORG_ID);
     let mut user_orgs: HashMap<String, Vec<OrgRoleMapping>> = HashMap::new();
     log::debug!("Listing users for org: {}", org_id);
 
     #[cfg(feature = "enterprise")]
     if get_openfga_config().enabled && role.is_none() && permitted.is_some() {
+        let need_check_permission = !matches!(role, Some(UserRole::ServiceAccount));
         let permitted = permitted.as_ref().unwrap();
         // This user does not have list users permission
         // Hence only return this specific user
-        if permitted.is_empty() {
+        if need_check_permission && permitted.is_empty() {
             if let Some(user) = get_user(Some(org_id), _initiator_id).await {
                 user_list.push(UserResponse {
                     email: user.email.clone(),
@@ -1160,9 +1186,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users() {
         set_up().await;
-        assert!(list_users("dummy", "admin@zo.dev", None, None, false)
-            .await
-            .is_ok())
+        assert!(list_users("", "dummy", None, None).await.is_ok())
     }
 
     #[tokio::test]

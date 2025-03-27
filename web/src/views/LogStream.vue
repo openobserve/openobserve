@@ -28,10 +28,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :row-key="getRowKey"
       :selected-rows-label="getSelectedString"
       selection="multiple"
-      :pagination="pagination"
+      v-model:pagination="pagination"
       :filter="filterQuery"
       :filter-method="filterData"
       style="width: 100%"
+      :rows-per-page-options="perPageOptions"
+      @request="onRequest"
     >
       <template #no-data>
         <div v-if="!loadingState" class="text-center full-width full-height">
@@ -131,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 class="q-ml-auto q-mb-xs no-border"
                 :placeholder="t('logStream.search')"
+                debounce="300"
               >
                 <template #prepend>
                   <q-icon name="search" />
@@ -147,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="getLogStream(true)"
             />
             <q-btn
+              v-if="isSchemaUDSEnabled"
               data-test="log-stream-add-stream-btn"
               class="q-ml-md q-mb-xs text-bold no-border"
               padding="sm lg"
@@ -157,38 +161,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <QTablePagination
-          data-test="log-stream-table-pagination"
-          :scope="scope"
-          :pageTitle="t('logStream.header')"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <div class="flex justify-between items-center full-width q-mt-sm" style="font-size: 12px">
+          <div class="q-table__separator col text-bold">
+            {{scope.pagination.rowsNumber}} Stream(s)
+          </div>
+          <div class="q-table__control" v-if="scope.pagination.rowsNumber > 0">
+            Showing {{ ((scope.pagination.page - 1) * scope.pagination.rowsPerPage) + 1 }} - {{((scope.pagination.page * scope.pagination.rowsPerPage) > scope.pagination.rowsNumber) ? scope.pagination.rowsNumber : scope.pagination.page * scope.pagination.rowsPerPage}} of {{scope.pagination.rowsNumber}}
+            <div class="q-btn-group row no-wrap inline q-ml-md">
+              <q-btn
+                icon="chevron_left"
+                color="grey-8"
+                round
+                dense
+                flat
+                size="sm"
+                class="q-px-sm"
+                :disable="scope.isFirstPage"
+                @click="scope.prevPage"
+              />
+              <hr class="q-separator q-separator--vertical" aria-orientation="vertical">
+              <q-btn
+                icon="chevron_right"
+                color="grey-8"
+                round
+                dense
+                flat
+                size="sm"
+                class="q-px-sm"
+                :disable="scope.isLastPage"
+                @click="scope.nextPage"
+              />
+            </div>
+          </div>
+        </div>
       </template>
-
-      <template #bottom="scope">
-        <div class="bottom-bar">
+      <template v-slot:pagination="scope">
+        <q-btn
+          v-if="selected.length > 0"
+          class="delete-btn absolute-bottom-left q-pl-lg"
+          color="red"
+          icon="delete"
+          :label="isDeleting ? 'Deleting...' : 'Delete'"
+          :disable="isDeleting"
+          @click="confirmBatchDeleteAction"
+        />
+        
+        <div class="q-btn-group row no-wrap inline q-ml-md">
           <q-btn
-            v-if="selected.length > 0"
-            class="delete-btn"
-            color="red"
-            icon="delete"
-            :label="isDeleting ? 'Deleting...' : 'Delete'"
-            :disable="isDeleting"
-            @click="confirmBatchDeleteAction"
+            icon="chevron_left"
+            color="grey-8"
+            round
+            dense
+            flat
+            size="sm"
+            class="q-px-sm"
+            :disable="scope.isFirstPage"
+            @click="scope.prevPage"
           />
-          <QTablePagination
-            data-test="log-stream-table-pagination"
-            :scope="scope"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            position="bottom"
-            @update:changeRecordPerPage="changePagination"
+          <hr class="q-separator q-separator--vertical" aria-orientation="vertical">
+          <q-btn
+            icon="chevron_right"
+            color="grey-8"
+            round
+            dense
+            flat
+            size="sm"
+            class="q-px-sm"
+            :disable="scope.isLastPage"
+            @click="scope.nextPage"
           />
         </div>
       </template>
+
     </q-table>
     <q-dialog
       v-model="showIndexSchemaDialog"
@@ -265,6 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import {
+  computed,
   defineComponent,
   ref,
   onActivated,
@@ -317,16 +362,33 @@ export default defineComponent({
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("logs");
     const loadingState = ref(true);
+    const searchKeyword = ref("");
 
+    const perPageOptions: any = [20, 50, 100, 250, 500];
+    const maxRecordToReturn = ref<number>(100);
+    const selectedPerPage = ref<number>(20);
+    const pagination = ref({
+      sortBy: 'name',
+      descending: false,
+      page: 1,
+      rowsPerPage: 20,
+      rowsNumber: 0,
+    });
+    const sortField = ref("name");
+    const sortAsc = ref(true);
+
+    const offset = pagination.value.page - 1 * pagination.value.rowsPerPage < 0 ? 0 : pagination.value.page - 1 * pagination.value.rowsPerPage;
+    const pageOffset = ref(offset);
+    const pageRecordsPerPage = ref(pagination.value.rowsPerPage);
+    
     const streamFilterValues = [
       { label: t("logStream.labelLogs"), value: "logs" },
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
       { label: t("logStream.labelMetadata"), value: "metadata" },
       { label: t("logStream.labelIndex"), value: "index" },
-      { label: t("logStream.labelAll"), value: "all" },
     ];
-    const { getStreams, resetStreams, removeStream, getStream } = useStreams();
+    const { getStreams, resetStreams, removeStream, getStream, getPaginatedStreams } = useStreams();
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -346,7 +408,7 @@ export default defineComponent({
         field: "stream_type",
         label: t("logStream.type"),
         align: "left",
-        sortable: true,
+        sortable: false,
       },
       {
         name: "doc_num",
@@ -373,7 +435,7 @@ export default defineComponent({
         field: (row: any) => formatSizeFromMB(row.compressed_size),
         label: t("logStream.compressedSize"),
         align: "left",
-        sortable: true,
+        sortable: false,
         sort: (a, b, rowA, rowB) =>
           parseInt(rowA.compressed_size) - parseInt(rowB.compressed_size),
       },
@@ -429,6 +491,10 @@ export default defineComponent({
       }
     });
 
+    const isSchemaUDSEnabled = computed(() => {
+      return store.state.zoConfig.user_defined_schemas_enabled;
+    });
+
     // As filter data don't gets called when search input is cleared.
     // So calling onChangeStreamFilter to filter again
     // watch(
@@ -454,14 +520,21 @@ export default defineComponent({
         if (refresh) resetStreams();
 
         let counter = 1;
-        getStreams(selectedStreamType.value || "", false, false)
-          .then((res: any) => {
+        let streamResponse;
+        // if(selectedStreamType.value == "all") {
+        //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
+        // } else {
+          streamResponse = getPaginatedStreams(selectedStreamType.value || "", false, false, pageOffset.value, pageRecordsPerPage.value, filterQuery.value, sortField.value, sortAsc.value);
+        // }
+
+        streamResponse.then((res: any) => {
             logStream.value = [];
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";
             let index_size = "";
             resultTotal.value = res.list.length;
+            pagination.value.rowsNumber = res.total;
             logStream.value.push(
               ...res.list.map((data: any) => {
                 doc_num = "--";
@@ -494,6 +567,7 @@ export default defineComponent({
               }
             });
 
+            console.log(logStream.value)
             // onChangeStreamFilter(selectedStreamType.value);
             loadingState.value = false;
             dismiss();
@@ -538,23 +612,6 @@ export default defineComponent({
       });
     };
 
-    const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
     const changeMaxRecordToReturn = (val: any) => {
       maxRecordToReturn.value = val;
     };
@@ -794,6 +851,35 @@ export default defineComponent({
       return `${row.name}-${row.stream_type}`; // Unique key by combining `name` and `stream_type`
     };
 
+    const onRequest = async (props: any) => {
+      const { page, rowsPerPage, sortBy, descending } = props.pagination
+      const filter = props.filter;
+
+      if(sortBy != null) {
+        sortField.value = sortBy;
+        sortAsc.value = !descending;
+      } else {
+        sortField.value = "name";
+        sortAsc.value = true;
+      }
+
+      pageOffset.value = ((page - 1) * rowsPerPage) < 0 ? 0 : (page - 1) * rowsPerPage;
+      pageRecordsPerPage.value = rowsPerPage;
+
+      loadingState.value = true
+
+      await getLogStream();
+
+      // don't forget to update local pagination object
+      pagination.value.page = page
+      pagination.value.rowsPerPage = rowsPerPage
+      pagination.value.sortBy = sortBy
+      pagination.value.descending = descending
+
+        // ...and turn of loading indicator
+      loadingState.value = false;
+    }
+
     return {
       t,
       qTable,
@@ -816,11 +902,11 @@ export default defineComponent({
       schemaData,
       perPageOptions,
       selectedPerPage,
-      changePagination,
       maxRecordToReturn,
       showIndexSchemaDialog,
       changeMaxRecordToReturn,
       outlinedDelete,
+      isSchemaUDSEnabled,
       filterQuery,
       filterData,
       getImageURL,
@@ -836,6 +922,8 @@ export default defineComponent({
       getSelectedItems,
       isDeleting,
       getRowKey,
+      searchKeyword,
+      onRequest,
     };
   },
 });

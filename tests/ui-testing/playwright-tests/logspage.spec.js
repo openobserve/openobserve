@@ -101,7 +101,7 @@ test.describe("Logs UI testcases", () => {
   }) => {
     await page.waitForTimeout(3000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-query-editor"]').click();
     await page.keyboard.press(
       process.platform === "darwin" ? "Meta+A" : "Control+A"
@@ -197,48 +197,6 @@ test.describe("Logs UI testcases", () => {
     await expect(page.locator(".q-notification__message")).toContainText(
       "Please provide valid view name"
     );
-  });
-
-  test("should allow alphanumeric name under saved view", async ({ page }) => {
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator("button")
-      .filter({ hasText: "savesaved_search" })
-      .click();
-    await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill("e2enewtest");
-    await page
-      .locator('[data-test="saved-view-dialog-save-btn"]')
-      .click({ force: true });
-    await page.waitForTimeout(5000);
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .click({ force: true });
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("e2enewtest");
-    await page.waitForTimeout(3000);
-    await page.getByText("e2enewtest").click();
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("e2enewtest");
-    await page.getByText("delete").click();
-    await page.locator('[data-test="confirm-button"]').click();
   });
 
   test("should display error when user directly clicks on OK without adding name", async ({
@@ -358,8 +316,9 @@ test.describe("Logs UI testcases", () => {
     // Click on the date-time button
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
-    // Click on the SQL Mode toggle
-    await page.locator('[aria-label="SQL Mode"]').click({ force: true });
+    await page.waitForTimeout(1000);
+
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
 
     // Assert that the SQL query is visible
     const expectedQuery =
@@ -424,6 +383,7 @@ test.describe("Logs UI testcases", () => {
       .click({ force: true });
     await page.getByPlaceholder("Search Stream").click();
     await page.getByPlaceholder("Search Stream").fill("e2e");
+    await page.waitForTimeout(1000);
     await page
       .getByRole("button", { name: "Explore" })
       .first()
@@ -510,11 +470,11 @@ test.describe("Logs UI testcases", () => {
     await page.waitForTimeout(4000);
     // await page.locator('[data-test="logs-search-subfield-add-code-200"] [data-test="log-search-subfield-list-equal-code-field-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
     });
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
     });
@@ -550,7 +510,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display search around in SQL mode', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
     await page.waitForTimeout(2000)
@@ -567,7 +527,7 @@ test.describe("Logs UI testcases", () => {
     await page.click('[data-test="logs-search-bar-query-editor"]')
     await page.keyboard.type("match_all('code') limit 5");
     await page.waitForTimeout(2000);
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();

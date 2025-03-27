@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,10 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
 use infra::table::cipher::CipherEntry;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::cipher::{http_repr::merge_updates, Cipher, CipherData};
+use o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates};
 
 #[cfg(feature = "enterprise")]
 use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};
@@ -154,7 +154,7 @@ pub async fn get(
             Ok(None) => {
                 return Ok(MetaHttpResponse::not_found(format!(
                     "Key {key_name} not found"
-                )))
+                )));
             }
             Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };
@@ -339,7 +339,7 @@ pub async fn update(
             Ok(None) => {
                 return Ok(MetaHttpResponse::not_found(format!(
                     "Key {key_name} not found"
-                )))
+                )));
             }
             Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };

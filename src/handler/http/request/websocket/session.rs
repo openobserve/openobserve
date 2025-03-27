@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use actix_http::ws::{CloseCode, CloseReason};
-use actix_ws::{MessageStream, Session};
+use actix_ws::MessageStream;
 use config::{
     get_config,
     meta::websocket::{SearchEventReq, SearchResultType},
 };
-use dashmap::DashMap;
 use futures::StreamExt;
 use infra::errors::{self, Error};
 #[cfg(feature = "enterprise")]
@@ -27,68 +28,21 @@ use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, WsMeta},
     infra::config::get_config as get_o2_config,
 };
-use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
 
-use super::utils::search_registry_utils::SearchState;
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::websocket::utils::search_registry_utils;
-use crate::handler::http::request::websocket::{
-    search,
-    utils::{sessions_cache_utils, WsClientEvents, WsServerEvents},
+use crate::service::{
+    self_reporting::audit,
+    websocket_events::{handle_cancel, search_registry_utils},
 };
-#[cfg(feature = "enterprise")]
-use crate::service::self_reporting::audit;
-
-// Global registry for search requests by `trace_id`
-pub static SEARCH_REGISTRY: Lazy<DashMap<String, SearchState>> = Lazy::new(DashMap::new);
-
-// Do not clone the session, instead use a reference to the session
-pub struct WsSession {
-    inner: Option<Session>,
-}
-
-impl WsSession {
-    pub fn new(inner: Session) -> Self {
-        Self { inner: Some(inner) }
-    }
-
-    /// Send a text message to the client
-    pub async fn text(&mut self, msg: String) -> Result<(), actix_ws::Closed> {
-        if let Some(ref mut session) = self.inner {
-            session.text(msg).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-
-    /// Close the session with a reason
-    pub async fn close(&mut self, reason: Option<CloseReason>) -> Result<(), actix_ws::Closed> {
-        if let Some(session) = self.inner.take() {
-            session.close(reason).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-
-    /// Send a pong response
-    pub async fn pong(&mut self, payload: &[u8]) -> Result<(), actix_ws::Closed> {
-        if let Some(ref mut session) = self.inner {
-            session.pong(payload).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-
-    pub async fn ping(&mut self, payload: &[u8]) -> Result<(), actix_ws::Closed> {
-        if let Some(ref mut session) = self.inner {
-            session.ping(payload).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-}
+use crate::{
+    common::infra::config::WS_SEARCH_REGISTRY,
+    service::websocket_events::{
+        WsClientEvents, WsServerEvents, handle_search_request, search_registry_utils::SearchState,
+        sessions_cache_utils,
+    },
+};
 
 pub async fn run(
     mut msg_stream: MessageStream,
@@ -98,41 +52,37 @@ pub async fn run(
     path: String,
 ) {
     let cfg = get_config();
+    let mut ping_interval =
+        tokio::time::interval(Duration::from_secs(cfg.websocket.ping_interval_secs as u64));
     let mut close_reason: Option<CloseReason> = None;
 
     loop {
         tokio::select! {
             Some(msg) = msg_stream.next() => {
+                // Update activity on any message
+                if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                    session.update_activity();
+                }
+
                 match msg {
                     Ok(actix_ws::Message::Ping(bytes)) => {
-                        let mut session = if let Some(session) =
-                                    sessions_cache_utils::get_mut_session(&req_id)
-                                {
-                                    session
-                                } else {
-                                    log::error!(
-                                        "[WS_HANDLER]: req_id: {} session not found",
-                                        req_id
-                                    );
-                                    return;
-                                };
-                        if session.pong(&bytes).await.is_err() {
-                            log::error!("[WS_HANDLER]: Pong failed for request_id: {}", req_id);
+                        if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                            if let Err(e) = session.pong(&bytes).await {
+                                log::error!("[WS_HANDLER]: Failed to send pong: {}", e);
+                                break;
+                            }
+                        } else {
+                            log::error!("[WS_HANDLER]: Session not found for ping response");
                             break;
                         }
                     }
-                    // handle pong as well
-                    Ok(actix_ws::Message::Pong(bytes)) => {
-                        log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received pong {:?}",
-                            req_id,
-                            cfg.common.node_role,
-                            bytes
-                        );
+                    Ok(actix_ws::Message::Pong(_)) => {
+                        log::debug!("[WS_HANDLER] Received pong from {}", req_id);
                     }
                     Ok(actix_ws::Message::Text(msg)) => {
                         log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received message: {}",
                             req_id,
-                            cfg.common.node_role,
+                            get_config().common.node_role,
                             msg
                         );
                         handle_text_message(&org_id, &user_id, &req_id, msg.to_string(), path.clone()).await;
@@ -143,12 +93,12 @@ pub async fn run(
                                 CloseCode::Normal | CloseCode::Error => {
                                     log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Closing connection with reason: {:?}",
                                         req_id,
-                                        cfg.common.node_role,
+                                        get_config().common.node_role,
                                         reason
                                     );
                                 },
                                 _ => {
-                                    log::error!("[WS_HANDLER]: Request Id: {} Node Role: {} Abnormal closure with reason: {:?}",req_id,cfg.common.node_role,reason);
+                                    log::error!("[WS_HANDLER]: Request Id: {} Node Role: {} Abnormal closure with reason: {:?}",req_id,get_config().common.node_role,reason);
                                 },
                             }
                         }
@@ -156,6 +106,15 @@ pub async fn run(
                         break;
                     }
                     _ => ()
+                }
+            }
+            // Heartbeat to keep the connection alive
+            _ = ping_interval.tick() => {
+                if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                    if let Err(e) = session.ping(&[]).await {
+                        log::error!("[WS_HANDLER] Failed to send ping: {}", e);
+                        break;
+                    }
                 }
             }
         }
@@ -181,26 +140,33 @@ pub async fn handle_text_message(
                     handle_search_event(search_req, org_id, user_id, req_id, path.clone()).await;
                 }
                 #[cfg(feature = "enterprise")]
-                WsClientEvents::Cancel { trace_id } => {
+                WsClientEvents::Cancel { trace_id, .. } => {
                     // First handle the cancel event
                     // send a cancel flag to the search task
-                    handle_cancel_event(&trace_id).await;
+                    if let Err(e) = handle_cancel_event(&trace_id).await {
+                        log::warn!("[WS_HANDLER]: Error in cancelling : {}", e);
+                        return;
+                    }
 
                     log::info!(
-                        "[WS_HANDLER]: trace_id: {}, Cancellation flag set to: {}",
+                        "[WS_HANDLER]: trace_id: {}, Cancellation flag set to: {:?}",
                         trace_id,
                         search_registry_utils::is_cancelled(&trace_id)
                     );
 
-                    let res = search::handle_cancel(&trace_id, org_id).await;
+                    let res = handle_cancel(&trace_id, org_id).await;
                     let _ = send_message(req_id, res.to_json().to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
-                        description: Some(format!("trace_id {} Search canceled", trace_id)),
+                        description: None,
                     });
 
                     #[cfg(feature = "enterprise")]
-                    let client_msg = WsClientEvents::Cancel { trace_id };
+                    let client_msg = WsClientEvents::Cancel {
+                        trace_id,
+                        org_id: org_id.to_string(),
+                        user_id: None,
+                    };
 
                     // Add audit before closing
                     #[cfg(feature = "enterprise")]
@@ -243,9 +209,21 @@ pub async fn handle_text_message(
                     let _ = send_message(req_id, response.to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
-                        description: Some(format!("id {} benchmark completed", id)),
+                        description: None,
                     });
                     cleanup_and_close_session(req_id, close_reason).await;
+                }
+                WsClientEvents::TestAbnormalClose { req_id } => {
+                    log::info!(
+                        "[WS_HANDLER]: Request Id: {} Node Role: {} Test Abnormal Close",
+                        req_id,
+                        get_config().common.node_role
+                    );
+                    let close_reason = Some(CloseReason {
+                        code: CloseCode::Error,
+                        description: None,
+                    });
+                    cleanup_and_close_session(&req_id, close_reason).await;
                 }
             }
         }
@@ -256,11 +234,16 @@ pub async fn handle_text_message(
                 msg,
                 e
             );
-            let err_res = WsServerEvents::error_response(e.into(), Some(req_id.to_string()), None);
+            let err_res = WsServerEvents::error_response(
+                e.into(),
+                Some(req_id.to_string()),
+                None,
+                Default::default(),
+            );
             let _ = send_message(req_id, err_res.to_json().to_string()).await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
-                description: Some(format!("req_id {} Request Error", req_id)),
+                description: None,
             });
             let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
                 session
@@ -277,7 +260,6 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
     let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
         session
     } else {
-        log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
         return Err(Error::Message(format!(
             "[req_id {}] session not found",
             req_id
@@ -285,6 +267,7 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
     };
 
     log::debug!("[WS_HANDLER]: req_id: {} sending message: {}", req_id, msg);
+
     session.text(msg).await.map_err(|e| {
         log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
         Error::Message(e.to_string())
@@ -293,47 +276,22 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
 
 async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
     if let Some(mut session) = sessions_cache_utils::get_mut_session(req_id) {
-        let mut close_reason = close_reason;
-        if let Some(reason) = close_reason.as_mut() {
+        if let Some(reason) = close_reason.as_ref() {
             log::info!(
                 "[WS_HANDLER]: req_id: {} Closing session with reason: {:?}",
                 req_id,
                 reason
             );
-        } else {
-            log::info!(
-                "[WS_HANDLER]: req_id: {} Closing session with no specific reason",
-                req_id
-            );
-        }
-
-        // Experiment: sleep for the interval duration in milliseconds to avoid race condition
-        // where the close frame (control frame) is treated as a data frame
-        // and mal forms the data frame
-        let cfg = get_config();
-        let interval = cfg.common.websocket_close_frame_delay;
-        if interval > 0 {
-            tokio::time::sleep(std::time::Duration::from_millis(interval)).await;
         }
 
         // Attempt to close the session
         if let Err(e) = session.close(close_reason).await {
             log::error!(
-                "[WS_HANDLER]: req_id: {} Failed to close session gracefully. Connection may have been closed prematurely: {:?}",
+                "[WS_HANDLER]: req_id: {} Failed to close session gracefully: {:?}",
                 req_id,
                 e
             );
-        } else {
-            log::info!(
-                "[WS_HANDLER]: req_id: {} Close frame sent successfully. Waiting for acknowledgment...",
-                req_id
-            );
         }
-    } else {
-        log::error!(
-            "[WS_HANDLER]: req_id: {} Session not found during cleanup",
-            req_id
-        );
     }
 
     // Remove the session from the cache
@@ -369,8 +327,14 @@ async fn handle_search_event(
     #[cfg(feature = "enterprise")]
     let client_msg = WsClientEvents::Search(Box::new(search_req.clone()));
 
-    // Register running search BEFORE spawning task
-    SEARCH_REGISTRY.insert(trace_id.clone(), SearchState::Running { cancel_tx });
+    // Register running search BEFORE spawning the search task
+    WS_SEARCH_REGISTRY.insert(
+        trace_id.clone(),
+        SearchState::Running {
+            cancel_tx,
+            req_id: req_id.to_string(),
+        },
+    );
 
     // Spawn the search task
     tokio::spawn(async move {
@@ -381,7 +345,7 @@ async fn handle_search_event(
         // The task will also close the session
         // The task will also cleanup the search resources
         tokio::select! {
-            search_result = search::handle_search_request(
+            search_result = handle_search_request(
                 &req_id,
                 &mut accumulated_results,
                 &org_id,
@@ -390,13 +354,15 @@ async fn handle_search_event(
             ) => {
                 match search_result {
                     Ok(_) => {
-                        if let Some(mut state) = SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
-                            *state = SearchState::Completed;
+                        if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
+                            *state = SearchState::Completed {
+                                req_id: req_id.to_string(),
+                            };
                         }
 
                         let close_reason = CloseReason {
                             code: CloseCode::Normal,
-                            description: Some(format!("trace_id {} Search completed", trace_id_for_task)),
+                            description: None,
                         };
 
                         // Add audit before closing
@@ -459,18 +425,21 @@ async fn handle_search_event(
 
 // Cancel handler
 #[cfg(feature = "enterprise")]
-async fn handle_cancel_event(trace_id: &str) {
-    if let Some(mut entry) = SEARCH_REGISTRY.get_mut(trace_id) {
+async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
+    if let Some(mut entry) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
         let state = entry.value_mut();
         let cancel_tx = match state {
-            SearchState::Running { cancel_tx } => cancel_tx.clone(),
+            SearchState::Running { cancel_tx, .. } => cancel_tx.clone(),
             state => {
-                log::info!("[WS_HANDLER]: Cannot cancel search in state: {:?}", state);
-                return;
+                let err_msg = format!("Cannot cancel search in state: {:?}", state);
+                log::warn!("[WS_HANDLER]: {}", err_msg);
+                return Err(anyhow::anyhow!(err_msg));
             }
         };
 
-        *entry.value_mut() = SearchState::Cancelled;
+        *entry.value_mut() = SearchState::Cancelled {
+            req_id: trace_id.to_string(),
+        };
 
         if let Err(e) = cancel_tx.send(()).await {
             log::error!("[WS_HANDLER]: Failed to send cancel signal: {}", e);
@@ -478,6 +447,7 @@ async fn handle_cancel_event(trace_id: &str) {
 
         log::info!("[WS_HANDLER]: Search cancelled for trace_id: {}", trace_id);
     }
+    Ok(())
 }
 
 async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
@@ -489,27 +459,35 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
             trace_id
         );
         // Update state to cancelled before returning
-        if let Some(mut state) = SEARCH_REGISTRY.get_mut(trace_id) {
-            *state = SearchState::Cancelled;
+        if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
+            *state = SearchState::Cancelled {
+                req_id: trace_id.to_string(),
+            };
         }
         return None;
     }
 
     log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
     // Send error response
-    let err_res =
-        WsServerEvents::error_response(e, Some(trace_id.to_string()), Some(req_id.to_string()));
+    let err_res = WsServerEvents::error_response(
+        e,
+        Some(trace_id.to_string()),
+        Some(req_id.to_string()),
+        Default::default(),
+    );
     let _ = send_message(req_id, err_res.to_json().to_string()).await;
 
     // Close with error
     let close_reason = CloseReason {
         code: CloseCode::Error,
-        description: Some(format!("trace_id {} Search Error", trace_id)),
+        description: None,
     };
 
     // Update registry state
-    if let Some(mut state) = SEARCH_REGISTRY.get_mut(trace_id) {
-        *state = SearchState::Completed;
+    if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
+        *state = SearchState::Completed {
+            req_id: trace_id.to_string(),
+        };
     }
 
     Some(close_reason)
@@ -517,6 +495,6 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
 
 // Add cleanup function
 async fn cleanup_search_resources(trace_id: &str) {
-    SEARCH_REGISTRY.remove(trace_id);
+    WS_SEARCH_REGISTRY.remove(trace_id);
     log::debug!("[WS_HANDLER]: trace_id: {}, Resources cleaned up", trace_id);
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,11 +15,14 @@
 
 use core::clone::Clone;
 
+use std::net::IpAddr;
+
 use actix_web::{
+    Error,
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorNotFound, ErrorUnauthorized},
-    http::{header, Method},
-    web, Error,
+    http::{Method, header},
+    web,
 };
 use config::{
     get_config,
@@ -30,9 +33,11 @@ use config::{
 use o2_dex::config::get_config as get_dex_config;
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
+use url::Url;
 
 use crate::{
     common::{
+        infra::cluster,
         meta::{
             ingestion::INGESTION_EP,
             organization::DEFAULT_ORG,
@@ -42,7 +47,7 @@ use crate::{
             },
         },
         utils::{
-            auth::{get_hash, is_root_user, AuthExtractor},
+            auth::{AuthExtractor, V2_API_PREFIX, get_hash, is_root_user},
             redirect_response::RedirectResponseBuilder,
         },
     },
@@ -179,11 +184,7 @@ pub async fn validate_credentials(
     } else {
         match path.find('/') {
             Some(index) => {
-                // hack for v2 api for alerts and folders
-                let org_id = if path_columns.len() > 2
-                    && path_columns[0].eq("v2")
-                    && (path_columns[2].eq("alerts") || path_columns[2].eq("folders"))
-                {
+                let org_id = if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
                     path_columns[1]
                 } else {
                     &path[0..index]
@@ -334,11 +335,7 @@ pub async fn validate_credentials_ext(
     } else {
         match path.find('/') {
             Some(index) => {
-                // hack for v2 api for alerts and folders
-                let org_id = if path_columns.len() > 2
-                    && path_columns[0].eq("v2")
-                    && (path_columns[2].eq("alerts") || path_columns[2].eq("folders"))
-                {
+                let org_id = if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
                     path_columns[1]
                 } else {
                     &path[0..index]
@@ -668,6 +665,11 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    // Check if the ws request is using internal grpc token
+    if get_config().websocket.enabled && auth_info.auth.eq(&get_config().grpc.internal_grpc_token) {
+        return validate_http_internal(req).await;
+    }
+
     if auth_info.auth.starts_with("Basic") {
         let decoded = match base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim()) {
             Ok(val) => val,
@@ -833,6 +835,62 @@ pub async fn validator_proxy_url(
     oo_validator_internal(req, auth_info, path_prefix).await
 }
 
+pub async fn validate_http_internal(
+    req: ServiceRequest,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let router_nodes = cluster::get_cached_online_router_nodes()
+        .await
+        .unwrap_or_default();
+
+    // Get the peer address early and own the string
+    let peer = req
+        .connection_info()
+        .peer_addr()
+        .unwrap_or("unknown")
+        .to_string();
+
+    let router_node = router_nodes.iter().find(|node| {
+        let node_url = match Url::parse(&node.http_addr) {
+            Ok(node_url) => node_url,
+            Err(e) => {
+                log::error!("Failed to parse node URL: {}", e);
+                return false;
+            }
+        };
+
+        // Get IP from peer address (strips port if present)
+        let peer_ip = match peer
+            .split(':')
+            .next()
+            .and_then(|addr| addr.parse::<IpAddr>().ok())
+        {
+            Some(ip) => ip,
+            None => {
+                log::debug!("Failed to parse peer IP from: {}", peer);
+                return false;
+            }
+        };
+
+        let node_ip = match node_url
+            .host()
+            .and_then(|h| h.to_string().parse::<IpAddr>().ok())
+        {
+            Some(ip) => ip,
+            None => {
+                log::debug!("Failed to parse node IP");
+                return false;
+            }
+        };
+
+        peer_ip == node_ip
+    });
+
+    if router_node.is_none() {
+        return Err((ErrorUnauthorized("Unauthorized Access"), req));
+    }
+    Ok(req)
+}
+
 #[cfg(feature = "enterprise")]
 pub(crate) async fn check_permissions(
     user_id: &str,
@@ -953,7 +1011,7 @@ fn extract_relative_path(full_path: &str, path_prefix: &str) -> String {
 fn is_short_url_path(path_columns: &[&str]) -> bool {
     path_columns
         .get(1)
-        .map_or(false, |&segment| segment.to_lowercase() == "short")
+        .is_some_and(|&segment| segment.to_lowercase() == "short")
 }
 
 /// Handles authentication failure by logging the error and returning a redirect response.

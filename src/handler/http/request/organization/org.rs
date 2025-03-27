@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,11 @@ use std::{
     io::Error,
 };
 
-use actix_web::{get, http, post, put, web, HttpRequest, HttpResponse, Result};
+use actix_web::{HttpRequest, HttpResponse, Result, get, http, post, put, web};
+use config::meta::cluster::NodeInfo;
+use infra::schema::STREAM_SCHEMAS_LATEST;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 #[cfg(feature = "cloud")]
 use {
     crate::common::meta::organization::OrganizationInvites,
@@ -27,14 +31,16 @@ use {
 
 use crate::{
     common::{
+        infra::{cluster, config::USERS},
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                OrgDetails, OrgRenameBody, OrgUser, Organization, OrganizationResponse,
-                PasscodeResponse, RumIngestionResponse, THRESHOLD,
+                CUSTOM, DEFAULT_ORG, NodeListResponse, OrgDetails, OrgRenameBody, OrgUser,
+                Organization, OrganizationResponse, PasscodeResponse, RumIngestionResponse,
+                THRESHOLD,
             },
         },
-        utils::auth::{is_root_user, UserEmail},
+        utils::auth::{UserEmail, is_root_user},
     },
     service::organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
 };
@@ -495,4 +501,138 @@ async fn accept_org_invite(
             err.to_string(),
         ))),
     }
+}
+
+/// GetNodeList
+///
+/// This endpoint returns a hierarchical list of all nodes in the OpenObserve cluster organized by
+/// regions and clusters, along with node details including versions and other essential
+/// information. It can be useful for:
+///
+/// - Monitoring which nodes are online/offline in a distributed deployment
+/// - Checking version consistency across the cluster
+/// - Identifying nodes by their roles
+/// - Filtering nodes by region when using a multi-region setup
+///
+/// NOTE: This endpoint is only accessible through the "_meta" organization and requires
+/// the user to have access to this special organization.
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetMetaOrganizationNodeList",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Must be '_meta'"),
+        ("regions" = String, Query, description = "Optional comma-separated list of regions to filter by (e.g., 'us-east-1,us-west-2')")
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = NodeListResponse),
+        (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/node/list")]
+async fn node_list(
+    org_id: web::Path<String>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> Result<HttpResponse, Error> {
+    let org = org_id.into_inner();
+
+    // Ensure this API is only available for the "_meta" organization
+    if org != config::META_ORG_ID {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            http::StatusCode::FORBIDDEN.into(),
+            "This API is only available for the _meta organization".to_string(),
+        )));
+    }
+
+    // Extract regions from query params
+    let _regions = query.get("regions").map_or_else(Vec::new, |regions_str| {
+        regions_str
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect()
+    });
+
+    // Configure and populate the response based on environment
+    #[cfg(feature = "enterprise")]
+    let response = if get_o2_config().super_cluster.enabled {
+        // Super cluster is enabled, get nodes from super cluster
+        match get_super_cluster_nodes(&_regions).await {
+            Ok(response) => response,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        }
+    } else {
+        // Super cluster not enabled, get local nodes
+        get_local_nodes().await
+    };
+
+    #[cfg(not(feature = "enterprise"))]
+    let response = get_local_nodes().await;
+
+    // Return the nested response
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Helper function to collect nodes from the local cluster
+async fn get_local_nodes() -> NodeListResponse {
+    let mut response = NodeListResponse::new();
+
+    // Get all nodes from cache if available
+    if let Some(nodes) = cluster::get_cached_nodes(|_| true).await {
+        for node in nodes {
+            response.add_node(node.clone(), node.get_region(), node.get_cluster_name());
+        }
+    }
+
+    response
+}
+
+#[cfg(feature = "enterprise")]
+/// Helper function to collect nodes from all clusters in a super cluster
+async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse, anyhow::Error> {
+    let mut response = NodeListResponse::new();
+
+    // Get all nodes in the super cluster
+    let cluster_nodes = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
+        "list_nodes",
+        regions.to_vec(),
+        vec![],
+    )
+    .await
+    {
+        Ok(nodes) => nodes,
+        Err(e) => {
+            log::error!("Failed to get super cluster nodes: {:?}", e);
+            return Ok(response); // Return empty response instead of failing
+        }
+    };
+
+    // For each node in the super cluster
+    for node in cluster_nodes {
+        let region = node.get_region();
+        let cluster_name = node.get_cluster_name();
+
+        // Fetch child nodes from this cluster node
+        match crate::service::node::get_node_list(node).await {
+            Ok(cluster_nodes) => {
+                for node in cluster_nodes {
+                    response.add_node(node.clone(), region.clone(), cluster_name.clone());
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to get node list from cluster {}: {:?}",
+                    cluster_name,
+                    e
+                );
+                return Err(anyhow::anyhow!("Failed to get node list: {:?}", e));
+            }
+        }
+    }
+
+    Ok(response)
 }

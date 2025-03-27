@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,16 +21,16 @@ use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::{
     fs,
-    sync::{mpsc, RwLock},
+    sync::{RwLock, mpsc},
 };
 
 use crate::{
+    ReadRecordBatchEntry,
     entry::PersistStat,
     errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioMpscSendSnafu, WriteDataSnafu},
     memtable::MemTable,
     rwmap::RwIndexMap,
     writer::WriterKey,
-    ReadRecordBatchEntry,
 };
 
 pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
@@ -183,8 +183,4 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
 
     Ok(())
-}
-
-pub(crate) async fn len() -> usize {
-    IMMUTABLES.read().await.len()
 }

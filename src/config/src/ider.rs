@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -106,7 +106,7 @@ impl SnowflakeIdGenerator {
 
         // last_time_millis is 64 bits, left shift 22 bit, store 42 bits, machine_id left shift 12
         // bits, idx complementing bits.
-        self.last_time_millis << 22 | ((self.machine_id << 12) as i64) | (self.idx as i64)
+        (self.last_time_millis << 22) | ((self.machine_id << 12) as i64) | (self.idx as i64)
     }
 
     /// The basic guarantee time punctuality.
@@ -136,7 +136,7 @@ impl SnowflakeIdGenerator {
 
         // last_time_millis is 64 bits, left shift 22 bit, store 42 bits, machine_id left shift 12
         // bits, idx complementing bits.
-        self.last_time_millis << 22 | ((self.machine_id << 12) as i64) | (self.idx as i64)
+        (self.last_time_millis << 22) | ((self.machine_id << 12) as i64) | (self.idx as i64)
     }
 
     /// The lazy generate.
@@ -153,7 +153,7 @@ impl SnowflakeIdGenerator {
 
         // last_time_millis is 64 bits, left shift 22 bit, store 42 bits, machine_id left shift 12
         // bits, idx complementing bits.
-        self.last_time_millis << 22 | ((self.machine_id << 12) as i64) | (self.idx as i64)
+        (self.last_time_millis << 22) | ((self.machine_id << 12) as i64) | (self.idx as i64)
     }
 }
 

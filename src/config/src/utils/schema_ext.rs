@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -119,5 +119,7 @@ mod tests {
             Field::new("flag", DataType::UInt8, false),
         ]);
         assert_ne!(schema1.hash_key(), schema2.hash_key());
+        assert_eq!(schema1.hash_key().len(), 16);
+        assert_eq!(schema2.hash_key().len(), 16);
     }
 }

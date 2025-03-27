@@ -19,7 +19,7 @@ export class LogsPage {
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
 
-    this.sqlModeToggle = this.page.getByLabel('SQL Mode').locator('div').nth(2);
+    this.sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2)
 
     this.absoluteTab = absoluteTabLocator;
 
@@ -225,7 +225,7 @@ export class LogsPage {
 
   async clearAndRunQuery() {
     await this.page.locator(this.queryButton).click();
-    await this.page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await this.page.locator(this.queryEditor).click();
     await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
     await this.page.keyboard.press("Backspace");
@@ -322,7 +322,6 @@ export class LogsPage {
 
   async clickQuickModeToggle() {
 
-    await this.page.waitForSelector('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
     // Get the toggle button element
     const toggleButton = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
     // Evaluate the class attribute to determine if the toggle is in the off state
@@ -436,9 +435,48 @@ export class LogsPage {
   }
 
   async selectStreamAndStreamTypeForLogs(stream) {
+
     await this.page.locator('[data-test="log-search-index-list-select-stream"]').click();
+    await this.page.waitForTimeout(2000);
     await this.page.locator('[data-test="log-search-index-list-select-stream"]').fill(stream);
+    await this.page.waitForTimeout(2000);
     await this.page.waitForSelector(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`, { state: "visible" });
+    await this.page.waitForTimeout(2000);
     await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
 }
+
+async toggleHistogram() {
+  await this.page.waitForSelector('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
+  await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
+}
+
+async checkErrorVisible() {
+  return this.page.getByRole('heading', { name: 'Error while fetching' }).isVisible();
+}
+
+async getErrorDetails() {
+  return this.page.locator('[data-test="logs-search-search-result"]').getByRole('heading');
+}
+
+async selectIndexStreamDefault() {
+  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.waitForTimeout(3000);
+  await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
+
+}
+
+async clearAndFillQueryEditor(query) {
+  const editor = this.page.locator('[data-test="logs-search-bar-query-editor"]').getByLabel('Editor content;Press Alt+F1');
+  await editor.fill(''); // Clear the editor
+  await this.page.waitForTimeout(1000); // Optional: adjust or remove as per your needs
+  await editor.fill(query); // Fill with the new query
+}
+
+async waitForSearchResultAndCheckText(expectedText) {
+  const locator = this.page.locator('[data-test="logs-search-search-result"]').getByRole('heading');
+  await locator.waitFor(); // Wait for the element to be visible
+  await expect(locator).toContainText(expectedText);
+}
+
+
 }

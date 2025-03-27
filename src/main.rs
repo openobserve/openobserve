@@ -19,17 +19,17 @@ use std::{
     net::SocketAddr,
     str::FromStr,
     sync::{
-        atomic::{AtomicU16, Ordering},
         Arc,
+        atomic::{AtomicU16, Ordering},
     },
     time::Duration,
 };
 
-use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
+use actix_web::{App, HttpServer, dev::ServerHandle, http::KeepAlive, middleware, web};
 use actix_web_lab::middleware::from_fn;
 use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
-use config::get_config;
+use config::{get_config, utils::size::bytes_to_human_readable};
 use log::LevelFilter;
 #[cfg(feature = "enterprise")]
 use openobserve::handler::http::{
@@ -38,11 +38,12 @@ use openobserve::handler::http::{
 use openobserve::{
     cli::basic::cli,
     common::{
-        infra::{self as common_infra, cluster, config::VERSION},
+        infra::{self as common_infra, cluster},
         meta, migration,
         utils::zo_logger,
     },
     handler::{
+        self,
         grpc::{
             auth::check_auth,
             flight::FlightServiceImpl,
@@ -59,25 +60,28 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, metadata, search::SEARCH_SERVER, self_reporting, tls::http_tls_config},
+    service::{
+        db, metadata, node::NodeService, search::SEARCH_SERVER, self_reporting,
+        tls::http_tls_config,
+    },
 };
-use opentelemetry::{global, trace::TracerProvider, KeyValue};
+use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
     metrics::v1::metrics_service_server::MetricsServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
-use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource};
+use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
 use proto::cluster_rpc::{
     event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
-    query_cache_server::QueryCacheServer, search_server::SearchServer,
-    streams_server::StreamsServer,
+    node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
+    search_server::SearchServer, streams_server::StreamsServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]
-use pyroscope_pprofrs::{pprof_backend, PprofConfig};
+use pyroscope_pprofrs::{PprofConfig, pprof_backend};
 use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
@@ -90,7 +94,7 @@ use tracing_subscriber::Registry;
 #[cfg(feature = "pyroscope")]
 use {
     pyroscope::PyroscopeAgent,
-    pyroscope_pprofrs::{pprof_backend, PprofConfig},
+    pyroscope_pprofrs::{PprofConfig, pprof_backend},
 };
 
 #[cfg(feature = "mimalloc")]
@@ -100,7 +104,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 use tracing_subscriber::{
-    filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
+    EnvFilter, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*,
 };
 
 #[tokio::main]
@@ -146,7 +150,7 @@ async fn main() -> Result<(), anyhow::Error> {
             [
                 ("role", cfg.common.node_role.as_str()),
                 ("instance", cfg.common.instance_name.as_str()),
-                ("version", VERSION),
+                ("version", config::VERSION),
             ]
             .to_vec(),
         )
@@ -164,6 +168,8 @@ async fn main() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    let mut tracer_provider = None;
+
     // setup logs
     #[cfg(feature = "tokio-console")]
     let enable_tokio_console = true;
@@ -180,25 +186,25 @@ async fn main() -> Result<(), anyhow::Error> {
         })?;
         None
     } else if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-        enable_tracing()?;
+        tracer_provider = Some(enable_tracing()?);
         None
     } else {
         Some(setup_logs())
     };
 
-    log::info!("Starting OpenObserve {}", VERSION);
+    log::info!("Starting OpenObserve {}", config::VERSION);
     log::info!(
-        "System info: CPU cores {}, MEM total {:.2} GB, Disk total {:.2} GB, free {:.2} GB",
+        "System info: CPU cores {}, MEM total {}, Disk total {}, free {}",
         cfg.limit.real_cpu_num,
-        cfg.limit.mem_total as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.limit.disk_total as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.limit.disk_free as f64 / 1024.0 / 1024.0 / 1024.0,
+        bytes_to_human_readable(cfg.limit.mem_total as f64),
+        bytes_to_human_readable(cfg.limit.disk_total as f64),
+        bytes_to_human_readable(cfg.limit.disk_free as f64),
     );
     log::info!(
-        "Caches info: Disk max size {:.2} GB, MEM max size {:.2} GB, Datafusion pool size: {:.2} GB",
-        cfg.disk_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.memory_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.memory_cache.datafusion_max_size as f64 / 1024.0 / 1024.0 / 1024.0,
+        "Caches info: Disk max size {}, MEM max size {}, Datafusion pool size: {}",
+        bytes_to_human_readable(cfg.disk_cache.max_size as f64),
+        bytes_to_human_readable((cfg.memory_cache.max_size * cfg.memory_cache.bucket_num) as f64),
+        bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
     );
 
     // init script server
@@ -257,7 +263,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // check version upgrade
             let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
-            if let Err(e) = migration::check_upgrade(&old_version, VERSION).await {
+            if let Err(e) = migration::check_upgrade(&old_version, config::VERSION).await {
                 job_init_tx.send(false).ok();
                 panic!("check upgrade failed: {}", e);
             }
@@ -303,6 +309,15 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("meter provider init failed");
             };
+
+            // init websocket gc
+            if cfg.websocket.enabled {
+                log::info!("Initializing WebSocket session garbage collector");
+                if let Err(e) = handler::http::request::websocket::init().await {
+                    job_init_tx.send(false).ok();
+                    panic!("websocket gc init failed: {}", e);
+                }
+            }
 
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
@@ -368,11 +383,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // let node online
     let _ = cluster::set_online(false).await;
 
-    // This is specifically for enrichment tables, as caching is happening using
-    // search service
-    db::schema::cache_enrichment_tables()
+    // initialize the jobs are deferred until the gRPC service starts
+    job::init_deferred()
         .await
-        .expect("EnrichmentTables cache failed");
+        .expect("Deferred jobs failed to init");
 
     if cfg.log.events_enabled {
         tokio::task::spawn(async move { zo_logger::send_logs().await });
@@ -394,6 +408,12 @@ async fn main() -> Result<(), anyhow::Error> {
         log::error!("HTTP server runs failed: {}", e);
     }
     log::info!("HTTP server stopped");
+
+    // stop tracing
+    if let Some(tracer_provider) = tracer_provider {
+        let result = tracer_provider.shutdown();
+        log::info!("Tracer provider shutdown result: {:?}", result);
+    }
 
     // flush usage report
     self_reporting::flush().await;
@@ -487,7 +507,9 @@ async fn init_common_grpc_server(
     let gaddr: SocketAddr = format!("{}:{}", ip, cfg.grpc.port).parse()?;
     let event_svc = EventServer::new(Eventer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let search_svc = SearchServer::new(SEARCH_SERVER.clone())
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -500,10 +522,14 @@ async fn init_common_grpc_server(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let metrics_ingest_svc = MetricsServiceServer::new(MetricsIngester)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let logs_svc = LogsServiceServer::new(LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let trace_svc = TraceServiceServer::new(TraceServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -511,10 +537,14 @@ async fn init_common_grpc_server(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let ingest_svc = IngestServer::new(Ingester)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let streams_svc = StreamsServer::new(StreamServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -522,7 +552,15 @@ async fn init_common_grpc_server(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    let node_svc = NodeServiceServer::new(NodeService)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+
     log::info!(
         "starting gRPC server {} at {}",
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
@@ -549,6 +587,7 @@ async fn init_common_grpc_server(
         .add_service(ingest_svc)
         .add_service(streams_svc)
         .add_service(flight_svc)
+        .add_service(node_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
@@ -613,8 +652,6 @@ async fn init_router_grpc_server(
 
 async fn init_http_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // metrics
-    let prometheus = config::metrics::create_prometheus_handler();
 
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
@@ -645,7 +682,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             haddr,
             local_id
         );
-        let mut app = App::new().wrap(prometheus.clone());
+        let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
                 router::http::create_http_client().expect("Failed to create http tls client");
@@ -658,6 +695,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                             cfg.limit.circuit_breaker_enabled,
                         ))
                         .wrap(from_fn(middlewares::check_keep_alive))
+                        .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -676,6 +714,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                         cfg.limit.circuit_breaker_enabled,
                     ))
                     .wrap(from_fn(middlewares::check_keep_alive))
+                    .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -695,9 +734,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
-        cfg.limit.http_keep_alive,
-    )))
+    .keep_alive(if cfg.limit.http_keep_alive_disabled {
+        KeepAlive::Disabled
+    } else {
+        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.http_keep_alive)))
+    })
     .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
@@ -722,9 +763,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
 async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // metrics
-    let prometheus = config::metrics::create_prometheus_handler();
-
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
         format!("[::]:{}", cfg.http.port).parse()?
@@ -756,7 +794,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             local_id
         );
 
-        let mut app = App::new().wrap(prometheus.clone());
+        let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
                 router::http::create_http_client().expect("Failed to create http tls client");
@@ -769,6 +807,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                             cfg.limit.circuit_breaker_enabled,
                         ))
                         .wrap(from_fn(middlewares::check_keep_alive))
+                        .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -787,6 +826,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                         cfg.limit.circuit_breaker_enabled,
                     ))
                     .wrap(from_fn(middlewares::check_keep_alive))
+                    .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -805,9 +845,11 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
     })
-    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
-        cfg.limit.http_keep_alive,
-    )))
+    .keep_alive(if cfg.limit.http_keep_alive_disabled {
+        KeepAlive::Disabled
+    } else {
+        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.http_keep_alive)))
+    })
     .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
@@ -833,7 +875,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 async fn graceful_shutdown(handle: ServerHandle) {
     #[cfg(unix)]
     {
-        use tokio::signal::unix::{signal, SignalKind};
+        use tokio::signal::unix::{SignalKind, signal};
 
         let mut sigquit = signal(SignalKind::quit()).unwrap();
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
@@ -921,7 +963,7 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
     guard
 }
 
-fn enable_tracing() -> Result<(), anyhow::Error> {
+fn enable_tracing() -> Result<opentelemetry_sdk::trace::TracerProvider, anyhow::Error> {
     let cfg = get_config();
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
     let tracer = opentelemetry_otlp::new_pipeline().tracing();
@@ -937,6 +979,10 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
                 .with_http_client(
                     reqwest::Client::builder()
                         .danger_accept_invalid_certs(true)
+                        .timeout(Duration::from_secs(10))           // Overall request timeout
+                        .connect_timeout(Duration::from_secs(5))    // Connection establishment timeout
+                        .pool_idle_timeout(Duration::from_secs(60)) // How long to keep idle connections
+                        .pool_max_idle_per_host(10) // How many idle connections to keep per host
                         .build()?,
                 )
                 .with_endpoint(&cfg.common.otel_otlp_url)
@@ -964,15 +1010,18 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
                 .with_protocol(opentelemetry_otlp::Protocol::Grpc)
         })
     };
-    let tracer = tracer
-        .with_trace_config(opentelemetry_sdk::trace::Config::default().with_resource(
-            Resource::new(vec![
-                KeyValue::new("service.name", cfg.common.node_role.to_string()),
-                KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-                KeyValue::new("service.version", VERSION),
-            ]),
-        ))
-        .install_batch(opentelemetry_sdk::runtime::Tokio)?;
+
+    // Store the tracer provider before installing batch processor
+    let tracer = tracer.with_trace_config(
+        opentelemetry_sdk::trace::Config::default().with_resource(Resource::new(vec![
+            KeyValue::new("service.name", cfg.common.node_role.to_string()),
+            KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
+            KeyValue::new("service.version", config::VERSION),
+        ])),
+    );
+
+    // Install batch processor
+    let tracer = tracer.install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
     let layer = if cfg.log.json_format {
         tracing_subscriber::fmt::layer()
@@ -991,14 +1040,14 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
             tracer.tracer("tracing-otel-subscriber"),
         ))
         .init();
-    Ok(())
+
+    // Return the tracer provider
+    Ok(tracer)
 }
 
 #[cfg(feature = "enterprise")]
 async fn init_script_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // metrics
-    let prometheus = config::metrics::create_prometheus_handler();
 
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
@@ -1014,7 +1063,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
 
     // following command will setup the namespace
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::actions::app_deployer::init().await?;
+    o2_enterprise::enterprise::actions::action_deployer::init().await?;
 
     let server = HttpServer::new(move || {
         let cfg = get_config();
@@ -1033,10 +1082,8 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             haddr,
             local_id
         );
-        let mut app = App::new().wrap(prometheus.clone());
-
+        let mut app = App::new();
         app = app.service(web::scope(&cfg.common.base_uri).configure(get_script_server_routes));
-
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
@@ -1046,9 +1093,11 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
-        cfg.limit.http_keep_alive,
-    )))
+    .keep_alive(if cfg.limit.http_keep_alive_disabled {
+        KeepAlive::Disabled
+    } else {
+        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.http_keep_alive)))
+    })
     .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
@@ -1104,7 +1153,8 @@ pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
             .service(script_server::create_job)
             .service(script_server::delete_job)
             .service(script_server::get_app_details)
-            .service(script_server::list_deployed_apps),
+            .service(script_server::list_deployed_apps)
+            .service(script_server::patch_action),
     );
 }
 

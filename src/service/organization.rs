@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,7 @@ use config::{
     },
     utils::rand::generate_random_string,
 };
+use infra::table;
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 #[cfg(feature = "cloud")]
@@ -31,21 +32,24 @@ use {
         OrganizationInviteResponse, OrganizationInviteUserRecord, OrganizationInvites,
     },
     chrono::{Duration, Utc},
-    config::{get_config, SMTP_CLIENT},
-    lettre::{message::SinglePart, AsyncTransport, Message},
-    o2_enterprise::enterprise::cloud::{org_invites, OrgInviteStatus},
+    config::{SMTP_CLIENT, get_config},
+    lettre::{AsyncTransport, Message, message::SinglePart},
+    o2_enterprise::enterprise::cloud::{OrgInviteStatus, org_invites},
 };
 
-use super::{db::org_users, users::add_admin_to_org};
 use crate::{
     common::{
         meta::organization::{
-            AlertSummary, IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
-            PipelineSummary, RumIngestionToken, StreamSummary, CUSTOM, DEFAULT_ORG,
+            AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
+            OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
-    service::{db, stream::get_streams},
+    service::{
+        db::{self, org_users},
+        stream::get_streams,
+        users::add_admin_to_org,
+    },
 };
 
 pub async fn get_summary(org_id: &str) -> OrgSummary {
@@ -82,7 +86,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     };
 
     let functions = db::functions::list(org_id).await.unwrap_or_default();
-    let dashboards = super::dashboards::list_dashboards(ListDashboardsParams::new(org_id))
+    let dashboards = table::dashboards::list(ListDashboardsParams::new(org_id))
         .await
         .unwrap_or_default();
 

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,15 +16,14 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Duration;
-use config::metrics::DB_QUERY_NUMS;
+use config::{metrics::DB_QUERY_NUMS, utils::hash::Sum64};
 use sqlx::Row;
 
-use super::{get_scheduler_max_retries, Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
+use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
 use crate::{
     db::{
-        self,
-        postgres::{create_index, CLIENT},
-        IndexStatement,
+        self, IndexStatement,
+        postgres::{CLIENT, CLIENT_RO, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -115,7 +114,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
     /// The count of jobs for the given module (Report/Alert etc.)
     async fn len_module(&self, module: TriggerModule) -> usize {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -265,27 +264,46 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
-    async fn update_trigger(&self, trigger: Trigger) -> Result<()> {
+    async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
-        sqlx::query(
-            r#"UPDATE scheduled_jobs
-SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5, data = $6
-WHERE org = $7 AND module_key = $8 AND module = $9;"#,
-        )
-        .bind(trigger.status)
-        .bind(trigger.retries)
-        .bind(trigger.next_run_at)
-        .bind(trigger.is_realtime)
-        .bind(trigger.is_silenced)
-        .bind(&trigger.data)
-        .bind(&trigger.org)
-        .bind(&trigger.module_key)
-        .bind(&trigger.module)
-        .execute(&pool)
-        .await?;
+        let query = if clone {
+            sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = $1, start_time = $2, end_time = $3, retries = $4, next_run_at = $5, is_realtime = $6, is_silenced = $7, data = $8
+    WHERE org = $9 AND module_key = $10 AND module = $11;"#,
+            )
+            .bind(trigger.status)
+            .bind(trigger.start_time)
+            .bind(trigger.end_time)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module)
+        } else {
+            sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5, data = $6
+    WHERE org = $7 AND module_key = $8 AND module = $9;"#,
+            )
+            .bind(trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module)
+        };
+
+        query.execute(&pool).await?;
 
         // For now, only send realtime alert triggers
         if trigger.module == TriggerModule::Alert && trigger.is_realtime {
@@ -316,10 +334,6 @@ WHERE org = $7 AND module_key = $8 AND module = $9;"#,
         report_timeout: i64,
     ) -> Result<Vec<Trigger>> {
         let pool = CLIENT.clone();
-        let (include_max, mut max_retries) = get_scheduler_max_retries();
-        if include_max {
-            max_retries += 1;
-        }
 
         let now = chrono::Utc::now().timestamp_micros();
         let report_max_time = now
@@ -332,9 +346,6 @@ WHERE org = $7 AND module_key = $8 AND module = $9;"#,
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
-        DB_QUERY_NUMS
-            .with_label_values(&["update", "scheduled_jobs"])
-            .inc();
         let query = r#"UPDATE scheduled_jobs
 SET status = $1, start_time = $2,
     end_time = CASE
@@ -344,14 +355,37 @@ SET status = $1, start_time = $2,
 WHERE id IN (
     SELECT id
     FROM scheduled_jobs
-    WHERE status = $6 AND next_run_at <= $7 AND retries < $8 AND NOT (is_realtime = $9 AND is_silenced = $10)
+    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9) 
     ORDER BY next_run_at
-    LIMIT $11
+    LIMIT $10
     FOR UPDATE
 )
 RETURNING *;"#;
 
         let mut tx = pool.begin().await?;
+
+        // Lock the table for the duration of the transaction
+        let lock_key = "scheduler_pull_lock";
+        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+        let lock_id = if lock_id > i64::MAX as u64 {
+            (lock_id >> 1) as i64
+        } else {
+            lock_id as i64
+        };
+        let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
+        DB_QUERY_NUMS
+            .with_label_values(&["get_lock", "scheduled_jobs"])
+            .inc();
+        if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SCHEDULER] rollback pull scheduled_jobs error: {}", e);
+            }
+            return Err(e.into());
+        }
+
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
         let jobs: Vec<Trigger> = match sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
             .bind(now)
@@ -360,7 +394,6 @@ RETURNING *;"#;
             .bind(report_max_time)
             .bind(TriggerStatus::Waiting)
             .bind(now)
-            .bind(max_retries)
             .bind(true)
             .bind(false)
             .bind(concurrency)
@@ -384,7 +417,7 @@ RETURNING *;"#;
     }
 
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -410,7 +443,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     }
 
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -429,7 +462,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
 
     /// List all the jobs for the given module and organization
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -486,7 +519,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
         let now = chrono::Utc::now().timestamp_micros();
-        sqlx::query(
+        let res = sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = $1, retries = retries + 1
 WHERE status = $2 AND end_time <= $3;
@@ -497,11 +530,15 @@ WHERE status = $2 AND end_time <= $3;
         .bind(now)
         .execute(&pool)
         .await?;
+        log::debug!(
+            "[SCHEDULER] watch_timeout for scheduler updated {} rows",
+            res.rows_affected()
+        );
         Ok(())
     }
 
     async fn len(&self) -> usize {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();

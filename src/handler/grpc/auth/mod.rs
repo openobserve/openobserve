@@ -15,7 +15,7 @@
 
 use config::meta::cluster::get_internal_grpc_token;
 use http_auth_basic::Credentials;
-use tonic::{metadata::MetadataValue, Request, Status};
+use tonic::{Request, Status, metadata::MetadataValue};
 
 use crate::{
     common::{

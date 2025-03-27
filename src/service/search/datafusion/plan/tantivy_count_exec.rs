@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,18 +19,19 @@ use arrow::array::{Array, Int64Array};
 use config::meta::{inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
-    common::{internal_err, Result, Statistics},
+    common::{Result, Statistics, internal_err},
     error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
-        stream::RecordBatchStreamAdapter, DisplayAs, DisplayFormatType, ExecutionMode,
-        ExecutionPlan, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
+        execution_plan::{Boundedness, EmissionType},
+        stream::RecordBatchStreamAdapter,
     },
 };
 
 use crate::service::search::{
-    grpc::{storage::filter_file_list_by_tantivy_index, QueryParams},
+    grpc::{QueryParams, storage::filter_file_list_by_tantivy_index},
     index::IndexCondition,
 };
 
@@ -67,7 +68,8 @@ impl TantivyCountExec {
             // Output Partitioning
             Partitioning::UnknownPartitioning(1),
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Final,
+            Boundedness::Bounded,
         )
     }
 }
@@ -84,7 +86,7 @@ impl DisplayAs for TantivyCountExec {
             .join(", ");
         write!(
             f,
-            "TantivyCountExec: file num: {}, file_list: [{file_keys}]",
+            "TantivyCountExec: files: {}, file_list: [{file_keys}]",
             self.file_list.len()
         )
     }

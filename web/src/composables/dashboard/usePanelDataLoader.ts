@@ -76,22 +76,13 @@ export const usePanelDataLoader = (
   };
   let runCount = 0;
 
-  const searchRetriesCount = ref<{ [key: string]: number }>({});
-
   const store = useStore();
-
-  // Add cleanup function
-  const cleanupSearchRetries = (traceId: string) => {
-    if (searchRetriesCount.value[traceId]) {
-      delete searchRetriesCount.value[traceId];
-    }
-  };
 
   const {
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
     cancelSearchQueryBasedOnRequestId,
-    closeSocketBasedOnRequestId,
+    cleanUpListeners,
   } = useSearchWebSocket();
 
   const { refreshAnnotations } = useAnnotations(
@@ -144,9 +135,6 @@ export const usePanelDataLoader = (
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
-    searchWebSocketRequestIdsAndTraceIds: <
-      { requestId: string; traceId: string }[]
-    >[],
     isOperationCancelled: false,
   });
 
@@ -321,18 +309,19 @@ export const usePanelDataLoader = (
 
     state.isOperationCancelled = true;
 
-    if (isWebSocketEnabled() && state.searchWebSocketRequestIdsAndTraceIds) {
+    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
       try {
-        // loop on state.searchWebSocketRequestIdsAndTraceIds
-        state.searchWebSocketRequestIdsAndTraceIds.forEach((it) => {
-          if (it?.requestId && it?.traceId) {
-            cancelSearchQueryBasedOnRequestId(it?.requestId, it?.traceId);
-          }
+        // loop on state.searchRequestTraceIds
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelSearchQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
         });
       } catch (error) {
         console.error("Error during WebSocket cleanup:", error);
       } finally {
-        state.searchWebSocketRequestIdsAndTraceIds = [];
+        state.searchRequestTraceIds = [];
       }
     }
     if (abortController) {
@@ -456,7 +445,7 @@ export const usePanelDataLoader = (
                   dashboard_id: dashboardId?.value,
                   folder_id: folderId?.value,
                 },
-                searchType.value ?? "Dashboards",
+                searchType.value ?? "dashboards",
               ),
             abortControllerRef.signal,
           );
@@ -607,11 +596,7 @@ export const usePanelDataLoader = (
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
-  const handleSearchResponse = (
-    requestId: string,
-    payload: any,
-    response: any,
-  ) => {
+  const handleSearchResponse = (payload: any, response: any) => {
     try {
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
@@ -638,15 +623,18 @@ export const usePanelDataLoader = (
     }
   };
 
-  const sendSearchMessage = async (requestId: string, payload: any) => {
+  const sendSearchMessage = async (payload: any) => {
     // check if query is already canceled, if it is, close the socket
     if (state.isOperationCancelled) {
-      closeSocketBasedOnRequestId(requestId);
       state.isOperationCancelled = false;
+
+      // clean up the listeners
+      cleanUpListeners(payload.traceId);
+
       return;
     }
 
-    sendSearchMessageBasedOnRequestId(requestId, {
+    sendSearchMessageBasedOnRequestId({
       type: "search",
       content: {
         trace_id: payload.traceId,
@@ -660,7 +648,8 @@ export const usePanelDataLoader = (
           ),
         },
         stream_type: payload.pageType,
-        search_type: "dashboards",
+        search_type: searchType.value ?? "dashboards",
+        org_id: store?.state?.selectedOrganization?.identifier,
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
@@ -669,70 +658,27 @@ export const usePanelDataLoader = (
     });
   };
 
-  const handleSearchClose = (
-    requestId: string,
-    payload: any,
-    response: any,
-  ) => {
-    const MAX_RETRIES = 2;
-    const RECONNECT_DELAY = 1000; // 1 second
-
-    removeRequestId(requestId);
-
-    if (response.code === 1001 || response.code === 1006) {
-      const retryCount = searchRetriesCount.value[payload.traceId] || 0;
-      searchRetriesCount.value[payload.traceId] = retryCount + 1;
-
-      if (retryCount < MAX_RETRIES) {
-        state.loading = true;
-        state.isOperationCancelled = false;
-
-        setTimeout(() => {
-          try {
-            const newRequestId = fetchQueryDataWithWebSocket(payload, {
-              open: sendSearchMessage,
-              close: handleSearchClose,
-              error: handleSearchError,
-              message: handleSearchResponse,
-            }) as string;
-
-            addRequestId(newRequestId, payload.traceId);
-          } catch (error: any) {
-            console.error("Error reconnecting WebSocket:", error);
-            cleanupSearchRetries(payload?.traceId);
-            handleSearchError(requestId, payload, {
-              content: {
-                message: "Failed to reconnect WebSocket",
-                trace_id: payload.traceId,
-                code: response.code,
-                error_detail: error?.message,
-              },
-            });
-          }
-        }, RECONNECT_DELAY);
-
-        return;
-      } else {
-        // remove current traceId
-        cleanupSearchRetries(payload?.traceId);
-        handleSearchError(requestId, payload, {
-          content: {
-            message:
-              "WebSocket connection terminated unexpectedly. Please check your network and try again",
-            trace_id: payload.traceId,
-            code: response.code,
-            error_detail: "",
-          },
-        });
-      }
-    }
+  const handleSearchClose = (payload: any, response: any) => {
+    removeTraceId(payload?.traceId);
 
     if (response.type === "error") {
       processApiError(response?.content, "sql");
     }
 
-    // remove current traceId
-    cleanupSearchRetries(payload?.traceId);
+
+    const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
+
+    if (errorCodes.includes(response.code)) {
+      handleSearchError(payload, {
+        content: {
+          message:
+            "WebSocket connection terminated unexpectedly. Please check your network and try again",
+          trace_id: payload.traceId,
+          code: response.code,
+          error_detail: "",
+        }
+      });
+    }
 
     // set loading to false
     state.loading = false;
@@ -742,14 +688,23 @@ export const usePanelDataLoader = (
     saveCurrentStateToCache();
   };
 
-  const handleSearchError = (
-    requestId: string,
-    payload: any,
-    response: any,
-  ) => {
-    removeRequestId(requestId);
+  const handleSearchReset = (payload: any) => {
+    // reset old state data
+    state.data = [];
+    state.resultMetaData = [];
 
-    cleanupSearchRetries(payload?.traceId);
+    getDataThroughWebSocket(
+      payload.queryReq.query,
+      payload.queryReq.it,
+      payload.queryReq.startISOTimestamp,
+      payload.queryReq.endISOTimestamp,
+      payload.pageType,
+      payload.currentQueryIndex,
+    );
+  }
+
+  const handleSearchError = (payload: any, response: any) => {
+    removeTraceId(payload.traceId);
 
     // set loading to false
     state.loading = false;
@@ -764,11 +719,11 @@ export const usePanelDataLoader = (
     startISOTimestamp: string,
     endISOTimestamp: string,
     pageType: string,
-    abortControllerRef: AbortController,
     currentQueryIndex: number,
   ) => {
     try {
       const { traceId } = generateTraceContext();
+      addTraceId(traceId);
 
       const payload: {
         queryReq: any;
@@ -783,7 +738,6 @@ export const usePanelDataLoader = (
           it,
           startISOTimestamp,
           endISOTimestamp,
-          abortControllerRef,
           currentQueryIndex,
         },
         type: "histogram",
@@ -792,14 +746,16 @@ export const usePanelDataLoader = (
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
       };
-      const requestId = fetchQueryDataWithWebSocket(payload, {
+
+      fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
         error: handleSearchError,
         message: handleSearchResponse,
-      }) as string;
+        reset: handleSearchReset,
+      });
 
-      addRequestId(requestId, traceId);
+      addTraceId(traceId);
     } catch (e: any) {
       state.errorDetail = e?.message || e;
       state.loading = false;
@@ -892,6 +848,9 @@ export const usePanelDataLoader = (
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
+      // remove past error detail
+      state.errorDetail = "";
+      
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
         // Iterate through each query in the panel schema
@@ -926,6 +885,7 @@ export const usePanelDataLoader = (
                     query: query,
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
+                    step: panelSchema.value.config.step_value ?? "0",
                   }),
                 abortController.signal,
               );
@@ -963,7 +923,8 @@ export const usePanelDataLoader = (
         const abortControllerRef = abortController;
 
         try {
-          // reset old state data
+
+          // Call search API
           state.data = [];
           state.metadata = {
             queries: [],
@@ -971,9 +932,7 @@ export const usePanelDataLoader = (
           state.resultMetaData = [];
           state.annotations = [];
           state.isOperationCancelled = false;
-
-          // Call search API
-
+          
           // Get the page type from the first query in the panel schema
           const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 
@@ -1095,7 +1054,7 @@ export const usePanelDataLoader = (
                           dashboard_id: dashboardId?.value,
                           folder_id: folderId?.value,
                         },
-                        searchType.value ?? "Dashboards",
+                        searchType.value ?? "dashboards",
                       ),
                     abortControllerRef.signal,
                   );
@@ -1219,7 +1178,6 @@ export const usePanelDataLoader = (
                   startISOTimestamp,
                   endISOTimestamp,
                   pageType,
-                  abortControllerRef,
                   panelQueryIndex,
                 );
               } else {
@@ -1352,9 +1310,8 @@ export const usePanelDataLoader = (
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
-          const value = variable.value
-            .map((value: any) => `'${value}'`)
-            .join(",");
+          const value =
+            variable.value.map((value: any) => `'${value}'`).join(",") || "''";
           const possibleVariablesPlaceHolderTypes = [
             {
               placeHolder: `\${${variable.name}:csv}`,
@@ -1366,7 +1323,9 @@ export const usePanelDataLoader = (
             },
             {
               placeHolder: `\${${variable.name}:doublequote}`,
-              value: variable.value.map((value: any) => `"${value}"`).join(","),
+              value:
+                variable.value.map((value: any) => `"${value}"`).join(",") ||
+                '""',
             },
             {
               placeHolder: `\${${variable.name}:singlequote}`,
@@ -1516,20 +1475,6 @@ export const usePanelDataLoader = (
     state.searchRequestTraceIds = state.searchRequestTraceIds.filter(
       (id: any) => id !== traceId,
     );
-  };
-
-  const addRequestId = (requestId: string, traceId: string) => {
-    state.searchWebSocketRequestIdsAndTraceIds = [
-      ...state.searchWebSocketRequestIdsAndTraceIds,
-      { requestId, traceId },
-    ];
-  };
-
-  const removeRequestId = (requestId: string) => {
-    state.searchWebSocketRequestIdsAndTraceIds =
-      state.searchWebSocketRequestIdsAndTraceIds.filter(
-        (id: any) => id.requestId !== requestId,
-      );
   };
 
   const hasAtLeastOneQuery = () =>
@@ -1918,6 +1863,23 @@ export const usePanelDataLoader = (
     }
     if (observer) {
       observer.disconnect();
+    }
+
+    // for websocket
+    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+      try {
+        // loop on state.searchRequestTraceIds
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelSearchQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
+        });
+      } catch (error) {
+        console.error("Error during WebSocket cleanup:", error);
+      } finally {
+        state.searchRequestTraceIds = [];
+      }
     }
 
     // remove cancelquery event

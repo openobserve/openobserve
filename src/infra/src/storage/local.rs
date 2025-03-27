@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,12 +20,12 @@ use bytes::Bytes;
 use config::metrics;
 use futures::stream::BoxStream;
 use object_store::{
-    limit::LimitStore, local::LocalFileSystem, path::Path, Error, GetOptions, GetResult,
-    ListResult, MultipartUpload, ObjectMeta, ObjectStore, PutMultipartOpts, PutOptions, PutPayload,
-    PutResult, Result,
+    Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
+    local::LocalFileSystem, path::Path,
 };
 
-use crate::storage::{format_key, CONCURRENT_REQUESTS};
+use crate::storage::{CONCURRENT_REQUESTS, format_key};
 
 pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
@@ -127,7 +127,11 @@ impl ObjectStore for Local {
         let result = self
             .client
             .get(&(format_key(&file, self.with_prefix).into()))
-            .await?;
+            .await
+            .map_err(|e| {
+                log::error!("[STORAGE] get local file: {}, error: {:?}", file, e);
+                e
+            })?;
 
         // metrics
         let data_len = result.meta.size;
@@ -154,7 +158,11 @@ impl ObjectStore for Local {
         let result = self
             .client
             .get_opts(&(format_key(&file, self.with_prefix).into()), options)
-            .await?;
+            .await
+            .map_err(|e| {
+                log::error!("[STORAGE] get_opts local file: {}, error: {:?}", file, e);
+                e
+            })?;
 
         // metrics
         let data_len = result.meta.size;
@@ -168,7 +176,7 @@ impl ObjectStore for Local {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "local"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "local"])
                 .inc_by(time);
         }
 
@@ -180,8 +188,17 @@ impl ObjectStore for Local {
         let file = location.to_string();
         let data = self
             .client
-            .get_range(&(format_key(&file, self.with_prefix).into()), range)
-            .await?;
+            .get_range(&(format_key(&file, self.with_prefix).into()), range.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[STORAGE] get_range local file: {}, range: {:?}, error: {:?}",
+                    file,
+                    range,
+                    e
+                );
+                e
+            })?;
 
         // metrics
         let data_len = data.len();
@@ -195,7 +212,7 @@ impl ObjectStore for Local {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "local"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
                 .inc_by(time);
         }
 

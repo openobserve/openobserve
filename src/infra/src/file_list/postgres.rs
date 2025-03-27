@@ -25,7 +25,7 @@ use config::{
     utils::{
         hash::Sum64,
         parquet::parse_file_key_columns,
-        time::{end_of_the_day, DAY_MICRO_SECS},
+        time::{DAY_MICRO_SECS, end_of_the_day},
     },
 };
 use hashbrown::HashMap;
@@ -33,8 +33,8 @@ use sqlx::{Executor, Postgres, QueryBuilder, Row};
 
 use crate::{
     db::{
-        postgres::{create_index, CLIENT},
         IndexStatement,
+        postgres::{CLIENT, CLIENT_RO, create_index},
     },
     errors::{Error, Result},
 };
@@ -271,7 +271,7 @@ impl super::FileList for PostgresFileList {
     }
 
     async fn get(&self, file: &str) -> Result<FileMeta> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS.with_label_values(&["get", "file_list"]).inc();
@@ -294,7 +294,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
     }
 
     async fn contains(&self, file: &str) -> Result<bool> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS
@@ -359,7 +359,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["query", "file_list"])
             .inc();
@@ -426,7 +426,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["query_by_date", "file_list"])
             .inc();
@@ -469,7 +469,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             return Ok(Vec::default());
         }
         let mut ret = Vec::new();
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
 
         for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
             if chunk.is_empty() {
@@ -548,7 +548,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         for (time_start, time_end) in day_partitions {
             let stream_key = stream_key.clone();
             tasks.push(tokio::task::spawn(async move {
-                let pool = CLIENT.clone();
+                let pool = CLIENT_RO.clone();
                 DB_QUERY_NUMS
                 .with_label_values(&["query_ids", "file_list"])
                 .inc();
@@ -598,7 +598,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["query_old_data_hours", "file_list"])
             .inc();
@@ -642,7 +642,7 @@ SELECT date
         if time_max == 0 {
             return Ok(Vec::new());
         }
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
@@ -664,6 +664,26 @@ SELECT date
             .collect())
     }
 
+    async fn list_deleted(&self) -> Result<Vec<FileListDeleted>> {
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "file_list_deleted"])
+            .inc();
+        let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
+            r#"SELECT stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+        )
+        .fetch_all(&pool)
+        .await?;
+        Ok(ret
+            .iter()
+            .map(|r| FileListDeleted {
+                file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                index_file: r.index_file,
+                flattened: r.flattened,
+            })
+            .collect())
+    }
+
     async fn get_min_ts(
         &self,
         org_id: &str,
@@ -672,7 +692,7 @@ SELECT date
     ) -> Result<i64> {
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
@@ -687,7 +707,7 @@ SELECT date
     }
 
     async fn get_max_pk_value(&self) -> Result<i64> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
@@ -699,7 +719,7 @@ SELECT date
     }
 
     async fn get_min_pk_value(&self) -> Result<i64> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
@@ -757,7 +777,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
                 }
             }
         };
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let op_name = if deleted { "stats_deleted" } else { "stats" };
         DB_QUERY_NUMS
             .with_label_values(&[op_name, "file_list"])
@@ -792,7 +812,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
         } else {
             format!("SELECT * FROM stream_stats WHERE org = '{}';", org_id)
         };
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "stream_stats"])
             .inc();
@@ -982,7 +1002,7 @@ UPDATE stream_stats
     }
 
     async fn len(&self) -> usize {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();

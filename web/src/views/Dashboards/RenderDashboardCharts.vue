@@ -85,8 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :layout.sync="getDashboardLayout(panels)"
         :col-num="48"
         :row-height="30"
-        :is-draggable="!viewOnly"
-        :is-resizable="!viewOnly"
+        :is-draggable="!viewOnly && !saveDashboardData.isLoading.value"
+        :is-resizable="!viewOnly && !saveDashboardData.isLoading.value"
         :vertical-compact="true"
         :autoSize="true"
         :restore-on-drag="true"
@@ -199,6 +199,7 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
+import { useLoading } from "@/composables/useLoading";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -278,8 +279,8 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
-    const refreshDashboard = () => {
-      emit("refresh");
+    const refreshDashboard = (onlyIfRequired = false) => {
+      emit("refresh", onlyIfRequired);
     };
 
     const onMovePanel = (panelId: any, newTabId: any) => {
@@ -443,7 +444,7 @@ export default defineComponent({
     provide("hoveredSeriesState", hoveredSeriesState);
 
     // save the dashboard value
-    const saveDashboard = async () => {
+    const saveDashboardData = useLoading(async () => {
       try {
         await updateDashboard(
           store,
@@ -470,7 +471,7 @@ export default defineComponent({
         // refresh dashboard
         refreshDashboard();
       }
-    };
+    });
 
     //add panel
     const addPanelData = () => {
@@ -486,12 +487,12 @@ export default defineComponent({
     };
 
     const movedEvent = async (i, newX, newY) => {
-      await saveDashboard();
+      await saveDashboardData.execute();
     };
 
     const resizedEvent = async (i, newX, newY, newHPx, newWPx) => {
       window.dispatchEvent(new Event("resize"));
-      await saveDashboard();
+      await saveDashboardData.execute();
     };
 
     const getDashboardLayout: any = (panels: any) => {
@@ -552,19 +553,28 @@ export default defineComponent({
       }
     };
 
-    // update initial variable values using the variable value selector ref
+    /**
+     * Updates the initial variable values using the variable value selector ref
+     * @param args - Any arguments to be passed to `changeInitialVariableValues` method
+     */
     const updateInitialVariableValues = async (...args: any) => {
       // if view panel is open then close it
       showViewPanel.value = false;
 
       // first, refresh the dashboard
-      refreshDashboard();
+      refreshDashboard(true);
 
       // NOTE: after variables in variables feature, it works without changing the initial variable values
       // then, update the initial variable values
       await variablesValueSelectorRef.value.changeInitialVariableValues(
         ...args,
       );
+
+      // This is necessary to ensure that panels refresh automatically based on the drilldown
+      // without requiring the user to click on refresh to load the panel/whole dashboard
+      currentVariablesDataRef.value = {
+        __global: JSON.parse(JSON.stringify(variablesData.value)),
+      };
     };
 
     const refreshPanelRequest = (panelId) => {
@@ -606,7 +616,7 @@ export default defineComponent({
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
       currentQueryTraceIds,
       openEditLayout,
-      saveDashboard,
+      saveDashboardData,
       currentVariablesDataRef,
     };
   },

@@ -16,15 +16,15 @@
 use std::{
     collections::VecDeque,
     sync::{
-        atomic::{AtomicI64, Ordering},
         Arc,
+        atomic::{AtomicI64, Ordering},
     },
 };
 
 use config::{
     get_config,
     utils::{
-        hash::{gxhash, Sum64},
+        hash::{Sum64, gxhash},
         time::{now, now_micros, second_micros},
     },
 };
@@ -56,7 +56,7 @@ static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
 
 pub async fn init() -> Result<()> {
     let cfg = get_config();
-    if !cfg.common.metrics_cache_enabled || !cfg.disk_cache.enabled {
+    if !cfg.common.metrics_cache_enabled {
         return Ok(());
     }
 
@@ -408,7 +408,7 @@ fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
     if !key.starts_with("metrics_results/") || !key.ends_with(".pb") {
         return None;
     }
-    let item_key = key.split('/').last().unwrap_or("");
+    let item_key = key.split('/').next_back().unwrap_or("");
     let parts = item_key.split('_').collect::<Vec<_>>();
     if parts.len() != 4 {
         return None;

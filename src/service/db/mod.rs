@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -49,7 +49,7 @@ pub mod syslog;
 pub mod user;
 pub mod version;
 
-pub(crate) use infra_db::{get_coordinator, Event, NEED_WATCH, NO_NEED_WATCH};
+pub(crate) use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
 
 #[inline]
 pub(crate) async fn get(key: &str) -> Result<Bytes> {

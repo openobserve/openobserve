@@ -1,12 +1,27 @@
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use std::sync::Arc;
 
 use config::{
-    meta::{search, stream::StreamType},
+    meta::{cluster::RoleGroup, search, stream::StreamType},
     utils::json,
 };
 use infra::errors::{Error, ErrorCodes};
-use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-use tracing::{info_span, Instrument};
+use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
+use tracing::{Instrument, info_span};
 
 use crate::{
     common::infra::cluster as infra_cluster,
@@ -20,8 +35,9 @@ pub async fn grpc_search(
     stream_type: StreamType,
     user_id: Option<String>,
     in_req: &search::Request,
+    node_group: Option<RoleGroup>,
 ) -> Result<search::Response, Error> {
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
         Some(nodes) => nodes,
         None => {
             log::error!("search->grpc: no querier node online");
@@ -90,9 +106,10 @@ pub async fn grpc_search_partition(
     org_id: &str,
     stream_type: StreamType,
     in_req: &search::SearchPartitionRequest,
+    node_group: Option<RoleGroup>,
     skip_max_query_range: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
         Some(nodes) => nodes,
         None => {
             log::error!("search->grpc: no querier node online");

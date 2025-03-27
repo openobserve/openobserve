@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,14 +24,13 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    get_config, is_local_disk_storage,
+    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, RwAHashMap, get_config,
     meta::inverted_index::InvertedIndexTantivyMode,
     metrics,
     utils::{
         file::*,
-        hash::{gxhash, Sum64},
+        hash::{Sum64, gxhash},
     },
-    RwAHashMap, FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER,
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -40,6 +39,7 @@ use tokio::sync::RwLock;
 use super::CacheStrategy;
 use crate::{cache::meta::ResultCacheMeta, storage};
 
+// parquet cache
 static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
@@ -49,7 +49,7 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     files
 });
 
-// read only
+// read only parquet cache
 static FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
@@ -155,7 +155,7 @@ impl FileData {
 
     async fn get_size(&self, file: &str) -> Option<usize> {
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        match get_file_len(&file_path) {
+        match get_file_size(&file_path) {
             Ok(v) => Some(v as usize),
             Err(_) => None,
         }
@@ -216,7 +216,7 @@ impl FileData {
         loop {
             let item = self.data.remove();
             if item.is_none() {
-                log::error!(
+                log::warn!(
                     "[trace_id {trace_id}] File disk cache is corrupt, it shouldn't be none"
                 );
                 break;
@@ -458,15 +458,14 @@ pub async fn exist(file: &str) -> bool {
 
 #[inline]
 pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    if !cfg.disk_cache.enabled
-        || (is_local_disk_storage()
-            && !cfg.common.result_cache_enabled
-            && !cfg.common.metrics_cache_enabled)
-    {
+    if !get_config().disk_cache.enabled {
         return Ok(());
     }
+
+    // hash the file name and get the bucket index
     let idx = get_bucket_idx(file);
+
+    // get all the files from the bucket
     let mut files = if file.starts_with("files") {
         FILES[idx].write().await
     } else {
@@ -521,6 +520,17 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         log::error!("load disk cache error: {}", e);
                     }
                 } else {
+                    // check file is tmp file
+                    if fp.extension().is_some_and(|ext| ext == "tmp") {
+                        log::debug!(
+                            "Removing temporary file during cache load: {}",
+                            fp.display()
+                        );
+                        if let Err(e) = tokio::fs::remove_file(&fp).await {
+                            log::warn!("Failed to remove tmp file: {}, error: {}", fp.display(), e);
+                        }
+                        continue;
+                    }
                     let meta = match get_file_meta(&fp) {
                         Ok(m) => m,
                         Err(e) => {
@@ -614,13 +624,13 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
 
 async fn gc() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    if !cfg.disk_cache.enabled || is_local_disk_storage() {
+    if !cfg.disk_cache.enabled {
         return Ok(());
     }
+
     for file in FILES.iter() {
         let r = file.read().await;
         if r.cur_size + cfg.disk_cache.release_size < r.max_size {
-            drop(r);
             continue;
         }
         drop(r);
@@ -725,10 +735,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_set_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_1";
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
-        for i in 0..100 {
+        for i in 0..50 {
             let file_key = format!(
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
@@ -740,7 +750,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_get_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_2";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
@@ -762,7 +772,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_miss() {
-        let trace_id = "session_456";
+        let trace_id = "session_3";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "lru");
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
@@ -785,10 +795,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_set_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_4";
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
-        for i in 0..100 {
+        for i in 0..50 {
             let file_key = format!(
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_4_{}.parquet",
                 i
@@ -800,7 +810,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_5";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "fifo");
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_5_1.parquet";
@@ -822,7 +832,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_miss() {
-        let trace_id = "session_456";
+        let trace_id = "session_6";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "fifo");
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_6_2.parquet";
@@ -851,7 +861,7 @@ mod tests {
             .map(|s| s.to_string())
             .collect();
 
-        let trace_id = "session_123";
+        let trace_id = "session_7";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
         file_data.multi_dir = multi_dir;

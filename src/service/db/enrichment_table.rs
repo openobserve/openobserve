@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -53,6 +53,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         search_type: None,
         search_event_context: None,
         use_cache: None,
+        local_mode: Some(true),
     };
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
@@ -148,7 +149,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     },
                 );
             }
-            db::Event::Delete(_) => {}
+            db::Event::Delete(ev) => {
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                if let Some((key, _)) = ENRICHMENT_TABLES.remove(item_key) {
+                    log::info!("deleted enrichment table: {}", key);
+                }
+            }
             db::Event::Empty => {}
         }
     }

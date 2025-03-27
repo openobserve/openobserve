@@ -967,7 +967,7 @@ export const deepCopy = (value: any) => {
 
 export const getWebSocketUrl = (request_id: string, org_identifier: string) => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/${request_id}`;
+  return `${protocol}//${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/v2/${request_id}`;
 };
 
 export const isWebSocketEnabled = () => {

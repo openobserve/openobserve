@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,17 +16,16 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Duration;
-use config::metrics::DB_QUERY_NUMS;
+use config::{metrics::DB_QUERY_NUMS, utils::hash::Sum64};
 use sqlx::Row;
 
 use super::{
-    get_scheduler_max_retries, Trigger, TriggerId, TriggerModule, TriggerStatus, TRIGGERS_KEY,
+    TRIGGERS_KEY, Trigger, TriggerId, TriggerModule, TriggerStatus, get_scheduler_max_retries,
 };
 use crate::{
     db::{
-        self,
-        mysql::{create_index, CLIENT},
-        IndexStatement,
+        self, IndexStatement,
+        mysql::{CLIENT, CLIENT_RO, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -117,7 +116,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
     /// The count of jobs for the given module (Report/Alert etc.)
     async fn len_module(&self, module: TriggerModule) -> usize {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -267,27 +266,47 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         Ok(())
     }
 
-    async fn update_trigger(&self, trigger: Trigger) -> Result<()> {
+    async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
-        sqlx::query(
-            r#"UPDATE scheduled_jobs
-SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
-WHERE org = ? AND module_key = ? AND module = ?;"#,
-        )
-        .bind(trigger.status)
-        .bind(trigger.retries)
-        .bind(trigger.next_run_at)
-        .bind(trigger.is_realtime)
-        .bind(trigger.is_silenced)
-        .bind(&trigger.data)
-        .bind(&trigger.org)
-        .bind(&trigger.module_key)
-        .bind(&trigger.module)
-        .execute(&pool)
-        .await?;
+
+        let query = if clone {
+            sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = ?, start_time = ?, end_time = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
+    WHERE org = ? AND module_key = ? AND module = ?;"#,
+            )
+            .bind(trigger.status)
+            .bind(trigger.start_time)
+            .bind(trigger.end_time)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module)
+        } else {
+            sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
+    WHERE org = ? AND module_key = ? AND module = ?;"#,
+            )
+            .bind(trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module)
+        };
+
+        query.execute(&pool).await?;
 
         // For now, only send realtime alert triggers
         if trigger.module == TriggerModule::Alert && trigger.is_realtime {
@@ -317,12 +336,6 @@ WHERE org = ? AND module_key = ? AND module = ?;"#,
         alert_timeout: i64,
         report_timeout: i64,
     ) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
-        let (include_max, mut max_retries) = get_scheduler_max_retries();
-        if include_max {
-            max_retries += 1;
-        }
-
         log::debug!("Start pulling scheduled_job");
         let now = chrono::Utc::now().timestamp_micros();
         let report_max_time = now
@@ -335,14 +348,73 @@ WHERE org = ? AND module_key = ? AND module = ?;"#,
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
-        let mut tx = pool.begin().await?;
+
+        let lock_pool = CLIENT.clone();
+        let lock_key = "scheduler_pull_lock".to_string();
+        let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
+        let lock_sql = format!(
+            "SELECT GET_LOCK('{}', {})",
+            lock_id,
+            config::get_config().limit.meta_transaction_lock_timeout
+        );
+        let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
+        let mut lock_tx = lock_pool.begin().await?;
+        DB_QUERY_NUMS
+            .with_label_values(&["get_lock", "scheduled_jobs"])
+            .inc();
+        match sqlx::query_scalar::<_, i64>(&lock_sql)
+            .fetch_one(&mut *lock_tx)
+            .await
+        {
+            Ok(v) => {
+                if v != 1 {
+                    if let Err(e) = lock_tx.rollback().await {
+                        log::error!(
+                            "[SCHEDULER] rollback lock for pull scheduled_jobs error: {}",
+                            e
+                        );
+                    }
+                    return Err(Error::from(DbError::DBOperError(
+                        "LockTimeout".to_string(),
+                        lock_key,
+                    )));
+                }
+            }
+            Err(e) => {
+                if let Err(e) = lock_tx.rollback().await {
+                    log::error!(
+                        "[SCHEDULER] rollback lock for pull scheduled_jobs error: {}",
+                        e
+                    );
+                }
+                return Err(e.into());
+            }
+        };
+
+        let pool = CLIENT.clone();
+        let mut tx = match pool.begin().await {
+            Ok(tx) => tx,
+            Err(e) => {
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!(
+                        "[SCHEDULER] commit for unlock pull scheduled_jobs error: {}",
+                        e
+                    );
+                }
+                return Err(e.into());
+            }
+        };
+
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
         let job_ids: Vec<TriggerId> = match sqlx::query_as::<_, TriggerId>(
             r#"SELECT id
 FROM scheduled_jobs
-WHERE status = ? AND next_run_at <= ? AND retries < ? AND NOT (is_realtime = ? AND is_silenced = ?)
+WHERE status = ? AND next_run_at <= ? AND NOT (is_realtime = ? AND is_silenced = ?)
 ORDER BY next_run_at
 LIMIT ?
 FOR UPDATE;
@@ -350,7 +422,6 @@ FOR UPDATE;
         )
         .bind(TriggerStatus::Waiting)
         .bind(now)
-        .bind(max_retries)
         .bind(true)
         .bind(false)
         .bind(concurrency)
@@ -360,7 +431,19 @@ FOR UPDATE;
             Ok(ids) => ids,
             Err(e) => {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback select jobs for update error: {}", e);
+                    log::error!("[SCHEDULER] rollback select jobs for update error: {}", e);
+                }
+                DB_QUERY_NUMS
+                    .with_label_values(&["release_lock", "scheduled_jobs"])
+                    .inc();
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!(
+                        "[SCHEDULER] commit for unlock pull scheduled_jobs error: {}",
+                        e
+                    );
                 }
                 return Err(e.into());
             }
@@ -372,8 +455,19 @@ FOR UPDATE;
         );
         if job_ids.is_empty() {
             if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback scheduler pull error: {}", e);
-                return Err(e.into());
+                log::error!("[SCHEDULER] rollback scheduler pull error: {}", e);
+            }
+            DB_QUERY_NUMS
+                .with_label_values(&["release_lock", "scheduled_jobs"])
+                .inc();
+            if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+            }
+            if let Err(e) = lock_tx.commit().await {
+                log::error!(
+                    "[SCHEDULER] commit for unlock pull scheduled_jobs error: {}",
+                    e
+                );
             }
             return Ok(vec![]);
         }
@@ -404,13 +498,50 @@ WHERE id IN ({});",
             if let Err(e) = tx.rollback().await {
                 log::error!("[MYSQL] rollback update scheduled jobs status error: {}", e);
             }
+            DB_QUERY_NUMS
+                .with_label_values(&["release_lock", "scheduled_jobs"])
+                .inc();
+            if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+            }
+            if let Err(e) = lock_tx.commit().await {
+                log::error!(
+                    "[SCHEDULER] commit for unlock pull scheduled_jobs error: {}",
+                    e
+                );
+            }
             return Err(e.into());
         }
 
         log::debug!("Update scheduled jobs for selected pull job ids");
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit scheduler pull update error: {}", e);
+            log::error!("[SCHEDULER] commit scheduler pull update error: {}", e);
+            DB_QUERY_NUMS
+                .with_label_values(&["release_lock", "scheduled_jobs"])
+                .inc();
+            if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+            }
+            if let Err(e) = lock_tx.commit().await {
+                log::error!(
+                    "[SCHEDULER] commit for unlock pull scheduled_jobs error: {}",
+                    e
+                );
+            }
             return Err(e.into());
+        }
+
+        DB_QUERY_NUMS
+            .with_label_values(&["release_lock", "scheduled_jobs"])
+            .inc();
+        if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+            log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+        }
+        if let Err(e) = lock_tx.commit().await {
+            log::error!(
+                "[SCHEDULER] commit for unlock pull scheduled_jobs error: {}",
+                e
+            );
         }
 
         let query = format!(
@@ -429,7 +560,7 @@ WHERE id IN ({});",
     }
 
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -454,7 +585,7 @@ WHERE id IN ({});",
     }
 
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -473,7 +604,7 @@ WHERE id IN ({});",
 
     /// List all the jobs for the given module and organization
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -529,7 +660,7 @@ WHERE id IN ({});",
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
-        sqlx::query(
+        let res = sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = ?, retries = retries + 1
 WHERE status = ? AND end_time <= ?
@@ -540,11 +671,15 @@ WHERE status = ? AND end_time <= ?
         .bind(now)
         .execute(&pool)
         .await?;
+        log::debug!(
+            "[SCHEDULER] watch_timeout for scheduler updated {} rows",
+            res.rows_affected()
+        );
         Ok(())
     }
 
     async fn len(&self) -> usize {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();

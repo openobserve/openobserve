@@ -50,9 +50,9 @@ use crate::service::{
     search::{
         datafusion::{
             distributed_plan::{
+                NewEmptyExecVisitor, ReplaceTableScanExec,
                 codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
                 empty_exec::NewEmptyExec,
-                NewEmptyExecVisitor, ReplaceTableScanExec,
             },
             exec::{prepare_datafusion_context, register_udf},
             plan::tantivy_count_exec::TantivyCountExec,
@@ -212,7 +212,7 @@ pub async fn search(
         )
         .await?;
         log::info!(
-            "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, num: {}, took: {} ms",
+            "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, files: {}, took: {} ms",
             req.query_identifier.partition,
             file_list.len(),
             file_list_took,
@@ -453,10 +453,10 @@ fn collect_stats(files: &[FileKey]) -> ScanStats {
     let mut scan_stats = ScanStats::new();
     scan_stats.files = files.len() as i64;
     for file in files.iter() {
-        scan_stats.idx_scan_size += file.meta.index_size;
         scan_stats.records += file.meta.records;
         scan_stats.original_size += file.meta.original_size;
         scan_stats.compressed_size += file.meta.compressed_size;
+        scan_stats.idx_scan_size += file.meta.index_size;
     }
     scan_stats
 }

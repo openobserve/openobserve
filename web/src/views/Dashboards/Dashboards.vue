@@ -97,6 +97,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-bold q-px-md q-pt-sm">
           {{ t("dashboard.folderLabel") }}
         </div>
+            <!-- Search Input -->
+    <div style="width: 100%;" class="flex folder-item q-py-xs  ">
+          <q-input
+          v-model="folderSearchQuery"   
+          dense
+          filled
+          borderless
+          data-test="folder-search"
+          placeholder="Search Folders"
+          style="width: 100%;"
+          clearable
+        >
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+              <div>
+        </div>
+          </div>
         <div class="dashboards-tabs">
           <q-tabs
             indicator-color="transparent"
@@ -106,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboards-folder-tabs"
           >
             <q-tab
-              v-for="(tab, index) in store.state.organizationData.folders"
+              v-for="(tab, index) in filteredFolders"
               :key="tab.folderId"
               :name="tab.folderId"
               content-class="tab_content full-width"
@@ -114,12 +133,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-folder-tab-${tab.folderId}`"
             >
               <div class="folder-item full-width row justify-between no-wrap">
-                <span class="folder-name" :title="tab.name">{{
+                <span class="folder-name text-truncate" :title="tab.name">{{
                   tab.name
                 }}</span>
                 <div class="hover-actions">
                   <q-btn
-                    v-if="index"
+                    v-if="index || (folderSearchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
                     dense
                     flat
                     no-caps
@@ -207,6 +226,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : props.value
                 }}
               </div>
+            </q-td>
+          </template>
+          <template #body-cell-folder="props">
+            <q-td :props="props">
+                <div @click.stop="updateActiveFolderId(props.row.folder_id)">
+                  {{ props.row.folder }}
+                </div>
             </q-td>
           </template>
           <!-- add delete icon in actions column -->
@@ -432,6 +458,7 @@ export default defineComponent({
     const showMoveDashboardDialog = ref(false);
     const searchAcrossFolders = ref(false);
     const filterQuery = ref("");
+    const folderSearchQuery = ref("");
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
       const columns = computed(() => {
@@ -920,6 +947,16 @@ export default defineComponent({
       searchQuery.value = "";
       filteredResults.value = [];
     }
+    const filteredFolders = computed(()=>{
+      if(!folderSearchQuery.value) return store.state.organizationData.folders;
+      return store.state.organizationData.folders?.filter((folder: any)=> folder.name.toLowerCase().includes(folderSearchQuery.value.toLowerCase()));
+    })
+
+    const updateActiveFolderId = (folderId: any) => {
+      activeFolderId.value = folderId;
+      filterQuery.value = "";
+      searchQuery.value = "";
+    }
 
 
     return {
@@ -988,6 +1025,9 @@ export default defineComponent({
       activeFolderToMove,
       clearSearchHistory,
       dynamicQueryModel,
+      folderSearchQuery,
+      filteredFolders,
+      updateActiveFolderId
     };
   },
   methods: {
@@ -1011,7 +1051,6 @@ export default defineComponent({
       this.routeToViewD(row);
     },
   },
-
 });
 </script>
 
@@ -1089,6 +1128,9 @@ export default defineComponent({
 }
 
 .folder-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-transform: none !important;
 }
 </style>

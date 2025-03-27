@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,19 +15,18 @@
 
 use std::collections::{HashMap, HashSet};
 
-use actix_web::{http, HttpResponse};
+use actix_web::{HttpResponse, http};
 use anyhow::Result;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -93,14 +92,17 @@ pub async fn handle_grpc_request(
     }
 
     // Start get user defined schema
-    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut streams_need_original_set: HashSet<String> = HashSet::new();
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
     crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
-        &mut streams_need_original_set,
+        &mut streams_need_original_map,
     )
     .await;
+    // with pipeline, we need to store original if any of the destinations requires original
+    let store_original_when_pipeline_exists =
+        executable_pipeline.is_some() && streams_need_original_map.values().any(|val| *val);
     // End get user defined schema
 
     let mut stream_status = StreamStatus::new(&stream_name);
@@ -159,7 +161,7 @@ pub async fn handle_grpc_request(
                     continue;
                 }
 
-                rec[cfg.common.column_timestamp.clone()] = timestamp.into();
+                rec[TIMESTAMP_COL_NAME.to_string()] = timestamp.into();
                 rec["severity"] = if !log_record.severity_text.is_empty() {
                     log_record.severity_text.to_owned().into()
                 } else {
@@ -205,14 +207,15 @@ pub async fn handle_grpc_request(
                     // 2. current stream does not have pipeline
                     if executable_pipeline.is_none() {
                         // current stream requires original
-                        streams_need_original_set
-                            .contains(&stream_name)
+                        streams_need_original_map
+                            .get(&stream_name)
+                            .is_some_and(|v| *v)
                             .then_some(rec.to_string())
                     } else {
                         // 3. with pipeline, storing original as long as streams_need_original_set
                         //    is not empty
                         // because not sure the pipeline destinations
-                        (!streams_need_original_set.is_empty()).then_some(rec.to_string())
+                        store_original_when_pipeline_exists.then_some(rec.to_string())
                     }
                 } else {
                     None // `item` won't be flattened, no need to store original
@@ -233,12 +236,16 @@ pub async fn handle_grpc_request(
                         _ => unreachable!(),
                     };
 
-                    if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+                    if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
                         local_val = crate::service::logs::refactor_map(local_val, fields);
                     }
 
                     // add `_original` and '_record_id` if required by StreamSettings
-                    if streams_need_original_set.contains(&stream_name) && original_data.is_some() {
+                    if streams_need_original_map
+                        .get(&stream_name)
+                        .is_some_and(|v| *v)
+                        && original_data.is_some()
+                    {
                         local_val.insert(
                             ORIGINAL_DATA_COL_NAME.to_string(),
                             original_data.unwrap().into(),
@@ -267,7 +274,10 @@ pub async fn handle_grpc_request(
     // batch process records through pipeline
     if let Some(exec_pl) = &executable_pipeline {
         let records_count = pipeline_inputs.len();
-        match exec_pl.process_batch(org_id, pipeline_inputs).await {
+        match exec_pl
+            .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+            .await
+        {
             Err(e) => {
                 log::error!(
                     "[Pipeline] for stream {}/{}: Batch execution error: {}.",
@@ -293,6 +303,17 @@ pub async fn handle_grpc_request(
                         continue;
                     }
 
+                    let destination_stream = stream_params.stream_name.to_string();
+                    if !user_defined_schema_map.contains_key(&destination_stream) {
+                        // a new dynamically created stream. need to check the two maps again
+                        crate::service::ingestion::get_uds_and_original_data_streams(
+                            &[stream_params],
+                            &mut user_defined_schema_map,
+                            &mut streams_need_original_map,
+                        )
+                        .await;
+                    }
+
                     for (idx, mut res) in stream_pl_results {
                         // get json object
                         let mut local_val = match res.take() {
@@ -300,14 +321,15 @@ pub async fn handle_grpc_request(
                             _ => unreachable!(),
                         };
 
-                        if let Some(fields) =
-                            user_defined_schema_map.get(stream_params.stream_name.as_str())
+                        if let Some(Some(fields)) = user_defined_schema_map.get(&destination_stream)
                         {
                             local_val = crate::service::logs::refactor_map(local_val, fields);
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if streams_need_original_set.contains(stream_params.stream_name.as_str())
+                        if streams_need_original_map
+                            .get(&destination_stream)
+                            .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
                             local_val.insert(
@@ -316,7 +338,7 @@ pub async fn handle_grpc_request(
                             );
                             let record_id = crate::service::ingestion::generate_record_id(
                                 org_id,
-                                &stream_params.stream_name,
+                                &destination_stream,
                                 &StreamType::Logs,
                             );
                             local_val.insert(
@@ -326,7 +348,7 @@ pub async fn handle_grpc_request(
                         }
 
                         let (ts_data, fn_num) = json_data_by_stream
-                            .entry(stream_params.stream_name.to_string())
+                            .entry(destination_stream.clone())
                             .or_insert((Vec::new(), None));
                         ts_data.push((timestamps[idx], local_val));
                         *fn_num = Some(function_no); // no pl -> no func
@@ -341,6 +363,7 @@ pub async fn handle_grpc_request(
     drop(original_options);
     drop(timestamps);
     drop(user_defined_schema_map);
+    drop(streams_need_original_map);
 
     // Update partial success
     if stream_status.status.failed > 0 {
@@ -405,8 +428,9 @@ pub async fn handle_grpc_request(
             ep,
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.as_str(),
+            "",
+            "",
         ])
         .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -414,8 +438,9 @@ pub async fn handle_grpc_request(
             ep,
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.as_str(),
+            "",
+            "",
         ])
         .inc();
 
@@ -430,8 +455,8 @@ mod tests {
     use opentelemetry_proto::tonic::{
         collector::logs::v1::ExportLogsServiceRequest,
         common::v1::{
-            any_value::Value::{IntValue, StringValue},
             AnyValue, InstrumentationScope, KeyValue,
+            any_value::Value::{IntValue, StringValue},
         },
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     };

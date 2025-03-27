@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -43,8 +43,8 @@
 
 use itertools::Itertools;
 use sea_orm::{
-    sea_query::{Table, TableCreateStatement},
     DeriveIden, EntityTrait, IntoActiveModel, PaginatorTrait, Set, TransactionTrait,
+    sea_query::{Table, TableCreateStatement},
 };
 use sea_orm_migration::prelude::*;
 
@@ -520,14 +520,14 @@ mod new_dashboards {
     }
 }
 
+pub const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
+    "alerts_org_stream_type_stream_name_name_idx_2";
 mod new_alerts {
     use sea_orm::QueryOrder;
 
     use super::*;
     use crate::table::migration::get_text_type;
     const ALERTS_FOLDERS_FK: &str = "alerts_folders_fk_2";
-    const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
-        "alerts_org_stream_type_stream_name_name_idx_2";
     const ALERTS_FOLDER_ID_IDX: &str = "alerts_folder_id_idx_2";
 
     /// Identifiers used in queries on the alerts table.
