@@ -51,7 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    
                   >
                     </q-select>
-                    <div class="quota-tabs">
+                    <div
+                        v-if="selectedOrganization"
+                     class="quota-tabs">
                         <q-tabs
                         data-test="quota-tabs"
                         :model-value="activeTab"
@@ -149,7 +151,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     </q-select>
                  </div>
-                 <div class="quota-tabs float-right q-ml-auto">
+                 <div
+                 v-if="selectedOrganization"
+
+                  class="quota-tabs float-right q-ml-auto">
                         <q-tabs
                         data-test="table-json-type-selection-tabs"
                         :model-value="activeType"
@@ -411,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-spinner-hourglass color="primary" size="lg" />
         </div>
         <div v-else-if=" activeTab == 'role-limits' && !loading && !rolesLimitRows.length">
-            <NoOrganizationSelected />
+            <NoData />
         </div>
         <div class="flex justify-end w-full tw-ml-auto floating-buttons  q-pr-md"
             v-if="editTable && activeType == 'table'"
@@ -576,6 +581,7 @@ import {
   outlinedInsertDriveFile
 } from "@quasar/extras/material-icons-outlined";
 import AppTable from "@/components/AppTable.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 export default defineComponent ({
     name: "Quota",
     components: {
@@ -583,7 +589,8 @@ export default defineComponent ({
         AppTabs,
         QTablePagination,
         ConfirmDialog,
-        QueryEditor
+        QueryEditor,
+        NoData
     },
     setup() {
         const { t } = useI18n();
