@@ -19,10 +19,10 @@ import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import { extractFields } from "@/utils/query/sqlUtils";
-import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
 import {
   buildSQLQueryFromInput,
   buildSQLJoinsFromInput,
+  validateSQLPanelFields,
 } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useStreams from "./useStreams";
 
