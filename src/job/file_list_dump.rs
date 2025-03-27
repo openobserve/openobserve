@@ -21,34 +21,77 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::Schema;
-use chrono::{Datelike, Duration, Timelike, Utc};
+use chrono::{Datelike, Timelike};
 use config::{
     PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE, PARQUET_PAGE_SIZE,
     cluster::{self, LOCAL_NODE},
     get_config, get_parquet_compression,
 };
+use infra::{file_list::FileRecord, table::file_list_dump::FileListDump};
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 
 const HOUR_IN_MS: i64 = 3600 * 1000;
-const FILE_LIST_CACHE_DIR_NAME: &str = "_oo_file_list_cache";
+const FILE_LIST_CACHE_DIR_NAME: &str = "_oo_file_list_dump";
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // cache generation is only done on compactor
     if !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
-    // prepare files
+    let config = get_config();
+
+    if !config.common.file_list_dump_enabled {
+        return Ok(());
+    }
+
     loop {
         if cluster::is_offline() {
             break;
         }
-        if let Err(e) = generate_cache_file().await {
-            log::error!("[COMPACTOR:JOB] cache file generation error : {e}");
+
+        // TOD (YJDoc2) check nats lock needed or not for multiple compactors
+        // TODO (YJDoc2) move sleep to start?
+        let pending = infra::file_list::get_pending_dump_jobs().await?;
+
+        for (job_id, org, stream, offset) in pending {
+            let start = offset;
+            let end = offset + HOUR_IN_MS * 1000;
+            let files = infra::file_list::get_entries_in_range(&org, &stream, start, end).await?;
+            let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
+            if let Err(e) = generate_cache_file(&org, &stream, (start, end), files).await {
+                log::error!("[COMPACTOR:JOB] file_list dump file generation error : {e}");
+            } else {
+                log::info!("successfully dumped file list {org}/{stream} offset {offset}");
+                // we remove files only if not dual writing
+                if !config.common.file_list_dump_dual_write {
+                    if let Err(e) = remove_files_from_file_list(&ids).await {
+                        log::error!(
+                            "error in removing dumped files from file_list, error : {}, ids {:?}",
+                            e,
+                            ids
+                        )
+                    } else {
+                        log::info!(
+                            "successfully removed dumped files from file_list for {org}/{stream} offset {offset}"
+                        );
+                    }
+                }
+                if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
+                    log::error!(
+                        "error in setting dumped = true for job with id {job_id}, error : {e}"
+                    );
+                }
+            }
         }
+
         // sleep
-        tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60)).await;
+        // because we depend on the compact jobs, we run with the same interval
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            get_config().compact.interval,
+        ))
+        .await;
     }
-    log::info!("[COMPACTOR:JOB] job::files::file_list_cache is stopped");
+    log::info!("[COMPACTOR:JOB] job::files::file_list_dump is stopped");
     Ok(())
 }
 
@@ -82,22 +125,22 @@ fn get_writer(schema: Arc<Schema>, buf: &mut Vec<u8>) -> AsyncArrowWriter<&mut V
     AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }
 
-async fn generate_cache_file() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let start_time = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
-        .timestamp_millis();
+async fn remove_files_from_file_list(ids: &[i64]) -> Result<(), anyhow::Error> {
+    infra::file_list::batch_remove_by_ids(&ids).await?;
+    Ok(())
+}
 
-    // we need to get file_list in 1 hour duration before the ingest_allowed_upto
-    // however we might not be on exact 1 hour mark when this run. So we subtract 1 more
-    // hour from it, to get in the safe zone where we are sure the start time (hour) is beyond
-    // the ingest_allowed_upto mark. Finally the end_time is 2 hours beyond the
-    // ingest_allowed_upto mark
-    let start_time = (start_time - start_time % HOUR_IN_MS);
-    let end_time = start_time - HOUR_IN_MS;
-
-    // TODO(YJDoc2) check if we can paginate
-    let entries = infra::file_list::get_entries_in_range(start_time, end_time).await?;
-    let batch_size = entries.len();
+async fn generate_cache_file(
+    org: &str,
+    stream: &str,
+    range: (i64, i64),
+    files: Vec<FileRecord>,
+) -> Result<(), anyhow::Error> {
+    // if there are no files to dump, no point in making a dump file
+    if files.is_empty() {
+        return Ok(());
+    }
+    let batch_size = files.len();
 
     let mut field_id = Int64Builder::with_capacity(batch_size);
     let mut field_org = StringBuilder::with_capacity(batch_size, batch_size * 128);
@@ -113,20 +156,20 @@ async fn generate_cache_file() -> Result<(), anyhow::Error> {
     let mut field_index_size = Int64Builder::with_capacity(batch_size);
     let mut field_flattened = BooleanBuilder::with_capacity(batch_size);
 
-    for entry in entries {
-        field_id.append_value(entry.id);
-        field_org.append_value(entry.org);
-        field_stream.append_value(entry.stream);
-        field_date.append_value(entry.date);
-        field_file.append_value(entry.file);
-        field_deleted.append_value(entry.deleted);
-        field_min_ts.append_value(entry.min_ts);
-        field_max_ts.append_value(entry.max_ts);
-        field_records.append_value(entry.records);
-        field_original_size.append_value(entry.original_size);
-        field_compressed_size.append_value(entry.compressed_size);
-        field_index_size.append_value(entry.index_size);
-        field_flattened.append_value(entry.flattened);
+    for file in files {
+        field_id.append_value(file.id);
+        field_org.append_value(file.org);
+        field_stream.append_value(file.stream);
+        field_date.append_value(file.date);
+        field_file.append_value(file.file);
+        field_deleted.append_value(file.deleted);
+        field_min_ts.append_value(file.min_ts);
+        field_max_ts.append_value(file.max_ts);
+        field_records.append_value(file.records);
+        field_original_size.append_value(file.original_size);
+        field_compressed_size.append_value(file.compressed_size);
+        field_index_size.append_value(file.index_size);
+        field_flattened.append_value(file.flattened);
     }
 
     // TODO(YJDoc2) extract schema to static arc
@@ -156,16 +199,30 @@ async fn generate_cache_file() -> Result<(), anyhow::Error> {
     writer.write(&batch).await?;
     writer.close().await?;
 
-    let ts = chrono::DateTime::from_timestamp_millis(start_time).unwrap();
-    // TODO(YJDoc2): add version suffix
-    let file_key = format!(
-        "files/{}/{:04}_{:02}_{:02}_{:02}.parquet",
-        FILE_LIST_CACHE_DIR_NAME,
+    let ts = chrono::DateTime::from_timestamp_micros(range.0).unwrap();
+
+    let file_name = format!(
+        "{:04}/{:02}/{:02}/{:02}/{}.parquet",
         ts.year(),
         ts.month(),
         ts.day(),
-        ts.hour()
+        ts.hour(),
+        config::ider::generate()
     );
+
+    let file_key = format!(
+        "files/{org}/{}/{stream}/{}",
+        FILE_LIST_CACHE_DIR_NAME, file_name
+    );
+    let entry = FileListDump {
+        id: 0, // will be set by db
+        org: org.to_string(),
+        stream: stream.to_string(),
+        start_ts: range.0,
+        end_ts: range.1,
+        file: file_name,
+    };
     infra::storage::put(&file_key, buf.into()).await?;
+    infra::table::file_list_dump::add_dump_file(entry).await?;
     Ok(())
 }
