@@ -48,7 +48,6 @@ struct QueryParams {
     update_type: Option<String>,
     user_role: Option<String>,
 }
-
 impl QueryParams {
     fn get_org_id(&self) -> String {
         match self.org_id.as_str() {
@@ -64,7 +63,7 @@ impl QueryParams {
 
 #[cfg(not(feature = "enterprise"))]
 #[derive(Debug, Clone, Deserialize)]
-struct UpdateQueryParams();
+struct QueryParams();
 
 #[cfg(feature = "enterprise")]
 async fn validate_ratelimit_updater(
