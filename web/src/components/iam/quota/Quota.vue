@@ -32,7 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-select
                     :loading="isOrgLoading"
                     v-model="selectedOrganization"
-                    :options="organizations"
+                    :options="filteredOrganizations"
+                    @filter="filterOrganizations"
                     placeholder="Select Org"
                     :popup-content-style="{ textTransform: 'lowercase' }"
                     color="input-border"
@@ -129,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="activeTab == 'role-limits'"
                         :loading="isRoleModulesLoading"
                         v-model="selectedRole"
-                        :options="rolesToBeDisplayed"
+                        :options="filteredRolesToDisplayOptions"
                         placeholder="Select Api Category"
                         color="input-border"
                         style="padding: 0px;"
@@ -143,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         hide-selected
                         fill-input                    
                         clearable
+                        @filter="filterRolesToDisplayOptions"
                         @update:model-value="updateSelectedRole()"
                   >
                     </q-select>
@@ -739,7 +741,8 @@ export default defineComponent ({
         const nextType = ref<string | null>(null);
         const showConfirmDialogTypeSwitch = ref(false);
         const isSavingJson = ref<boolean>(false);
-
+        const filteredOrganizations = ref<any[]>([]);
+        const filteredRolesToDisplayOptions = ref<any[]>([]);
 
         onMounted(async ()=>{
             await getOrganizations();
@@ -750,7 +753,9 @@ export default defineComponent ({
                     value: router.currentRoute.value.query.quota_org
                 }
             }
-            await getApiLimitsByOrganization();
+            if(selectedOrganization.value){
+                await getApiLimitsByOrganization();
+            }
 
         })
 
@@ -887,7 +892,7 @@ export default defineComponent ({
         }
         const getRolesByOrganization = async () => {
             try{
-                const response = await getRoles(selectedOrganization.value.value);
+                const response = await getRoles(selectedOrganization.value?.value);
                 rolesLimitRows.value = response.data.map((role: any) => ({
                     role_name: role,
                     uuid: getUUID(),
@@ -908,7 +913,7 @@ export default defineComponent ({
             changedValues.value = {};
             editTable.value = false;
             try {
-                const response = await ratelimitService.getApiLimits(selectedOrganization.value.value);
+                const response = await ratelimitService.getApiLimits(selectedOrganization?.value?.value);
                 let transformedData: any = [];
 
             //predefined operation that we get from the api
@@ -1409,7 +1414,7 @@ export default defineComponent ({
         let isEmpty = false;
         Object.keys(changedValues).forEach((moduleName: any) => {
             Object.keys(changedValues[moduleName]).forEach((operation: any) => {
-                if(changedValues[moduleName][operation] == ""){
+                if(changedValues[moduleName][operation] === ""){
                     $q.notify({
                         type: "negative",
                         message: "some values are empty please check",
@@ -1457,7 +1462,7 @@ export default defineComponent ({
     const updateActiveType = (type: string) => {
         if(type == 'json'){
             let isChanged = Object.keys(changedValues.value).length > 0;
-            if(isChanged){
+            if(isChanged && editTable.value){
                 nextType.value = type.toLowerCase();
                 showConfirmDialogTypeSwitch.value = true;
             }
@@ -1469,8 +1474,7 @@ export default defineComponent ({
         }
         else{
             let isChanged = jsonDiff(jsonStrToDisplay.value, transformData(apiLimitsRows.value));
-            console.log(isChanged,'isChanged')
-            if(isChanged){
+            if(isChanged && editTable.value){
                 nextType.value = type.toLowerCase();
                 showConfirmDialogTypeSwitch.value = true;
             }
@@ -1509,6 +1513,27 @@ export default defineComponent ({
     const jsonDiff = (oldJson: any, newJson: any): boolean => {
         return JSON.stringify(oldJson) !== JSON.stringify(newJson);
     };
+    const filterOrganizations = (val: any, update: any) => {
+        console.log(val,'val')
+        if(val.length > 0){
+            update();
+            filteredOrganizations.value = organizations.value.filter((org: any) => org.label.toLowerCase().includes(val.toLowerCase()));
+        }
+        else{
+            update();
+            filteredOrganizations.value = organizations.value;
+        }
+    }
+    const filterRolesToDisplayOptions = (val: any, update: any) => {
+        if(val.length > 0){
+            update();
+            filteredRolesToDisplayOptions.value = rolesToBeDisplayed.value.filter((role: any) => role.label.toLowerCase().includes(val.toLowerCase()));
+        }
+        else{
+            update();
+            filteredRolesToDisplayOptions.value = rolesToBeDisplayed.value;
+        }
+    }
         return {
             t,
             selectedOrganization,
@@ -1588,6 +1613,10 @@ export default defineComponent ({
             saveJsonChanges,
             cancelJsonChanges,
             isSavingJson,
+            filteredOrganizations,
+            filterOrganizations,
+            filteredRolesToDisplayOptions,
+            filterRolesToDisplayOptions
         }
 
     }
