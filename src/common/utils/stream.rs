@@ -131,7 +131,7 @@ pub async fn get_settings_max_query_range(
     stream_max_query_range
 }
 
-pub fn get_max_query_range_by_user_role(stream_max_query_range: i64, user: &User) -> i64 {
+pub fn get_max_query_range_if_sa(stream_max_query_range: i64, user: &User) -> i64 {
     let config = get_config();
     let default_max_query_range = config.limit.default_max_query_range_days * 24;
 
