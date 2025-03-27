@@ -69,6 +69,7 @@ struct UpdateQueryParams();
 #[cfg(feature = "enterprise")]
 async fn validate_ratelimit_updater(
     org_id: &str,
+    update_type: &str,
     rules: &RatelimitRuleUpdater,
 ) -> Result<(), anyhow::Error> {
     let global_default_rules = get_default_rules().await.unwrap();
@@ -121,19 +122,22 @@ async fn validate_ratelimit_updater(
                 ));
             }
 
-            let compare_threshold =
-                org_level_thresholds.get(&(api_group_name.to_string(), operation));
-            if compare_threshold.is_some() && *compare_threshold.unwrap() < *threshold {
-                return Err(anyhow::anyhow!(
-                    "{}:{} threshold must be lower than or equal to {:?}, got {}, because org-level rules limit {}:{} is {:?}",
-                    api_group_name,
-                    operation.as_str(),
-                    compare_threshold,
-                    threshold,
-                    api_group_name,
-                    operation.as_str(),
-                    compare_threshold,
-                ));
+            if update_type == "role" {
+                let compare_threshold =
+                    org_level_thresholds.get(&(api_group_name.to_string(), operation));
+                if compare_threshold.is_some() && *compare_threshold.unwrap() < *threshold {
+                    let compare_threshold = compare_threshold.unwrap();
+                    return Err(anyhow::anyhow!(
+                        "{}:{} threshold must be lower than or equal to {:?}, got {}, because module-level rule limit {}:{} is {:?}",
+                        api_group_name,
+                        operation.as_str(),
+                        compare_threshold,
+                        threshold,
+                        api_group_name,
+                        operation.as_str(),
+                        compare_threshold,
+                    ));
+                }
             }
         }
     }
@@ -397,7 +401,9 @@ pub async fn update_ratelimit(
                 .await;
         }
 
-        if let Err(e) = validate_ratelimit_updater(org_id.as_str(), &updater).await {
+        if let Err(e) =
+            validate_ratelimit_updater(org_id.as_str(), &query.get_update_type(), &updater).await
+        {
             return Ok(MetaHttpResponse::bad_request(format!(
                 "validate ratelimit updater error: {}",
                 e,
