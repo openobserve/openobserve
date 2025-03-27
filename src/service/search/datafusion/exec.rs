@@ -177,36 +177,23 @@ pub async fn merge_parquet_files(
         compression,
     );
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-    let (tx, mut rx) =
-        tokio::sync::mpsc::channel::<arrow::record_batch::RecordBatch>(cfg.limit.cpu_num);
-    let task = tokio::task::spawn(async move {
-        loop {
-            match batch_stream.try_next().await {
-                Ok(None) => {
-                    break;
-                }
-                Ok(Some(batch)) => {
-                    if let Err(e) = tx.send(batch).await {
-                        log::error!("merge_parquet_files write to channel error: {}", e);
-                        return Err(DataFusionError::External(Box::new(e)));
-                    }
-                }
-                Err(e) => {
-                    log::error!("merge_parquet_files execute stream error: {}", e);
-                    return Err(e);
+    loop {
+        match batch_stream.try_next().await {
+            Ok(None) => {
+                break;
+            }
+            Ok(Some(batch)) => {
+                if let Err(e) = writer.write(&batch).await {
+                    log::error!("merge_parquet_files write error: {}", e);
+                    return Err(e.into());
                 }
             }
-        }
-        Ok(())
-    });
-    while let Some(batch) = rx.recv().await {
-        if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files write Error: {}", e);
-            return Err(e.into());
+            Err(e) => {
+                log::error!("merge_parquet_files execute stream error: {}", e);
+                return Err(e);
+            }
         }
     }
-    task.await
-        .map_err(|e| DataFusionError::External(Box::new(e)))??;
     writer.close().await?;
 
     ctx.deregister_table("tbl")?;
