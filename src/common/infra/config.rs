@@ -39,10 +39,11 @@ use crate::{
     common::meta::{
         maxmind::MaxmindClient, organization::OrganizationSetting, syslog::SyslogRoute, user::User,
     },
-    handler::http::request::websocket::session::WsSession,
+    handler::http::request::ws_v2::session::WsSession,
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
         pipeline::batch_execution::ExecutablePipeline,
+        websocket_events::search_registry_utils::SearchState,
     },
 };
 
@@ -98,3 +99,5 @@ pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashM
 pub static WS_SESSIONS: Lazy<RwHashMap<String, WsSession>> = Lazy::new(DashMap::default);
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
+// Global registry for search requests by `trace_id`
+pub static WS_SEARCH_REGISTRY: Lazy<DashMap<String, SearchState>> = Lazy::new(DashMap::new);

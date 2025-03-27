@@ -15,8 +15,9 @@
 
 use actix_web::http::StatusCode;
 use config::meta::websocket::SearchEventReq;
-use infra::{errors, errors::Error};
+use infra::errors;
 use serde::{Deserialize, Serialize};
+use tokio_tungstenite::tungstenite;
 
 pub mod enterprise_utils {
     #[allow(unused_imports)]
@@ -92,8 +93,8 @@ pub mod sessions_cache_utils {
 
     use super::search_registry_utils::SearchState;
     use crate::{
-        common::infra::config::WS_SESSIONS,
-        handler::http::request::websocket::session::{SEARCH_REGISTRY, WsSession},
+        common::infra::config::{WS_SEARCH_REGISTRY, WS_SESSIONS},
+        handler::http::request::ws_v2::session::WsSession,
     };
 
     pub async fn run_gc_ws_sessions() {
@@ -162,7 +163,7 @@ pub mod sessions_cache_utils {
     }
 
     fn cleanup_searches_for_session(session_id: &str) {
-        let searches_to_remove: Vec<String> = SEARCH_REGISTRY
+        let searches_to_remove: Vec<String> = WS_SEARCH_REGISTRY
             .iter()
             .filter_map(|entry| {
                 if entry.value().get_req_id() == session_id {
@@ -174,7 +175,7 @@ pub mod sessions_cache_utils {
             .collect();
 
         for trace_id in searches_to_remove {
-            if let Some((_, state)) = SEARCH_REGISTRY.remove(&trace_id) {
+            if let Some((_, state)) = WS_SEARCH_REGISTRY.remove(&trace_id) {
                 match state {
                     SearchState::Running { cancel_tx, req_id } => {
                         let _ = cancel_tx.try_send(());
@@ -227,7 +228,7 @@ pub mod sessions_cache_utils {
 pub mod search_registry_utils {
     use tokio::sync::mpsc;
 
-    use crate::handler::http::request::websocket::session::SEARCH_REGISTRY;
+    use crate::common::infra::config::WS_SEARCH_REGISTRY;
 
     #[derive(Debug)]
     pub enum SearchState {
@@ -255,7 +256,7 @@ pub mod search_registry_utils {
 
     // Add this function to check if a search is cancelled
     pub fn is_cancelled(trace_id: &str) -> Option<bool> {
-        SEARCH_REGISTRY
+        WS_SEARCH_REGISTRY
             .get(trace_id)
             .map(|state| matches!(*state, SearchState::Cancelled { .. }))
     }
@@ -286,9 +287,16 @@ pub enum WsClientEvents {
     #[cfg(feature = "enterprise")]
     Cancel {
         trace_id: String,
+        // TODO: remove this once v1 is deprecated
+        org_id: String,
+        // TODO: is it PII safe?
+        user_id: Option<String>,
     },
     Benchmark {
         id: String,
+    },
+    TestAbnormalClose {
+        req_id: String,
     },
 }
 
@@ -299,12 +307,46 @@ impl WsClientEvents {
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { .. } => "cancel",
             WsClientEvents::Benchmark { .. } => "benchmark",
+            WsClientEvents::TestAbnormalClose { .. } => "test_abnormal_close",
         }
         .to_string()
     }
 
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("Failed to serialize WsClientEvents")
+    }
+
+    pub fn get_trace_id(&self) -> String {
+        match &self {
+            Self::Search(req) => req.trace_id.clone(),
+            #[cfg(feature = "enterprise")]
+            Self::Cancel { trace_id, .. } => trace_id.clone(),
+            Self::Benchmark { id } => id.clone(),
+            Self::TestAbnormalClose { req_id } => req_id.clone(),
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        match self {
+            Self::Search(req) => req.is_valid(),
+            #[cfg(feature = "enterprise")]
+            Self::Cancel {
+                trace_id, org_id, ..
+            } => !trace_id.is_empty() && !org_id.is_empty(),
+            Self::Benchmark { id } => !id.is_empty(),
+            Self::TestAbnormalClose { req_id } => !req_id.is_empty(),
+        }
+    }
+
+    // Append `user_id` to the ws client events when run in cluster mode to handle stream
+    // permissions
+    #[cfg(feature = "enterprise")]
+    pub fn append_user_id(&mut self, user_id: Option<String>) {
+        match self {
+            Self::Search(req) => req.user_id = user_id,
+            Self::Cancel { user_id: uid, .. } => *uid = user_id,
+            _ => {}
+        }
     }
 }
 
@@ -339,10 +381,13 @@ pub enum WsServerEvents {
         error_detail: Option<String>,
         trace_id: Option<String>,
         request_id: Option<String>,
+        should_client_retry: bool,
     },
     End {
         trace_id: Option<String>,
     },
+    Ping(Vec<u8>),
+    Pong(Vec<u8>),
 }
 
 impl WsServerEvents {
@@ -351,25 +396,83 @@ impl WsServerEvents {
     }
 
     pub fn error_response(
-        err: Error,
+        err: errors::Error,
         request_id: Option<String>,
         trace_id: Option<String>,
+        should_client_retry: bool,
     ) -> Self {
         match err {
-            errors::Error::ErrorCode(code) => Self::Error {
+            errors::Error::ErrorCode(code) => WsServerEvents::Error {
                 code: code.get_code(),
                 message: code.get_message(),
                 error_detail: Some(code.get_error_detail()),
                 trace_id: trace_id.clone(),
                 request_id: request_id.clone(),
+                should_client_retry,
             },
-            _ => Self::Error {
+            _ => WsServerEvents::Error {
                 code: StatusCode::INTERNAL_SERVER_ERROR.into(),
                 message: err.to_string(),
                 error_detail: None,
                 trace_id,
                 request_id,
+                should_client_retry,
             },
+        }
+    }
+
+    pub fn get_trace_id(&self) -> String {
+        match self {
+            Self::SearchResponse { trace_id, .. } => trace_id.to_string(),
+            #[cfg(feature = "enterprise")]
+            Self::CancelResponse { trace_id, .. } => trace_id.to_string(),
+            Self::Error { trace_id, .. } => trace_id.clone().unwrap_or_default(),
+            Self::End { trace_id } => trace_id.clone().unwrap_or_default(),
+            Self::Ping(_) => "".to_string(),
+            Self::Pong(_) => "".to_string(),
+        }
+    }
+
+    pub fn should_clean_trace_id(&self) -> Option<String> {
+        match self {
+            #[cfg(feature = "enterprise")]
+            Self::CancelResponse {
+                trace_id,
+                is_success,
+            } if *is_success => Some(trace_id.to_owned()),
+            Self::Error { trace_id, .. } => trace_id.to_owned(),
+            Self::End { trace_id } => trace_id.to_owned(),
+            _ => None,
+        }
+    }
+}
+
+impl From<WsClientEvents> for tungstenite::protocol::Message {
+    fn from(event: WsClientEvents) -> Self {
+        let payload = serde_json::to_value(&event).unwrap_or_default();
+        tungstenite::protocol::Message::Text(payload.to_string())
+    }
+}
+
+impl From<WsServerEvents> for tungstenite::protocol::Message {
+    fn from(event: WsServerEvents) -> Self {
+        let payload = serde_json::to_value(&event).unwrap_or_default();
+        tungstenite::protocol::Message::Text(payload.to_string())
+    }
+}
+
+impl TryFrom<serde_json::Value> for WsServerEvents {
+    type Error = String;
+
+    fn try_from(
+        value: serde_json::Value,
+    ) -> Result<Self, <Self as TryFrom<serde_json::Value>>::Error> {
+        match value["type"].as_str() {
+            Some("search_response") => serde_json::from_value(value).map_err(|e| e.to_string()),
+            Some("cancel_response") => serde_json::from_value(value).map_err(|e| e.to_string()),
+            Some("error") => serde_json::from_value(value).map_err(|e| e.to_string()),
+            Some("end") => serde_json::from_value(value).map_err(|e| e.to_string()),
+            _ => Err("Unknown message type".to_string()),
         }
     }
 }

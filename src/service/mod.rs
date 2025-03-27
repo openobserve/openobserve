@@ -40,6 +40,8 @@ pub mod promql;
 pub mod ratelimit;
 pub mod schema;
 pub mod search;
+pub mod websocket_events;
+
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
 pub mod self_reporting;
