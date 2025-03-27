@@ -10,8 +10,6 @@ import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
 import { waitForDashboardPage } from "../utils/dashCreation";
 
-const randomDashboardName =
-  "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
 
@@ -77,7 +75,7 @@ test.describe("dashboard Import testcases", () => {
         .nth(4)
     ).toBeVisible();
 
-    //is used for setting the file to be importedad
+    //is used for setting the file to be imported
     await page.getByRole("button", { name: "Import" }).click();
 
     await expect(
@@ -110,39 +108,6 @@ test.describe("dashboard Import testcases", () => {
     await page.getByRole("button", { name: "Import" }).click();
     await expect(page.getByText("Please Enter a JSON object")).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();
-  });
-
-  test.skip("Verify that the .json data is editable in the UI file editor.", async ({
-    page,
-  }) => {
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-    await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
-
-    //file name to be used for import
-    const fileContentPath = "../test-data/dashboards-import.json";
-
-    // Locate the file input field and set the JSON file
-    const inputFile = await page.locator('input[type="file"]');
-    //is used for setting the file to be imported
-    await inputFile.setInputFiles(fileContentPath);
-
-    await page.getByText('"Cloudfront Distribution to').click();
-    // await page
-    //   .getByLabel("Editor content;Press Alt+F1")
-    //   .fill(
-    //     '[\n  {\n    "version": 5,\n    "dashboardId": "7300465175298072125",\n    "title": "Cloudfront to OpenObserve",\n    "description": "Cloudfront Distribution test to Kinesis Streams to Amazon Data Firehose to OpenObserve",\n    "role": "",\n    "owner": "",\n    "created": "2025-02-26T10:45:04.098Z",\n'
-    //   );
-    await page.getByRole("button", { name: "Import" }).click();
-
-    await expect(
-      page.getByRole("cell", { name: "Cloudfront to OpenObserve" }).first()
-    ).toBeVisible();
-    await page
-      .getByRole("row", { name: "01 Cloudfront to OpenObserve" })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
   });
 
   test("Should display an error validation message when clicking the Import button if the 'Title' field is missing in the .json data.", async ({
@@ -442,8 +407,7 @@ test.describe("dashboard Import testcases", () => {
         "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Kubernetes(kube-prometheus-stack)/Kubernetes%20_%20Compute%20Resources%20_%20Cluster.dashboard.json"
       );
 
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(1000);
     //is used for setting the file to be importedad
     await page.getByRole("button", { name: "Import" }).click();
     await page.waitForTimeout(3000);
