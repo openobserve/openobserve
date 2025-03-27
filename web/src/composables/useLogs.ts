@@ -242,9 +242,7 @@ const defaultObject = {
     customDownloadQueryObj: <any>{},
     functionError: "",
     searchRequestTraceIds: <string[]>[],
-    searchWebSocketRequestIdsAndTraceIds: <
-      { requestId: string; traceId: string }[]
-    >[],
+    searchWebSocketRequestIdsAndTraceIds: <{ traceId: string }[]>[],
     isOperationCancelled: false,
     searchRetriesCount: <{ [key: string]: number }>{},
     actionId: null,
@@ -635,8 +633,9 @@ const useLogs = () => {
   const updateUrlQueryParams = () => {
     const query = generateURLQuery(false);
     if (
-      Object.hasOwn(query, "type") &&
-      query.type == "search_history_re_apply" || query.type == "search_scheduler"
+      (Object.hasOwn(query, "type") &&
+        query.type == "search_history_re_apply") ||
+      query.type == "search_scheduler"
     ) {
       delete query.type;
     }
@@ -1658,7 +1657,6 @@ const useLogs = () => {
           JSON.stringify(queryReq),
         );
 
-
         // get the current page detail and set it into query request
         queryReq.query.start_time =
           searchObj.data.queryResults.partitionDetail.paginations[
@@ -1729,7 +1727,6 @@ const useLogs = () => {
           searchObj.meta.refreshHistogram = false;
           if (searchObj.data.queryResults.hits.length > 0) {
             if (searchObj.data.stream.selectedStream.length > 1) {
-
               searchObj.data.histogram = {
                 xData: [],
                 yData: [],
@@ -1839,7 +1836,6 @@ const useLogs = () => {
           }
 
           if (searchObj.data.stream.selectedStream.length > 1) {
-
             searchObj.data.histogram = {
               xData: [],
               yData: [],
@@ -1978,7 +1974,6 @@ const useLogs = () => {
   }
 
   function resetHistogramWithError(errorMsg: string, errorCode: number = 0) {
-
     searchObj.data.histogram = {
       xData: [],
       yData: [],
@@ -2010,7 +2005,6 @@ const useLogs = () => {
   }
 
   function generateHistogramSkeleton() {
-
     if (
       searchObj.data.queryResults.hasOwnProperty("aggs") &&
       searchObj.data.queryResults.aggs
@@ -2123,12 +2117,12 @@ const useLogs = () => {
         if(queryReq.query.action_id) delete queryReq.query.action_id;
 
         queryReq.query["sql_mode"] = "full";
-  
+
         queryReq.query.track_total_hits = true;
-  
+
         const { traceparent, traceId } = generateTraceContext();
         addTraceId(traceId);
-  
+
         searchService
           .search(
             {
@@ -2165,8 +2159,7 @@ const useLogs = () => {
                 }
               }
             }
-  
-  
+
             let regeratePaginationFlag = false;
             if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
               regeratePaginationFlag = true;
@@ -2182,11 +2175,11 @@ const useLogs = () => {
           .catch((err) => {
             searchObj.loading = false;
             searchObj.loadingCounter = false;
-  
-          // Reset cancel query on search error
-          searchObj.data.isOperationCancelled = false;
 
-          let trace_id = "";
+            // Reset cancel query on search error
+            searchObj.data.isOperationCancelled = false;
+
+            let trace_id = "";
             searchObj.data.countErrorMsg =
               "Error while retrieving total events: ";
             if (err.response != undefined) {
@@ -2198,17 +2191,17 @@ const useLogs = () => {
                 trace_id = err?.trace_id;
               }
             }
-  
+
             const customMessage = logsErrorMessage(err?.response?.data.code);
             searchObj.data.errorCode = err?.response?.data.code;
-  
+
             notificationMsg.value = searchObj.data.countErrorMsg;
-  
+
             if (err?.request?.status >= 429) {
               notificationMsg.value = err?.response?.data?.message;
               searchObj.data.countErrorMsg += err?.response?.data?.message;
             }
-  
+
             if (trace_id) {
               searchObj.data.countErrorMsg += " TraceID:" + trace_id;
               notificationMsg.value += " TraceID:" + trace_id;
@@ -2223,7 +2216,6 @@ const useLogs = () => {
         searchObj.loadingCounter = false;
         reject(false);
       }
-
     });
   };
 
@@ -2237,8 +2229,7 @@ const useLogs = () => {
     updateGridColumns();
 
     filterHitsColumns();
-      searchObj.data.histogram.chartParams.title = getHistogramTitle();
-
+    searchObj.data.histogram.chartParams.title = getHistogramTitle();
   };
 
   const getPaginatedData = async (
@@ -2266,7 +2257,7 @@ const useLogs = () => {
         showCancelSearchNotification();
         return;
       }
-      if (searchObj.meta.jobId != ""){
+      if (searchObj.meta.jobId != "") {
         searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
       }
       const parsedSQL: any = fnParsedSQL();
@@ -2350,7 +2341,7 @@ const useLogs = () => {
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
-          if (searchObj.meta.jobId == ""){
+          if (searchObj.meta.jobId == "") {
             for (const [
               index,
               item,
@@ -2425,9 +2416,8 @@ const useLogs = () => {
               );
               searchObj.data.queryResults.hits = res.data.hits;
             } else {
-              if (searchObj.meta.jobId != ""){
+              if (searchObj.meta.jobId != "") {
                 searchObj.data.queryResults.total = res.data.total;
-                
               }
               if (!queryReq.query.hasOwnProperty("track_total_hits")) {
                 delete res.data.total;
@@ -2470,7 +2460,7 @@ const useLogs = () => {
             searchObj.data.queryResults.subpage++;
 
             setTimeout(async () => {
-                processPostPaginationData();
+              processPostPaginationData();
 
               // searchObj.data.functionError = "";
               // if (
@@ -2482,7 +2472,7 @@ const useLogs = () => {
             }, 0);
             await getPaginatedData(queryReq, true);
           }
-          if (searchObj.meta.jobId != ""){
+          if (searchObj.meta.jobId != "") {
             searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
             searchObj.data.queryResults.pagination = [];
             refreshJobPagination(true);
@@ -2592,13 +2582,13 @@ const useLogs = () => {
 
   const routeToSearchSchedule = () => {
     router.push({
-      query:{
+      query: {
         action: "search_scheduler",
         org_identifier: store.state.selectedOrganization.identifier,
-        type: "search_scheduler_list"
-      }
+        type: "search_scheduler_list",
+      },
     });
-  }
+  };
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
@@ -3949,18 +3939,14 @@ const useLogs = () => {
       await getFunctions();
       if (isActionsEnabled.value) await getActions();
       await extractFields();
-      if (searchObj.meta.jobId == ""){
+      if (searchObj.meta.jobId == "") {
         await getQueryData();
-      }
-      else{
-
+      } else {
         await getJobData();
-
       }
       refreshData();
     } catch (e: any) {
       searchObj.loading = false;
-
     }
   };
   const loadJobData = async () => {
@@ -4008,7 +3994,7 @@ const useLogs = () => {
         }
       }, 120000);
       await getQueryData();
-      clearTimeout(queryTimeout); 
+      clearTimeout(queryTimeout);
     } catch (e: any) {
       console.log("Error while loading logs data");
     }
@@ -4381,17 +4367,16 @@ const useLogs = () => {
       );
   };
 
-  const addRequestId = (requestId: string, traceId: string) => {
+  const addRequestId = (traceId: string) => {
     searchObj.data.searchWebSocketRequestIdsAndTraceIds.push({
-      requestId,
       traceId,
     });
   };
 
-  const removeRequestId = (requestId: string) => {
+  const removeRequestId = (traceId: string) => {
     searchObj.data.searchWebSocketRequestIdsAndTraceIds =
       searchObj.data.searchWebSocketRequestIdsAndTraceIds.filter(
-        (id) => id.requestId !== requestId,
+        (id) => id.traceId !== traceId,
       );
   };
 
@@ -4626,10 +4611,10 @@ const useLogs = () => {
 
   const extractValueQuery = () => {
     try {
-      if(searchObj.meta.sqlMode == false || searchObj.data.query == "") {
+      if (searchObj.meta.sqlMode == false || searchObj.data.query == "") {
         return {};
       }
-      
+
       const orgQuery: string = searchObj.data.query
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
@@ -4895,7 +4880,7 @@ const useLogs = () => {
         throw new Error("Failed to initialize WebSocket connection");
       }
 
-      addRequestId(requestId, payload.traceId);
+      addRequestId(payload.traceId);
     } catch (e: any) {
       console.error("Error while getting data through web socket", e);
       searchObj.loading = false;
@@ -4940,13 +4925,94 @@ const useLogs = () => {
       close: handleSearchClose,
       error: handleSearchError,
       message: handleSearchResponse,
+      reset: handleSearchReset,
     }) as string;
   };
 
-  const sendSearchMessage = (requestId: string, queryReq: any) => {
+
+  const handleSearchReset = async (data: any) => {
+    // reset query data
+    try {
+      if(data.type === "search") {
+        if(!data.isPagination) {
+          resetQueryData();
+          searchObj.data.queryResults = {};
+        }
+
+        // reset searchAggData
+        searchAggData.total = 0;
+        searchAggData.hasAggregation = false;
+        searchObj.meta.showDetailTab = false;
+        searchObj.meta.searchApplied = true;
+        searchObj.data.functionError = "";
+      
+        searchObj.data.errorCode = 0;
+      
+        if(!data.isPagination) {
+          // Histogram reset
+          searchObj.data.histogram = {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: "",
+              unparsed_x_data: [],
+              timezone: "",
+            },
+            errorCode: 0,
+            errorMsg: "",
+            errorDetail: "",
+          };
+          resetHistogramError();
+        }
+
+        const payload = buildWebSocketPayload(data.queryReq, data.isPagination, "search");
+
+        initializeWebSocketConnection(payload);
+        addRequestId(payload.traceId);
+      }
+
+      if(data.type === "histogram" || data.type === "pageCount") {
+        searchObj.data.queryResults.aggs = [];
+        searchObj.data.histogram = {
+          xData: [],
+          yData: [],
+          chartParams: {
+            title: "",
+            unparsed_x_data: [],
+            timezone: "",
+          },
+          errorCode: 0,
+          errorMsg: "",
+          errorDetail: "",
+        };
+        
+        resetHistogramError();
+
+        searchObj.loadingHistogram = true;
+
+        if(data.type === "histogram") await generateHistogramSkeleton();
+
+        if(data.type === "histogram") histogramResults = [];
+
+        const payload = buildWebSocketPayload(
+          data.queryReq,
+          false,
+          data.type,
+        );
+
+        initializeWebSocketConnection(payload);
+
+        addRequestId(payload.traceId);
+      }
+    } catch(e: any){
+      console.error("Error while resetting search", e);
+    }
+  };
+
+  const sendSearchMessage = (queryReq: any) => {
     try {
       if (searchObj.data.isOperationCancelled) {
-        closeSocketBasedOnRequestId(requestId);
+        closeSocketBasedOnRequestId(queryReq.traceId);
         return;
       }
 
@@ -4960,6 +5026,7 @@ const useLogs = () => {
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
           use_cache: (window as any).use_cache ?? true,
+          org_id: searchObj.organizationIdentifier,
         },
       };
 
@@ -4971,7 +5038,7 @@ const useLogs = () => {
         payload.content.payload["clusters"] = queryReq.queryReq.clusters;
       }
 
-      sendSearchMessageBasedOnRequestId(requestId, payload);
+      sendSearchMessageBasedOnRequestId(payload);
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -4989,7 +5056,6 @@ const useLogs = () => {
 
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (
-    requestId: string,
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
@@ -5025,7 +5091,7 @@ const useLogs = () => {
     }
 
     if (response.type === "error") {
-      handleSearchError(requestId, payload.traceId, response);
+      handleSearchError(payload.traceId, response);
     }
 
     if (response.type === "cancel_response") {
@@ -5363,7 +5429,7 @@ const useLogs = () => {
         );
         const requestId = initializeWebSocketConnection(payload);
 
-        addRequestId(requestId, payload.traceId);
+        addRequestId(payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
@@ -5428,12 +5494,8 @@ const useLogs = () => {
     return searchObj.data.queryResults.aggs === undefined;
   }
 
-  const handleSearchClose = (
-    requestId: string,
-    payload: any,
-    response: any,
-  ) => {
-    if (requestId) removeRequestId(requestId);
+  const handleSearchClose = (payload: any, response: any) => {
+    if (payload.traceId) removeRequestId(payload.traceId);
 
     // Any case where below logic may end in recursion
     if (payload.traceId) delete searchPartitionMap[payload.traceId];
@@ -5448,44 +5510,25 @@ const useLogs = () => {
       return;
     }
 
-    if (response.code === 1001 || response.code === 1006) {
-      if (!searchObj.data.searchRetriesCount[payload.traceId]) {
-        searchObj.data.searchRetriesCount[payload.traceId] = 1;
-      } else {
-        searchObj.data.searchRetriesCount[payload.traceId] += 1;
-      }
+    //TODO Omkar: Remove the duplicate error codes, are present same in useSearchWebSocket.ts
+    const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
 
-      if (
-        searchObj.data.searchRetriesCount[payload.traceId] <=
-        searchReconnectDelay
-      ) {
-        if (payload.type === "search") searchObj.loading = true;
-        if (payload.type === "histogram") searchObj.loadingHistogram = true;
-
-        setTimeout(() => {
-          const requestId = initializeWebSocketConnection(payload);
-
-          addRequestId(requestId, payload.traceId);
-        }, maxSearchRetries);
-
-        return;
-      } else {
-        handleSearchError(requestId, payload, {
-          content: {
-            message:
-              "WebSocket connection terminated unexpectedly. Please check your network and try again",
-            trace_id: payload.traceId,
-            code: response.code,
-            error_detail: "",
-          },
-          type: "error",
-        });
-      }
+    if (errorCodes.includes(response.code)) {
+      handleSearchError(payload, {
+        content: {
+          message:
+            "WebSocket connection terminated unexpectedly. Please check your network and try again",
+          trace_id: payload.traceId,
+          code: response.code,
+          error_detail: "",
+        },
+        type: "error",
+      });
     }
 
-    if (searchObj.data.searchRetriesCount[payload.traceId]) {
-      delete searchObj.data.searchRetriesCount[payload.traceId];
-    }
+    // if (searchObj.data.searchRetriesCount[payload.traceId]) {
+    //   delete searchObj.data.searchRetriesCount[payload.traceId];
+    // }
 
     if (payload.traceId) removeTraceId(payload.traceId);
 
@@ -5504,11 +5547,7 @@ const useLogs = () => {
     searchObj.data.isOperationCancelled = false;
   };
 
-  const handleSearchError = (
-    requestId: string,
-    request: any,
-    err: WebSocketErrorResponse,
-  ) => {
+  const handleSearchError = (request: any, err: WebSocketErrorResponse) => {
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
 
@@ -5564,7 +5603,8 @@ const useLogs = () => {
       const { rowsPerPage } = searchObj.meta.resultGrid;
       const { currentPage } = searchObj.data.resultGrid;
 
-      if(searchObj.meta.jobId != "") searchObj.meta.resultGrid.rowsPerPage = 100;
+      if (searchObj.meta.jobId != "")
+        searchObj.meta.resultGrid.rowsPerPage = 100;
 
       let total = 0;
       let totalPages = 0;
@@ -5667,7 +5707,7 @@ const useLogs = () => {
 
     const requestId = initializeWebSocketConnection(payload);
 
-    addRequestId(requestId, payload.traceId);
+    addRequestId(payload.traceId);
   };
 
   const sendCancelSearchMessage = (searchRequests: any[]) => {
@@ -5680,8 +5720,11 @@ const useLogs = () => {
       searchObj.data.isOperationCancelled = true;
 
       // loop on all requestIds
-      searchRequests.forEach(({ requestId, traceId }) => {
-        cancelSearchQueryBasedOnRequestId(requestId, traceId);
+      searchRequests.forEach(({ traceId }) => {
+        cancelSearchQueryBasedOnRequestId({
+          trace_id: traceId,
+          org_id: store?.state?.selectedOrganization?.identifier,
+        });
       });
     } catch (error: any) {
       console.error("Failed to cancel WebSocket searches:", error);
@@ -5807,7 +5850,8 @@ const useLogs = () => {
     initializeWebSocketConnection,
     addRequestId,
     routeToSearchSchedule,
-    isActionsEnabled
+    isActionsEnabled,
+    sendCancelSearchMessage,
   };
 };
 

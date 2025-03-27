@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::net::IpAddr;
+
 use actix_web::{
     Error,
     dev::ServiceRequest,
@@ -25,9 +27,11 @@ use config::{get_config, utils::base64};
 use o2_dex::config::get_config as get_dex_config;
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
+use url::Url;
 
 use crate::{
     common::{
+        infra::cluster,
         meta::{
             ingestion::INGESTION_EP,
             user::{
@@ -599,6 +603,11 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    // Check if the ws request is using internal grpc token
+    if get_config().websocket.enabled && auth_info.auth.eq(&get_config().grpc.internal_grpc_token) {
+        return validate_http_internal(req).await;
+    }
+
     if auth_info.auth.starts_with("Basic") {
         let decoded = match base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim()) {
             Ok(val) => val,
@@ -758,6 +767,62 @@ pub async fn validator_proxy_url(
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path_prefix = "/proxy/";
     oo_validator_internal(req, auth_info, path_prefix).await
+}
+
+pub async fn validate_http_internal(
+    req: ServiceRequest,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let router_nodes = cluster::get_cached_online_router_nodes()
+        .await
+        .unwrap_or_default();
+
+    // Get the peer address early and own the string
+    let peer = req
+        .connection_info()
+        .peer_addr()
+        .unwrap_or("unknown")
+        .to_string();
+
+    let router_node = router_nodes.iter().find(|node| {
+        let node_url = match Url::parse(&node.http_addr) {
+            Ok(node_url) => node_url,
+            Err(e) => {
+                log::error!("Failed to parse node URL: {}", e);
+                return false;
+            }
+        };
+
+        // Get IP from peer address (strips port if present)
+        let peer_ip = match peer
+            .split(':')
+            .next()
+            .and_then(|addr| addr.parse::<IpAddr>().ok())
+        {
+            Some(ip) => ip,
+            None => {
+                log::debug!("Failed to parse peer IP from: {}", peer);
+                return false;
+            }
+        };
+
+        let node_ip = match node_url
+            .host()
+            .and_then(|h| h.to_string().parse::<IpAddr>().ok())
+        {
+            Some(ip) => ip,
+            None => {
+                log::debug!("Failed to parse node IP");
+                return false;
+            }
+        };
+
+        peer_ip == node_ip
+    });
+
+    if router_node.is_none() {
+        return Err((ErrorUnauthorized("Unauthorized Access"), req));
+    }
+    Ok(req)
 }
 
 #[cfg(feature = "enterprise")]

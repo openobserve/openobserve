@@ -25,6 +25,10 @@ const auth = {
     const res = await http().get("/config/dex_login");
     return res.data;
   },
+  refresh_token: async () => {
+    const res = await http().get("/config/dex_refresh");
+    return res.data;
+  }
 };
 
 export default auth;

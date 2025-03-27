@@ -29,6 +29,7 @@ import {
   calculateWidthText,
   formatDate,
   formatUnitValue,
+  getContrastColor,
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
@@ -1988,6 +1989,8 @@ export const convertSQLData = async (
         panelSchema.config?.unit_custom,
         panelSchema.config?.decimals,
       );
+      options.backgroundColor =
+        panelSchema.config?.background?.value?.color ?? "";
       options.dataset = { source: [[]] };
       options.tooltip = {
         show: false,
@@ -2005,6 +2008,10 @@ export const convertSQLData = async (
         {
           ...defaultSeriesProps,
           renderItem: function (params: any) {
+            const backgroundColor =
+              panelSchema.config?.background?.value?.color;
+            const isDarkTheme = store.state.theme === "dark";
+
             return {
               type: "text",
               style: {
@@ -2018,7 +2025,7 @@ export const convertSQLData = async (
                 verticalAlign: "middle",
                 x: params.coordSys.cx,
                 y: params.coordSys.cy,
-                fill: store.state.theme == "dark" ? "#fff" : "#000",
+                fill: getContrastColor(backgroundColor, isDarkTheme),
               },
             };
           },
