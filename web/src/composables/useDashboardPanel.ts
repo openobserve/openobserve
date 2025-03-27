@@ -109,6 +109,7 @@ const getDefaultDashboardPanelData: any = () => ({
         fixedColor: ["#53ca53"],
         seriesBy: "last",
       },
+      background: null,
     },
     htmlContent: "",
     markdownContent: "",
@@ -2473,6 +2474,56 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       } else {
         query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
       }
+    }
+
+    // Add HAVING clause if y-axis or z-axis has operator and value
+    const yAxisFields =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.y;
+
+    const zAxisFields =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields?.z || [];
+
+    const havingClauses: any = [];
+
+    // Only add having clauses for non-heatmap charts from y-axis
+    if (dashboardPanelData.data.type !== "heatmap") {
+      // Process y-axis having conditions
+      yAxisFields.forEach((field: any) => {
+        if (
+          field?.havingConditions?.[0]?.operator &&
+          field?.havingConditions?.[0]?.value !== undefined &&
+          field?.havingConditions?.[0]?.value !== null &&
+          field?.havingConditions?.[0]?.value !== ""
+        ) {
+          const columnName = field.alias;
+          havingClauses.push(
+            `${columnName} ${field.havingConditions[0].operator} ${field.havingConditions[0].value}`,
+          );
+        }
+      });
+    }
+
+    // Process z-axis having conditions
+    zAxisFields.forEach((field: any) => {
+      if (
+        field?.havingConditions?.[0]?.operator &&
+        field?.havingConditions?.[0]?.value !== undefined &&
+        field?.havingConditions?.[0]?.value !== null &&
+        field?.havingConditions?.[0]?.value !== ""
+      ) {
+        const columnName = field.alias;
+        havingClauses.push(
+          `${columnName} ${field.havingConditions[0].operator} ${field.havingConditions[0].value}`,
+        );
+      }
+    });
+
+    if (havingClauses.length > 0) {
+      query += " HAVING " + havingClauses.join(" AND ");
     }
 
     // 5. Order by
