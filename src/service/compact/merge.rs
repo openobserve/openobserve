@@ -497,7 +497,7 @@ pub async fn merge_by_stream(
     // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
-    for (prefix, files_with_size) in partition_files_with_size.into_iter() {
+    for (prefix, mut files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -505,7 +505,6 @@ pub async fn merge_by_stream(
         let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
-            let mut files_with_size = files_with_size.to_owned();
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
             match job_strategy {
                 MergeStrategy::FileSize => {

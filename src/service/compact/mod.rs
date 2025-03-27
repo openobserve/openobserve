@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
+
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE,
@@ -378,6 +380,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
         if let Err(e) = infra_file_list::set_job_done(&need_done_ids).await {
             log::error!("[COMPACTOR] set_job_done failed: {}", e);
         }
+        let need_done_ids = need_done_ids.into_iter().collect::<HashSet<_>>();
         jobs.retain(|job| !need_done_ids.contains(&job.id));
     }
 
@@ -386,6 +389,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
         if let Err(e) = infra_file_list::set_job_pending(&need_release_ids).await {
             log::error!("[COMPACTOR] set_job_pending failed: {}", e);
         }
+        let need_release_ids = need_release_ids.into_iter().collect::<HashSet<_>>();
         jobs.retain(|job| !need_release_ids.contains(&job.id));
     }
 
