@@ -1499,6 +1499,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardPanelData="dashboardPanelData"
     />
     <div class="space"></div>
+
+    <BackGroundColorConfig v-if="dashboardPanelData.data.type == 'metric'" />
   </div>
 </template>
 
@@ -1512,6 +1514,7 @@ import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
+import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import OverrideConfig from "./OverrideConfig.vue";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
 import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
@@ -1529,6 +1532,7 @@ export default defineComponent({
     MarkLineConfig,
     CustomDateTimePicker,
     ColorPaletteDropDown,
+    BackGroundColorConfig,
     OverrideConfig,
     LinearIcon,
     NoSymbol,
@@ -1881,6 +1885,7 @@ export default defineComponent({
         iconComponent: markRaw(StepMiddle),
       },
     ];
+
     const isWeightFieldPresent = computed(() => {
       const layoutFields =
         dashboardPanelData.data.queries[

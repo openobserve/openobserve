@@ -1166,3 +1166,62 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
 
   return errors;
 };
+
+// Modify the getContrastColor function to consider theme
+export const getContrastColor = (
+  backgroundColor: string,
+  isDarkTheme: boolean,
+): string => {
+  // If no background color, return based on theme
+  if (!backgroundColor) {
+    return isDarkTheme ? "#FFFFFF" : "#000000";
+  }
+
+  // Normalize input (support hex, rgb, rgba)
+  const normalizeColor = (
+    color: string,
+  ): { r: number; g: number; b: number } => {
+    // Remove spaces and convert to lowercase
+    color = color.replace(/\s/g, "").toLowerCase();
+
+    // Hex color
+    if (color.startsWith("#")) {
+      const hex = color.replace("#", "");
+      return {
+        r: parseInt(hex.substr(0, 2), 16),
+        g: parseInt(hex.substr(2, 2), 16),
+        b: parseInt(hex.substr(4, 2), 16),
+      };
+    }
+
+    // RGB or RGBA
+    if (color.startsWith("rgb")) {
+      const matches = color.match(/rgba?\((\d+),(\d+),(\d+)(?:,([.\d]+))?\)/);
+      if (matches) {
+        return {
+          r: parseInt(matches[1], 10),
+          g: parseInt(matches[2], 10),
+          b: parseInt(matches[3], 10),
+        };
+      }
+    }
+
+    // Fallback
+    return { r: 255, g: 255, b: 255 };
+  };
+
+  // Normalize the background color
+  const { r, g, b } = normalizeColor(backgroundColor);
+
+  // Calculate relative luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  // Return black or white based on luminance and theme
+  if (isDarkTheme) {
+    // In dark theme, prefer white text unless background is very light
+    return luminance > 0.8 ? "#000000" : "#FFFFFF";
+  } else {
+    // In light theme, prefer black text unless background is very dark
+    return luminance > 0.5 ? "#000000" : "#FFFFFF";
+  }
+};

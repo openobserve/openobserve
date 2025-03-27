@@ -130,11 +130,6 @@ pub async fn get_settings_max_query_range(
 }
 
 pub fn get_max_query_range_by_user_role(stream_max_query_range: i64, user: &User) -> i64 {
-    log::debug!(
-        "get_max_query_range_if_sa stream_max_query_range: {stream_max_query_range}, user_role: {:?}",
-        user.role
-    );
-
     let config = get_config();
     let default_max_query_range = config.limit.default_max_query_range_days * 24;
 
@@ -148,12 +143,19 @@ pub fn get_max_query_range_by_user_role(stream_max_query_range: i64, user: &User
     // Then apply service account specific restrictions if applicable
     if user.role == UserRole::ServiceAccount {
         let max_query_range_sa = config.limit.max_query_range_for_sa;
-        return if max_query_range_sa > 0 {
+        return if max_query_range_sa > 0 && effective_max_query_range > 0 {
             std::cmp::min(effective_max_query_range, max_query_range_sa)
+        } else if max_query_range_sa > 0 {
+            max_query_range_sa
         } else {
             effective_max_query_range
         };
     }
+
+    log::debug!(
+        "get_max_query_range_if_sa stream_max_query_range: {effective_max_query_range}, user_role: {:?}",
+        user.role
+    );
 
     effective_max_query_range
 }

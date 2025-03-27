@@ -214,6 +214,19 @@ pub struct GroupType {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct Background {
+    #[serde(rename = "type")]
+    pub typ: String,
+    pub value: Option<BackgroundValue>, // "", single
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct BackgroundValue {
+    pub color: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FilterCondition {
     #[serde(rename = "type")]
     pub typ: String,
@@ -285,6 +298,8 @@ pub struct PanelConfig {
     mappings: Option<Vec<Mapping>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     color: Option<ColorCfg>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    background: Option<Background>,
     #[serde(skip_serializing_if = "Option::is_none")]
     trellis: Option<Trellis>,
 }

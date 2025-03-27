@@ -3005,6 +3005,7 @@ mod tests {
                 session_max_lifetime_secs: i64::default(),
                 session_gc_interval_secs: i64::default(),
                 ping_interval_secs: i64::default(),
+                check_cookie_expiry: bool::default(),
             },
             route: config::Route {
                 timeout: u64::default(),

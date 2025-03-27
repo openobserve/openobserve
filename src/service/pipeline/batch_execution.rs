@@ -340,7 +340,7 @@ impl ExecutablePipeline {
             .filter_map(|exec_node| {
                 if exec_node.children.is_empty() {
                     if let NodeData::Stream(stream_params) = &exec_node.node_data {
-                        Some(stream_params.clone())
+                        (!stream_params.stream_name.contains("{")).then_some(stream_params.clone())
                     } else {
                         None
                     }
@@ -538,7 +538,12 @@ async fn process_node(
                     if destination_stream.stream_name.contains("{") {
                         match resolve_stream_name(&destination_stream.stream_name, &record) {
                             Ok(stream_name) if !stream_name.is_empty() => {
-                                destination_stream.stream_name = stream_name.into();
+                                destination_stream.stream_name =
+                                    if cfg.common.skip_formatting_stream_name {
+                                        stream_name.into()
+                                    } else {
+                                        stream_name.to_lowercase().into()
+                                    }
                             }
                             resolve_res => {
                                 let err_msg = if let Err(e) = resolve_res {

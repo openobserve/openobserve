@@ -106,14 +106,17 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     }
 
     // Start get user defined schema
-    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut streams_need_original_set: HashSet<String> = HashSet::new();
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
     crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
-        &mut streams_need_original_set,
+        &mut streams_need_original_map,
     )
     .await;
+    // with pipeline, we need to store original if any of the destinations requires original
+    let store_original_when_pipeline_exists =
+        executable_pipeline.is_some() && streams_need_original_map.values().any(|val| *val);
     // End get user defined schema
 
     let mut stream_status = StreamStatus::new(&stream_name);
@@ -129,13 +132,14 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         // 2. current stream does not have pipeline
         if executable_pipeline.is_none() {
             // current stream requires original
-            streams_need_original_set
-                .contains(&stream_name)
+            streams_need_original_map
+                .get(&stream_name)
+                .is_some_and(|v| *v)
                 .then_some(value.to_string())
         } else {
             // 3. with pipeline, storing original as long as streams_need_original_set is not empty
             // because not sure the pipeline destinations
-            (!streams_need_original_set.is_empty()).then_some(value.to_string())
+            store_original_when_pipeline_exists.then_some(value.to_string())
         }
     } else {
         None // `item` won't be flattened, no need to store original
@@ -177,12 +181,16 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             _ => unreachable!(),
         };
 
-        if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+        if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
             local_val = crate::service::logs::refactor_map(local_val, fields);
         }
 
         // add `_original` and '_record_id` if required by StreamSettings
-        if streams_need_original_set.contains(&stream_name) && original_data.is_some() {
+        if streams_need_original_map
+            .get(&stream_name)
+            .is_some_and(|v| *v)
+            && original_data.is_some()
+        {
             local_val.insert(
                 ORIGINAL_DATA_COL_NAME.to_string(),
                 original_data.unwrap().into(),
@@ -237,6 +245,17 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                         continue;
                     }
 
+                    let destination_stream = stream_params.stream_name.to_string();
+                    if !user_defined_schema_map.contains_key(&destination_stream) {
+                        // a new dynamically created stream. need to check the two maps again
+                        crate::service::ingestion::get_uds_and_original_data_streams(
+                            &[stream_params],
+                            &mut user_defined_schema_map,
+                            &mut streams_need_original_map,
+                        )
+                        .await;
+                    }
+
                     for (idx, mut res) in stream_pl_results {
                         // handle timestamp
                         if let Err(e) = handle_timestamp(&mut res, min_ts) {
@@ -267,14 +286,15 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                             _ => unreachable!(),
                         };
 
-                        if let Some(fields) =
-                            user_defined_schema_map.get(stream_params.stream_name.as_str())
+                        if let Some(Some(fields)) = user_defined_schema_map.get(&destination_stream)
                         {
                             local_val = crate::service::logs::refactor_map(local_val, fields);
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if streams_need_original_set.contains(stream_params.stream_name.as_str())
+                        if streams_need_original_map
+                            .get(&destination_stream)
+                            .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
                             local_val.insert(
@@ -283,7 +303,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                             );
                             let record_id = crate::service::ingestion::generate_record_id(
                                 org_id,
-                                &stream_params.stream_name,
+                                &destination_stream,
                                 &StreamType::Logs,
                             );
                             local_val.insert(
@@ -316,7 +336,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                         };
 
                         let (ts_data, fn_num) = json_data_by_stream
-                            .entry(stream_params.stream_name.to_string())
+                            .entry(destination_stream.clone())
                             .or_insert_with(|| (Vec::new(), None));
                         ts_data.push((timestamp, local_val));
                         *fn_num = Some(function_no);
@@ -335,7 +355,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     }
 
     // drop memory-intensive variables
-    drop(streams_need_original_set);
+    drop(streams_need_original_map);
     drop(executable_pipeline);
     drop(original_options);
     drop(user_defined_schema_map);

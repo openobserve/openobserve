@@ -62,7 +62,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(async move { run_schedule_jobs().await });
-    tokio::task::spawn(async move { clean_complete_jobs().await });
     tokio::task::spawn(async move { watch_timeout_jobs().await });
     for i in 0..cfg.limit.search_job_workers {
         tokio::task::spawn(async move { run_search_jobs(i).await });
@@ -77,21 +76,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
 /// Runs the schedule jobs
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     service::alerts::scheduler::run().await
-}
-
-async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
-    let scheduler_clean_interval = get_config().limit.scheduler_clean_interval;
-    if scheduler_clean_interval < 0 {
-        return Ok(());
-    }
-    let mut interval = time::interval(time::Duration::from_secs(scheduler_clean_interval as u64));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        if let Err(e) = infra::scheduler::clean_complete().await {
-            log::error!("[SCHEDULER] clean complete jobs error: {}", e);
-        }
-    }
 }
 
 async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
