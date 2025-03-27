@@ -213,6 +213,8 @@ test.describe("dashboard Import testcases", () => {
 
     await page.getByRole("button", { name: "Import" }).click();
 
+    await page.waitForTimeout(2000);
+
     //  delete the dashboard
     await page
       .getByRole("row", { name: "01 Cloudfront to OpenObserve" })
@@ -246,7 +248,7 @@ test.describe("dashboard Import testcases", () => {
     ).toBeVisible();
   });
 
-  test("Should save the .json file in the correct folder when selecting a dashboard folder name and delete it via UI", async ({
+  test("Should save the .json file in the correct folder when selecting a dashboard folder name and delete it", async ({
     page,
   }) => {
     // Step 1: Navigate to the dashboard page
