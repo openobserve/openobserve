@@ -521,35 +521,37 @@ pub async fn get_node_by_uuid(uuid: &str) -> Option<Node> {
 
 #[inline]
 pub async fn get_cached_online_nodes() -> Option<Vec<Node>> {
-    get_cached_nodes(|node| node.status == NodeStatus::Online && node.scheduled).await
-}
-
-#[inline]
-pub async fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
-    get_cached_nodes(|node| {
-        node.status == NodeStatus::Online && node.scheduled && node.is_ingester()
-    })
-    .await
-}
-
-#[inline]
-pub async fn get_cached_online_querier_nodes(group: Option<RoleGroup>) -> Option<Vec<Node>> {
-    let nodes = get_cached_nodes(|node| {
-        node.status == NodeStatus::Online && node.scheduled && node.is_querier()
-    })
-    .await;
-    filter_nodes_with_group(nodes, group)
+    get_cached_nodes(|node| node.status == NodeStatus::Online).await
 }
 
 #[inline]
 pub async fn get_cached_online_query_nodes(group: Option<RoleGroup>) -> Option<Vec<Node>> {
     let nodes = get_cached_nodes(|node| {
-        node.status == NodeStatus::Online
-            && node.scheduled
-            && (node.is_querier() || node.is_ingester())
+        node.status == NodeStatus::Online && (node.is_querier() || node.is_ingester())
     })
     .await;
     filter_nodes_with_group(nodes, group)
+}
+
+#[inline]
+pub async fn get_cached_online_querier_nodes(group: Option<RoleGroup>) -> Option<Vec<Node>> {
+    let nodes =
+        get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_querier()).await;
+    filter_nodes_with_group(nodes, group)
+}
+
+#[inline]
+pub async fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
+    get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_ingester()).await
+}
+
+#[inline]
+pub async fn get_cached_schedulable_ingester_nodes() -> Option<Vec<Node>> {
+    get_cached_nodes(|node| {
+        // the scheduled used for ingestion, so we need to check it
+        node.status == NodeStatus::Online && node.is_ingester() && node.scheduled
+    })
+    .await
 }
 
 #[inline(always)]

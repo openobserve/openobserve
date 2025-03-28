@@ -41,7 +41,7 @@ pub(crate) async fn get_ingester_channel() -> Result<(String, Channel), tonic::S
 }
 
 async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
-    let nodes = cluster::get_cached_online_ingester_nodes().await;
+    let nodes = cluster::get_cached_schedulable_ingester_nodes().await;
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
         Err(tonic::Status::internal(
             "No online ingester nodes".to_string(),

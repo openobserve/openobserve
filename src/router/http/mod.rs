@@ -227,7 +227,7 @@ async fn get_url(path: &str) -> URLDetails {
         }
     } else {
         node_type = Role::Ingester;
-        cluster::get_cached_online_ingester_nodes().await
+        cluster::get_cached_schedulable_ingester_nodes().await
     };
 
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
