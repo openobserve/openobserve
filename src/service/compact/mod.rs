@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
+
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE,
@@ -163,7 +165,9 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                     continue; // no compactor node
                 };
                 if LOCAL_NODE.name.ne(&node_name) {
-                    // Check if this node holds the stream
+                    // This needs to be done in the case when there is a new node in the cluster
+                    // This will change the node that holds the stream
+                    // In case this node holds the stream, we release it for the designated node
                     if let Some((offset, _)) = db::compact::files::get_offset_from_cache(
                         &org_id,
                         stream_type,
@@ -378,6 +382,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
         if let Err(e) = infra_file_list::set_job_done(&need_done_ids).await {
             log::error!("[COMPACTOR] set_job_done failed: {}", e);
         }
+        let need_done_ids = need_done_ids.into_iter().collect::<HashSet<_>>();
         jobs.retain(|job| !need_done_ids.contains(&job.id));
     }
 
@@ -386,6 +391,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
         if let Err(e) = infra_file_list::set_job_pending(&need_release_ids).await {
             log::error!("[COMPACTOR] set_job_pending failed: {}", e);
         }
+        let need_release_ids = need_release_ids.into_iter().collect::<HashSet<_>>();
         jobs.retain(|job| !need_release_ids.contains(&job.id));
     }
 
@@ -408,10 +414,8 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
                     return;
                 }
             }
-            for id in job_ids.iter() {
-                if let Err(e) = infra_file_list::update_running_jobs(*id).await {
-                    log::error!("[COMPACTOR] update_job_status failed: {}", e);
-                }
+            if let Err(e) = infra_file_list::update_running_jobs(&job_ids).await {
+                log::error!("[COMPACTOR] update_job_status failed: {}", e);
             }
         }
     });

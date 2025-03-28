@@ -1263,14 +1263,20 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         Ok(())
     }
 
-    async fn update_running_jobs(&self, id: i64) -> Result<()> {
+    async fn update_running_jobs(&self, ids: &[i64]) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "file_list_jobs"])
             .inc();
-        sqlx::query(r#"UPDATE file_list_jobs SET updated_at = ? WHERE id = ?;"#)
+        let sql = format!(
+            r#"UPDATE file_list_jobs SET updated_at = ? WHERE id IN ({})"#,
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        sqlx::query(&sql)
             .bind(config::utils::time::now_micros())
-            .bind(id)
             .execute(&pool)
             .await?;
         Ok(())

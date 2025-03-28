@@ -298,6 +298,11 @@ pub async fn search(
             target_partitions,
         };
 
+        log::debug!(
+            "search->storage: session target_partitions: {}",
+            target_partitions
+        );
+
         let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         let table = exec::create_parquet_table(
             &session,
@@ -308,6 +313,7 @@ pub async fn search(
             file_stat_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
+            true,
         )
         .await?;
         tables.push(table);

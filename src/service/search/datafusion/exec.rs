@@ -15,6 +15,7 @@
 
 use std::{str::FromStr, sync::Arc};
 
+use arrow::record_batch::RecordBatch;
 use arrow_schema::Field;
 use config::{
     PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
@@ -50,7 +51,7 @@ use futures::TryStreamExt;
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
-    arrow::array::{Int64Array, RecordBatch},
+    arrow::array::Int64Array,
     config::meta::promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
     o2_enterprise::enterprise::{
         common::downsampling::get_largest_downsampling_rule,
@@ -92,13 +93,13 @@ pub async fn merge_parquet_files(
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
     metadata: &FileMeta,
-    _is_ingester: bool,
+    is_ingester: bool,
 ) -> Result<(Arc<Schema>, MergeParquetResult)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
     #[cfg(feature = "enterprise")]
-    if stream_type == StreamType::Metrics && !_is_ingester {
+    if stream_type == StreamType::Metrics && !is_ingester {
         let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
         if let Some(rule) = rule {
             return merge_parquet_files_with_downsampling(
@@ -152,27 +153,62 @@ pub async fn merge_parquet_files(
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     let schema = physical_plan.schema();
 
+    // print the physical plan
+    if cfg.common.print_key_sql {
+        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
+            .indent(false)
+            .to_string();
+        println!("+---------------------------+--------------------------+");
+        println!("merge_parquet_files");
+        println!("+---------------------------+--------------------------+");
+        println!("{}", plan);
+    }
+
     // write result to parquet file
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true);
+    let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
+        Some("none")
+    } else {
+        None
+    };
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        &schema,
+        bloom_filter_fields,
+        metadata,
+        true,
+        compression,
+    );
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-    loop {
-        match batch_stream.try_next().await {
-            Ok(Some(batch)) => {
-                if let Err(e) = writer.write(&batch).await {
-                    log::error!("merge_parquet_files write Error: {}", e);
-                    return Err(e.into());
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+    let task = tokio::task::spawn(async move {
+        loop {
+            match batch_stream.try_next().await {
+                Ok(None) => {
+                    break;
+                }
+                Ok(Some(batch)) => {
+                    if let Err(e) = tx.send(batch).await {
+                        log::error!("merge_parquet_files write to channel error: {}", e);
+                        return Err(DataFusionError::External(Box::new(e)));
+                    }
+                }
+                Err(e) => {
+                    log::error!("merge_parquet_files execute stream error: {}", e);
+                    return Err(e);
                 }
             }
-            Ok(None) => {
-                break;
-            }
-            Err(e) => {
-                log::error!("merge_parquet_files execute stream Error: {}", e);
-                return Err(e);
-            }
+        }
+        Ok(())
+    });
+    while let Some(batch) = rx.recv().await {
+        if let Err(e) = writer.write(&batch).await {
+            log::error!("merge_parquet_files write error: {}", e);
+            return Err(e.into());
         }
     }
+    task.await
+        .map_err(|e| DataFusionError::External(Box::new(e)))??;
     writer.close().await?;
 
     ctx.deregister_table("tbl")?;
@@ -226,50 +262,76 @@ pub async fn merge_parquet_files_with_downsampling(
 
     let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
     let mut file_meta = FileMeta::default();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, &metadata, false);
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        &schema,
+        bloom_filter_fields,
+        &metadata,
+        false,
+        None,
+    );
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-    loop {
-        match batch_stream.try_next().await {
-            Ok(Some(batch)) => {
-                if file_meta.max_ts == 0 {
-                    file_meta.max_ts = get_max_timestamp(&batch);
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+    let task = tokio::task::spawn(async move {
+        loop {
+            match batch_stream.try_next().await {
+                Ok(None) => {
+                    break;
                 }
-                file_meta.original_size += batch.get_array_memory_size() as i64;
-                file_meta.records += batch.num_rows() as i64;
-                min_ts = get_min_timestamp(&batch);
-                if file_meta.original_size > cfg.compact.max_file_size as i64 {
-                    file_meta.min_ts = min_ts;
-                    append_metadata(&mut writer, &file_meta)?;
-                    writer.close().await?;
-                    bufs.push(std::mem::take(&mut buf));
-                    file_metas.push(file_meta);
-
-                    // reset for next file
-                    buf.clear();
-                    file_meta = FileMeta::default();
-                    writer = new_parquet_writer(
-                        &mut buf,
-                        &schema,
-                        bloom_filter_fields,
-                        &metadata,
-                        false,
+                Ok(Some(batch)) => {
+                    if let Err(e) = tx.send(batch).await {
+                        log::error!(
+                            "merge_parquet_files_with_downsampling write to channel error: {}",
+                            e
+                        );
+                        return Err(DataFusionError::External(Box::new(e)));
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "merge_parquet_files_with_downsampling execute stream error: {}",
+                        e
                     );
+                    return Err(e);
                 }
-                if let Err(e) = writer.write(&batch).await {
-                    log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
-                    return Err(e.into());
-                }
-            }
-            Ok(None) => break,
-            Err(e) => {
-                log::error!(
-                    "merge_parquet_files_with_downsampling execute stream Error: {}",
-                    e
-                );
-                return Err(e);
             }
         }
+        Ok(())
+    });
+    while let Some(batch) = rx.recv().await {
+        if file_meta.max_ts == 0 {
+            file_meta.max_ts = get_max_timestamp(&batch);
+        }
+        file_meta.original_size += batch.get_array_memory_size() as i64;
+        file_meta.records += batch.num_rows() as i64;
+        min_ts = get_min_timestamp(&batch);
+        if file_meta.original_size > cfg.compact.max_file_size as i64 {
+            file_meta.min_ts = min_ts;
+            append_metadata(&mut writer, &file_meta)?;
+            writer.close().await?;
+            bufs.push(std::mem::take(&mut buf));
+            file_metas.push(file_meta);
+
+            // reset for next file
+            buf.clear();
+            file_meta = FileMeta::default();
+            writer = new_parquet_writer(
+                &mut buf,
+                &schema,
+                bloom_filter_fields,
+                &metadata,
+                false,
+                None,
+            );
+        }
+        if let Err(e) = writer.write(&batch).await {
+            log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
+            return Err(e.into());
+        }
     }
+    task.await
+        .map_err(|e| DataFusionError::External(Box::new(e)))??;
+
     if file_meta.original_size > 0 {
         file_meta.min_ts = min_ts;
         append_metadata(&mut writer, &file_meta)?;
@@ -484,6 +546,7 @@ pub async fn register_table(
     files: &[FileKey],
     rules: HashMap<String, DataType>,
     sort_key: &[(String, bool)],
+    need_optimize_partition: bool,
 ) -> Result<SessionContext> {
     // only sort by timestamp desc
     let sorted_by_time =
@@ -506,6 +569,7 @@ pub async fn register_table(
         ctx.runtime_env().cache_manager.get_file_statistic_cache(),
         None,
         vec![],
+        need_optimize_partition,
     )
     .await?;
     ctx.register_table(table_name, table)?;
@@ -523,6 +587,7 @@ pub async fn create_parquet_table(
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
+    need_optimize_partition: bool,
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
     let target_partitions = if session.target_partitions == 0 {
@@ -543,6 +608,11 @@ pub async fn create_parquet_table(
     } else {
         target_partitions
     };
+
+    log::debug!(
+        "create_parquet_table: target_partitions: {}",
+        target_partitions
+    );
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -608,7 +678,13 @@ pub async fn create_parquet_table(
         schema
     };
     config = config.with_schema(schema);
-    let mut table = NewListingTable::try_new(config, rules, index_condition, fst_fields)?;
+    let mut table = NewListingTable::try_new(
+        config,
+        rules,
+        index_condition,
+        fst_fields,
+        need_optimize_partition,
+    )?;
     if session.storage_type != StorageType::Tmpfs && file_stat_cache.is_some() {
         table = table.with_cache(file_stat_cache);
     }

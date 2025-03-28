@@ -730,6 +730,7 @@ async fn merge_files(
         None,
         None,
         vec![],
+        false,
     )
     .await?;
     let tables = vec![table];
