@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-select
                     :loading="isOrgLoading"
                     v-model="selectedOrganization"
-                    :options="filteredOrganizations"
+                    :options="organizationToDisplay"
                     @filter="filterOrganizations"
                     placeholder="Select Org"
                     :popup-content-style="{ textTransform: 'lowercase' }"
@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     </q-select>
                     <div
-                        v-if="selectedOrganization"
                      class="quota-tabs">
                         <q-tabs
                         data-test="quota-tabs"
@@ -78,29 +77,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     </div>
                     <div  class="flex items-center" v-if="selectedOrganization">
-                     <!-- this is bulk update and it is deprecated feature not needed -->
-
-                        <q-btn
-                            data-test="bulk-update-btn"
-                            label="Bulk Update"
-                            class="border q-ml-md title-height"
-                            no-caps
-                            @click="bulkUpdate"
-                            v-if="false"
-                        >
-                        <q-icon name="cached" style="font-weight: 200; opacity: 0.7;"  class="q-ml-sm"/>
-                    </q-btn>
-
-                       
-
                     <!-- this is edit quota and it is needed -->
                         <q-btn
                         v-if="!editTable"
                             data-test="edit-table-btn"
                             label="Edit Quota"
-                            class="border q-mr-md title-height"
+                            class="border  title-height"
                             no-caps
-
+                            :disable="activeTab == 'role-limits' && !expandedRow"
                             @click="editTableWithInput"
                         >
                         <q-icon name="edit" style="font-weight: 200; opacity: 0.7;"  class="q-ml-sm"/>
@@ -130,9 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-input>
                     <q-select
                         v-if="activeTab == 'role-limits'"
-                        :loading="isRoleModulesLoading"
-                        v-model="selectedRole"
-                        :options="filteredRolesToDisplayOptions"
+                        :loading="isApiCategoryLoading"
+                        v-model="selectedApiCategory"
+                        :options="filteredApiCategoryToDisplayOptions"
                         placeholder="Select Api Category"
                         color="input-border"
                         style="padding: 0px;"
@@ -146,8 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         hide-selected
                         fill-input                    
                         clearable
-                        @filter="filterRolesToDisplayOptions"
-                        @update:model-value="updateSelectedRole()"
+                        @filter="filterApiCategoriesToDisplayOptions"
+                        @update:model-value="filterModulesBasedOnCategory()"
                   >
                     </q-select>
                  </div>
@@ -228,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'editable-cell': editTable && props.col.name !== 'module_name',
                     'edited-input': isEdited(props.row.module_name, props.col.name)
                 }"
-                @input="(event: any) => handleInputChange(props.row.module_name , props.row[props.col.name], props.col.name, event.target.innerText)"
+                @input="(event: any) => handleInputChange('' , props.row.module_name , props.row[props.col.name], props.col.name, event.target.innerText)"
                  @keypress="restrictToNumbers"
                 @paste="preventNonNumericPaste"
                 >
@@ -380,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         'editable-cell': editTable && col.name !== 'module_name',
                         'edited-input': isEdited(row.module_name, col.name)
                     }"
-                    @input="(event: any) => handleRoleInputChange(props.row.role_name , row.module_name , row[col.name], col.name, event.target.innerText)"
+                    @input="(event: any) => handleInputChange(props.row.role_name , row.module_name , row[col.name], col.name, event.target.innerText)"
                     @keypress="restrictToNumbers"
                     @paste="preventNonNumericPaste"
                     >
@@ -561,7 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { useI18n } from "vue-i18n";
-import { defineComponent, onMounted, reactive, ref, watch } from "vue";
+import { computed, defineComponent, onMounted, reactive, ref, watch } from "vue";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
 import { useStore } from "vuex";
 import organizationsService from "@/services/organizations";
@@ -574,6 +558,8 @@ import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
+
+import useRateLimiter from "@/composables/useRateLimiter";
 import {
   outlinedDelete,
   outlinedPause,
@@ -604,6 +590,7 @@ export default defineComponent ({
         const isOrgLoading = ref<boolean>(false);
         const resultTotal = ref<number>(0);
         const perPageOptions = ref<number[]>([10, 20, 50, 100]);
+        const { getApiLimitsByOrganization, getRoleLimitsByOrganization , getModulesToDisplay} = useRateLimiter();
         const pagination: any = ref({
             rowsPerPage: 20,
             });
@@ -738,9 +725,9 @@ export default defineComponent ({
         const roleLevelLoading = ref<boolean>(false);
 
         const openedRole = ref<any>("");
-        const selectedRole = ref<any>(null);
+        const selectedApiCategory = ref<any>(null);
         const rolesToBeDisplayed = ref<any[]>([]);
-        const isRoleModulesLoading = ref<boolean>(false);
+        const isApiCategoryLoading = ref<boolean>(false);
         const filteredRoleLevelModuleRows = ref<any[]>([]);
         const expandedRole = ref<string>("");
         const showConfirmDialogTabSwitch = ref(false);
@@ -752,137 +739,195 @@ export default defineComponent ({
         const showConfirmDialogTypeSwitch = ref(false);
         const isSavingJson = ref<boolean>(false);
         const filteredOrganizations = ref<any[]>([]);
-        const filteredRolesToDisplayOptions = ref<any[]>([]);
+        const filteredApiCategoryToDisplayOptions = ref<any[]>([]);
+        const apiCategories = ref<any[]>([]);
 
-        onMounted(async ()=>{
-            await getOrganizations();
-            if(router.currentRoute.value.query.quota_org){
-                selectedOrganization.value = {
-                    label: router.currentRoute.value.query.quota_org,
-                  
-                    value: router.currentRoute.value.query.quota_org
-                }
+        const selectedPerPage = ref<number>(20);
+        const qTable = ref<any>(null);
+
+    onMounted(async ()=>{
+        await getOrganizations();
+        if(router.currentRoute.value.query.quota_org){
+            selectedOrganization.value = {
+                label: router.currentRoute.value.query.quota_org,
+                
+                value: router.currentRoute.value.query.quota_org
             }
-            if(selectedOrganization.value){
-                await getApiLimitsByOrganization();
-            }
-
-        })
-
-        //watch here
-
-        watch (()=>uploadedRules.value, (newVal) => {
-            if(!newVal || newVal.length == 0){
-                fileListToDisplay.value = '';
-                return;
-            }
-            fileListToDisplay.value = '';
-            if(newVal.length > 1){
-            newVal.forEach((file: any) => {
-                fileListToDisplay.value += file.name + ',';
-            });
         }
-        else{
-            fileListToDisplay.value = newVal[0].name;
-        }
-
-
-        })
-        const updateOrganization = () => {
-            router.push({
-                ...router.currentRoute.value,
-                query: {
-                    ...router.currentRoute.value.query,
-                    quota_org: selectedOrganization.value.value.toLowerCase(),
-                }
-            })
+        if(selectedOrganization.value){
             if(activeTab.value === "api-limits"){
-                getApiLimitsByOrganization();
+                //here we are getting the api limits for the selected organization
+                apiLimitsRows.value = await getApiLimitsByOrganization(selectedOrganization.value.value);
+                resultTotal.value = apiLimitsRows.value.length;
             }
             else{
+                //here we are getting the role limits for the selected organization
+                if(rolesLimitRows.value.length === 0){
+                    getRolesByOrganization();
+                }
+                resultTotal.value = rolesLimitRows.value.length
+            }
+            //these are the modules that are displayed in the dropdown 
+            //to select the api category that user can use to filter the api limits
+            apiCategories.value = await getModulesToDisplay();
+        }
+
+
+    })
+
+    //watch here
+
+    watch (()=>uploadedRules.value, (newVal) => {
+        if(!newVal || newVal.length == 0){
+            fileListToDisplay.value = '';
+            return;
+        }
+        fileListToDisplay.value = '';
+        if(newVal.length > 1){
+        newVal.forEach((file: any) => {
+            fileListToDisplay.value += file.name + ',';
+        });
+    }
+    else{
+        fileListToDisplay.value = newVal[0].name;
+    }
+
+
+    })
+
+    //computed here
+
+    const organizationToDisplay = computed (() => {
+        if(activeTab.value === "api-limits"){
+            const newArray = [...filteredOrganizations.value];
+            newArray.unshift({
+                label: "GLOBAL RULES META",
+                value: "GLOBAL_RULES_META"
+            });
+            return newArray;
+        }
+        else{
+            return filteredOrganizations.value;
+        }
+    });
+    const updateOrganization = async () => {
+        router.push({
+            ...router.currentRoute.value,
+            query: {
+                ...router.currentRoute.value.query,
+                quota_org: selectedOrganization.value.value.toLowerCase(),
+            }
+        })
+
+        if(activeTab.value === "api-limits"){
+            if(!store.state.allApiLimitsByOrgId[selectedOrganization.value.value]){
+                apiLimitsRows.value = await getApiLimitsByOrganization(selectedOrganization.value.value);
+            }
+            else{
+                apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
+            }
+        }
+        else if(activeTab.value === "role-limits"){
+            if(rolesLimitRows.value.length === 0){
                 getRolesByOrganization();
             }
         }
-        const getOrganizations = async () => {
-            if(store.state.organizations.length === 0){
-                try{
-                    isOrgLoading.value = true;
-                    const response = await organizationsService.os_list(0, 100000, "id", false, "", "default")
-                    organizations.value = response.data.data.map((org: any) => ({
-                        label: org.name,
-                        value: org.identifier
-                    }));
-                    isOrgLoading.value = false;
-                }
-                catch(error){
-                    isOrgLoading.value = false;
-                    console.log(error);
-                }
-                finally{
-                    isOrgLoading.value = false;
-    
-                }
-            }
-            else{
-                organizations.value = store.state.organizations.map((org: any) => ({
+    }
+    const getOrganizations = async () => {
+        //this is used to get the organization from the api
+        if(store.state.organizations.length === 0){
+            try{
+                isOrgLoading.value = true;
+                const response = await organizationsService.os_list(0, 100000, "id", false, "", "default")
+                organizations.value = response.data.data.map((org: any) => ({
                     label: org.name,
                     value: org.identifier
                 }));
-
+                organizations.value.sort((a: any, b: any) => a.label.localeCompare(b.label));
+                isOrgLoading.value = false;
             }
-            if(activeTab.value == 'api-limits'){
-                organizations.value.unshift({
-                    label: "GLOBAL RULES META",
-                    value: "GLOBAL_RULES_META"
-                });
+            catch(error){
+                isOrgLoading.value = false;
+                console.log(error);
+            }
+            finally{
+                isOrgLoading.value = false;
+
             }
         }
-        const updateActiveTab = (tab: string) => {
-            if(tab == 'role-limits'){
-                delete organizations.value[0];
-            }
-            if(tab == 'api-limits'){
-                organizations.value.unshift({
-                    label: "GLOBAL RULES META",
-                    value: "GLOBAL_RULES_META"
-                });
-            }
-            let isChanged = Object.keys(changedValues.value).length > 0;
+        else{
+            organizations.value = store.state.organizations.map((org: any) => ({
+                label: org.name,
+                value: org.identifier
+            }));
 
-            if (isChanged) {
-                nextTab.value = tab; // Store the tab user wants to switch to
-                showConfirmDialogTabSwitch.value = true; // Show confirmation dialog
-            } else {
-                switchTab(tab);
-            }
-        };
+        }
+    }
+    const updateActiveTab = (tab: string) => {
+        let isChanged = Object.keys(changedValues.value).length > 0;
 
-        const switchTab = async (tab: string) => {
-            activeType.value = 'table'
-            activeTab.value = tab;
-
-            // Load data if needed
-            if (tab === "role-limits" && roleLevelModuleRows.value.length === 0 && rolesLimitRows.value.length === 0) {
+        if (isChanged) {
+            nextTab.value = tab; // Store the tab user wants to switch to
+            showConfirmDialogTabSwitch.value = true; // Show confirmation dialog
+        } else {
+            switchTab(tab);
+        }
+    };
+    //this is used to switch the tab
+    const switchTab = async (tab: string) => {
+        //here when we switch the tab we need to reset the activeType and activeTab
+        //active type to table --> reason: sometimes user might have shift from api-limits to role-limits and if activeType is json then none of the row is expanded right
+        //which will lead to the issue that user will not be able to see the table data
+        activeType.value = 'table'
+        activeTab.value = tab;
+        //
+        if (tab === "role-limits") {
+        //this check is for only for when user switch to role-limits tab for the first time but anyways on mounting we are calling the roles api 
+        //so the roles all already fetched
+            
+            if(rolesLimitRows.value.length === 0){
                 await getRolesByOrganization();
-                await getModulesToDisplay();
             }
-            if (tab === "api-limits") {
-                await getApiLimitsByOrganization();
+            resultTotal.value = rolesLimitRows.value.length;
+            //here we are checking if the organization is global_rules_meta then we need to reset the selectedOrganization
+            //because in role limit we dont have something called global_rules_meta org
+            if(router.currentRoute.value.query.quota_org == "global_rules_meta"){
+                selectedOrganization.value = ""
+                $q.notify({
+                    type: "negative",
+                    message: "Global rules meta is not available for role limits",
+                    timeout: 3000,
+                })
             }
-        };
-
+        }
+        if (tab === "api-limits" ) {
+            if(!store.state.allApiLimitsByOrgId[selectedOrganization.value.value]){
+                apiLimitsRows.value = await getApiLimitsByOrganization(selectedOrganization.value.value);
+            }
+            else{
+                apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
+            }
+            resultTotal.value = apiLimitsRows.value.length
+        }
+    };
+    //this is used to save the changes and switch the tab 
+    //when user confirms the changes and click save in the confirm dialog
     const saveChangesAndTabSwitch = async () => {
         await saveChanges();
         changedValues.value = {};
         editTable.value = false;
+        showConfirmDialogTabSwitch.value = false;
+        jsonStrToDisplay.value = '';
         if (nextTab.value) {
             switchTab(nextTab.value);
             nextTab.value = null;
         }
-        showConfirmDialogTabSwitch.value = false;
     };
 
     const discardChangesTabSwitch = () => {
+        //when user discard the changes and swith the tab we just reset the changedValues and editTable
+        //and also we need to reset the activeType
+        //we just assign the stored tab value to the activeTab
         changedValues.value = {};
         editTable.value = false;
         if (nextTab.value) {
@@ -891,200 +936,29 @@ export default defineComponent ({
         }
         showConfirmDialogTabSwitch.value = false;
     };
-
-
-        const bulkUpdate = () => {
-            isBulkUpdate.value = true;
+    const editTableWithInput = () => {
+        editTable.value = true;
+    }
+    const getRolesByOrganization = async () => {
+        //here we are getting the roles from the api 
+        //as we are not storing the roles in the store
+        //so we need to get the roles from the api
+        try{
+            const response = await getRoles(selectedOrganization.value?.value);
+            rolesLimitRows.value = response.data.map((role: any) => ({
+                role_name: role,
+                uuid: getUUID(),
+                list: 10,
+                get: 10,
+                create: 10,
+                update: 10,
+                delete: 10
+            }));
         }
-        const saveBulkUpdate = () => {
-            console.log('save bulk update')
-        }
-        const editTableWithInput = () => {
-            editTable.value = true;
-        }
-        const changePagination = (page: number, perPage: number) => {
-
-        }
-        const generateRolesColumns = () => {
-            rolesColumns.value = [
-                {
-                    name: "name", label: "Name", field: "name"
-                }
-            ]
-        }
-        const getRolesByOrganization = async () => {
-            try{
-                const response = await getRoles(selectedOrganization.value?.value);
-                rolesLimitRows.value = response.data.map((role: any) => ({
-                    role_name: role,
-                    uuid: getUUID(),
-                    list: 10,
-                    get: 10,
-                    create: 10,
-                    update: 10,
-                    delete: 10
-                }));
-                console.log(rolesLimitRows.value,'rolesLimitRows');
-            }
-            catch(error){
-                console.log(error);
-            }
-        }
-        const getApiLimitsByOrganization = async () => {
-            loading.value = true;
-            changedValues.value = {};
-            editTable.value = false;
-            try {
-                const response = await ratelimitService.getApiLimits(selectedOrganization?.value?.value);
-                let transformedData: any = [];
-
-            //predefined operation that we get from the api
-            const operations = ['list', 'get', 'create', 'update', 'delete'];
-            // Iterate over each module in api_group_info
-            Object.keys(response.data).forEach((moduleName) => {
-                const module = response.data[moduleName];
-
-                // Create an object to store the threshold values for each operation
-                let moduleThresholds: any = {
-                    module_name: moduleName,
-                };
-
-                operations.forEach((operation) => {
-                    // Check if the operation exists for the current module
-                    if (module[operation.toLowerCase()] !== undefined) {
-                        // If the operation exists, get the threshold value
-                        moduleThresholds[operation.toLowerCase()] =  module[operation.toLowerCase()];
-                    } else {
-                        // If the operation doesn't exist, set it as '--'
-                        moduleThresholds[operation.toLowerCase()] = '-';
-                    }
-                });
-                // Add the transformed data to the array
-                transformedData.push(moduleThresholds);
-
-            });
-            transformedData.sort((a: any, b: any) => a.module_name.localeCompare(b.module_name));
-            apiLimitsRows.value = transformedData;
-            resultTotal.value = transformedData.length;
-            loading.value = false;
-        } catch (error) {
-            loading.value = false;
+        catch(error){
             console.log(error);
         }
-        finally{
-            loading.value = false;
-        }
-        };
-        const getRoleLimitsByOrganization = async (rolename: string) => {
-            roleLevelLoading.value = true;
-            changedValues.value = {};
-            editTable.value = false;
-            try {
-                const response = await ratelimitService.getRoleLimits(selectedOrganization.value.value, rolename);
-                let transformedData: any = [];
-
-            //predefined operation that we get from the api
-            const operations = ['list', 'get', 'create', 'update', 'delete'];
-            // Iterate over each module in api_group_info
-            Object.keys(response.data).forEach((moduleName) => {
-                const module = response.data[moduleName];
-
-                // Create an object to store the threshold values for each operation
-                let moduleThresholds: any = {
-                    module_name: moduleName,
-                };
-
-                operations.forEach((operation) => {
-                    // Check if the operation exists for the current module
-                    if (module[operation.toLowerCase()] !== undefined) {
-                        // If the operation exists, get the threshold value
-                        moduleThresholds[operation.toLowerCase()] =  module[operation.toLowerCase()];
-                    } else {
-                        // If the operation doesn't exist, set it as '--'
-                        moduleThresholds[operation.toLowerCase()] = '-';
-                    }
-                });
-                // Add the transformed data to the array
-                transformedData.push(moduleThresholds);
-
-            });
-            transformedData.sort((a: any, b: any) => a.module_name.localeCompare(b.module_name));
-            roleLevelModuleRows.value = transformedData;
-            if(selectedRole.value?.value){
-                filteredRoleLevelModuleRows.value = transformedData.filter((row: any) => row.module_name.toLowerCase() === selectedRole.value?.value.toLowerCase());
-            }
-            else{
-                filteredRoleLevelModuleRows.value = transformedData;
-            }
-            resultTotal.value = transformedData.length;
-            roleLevelLoading.value = false;
-        } catch (error) {
-            roleLevelLoading.value = false;
-            console.log(error);
-        }
-        finally{
-            roleLevelLoading.value = false;
-        }
-        };
-
-        
-
-    const handleInputChange = (moduleName: string, row: any, operation: string, value: any) => {
-                    // Remove non-numeric characters except "."
-            let cleanedValue = value.replace(/[^0-9.]/g, "");
-
-            // Prevent multiple dots
-            const parts = cleanedValue.split(".");
-            if (parts.length > 2) {
-            cleanedValue = parts[0] + "." + parts.slice(1).join("");
-            }
-
-            // Ensure empty string is stored instead of NaN
-            if (cleanedValue === ".") {
-            cleanedValue = "";
-            }
-
-            // Update value in changedValues
-            if (!changedValues.value[moduleName]) {
-            changedValues.value[moduleName] = reactive ({});
-            }
-            changedValues.value[moduleName][operation] = cleanedValue;
-
-            let valueToUpdate ;
-
-            if(isNaN(parseInt(value))){
-                valueToUpdate = ""
-            }
-        else{
-            valueToUpdate = parseInt(value);
-        }
-        changedValues.value[moduleName][operation] = valueToUpdate;
-
-        //this is deprecated code 
-        // if(row.rule){
-        //     const rowRule = row.rule;
-        //     rowRule.threshold = parseInt(value);
-        //     changedValues.value[moduleName][operation] = {
-        //         ...rowRule
-        //     };
-        // }
-        // else{
-        //     //handle the case where the rules are not there in the row
-        //     delete row.rule;
-        //     delete row.api_set
-        //     delete row.global_default_rule
-        //     row.rule_type = 'exact'
-        //     row.user_role = ".*"
-        //     row.user_id = ".*"
-        //     row.threshold = parseInt(value);
-        //     row.org = selectedOrganization.value.value;
-        //     changedValues.value[moduleName][operation] = {
-        //         ...row
-        //     };
-
-        // }
-
-    };
+    }
     const restrictToNumbers = (event: any) => {
     const char = String.fromCharCode(event.keyCode);
 
@@ -1093,58 +967,36 @@ export default defineComponent ({
         event.preventDefault();
     }
     };
-    const handleRoleInputChange =  (roleName: any, moduleName: string, row: any, operation: string, value: any) => {
+    //this is used for handling the input changes for both api limits and row limits
+    const handleInputChange =  (roleName: any = "", moduleName: string, row: any, operation: string, value: any) => {
         let cleanedValue = value.replace(/[^0-9.]/g, "");
 
-            // Prevent multiple dots
-            const parts = cleanedValue.split(".");
-            if (parts.length > 2) {
-            cleanedValue = parts[0] + "." + parts.slice(1).join("");
-            }
+        // Prevent multiple dots
+        const parts = cleanedValue.split(".");
+        if (parts.length > 2) {
+        cleanedValue = parts[0] + "." + parts.slice(1).join("");
+        }
 
-            // Ensure empty string is stored instead of NaN
-            if (cleanedValue === ".") {
-            cleanedValue = "";
-            }
+        // Ensure empty string is stored instead of NaN
+        if (cleanedValue === ".") {
+        cleanedValue = "";
+        }
 
-            // Update value in changedValues
-            if (!changedValues.value[moduleName]) {
-            changedValues.value[moduleName] = reactive ({});
-            }
-            changedValues.value[moduleName][operation] = cleanedValue;
+        // Update value in changedValues
+        if (!changedValues.value[moduleName]) {
+        changedValues.value[moduleName] = reactive ({});
+        }
+        changedValues.value[moduleName][operation] = cleanedValue;
 
-            let valueToUpdate ;
+        let valueToUpdate ;
 
-            if(isNaN(parseInt(value))){
-                valueToUpdate = ""
-            }
-            else{
-            valueToUpdate = parseInt(value);
-            }
-            changedValues.value[moduleName][operation] = valueToUpdate;
-
-        // row.user_role = roleName;
-        // if(row.rule){
-        //     const rowRule = row.rule;
-        //     rowRule.threshold = parseInt(value);
-        //     changedValues.value[moduleName][operation] = {
-        //         ...rowRule
-        //     };
-        // }
-        // else{
-        //     //handle the case where the rules are not there in the row
-        //     delete row.rule;
-        //     delete row.api_set
-        //     delete row.global_default_rule
-        //     row.rule_type = 'exact'
-        //     row.user_id = ".*"
-        //     row.threshold = parseInt(value);
-        //     row.org = selectedOrganization.value.value;
-        //     changedValues.value[moduleName][operation] = {
-        //         ...row
-        //     };
-        // }
-
+        if(isNaN(parseInt(value))){
+            valueToUpdate = ""
+        }
+        else{
+        valueToUpdate = parseInt(value);
+        }
+        changedValues.value[moduleName][operation] = valueToUpdate;
     };
 
     const saveChanges = async () => {
@@ -1177,10 +1029,11 @@ export default defineComponent ({
         // After successful save, refresh the data
         editTable.value = false;
         if(activeTab.value === "api-limits"){
-                await getApiLimitsByOrganization();
+                apiLimitsRows.value = await getApiLimitsByOrganization(selectedOrganization.value.value);
             }
-            else{
-                await getRoleLimitsByOrganization(openedRole.value);
+            else if(activeTab.value === "role-limits"){                    
+                roleLevelModuleRows.value  =  await getRoleLimitsByOrganization(selectedOrganization.value.value, openedRole.value);
+                filterModulesBasedOnCategory();
             }
         changedValues.value = {};
     } catch (error: any) {
@@ -1194,14 +1047,13 @@ export default defineComponent ({
     };
 
     const cancelChanges = () => {
-        console.log('cancelChanges')
         changedValues.value = {};
         editTable.value = false;
     };
 
     const cancelJsonChanges = () => {
-        console.log('cancelJsonChanges')
         changedValues.value = {};
+        jsonStrToDisplay.value = '';
         editTable.value = false;
     };
 
@@ -1229,10 +1081,10 @@ export default defineComponent ({
         // After successful save, refresh the data
         editTable.value = false;
         if(activeTab.value === "api-limits"){
-                await getApiLimitsByOrganization();
+                apiLimitsRows.value = await getApiLimitsByOrganization(selectedOrganization.value.value);
             }
             else{
-                await getRoleLimitsByOrganization(openedRole.value);
+                roleLevelModuleRows.value  =  await getRoleLimitsByOrganization(selectedOrganization.value.value, openedRole.value);
             }
             isSavingJson.value = false;
     } catch (error: any) {
@@ -1297,7 +1149,7 @@ export default defineComponent ({
             uploadingRules.value = false;
             isBulkUpdate.value = false;
             uploadedRules.value = null;
-            await getApiLimitsByOrganization();
+            await getApiLimitsByOrganization(selectedOrganization.value.value);
             dismiss();
         }
         catch(error){
@@ -1352,14 +1204,9 @@ export default defineComponent ({
         focusedInputId.value = generateUniqueId(row);
     };
 
-    // Handle blur event and clear the focused input ID
-    const onBlur = () => {
-    };
-
     const generateUniqueId = (row: any) => {
         return row.api_group_name + '_' + row.api_group_operation;
     }
-
     const filteredData = (rows: any, terms: any) => {
         var filtered = [];
         terms = terms.toLowerCase();
@@ -1379,8 +1226,8 @@ export default defineComponent ({
         }
 
         return filtered;
-      }
-      const triggerExpand = async (props : any) =>{
+    }
+    const triggerExpand = async (props : any) =>{
         if(Object.keys(changedValues.value).length > 0){
             showConfirmDialogRowSwitch.value = true;
             toBeExpandedRow.value = props.row;
@@ -1393,36 +1240,19 @@ export default defineComponent ({
             } 
         else {
             openedRole.value = props.row.role_name;
-            await getRoleLimitsByOrganization(props.row.role_name);
+            let roleLimits : any;
+            if(!store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value]?.[props.row.role_name]){
+                roleLevelModuleRows.value =  await getRoleLimitsByOrganization(selectedOrganization.value.value, props.row.role_name);
+            }
+            else{
+                roleLevelModuleRows.value = store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value][props.row.role_name];
+            }
+            filterModulesBasedOnCategory();
         // Otherwise, expand the clicked row and collapse any other row
             expandedRow.value = props.row.uuid;
         }
-    }
-    const updateSelectedRole = () => {
-        if(selectedRole.value?.value){
-            filteredRoleLevelModuleRows.value = roleLevelModuleRows.value.filter((row: any) => row.module_name.toLowerCase() === selectedRole.value?.value.toLowerCase());
-        }
-        else{
-            filteredRoleLevelModuleRows.value = roleLevelModuleRows.value;
-        }
-    }   
+    }  
 
-    const getModulesToDisplay = async () => {
-        try {
-            isRoleModulesLoading.value = true;
-        const response = await ratelimitService.getModules(selectedOrganization.value.value);
-
-        rolesToBeDisplayed.value = response.data.map((role: any) => ({
-                label: role,
-                value: role
-            }));
-            isRoleModulesLoading.value = false;
-        } catch (error) {
-            isRoleModulesLoading.value = false;
-        }
-
-
-    }
     const preventNonNumericPaste = (event: any) => {
         const clipboardData = event.clipboardData.getData("text");
 
@@ -1455,10 +1285,7 @@ export default defineComponent ({
         await saveChanges();
         showConfirmDialogRowSwitch.value = false;
         if(toBeExpandedRow.value){
-            console.log(toBeExpandedRow.value,'toBeExpandedRow')
             const index = rolesLimitRows.value.findIndex((row: any) => row.role_name === toBeExpandedRow.value.role_name);
-            console.log(index,'index')
-            console.log(rolesLimitRows.value[index],'row')
             expandedRow.value = rolesLimitRows.value[index].uuid;
             toBeExpandedRow.value = null;
         }
@@ -1482,6 +1309,11 @@ export default defineComponent ({
     }, {});
 };
     const updateActiveType = (type: string) => {
+        //here we are updating the active type to json mode or table mode
+        //if the active type is json then we need to check if the changes are there in the changedValues
+        //if the changes are there then we need to show the confirm dialog
+        //if the changes are not there then we need to update the active type to json mode
+
         if(type == 'json'){
             let isChanged = Object.keys(changedValues.value).length > 0;
             if(isChanged && editTable.value){
@@ -1494,12 +1326,18 @@ export default defineComponent ({
                 populateJsonStr();
             }
         }
+        //if the active type is table then we need to check if the changes are there in the jsonStrToDisplay
+        //if the changes are there then we need to show the confirm dialog
+        //if the changes are not there then we need to update the active type to table mode
         else{
+            //here we are checking if any changes are made to the json string so that we can show the confirm dialog
             let isChanged = jsonDiff(jsonStrToDisplay.value, transformData(apiLimitsRows.value));
             if(isChanged && editTable.value){
+                //here we store the next type to be used when the user confirms the changes
                 nextType.value = type.toLowerCase();
                 showConfirmDialogTypeSwitch.value = true;
             }
+            //if no changes are made then we are updating the active type to table mode
             else{
                 activeType.value = type.toLowerCase();
                 editTable.value = false
@@ -1512,7 +1350,7 @@ export default defineComponent ({
             jsonStrToDisplay.value = JSON.stringify(transformData(apiLimitsRows.value), null, 2);
         }
         else{
-            jsonStrToDisplay.value = JSON.stringify(transformData(roleLevelModuleRows.value), null, 2);
+            jsonStrToDisplay.value = JSON.stringify(transformData(filteredRoleLevelModuleRows.value), null, 2);
         }
     }
     const saveChangesAndTypeSwitch = async () => {
@@ -1536,7 +1374,6 @@ export default defineComponent ({
         return JSON.stringify(oldJson) !== JSON.stringify(newJson);
     };
     const filterOrganizations = (val: any, update: any) => {
-        console.log(val,'val')
         if(val.length > 0){
             update();
             filteredOrganizations.value = organizations.value.filter((org: any) => org.label.toLowerCase().includes(val.toLowerCase()));
@@ -1546,14 +1383,33 @@ export default defineComponent ({
             filteredOrganizations.value = organizations.value;
         }
     }
-    const filterRolesToDisplayOptions = (val: any, update: any) => {
+    //this is used to search the api categories that is there role-limit
+    //we do have multiple api categories so we need to filter them based on the search query
+    const filterApiCategoriesToDisplayOptions = (val: any, update: any) => {
         if(val.length > 0){
             update();
-            filteredRolesToDisplayOptions.value = rolesToBeDisplayed.value.filter((role: any) => role.label.toLowerCase().includes(val.toLowerCase()));
+            filteredApiCategoryToDisplayOptions.value = apiCategories.value.filter((role: any) => role.label.toLowerCase().includes(val.toLowerCase()));
         }
         else{
             update();
-            filteredRolesToDisplayOptions.value = rolesToBeDisplayed.value;
+            filteredApiCategoryToDisplayOptions.value = apiCategories.value;
+        }
+    }
+    const changePagination = (val: { label: string; value: any }) => {
+    //used to change the pagination of the table
+      selectedPerPage.value = val.value;
+      pagination.value.rowsPerPage = val.value;
+      qTable.value?.setPagination(pagination.value);
+    };
+    //here we are filtering the modules based on the selected api category
+    const filterModulesBasedOnCategory = () => {
+        //here we filter based upon selectedapicategory so we only user can able to see one module at a time 
+        //if they apply filter 
+        if(selectedApiCategory.value?.value){
+            filteredRoleLevelModuleRows.value = roleLevelModuleRows.value.filter((row: any) => row.module_name.toLowerCase() === selectedApiCategory.value?.value.toLowerCase());
+        }
+        else{
+            filteredRoleLevelModuleRows.value = roleLevelModuleRows.value;
         }
     }
         return {
@@ -1565,10 +1421,8 @@ export default defineComponent ({
             activeTab,
             updateActiveTab ,
             tabs,
-            bulkUpdate,
             editTable,
             searchQuery,
-            changePagination,
             resultTotal,
             perPageOptions,
             rolesLimitRows,
@@ -1599,20 +1453,17 @@ export default defineComponent ({
             closeBulkUpdate,
             focusedInputId,
             onFocus,
-            onBlur,
             generateUniqueId,
             filteredData,
             roleLimitsColumns,
             triggerExpand,
             expandedRow,
-            handleRoleInputChange,
             roleLevelModuleRows,
             roleLevelLoading,
             getRoleLimitsByOrganization,
-            selectedRole,
+            selectedApiCategory,
             rolesToBeDisplayed,
-            isRoleModulesLoading,
-            updateSelectedRole,
+            isApiCategoryLoading,
             filteredRoleLevelModuleRows,
             restrictToNumbers,
             preventNonNumericPaste,
@@ -1637,8 +1488,13 @@ export default defineComponent ({
             isSavingJson,
             filteredOrganizations,
             filterOrganizations,
-            filteredRolesToDisplayOptions,
-            filterRolesToDisplayOptions
+            filteredApiCategoryToDisplayOptions,
+            filterApiCategoriesToDisplayOptions,
+            changePagination,
+            selectedPerPage,
+            qTable,
+            organizationToDisplay,
+            filterModulesBasedOnCategory
         }
 
     }
