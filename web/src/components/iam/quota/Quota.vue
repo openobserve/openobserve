@@ -29,27 +29,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex items-center justify-between full-width q-mb-sm">
                     <div class="flex items-center ">
-                    <q-select
-                    :loading="isOrgLoading"
-                    v-model="selectedOrganization"
-                    :options="organizationToDisplay"
-                    @filter="filterOrganizations"
-                    placeholder="Select Org"
-                    :popup-content-style="{ textTransform: 'lowercase' }"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="q-py-sm no-case q-mr-md input-width org-select"
-                    stack-label
-                    outlined
-                    filled
-                    dense
-                    use-input
-                    hide-selected
-                    fill-input                    
-                    @update:model-value="updateOrganization()"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                   
-                  >
+                        <q-select
+                        :loading="isOrgLoading"
+                        v-model="selectedOrganization"
+                        :options="organizationToDisplay"
+                        @filter="filterOrganizations"
+                        placeholder="Select Org"
+                        :popup-content-style="{ textTransform: 'lowercase' }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm no-case q-mr-md input-width org-select"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input                    
+                        @update:model-value="updateOrganization()"
+                        :rules="[(val: any) => !!val || 'Field is required!']"
+                    
+                    >
                     </q-select>
                     <div
                     v-if="selectedOrganization"
@@ -78,9 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     </div>
                     <div  class="flex items-center" v-if="selectedOrganization">
-                    <!-- this is edit quota and it is needed -->
                         <q-btn
-                        v-if="!editTable"
+                            v-if="!editTable"
                             data-test="edit-table-btn"
                             label="Edit Quota"
                             class="border  title-height"
@@ -136,10 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     </q-select>
                  </div>
-                 <div
-                 v-if="selectedOrganization"
-
-                  class="quota-tabs float-right q-ml-auto">
+                    <div
+                        v-if="selectedOrganization"
+                        class="quota-tabs float-right q-ml-auto">
                         <q-tabs
                         data-test="table-json-type-selection-tabs"
                         :model-value="activeType"
@@ -176,210 +174,208 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="activeTab == 'api-limits' && activeType == 'table'"
             dense
             class="q-mx-md"
-        >
-        <template v-slot:header="props">
-            <q-tr  :props="props" class="thead-sticky ">
-            <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :style="col.style"
             >
-                {{ col.label }}
-            </q-th>
-            </q-tr>
-        </template>
-        <template #no-data></template>
-
-            <template #bottom="scope">
-                <q-table-pagination
-                :scope="scope"
-                :resultTotal="resultTotal"
-                position="bottom"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-            />
-            </template>
-
-            <template v-slot:body-cell="props">
-            <q-td  :props="props" v-if="editTable" 
-            :style="{
-                    backgroundColor: editTable && props.col.name !== 'module_name' ? store.state.theme === 'dark' ? '#212121' : '#f1f1ee' : 'transparent',
-                    }"
-             >
-                <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'" contenteditable="true"
-                debounce="500"
-                :class="{
-                    'editable-cell': editTable && props.col.name !== 'module_name',
-                    'edited-input': isEdited(props.row.module_name, props.col.name)
-                }"
-                @input="(event: any) => handleInputChange('' , props.row.module_name , props.row[props.col.name], props.col.name, event.target.innerText)"
-                 @keypress="restrictToNumbers"
-                @paste="preventNonNumericPaste"
+            <template v-slot:header="props">
+                <q-tr  :props="props" class="thead-sticky ">
+                <q-th
+                    v-for="col in props.cols"
+                    :key="col.name"
+                    :props="props"
+                    :style="col.style"
                 >
-                    {{ changedValues[props.row.module_name]?.[props.col.name] ?? props.row[props.col.name]}}
-                </div>
-                    <div v-else-if="props.col.name == 'module_name'"> 
-                    {{ props.row[ props.col.name ] }}
-                </div>
-                <div
-                 :disabled="true" v-else-if="props.row[props.col.name] == '-'">
-                   -
-                </div>
-            </q-td>
-            <q-td  :props="props" v-else>
-                <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'">
-                    {{ props.row[ props.col.name ] }}
-                </div>
-                    <div v-else-if="props.col.name == 'module_name'"> 
-                    {{ props.row[ props.col.name ] }}
-                </div>
-                <div v-else-if="props.row[props.col.name] == '-'">
-                   -
-                </div>
-            </q-td>
+                    {{ col.label }}
+                </q-th>
+                </q-tr>
             </template>
-        </q-table>
-        <div class="q-mt-md" v-if="activeTab == 'api-limits'  && activeType == 'json'" style="height: calc(100vh - 245px); ">
-           <!-- here add the queryeditor -->
-           <query-editor
-                data-test="json-view-roles-editor"
-                ref="queryEditorRef"
-                editor-id="json-view-roles-editor"
-                class="monaco-editor"
-                :debounceTime="300"
-                v-model:query="jsonStrToDisplay"
-                language="json"
-                style="height: 100%;"
-                :read-only="!editTable"
-              />
-        </div>
-        <q-table
-          :rows="rolesLimitRows"
-          :columns="roleLimitsColumns"
-          row-key="name"
-          :pagination="pagination"
-          :filter="searchQuery"
-          :filter-method="filteredData"
-          dense
-          v-if="activeTab == 'role-limits' && activeType == 'table'"
-          class="q-mx-md"
-      >
-      <template v-slot:header="props">
-      <q-tr :props="props" class="thead-sticky">
-        <q-th
-          v-for="col in props.cols"
-          :key="col.name"
-          :props="props"
-          :style="col.style"
-        >
-          {{ col.label }}
-        </q-th>
-      </q-tr>
-    </template>
-      <template #no-data></template>
+            <template #no-data></template>
 
-          <template #bottom="scope">
-              <q-table-pagination
-              :scope="scope"
-              :resultTotal="resultTotal"
-              position="bottom"
-              :perPageOptions="perPageOptions"
-              @update:changeRecordPerPage="changePagination"
-          />
-          </template>
-          <template v-slot:body="props">
-      <q-tr
-        :data-test="`quota-role-list-table-${props.row.uuid}-row`"
-        :props="props"
-        style="cursor: pointer"
-      >
-
-      <q-td v-for="col in roleLimitsColumns" :key="col.name" :props="props" :style="col.style">
-          <template v-if="col.name == 'role_name'">
-            <q-btn
-                  dense
-                  flat
-                  size="xs"
-                  :icon=" 
-              expandedRow != props.row.uuid
-                  ? 'chevron_right'
-                  : 'expand_more'
-              "
-          @click="triggerExpand(props)"
-          />
-              {{ props.row[col.name] }}
-          </template>
-          <template v-else>
-            
-          </template>
-          
-      </q-td>
-      </q-tr>
-      <q-tr v-if="!editTable && !roleLevelLoading" v-for="(row,index) in filteredRoleLevelModuleRows" data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.uuid" :props="props" >
-          <q-td v-for="col in props.cols" :key="col.name" :props="props">
-           <template v-if="col.name == 'role_name'">
-            <div style="padding-left: 20px;">
-                {{ row['module_name'] }}
-            </div>
-           </template>
-           <template v-else-if="col.name == '#'"> 
-            {{}}
-           </template>
-           <template v-else-if="row[col.name] == '-'">
-            -
-        </template>
-           <template v-else> 
-            {{ row[col.name] }}
-           </template>
-
-          </q-td>
-     </q-tr>
-     <q-tr v-if="editTable && !roleLevelLoading" v-for="(row,index) in filteredRoleLevelModuleRows" data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.uuid" :props="props" >
-            <q-td
-            :style="{
-                    backgroundColor: editTable && col.name !== 'role_name' ? store.state.theme === 'dark' ? '#212121' : '#f1f1ee' : 'transparent',
-                    }"
-
-            
-             :props="props" 
-                 v-for="col in props.cols" :key="col.name" 
-                  v-if="editTable"
-                  style="padding-left: 8px ;">
-                   <template v-if="col.name == 'role_name'">
-                    <div style="padding-left: 20px;">
-                        {{ row['module_name'] }}
-                    </div>
+                <template #bottom="scope">
+                    <q-table-pagination
+                    :scope="scope"
+                    :resultTotal="resultTotal"
+                    position="bottom"
+                    :perPageOptions="perPageOptions"
+                    @update:changeRecordPerPage="changePagination"
+                />
                 </template>
-                <template v-else-if="col.name == '#'"> 
-                    {{}}
-                </template>
-                <template v-else-if="row[col.name] == '-'">
-                    -
-                </template>
-                <template v-else> 
-                    <div
-                    contenteditable="true"
+
+                <template v-slot:body-cell="props">
+                <q-td  :props="props" v-if="editTable" 
+                :style="{
+                        backgroundColor: editTable && props.col.name !== 'module_name' ? store.state.theme === 'dark' ? '#212121' : '#f1f1ee' : 'transparent',
+                        }"
+                >
+                    <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'" contenteditable="true"
                     debounce="500"
                     :class="{
-                        'editable-cell': editTable && col.name !== 'module_name',
-                        'edited-input': isEdited(row.module_name, col.name)
+                        'editable-cell': editTable && props.col.name !== 'module_name',
+                        'edited-input': isEdited(props.row.module_name, props.col.name)
                     }"
-                    @input="(event: any) => handleInputChange(props.row.role_name , row.module_name , row[col.name], col.name, event.target.innerText)"
+                    @input="(event: any) => handleInputChange('' , props.row.module_name , props.row[props.col.name], props.col.name, event.target.innerText)"
                     @keypress="restrictToNumbers"
                     @paste="preventNonNumericPaste"
                     >
-                    {{ row[col.name] }}
+                        {{ changedValues[props.row.module_name]?.[props.col.name] ?? props.row[props.col.name]}}
                     </div>
-                 
+                        <div v-else-if="props.col.name == 'module_name'"> 
+                        {{ props.row[ props.col.name ] }}
+                    </div>
+                    <div
+                    :disabled="true" v-else-if="props.row[props.col.name] == '-'">
+                    -
+                    </div>
+                </q-td>
+                <q-td  :props="props" v-else>
+                    <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'">
+                        {{ props.row[ props.col.name ] }}
+                    </div>
+                        <div v-else-if="props.col.name == 'module_name'"> 
+                        {{ props.row[ props.col.name ] }}
+                    </div>
+                    <div v-else-if="props.row[props.col.name] == '-'">
+                    -
+                    </div>
+                </q-td>
                 </template>
-            </q-td>
-     </q-tr>
+            </q-table>
+            <div class="q-mt-md" v-if="activeTab == 'api-limits'  && activeType == 'json'" style="height: calc(100vh - 245px); ">
+            <!-- here add the queryeditor -->
+            <query-editor
+                    data-test="json-view-roles-editor"
+                    ref="queryEditorRef"
+                    editor-id="json-view-roles-editor"
+                    class="monaco-editor"
+                    :debounceTime="300"
+                    v-model:query="jsonStrToDisplay"
+                    language="json"
+                    style="height: 100%;"
+                    :read-only="!editTable"
+                />
+            </div>
+            <q-table
+                :rows="rolesLimitRows"
+                :columns="roleLimitsColumns"
+                row-key="name"
+                :pagination="pagination"
+                :filter="searchQuery"
+                :filter-method="filteredData"
+                dense
+                v-if="activeTab == 'role-limits' && activeType == 'table'"
+                class="q-mx-md"
+                >
+                <template v-slot:header="props">
+                    <q-tr :props="props" class="thead-sticky">
+                        <q-th
+                        v-for="col in props.cols"
+                        :key="col.name"
+                        :props="props"
+                        :style="col.style"
+                        >
+                        {{ col.label }}
+                        </q-th>
+                    </q-tr>
+                </template>
+                <template #no-data></template>
+                <template #bottom="scope">
+                    <q-table-pagination
+                    :scope="scope"
+                    :resultTotal="resultTotal"
+                    position="bottom"
+                    :perPageOptions="perPageOptions"
+                    @update:changeRecordPerPage="changePagination"
+                />
+                </template>
+                <template v-slot:body="props">
+                    <q-tr
+                        :data-test="`quota-role-list-table-${props.row.uuid}-row`"
+                        :props="props"
+                        style="cursor: pointer"
+                    >
 
-    </template>
+                    <q-td v-for="col in roleLimitsColumns" :key="col.name" :props="props" :style="col.style">
+                        <template v-if="col.name == 'role_name'">
+                            <q-btn
+                                dense
+                                flat
+                                size="xs"
+                                :icon=" 
+                            expandedRow != props.row.uuid
+                                ? 'chevron_right'
+                                : 'expand_more'
+                            "
+                        @click="triggerExpand(props)"
+                        />
+                            {{ props.row[col.name] }}
+                        </template>
+                        <template v-else>
+                            
+                        </template>
+                        
+                    </q-td>
+                    </q-tr>
+                    <q-tr v-if="!editTable && !roleLevelLoading" v-for="(row,index) in filteredRoleLevelModuleRows" data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.uuid" :props="props" >
+                        <q-td v-for="col in props.cols" :key="col.name" :props="props">
+                        <template v-if="col.name == 'role_name'">
+                            <div style="padding-left: 20px;">
+                                {{ row['module_name'] }}
+                            </div>
+                        </template>
+                        <template v-else-if="col.name == '#'"> 
+                            {{}}
+                        </template>
+                        <template v-else-if="row[col.name] == '-'">
+                            -
+                        </template>
+                        <template v-else> 
+                            {{ row[col.name] }}
+                        </template>
 
-      </q-table>
-      <div class="q-mt-md" v-if="activeTab == 'role-limits' && activeType == 'json'" style="height: calc(100vh - 245px);">
+                        </q-td>
+                    </q-tr>
+                    <q-tr v-if="editTable && !roleLevelLoading" v-for="(row,index) in filteredRoleLevelModuleRows" data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.uuid" :props="props" >
+                            <q-td
+                            :style="{
+                                    backgroundColor: editTable && col.name !== 'role_name' ? store.state.theme === 'dark' ? '#212121' : '#f1f1ee' : 'transparent',
+                                    }"
+
+                        
+                        :props="props" 
+                            v-for="col in props.cols" :key="col.name" 
+                            v-if="editTable"
+                            style="padding-left: 8px ;">
+                            <template v-if="col.name == 'role_name'">
+                                <div style="padding-left: 20px;">
+                                    {{ row['module_name'] }}
+                                </div>
+                            </template>
+                            <template v-else-if="col.name == '#'"> 
+                                {{}}
+                            </template>
+                            <template v-else-if="row[col.name] == '-'">
+                                -
+                            </template>
+                            <template v-else> 
+                                <div
+                                contenteditable="true"
+                                debounce="500"
+                                :class="{
+                                    'editable-cell': editTable && col.name !== 'module_name',
+                                    'edited-input': isEdited(row.module_name, col.name)
+                                }"
+                                @input="(event: any) => handleInputChange(props.row.role_name , row.module_name , row[col.name], col.name, event.target.innerText)"
+                                @keypress="restrictToNumbers"
+                                @paste="preventNonNumericPaste"
+                                >
+                                {{ row[col.name] }}
+                                </div>
+                            
+                            </template>
+                        </q-td>
+                    </q-tr>
+                </template>
+
+            </q-table>
+        <div class="q-mt-md" v-if="activeTab == 'role-limits' && activeType == 'json'" style="height: calc(100vh - 245px);">
            <!-- here add the queryeditor -->
            <query-editor
                 data-test="json-view-roles-editor"
@@ -760,9 +756,8 @@ export default defineComponent ({
             }
             else{
                 //here we are getting the role limits for the selected organization
-                if(rolesLimitRows.value.length === 0){
                     getRolesByOrganization();
-                }
+
                 resultTotal.value = rolesLimitRows.value.length
             }
             //these are the modules that are displayed in the dropdown 
@@ -826,9 +821,7 @@ export default defineComponent ({
             }
         }
         else if(activeTab.value === "role-limits"){
-            if(rolesLimitRows.value.length === 0){
                 getRolesByOrganization();
-            }
         }
     }
     const getOrganizations = async () => {
@@ -880,12 +873,10 @@ export default defineComponent ({
         activeTab.value = tab;
         //
         if (tab === "role-limits") {
-        //this check is for only for when user switch to role-limits tab for the first time but anyways on mounting we are calling the roles api 
-        //so the roles all already fetched
-            
-            if(rolesLimitRows.value.length === 0){
-                await getRolesByOrganization();
-            }
+            //here we are getting the roles from the api
+            //as we are not storing the roles in the store
+            //so we need to get the roles from the api
+            await getRolesByOrganization();
             resultTotal.value = rolesLimitRows.value.length;
             //here we are checking if the organization is global_rules_meta then we need to reset the selectedOrganization
             //because in role limit we dont have something called global_rules_meta org
