@@ -27,13 +27,9 @@ use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
     crate::{
-        common::{
-            infra::config::USER_SESSIONS,
-            {meta, meta::ingestion::INGESTION_EP},
-        },
+        common::{infra::config::USER_SESSIONS, meta::ingestion::INGESTION_EP},
         service::users::get_user,
     },
-    argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString},
     jsonwebtoken::TokenData,
     o2_dex::service::auth::get_dex_jwks,
     o2_openfga::config::get_config as get_openfga_config,

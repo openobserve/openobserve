@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use core::clone::Clone;
-
 use std::net::IpAddr;
 
 use actix_web::{
@@ -42,8 +41,8 @@ use crate::{
             ingestion::INGESTION_EP,
             organization::DEFAULT_ORG,
             user::{
-                get_default_user_role, AuthTokensExt, TokenValidationResponse,
-                TokenValidationResponseBuilder,
+                AuthTokensExt, TokenValidationResponse, TokenValidationResponseBuilder,
+                get_default_user_role,
             },
         },
         utils::{
@@ -900,7 +899,6 @@ pub(crate) async fn check_permissions(
 ) -> bool {
     use crate::common::infra::config::ORG_USERS;
 
-    let cfg = get_config();
     if !get_openfga_config().enabled {
         return true;
     }
@@ -916,7 +914,7 @@ pub(crate) async fn check_permissions(
         // root user should have access to everything , bypass check in openfga
         return true;
     } else if auth_info.org_id.eq("organizations") && auth_info.method.eq("POST") {
-        match ORG_USERS.get(&format!("{}/{user_id}", cfg.common.usage_org)) {
+        match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
             Some(user) => format!("{}", user.role),
             None => "".to_string(),
         }
@@ -927,7 +925,7 @@ pub(crate) async fn check_permissions(
         if auth_info.method.eq("POST") {
             // The user is trying to create a new organization
             // Use the usage org to check for permission
-            &cfg.common.usage_org
+            config::META_ORG_ID
         } else {
             user_id
         }

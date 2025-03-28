@@ -156,10 +156,7 @@ async fn query(
     #[cfg(feature = "enterprise")]
     {
         use crate::{
-            common::{
-                infra::USERS,
-                utils::auth::{AuthExtractor, is_root_user},
-            },
+            common::utils::auth::{AuthExtractor, is_root_user},
             service::db::org_users::get_cached_user_org,
         };
 
@@ -413,9 +410,9 @@ async fn query_range(
     let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{AuthExtractor, is_root_user},
+        use crate::{
+            common::utils::auth::{AuthExtractor, is_root_user},
+            service::db::org_users::get_cached_user_org,
         };
 
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
@@ -662,9 +659,9 @@ async fn series(
 
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{AuthExtractor, is_root_user},
+        use crate::{
+            common::utils::auth::{AuthExtractor, is_root_user},
+            service::db::org_users::get_cached_user_org,
         };
 
         let metric_name = match selector

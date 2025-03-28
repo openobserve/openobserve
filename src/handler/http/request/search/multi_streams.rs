@@ -228,10 +228,7 @@ pub async fn search_multi(
             use o2_openfga::meta::mapping::OFGA_MODELS;
 
             use crate::{
-                common::{
-                    infra::config::USERS,
-                    utils::auth::{AuthExtractor, is_root_user},
-                },
+                common::utils::auth::{AuthExtractor, is_root_user},
                 service::users::get_user,
             };
 

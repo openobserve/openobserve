@@ -19,7 +19,6 @@ use o2_openfga::meta::mapping::OFGA_MODELS;
 
 use crate::{
     common::{
-        infra::config::USERS,
         meta::http::HttpResponse as MetaHttpResponse,
         utils::auth::{AuthExtractor, is_root_user},
     },
