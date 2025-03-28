@@ -74,10 +74,12 @@ test.describe("dashboard filter testcases", () => {
     await ingestion(page);
     await page.waitForTimeout(2000);
 
-    const orgNavigation = page.goto(
-      `${geoMapdata.geoMapdataUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
-    await orgNavigation;
+    // const orgNavigation = page.goto(
+    //   `${geoMapdata.geoMapdataUrl}?org_identifier=${process.env["ORGNAME"]}`
+    // );
+
+
+    // await orgNavigation;
   });
 
 
@@ -95,7 +97,7 @@ test.describe("dashboard filter testcases", () => {
       .fill(randomDashboardName);
 
     await page.locator('[data-test="dashboard-add-submit"]').click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(3000);
 
     const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
     await expect(settingsButton).toBeVisible();
@@ -121,9 +123,9 @@ test.describe("dashboard filter testcases", () => {
 
     await page
       .locator('[data-test="dashboard-variable-stream-select"]')
-      .fill("e2e_automate");
+      .fill("geojson");
     await page
-      .getByRole("option", { name: "e2e_automate", exact: true })
+      .getByRole("option", { name: "geojson", exact: true })
       .locator("div")
       .nth(2)
       .click();
@@ -131,23 +133,23 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="dashboard-variable-field-select"]').click();
     await page
       .locator('[data-test="dashboard-variable-field-select"]')
-      .fill("kubernetes_container_name");
-    await page.getByText("kubernetes_container_name").click();
+      .fill("country");
+    await page.getByText("country").click();
 
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
 
-    await page.waitForTimeout(3000);
+    // await page.waitForTimeout(3000);
 
     await page.locator('[data-test="dashboard-settings-close-btn"]').click();
+
 
     const button = page.locator(
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
     );
     await expect(button).toBeVisible();
-
-    await page.waitForTimeout(2000);
     await button.click();
 
+    await page.locator('[data-test="selected-chart-geomap-item"] img').click();
     await page
       .locator('[data-test="index-dropdown-stream"]')
       .waitFor({ state: "visible" });
@@ -158,56 +160,48 @@ test.describe("dashboard filter testcases", () => {
       .press("Control+a");
     await page
       .locator('[data-test="index-dropdown-stream"]')
-      .fill("e2e_automat");
+      .fill("geojson");
 
     await page
-      .getByRole("option", { name: "e2e_automate", exact: true })
+      .getByRole("option", { name: "geojson", exact: true })
       .click();
 
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-_timestamp"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
+      await page.waitForTimeout(2000);
+   await page.locator('[data-test="field-list-item-logs-geojson-lat"] [data-test="dashboard-add-latitude-data"]').click();
 
-    await page.locator('[data-test="dashboard-apply"]').click();
+  await page.locator('[data-test="field-list-item-logs-geojson-lon"] [data-test="dashboard-add-longitude-data"]').click();
 
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
-      timeout: 5000,
-    });
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="date-time-apply-btn"]').click();
+  await page.locator('[data-test="field-list-item-logs-geojson-country"] [data-test="dashboard-add-weight-data"]').click();
 
-    await page.waitForTimeout(2000);
+    // await page.locator('[data-test="dashboard-apply"]').click();
 
-    await page.locator('[data-test="dashboard-apply"]').click();
 
     const filterButton = page.locator(
-      '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-filter-data"]'
+      '[data-test="field-list-item-logs-geojson-country"] [data-test="dashboard-add-filter-geomap-data"]'
     );
     await expect(filterButton).toBeVisible();
     await filterButton.click();
-    await page
-      .locator('[data-test="dashboard-variable-query-value-selector"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-variable-query-value-selector"]')
-      .fill("ziox");
-    await page.getByRole("option", { name: "ziox" }).click();
-    await page.locator('[data-test="dashboard-add-condition-add"]').click();
+
+    await page.locator('[data-test="dashboard-apply"]').click();
+
+    await page.waitForTimeout(3000);
+
+
 
     await page
-      .locator(
-        '[data-test="dashboard-add-condition-label-0-kubernetes_container_name"]'
-      )
-      .click();
+    .locator('[data-test="dashboard-variable-query-value-selector"]').click();
     await page
-      .locator('[data-test="dashboard-add-condition-condition-0"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-add-condition-operator"]')
-      .click();
+    .locator('[data-test="dashboard-variable-query-value-selector"]').fill("china");
+  
+  const option = await page.getByRole("option", { name: "china" });
+  await option.click();
+
+
+
+  await page.locator('[data-test="dashboard-add-condition-label-0-country"]').click();
+  await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
+  await page.locator('[data-test="dashboard-add-condition-operator"]').click();
+ 
 
     await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
@@ -215,20 +209,14 @@ test.describe("dashboard filter testcases", () => {
 
     await page.locator('[data-test="dashboard-apply"]').click();
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
-
-    await expect(
-      page.getByRole("cell", {
-        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'$variablename\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
-        exact: true,
-      })
-    ).toBeVisible();
-
-    await page.locator('[data-test="query-inspector-close-btn"]').click();
+    await page.locator('#chart-map canvas').click({
+      position: {
+        x: 643,
+        y: 69
+      }
+    });
 
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page
