@@ -51,6 +51,8 @@ impl From<FolderError> for HttpResponse {
 }
 
 /// CreateFolder
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -92,6 +94,8 @@ pub async fn create_folder(
 }
 
 /// UpdateFolder
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -131,6 +135,8 @@ pub async fn update_folder(
 }
 
 /// ListFolders
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -172,6 +178,8 @@ pub async fn list_folders(
 }
 
 /// GetFolder
+///
+/// {"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -202,6 +210,8 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
 }
 
 /// GetFolderByName
+///
+/// {"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -232,6 +242,8 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
 }
 
 /// DeleteFolder
+///
+/// {"ratelimit_module":"Folders", "ratelimit_module_operation":"delete"}
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",

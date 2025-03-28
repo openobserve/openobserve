@@ -86,6 +86,18 @@ const tabs = ref([
     class: "tab_content",
   },
   {
+    dataTest: "iam-quota-tab",
+    name: "quota",
+    to: {
+      name: "quota",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.quota"),
+    class: "tab_content",
+  },
+  {
     dataTest: "iam-organizations-tab",
     name: "organizations",
     to: {
@@ -117,7 +129,6 @@ watch(
     immediate: true,
   }
 );
-
 watch(
   () => store.state.zoConfig,
   () => {
@@ -143,10 +154,14 @@ function setTabs() {
     let filteredTabs = tabs.value.filter((tab) => cloud.includes(tab.name));
 
     if (store.state.zoConfig.rbac_enabled) {
+      if(store.state.selectedOrganization.identifier === '_meta'){
+        rbac.push("quota")
+      }
       filteredTabs = [
         ...filteredTabs,
         ...tabs.value.filter((tab) => rbac.includes(tab.name)),
       ];
+
     }
 
     tabs.value = filteredTabs;

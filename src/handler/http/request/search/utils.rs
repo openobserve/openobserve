@@ -13,17 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::HttpResponse;
-use config::meta::stream::StreamType;
-use o2_openfga::meta::mapping::OFGA_MODELS;
-
-use crate::common::{
-    infra::config::USERS,
-    meta::{self, http::HttpResponse as MetaHttpResponse},
-    utils::auth::{AuthExtractor, is_root_user},
+#[cfg(feature = "enterprise")]
+use {
+    crate::common::{
+        infra::config::USERS,
+        meta::{self, http::HttpResponse as MetaHttpResponse},
+        utils::auth::{AuthExtractor, is_root_user},
+    },
+    actix_web::HttpResponse,
+    config::meta::stream::StreamType,
+    o2_openfga::meta::mapping::OFGA_MODELS,
 };
 
 // Check permissions on stream
+#[cfg(feature = "enterprise")]
 pub async fn check_stream_permissions(
     stream_name: &str,
     org_id: &str,

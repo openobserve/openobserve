@@ -19,6 +19,8 @@ use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 use config::meta::function::{TestVRLRequest, Transform};
 
 /// CreateFunction
+///
+/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -48,6 +50,8 @@ pub async fn save_function(
 }
 
 /// ListFunctions
+///
+/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -96,6 +100,8 @@ async fn list_functions(
 }
 
 /// DeleteFunction
+///
+/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -120,6 +126,8 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
 }
 
 /// UpdateFunction
+///
+/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -151,6 +159,8 @@ pub async fn update_function(
 }
 
 /// FunctionPipelineDependency
+///
+/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",

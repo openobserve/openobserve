@@ -3429,6 +3429,10 @@ mod tests {
                 algorithm: String::default(),
                 master_key: String::default(),
             },
+            ratelimit: config::RateLimit {
+                ratelimit_rule_refresh_interval: 0,
+                ratelimit_enabled: false,
+            },
         }
     }
 }
