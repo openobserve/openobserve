@@ -266,6 +266,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let audit_enabled = get_o2_config().common.audit_enabled;
     #[cfg(not(feature = "enterprise"))]
     let audit_enabled = false;
+    let cfg = get_config();
     let key = "/schema/";
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;

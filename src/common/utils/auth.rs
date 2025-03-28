@@ -16,7 +16,6 @@
 use std::fmt::Debug;
 
 use actix_web::{Error, FromRequest, HttpRequest, dev::Payload};
-use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString};
 use base64::Engine;
 use config::{
     meta::user::UserRole,
@@ -34,6 +33,7 @@ use {
         },
         service::users::get_user,
     },
+    argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString},
     jsonwebtoken::TokenData,
     o2_dex::service::auth::get_dex_jwks,
     o2_openfga::config::get_config as get_openfga_config,

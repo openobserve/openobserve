@@ -68,7 +68,11 @@ pub mod service_accounts;
     )
 )]
 #[get("/{org_id}/users")]
-pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<HttpResponse, Error> {
+pub async fn list(
+    org_id: web::Path<String>,
+    user_email: UserEmail,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let list_all = match query.get("list_all") {
@@ -94,7 +98,14 @@ pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<Ht
         _user_list_from_rbac = Some(vec![]);
     }
 
-    users::list_users(&org_id, user_id, None, _user_list_from_rbac, list_all).await
+    users::list_users(
+        &user_email.user_id,
+        &org_id,
+        None,
+        _user_list_from_rbac,
+        list_all,
+    )
+    .await
 }
 
 /// CreateUser

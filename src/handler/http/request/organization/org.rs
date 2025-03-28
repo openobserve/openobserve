@@ -20,7 +20,6 @@ use std::{
 
 use actix_web::{HttpRequest, HttpResponse, Result, get, http, post, put, web};
 use config::meta::cluster::NodeInfo;
-use infra::schema::STREAM_SCHEMAS_LATEST;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 #[cfg(feature = "cloud")]
@@ -31,13 +30,12 @@ use {
 
 use crate::{
     common::{
-        infra::{cluster, config::USERS},
+        infra::cluster,
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                CUSTOM, DEFAULT_ORG, NodeListResponse, OrgDetails, OrgRenameBody, OrgUser,
-                Organization, OrganizationResponse, PasscodeResponse, RumIngestionResponse,
-                THRESHOLD,
+                NodeListResponse, OrgDetails, OrgRenameBody, OrgUser, Organization,
+                OrganizationResponse, PasscodeResponse, RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{UserEmail, is_root_user},
@@ -126,6 +124,7 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
             orgs.push(org)
         }
     }
+    orgs.sort_by(|a, b| a.name.cmp(&b.name));
     let org_response = OrganizationResponse { data: orgs };
 
     Ok(HttpResponse::Ok().json(org_response))

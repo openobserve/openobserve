@@ -773,7 +773,6 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
 pub async fn list_users(
     _user_id: &str,
     org_id: &str,
-    _initiator_id: &str,
     role: Option<UserRole>,
     permitted: Option<Vec<String>>,
     list_all: bool,
@@ -790,7 +789,7 @@ pub async fn list_users(
         // This user does not have list users permission
         // Hence only return this specific user
         if need_check_permission && permitted.is_empty() {
-            if let Some(user) = get_user(Some(org_id), _initiator_id).await {
+            if let Some(user) = get_user(Some(org_id), _user_id).await {
                 user_list.push(UserResponse {
                     email: user.email.clone(),
                     role: user.role.to_string(),
@@ -1186,7 +1185,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users() {
         set_up().await;
-        assert!(list_users("", "dummy", None, None).await.is_ok())
+        assert!(list_users("", "dummy", None, None, false).await.is_ok())
     }
 
     #[tokio::test]

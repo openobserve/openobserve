@@ -24,13 +24,12 @@ use infra::{
     table::users,
 };
 #[cfg(feature = "cloud")]
-use o2_enterprise::enterprise::cloud::{org_invites, InvitationRecord};
+use o2_enterprise::enterprise::cloud::{InvitationRecord, org_invites};
 
 use super::org_users::{self, get_cached_user_org};
 use crate::{
     common::{
         infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
-        meta::user::{DBUser, User, UserOrg, UserRole},
         utils::auth::is_root_user,
     },
     service::db,
@@ -48,10 +47,10 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
     // Do not rely on the org_id to check if the user is root. If the user is root,
     // Just return the root user.
     let user = if is_root_user(name) {
-        ROOT_USER.get("root")
+        ROOT_USER.get("root").map(|usr| usr.clone())
     } else {
         match org_id {
-            None => ROOT_USER.get("root").map(|v| v.value().clone()),
+            None => ROOT_USER.get("root").map(|usr| usr.clone()),
             Some(org_id) => get_cached_user_org(org_id, &name),
         }
     };
