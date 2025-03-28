@@ -42,6 +42,7 @@ pub type TraceId = String;
 pub struct WsHandler {
     pub session_manager: Arc<SessionManager>,
     pub connection_pool: Arc<QuerierConnectionPool>,
+    pub is_session_drain_state: Arc<AtomicBool>,
 }
 
 impl WsHandler {
@@ -52,6 +53,7 @@ impl WsHandler {
         Self {
             session_manager,
             connection_pool,
+            is_session_drain_state: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -91,6 +93,9 @@ impl WsHandler {
             tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
+
+        // Before spawning the async task, clone the drain state
+        let is_session_drain_state = self.is_session_drain_state.clone();
 
         // Spawn message handling tasks between client and router
         actix_web::rt::spawn(async move {
@@ -167,13 +172,16 @@ impl WsHandler {
                                         Ok(mut message) => {
                                             // check if cookie is valid for each client event only
                                             // for enterprise
-                                            let mut is_cookie_not_valid = !session_manager.is_client_cookie_valid(&client_id).await;
+                                            if !is_session_drain_state.load(Ordering::SeqCst) && !session_manager.is_client_cookie_valid(&client_id).await {
+                                                is_session_drain_state.store(true, Ordering::SeqCst);
+                                            }
+                                            // TODO: remove this after testing
                                             if cfg.websocket.is_session_drain_enabled{
                                                 if count != 1 && count % 5 == 0 {
-                                                    is_cookie_not_valid = !is_cookie_not_valid;
+                                                    is_session_drain_state.store(true, Ordering::SeqCst);
                                                 }
                                             }
-                                            if cfg.websocket.check_cookie_expiry && is_cookie_not_valid
+                                            if cfg.websocket.check_cookie_expiry && is_session_drain_state.load(Ordering::SeqCst)
                                             {
                                                 log::info!(
                                                     "[WS::Router::Handler] Client cookie expired. Disconnect..."
