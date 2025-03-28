@@ -787,6 +787,11 @@ export default defineComponent ({
 
 
     })
+    watch (()=>selectedOrganization.value, async (newVal) => {
+        if(newVal){
+             apiCategories.value = await getModulesToDisplay(newVal.value);
+        }
+    })
 
     //computed here
 
