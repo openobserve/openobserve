@@ -107,13 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-if="searchObj.data?.histogram?.errorMsg == ''">
         <ChartRenderer
-          v-if="searchObj.meta.showHistogram && searchObj.data?.queryResults?.aggs?.length > 0"
+          v-if="searchObj.meta.showHistogram && (searchObj.data?.queryResults?.aggs?.length > 0 || ( plotChart && Object.keys(plotChart)?.length > 0))"
           data-test="logs-search-result-bar-chart"
           :data="plotChart"
           style="max-height: 100px"
           @updated:dataZoom="onChartUpdate"
         />
-        <div v-else-if="searchObj.meta.showHistogram && searchObj.data?.queryResults?.aggs?.length == 0">
+        
+        <div v-else-if="searchObj.meta.showHistogram && (Object.keys(plotChart)?.length == 0)">
           <h3
             class="text-center"
             style="margin: 30px 0px"
@@ -668,6 +669,9 @@ export default defineComponent({
     reDrawChartData() {
       return this.searchObj.data.histogram;
     },
+    resetPlotChart() {
+      return this.searchObj.meta.resetPlotChart;
+    },
   },
   watch: {
     toggleWrapFlag() {
@@ -678,6 +682,12 @@ export default defineComponent({
     },
     updateTitle() {
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
+    },
+    resetPlotChart(newVal: boolean) {
+      if(newVal) {
+        this.plotChart = {};
+        this.searchObj.meta.resetPlotChart = false;
+      }
     },
     reDrawChartData: {
       deep: true,
