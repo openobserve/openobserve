@@ -290,7 +290,7 @@ impl FlightSenderStream {
         match trace_id {
             Some(trace_id) => {
                 let mut span = tracer
-                    .span_builder("service:search:flight::do_get_end")
+                    .span_builder("service:search:flight::do_get_stream")
                     .with_trace_id(trace_id)
                     .with_start_time(start_time)
                     .with_attributes(vec![opentelemetry::KeyValue::new(
