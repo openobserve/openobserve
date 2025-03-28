@@ -37,8 +37,9 @@ use {
     },
     std::collections::HashMap,
 };
-
+#[cfg(feature = "enterprise")]
 const QUOTA_PAGE_REQUIRED_ORG: &str = "_meta";
+#[cfg(feature = "enterprise")]
 const QUOTA_PAGE_GLOBAL_RULES_ORG: &str = "GLOBAL_RULES_META";
 
 #[cfg(feature = "enterprise")]
@@ -48,6 +49,7 @@ struct QueryParams {
     update_type: Option<String>,
     user_role: Option<String>,
 }
+#[cfg(feature = "enterprise")]
 impl QueryParams {
     fn get_org_id(&self) -> String {
         match self.org_id.as_str() {
@@ -197,6 +199,7 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
 
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(path);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
@@ -264,6 +267,7 @@ pub async fn list_module_ratelimit(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
+        let _ = query;
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
@@ -348,6 +352,7 @@ pub async fn list_role_ratelimit(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
+        let _ = query;
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }

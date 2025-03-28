@@ -798,10 +798,17 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
                 router::http::create_http_client().expect("Failed to create http tls client");
+            let factory = web::scope(&cfg.common.base_uri);
+            #[cfg(feature = "enterprise")]
+            let factory = factory.wrap(
+                o2_ratelimit::middleware::RateLimitController::new_with_extractor(Some(
+                    router::ratelimit::resource_extractor::default_extractor,
+                )),
+            );
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
-                    web::scope(&cfg.common.base_uri)
+                    factory
                         .wrap(middlewares::SlowLog::new(
                             cfg.limit.http_slow_log_threshold,
                             cfg.limit.circuit_breaker_enabled,
