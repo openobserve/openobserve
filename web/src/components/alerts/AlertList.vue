@@ -30,9 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-table__title" data-test="alerts-list-title">
         {{ t("alerts.header") }}
       </div>
-      <div class="flex q-ml-auto tw-ps-2 alerts-list-tabs">
+      <div class="flex q-ml-auto tw-ps-2 alerts-list-tabs items-center">
         <app-tabs
-        v-if="false"
           class="q-mr-md"
           :tabs="tabs"
           v-model:active-tab="activeTab"
