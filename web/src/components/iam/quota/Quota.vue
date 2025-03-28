@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     </q-select>
                     <div
+                    v-if="selectedOrganization"
                      class="quota-tabs">
                         <q-tabs
                         data-test="quota-tabs"
@@ -392,17 +393,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :read-only="!editTable"
               />
         </div>
-        <div v-if=" activeTab == 'api-limits' && loading && !apiLimitsRows.length" class="flex justify-center items-center">
+        <div v-if=" (activeTab == 'api-limits' || activeTab == 'role-limits') && loading && !apiLimitsRows.length" class="flex justify-center items-center">
             <q-spinner-hourglass color="primary" size="lg" />
         </div>
-        <div v-else-if=" activeTab == 'api-limits' && !loading && !apiLimitsRows.length">
+        <div v-else-if=" ((activeTab == 'api-limits'  || activeTab == 'role-limits') && !loading && !selectedOrganization )">
 
             <NoOrganizationSelected />
         </div>
-        <div v-if=" activeTab == 'role-limits' && loading && !rolesLimitRows.length" class="flex justify-center items-center">  
-            <q-spinner-hourglass color="primary" size="lg" />
-        </div>
-        <div v-else-if=" activeTab == 'role-limits' && !loading && !rolesLimitRows.length">
+        <div v-else-if="(activeTab == 'api-limits' || activeTab == 'role-limits') && !loading && !apiLimitsRows.length">
             <NoData />
         </div>
         <div class="flex justify-end w-full tw-ml-auto floating-buttons  q-pr-md"
@@ -518,26 +516,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <ConfirmDialog
-            title="UnSaved Changes Detected"
-            message="save changes before switching tabs"
-            @update:ok="saveChangesAndTabSwitch"
-            @update:cancel="discardChangesTabSwitch"
-            v-model="showConfirmDialogTabSwitch"
-            />
-            <ConfirmDialog
-            title="UnSaved Changes Detected"
-            message="save changes before expanding another row"
-            @update:ok="saveChangesAndRoleSwitch"
-            @update:cancel="discardChangesRoleSwitch"
-            v-model="showConfirmDialogRowSwitch"
-            />
-            <ConfirmDialog
-            title="UnSaved Changes Detected"
-            message="save changes before switching Type"
-            @update:ok="saveChangesAndTypeSwitch"
-            @update:cancel="discardChangesTypeSwitch"
-            v-model="showConfirmDialogTypeSwitch"
-            />
+        title="UnSaved Changes Detected"
+        message="save changes before switching tabs"
+        @update:ok="saveChangesAndTabSwitch"
+        @update:cancel="discardChangesTabSwitch"
+        v-model="showConfirmDialogTabSwitch"
+        />
+        <ConfirmDialog
+        title="UnSaved Changes Detected"
+        message="save changes before expanding another row"
+        @update:ok="saveChangesAndRoleSwitch"
+        @update:cancel="discardChangesRoleSwitch"
+        v-model="showConfirmDialogRowSwitch"
+        />
+        <ConfirmDialog
+        title="UnSaved Changes Detected"
+        message="save changes before switching Type"
+        @update:ok="saveChangesAndTypeSwitch"
+        @update:cancel="discardChangesTypeSwitch"
+        v-model="showConfirmDialogTypeSwitch"
+        />
       </q-page>
       
 
