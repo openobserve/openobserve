@@ -179,24 +179,13 @@ impl WsHandler {
                                                     is_session_drain_state.store(true, Ordering::SeqCst);
                                                 }
                                             }
-                                            if cfg.websocket.check_cookie_expiry && is_session_drain_state.load(Ordering::SeqCst)
-                                            {
-                                                log::info!(
-                                                    "[WS::Router::Handler] Client cookie expired. Disconnect..."
-                                                );
-                                                let err_msg = ErrorMessage::new_unauthorized(
-                                                    Some(message.get_trace_id()),
-                                                );
-                                                if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Error(err_msg))).await
-                                                {
-                                                    log::error!(
-                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
-                                                    );
-                                                };
-                                                log::debug!(
-                                                    "[WS::Router::Handler] Stop handle_incoming"
-                                                );
-                                                break;
+                                            if is_session_drain_state.load(Ordering::SeqCst) {
+                                                // Don't forward to querier, return unauthorized error instead
+                                                let err_msg = ErrorMessage::new_unauthorized(Some(message.get_trace_id()));
+                                                if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Error(err_msg))).await {
+                                                    log::error!("[WS::Router::Handler] Error sending error: {e}");
+                                                }
+                                                continue; // Skip forwarding to querier
                                             }
                                             // end of cookie check
 
