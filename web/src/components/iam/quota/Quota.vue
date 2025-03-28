@@ -278,6 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :filter-method="filteredData"
           dense
           v-if="activeTab == 'role-limits' && activeType == 'table'"
+          class="q-mx-md"
       >
       <template v-slot:header="props">
       <q-tr :props="props" class="thead-sticky">
@@ -829,12 +830,23 @@ export default defineComponent ({
                 }));
 
             }
-            organizations.value.unshift({
-                label: "GLOBAL RULES META",
-                value: "GLOBAL_RULES_META"
-            });
+            if(activeTab.value == 'api-limits'){
+                organizations.value.unshift({
+                    label: "GLOBAL RULES META",
+                    value: "GLOBAL_RULES_META"
+                });
+            }
         }
         const updateActiveTab = (tab: string) => {
+            if(tab == 'role-limits'){
+                delete organizations.value[0];
+            }
+            if(tab == 'api-limits'){
+                organizations.value.unshift({
+                    label: "GLOBAL RULES META",
+                    value: "GLOBAL_RULES_META"
+                });
+            }
             let isChanged = Object.keys(changedValues.value).length > 0;
 
             if (isChanged) {
