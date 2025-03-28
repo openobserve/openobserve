@@ -154,12 +154,15 @@ pub async fn merge_parquet_files(
     let schema = physical_plan.schema();
 
     // print the physical plan
-    // let plan =
-    // datafusion::physical_plan::displayable(physical_plan.as_ref()).indent(false).to_string();
-    // println!("+---------------------------+--------------------------+");
-    // println!("merge_parquet_files_with_sort");
-    // println!("+---------------------------+--------------------------+");
-    // println!("{}", plan);
+    if cfg.common.print_key_sql {
+        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
+            .indent(false)
+            .to_string();
+        println!("+---------------------------+--------------------------+");
+        println!("merge_parquet_files");
+        println!("+---------------------------+--------------------------+");
+        println!("{}", plan);
+    }
 
     // write result to parquet file
     let mut buf = Vec::new();

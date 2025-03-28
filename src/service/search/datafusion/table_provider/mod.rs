@@ -366,9 +366,9 @@ impl TableProvider for NewListingTable {
         };
 
         log::debug!(
-            "after partition, file groups: {}, target_partitions: {}",
-            partitioned_file_lists.len(),
-            self.options.target_partitions
+            "after partition, target_partitions: {}, file groups: {}",
+            self.options.target_partitions,
+            partitioned_file_lists.len()
         );
 
         // extract types of partition columns
