@@ -348,7 +348,11 @@ impl Drop for FlightSenderStream {
             self.trace_id,
             end
         );
-        let _span_context = self.create_stream_end_span();
+        let cfg = config::get_config();
+        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+            let _span_context = self.create_stream_end_span();
+        }
+
         // metrics
         let time = self.start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
