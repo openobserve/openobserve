@@ -740,7 +740,7 @@ mod tests {
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
             let file_key = format!(
-                "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
+                "files/default/logs/disk/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
             let resp = file_data.set(trace_id, &file_key, content.clone()).await;
@@ -753,7 +753,7 @@ mod tests {
         let trace_id = "session_2";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
-        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
+        let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
         file_data
@@ -774,8 +774,8 @@ mod tests {
     async fn test_lru_cache_miss() {
         let trace_id = "session_3";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "lru");
-        let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
-        let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
+        let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_1.parquet";
+        let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
         file_data
@@ -800,10 +800,13 @@ mod tests {
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
             let file_key = format!(
-                "files/default/logs/olympics/2022/10/03/10/6982652937134804993_4_{}.parquet",
+                "files/default/logs/disk/2022/10/03/10/6982652937134804993_4_{}.parquet",
                 i
             );
             let resp = file_data.set(trace_id, &file_key, content.clone()).await;
+            if let Some(e) = resp.as_ref().err() {
+                println!("set file_key: {} error: {:?}", file_key, e);
+            }
             assert!(resp.is_ok());
         }
     }
@@ -813,7 +816,7 @@ mod tests {
         let trace_id = "session_5";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "fifo");
-        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_5_1.parquet";
+        let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
 
         file_data
@@ -834,8 +837,8 @@ mod tests {
     async fn test_fifo_cache_miss() {
         let trace_id = "session_6";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "fifo");
-        let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_6_1.parquet";
-        let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_6_2.parquet";
+        let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_1.parquet";
+        let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
         file_data
@@ -865,7 +868,7 @@ mod tests {
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
         file_data.multi_dir = multi_dir;
-        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_7_1.parquet";
+        let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_7_1.parquet";
         let content = Bytes::from("Some text");
 
         file_data
