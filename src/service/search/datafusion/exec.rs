@@ -606,7 +606,10 @@ pub async fn create_parquet_table(
         target_partitions
     };
 
-    log::debug!("create_parquet_table: target_partitions: {}", target_partitions);
+    log::debug!(
+        "create_parquet_table: target_partitions: {}",
+        target_partitions
+    );
 
     // Configure listing options
     let file_format = ParquetFormat::default();

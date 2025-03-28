@@ -1268,10 +1268,13 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         DB_QUERY_NUMS
             .with_label_values(&["update", "file_list_jobs"])
             .inc();
-        let sql = format!(r#"UPDATE file_list_jobs SET updated_at = ? WHERE id IN ({})"#, ids.iter()
+        let sql = format!(
+            r#"UPDATE file_list_jobs SET updated_at = ? WHERE id IN ({})"#,
+            ids.iter()
                 .map(|id| id.to_string())
                 .collect::<Vec<_>>()
-                .join(","));
+                .join(",")
+        );
         sqlx::query(&sql)
             .bind(config::utils::time::now_micros())
             .execute(&pool)
