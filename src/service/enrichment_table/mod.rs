@@ -33,6 +33,7 @@ use config::{
     utils::{flatten::format_key, json, schema_ext::SchemaExt},
 };
 use futures::{StreamExt, TryStreamExt};
+use hashbrown::HashSet;
 use infra::{
     cache::stats,
     schema::{
@@ -296,8 +297,10 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
 
 pub async fn extract_multipart(
     mut payload: Multipart,
+    append_data: bool,
 ) -> Result<Vec<json::Map<String, json::Value>>, Error> {
     let mut records = Vec::new();
+    let mut headers_set = HashSet::new();
     while let Ok(Some(mut field)) = payload.try_next().await {
         let Some(content_disposition) = field.content_disposition() else {
             continue;
@@ -319,6 +322,7 @@ pub async fn extract_multipart(
             .map(|x| {
                 let mut x = x.trim().to_string();
                 format_key(&mut x);
+                headers_set.insert(x.clone());
                 x
             })
             .collect::<Vec<_>>()
@@ -339,6 +343,21 @@ pub async fn extract_multipart(
                 records.push(json_record);
             }
         }
+    }
+
+    if records.is_empty() && !headers_set.is_empty() && !append_data {
+        // If the records are empty, that means user has uploaded only headers, not the data
+        // So, we can assume that the user wants to upload an enrichment table with no row data.
+        // The headers are the columns of the enrichment table. Lets push a json
+        // with the headers as the keys and empty strings as the values.
+
+        // This way we will still have the headers in the enrichment table.
+        // And the enrichment table will not be deleted.
+        let mut json_record = json::Map::new();
+        for header in headers_set {
+            json_record.insert(header, json::Value::String("".to_string()));
+        }
+        records.push(json_record);
     }
 
     Ok(records)
