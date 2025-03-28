@@ -42,7 +42,6 @@ pub type TraceId = String;
 pub struct WsHandler {
     pub session_manager: Arc<SessionManager>,
     pub connection_pool: Arc<QuerierConnectionPool>,
-    pub is_session_drain_state: Arc<AtomicBool>,
 }
 
 impl WsHandler {
@@ -53,7 +52,6 @@ impl WsHandler {
         Self {
             session_manager,
             connection_pool,
-            is_session_drain_state: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -95,7 +93,7 @@ impl WsHandler {
         let connection_pool = self.connection_pool.clone();
 
         // Before spawning the async task, clone the drain state
-        let is_session_drain_state = self.is_session_drain_state.clone();
+        let is_session_drain_state = session_manager.is_session_drain_state(&client_id).await;
 
         // Spawn message handling tasks between client and router
         actix_web::rt::spawn(async move {
