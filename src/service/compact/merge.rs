@@ -113,10 +113,9 @@ pub async fn generate_job_by_stream(
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_created = stream::stream_created(&schema).unwrap_or_default();
-    if offset == 0 {
+    if offset == 0 && stream_created > 0 {
         offset = stream_created
-    }
-    if offset == 0 {
+    } else if offset == 0 {
         return Ok(()); // no data
     }
 
@@ -488,6 +487,10 @@ pub async fn merge_by_stream(
     // do partition by partition key
     let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
+        // skip the files which already reach the max_file_size * 95%
+        if file.meta.original_size > cfg.compact.max_file_size as i64 * 95 / 100 {
+            continue;
+        }
         let file_name = file.key.clone();
         let prefix = file_name[..file_name.rfind('/').unwrap()].to_string();
         let partition = partition_files_with_size.entry(prefix).or_default();
@@ -497,7 +500,7 @@ pub async fn merge_by_stream(
     // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
-    for (prefix, files_with_size) in partition_files_with_size.into_iter() {
+    for (prefix, mut files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -505,7 +508,6 @@ pub async fn merge_by_stream(
         let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
-            let mut files_with_size = files_with_size.to_owned();
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
             match job_strategy {
                 MergeStrategy::FileSize => {
@@ -513,6 +515,9 @@ pub async fn merge_by_stream(
                 }
                 MergeStrategy::FileTime => {
                     files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+                }
+                MergeStrategy::TimeRange => {
+                    files_with_size = sort_by_time_range(files_with_size);
                 }
             }
 
@@ -546,7 +551,10 @@ pub async fn merge_by_stream(
                 let mut new_file_list = Vec::new();
                 let mut new_file_size = 0;
                 for file in files_with_size.iter() {
-                    if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
+                    if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
+                        || (cfg.compact.max_group_files > 0
+                            && new_file_list.len() >= cfg.compact.max_group_files)
+                    {
                         if new_file_list.len() <= 1 {
                             if job_strategy == MergeStrategy::FileSize {
                                 break;
@@ -692,6 +700,7 @@ pub async fn merge_files(
     prefix: &str,
     files_with_size: &[FileKey],
 ) -> Result<(Vec<String>, Vec<FileMeta>, Vec<FileKey>), anyhow::Error> {
+    let start = std::time::Instant::now();
     #[cfg(feature = "enterprise")]
     let is_match_downsampling_rule = get_largest_downsampling_rule(
         stream_name,
@@ -738,6 +747,11 @@ pub async fn merge_files(
 
     // cache parquet files
     let deleted_files = cache_remote_files(&new_file_list).await?;
+    log::info!(
+        "[COMPACTOR:WORKER:{thread_id}] download {} parquet files, took: {} ms",
+        new_file_list.len(),
+        start.elapsed().as_millis()
+    );
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
@@ -745,11 +759,20 @@ pub async fn merge_files(
         return Ok((Vec::new(), Vec::new(), retain_file_list));
     }
 
-    // get time range for these files
-    let min_ts = new_file_list.iter().map(|f| f.meta.min_ts).min().unwrap();
-    let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
-    let total_records = new_file_list.iter().map(|f| f.meta.records).sum();
-    let new_file_size = new_file_list.iter().map(|f| f.meta.original_size).sum();
+    // get time range and stats for these files in a single iteration
+    let (min_ts, max_ts, total_records, new_file_size) = new_file_list.iter().fold(
+        (i64::MAX, i64::MIN, 0, 0),
+        |(min_ts, max_ts, records, size), file| {
+            (
+                min_ts.min(file.meta.min_ts),
+                max_ts.max(file.meta.max_ts),
+                records + file.meta.records,
+                size + file.meta.original_size,
+            )
+        },
+    );
+    let min_ts = if min_ts == i64::MAX { 0 } else { min_ts };
+    let max_ts = if max_ts == i64::MIN { 0 } else { max_ts };
     let mut new_file_meta = FileMeta {
         min_ts,
         max_ts,
@@ -846,6 +869,7 @@ pub async fn merge_files(
             None,
             None,
             vec![],
+            is_match_downsampling_rule,
         )
         .await
         {
@@ -863,7 +887,6 @@ pub async fn merge_files(
         tables.push(table);
     }
 
-    let start = std::time::Instant::now();
     let merge_result = {
         let stream_name = stream_name.to_string();
         let latest_schema = latest_schema.clone();
@@ -1347,4 +1370,34 @@ fn generate_schema_diff(
     }
 
     Ok(diff_fields)
+}
+
+/// sort by time range without overlapping
+fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
+    let files_num = file_list.len();
+    file_list.sort_by_key(|f| f.meta.min_ts);
+    let mut groups: Vec<Vec<FileKey>> = Vec::new();
+    for file in file_list {
+        let mut inserted = None;
+        for (i, group) in groups.iter().enumerate() {
+            if group
+                .last()
+                .map(|f| file.meta.min_ts >= f.meta.max_ts)
+                .unwrap_or(false)
+            {
+                inserted = Some(i);
+                break;
+            }
+        }
+        if let Some(i) = inserted {
+            groups[i].push(file);
+        } else {
+            groups.push(vec![file]);
+        }
+    }
+    let mut files = Vec::with_capacity(files_num);
+    for group in groups {
+        files.extend(group);
+    }
+    files
 }

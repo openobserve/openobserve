@@ -181,6 +181,34 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .default_value("10")
                     .help("limit the number of results"),
             ]),
+            clap::Command::new("test").about("test command").subcommands([
+                clap::Command::new("file_list").about("test generate file list groups").args([
+                    clap::Arg::new("mode")
+                        .short('m')
+                        .long("mode")
+                        .required(true)
+                        .default_value("file_size")
+                        .help("mode: file_size, file_time, time_range"),
+                    clap::Arg::new("stream")
+                        .short('s')
+                        .long("stream")
+                        .required(true)
+                        .default_value("")
+                        .help("stream name, the format is org/logs/default"),
+                    clap::Arg::new("hour")
+                        .short('d')
+                        .long("date")
+                        .required(true)
+                        .default_value("")
+                        .help("date for testing, the format is 2025/01/01/00"),
+                    clap::Arg::new("group_size")
+                        .short('g')
+                        .long("group_size")
+                        .required(false)
+                        .default_value("5")
+                        .help("group size by gb, default is 5gb"),
+                ]),
+            ]),
         ])
         .get_matches();
 
@@ -409,6 +437,21 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 limit = 10;
             }
             super::http::query(org, sql, time, limit).await?;
+        }
+        "test" => {
+            let command = command.subcommand();
+            match command {
+                Some(("file_list", args)) => {
+                    let mode = args.get_one::<String>("mode").unwrap();
+                    let stream = args.get_one::<String>("stream").unwrap();
+                    let hour = args.get_one::<String>("hour").unwrap();
+                    let group_size = args.get_one::<String>("group_size").unwrap();
+                    super::test::file_list(mode, stream, hour, group_size).await?;
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupported sub command: {name}"));
+                }
+            }
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));

@@ -40,13 +40,14 @@ pub fn new_parquet_writer<'a>(
     bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
     write_metadata: bool,
+    compression: Option<&str>,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let cfg = get_config();
+    let compression = compression.unwrap_or(&cfg.common.parquet_compression);
     let mut writer_props = WriterProperties::builder()
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
-        .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
-        .set_compression(get_parquet_compression(&cfg.common.parquet_compression))
+        .set_compression(get_parquet_compression(compression))
         .set_column_dictionary_enabled(
             TIMESTAMP_COL_NAME.into(),
             false,
@@ -100,7 +101,8 @@ pub async fn write_recordbatch_to_parquet(
     metadata: &FileMeta,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true);
+    let mut writer =
+        new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true, None);
     for batch in record_batches {
         writer.write(batch).await?;
     }

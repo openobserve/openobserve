@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
+
 use config::{
     RwHashMap, RwHashSet,
     meta::stream::{FileKey, FileMeta},
@@ -35,7 +37,7 @@ pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
 pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
     Lazy::new(|| DashMap::with_capacity_and_hasher(64, Default::default()));
 
-pub static BLOCKED_ORGS: Lazy<Vec<String>> = Lazy::new(|| {
+pub static BLOCKED_ORGS: Lazy<HashSet<String>> = Lazy::new(|| {
     config::get_config()
         .compact
         .blocked_orgs
