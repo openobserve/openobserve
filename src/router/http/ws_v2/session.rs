@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, atomic::AtomicBool},
+};
 
 use chrono::{DateTime, Utc};
 use config::RwAHashMap;
@@ -34,6 +37,7 @@ pub struct SessionInfo {
     pub querier_mappings: HashMap<TraceId, QuerierName>,
     pub cookie_expiry: Option<DateTime<Utc>>,
     pub last_active: DateTime<Utc>,
+    pub is_session_drain_state: Arc<AtomicBool>,
 }
 
 impl SessionManager {
@@ -50,6 +54,7 @@ impl SessionManager {
             querier_mappings: HashMap::default(),
             cookie_expiry,
             last_active: Utc::now(),
+            is_session_drain_state: Arc::new(AtomicBool::new(false)),
         };
 
         let mut write_guard = self.sessions.write().await;
@@ -218,5 +223,14 @@ impl SessionManager {
             .get(client_id)
             .map(|session_info| session_info.querier_mappings.keys().cloned().collect())
             .unwrap_or_default()
+    }
+
+    pub async fn is_session_drain_state(&self, client_id: &ClientId) -> Arc<AtomicBool> {
+        self.sessions
+            .read()
+            .await
+            .get(client_id)
+            .map(|session_info| session_info.is_session_drain_state.clone())
+            .unwrap_or(Arc::new(AtomicBool::new(false)))
     }
 }
