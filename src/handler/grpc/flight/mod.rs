@@ -350,7 +350,9 @@ impl Drop for FlightSenderStream {
         );
         let cfg = config::get_config();
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-            let _span_context = self.create_stream_end_span();
+            if let Err(e) = self.create_stream_end_span() {
+                log::error!("error creating stream span: {}", e);
+            }
         }
 
         // metrics
