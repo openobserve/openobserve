@@ -35,13 +35,14 @@ mod ws;
 pub(crate) mod ws_v2;
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 20] = [
+const QUERIER_ROUTES: [(&str, usize); 21] = [
     ("config", 0),                            // /config
     ("summary", 2),                           // /api/{org_id}/summary
     ("organizations", 1),                     // /api/organizations
     ("settings", 2),                          // /api/{org_id}/settings/...
     ("schema", 3),                            // /api/{org_id}/streams/{stream_name}/schema
     ("streams", 2),                           // /api/{org_id}/streams/...
+    ("traces/latest", 3),                     // /api/{org_id}/{stream_name}/traces/latest
     ("clusters", 1),                          // /api/clusters
     ("query_manager", 2),                     // /api/{org_id}/query_manager/...
     ("ws", 2),                                // /api/{org_id}/ws
@@ -69,7 +70,7 @@ const INGESTER_ROUTES: [&str; 11] = [
     "/_multi",
     "/_json",
     "/_kinesis_firehose",
-    "/__sub",
+    "/_sub",
     "/v1/logs",
     "/ingest/metrics/_json",
     "/v1/metrics",
