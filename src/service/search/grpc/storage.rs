@@ -310,6 +310,7 @@ pub async fn search(
             file_stat_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
+            true,
         )
         .await?;
         tables.push(table);

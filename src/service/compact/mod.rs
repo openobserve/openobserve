@@ -299,10 +299,8 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
                     return;
                 }
             }
-            for id in job_ids.iter() {
-                if let Err(e) = infra_file_list::update_running_jobs(*id).await {
-                    log::error!("[COMPACTOR] update_job_status failed: {}", e);
-                }
+            if let Err(e) = infra_file_list::update_running_jobs(&job_ids).await {
+                log::error!("[COMPACTOR] update_job_status failed: {}", e);
             }
         }
     });

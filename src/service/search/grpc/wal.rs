@@ -278,6 +278,7 @@ pub async fn search_parquet(
             file_stat_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
+            true,
         )
         .await
         {

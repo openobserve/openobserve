@@ -727,6 +727,7 @@ async fn merge_files(
         None,
         None,
         vec![],
+        false,
     )
     .await?;
     let tables = vec![table];
@@ -739,6 +740,7 @@ async fn merge_files(
         tables,
         &bloom_filter_fields,
         &new_file_meta,
+        true,
     )
     .await;
 

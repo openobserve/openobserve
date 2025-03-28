@@ -256,6 +256,7 @@ impl From<&String> for QueryPartitionStrategy {
 pub enum MergeStrategy {
     FileSize,
     FileTime,
+    TimeRange,
 }
 
 impl From<&String> for MergeStrategy {
@@ -263,6 +264,7 @@ impl From<&String> for MergeStrategy {
         match s.to_lowercase().as_str() {
             "file_size" => MergeStrategy::FileSize,
             "file_time" => MergeStrategy::FileTime,
+            "time_range" => MergeStrategy::TimeRange,
             _ => MergeStrategy::FileSize,
         }
     }

@@ -15,6 +15,7 @@
 
 use std::{
     io::Cursor,
+    ops::Sub,
     sync::Arc,
     task::{Context, Poll},
 };
@@ -38,6 +39,7 @@ use datafusion::{
 use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::TaskStatus;
+use opentelemetry::trace::{Span, TraceId, Tracer};
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -75,7 +77,7 @@ impl FlightService for FlightServiceImpl {
         let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
             prop.extract(&MetadataMap(request.metadata()))
         });
-        tracing::Span::current().set_parent(parent_cx);
+        tracing::Span::current().set_parent(parent_cx.clone());
 
         // 1. decode ticket to RemoteExecNode
         let ticket = request.into_inner();
@@ -159,7 +161,8 @@ impl FlightService for FlightServiceImpl {
             .with_max_flight_data_size(33554432) // 32MB
             .with_options(write_options)
             .build(FlightSenderStream::new(
-                trace_id.to_string(),
+             trace_id.to_string(),
+                parent_cx,
                 execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
                     log::error!(
                         "[trace_id {}] flight->search: do_get physical plan execution error: {e:?}",
@@ -244,6 +247,7 @@ impl FlightService for FlightServiceImpl {
 
 struct FlightSenderStream {
     trace_id: String,
+    parent_cx: opentelemetry::Context,
     stream: SendableRecordBatchStream,
     defer: Option<AsyncDefer>,
     start: std::time::Instant,
@@ -253,6 +257,7 @@ struct FlightSenderStream {
 impl FlightSenderStream {
     fn new(
         trace_id: String,
+        parent_cx: opentelemetry::Context,
         stream: SendableRecordBatchStream,
         defer: Option<AsyncDefer>,
         start: std::time::Instant,
@@ -260,10 +265,48 @@ impl FlightSenderStream {
     ) -> Self {
         Self {
             trace_id,
+            parent_cx,
             stream,
             defer,
             start,
             timeout,
+        }
+    }
+
+    fn create_stream_end_span(
+        &self,
+    ) -> Result<opentelemetry::trace::SpanContext, infra::errors::Error> {
+        let tracer = opentelemetry::global::tracer("FlightSenderStream");
+
+        let now = std::time::SystemTime::now();
+        let duration = self.start.elapsed();
+        let start_time = now.sub(duration);
+
+        let trace_id = self
+            .trace_id
+            .split('-')
+            .next()
+            .and_then(|id| TraceId::from_hex(id).ok());
+        match trace_id {
+            Some(trace_id) => {
+                let mut span = tracer
+                    .span_builder("service:search:flight::do_get_stream")
+                    .with_trace_id(trace_id)
+                    .with_start_time(start_time)
+                    .with_attributes(vec![opentelemetry::KeyValue::new(
+                        "duration",
+                        duration.as_nanos() as i64,
+                    )])
+                    .start_with_context(&tracer, &self.parent_cx);
+
+                let span_context = span.span_context().clone();
+                span.end_with_timestamp(now);
+                Ok(span_context)
+            }
+            None => Err(infra::errors::Error::Message(format!(
+                "Invalid trace id:{}",
+                self.trace_id
+            ))),
         }
     }
 }
@@ -304,6 +347,13 @@ impl Drop for FlightSenderStream {
             self.trace_id,
             end
         );
+
+        let cfg = config::get_config();
+        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+            if let Err(e) = self.create_stream_end_span() {
+                log::error!("error creating stream span: {}", e);
+            }
+        }
 
         // metrics
         let time = self.start.elapsed().as_secs_f64();

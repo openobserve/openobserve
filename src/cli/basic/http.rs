@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::size::bytes_to_human_readable;
 use hashbrown::HashSet;
 use prettytable::{Cell, Row, Table};
 
@@ -46,7 +47,7 @@ pub async fn query(
     };
     let response = serde_json::from_str::<config::meta::search::Response>(&body)?;
     if response.hits.is_empty() {
-        println!("total: 0, took: {} ms", response.took);
+        println!("total: 0, scan size: 0, took: {} ms", response.took);
         return Ok(());
     }
 
@@ -76,7 +77,12 @@ pub async fn query(
         table.add_row(Row::new(row));
     }
     table.printstd();
-    println!("total: {}, took: {} ms", response.total, response.took);
+    println!(
+        "total: {}, scan size: {}, took: {} ms",
+        response.total,
+        bytes_to_human_readable((response.scan_size * 1024 * 1024) as f64),
+        response.took
+    );
     Ok(())
 }
 

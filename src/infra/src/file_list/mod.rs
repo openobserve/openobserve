@@ -155,7 +155,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
     async fn set_job_pending(&self, ids: &[i64]) -> Result<()>;
     async fn set_job_done(&self, id: i64) -> Result<()>;
-    async fn update_running_jobs(&self, id: i64) -> Result<()>;
+    async fn update_running_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
 }
@@ -420,8 +420,8 @@ pub async fn set_job_done(id: i64) -> Result<()> {
 }
 
 #[inline]
-pub async fn update_running_jobs(id: i64) -> Result<()> {
-    CLIENT.update_running_jobs(id).await
+pub async fn update_running_jobs(ids: &[i64]) -> Result<()> {
+    CLIENT.update_running_jobs(ids).await
 }
 
 #[inline]
