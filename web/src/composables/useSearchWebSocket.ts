@@ -90,7 +90,7 @@ const useSearchWebSocket = () => {
       // console.log("shouldRetry", JSON.parse(JSON.stringify(traces)));
       setTimeout(() => {
         Object.keys(traces).forEach((traceId) => {
-          if((traces[traceId].socketId === _socketId) && traces[traceId].isInitiated) {
+          if(((traces[traceId].socketId === _socketId) && traces[traceId].isInitiated) || !traces[traceId].socketId) {
             response.code = 1000;
             traces[traceId]?.close.forEach((handler: any) => handler(response));
             traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data));
