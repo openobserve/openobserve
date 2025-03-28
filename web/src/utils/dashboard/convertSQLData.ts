@@ -1321,6 +1321,7 @@ export const convertSQLData = async (
           seriesData,
           chartMin,
           chartMax,
+          store.state.theme,
         ) ?? null,
       data: seriesData,
       ...seriesConfig,
@@ -1645,6 +1646,7 @@ export const convertSQLData = async (
                       [params.value],
                       chartMin,
                       chartMax,
+                      store.state.theme,
                     ) ?? null
                   );
                 },
@@ -1715,6 +1717,7 @@ export const convertSQLData = async (
                       [params.value],
                       chartMin,
                       chartMax,
+                      store.state.theme,
                     ) ?? null
                   );
                 },
@@ -2163,6 +2166,7 @@ export const convertSQLData = async (
                     [it],
                     chartMin,
                     chartMax,
+                    store.state.theme,
                   ) ?? null,
               },
             },
