@@ -180,12 +180,11 @@ impl WsHandler {
                                                 }
                                             }
                                             if is_session_drain_state.load(Ordering::SeqCst) {
-                                                // Don't forward to querier, return unauthorized error instead
                                                 let err_msg = ErrorMessage::new_unauthorized(Some(message.get_trace_id()));
                                                 if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Error(err_msg))).await {
                                                     log::error!("[WS::Router::Handler] Error sending error: {e}");
                                                 }
-                                                continue; // Skip forwarding to querier
+                                                continue;
                                             }
                                             // end of cookie check
 
