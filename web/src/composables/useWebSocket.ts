@@ -2,10 +2,10 @@
 
 import { onBeforeUnmount } from "vue";
 
-type MessageHandler = (event: MessageEvent) => void;
-type OpenHandler = (event: Event) => void;
+type MessageHandler = (event: MessageEvent, socketId: string) => void;
+type OpenHandler = (event: Event, socketId: string) => void;
 type CloseHandler = (event: CloseEvent, socketId: string) => void;
-type ErrorHandler = (event: Event) => void;
+type ErrorHandler = (event: Event, socketId: string) => void;
 
 type WebSocketHandler =
   | MessageHandler
@@ -51,18 +51,18 @@ const connect = (socketId: string, url: string) => {
 };
 
 const onOpen = (socketId: string, event: Event) => {
-  openHandlers[socketId]?.forEach((handler) => handler(event));
+  openHandlers[socketId]?.forEach((handler) => handler(event, socketId));
 };
 
 const onMessage = (socketId: string, event: MessageEvent) => {
   const data = JSON.parse(event.data);
 
   if (data.type === "error") {
-    errorHandlers[socketId]?.forEach((handler) => handler(data));
+    errorHandlers[socketId]?.forEach((handler) => handler(data, socketId));
     return;
   }
 
-  messageHandlers[socketId]?.forEach((handler) => handler(data));
+  messageHandlers[socketId]?.forEach((handler) => handler(data, socketId));
 };
 
 const onClose = (socketId: string, event: CloseEvent) => {
@@ -75,7 +75,7 @@ const onClose = (socketId: string, event: CloseEvent) => {
 };
 
 const onError = (socketId: string, event: Event) => {
-  errorHandlers[socketId]?.forEach((handler) => handler(event));
+  errorHandlers[socketId]?.forEach((handler) => handler(event, socketId));
 };
 
 // Message and handler functions
