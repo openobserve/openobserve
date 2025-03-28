@@ -113,10 +113,9 @@ pub async fn generate_job_by_stream(
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_created = stream::stream_created(&schema).unwrap_or_default();
-    if offset == 0 {
+    if offset == 0 && stream_created > 0 {
         offset = stream_created
-    }
-    if offset == 0 {
+    } else if offset == 0 {
         return Ok(()); // no data
     }
 
@@ -760,11 +759,20 @@ pub async fn merge_files(
         return Ok((Vec::new(), Vec::new(), retain_file_list));
     }
 
-    // get time range for these files
-    let min_ts = new_file_list.iter().map(|f| f.meta.min_ts).min().unwrap();
-    let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
-    let total_records = new_file_list.iter().map(|f| f.meta.records).sum();
-    let new_file_size = new_file_list.iter().map(|f| f.meta.original_size).sum();
+    // get time range and stats for these files in a single iteration
+    let (min_ts, max_ts, total_records, new_file_size) = new_file_list.iter().fold(
+        (i64::MAX, i64::MIN, 0, 0),
+        |(min_ts, max_ts, records, size), file| {
+            (
+                min_ts.min(file.meta.min_ts),
+                max_ts.max(file.meta.max_ts),
+                records + file.meta.records,
+                size + file.meta.original_size,
+            )
+        },
+    );
+    let min_ts = if min_ts == i64::MAX { 0 } else { min_ts };
+    let max_ts = if max_ts == i64::MIN { 0 } else { max_ts };
     let mut new_file_meta = FileMeta {
         min_ts,
         max_ts,

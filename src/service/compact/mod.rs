@@ -165,7 +165,9 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                     continue; // no compactor node
                 };
                 if LOCAL_NODE.name.ne(&node_name) {
-                    // Check if this node holds the stream
+                    // This needs to be done in the case when there is a new node in the cluster
+                    // This will change the node that holds the stream
+                    // In case this node holds the stream, we release it for the designated node
                     if let Some((offset, _)) = db::compact::files::get_offset_from_cache(
                         &org_id,
                         stream_type,
@@ -412,10 +414,8 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
                     return;
                 }
             }
-            for id in job_ids.iter() {
-                if let Err(e) = infra_file_list::update_running_jobs(*id).await {
-                    log::error!("[COMPACTOR] update_job_status failed: {}", e);
-                }
+            if let Err(e) = infra_file_list::update_running_jobs(&job_ids).await {
+                log::error!("[COMPACTOR] update_job_status failed: {}", e);
             }
         }
     });
