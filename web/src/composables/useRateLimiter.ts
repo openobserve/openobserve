@@ -107,9 +107,9 @@ import rateLimiterService from "@/services/rate_limit";
   }
     };
 
-    const getModulesToDisplay = async () => {
+    const getModulesToDisplay = async (orgId: string) => {
       try {
-      const response = await rateLimiterService.getModules();
+      const response = await rateLimiterService.getModules(orgId);
       const modulesToDisplay = response.data.map((role: any) => ({
         label: role,
         value: role

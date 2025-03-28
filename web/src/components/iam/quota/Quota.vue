@@ -769,7 +769,7 @@ export default defineComponent ({
             }
             //these are the modules that are displayed in the dropdown 
             //to select the api category that user can use to filter the api limits
-            apiCategories.value = await getModulesToDisplay();
+            apiCategories.value = await getModulesToDisplay(selectedOrganization.value.value);
         }
 
 
