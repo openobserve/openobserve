@@ -46,6 +46,7 @@ pub async fn get_org_usage(
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
@@ -57,12 +58,13 @@ pub async fn get_org_usage(
         search_type: Some(SearchEventType::Other),
         search_event_context: None,
         use_cache: None,
+        local_mode: None,
     };
     let resp = SearchService::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
 
     if resp.is_partial {
         return Err(billings::BillingError::PartialUsageResults(
-            resp.function_error,
+            resp.function_error.join(", "),
         ));
     }
 
