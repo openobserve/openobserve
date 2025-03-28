@@ -177,7 +177,7 @@ pub async fn merge_parquet_files(
         compression,
     );
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(4);
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
     let task = tokio::task::spawn(async move {
         loop {
             match batch_stream.try_next().await {
@@ -605,6 +605,8 @@ pub async fn create_parquet_table(
     } else {
         target_partitions
     };
+
+    log::debug!("create_parquet_table: target_partitions: {}", target_partitions);
 
     // Configure listing options
     let file_format = ParquetFormat::default();
