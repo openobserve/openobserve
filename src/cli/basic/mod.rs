@@ -16,3 +16,4 @@
 pub mod cli;
 mod http;
 mod load;
+mod test;

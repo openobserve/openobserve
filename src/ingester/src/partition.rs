@@ -208,12 +208,18 @@ impl Partition {
                         .context(MergeRecordBatchSnafu)?;
 
                 let mut buf_parquet = Vec::new();
+                let compression = if cfg.common.feature_ingester_none_compression {
+                    Some("none")
+                } else {
+                    None
+                };
                 let mut writer = new_parquet_writer(
                     &mut buf_parquet,
                     &schema,
                     &bloom_filter_fields,
                     &file_meta,
                     true,
+                    compression,
                 );
 
                 writer

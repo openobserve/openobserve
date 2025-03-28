@@ -101,7 +101,7 @@ impl JobScheduler {
                                         }
                                     }
                                     if let Err(e) =
-                                        infra::file_list::update_running_jobs(job.job_id).await
+                                        infra::file_list::update_running_jobs(&[job.job_id]).await
                                     {
                                         log::error!(
                                             "[COMPACTOR:SCHEDULER:{thread_id}] update_job_status[{}] failed: {}",

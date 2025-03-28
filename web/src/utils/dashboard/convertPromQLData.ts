@@ -505,6 +505,7 @@ export const convertPromQLData = async (
                         metric.values.map((value: any) => value[1]),
                         chartMin,
                         chartMax,
+                        store.state.theme,
                       );
                     } catch (error) {
                       console.warn("Failed to get series color:", error);
@@ -614,6 +615,7 @@ export const convertPromQLData = async (
                         values[0][1],
                         chartMin,
                         chartMax,
+                        store.state.theme,
                       ) ?? defaultColor
                     );
                   })(),

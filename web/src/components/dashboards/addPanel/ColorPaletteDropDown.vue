@@ -109,8 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { classicColorPalette } from "@/utils/dashboard/colorPalette";
+import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { computed, inject, onBeforeMount, defineComponent } from "vue";
+import { useStore } from "vuex";
 export default defineComponent({
   name: "ColorPaletteDropdown",
   setup() {
@@ -132,6 +133,8 @@ export default defineComponent({
       }
     });
 
+    const store = useStore();
+
     const colorOptions = [
       {
         label: "<b>By Series</b>",
@@ -140,7 +143,7 @@ export default defineComponent({
       {
         label: "Default Palette (By Series)",
         subLabel: "Series with the same name will use the same color",
-        colorPalette: classicColorPalette,
+        colorPalette: getColorPalette(store.state.theme),
         value: "palette-classic-by-series",
       },
       {
