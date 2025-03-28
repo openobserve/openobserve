@@ -137,7 +137,6 @@ pub async fn node_list() -> Result<(), anyhow::Error> {
         Cell::new("Status"),
         Cell::new("Scheduled"),
         Cell::new("CPU"),
-        Cell::new("MEM"),
     ]));
 
     for node in nodes {
