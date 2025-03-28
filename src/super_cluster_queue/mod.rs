@@ -34,9 +34,8 @@ mod user;
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue,
-    OrgUsersQueue, OrganizationsQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue,
-    SuperClusterQueueTrait,
-    TemplatesQueue, UsersQueue,
+    OrgUsersQueue, OrganizationsQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
+    SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue, UsersQueue,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins

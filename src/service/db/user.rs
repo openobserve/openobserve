@@ -51,7 +51,7 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
     } else {
         match org_id {
             None => ROOT_USER.get("root").map(|usr| usr.clone()),
-            Some(org_id) => get_cached_user_org(org_id, &name),
+            Some(org_id) => get_cached_user_org(org_id, name),
         }
     };
 
@@ -63,7 +63,7 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
     }
 
     let org_id = org_id.unwrap();
-    let user = org_users::get_expanded_user_org(org_id, &name).await?;
+    let user = org_users::get_expanded_user_org(org_id, name).await?;
 
     Ok(Some(User {
         email: user.email,

@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{HttpRequest, HttpResponse, Responder, get, post, web};
 use config::{get_config, utils::json};
 use o2_enterprise::enterprise::cloud::billings as o2_cloud_billings;
 
@@ -274,7 +274,7 @@ pub async fn create_billing_portal_session(
         org_id
     );
 
-    match o2_cloud_billings::create_customer_portal_session(&customer_id, &return_url).await {
+    match o2_cloud_billings::create_customer_portal_session(customer_id, &return_url).await {
         Err(err) => err.into_http_response(),
         Ok(billing_session) => MetaHttpResponse::json(billing_session),
     }
@@ -297,7 +297,7 @@ pub async fn handle_stripe_event(
     let payload_str = match String::from_utf8(payload.to_vec()) {
         Ok(str) => str,
         Err(_) => {
-            return o2_cloud_billings::BillingError::InvalidStripePayload.into_http_response()
+            return o2_cloud_billings::BillingError::InvalidStripePayload.into_http_response();
         }
     };
 
@@ -306,7 +306,7 @@ pub async fn handle_stripe_event(
         Some(sig) => match sig.to_str() {
             Ok(s) => s,
             Err(_) => {
-                return o2_cloud_billings::BillingError::InvalidStripeSig.into_http_response()
+                return o2_cloud_billings::BillingError::InvalidStripeSig.into_http_response();
             }
         },
         None => return o2_cloud_billings::BillingError::StripeSigMissing.into_http_response(),

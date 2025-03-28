@@ -18,8 +18,8 @@ use config::{
     meta::user::{DBUser, UserRole, UserType},
 };
 use sea_orm::{
-    entity::prelude::*, ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Schema, Set,
+    ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema,
+    Set, entity::prelude::*,
 };
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ use super::{
     get_lock,
 };
 use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     errors::{self, DbError, Error},
 };
 

@@ -887,7 +887,7 @@ pub async fn check_permissions(
     parent_id: &str,
 ) -> bool {
     if !is_root_user(user_id) {
-        let user: config::meta::user::User = match get_user(Some(&org_id), user_id).await {
+        let user: config::meta::user::User = match get_user(Some(org_id), user_id).await {
             Some(user) => user.clone(),
             None => return false,
         }

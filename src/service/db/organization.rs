@@ -26,7 +26,7 @@ use infra::{
 // use o2_enterprise::enterprise::cloud::org_usage::{self, OrgUsageRecord};
 use crate::{
     common::{
-        infra::config::{ORGANIZATIONS, ORGANIZATION_SETTING},
+        infra::config::{ORGANIZATION_SETTING, ORGANIZATIONS},
         meta::organization::{Organization, OrganizationSetting},
     },
     service::db,

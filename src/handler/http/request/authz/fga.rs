@@ -374,9 +374,9 @@ pub async fn get_group_details(_path: web::Path<(String, String)>) -> Result<Htt
 #[cfg(feature = "enterprise")]
 #[get("/{org_id}/resources")]
 pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    use o2_openfga::meta::mapping::Resource;
     #[cfg(feature = "cloud")]
     use o2_openfga::meta::mapping::NON_CLOUD_RESOURCE_KEYS;
+    use o2_openfga::meta::mapping::Resource;
     let resources = o2_openfga::meta::mapping::OFGA_MODELS
         .values()
         .collect::<Vec<&Resource>>();

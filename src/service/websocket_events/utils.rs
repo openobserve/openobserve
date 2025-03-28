@@ -46,7 +46,7 @@ pub mod enterprise_utils {
         }
 
         // Get user details from the USERS cache
-        let user: config::meta::user::User = get_user(Some(&org_id), &user_id).await.unwrap();
+        let user: config::meta::user::User = get_user(Some(org_id), user_id).await.unwrap();
 
         // If the user is external, check permissions
         let stream_type_str = stream_type.as_str();
