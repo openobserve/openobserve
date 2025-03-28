@@ -13,26 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod arrow;
-pub mod async_file;
-pub mod base64;
-pub mod cgroup;
-pub mod download_utils;
-pub mod file;
-pub mod flatten;
-pub mod hash;
-pub mod inverted_index;
-pub mod json;
-pub mod md5;
-pub mod parquet;
-pub mod prom_json_encoder;
-pub mod rand;
-pub mod record_batch_ext;
-pub mod schema;
-pub mod schema_ext;
-pub mod size;
-pub mod sql;
-pub mod str;
-pub mod tantivy;
-pub mod time;
-pub mod util;
+/// Convert bytes to human readable format
+pub fn bytes_to_human_readable(bytes: f64) -> String {
+    let units = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    let mut bytes = bytes;
+    let mut index = 0;
+
+    if bytes == 0.0 {
+        return "0 B".to_string();
+    }
+
+    while bytes >= 1024.0 && index < units.len() - 1 {
+        bytes /= 1024.0;
+        index += 1;
+    }
+
+    format!("{:.2} {}", bytes, units[index])
+}
