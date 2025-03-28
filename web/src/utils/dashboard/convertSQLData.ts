@@ -262,9 +262,7 @@ export const convertSQLData = async (
       }
 
       const yAxisValue = item[yAxisKey];
-      if (breakdownValue !== null && breakdownValue !== undefined) {
-        acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
-      }
+      acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
       return acc;
     }, {});
 
