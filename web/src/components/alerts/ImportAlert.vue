@@ -708,6 +708,7 @@ export default defineComponent({
           name: "alertList",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
+            folder: selectedFolderId.value,
           },
         });
       }
