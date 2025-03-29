@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <li
           v-for="awsService in awsServiceLinks"
           :key="awsService.name"
-          class="tw-py-2"
+          class="tw-py-1"
         >
           <a
             :href="awsService.link"
-            class="hover:tw-underline"
+            class="tw-underline"
             target="_blank"
             rel="noopener noreferrer"
             >{{ awsService.name }}</a

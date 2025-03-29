@@ -22,20 +22,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Check further documentation at:
       </div>
       <ol class="tw-list-decimal q-pl-md">
-        <li class="tw-py-2">
+        <li class="tw-py-1">
           <a
             href="https://openobserve.ai/blog/send-gcp-logs-to-openobserve"
-            class="hover:tw-underline"
+            class="tw-underline"
             target="_blank"
             rel="noopener noreferrer"
           >
           {{ t("ingestion.pubsub") }}
           </a>
         </li>
-        <li class="tw-py-2">
+        <li class="tw-py-1">
           <a
             href="https://short.openobserve.ai/security/google-workspace"
-            class="hover:tw-underline"
+            class="tw-underline"
             target="_blank"
             rel="noopener noreferrer"
           >
