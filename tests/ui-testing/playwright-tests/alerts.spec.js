@@ -207,7 +207,7 @@ test.describe("Alerts testcases", () => {
 
   });
 
-  test.skip("should click on add destination button and display error if user clicks directly on save", async ({ page }) => {
+  test("should click on add destination button and display error if user clicks directly on save", async ({ page }) => {
     await page.locator('[data-test="menu-link-settings-item"]').click();
     await page.waitForTimeout(2000);
     await page.waitForSelector('[data-test="alert-destinations-tab"]');
