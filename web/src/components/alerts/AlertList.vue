@@ -851,6 +851,8 @@ export default defineComponent({
       //so to avoid this we are using the refreshResults flag
       //if the flag is false then we are not assigning the alerts to the filteredResults
       //and if the flag is true then we are assigning the alerts to the filteredResults
+      //and also we are not filtering the alerts by the activeTab if the flag is false because we dont need to show the alerts in the table 
+      //for a moment also so we are not filtering the alerts by the activeTab 
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
       if (query){
@@ -864,18 +866,8 @@ export default defineComponent({
       if (query) {
         folderId = "";
       }
-      alertsService
-        .listByFolderId(
-          1,
-          1000,
-          "name",
-          false,
-          "",
-          store.state.selectedOrganization.identifier,
-          folderId,
-          query,
-        )
-        .then(async (res) => {
+      try {
+        const res = await alertsService.listByFolderId(1,1000,"name",false,"",store.state.selectedOrganization.identifier,folderId,query);
           var counter = 1;
           //this is the alerts that we use to store
           allAlerts.value = res.data.list.map((alert: any) => {
@@ -948,14 +940,14 @@ export default defineComponent({
           //this is the condition where we are setting the filteredResults 
           //1. If it is search across folders then also we are setting the filteredResults(which contains the filtered alerts)
           //2. If it is not search across folders then we are setting the filteredResults to the alerts(which contains all the alerts)
-          if(refreshResults){
             //here we are setting the filteredResults to the alerts
-            //this step is not needed but anyways we are setting the filteredResults to the alerts
-            //becuase we are anyways setting the filteredResults to the alerts in the filterAlertsByTab function
-            filteredResults.value = allAlerts.value;
-          }
+            if(refreshResults){
+              filteredResults.value = allAlerts.value;
+            }
+          
           //here we are filtering the alerts by the activeTab
-          filterAlertsByTab();
+          //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table 
+          filterAlertsByTab(refreshResults);
           if (router.currentRoute.value.query.action == "import") {
             showImportAlertDialog.value = true;
           }
@@ -971,16 +963,16 @@ export default defineComponent({
             });
           }
           dismiss();
-        })
-        .catch((e) => {
-          console.error(e);
+        
+      } catch (error) {
+          console.error(error);
           dismiss();
           $q.notify({
             type: "negative",
             message: "Error while pulling alerts.",
             timeout: 2000,
           });
-        });
+      }
     };
     const getAlertById = async (id: string) => {
       const dismiss = $q.notify({
@@ -1529,9 +1521,9 @@ export default defineComponent({
       activeFolderId: any,
       selectedFolderId: any,
     ) => {
-      await Promise.all([
-        getAlertsFn(store, selectedFolderId, "", false), // Run first and also dont add the results to the filteredResults
-      ]).then(() => getAlertsFn(store, activeFolderId)); 
+      //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
+      await getAlertsFn(store, selectedFolderId, "",false);
+      await getAlertsFn(store, activeFolderId);
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
       activeFolderToMove.value = "";
@@ -1738,7 +1730,10 @@ export default defineComponent({
       return owner;
     };
 
-    const filterAlertsByTab = () => {
+    const filterAlertsByTab = (refreshResults: boolean = true) => {
+      if(!refreshResults){
+       return;
+      }
       //here we are filtering the alerts by the activeTab
       //why allAlerts.value is used because we are not fetching the alerts again, 
       // we are just assigning the alerts to the filteredResults
