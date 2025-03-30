@@ -466,10 +466,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="10px"
                 class="progresbar tw-w-[80%] inline-block"
                 rounded
-                :value="props.row.cpu_total / 100"
-                :color="props.row.cpu_total > 85 ? 'red-9' : 'primary'"
+                :value="props.row.cpu_percentage_total / 100"
+                :color="props.row.cpu_percentage_total > 85 ? 'red-9' : 'primary'"
               />
-              {{ props.row.cpu_total }}%
+              {{ props.row.cpu_percentage_total }}%
             </q-td>
           </template>
 
@@ -480,10 +480,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="10px"
                 class="progresbar tw-w-[80%] inline-block"
                 rounded
-                :value="props.row.memory_total / 100"
-                :color="props.row.memory_total > 85 ? 'red-9' : 'primary'"
+                :value="props.row.percentage_memory_usage / 100"
+                :color="props.row.percentage_memory_usage > 85 ? 'red-9' : 'primary'"
               />
-              {{ props.row.memory_total }}%
+              {{ props.row.percentage_memory_usage }}%
             </q-td>
           </template>
 
@@ -555,7 +555,7 @@ export default defineComponent({
       },
       {
         name: "cpu",
-        field: "cpu_total",
+        field: "cpu_percentage_total",
         label: t("nodes.cpu"),
         align: "left",
         sortable: true,
@@ -563,7 +563,7 @@ export default defineComponent({
       },
       {
         name: "memory",
-        field: "memory_total",
+        field: "percentage_memory_usage",
         label: t("nodes.memory"),
         align: "left",
         sortable: false,
@@ -625,6 +625,8 @@ export default defineComponent({
     const maxEstablished = ref(60);
     const maxClosewait = ref(60);
     const maxWaittime = ref(60);
+    const maxCPUUsage = ref(100);
+    const maxMemoryUsage = ref(100);
 
     const closewaitUsage = ref({
       min: 0,
@@ -656,6 +658,8 @@ export default defineComponent({
             for (const cluster in data[region]) {
                 uniqueValues.clusters.add(cluster);
                 data[region][cluster].forEach((node: any) => {
+                    node.metrics["percentage_memory_usage"] = (node.metrics.memory_usage > 0) ? Math.round((node.metrics.memory_usage/node.metrics.memory_total) * 100) : 0;
+                    node.metrics["cpu_percentage_total"] = (node.metrics.cpu_usage > 0) ? Math.round((node.metrics.cpu_usage/node.metrics.cpu_total) * 100) : 0;
                     const { metrics, role, status, ...nodeData } = node;
                     
                     // Extract unique node types from role array
@@ -674,6 +678,14 @@ export default defineComponent({
 
                     if(node.tcp_conns_time_wait > maxWaittime.value) {
                       maxWaittime.value = node.tcp_conns_time_wait;
+                    }
+
+                    if(node.percentage_memory_usage > maxMemoryUsage.value) {
+                      maxMemoryUsage.value = node.percentage_memory_usage;
+                    }
+
+                    if(node.cpu_percentage_total > maxCPUUsage.value) {
+                      maxCPUUsage.value = node.cpu_percentage_total;
                     }
                     
                     result.push({
@@ -751,23 +763,23 @@ export default defineComponent({
 
     const applyFilter = (filterQuery: string) => {
       let terms = filterQuery.toLowerCase();
-        const data = originalData.value.filter((row: any) => {
-            const matchesSearch = row.name.toLowerCase().includes(terms);
-            const matchesRegion = selectedRegions.value.length === 0 || selectedRegions.value.some((region: any) => region.name === row.region);
-            const matchesCluster = selectedClusters.value.length === 0 || selectedClusters.value.some((cluster: any) => cluster.name === row.cluster);
-            const matchesNodeType = selectedNodetypes.value.length === 0 || row.role.some((r: any) => selectedNodetypes.value.some((nt: any) => nt.name === r));
-            const matchesStatus = selectedStatuses.value.length === 0 || selectedStatuses.value.some((status: any) => status.name === row.status);
-            const matchesCPU = row.cpu_usage >= cpuUsage.value.min && row.cpu_usage <= cpuUsage.value.max;
-            const matchesMemory = row.memory_usage >= memoryUsage.value.min && row.memory_usage <= memoryUsage.value.max;
-            const matchesEstablished = row.tcp_conns_established >= establishedUsage.value.min && row.tcp_conns_established <= establishedUsage.value.max;
-            const matchesCloseWait = row.tcp_conns_close_wait >= closewaitUsage.value.min && row.tcp_conns_close_wait <= closewaitUsage.value.max;
-            const matchesWaitTime = row.tcp_conns_time_wait >= waittimeUsage.value.min && row.tcp_conns_time_wait <= waittimeUsage.value.max;
-            
-            return matchesSearch && matchesRegion && matchesCluster && matchesNodeType && matchesStatus && matchesCPU && matchesMemory && matchesEstablished && matchesCloseWait && matchesWaitTime;
-        });
+      const data = originalData.value.filter((row: any) => {
+          const matchesSearch = row.name.toLowerCase().includes(terms);
+          const matchesRegion = selectedRegions.value.length === 0 || selectedRegions.value.some((region: any) => region.name === row.region);
+          const matchesCluster = selectedClusters.value.length === 0 || selectedClusters.value.some((cluster: any) => cluster.name === row.cluster);
+          const matchesNodeType = selectedNodetypes.value.length === 0 || row.role.some((r: any) => selectedNodetypes.value.some((nt: any) => nt.name === r));
+          const matchesStatus = selectedStatuses.value.length === 0 || selectedStatuses.value.some((status: any) => status.name === row.status);
+          const matchesCPU = row.cpu_percentage_total >= cpuUsage.value.min && row.cpu_percentage_total <= cpuUsage.value.max;
+          const matchesMemory = row.percentage_memory_usage >= memoryUsage.value.min && row.percentage_memory_usage <= memoryUsage.value.max;
+          const matchesEstablished = row.tcp_conns_established >= establishedUsage.value.min && row.tcp_conns_established <= establishedUsage.value.max;
+          const matchesCloseWait = row.tcp_conns_close_wait >= closewaitUsage.value.min && row.tcp_conns_close_wait <= closewaitUsage.value.max;
+          const matchesWaitTime = row.tcp_conns_time_wait >= waittimeUsage.value.min && row.tcp_conns_time_wait <= waittimeUsage.value.max;
+          
+          return matchesSearch && matchesRegion && matchesCluster && matchesNodeType && matchesStatus && matchesCPU && matchesMemory && matchesEstablished && matchesCloseWait && matchesWaitTime;
+      });
 
-        tabledata.value = data;
-        resultTotal.value = data.length;
+      tabledata.value = data;
+      resultTotal.value = data.length;
     }
 
     return {
