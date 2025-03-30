@@ -300,12 +300,12 @@ const tabs = reactive ([
     value: "all",
   },
   {
-    label: "Realtime",
-    value: "realtime",
-  },
-  {
     label: "Scheduled",
     value: "scheduled",
+  },
+  {
+    label: "Real-Time",
+    value: "realtime",
   },
 ]);
 
