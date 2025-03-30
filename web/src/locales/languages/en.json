@@ -80,7 +80,8 @@
     "back": "Back",
     "save": "Save",
     "update": "Update",
-    "favourite": "Favorite"
+    "favourite": "Favorite",
+    "refresh": "Refresh"
   },
   "search": {
     "metrics": "Metrics",
@@ -1190,8 +1191,10 @@
     "memoryusage": "Memory Usage(%)",
     "tcpusage": "TCP",
     "establishedLabel": "Established",
-    "closewaitLabel": "Close Wait (mins)",
-    "waittimeLabel": "Wait Time (mins)",
-    "applyFilter": "Apply Filters"
+    "closewaitLabel": "Close Wait",
+    "waittimeLabel": "Time Wait",
+    "applyFilter": "Apply Filters",
+    "searchCluster": "Search Cluster",
+    "searchRegion": "Search Region"
   }
 }

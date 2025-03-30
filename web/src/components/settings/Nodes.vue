@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </h6>
             <q-separator />
           </div>
-          <div class="content">
+          <div class="">
             <q-list>
               <q-expansion-item
                 v-if="regionRows.length > 0"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dense
                           clearable
                           debounce="1"
-                          :placeholder="t('search.searchField')"
+                          :placeholder="t('nodes.searchRegion')"
                           class="full-width q-pa-none q-ma-none filter-input"
                         >
                           <template #prepend>
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dense
                           clearable
                           debounce="1"
-                          :placeholder="t('search.searchField')"
+                          :placeholder="t('nodes.searchCluster')"
                           class="full-width q-pa-none q-ma-none filter-input"
                         >
                           <template #prepend>
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="100"
                       label-side
                       size="25px"
-                      class="tw-w-[90%] q-mt-md q-ml-sm"
+                      class="tw-w-[85%] q-mt-md q-ml-md"
                     />
                   </q-card-section>
                 </q-card>
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="100"
                       label-side
                       size="25px"
-                      class="tw-w-[90%] q-mt-md q-ml-sm"
+                      class="tw-w-[85%] q-mt-md q-ml-md"
                     />
                   </q-card-section>
                 </q-card>
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxEstablished"
                       label-side
                       size="25px"
-                      class="tw-w-[90%] q-mt-md q-ml-sm"
+                      class="tw-w-[85%] q-mt-md q-ml-md"
                     />
 
                     <q-checkbox type="checkbox" class="q-mt-sm" size="xs" v-model="closewaitToggle" :label="t('nodes.closewaitLabel')" />
@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxClosewait"
                       label-side
                       size="25px"
-                      class="tw-w-[90%] q-mt-md q-ml-sm"
+                      class="tw-w-[85%] q-mt-md q-ml-md"
                     />
 
                     <q-checkbox type="checkbox" class="q-mt-sm" size="xs" v-model="waittimeToggle" :label="t('nodes.waittimeLabel')" />
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxWaittime"
                       label-side
                       size="25px"
-                      class="tw-w-[90%] q-mt-md q-ml-sm"
+                      class="tw-w-[85%] q-mt-md q-ml-md"
                     />
                   </q-card-section>
                 </q-card>
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <q-btn 
               :label="t('nodes.applyFilter')" 
-              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize" 
+              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm" 
               color="secondary"
               @click="applyFilter(filterQuery)"
             >
@@ -419,6 +419,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-icon name="search" />
                   </template>
                 </q-input>
+                <q-btn :label="t('common.refresh')" class="text-bold text-capitalize q-ml-sm q-pa-xs" 
+                color="secondary" @click="getData"></q-btn>
               </div>
               <div class="col-auto flex q-ml-md pagination-align">
                 <QTablePagination
@@ -466,10 +468,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="10px"
                 class="progresbar tw-w-[80%] inline-block"
                 rounded
-                :value="props.row.cpu_percentage_total / 100"
-                :color="props.row.cpu_percentage_total > 85 ? 'red-9' : 'primary'"
+                :value="props.row.cpu_usage / 100"
+                :color="props.row.cpu_usage > 85 ? 'red-9' : 'primary'"
               />
-              {{ props.row.cpu_percentage_total }}%
+              {{ props.row.cpu_usage }}%
             </q-td>
           </template>
 
@@ -555,7 +557,7 @@ export default defineComponent({
       },
       {
         name: "cpu",
-        field: "cpu_percentage_total",
+        field: "cpu_usage",
         label: t("nodes.cpu"),
         align: "left",
         sortable: true,
@@ -659,7 +661,7 @@ export default defineComponent({
                 uniqueValues.clusters.add(cluster);
                 data[region][cluster].forEach((node: any) => {
                     node.metrics["percentage_memory_usage"] = (node.metrics.memory_usage > 0) ? Math.round((node.metrics.memory_usage/node.metrics.memory_total) * 100) : 0;
-                    node.metrics["cpu_percentage_total"] = (node.metrics.cpu_usage > 0) ? Math.round((node.metrics.cpu_usage/node.metrics.cpu_total) * 100) : 0;
+                    node.metrics["cpu_usage"] = Math.round(node.metrics["cpu_usage"])
                     const { metrics, role, status, ...nodeData } = node;
                     
                     // Extract unique node types from role array
@@ -684,8 +686,8 @@ export default defineComponent({
                       maxMemoryUsage.value = node.percentage_memory_usage;
                     }
 
-                    if(node.cpu_percentage_total > maxCPUUsage.value) {
-                      maxCPUUsage.value = node.cpu_percentage_total;
+                    if(node.cpu_usage > maxCPUUsage.value) {
+                      maxCPUUsage.value = node.cpu_usage;
                     }
                     
                     result.push({
@@ -769,7 +771,7 @@ export default defineComponent({
           const matchesCluster = selectedClusters.value.length === 0 || selectedClusters.value.some((cluster: any) => cluster.name === row.cluster);
           const matchesNodeType = selectedNodetypes.value.length === 0 || row.role.some((r: any) => selectedNodetypes.value.some((nt: any) => nt.name === r));
           const matchesStatus = selectedStatuses.value.length === 0 || selectedStatuses.value.some((status: any) => status.name === row.status);
-          const matchesCPU = row.cpu_percentage_total >= cpuUsage.value.min && row.cpu_percentage_total <= cpuUsage.value.max;
+          const matchesCPU = row.cpu_usage >= cpuUsage.value.min && row.cpu_usage <= cpuUsage.value.max;
           const matchesMemory = row.percentage_memory_usage >= memoryUsage.value.min && row.percentage_memory_usage <= memoryUsage.value.max;
           const matchesEstablished = row.tcp_conns_established >= establishedUsage.value.min && row.tcp_conns_established <= establishedUsage.value.max;
           const matchesCloseWait = row.tcp_conns_close_wait >= closewaitUsage.value.min && row.tcp_conns_close_wait <= closewaitUsage.value.max;
@@ -929,6 +931,7 @@ export default defineComponent({
 <style lang="scss">
 .nodes-list-table .q-table tr th {
   background-color: #f2f2f2 !important;
+  color: #000000;
 }
 
 .status-online {
@@ -944,8 +947,16 @@ export default defineComponent({
 }
 
 .node-list-filter-table {
-  max-height: 400px;
+  max-height: 200px;
   overflow: auto;
+
+  .q-table__top {
+    padding: 0px !important;
+  }
+
+  .q-table__control {
+    width: 100% !important;
+  }
 
   td {
     padding: 0 0 0 7px !important;
