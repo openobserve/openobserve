@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="sticky-header">
             <h6 class="q-ma-none q-pa-sm">
               {{t("nodes.filter_header")}} <q-icon name="filter_list" />
-              <div class="float-right"><a class="cursor-pointer text-caption tw-underline">{{t("nodes.clear_all")}}</a></div>
+              <div class="float-right"><a class="cursor-pointer text-caption tw-underline" @click="clearAll(filterQuery)">{{t("nodes.clear_all")}}</a></div>
             </h6>
             <q-separator />
           </div>
@@ -784,6 +784,21 @@ export default defineComponent({
       resultTotal.value = data.length;
     }
 
+    const clearAll = (filterQuery: string) => {
+      filterQuery = "";
+      selectedRegions.value = [];
+      selectedClusters.value = [];
+      selectedNodetypes.value = [];
+      selectedStatuses.value = [];
+      cpuUsage.value = {min: 0, max: maxCPUUsage.value};
+      memoryUsage.value = {min: 0, max: maxMemoryUsage.value};
+      establishedUsage.value = {min: 0, max: maxEstablished.value};
+      closewaitUsage.value = {min: 0, max: maxClosewait.value};
+      waittimeUsage.value = {min: 0, max: maxWaittime.value};
+      tabledata.value = originalData.value;
+      resultTotal.value = originalData.value.length;
+    }
+
     return {
       t,
       store,
@@ -820,6 +835,7 @@ export default defineComponent({
       maxClosewait,
       maxWaittime,
       applyFilter,
+      clearAll,
       filterColumns: [{ name: "name", label: "Name", field: "name", align: "left" }],
       filterQuery: ref(""),
       filterData(rows: any, terms: string) {
