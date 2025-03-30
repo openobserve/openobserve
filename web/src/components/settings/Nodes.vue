@@ -447,8 +447,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-slot:body-cell-region="props">
             <q-td :props="props">
-              <q-badge class="badge-region q-mr-xs">{{ props.row.region }}</q-badge>
-              <q-badge class="badge-cluster">{{ props.row.cluster }}</q-badge>
+              <q-badge class="badge-region q-mr-xs">{{ props.row.region }}
+                <q-tooltip>{{t("nodes.region")}}</q-tooltip>
+              </q-badge>
+              <q-badge class="badge-cluster">{{ props.row.cluster }}
+                <q-tooltip>{{t("nodes.cluster")}}</q-tooltip>
+              </q-badge>
             </q-td>
           </template>
 
