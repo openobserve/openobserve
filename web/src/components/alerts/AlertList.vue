@@ -723,9 +723,13 @@ export default defineComponent({
     };
     const activeFolderToMove = ref("default");
 
-    const activeTab = ref("scheduled");
+    const activeTab = ref("all");
 
     const tabs = reactive([
+      {
+        label: t("alerts.all"),
+        value: "all",
+      },
       {
         label: t("alerts.scheduled"),
         value: "scheduled",
@@ -1482,23 +1486,17 @@ export default defineComponent({
       }
     };
     const updateActiveFolderId = (newVal: any) => {
-      if(searchQuery.value){
-        searchQuery.value = "";
-      }
-      if(filterQuery.value){
-        filterQuery.value = "";
-      }
-      if(searchAcrossFolders.value){
-        searchAcrossFolders.value = false;
-      }
-      if(allSelectedAlerts.value){
-        allSelectedAlerts.value = false;
-      }
-      if(selectedAlerts.value){
-        selectedAlerts.value = [];
-      }
+      //here we are resetting the searchQuery, filterQuery, searchAcrossFolders, allSelectedAlerts, selectedAlerts
+      //here we only reset if the value is not null
+      if(searchQuery.value) searchQuery.value = "";
+      if(filterQuery.value) filterQuery.value = "";
+      if(searchAcrossFolders.value) searchAcrossFolders.value = false;
+      if(allSelectedAlerts.value) allSelectedAlerts.value = false;
+      if(selectedAlerts.value) selectedAlerts.value = [];
       activeFolderId.value = newVal;
       //here we are resetting the selected alerts
+      //this is done because we need to reset the selected alerts when the user is changing the folder
+      //this is not needed but we are doing it to avoid any potential issues
       filteredResults.value?.forEach((alert: any) => {
         alert.selected = false;
       });
@@ -1587,10 +1585,17 @@ export default defineComponent({
           alert.name.toLowerCase().includes(newVal.toLowerCase())
         )
         filteredResults.value = tempResults.filter((alert: any) => {
+          //here we are filtering the alerts by the activeTab
           if(activeTab.value === "scheduled"){
             return !alert.is_real_time;
-          } else {
+          } 
+          //we filter the alerts by the realTime tab
+          else if(activeTab.value === "realTime"){
             return alert.is_real_time;
+          } 
+          //else we will return all the alerts
+          else {
+            return true;
           }
         })
       }
@@ -1727,8 +1732,14 @@ export default defineComponent({
       // we are just assigning the alerts to the filteredResults
       if (activeTab.value === "scheduled") {
         filteredResults.value = allAlerts.value.filter((alert: any) => !alert.is_real_time);
-      } else {
+      } 
+      //we filter the alerts by the realTime tab
+      else if (activeTab.value === "realTime") {
         filteredResults.value = allAlerts.value.filter((alert: any) => alert.is_real_time);
+      }
+      //else we will return all the alerts
+      else{
+        filteredResults.value = allAlerts.value;
       }
     };
 

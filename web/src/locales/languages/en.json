@@ -992,7 +992,8 @@
     "view":"View",
     "webhook":"Web Hook",
     "email":"Email",
-    "action":"Action"
+    "action":"Action",
+    "all":"All"
   },
   "alert_templates": {
     "header": "Templates",
