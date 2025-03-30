@@ -26,6 +26,10 @@ const common = {
       url += `?folder=${folder_id}`;
     }
     return http().patch(url, data);
+  },
+  list_nodes: (organization: string) => {
+    const url = `/api/${organization}/node/list`;
+    return http().get(url);
   }
 };
 

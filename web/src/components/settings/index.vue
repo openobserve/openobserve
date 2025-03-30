@@ -116,6 +116,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('settings.cipherKeys')"
             content-class="tab_content"
           />
+          <q-route-tab
+            v-if="config.isEnterprise == 'true' && isMetaOrg"
+            data-test="nodes-tab"
+            name="nodes"
+            :to="{
+              name: 'nodes',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            icon="hub"
+            :label="t('settings.nodes')"
+            content-class="tab_content"
+          />
         </q-tabs>
 
         </div>
