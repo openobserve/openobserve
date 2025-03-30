@@ -440,7 +440,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :props="props"
               :class="`status-${props.row.status.toLowerCase()}`"
             >
-              {{ props.row.name }}
+              {{ props.row.name.length > 40 ? props.row.name.substring(0, 40) + "..." : props.row.name }}
+              <q-tooltip>{{props.row.name}}</q-tooltip>
             </q-td>
           </template>
 
