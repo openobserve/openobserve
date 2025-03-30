@@ -65,7 +65,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { Object.getOwnPropertyDescriptor(scope, 'selected').set(val, evt) }" />
+                        <q-checkbox 
+                          :model-value="scope.selected" 
+                          size="xs" 
+                          color="secondary" 
+                          @update:model-value="(val, evt) => { 
+                            if (Object.hasOwn(scope, 'selected')) {
+                              Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
+                            }
+                          }" 
+                        />
                       </template>
                       <template #top-right>
                         <q-input
@@ -125,7 +134,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { Object.getOwnPropertyDescriptor(scope, 'selected').set(val, evt) }" />
+                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                            if (Object.hasOwn(scope, 'selected')) {
+                              Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
+                            }
+                          }"  />
                       </template>
                       <template #top-right>
                         <q-input
@@ -183,7 +196,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { Object.getOwnPropertyDescriptor(scope, 'selected').set(val, evt) }" />
+                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                            if (Object.hasOwn(scope, 'selected')) {
+                              Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
+                            }
+                          }"  />
                       </template>
                     </q-table>
                   </q-card-section>
@@ -218,7 +235,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { Object.getOwnPropertyDescriptor(scope, 'selected').set(val, evt) }" />
+                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                            if (Object.hasOwn(scope, 'selected')) {
+                              Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
+                            }
+                          }"  />
                       </template>
                       <template v-slot:body-cell-name="props">
                       <q-td
@@ -621,8 +642,8 @@ export default defineComponent({
       qTable.value.setPagination(pagination.value);
     };
 
-    function flattenObject(data) {
-        const result = [];
+    function flattenObject(data: any) {
+        const result: any = [];
         const uniqueValues = {
             regions: new Set(),
             clusters: new Set(),
@@ -634,11 +655,11 @@ export default defineComponent({
             uniqueValues.regions.add(region);
             for (const cluster in data[region]) {
                 uniqueValues.clusters.add(cluster);
-                data[region][cluster].forEach((node) => {
+                data[region][cluster].forEach((node: any) => {
                     const { metrics, role, status, ...nodeData } = node;
                     
                     // Extract unique node types from role array
-                    role.forEach(r => uniqueValues.nodeTypes.add(r));
+                    role.forEach((r: any) => uniqueValues.nodeTypes.add(r));
                     
                     // Extract unique statuses
                     uniqueValues.statuses.add(status);
@@ -730,12 +751,12 @@ export default defineComponent({
 
     const applyFilter = (filterQuery: string) => {
       let terms = filterQuery.toLowerCase();
-        const data = originalData.value.filter(row => {
+        const data = originalData.value.filter((row: any) => {
             const matchesSearch = row.name.toLowerCase().includes(terms);
-            const matchesRegion = selectedRegions.value.length === 0 || selectedRegions.value.some(region => region.name === row.region);
-            const matchesCluster = selectedClusters.value.length === 0 || selectedClusters.value.some(cluster => cluster.name === row.cluster);
-            const matchesNodeType = selectedNodetypes.value.length === 0 || row.role.some(r => selectedNodetypes.value.some(nt => nt.name === r));
-            const matchesStatus = selectedStatuses.value.length === 0 || selectedStatuses.value.some(status => status.name === row.status);
+            const matchesRegion = selectedRegions.value.length === 0 || selectedRegions.value.some((region: any) => region.name === row.region);
+            const matchesCluster = selectedClusters.value.length === 0 || selectedClusters.value.some((cluster: any) => cluster.name === row.cluster);
+            const matchesNodeType = selectedNodetypes.value.length === 0 || row.role.some((r: any) => selectedNodetypes.value.some((nt: any) => nt.name === r));
+            const matchesStatus = selectedStatuses.value.length === 0 || selectedStatuses.value.some((status: any) => status.name === row.status);
             const matchesCPU = row.cpu_usage >= cpuUsage.value.min && row.cpu_usage <= cpuUsage.value.max;
             const matchesMemory = row.memory_usage >= memoryUsage.value.min && row.memory_usage <= memoryUsage.value.max;
             const matchesEstablished = row.tcp_conns_established >= establishedUsage.value.min && row.tcp_conns_established <= establishedUsage.value.max;
