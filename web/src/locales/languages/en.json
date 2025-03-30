@@ -930,7 +930,7 @@
   },
   "alerts": {
     "header": "Alerts",
-    "add": "Add alert",
+    "add": "Add Alert",
     "edit": "Edit",
     "clone": "Clone alert",
     "search": "Search Alert",

@@ -1108,8 +1108,7 @@ export default defineComponent({
       { label: "10", value: 10 },
       { label: "20", value: 20 },
       { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "All", value: 0 },
+      { label: "100", value: 100 }
     ];
     const resultTotal = computed(function () {
       return filteredResults.value?.length;
