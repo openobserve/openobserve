@@ -1277,9 +1277,14 @@ export default defineComponent({
         });
       }
     };
-    const refreshList = (folderId: string) => {
-      getAlertsFn(store, folderId);
+    const refreshList = async (folderId: string) => {
+      //here we are fetching the alerts from the server because after creating the alert we should get the latest alerts
+      //and then we are setting the activeFolderId to the folderId
+      //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
+      //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
+      await getAlertsFn(store, folderId);
       hideForm();
+      activeFolderId.value = folderId;
     };
     const hideForm = () => {
       showAddAlertDialog.value = false;
