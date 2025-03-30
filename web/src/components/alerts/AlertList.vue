@@ -1051,7 +1051,12 @@ export default defineComponent({
     watch(searchQuery, async (newQuery) => {
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
-      if(newQuery == ""){
+      //here we check the if the new Query is empty and searchAcrossFolders is true
+      //then only we are fetching the alerts by the folderId and then filtering the alerts by the activeTab
+      //this is done because when we click on the any folder that is there in the the row when we do search across folders
+      //at that time also we are resetting theh searchQuery if any so it will trigger this watch which will cause fetching the alerts again 
+      //so to avoid we are checking the if the newQuery is empty and searchAcrossFolders is true
+      if(newQuery == "" && searchAcrossFolders.value){
         //here we are fetching the alerts by the folderId and then filtering the alerts by the activeTab
         //this is done because for empty searchQuery we need to fetch the alerts by the folderId
         await getAlertsByFolderId(store, activeFolderId.value);
@@ -1485,7 +1490,14 @@ export default defineComponent({
         console.error("Alert not found for UUID:", row.uuid);
       }
     };
-    const updateActiveFolderId = (newVal: any) => {
+    const updateActiveFolderId = async (newVal: any) => {
+      //this is the condition we kept because when we we click on the any folder that is there in the the row when we do search across folders
+      //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only 
+      //so we are fetching the alerts by the folderId and then filtering the alerts by the activeTab this is done explicitly on only if users clicks on same folder
+      if(newVal == activeFolderId.value){
+        getAlertsByFolderId(store, newVal);
+        filterAlertsByTab();
+      }
       //here we are resetting the searchQuery, filterQuery, searchAcrossFolders, allSelectedAlerts, selectedAlerts
       //here we only reset if the value is not null
       if(searchQuery.value) searchQuery.value = "";
