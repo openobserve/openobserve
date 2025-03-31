@@ -2,18 +2,30 @@ import random
 
 from requests.auth import HTTPBasicAuth
 from datetime import datetime, timedelta, timezone
+
 class SearchPage:
     # Make Unique_value_destination a class variable
     Unique_value_search = f"d4m20_{random.randint(100000, 999999)}"
 
-    now = datetime.now(timezone.utc)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
-    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-    two_hours_ago = int((now - timedelta(hours=2)).timestamp() * 1000000)
-    two_days_ago = int((now - timedelta(days=2)).timestamp() * 1000000)
-
-
+    @property
+    def now(self):
+        return datetime.now(timezone.utc)
+    @property
+    def one_min_ago(self):
+        return int((self.now - timedelta(minutes=1)).timestamp() * 1000000)
+    @property
+    def one_hour_ago(self):
+        return int((self.now - timedelta(hours=1)).timestamp() * 1000000)
+    @property
+    def one_day_ago(self):
+        return int((self.now - timedelta(days=1)).timestamp() * 1000000)
+    @property
+    def two_hours_ago(self):
+        return int((self.now - timedelta(hours=2)).timestamp() * 1000000)
+    @property
+    def two_days_ago(self):
+        return int((self.now - timedelta(days=2)).timestamp() * 1000000)
+    
     def __init__(self, session, base_url, org_id):
         self.session = session
         self.base_url = base_url
