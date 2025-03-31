@@ -2442,6 +2442,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].joins,
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields?.stream,
     )}`;
 
     // 3. Filter
