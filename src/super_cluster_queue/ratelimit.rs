@@ -54,7 +54,12 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
                 return Err(anyhow::anyhow!("Invalid rule entry type".to_string()));
             };
 
-            match infra::table::ratelimit::delete(rule.rule_id.unwrap()).await {
+            match infra::table::ratelimit::delete(
+                rule.rule_id
+                    .ok_or_else(|| anyhow::anyhow!("Missing rule_id"))?,
+            )
+            .await
+            {
                 Ok(_) => Ok(()),
                 Err(e) if e.to_string() == RULE_NOT_FOUND => {
                     log::warn!("[SUPER_CLUSTER:RATELIMIT] Rule not found for deletion, ignoring");

@@ -179,7 +179,7 @@ pub async fn list_folders(
 
 /// GetFolder
 ///
-/// {"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -243,7 +243,7 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
 
 /// DeleteFolder
 ///
-/// {"ratelimit_module":"Folders", "ratelimit_module_operation":"delete"}
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",

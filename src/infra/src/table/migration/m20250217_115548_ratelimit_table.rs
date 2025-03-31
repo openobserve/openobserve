@@ -26,6 +26,22 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
+            .drop_index(
+                Index::drop()
+                    .name(RULE_ID)
+                    .table(RateLimitRules::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_index(
+                Index::drop()
+                    .name(RESOURCE_KEY)
+                    .table(RateLimitRules::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
             .drop_table(Table::drop().table(RateLimitRules::Table).to_owned())
             .await
     }
