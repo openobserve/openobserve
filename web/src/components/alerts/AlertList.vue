@@ -495,8 +495,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ImportAlert
         :destinations="destinations"
         :templates="templates"
-        :alerts="store.state.organizationData.allAlertsListByFolderId[activeFolderId]"
-        @update:alerts="getAlertsFn"
+        :alerts="store?.state?.organizationData?.allAlertsListByFolderId[activeFolderId]"
+        @update:alerts="refreshImportedAlerts"
         @update:destinations="refreshDestination"
         @update:templates="getTemplates"
       />
@@ -867,7 +867,7 @@ export default defineComponent({
         folderId = "";
       }
       try {
-        const res = await alertsService.listByFolderId(1,1000,"name",false,"",store.state.selectedOrganization.identifier,folderId,query);
+        const res = await alertsService.listByFolderId(1,1000,"name",false,"",store?.state?.selectedOrganization?.identifier,folderId,query);
           var counter = 1;
           //this is the alerts that we use to store
           allAlerts.value = res.data.list.map((alert: any) => {
@@ -933,7 +933,7 @@ export default defineComponent({
             alertStateLoadingMap.value[alert.uuid as string] = false;
           });    
           //this is the condition where we are setting the allAlertsListByFolderId in the store
-          store.dispatch("setAllAlertsListByFolderId", {
+          store?.dispatch("setAllAlertsListByFolderId", {
             ...store.state.organizationData.allAlertsListByFolderId,
             [folderId]: allAlerts.value,
           });
@@ -1753,6 +1753,10 @@ export default defineComponent({
         filteredResults.value = allAlerts.value;
       }
     };
+    //this function is used to refresh the imported alerts
+    const refreshImportedAlerts = async (store: any, folderId: any) => {
+      await getAlertsFn(store, folderId);
+    };
 
 
     return {
@@ -1854,6 +1858,7 @@ export default defineComponent({
       computedOwner,
       tabs,
       filterAlertsByTab,
+      refreshImportedAlerts,
     };
   },
 });
