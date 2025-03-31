@@ -236,7 +236,7 @@ pub async fn search(
                 let stream_name = match config::meta::sql::Sql::new(&req_query.sql) {
                     Ok(v) => v.source.to_string(),
                     Err(e) => {
-                        log::error!("report_usage: parse sql error: {:?}", e);
+                        log::error!("ParseSQLError(report_usage: parse sql error: {:?})", e);
                         "".to_string()
                     }
                 };
@@ -350,7 +350,7 @@ pub async fn search_multi(
         stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
             Ok(v) => v.source.to_string(),
             Err(e) => {
-                log::error!("report_usage: parse sql error: {:?}", e);
+                log::error!("ParseSQLError(search_multi: parse sql error: {:?})", e);
                 "".to_string()
             }
         };
