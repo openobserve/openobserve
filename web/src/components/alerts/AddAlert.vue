@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="formData.is_real_time"
                 :checked="formData.is_real_time"
                 val="false"
-                :label="t('alerts.standard')"
+                :label="t('alerts.scheduled')"
                 class="q-ml-none"
               />
               <q-radio
@@ -711,6 +711,7 @@ export default defineComponent({
     const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
+    const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
     onMounted(async () => {});
 
@@ -1363,6 +1364,7 @@ export default defineComponent({
       handleAlertError,
       activeFolderId,
       updateActiveFolderId,
+      alertType,
     };
   },
 
@@ -1370,7 +1372,10 @@ export default defineComponent({
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
-    this.formData.is_real_time = this.formData.is_real_time.toString();
+    if(!this.isUpdated){
+      this.formData.is_real_time = this.alertType === 'realTime'? true : false;
+    }
+      this.formData.is_real_time = this.formData.is_real_time.toString();
 
     // Set default frequency to min_auto_refresh_interval
     if (this.store.state?.zoConfig?.min_auto_refresh_interval)
