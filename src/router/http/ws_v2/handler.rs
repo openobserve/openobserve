@@ -50,7 +50,7 @@ pub struct WsHandler {
 
 impl Drop for WsHandler {
     fn drop(&mut self) {
-        log::info!("[WS::Router::Handler] WsHandler dropped");
+        log::debug!("[WS::Router::Handler] WsHandler dropped");
     }
 }
 
