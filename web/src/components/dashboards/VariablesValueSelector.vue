@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  {{ filteredVariablesData.values }}
+  <!-- {{ filteredVariablesData.values }} -->
   <div
     v-if="filteredVariablesData.values?.length > 0"
     :key="filteredVariablesData.isVariablesLoading"
@@ -961,18 +961,36 @@ export default defineComponent({
       const currentVariable = filteredVariablesData.values[variableIndex];
       if (!currentVariable) return;
 
+      console.log(
+        `VariablesValueSelector: Updating variable ${currentVariable.name}`,
+      );
+
       // Find the variable in complete data
       const completeVariable = completeVariablesData.values.find(
         (v: any) => v.name === currentVariable.name,
       );
-      if (!completeVariable) return;
+      if (!completeVariable) {
+        console.log(
+          `VariablesValueSelector: Could not find variable ${currentVariable.name}`,
+        );
+        return;
+      }
 
       // Check if value actually changed
       const oldValue = oldVariablesData[currentVariable.name];
       const newValue = currentVariable.value;
       if (JSON.stringify(oldValue) === JSON.stringify(newValue)) {
+        console.log(
+          `VariablesValueSelector: Variable ${currentVariable.name} value did not change`,
+        );
         return;
       }
+
+      console.log(
+        `VariablesValueSelector: Updating variable ${currentVariable.name} from ${JSON.stringify(
+          oldValue,
+        )} to ${JSON.stringify(newValue)}`,
+      );
 
       // Update both filtered and complete variables
       completeVariable.value = newValue;
@@ -980,6 +998,10 @@ export default defineComponent({
 
       // Get all affected variables in dependency order
       const affectedVariables = getAllAffectedVariables(currentVariable.name);
+
+      console.log(
+        `VariablesValueSelector: Resetting ${affectedVariables.length} affected variables`,
+      );
 
       // Reset affected variables
       affectedVariables.forEach((varName) => {
@@ -998,6 +1020,10 @@ export default defineComponent({
 
       // Load affected variables in scope order
       await loadAffectedVariablesInOrder(affectedVariables);
+
+      console.log(
+        `VariablesValueSelector: Loaded ${affectedVariables.length} affected variables`,
+      );
 
       // Update filtered variables and force UI refresh
       updateFilteredVariables();
@@ -1101,24 +1127,28 @@ export default defineComponent({
         // Load variables in dependency order
         const loadVariablesInOrder = async (variables: any[]) => {
           for (const variable of variables) {
-            const parentVariables =
-              variablesDependencyGraph[variable.name]?.parentVariables || [];
-            const parentsLoaded = parentVariables.every((parentName: any) => {
-              const parent = completeVariablesData.values.find(
-                (v: any) => v.name === parentName,
-              );
-              return (
-                parent &&
-                !parent.isLoading &&
-                !parent.isVariableLoadingPending &&
-                parent.value !== null
-              );
-            });
+            try {
+              const parentVariables =
+                variablesDependencyGraph[variable.name]?.parentVariables || [];
+              const parentsLoaded = parentVariables.every((parentName: any) => {
+                const parent = completeVariablesData.values.find(
+                  (v: any) => v.name === parentName,
+                );
+                return (
+                  parent &&
+                  !parent.isLoading &&
+                  !parent.isVariableLoadingPending &&
+                  parent.value !== null
+                );
+              });
 
-            if (parentsLoaded) {
-              await loadSingleVariableDataByName(variable);
-              // Force UI update after each variable load
-              forceComponentUpdate();
+              if (parentsLoaded) {
+                await loadSingleVariableDataByName(variable);
+                // Force UI update after each variable load
+                forceComponentUpdate();
+              }
+            } catch (error) {
+              console.warn(`Failed to load variable ${variable.name}:`, error);
             }
           }
         };
@@ -1130,30 +1160,73 @@ export default defineComponent({
 
         // Sort global variables by dependency
         const independentGlobals = globalVariables.filter(
-          (v: any) => !variablesDependencyGraph[v.name]?.parentVariables?.length,
+          (v: any) =>
+            !variablesDependencyGraph[v.name]?.parentVariables?.length,
         );
         const dependentGlobals = globalVariables.filter(
-          (v: any) => variablesDependencyGraph[v.name]?.parentVariables?.length > 0,
+          (v: any) =>
+            variablesDependencyGraph[v.name]?.parentVariables?.length > 0,
         );
 
         // Load globals
         await loadVariablesInOrder(independentGlobals);
         await loadVariablesInOrder(dependentGlobals);
 
-        // Load tab variables
-        const tabVariables = completeVariablesData.values.filter(
-          (v: any) => v.scope === "tabs" && v.tabs?.includes(props.currentTabId),
-        );
-        await loadVariablesInOrder(tabVariables);
+        // Only load tab variables if we have a currentTabId
+        if (props.currentTabId) {
+          const tabVariables = completeVariablesData.values.filter(
+            (v: any) =>
+              v.scope === "tabs" && v.tabs?.includes(props.currentTabId),
+          );
+          await loadVariablesInOrder(tabVariables);
 
-        // Load panel variables
-        const panelVariables = completeVariablesData.values.filter(
-          (v: any) =>
-            v.scope === "panels" &&
-            v.tabs?.includes(props.currentTabId) &&
-            v.panels?.includes(props.currentPanelId),
-        );
-        await loadVariablesInOrder(panelVariables);
+          // Only load panel variables if we have both currentTabId and currentPanelId
+          if (props.currentPanelId) {
+            const panelVariables = completeVariablesData.values.filter(
+              (v: any) =>
+                v.scope === "panels" &&
+                v.tabs?.includes(props.currentTabId) &&
+                v.panels?.includes(props.currentPanelId),
+            );
+
+            // Special handling for panel variables
+            for (const panelVariable of panelVariables) {
+              try {
+                const parentVariables =
+                  variablesDependencyGraph[panelVariable.name]
+                    ?.parentVariables || [];
+                const parentsLoaded = parentVariables.every(
+                  (parentName: any) => {
+                    const parent = completeVariablesData.values.find(
+                      (v: any) => v.name === parentName,
+                    );
+                    return (
+                      parent &&
+                      !parent.isLoading &&
+                      !parent.isVariableLoadingPending &&
+                      parent.value !== null
+                    );
+                  },
+                );
+
+                if (parentsLoaded) {
+                  await loadSingleVariableDataByName(panelVariable);
+                  forceComponentUpdate();
+                }
+              } catch (error) {
+                console.warn(
+                  `Failed to load panel variable ${panelVariable.name}:`,
+                  error,
+                );
+                // Set default state for failed panel variables
+                panelVariable.isLoading = false;
+                panelVariable.isVariableLoadingPending = false;
+                panelVariable.value = panelVariable.multiSelect ? [] : null;
+                panelVariable.options = [];
+              }
+            }
+          }
+        }
 
         // Update filtered variables
         updateFilteredVariables();
@@ -1165,37 +1238,28 @@ export default defineComponent({
         emitVariablesData();
       } catch (error) {
         console.error("Error loading variables:", error);
+        // Reset loading states on error
+        completeVariablesData.values.forEach((variable: any) => {
+          variable.isLoading = false;
+          variable.isVariableLoadingPending = false;
+        });
+        filteredVariablesData.isVariablesLoading = false;
       } finally {
         isLoading = false;
       }
     };
 
-    // Add computed property for filtered variables
-    // const filteredVariables = computed(() => {
-    //   return variablesData.values.filter((item: any) => {
-    //     // If variable is hidden on dashboard, don't show it
-    //     if (item.hideOnDashboard) return false;
-
-    //     // Additional filtering logic can be added here
-    //     return true;
-    //   });
-    // });
-
-    // Add watchers for debugging (optional)
+    // Modify the watchers to prevent double firing
     watch(
-      () => props.currentTabId,
-      (newTabId) => {
-        console.debug("Current Tab ID changed:", newTabId);
-        loadAllVariablesData();
+      [() => props.currentTabId, () => props.currentPanelId],
+      ([newTabId, newPanelId], [oldTabId, oldPanelId]) => {
+        // Only trigger if there's an actual change
+        if (newTabId !== oldTabId || newPanelId !== oldPanelId) {
+          console.debug("Tab or Panel ID changed:", { newTabId, newPanelId });
+          loadAllVariablesData();
+        }
       },
-    );
-
-    watch(
-      () => props.currentPanelId,
-      (newPanelId) => {
-        console.debug("Current Panel ID changed:", newPanelId);
-        loadAllVariablesData();
-      },
+      { deep: true },
     );
 
     return {
