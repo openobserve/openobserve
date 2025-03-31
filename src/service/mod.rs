@@ -17,6 +17,7 @@ use config::{meta::stream::StreamParams, utils::schema::format_stream_name};
 use infra::errors::Result;
 pub mod alerts;
 pub mod circuit_breaker;
+pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
 pub mod db;
@@ -39,7 +40,6 @@ pub mod promql;
 pub mod schema;
 pub mod search;
 pub mod websocket_events;
-pub mod cluster_info;
 
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;

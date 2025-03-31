@@ -19,8 +19,8 @@ use config::{RwAHashMap, get_config, meta::cluster::NodeInfo, utils::rand::get_r
 use infra::errors::{Error, ErrorCodes};
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
-    self, metrics_client::MetricsClient, node_service_client::NodeServiceClient,
-    search_client::SearchClient, cluster_info_service_client::ClusterInfoServiceClient,
+    self, cluster_info_service_client::ClusterInfoServiceClient, metrics_client::MetricsClient,
+    node_service_client::NodeServiceClient, search_client::SearchClient,
 };
 use tonic::{
     Request, Status,
@@ -271,7 +271,12 @@ pub async fn make_grpc_node_client<T>(
 pub async fn make_grpc_cluster_info_client<T>(
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
-) -> Result<ClusterInfoServiceClient<InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>>, Error> {
+) -> Result<
+    ClusterInfoServiceClient<
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
+    >,
+    Error,
+> {
     let cfg = get_config();
     request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
@@ -296,12 +301,13 @@ pub async fn make_grpc_cluster_info_client<T>(
             );
             Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string()))
         })?;
-    let client = cluster_rpc::cluster_info_service_client::ClusterInfoServiceClient::with_interceptor(
-        channel,
-        move |mut req: Request<()>| {
-            req.metadata_mut().insert("authorization", token.clone());
-            Ok(req)
-        },
-    );
+    let client =
+        cluster_rpc::cluster_info_service_client::ClusterInfoServiceClient::with_interceptor(
+            channel,
+            move |mut req: Request<()>| {
+                req.metadata_mut().insert("authorization", token.clone());
+                Ok(req)
+            },
+        );
     Ok(client)
 }

@@ -3193,7 +3193,7 @@ pub mod node_service_server {
         const NAME: &'static str = "cluster.NodeService";
     }
 }
-/// Response message for GetNodes
+/// Response message for Get Cluster Info
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetClusterInfoResponse {

@@ -258,7 +258,7 @@ pub struct ClusterInfo {
 }
 
 /// Response struct for cluster info
-/// 
+///
 /// Contains a three-level hierarchy with a flat format:
 /// 1. Regions at the top level as object keys
 /// 2. Clusters within each region as object keys
@@ -267,12 +267,19 @@ pub struct ClusterInfoResponse {
     pub regions: std::collections::HashMap<String, RegionInfo<ClusterInfo>>,
 }
 
-
 impl ClusterInfoResponse {
-    pub fn add_cluster_info(&mut self, cluster_info: ClusterInfo, cluster_name: String, region_name: String) {
-        let region_entry = self.regions.entry(region_name).or_insert_with(|| RegionInfo {
-            clusters: std::collections::HashMap::new(),
-        });
+    pub fn add_cluster_info(
+        &mut self,
+        cluster_info: ClusterInfo,
+        cluster_name: String,
+        region_name: String,
+    ) {
+        let region_entry = self
+            .regions
+            .entry(region_name)
+            .or_insert_with(|| RegionInfo {
+                clusters: std::collections::HashMap::new(),
+            });
 
         region_entry.clusters.insert(cluster_name, cluster_info);
     }

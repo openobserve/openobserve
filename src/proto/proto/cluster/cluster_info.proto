@@ -13,7 +13,7 @@ service ClusterInfoService {
   rpc GetClusterInfo(EmptyRequest) returns (GetClusterInfoResponse) {}
 }
 
-// Response message for GetNodes
+// Response message for Get Cluster Info
 message GetClusterInfoResponse {
   // Compaction specific information
   CompactionInfo compaction_info = 1;

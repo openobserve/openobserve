@@ -27,8 +27,9 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                CUSTOM, DEFAULT_ORG, NodeListResponse, OrgDetails, OrgUser, Organization, ClusterInfo,
-                ClusterInfoResponse, OrganizationResponse, PasscodeResponse, RumIngestionResponse, THRESHOLD,
+                CUSTOM, ClusterInfo, ClusterInfoResponse, DEFAULT_ORG, NodeListResponse,
+                OrgDetails, OrgUser, Organization, OrganizationResponse, PasscodeResponse,
+                RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{UserEmail, is_root_user},
@@ -498,7 +499,8 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
 /// GetClusterInfo
 ///
 /// This endpoint returns detailed information about the OpenObserve cluster, organized by
-/// regions and clusters. It provides comprehensive visibility into cluster status and can be used for:
+/// regions and clusters. It provides comprehensive visibility into cluster status and can be used
+/// for:
 ///
 /// - Monitoring cluster health and status across regions
 /// - Viewing current workload information including pending jobs
@@ -541,7 +543,7 @@ async fn cluster_info(
     }
 
     // Extract regions from query params
-    let regions = query.get("regions").map_or_else(Vec::new, |regions_str| {
+    let _regions = query.get("regions").map_or_else(Vec::new, |regions_str| {
         regions_str
             .split(',')
             .filter(|s| !s.is_empty())
@@ -553,7 +555,7 @@ async fn cluster_info(
     #[cfg(feature = "enterprise")]
     let cluster_info_response = if get_o2_config().super_cluster.enabled {
         // Super cluster is enabled, get info from super cluster
-        match get_super_cluster_info(&regions).await {
+        match get_super_cluster_info(&_regions).await {
             Ok(resp) => resp,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         }
@@ -578,18 +580,20 @@ async fn cluster_info(
 /// Helper function to collect cluster info from the local cluster
 async fn get_local_cluster_info() -> Result<ClusterInfoResponse, anyhow::Error> {
     let mut response = ClusterInfoResponse::default();
-    
+
     let pending_jobs_map = infra::file_list::get_pending_jobs_count().await?;
     let local_cluster = config::get_cluster_name();
-    
+
     // Sum up all pending jobs across all organizations and stream types
     let total_pending_jobs: u64 = pending_jobs_map
         .values()
         .flat_map(|inner_map| inner_map.values())
         .map(|&count| count as u64)
         .sum();
-        
-    let cluster_info_obj = ClusterInfo { pending_jobs: total_pending_jobs };
+
+    let cluster_info_obj = ClusterInfo {
+        pending_jobs: total_pending_jobs,
+    };
     response.add_cluster_info(cluster_info_obj, local_cluster, "openobserve".to_string());
 
     Ok(response)
@@ -614,12 +618,12 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
             return Ok(response); // Return empty response instead of failing
         }
     };
-    
+
     // For each node in the super cluster
     for node in cluster_nodes {
         let region = node.get_region();
         let cluster_name = node.get_cluster_name();
-        
+
         // Fetch cluster info from this cluster node
         match crate::service::cluster_info::get_super_cluster_info(node).await {
             Ok(cluster_info_obj) => {
@@ -636,6 +640,6 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
             }
         }
     }
-    
+
     Ok(response)
 }

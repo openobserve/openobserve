@@ -15,17 +15,20 @@
 
 use std::sync::Arc;
 
-use proto::cluster_rpc::{EmptyRequest, GetClusterInfoResponse, CompactionInfo};
-use tonic::{Request, Response, Status};
-use infra::file_list as infra_file_list;
-use crate::common::meta::organization::ClusterInfo;
 use config::meta::cluster::NodeInfo;
+use infra::file_list as infra_file_list;
+use proto::cluster_rpc::{CompactionInfo, EmptyRequest, GetClusterInfoResponse};
+use tonic::{Request, Response, Status};
+
+use crate::common::meta::organization::ClusterInfo;
 
 pub struct ClusterInfoService;
 
 pub fn convert_response_to_cluster_info(response: GetClusterInfoResponse) -> ClusterInfo {
     ClusterInfo {
-        pending_jobs: response.compaction_info.as_ref()
+        pending_jobs: response
+            .compaction_info
+            .as_ref()
             .map(|info| info.pending_jobs)
             .unwrap_or_default(),
     }
@@ -42,10 +45,13 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
             Ok(jobs) => jobs,
             Err(e) => {
                 log::error!("Failed to get pending jobs count: {:?}", e);
-                return Err(Status::internal(format!("Failed to get pending jobs count: {:?}", e)));
+                return Err(Status::internal(format!(
+                    "Failed to get pending jobs count: {:?}",
+                    e
+                )));
             }
         };
-        
+
         Ok(Response::new(GetClusterInfoResponse {
             compaction_info: Some(CompactionInfo {
                 pending_jobs: jobs.len() as u64,
@@ -78,6 +84,9 @@ pub async fn get_super_cluster_info(node: Arc<dyn NodeInfo>) -> Result<ClusterIn
     Ok(response)
 }
 
-pub fn cluster_info_service() -> proto::cluster_rpc::cluster_info_service_server::ClusterInfoServiceServer<ClusterInfoService> {
-    proto::cluster_rpc::cluster_info_service_server::ClusterInfoServiceServer::new(ClusterInfoService)
+pub fn cluster_info_service()
+-> proto::cluster_rpc::cluster_info_service_server::ClusterInfoServiceServer<ClusterInfoService> {
+    proto::cluster_rpc::cluster_info_service_server::ClusterInfoServiceServer::new(
+        ClusterInfoService,
+    )
 }
