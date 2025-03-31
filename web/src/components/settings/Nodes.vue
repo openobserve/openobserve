@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td :props="props" class="tcp-cell">
               {{ props.row.tcp_conns }} (E:{{
                 props.row.tcp_conns_established
-              }}, C:{{ props.row.tcp_conns_close_wait }}, W:{{
+              }}, C:{{ props.row.tcp_conns_close_wait }}, T:{{
                 props.row.tcp_conns_time_wait
               }})
             </q-td>
