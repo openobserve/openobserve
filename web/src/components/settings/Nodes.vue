@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="regionRows.length > 0"
                 expand-separator
                 :label="t('nodes.region')"
-                class="text-subtitle1"
+                class="text-subtitle1 nodes-filter-list"
               >
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="clusterRows.length > 0"
                 expand-separator
                 :label="t('nodes.cluster')"
-                class="q-mt-sm text-subtitle1"
+                class="q-mt-sm text-subtitle1 nodes-filter-list"
               >
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="nodetypeRows.length > 0"
                 expand-separator
                 :label="t('nodes.nodetype')"
-                class="q-mt-sm text-subtitle1"
+                class="q-mt-sm text-subtitle1 nodes-filter-list"
               >
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="statusesRows.length > 0"
                 expand-separator
                 :label="t('nodes.status')"
-                class="q-mt-sm text-subtitle1"
+                class="q-mt-sm text-subtitle1 nodes-filter-list"
               >
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-expansion-item
                 expand-separator
                 :label="t('nodes.cpuusage')"
-                class="q-mt-sm text-subtitle1"
+                class="q-mt-sm text-subtitle1 nodes-filter-list"
               >
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-expansion-item
                 expand-separator
                 :label="t('nodes.memoryusage')"
-                class="q-mt-sm text-subtitle1"
+                class="q-mt-sm text-subtitle1 nodes-filter-list"
               >
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-expansion-item
                 expand-separator
                 :label="t('nodes.tcpusage')"
-                class="q-mt-sm text-subtitle1"
+                class="q-mt-sm text-subtitle1 nodes-filter-list"
               >
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
@@ -987,5 +987,9 @@ export default defineComponent({
     }
   }
 
+}
+
+.nodes-filter-list .q-item__label {
+  font-weight: 600 !important;
 }
 </style>
