@@ -61,37 +61,3 @@ pub async fn check_stream_permissions(
     }
     None
 }
-
-pub fn map_error_to_http_response(err: errors::Error, trace_id: String) -> HttpResponse {
-    match err {
-        errors::Error::ErrorCode(code) => match code {
-            errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests().json(
-                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-            ),
-            errors::ErrorCodes::SearchTimeout(_) => HttpResponse::RequestTimeout().json(
-                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-            ),
-            errors::ErrorCodes::InvalidParams(_)
-            | errors::ErrorCodes::SearchSQLExecuteError(_)
-            | errors::ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
-            | errors::ErrorCodes::SearchFunctionNotDefined(_)
-            | errors::ErrorCodes::FullTextSearchFieldNotFound
-            | errors::ErrorCodes::SearchFieldNotFound(_)
-            | errors::ErrorCodes::SearchSQLNotValid(_)
-            | errors::ErrorCodes::SearchStreamNotFound(_) => HttpResponse::BadRequest().json(
-                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-            ),
-
-            errors::ErrorCodes::ServerInternalError(_)
-            | errors::ErrorCodes::SearchParquetFileNotFound => {
-                HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                )
-            }
-        },
-        _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-            StatusCode::INTERNAL_SERVER_ERROR.into(),
-            err.to_string(),
-        )),
-    }
-}
