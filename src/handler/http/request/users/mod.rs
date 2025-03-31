@@ -479,7 +479,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 // Don't include query string as it may contain the auth token
                 query_params: "".to_string(),
                 response_code: 302,
-                error_msg : None
+                error_msg: None,
             }),
         };
 
