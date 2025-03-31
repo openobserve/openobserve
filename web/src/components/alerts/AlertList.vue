@@ -30,9 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-table__title" data-test="alerts-list-title">
         {{ t("alerts.header") }}
       </div>
-      <div class="flex q-ml-auto tw-ps-2 alerts-list-tabs">
+      <div class="flex q-ml-auto tw-ps-2 alerts-list-tabs items-center">
         <app-tabs
-        v-if="false"
           class="q-mr-md"
           :tabs="tabs"
           v-model:active-tab="activeTab"
@@ -496,8 +495,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ImportAlert
         :destinations="destinations"
         :templates="templates"
-        :alerts="store.state.organizationData.allAlertsListByFolderId[activeFolderId]"
-        @update:alerts="getAlertsFn"
+        :alerts="store?.state?.organizationData?.allAlertsListByFolderId[activeFolderId]"
+        @update:alerts="refreshImportedAlerts"
         @update:destinations="refreshDestination"
         @update:templates="getTemplates"
       />
@@ -724,9 +723,13 @@ export default defineComponent({
     };
     const activeFolderToMove = ref("default");
 
-    const activeTab = ref("scheduled");
+    const activeTab = ref("all");
 
     const tabs = reactive([
+      {
+        label: t("alerts.all"),
+        value: "all",
+      },
       {
         label: t("alerts.scheduled"),
         value: "scheduled",
@@ -817,6 +820,7 @@ export default defineComponent({
     const templates = ref([0]);
     const selectedAlerts: Ref<any> = ref([]);
     const allSelectedAlerts = ref(false);
+    const allAlerts: Ref<any[]> = ref([]);
 
     const searchQuery = ref<any>("");
     const filterQuery = ref<any>("");
@@ -831,15 +835,24 @@ export default defineComponent({
           await getAlertsFn(store, folderId);
         } else {
           //this is the condition where we are assigning the alerts to the filteredResults so whenever 
-          // we are changing the folder, we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
-          filteredResults.value =
-            store.state.organizationData.allAlertsListByFolderId[folderId];
+          // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
+         allAlerts.value = store.state.organizationData.allAlertsListByFolderId[folderId];
         }
       } catch (error) {
         throw error;
       }
     };
     const getAlertsFn = async (store: any, folderId: any, query = "", refreshResults = true) => {
+      //why refreshResults flag is used 
+      // this is the only used for one edge case when we move alerts from one folder to another folder 
+      //we forcing the destination and source folder to fetch the alerts again
+      //so what happens is that if destination folder takes time to fetch the alerts by the time source folder finishes it call
+      //and assign the alerts and the after that destination folder will resovle and override the source folder alerts
+      //so to avoid this we are using the refreshResults flag
+      //if the flag is false then we are not assigning the alerts to the filteredResults
+      //and if the flag is true then we are assigning the alerts to the filteredResults
+      //and also we are not filtering the alerts by the activeTab if the flag is false because we dont need to show the alerts in the table 
+      //for a moment also so we are not filtering the alerts by the activeTab 
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
       if (query){
@@ -853,29 +866,19 @@ export default defineComponent({
       if (query) {
         folderId = "";
       }
-      alertsService
-        .listByFolderId(
-          1,
-          1000,
-          "name",
-          false,
-          "",
-          store.state.selectedOrganization.identifier,
-          folderId,
-          query,
-        )
-        .then(async (res) => {
+      try {
+        const res = await alertsService.listByFolderId(1,1000,"name",false,"",store?.state?.selectedOrganization?.identifier,folderId,query);
           var counter = 1;
           //this is the alerts that we use to store
-          let alerts = [];
-          alerts = res.data.list.map((alert: any) => {
+          allAlerts.value = res.data.list.map((alert: any) => {
             return {
               ...alert,
               uuid: getUUID(),
             };
           });
           //general alerts that we use to display (formatting the alerts into the table format)
-          alerts = alerts.map((data: any) => {
+          //allAlerts is the alerts that we use to store
+          allAlerts.value = allAlerts.value.map((data: any) => {
             let conditions = "--";
             if (data.condition.conditions?.length) {
               conditions = data.condition.conditions
@@ -922,24 +925,29 @@ export default defineComponent({
                 name: data.folder_name,
                 id: data.folder_id,
               },
+              is_real_time: data.is_real_time,
             };
           });
           //this is the condition where we are setting the alertStateLoadingMap
-          alerts.forEach((alert: any) => {
+          allAlerts.value.forEach((alert: any) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
           });    
           //this is the condition where we are setting the allAlertsListByFolderId in the store
-          store.dispatch("setAllAlertsListByFolderId", {
+          store?.dispatch("setAllAlertsListByFolderId", {
             ...store.state.organizationData.allAlertsListByFolderId,
-            [folderId]: alerts,
+            [folderId]: allAlerts.value,
           });
           //this is the condition where we are setting the filteredResults 
           //1. If it is search across folders then also we are setting the filteredResults(which contains the filtered alerts)
           //2. If it is not search across folders then we are setting the filteredResults to the alerts(which contains all the alerts)
-          if(refreshResults){
-            filteredResults.value = alerts;
-          }
-          filterAlertsByTab();
+            //here we are setting the filteredResults to the alerts
+            if(refreshResults){
+              filteredResults.value = allAlerts.value;
+            }
+          
+          //here we are filtering the alerts by the activeTab
+          //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table 
+          filterAlertsByTab(refreshResults);
           if (router.currentRoute.value.query.action == "import") {
             showImportAlertDialog.value = true;
           }
@@ -955,16 +963,16 @@ export default defineComponent({
             });
           }
           dismiss();
-        })
-        .catch((e) => {
-          console.error(e);
+        
+      } catch (error) {
+          console.error(error);
           dismiss();
           $q.notify({
             type: "negative",
             message: "Error while pulling alerts.",
             timeout: 2000,
           });
-        });
+      }
     };
     const getAlertById = async (id: string) => {
       const dismiss = $q.notify({
@@ -1003,6 +1011,7 @@ export default defineComponent({
         activeFolderId.value = "default";
       }
       await getAlertsFn(store, router.currentRoute.value.query.folder ?? "default");
+      filterAlertsByTab();
     });
     watch(
       () => activeFolderId.value,
@@ -1027,16 +1036,29 @@ export default defineComponent({
             },
           });
         }
+        filterAlertsByTab();
       },
     );
 
     watch(searchQuery, async (newQuery) => {
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
-      if(newQuery == ""){
-       filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value];
+      //here we check the if the new Query is empty and searchAcrossFolders is true
+      //then only we are fetching the alerts by the folderId and then filtering the alerts by the activeTab
+      //this is done because when we click on the any folder that is there in the the row when we do search across folders
+      //at that time also we are resetting theh searchQuery if any so it will trigger this watch which will cause fetching the alerts again 
+      //so to avoid we are checking the if the newQuery is empty and searchAcrossFolders is true
+      if(newQuery == "" && searchAcrossFolders.value){
+        //here we are fetching the alerts by the folderId and then filtering the alerts by the activeTab
+        //this is done because for empty searchQuery we need to fetch the alerts by the folderId
+        await getAlertsByFolderId(store, activeFolderId.value);
+       filterAlertsByTab();
       }
-      await debouncedSearch(newQuery);
+      else{
+        //here we are filtering the alerts by the searchQuery
+        await debouncedSearch(newQuery);
+        filterAlertsByTab();
+      }
     });
     watch(
       () => router.currentRoute.value.query.action,
@@ -1086,8 +1108,7 @@ export default defineComponent({
       { label: "10", value: 10 },
       { label: "20", value: 20 },
       { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "All", value: 0 },
+      { label: "100", value: 100 }
     ];
     const resultTotal = computed(function () {
       return filteredResults.value?.length;
@@ -1218,31 +1239,35 @@ export default defineComponent({
         });
       }
     };
-    const showAddUpdateFn = (props: any) => {
+    const showAddUpdateFn = async (props: any) => {
+      //made this async because we need to wait for the router to navigate
+      //so that we can get the alert_type from the query params
       formData.value = props.row;
       let action;
-      if (!props.row) {
+      try {
+        if (!props.row) {
         isUpdated.value = false;
         action = "Add Alert";
-        router.push({
+        await router.push({
           name: "alertList",
           query: {
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
             folder: activeFolderId.value,
+            alert_type: activeTab.value
           },
         });
       } else {
         isUpdated.value = true;
         action = "Update Alert";
-        router.push({
+        await router.push({
           name: "alertList",
           query: {
             alert_id: props.row.id,
             action: "update",
             name: props.row.name,
             org_identifier: store.state.selectedOrganization.identifier,
-            folder: activeFolderId.value,
+            folder: activeFolderId.value
           },
         });
       }
@@ -1255,10 +1280,19 @@ export default defineComponent({
           page: "Alerts",
         });
       }
+      } catch (error) {
+        console.error('Navigation failed:', error);
+      }
+
     };
-    const refreshList = (folderId: string) => {
-      getAlertsFn(store, folderId);
+    const refreshList = async (folderId: string) => {
+      //here we are fetching the alerts from the server because after creating the alert we should get the latest alerts
+      //and then we are setting the activeFolderId to the folderId
+      //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
+      //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
+      await getAlertsFn(store, folderId);
       hideForm();
+      activeFolderId.value = folderId;
     };
     const hideForm = () => {
       showAddAlertDialog.value = false;
@@ -1460,18 +1494,28 @@ export default defineComponent({
         console.error("Alert not found for UUID:", row.uuid);
       }
     };
-    const updateActiveFolderId = (newVal: any) => {
-      searchQuery.value = "";
+    const updateActiveFolderId = async (newVal: any) => {
+      //this is the condition we kept because when we we click on the any folder that is there in the the row when we do search across folders
+      //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only 
+      //so we are fetching the alerts by the folderId and then filtering the alerts by the activeTab this is done explicitly on only if users clicks on same folder
+      if(newVal == activeFolderId.value){
+        getAlertsByFolderId(store, newVal);
+        filterAlertsByTab();
+      }
+      //here we are resetting the searchQuery, filterQuery, searchAcrossFolders, allSelectedAlerts, selectedAlerts
+      //here we only reset if the value is not null
+      if(searchQuery.value) searchQuery.value = "";
+      if(filterQuery.value) filterQuery.value = "";
+      if(searchAcrossFolders.value) searchAcrossFolders.value = false;
+      if(allSelectedAlerts.value) allSelectedAlerts.value = false;
+      if(selectedAlerts.value) selectedAlerts.value = [];
       activeFolderId.value = newVal;
-      selectedAlerts.value = [];
-      allSelectedAlerts.value = false;
-      filterQuery.value = "";
-      searchAcrossFolders.value = false;
       //here we are resetting the selected alerts
+      //this is done because we need to reset the selected alerts when the user is changing the folder
+      //this is not needed but we are doing it to avoid any potential issues
       filteredResults.value?.forEach((alert: any) => {
         alert.selected = false;
       });
-
     };
 
     const editAlert = async (row: any) => {
@@ -1489,9 +1533,9 @@ export default defineComponent({
       activeFolderId: any,
       selectedFolderId: any,
     ) => {
-      await Promise.all([
-        getAlertsFn(store, selectedFolderId, "", false), // Run first and also dont add the results to the filteredResults
-      ]).then(() => getAlertsFn(store, activeFolderId)); 
+      //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
+      await getAlertsFn(store, selectedFolderId, "",false);
+      await getAlertsFn(store, activeFolderId);
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
       activeFolderToMove.value = "";
@@ -1550,12 +1594,26 @@ export default defineComponent({
 
     watch(filterQuery, (newVal) => {
       if(newVal == ""){
-        filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value];
+        filterAlertsByTab();
       }
       if (newVal) {
-        filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value].filter((alert: any) =>
-          alert.name.toLowerCase().includes(newVal.toLowerCase()),
-        );
+        let tempResults = allAlerts.value.filter((alert: any) =>
+          alert.name.toLowerCase().includes(newVal.toLowerCase())
+        )
+        filteredResults.value = tempResults.filter((alert: any) => {
+          //here we are filtering the alerts by the activeTab
+          if(activeTab.value === "scheduled"){
+            return !alert.is_real_time;
+          } 
+          //we filter the alerts by the realTime tab
+          else if(activeTab.value === "realTime"){
+            return alert.is_real_time;
+          } 
+          //else we will return all the alerts
+          else {
+            return true;
+          }
+        })
       }
     });
     watch(searchAcrossFolders, (newVal) => {
@@ -1577,6 +1635,18 @@ export default defineComponent({
         filterQuery.value = searchQuery.value;
         searchQuery.value = null;
       }
+    });
+    watch(activeTab, async (newVal) => {
+      //here we are resetting the filterQuery when the activeTab is changed
+      //this is done because we need to trigger again the filterQuery watch
+      if(filterQuery.value){
+        let tempQuery = filterQuery.value;
+        filterQuery.value = null;
+        await nextTick();
+        filterQuery.value = tempQuery;
+      }
+      //here we are filtering the alerts by the activeTab
+      filterAlertsByTab();
     });
 
     const copyToClipboard = (text: string, type: string) => {
@@ -1672,14 +1742,28 @@ export default defineComponent({
       return owner;
     };
 
-    const filterAlertsByTab = () => {
-      // getAlertsByFolderId(store, activeFolderId.value);
-      // filteredResults.value = filteredResults.value
-      //   .filter((alert: any) => alert.type === "custom" && activeTab.value === "scheduled")
-      //   .map((alert: any, index: number) => ({
-      //     ...alert,
-      //     "#": index + 1,
-      //   }));
+    const filterAlertsByTab = (refreshResults: boolean = true) => {
+      if(!refreshResults){
+       return;
+      }
+      //here we are filtering the alerts by the activeTab
+      //why allAlerts.value is used because we are not fetching the alerts again, 
+      // we are just assigning the alerts to the filteredResults
+      if (activeTab.value === "scheduled") {
+        filteredResults.value = allAlerts.value.filter((alert: any) => !alert.is_real_time);
+      } 
+      //we filter the alerts by the realTime tab
+      else if (activeTab.value === "realTime") {
+        filteredResults.value = allAlerts.value.filter((alert: any) => alert.is_real_time);
+      }
+      //else we will return all the alerts
+      else{
+        filteredResults.value = allAlerts.value;
+      }
+    };
+    //this function is used to refresh the imported alerts
+    const refreshImportedAlerts = async (store: any, folderId: any) => {
+      await getAlertsFn(store, folderId);
     };
 
 
@@ -1782,6 +1866,7 @@ export default defineComponent({
       computedOwner,
       tabs,
       filterAlertsByTab,
+      refreshImportedAlerts,
     };
   },
 });
