@@ -530,7 +530,7 @@ fn validate_time_range(time_range: Option<(i64, i64)>) -> Result<()> {
     Ok(())
 }
 
-fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
+pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
     let ts = super::schema::unwrap_partition_time_level(None, stream_type).duration();
     if ts > 0 {
         time_end + second_micros(ts)

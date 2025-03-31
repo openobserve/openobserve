@@ -31,7 +31,7 @@ use infra::{file_list::FileRecord, table::file_list_dump::FileListDump};
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 
 const HOUR_IN_MS: i64 = 3600 * 1000;
-const FILE_LIST_CACHE_DIR_NAME: &str = "_oo_file_list_dump";
+pub const FILE_LIST_CACHE_DIR_NAME: &str = "_oo_file_list_dump";
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // cache generation is only done on compactor
@@ -51,6 +51,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
         // TOD (YJDoc2) check nats lock needed or not for multiple compactors
         // TODO (YJDoc2) move sleep to start?
+        // TODO (YJDoc2) set config limit to min old time for picking up jobs
         let pending = infra::file_list::get_pending_dump_jobs().await?;
 
         for (job_id, org, stream, offset) in pending {
@@ -221,6 +222,9 @@ async fn generate_cache_file(
         start_ts: range.0,
         end_ts: range.1,
         file: file_name,
+        records: batch_size as i64,
+        original_size: buf.len() as i64,
+        compressed_size: buf.len() as i64,
     };
     infra::storage::put(&file_key, buf.into()).await?;
     infra::table::file_list_dump::add_dump_file(entry).await?;

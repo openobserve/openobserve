@@ -12,6 +12,9 @@ pub struct Model {
     pub start_ts: i64,
     pub end_ts: i64,
     pub file: String,
+    pub records: i64,
+    pub original_size: i64,
+    pub compressed_size: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

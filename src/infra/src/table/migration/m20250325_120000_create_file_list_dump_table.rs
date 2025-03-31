@@ -59,6 +59,21 @@ fn create_file_list_dump_table_statement() -> TableCreateStatement {
         )
         .col(ColumnDef::new(FileListDump::EndTs).big_integer().not_null())
         .col(
+            ColumnDef::new(FileListDump::Records)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(FileListDump::OriginalSize)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(FileListDump::CompressedSize)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
             ColumnDef::new(FileListDump::File)
                 .string_len(100)
                 .not_null(),
@@ -76,6 +91,9 @@ enum FileListDump {
     StartTs,
     EndTs,
     File,
+    Records,
+    OriginalSize,
+    CompressedSize,
 }
 
 #[cfg(test)]

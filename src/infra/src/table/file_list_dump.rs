@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::stream::FileMeta;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +28,7 @@ use crate::{
 // DBKey to set file_list_dump keys
 pub const FILE_LIST_DUMP_PREFIX: &str = "/file_list_dump/";
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileListDump {
     pub id: i32,
     pub org: String,
@@ -35,6 +36,23 @@ pub struct FileListDump {
     pub start_ts: i64,
     pub end_ts: i64,
     pub file: String,
+    pub records: i64,
+    pub original_size: i64,
+    pub compressed_size: i64,
+}
+
+impl FileListDump {
+    pub fn file_meta(&self) -> FileMeta {
+        FileMeta {
+            min_ts: self.start_ts,
+            max_ts: self.end_ts,
+            records: self.records,
+            original_size: self.original_size,
+            compressed_size: self.compressed_size,
+            index_size: 0,
+            flattened: false,
+        }
+    }
 }
 
 impl Into<FileListDump> for Model {
@@ -46,6 +64,9 @@ impl Into<FileListDump> for Model {
             start_ts: self.start_ts,
             end_ts: self.end_ts,
             file: self.file,
+            records: self.records,
+            original_size: self.original_size,
+            compressed_size: self.compressed_size,
         }
     }
 }
@@ -57,6 +78,9 @@ pub async fn add_dump_file(entry: FileListDump) -> Result<(), errors::Error> {
         start_ts: Set(entry.start_ts),
         end_ts: Set(entry.end_ts),
         file: Set(entry.file),
+        records: Set(entry.records),
+        original_size: Set(entry.original_size),
+        compressed_size: Set(entry.compressed_size),
         ..Default::default()
     };
 

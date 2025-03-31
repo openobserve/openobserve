@@ -13,18 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use chrono::Utc;
 use config::{
     get_config,
     meta::{
         search::ScanStats,
-        stream::{FileKey, PartitionTimeLevel, StreamType},
+        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
     metrics::{FILE_LIST_CACHE_HIT_COUNT, FILE_LIST_ID_SELECT_COUNT},
     utils::file::get_file_meta as util_get_file_meta,
 };
 use hashbrown::HashSet;
-use infra::{errors::Result, file_list, storage};
+use infra::{
+    errors::Result,
+    file_list::{self, FileId},
+    storage,
+};
 use rayon::slice::ParallelSliceMut;
+
+use crate::service::file_list_dump;
 
 #[tracing::instrument(
     name = "service::file_list::query",
@@ -92,7 +99,14 @@ pub async fn query_by_date(
 }
 
 #[tracing::instrument(name = "service::file_list::query_by_ids", skip_all)]
-pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
+pub async fn query_by_ids(
+    trace_id: &str,
+    ids: &[i64],
+    org: &str,
+    stream_type: StreamType,
+    stream: &str,
+    time_range: Option<(i64, i64)>,
+) -> Result<Vec<FileKey>> {
     let cfg = get_config();
     FILE_LIST_ID_SELECT_COUNT
         .with_label_values(&[])
@@ -165,12 +179,58 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         start.elapsed().as_millis()
     );
 
+    // query from file_list_dump
+    let dumped_files = file_list_dump::get_file_list_entries_in_range(
+        org,
+        stream,
+        stream_type,
+        time_range.unwrap_or((0, Utc::now().timestamp_micros())),
+    )
+    .await?;
+    let dumped_files: Vec<_> = dumped_files
+        .into_iter()
+        .filter(|r| ids.contains(&r.id))
+        .map(|r| {
+            (
+                r.id,
+                FileKey {
+                    key: "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+                    meta: FileMeta {
+                        min_ts: r.min_ts,
+                        max_ts: r.max_ts,
+                        records: r.records,
+                        original_size: r.original_size,
+                        compressed_size: r.compressed_size,
+                        index_size: r.index_size,
+                        flattened: r.flattened,
+                    },
+                    deleted: r.deleted,
+                    segment_ids: None,
+                },
+            )
+        })
+        .collect();
+
     // 3. set the local cache
     if !cfg.common.local_mode {
         let start = std::time::Instant::now();
         let db_files: Vec<_> = db_files.iter().map(|(id, f)| (*id, f)).collect();
         if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
-            log::error!("[trace_id {trace_id}] file_list set cache failed: {:?}", e);
+            log::error!(
+                "[trace_id {trace_id}] file_list set cache failed for db files: {:?}",
+                e
+            );
+        }
+
+        let dumped_files: Vec<_> = dumped_files.iter().map(|(id, f)| (*id, f)).collect();
+        if let Err(e) = file_list::LOCAL_CACHE
+            .batch_add_with_id(&dumped_files)
+            .await
+        {
+            log::error!(
+                "[trace_id {trace_id}] file_list set cache failed for dumped files: {:?}",
+                e
+            );
         }
         log::info!(
             "[trace_id {trace_id}] file_list set cached_ids: {}, took: {} ms",
@@ -181,6 +241,7 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
 
     // 4. merge the results
     files.extend(db_files.into_iter().map(|(_, f)| f));
+    files.extend(dumped_files.into_iter().map(|(_, f)| f));
 
     Ok(files)
 }
@@ -197,6 +258,20 @@ pub async fn query_ids(
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<file_list::FileId>> {
     let mut files = file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
+    let dumped_files = super::file_list_dump::get_file_list_entries_in_range(
+        org_id,
+        stream_name,
+        stream_type,
+        time_range.unwrap(),
+    )
+    .await
+    .unwrap();
+    files.extend(dumped_files.into_iter().map(|r| FileId {
+        id: r.id,
+        records: r.records,
+        original_size: r.original_size,
+        deleted: r.deleted,
+    }));
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);
     Ok(files)
