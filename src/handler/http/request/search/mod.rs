@@ -360,7 +360,7 @@ pub async fn search(
                 "",
             );
             log::error!("[trace_id {trace_id}] search error: {}", err);
-            return Ok(utils::map_error_to_http_response(err, trace_id));
+            Ok(utils::map_error_to_http_response(err, trace_id))
         }
     }
 }
@@ -454,7 +454,7 @@ pub async fn around_v1(
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
             log::error!("search around error: {:?}", err);
-            return Ok(utils::map_error_to_http_response(err, trace_id));
+            Ok(utils::map_error_to_http_response(err, trace_id))
         }
     }
 }
@@ -558,7 +558,7 @@ pub async fn around_v2(
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
             log::error!("search around error: {:?}", err);
-            return Ok(utils::map_error_to_http_response(err, trace_id));
+            Ok(utils::map_error_to_http_response(err, trace_id))
         }
     }
 }
@@ -1070,7 +1070,7 @@ pub async fn search_partition(
                 "",
             );
             log::error!("search error: {:?}", err);
-            return Ok(utils::map_error_to_http_response(err, trace_id));
+            Ok(utils::map_error_to_http_response(err, trace_id))
         }
     }
 }
