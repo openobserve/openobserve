@@ -634,6 +634,7 @@ export const usePanelDataLoader = (
       return;
     }
 
+
     sendSearchMessageBasedOnRequestId({
       type: "search",
       content: {
@@ -665,7 +666,6 @@ export const usePanelDataLoader = (
       processApiError(response?.content, "sql");
     }
 
-
     const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
 
     if (errorCodes.includes(response.code)) {
@@ -676,7 +676,7 @@ export const usePanelDataLoader = (
           trace_id: payload.traceId,
           code: response.code,
           error_detail: "",
-        }
+        },
       });
     }
 
@@ -688,20 +688,9 @@ export const usePanelDataLoader = (
     saveCurrentStateToCache();
   };
 
-  const handleSearchReset = (payload: any) => {
-    // reset old state data
-    state.data = [];
-    state.resultMetaData = [];
-
-    getDataThroughWebSocket(
-      payload.queryReq.query,
-      payload.queryReq.it,
-      payload.queryReq.startISOTimestamp,
-      payload.queryReq.endISOTimestamp,
-      payload.pageType,
-      payload.currentQueryIndex,
-    );
-  }
+  const handleSearchReset = (payload: any, traceId?: string) => {
+    loadData();
+  };
 
   const handleSearchError = (payload: any, response: any) => {
     removeTraceId(payload.traceId);
@@ -850,7 +839,7 @@ export const usePanelDataLoader = (
 
       // remove past error detail
       state.errorDetail = "";
-      
+
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
         // Iterate through each query in the panel schema
@@ -923,7 +912,6 @@ export const usePanelDataLoader = (
         const abortControllerRef = abortController;
 
         try {
-
           // Call search API
           state.data = [];
           state.metadata = {
@@ -932,7 +920,7 @@ export const usePanelDataLoader = (
           state.resultMetaData = [];
           state.annotations = [];
           state.isOperationCancelled = false;
-          
+
           // Get the page type from the first query in the panel schema
           const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 

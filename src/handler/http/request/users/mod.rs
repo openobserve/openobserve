@@ -301,6 +301,7 @@ pub async fn authentication(
             body: "".to_string(),
             query_params: _req.query_string().to_string(),
             response_code: 200,
+            error_msg: None,
         }),
     };
 
@@ -449,6 +450,7 @@ pub async fn get_presigned_url(
                 body: "".to_string(),
                 query_params: _req.query_string().to_string(),
                 response_code: 200,
+                error_msg: None,
             }),
         };
         audit(audit_message).await;
@@ -489,6 +491,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 // Don't include query string as it may contain the auth token
                 query_params: "".to_string(),
                 response_code: 302,
+                error_msg: None,
             }),
         };
 
