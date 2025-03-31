@@ -159,6 +159,7 @@ const defaultObject = {
     showSearchScheduler: false,
     toggleFunction: false, // DEPRECATED use showTransformEditor instead
     isActionsEnabled: false,
+    resetPlotChart: false,
   },
   data: {
     query: <any>"",
@@ -2592,6 +2593,7 @@ const useLogs = () => {
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
+      searchObj.meta.resetPlotChart = true;
       if (searchObj.data.isOperationCancelled) {
         searchObj.loadingHistogram = false;
         searchObj.data.isOperationCancelled = false;

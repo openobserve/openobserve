@@ -676,6 +676,8 @@ pub struct Common {
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
     pub instance_name: String,
     pub instance_name_short: String,
+    #[env_config(name = "ZO_INGESTION_URL", default = "")]
+    pub ingestion_url: String,
     #[env_config(name = "ZO_WEB_URL", default = "http://localhost:5080")]
     pub web_url: String,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
