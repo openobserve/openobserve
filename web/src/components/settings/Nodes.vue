@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="sticky-header">
             <h6 class="q-ma-none q-pa-sm">
               {{t("nodes.filter_header")}} <q-icon name="filter_list" />
-              <div class="float-right"><a class="cursor-pointer text-caption tw-underline" @click="clearAll(filterQuery)">{{t("nodes.clear_all")}}</a></div>
+              <div class="float-right"><a class="cursor-pointer text-caption tw-underline" @click="clearAll()">{{t("nodes.clear_all")}}</a></div>
             </h6>
             <q-separator />
           </div>
@@ -782,8 +782,8 @@ export default defineComponent({
       resultTotal.value = data.length;
     }
 
-    const clearAll = (filterQuery: string) => {
-      filterQuery = "";
+    const clearAll = () => {
+      filterQuery.value = "";
       selectedRegions.value = [];
       selectedClusters.value = [];
       selectedNodetypes.value = [];
