@@ -154,13 +154,13 @@ export default defineComponent({
       switch (props.scope) {
         case "global":
           filteredList = props.variablesConfig.list.filter(
-            (variable) => !variable.scope || variable.scope === "global",
+            (variable: any) => !variable.scope || variable.scope === "global",
           );
           break;
 
         case "tabs":
           filteredList = props.variablesConfig.list.filter(
-            (variable) =>
+            (variable: any) =>
               variable.scope === "tabs" &&
               variable.tabs?.includes(props.currentTabId),
           );
@@ -168,7 +168,7 @@ export default defineComponent({
 
         case "panels":
           filteredList = props.variablesConfig.list.filter(
-            (variable) =>
+            (variable: any) =>
               variable.scope === "panels" &&
               variable.tabs?.includes(props.currentTabId) &&
               variable.panels?.includes(props.currentPanelId),
@@ -299,7 +299,7 @@ export default defineComponent({
     // Replace updateFilteredVariables with:
     const updateFilteredVariables = () => {
       const newFilteredValues = completeVariablesData.values.filter(
-        (variable) => {
+        (variable: any) => {
           switch (props.scope) {
             case "global":
               return !variable.scope || variable.scope === "global";
@@ -604,10 +604,10 @@ export default defineComponent({
       }
     };
 
-    const refreshVariableInArrays = (variableName, updates) => {
+    const refreshVariableInArrays = (variableName: any, updates: any) => {
       // Update in complete data
       const completeIndex = completeVariablesData.values.findIndex(
-        (v) => v.name === variableName,
+        (v: any) => v.name === variableName,
       );
       if (completeIndex >= 0) {
         completeVariablesData.values[completeIndex] = {
@@ -820,8 +820,8 @@ export default defineComponent({
       if (fieldHit) {
         // Create a new array for options to trigger reactivity
         const newOptions = fieldHit.values
-          .filter((value) => value.zo_sql_key || value.zo_sql_key === "")
-          .map((value) => ({
+          .filter((value: any) => value.zo_sql_key || value.zo_sql_key === "")
+          .map((value: any) => ({
             // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
             label:
               value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
@@ -883,7 +883,7 @@ export default defineComponent({
         // Update loading states
         completeVariablesData.isVariablesLoading =
           completeVariablesData.values.some(
-            (val) => val.isLoading || val.isVariableLoadingPending,
+            (val: any) => val.isLoading || val.isVariableLoadingPending,
           );
 
         filteredVariablesData.isVariablesLoading =
@@ -897,11 +897,11 @@ export default defineComponent({
           oldVariablesData[name] !== variableObject.value
         ) {
           const childVariableObjects = completeVariablesData.values.filter(
-            (variable) => childVariables.includes(variable.name),
+            (variable: any) => childVariables.includes(variable.name),
           );
 
           await Promise.all(
-            childVariableObjects.map((childVariable) =>
+            childVariableObjects.map((childVariable: any) =>
               loadSingleVariableDataByName(childVariable),
             ),
           );
@@ -937,7 +937,7 @@ export default defineComponent({
       // Update loading states
       completeVariablesData.isVariablesLoading =
         completeVariablesData.values.some(
-          (val) => val.isLoading || val.isVariableLoadingPending,
+          (val: any) => val.isLoading || val.isVariableLoadingPending,
         );
       filteredVariablesData.isVariablesLoading =
         completeVariablesData.isVariablesLoading;
@@ -963,7 +963,7 @@ export default defineComponent({
 
       // Find the variable in complete data
       const completeVariable = completeVariablesData.values.find(
-        (v) => v.name === currentVariable.name,
+        (v: any) => v.name === currentVariable.name,
       );
       if (!completeVariable) return;
 
@@ -981,62 +981,66 @@ export default defineComponent({
       // Get all affected variables in dependency order
       const affectedVariables = getAllAffectedVariables(currentVariable.name);
 
-      // Find all dependent variables (variables with dependencies)
-      const dependentVariables = variablesData.values.filter(
-        (variable: any) =>
-          variablesDependencyGraph[variable.name]?.parentVariables?.length > 0,
-      );
+      // Reset affected variables
+      affectedVariables.forEach((varName) => {
+        const variable = completeVariablesData.values.find(
+          (v: any) => v.name === varName,
+        );
+        if (variable) {
+          variable.isVariableLoadingPending = true;
+          variable.value = variable.multiSelect ? [] : null;
+          variable.options = [];
+        }
+      });
 
-      try {
-        // Load all independent variables
-        await Promise.all(
-          independentVariables.map((variable: any) =>
-            loadSingleVariableDataByName(variable),
-          ),
-        );
-      } catch (error) {
-        await Promise.all(
-          independentVariables.map((variable: any) =>
-            finalizeVariableLoading(variable, false),
-          ),
-        );
+      // Force UI update for reset state
+      forceComponentUpdate();
+
+      // Load affected variables in scope order
+      await loadAffectedVariablesInOrder(affectedVariables);
+
+      // Update filtered variables and force UI refresh
+      updateFilteredVariables();
+      forceComponentUpdate();
+
+      // Emit updated data
+      nextTick(() => {
+        emitVariablesData();
+      });
+    };
+
+    // Helper function to get all affected variables in dependency order
+    const getAllAffectedVariables = (
+      varName: string,
+      visited = new Set<string>(),
+    ): string[] => {
+      if (visited.has(varName)) return []; // Prevent circular dependencies
+      visited.add(varName);
+
+      const immediateChildren =
+        variablesDependencyGraph[varName]?.childVariables || [];
+      const allChildren: string[] = [...immediateChildren];
+
+      for (const childName of immediateChildren) {
+        const childrenOfChild = getAllAffectedVariables(childName, visited);
+        allChildren.push(...childrenOfChild);
       }
 
-      const loadDependentVariables = async () => {
-        for (const variable of dependentVariables) {
-          // Find all parent variables of the current variable
-          const parentVariables =
-            variablesDependencyGraph[variable.name].parentVariables;
-          // Check if all parent variables are loaded
-          const areParentsLoaded = parentVariables.every(
-            (parentName: string) => {
-              const parentVariable = variablesData.values.find(
-                (v: any) => v.name === parentName,
-              );
-              return (
-                parentVariable &&
-                !parentVariable.isLoading &&
-                !parentVariable.isVariableLoadingPending &&
-                parentVariable.value !== null
-              );
-            },
-          );
+      return Array.from(new Set(allChildren));
+    };
 
-          // If all parent variables are loaded, load the current variable
-          if (areParentsLoaded) {
-            await loadSingleVariableDataByName(variable);
-          }
-        }
+    // Load variables in correct scope order
+    const loadAffectedVariablesInOrder = async (variableNames: string[]) => {
+      // Group variables by scope
+      const scopedVariables: any = {
+        global: [] as any[],
+        tabs: [] as any[],
+        panels: [] as any[],
       };
 
-      // Attempt to load dependent variables up to 3 times
-      for (let attempt = 0; attempt < 3; attempt++) {
-        await loadDependentVariables();
-
-        // Check if all variables are loaded
-        const allLoaded = variablesData.values.every(
-          (variable: any) =>
-            !variable.isLoading && !variable.isVariableLoadingPending,
+      variableNames.forEach((name) => {
+        const variable = completeVariablesData.values.find(
+          (v: any) => v.name === name,
         );
         if (variable) {
           const scope = variable.scope || "global";
@@ -1049,9 +1053,9 @@ export default defineComponent({
         for (const variable of variables) {
           const parentVariables =
             variablesDependencyGraph[variable.name]?.parentVariables || [];
-          const parentsLoaded = parentVariables.every((parentName) => {
+          const parentsLoaded = parentVariables.every((parentName: any) => {
             const parent = completeVariablesData.values.find(
-              (v) => v.name === parentName,
+              (v: any) => v.name === parentName,
             );
             return (
               parent &&
@@ -1089,67 +1093,48 @@ export default defineComponent({
           return;
         }
 
-      // Update the old variables data
-      oldVariablesData[currentVariable.name] = currentVariable.value;
+        // Reset loading states
+        completeVariablesData.values.forEach((variable: any) => {
+          variable.isVariableLoadingPending = true;
+        });
 
-      // Get all affected variables recursively
-      const getAllAffectedVariables = (
-        varName: string,
-        visited = new Set<string>(),
-      ): string[] => {
-        if (visited.has(varName)) return []; // Prevent circular dependencies
-        visited.add(varName);
+        // Load variables in dependency order
+        const loadVariablesInOrder = async (variables: any[]) => {
+          for (const variable of variables) {
+            const parentVariables =
+              variablesDependencyGraph[variable.name]?.parentVariables || [];
+            const parentsLoaded = parentVariables.every((parentName: any) => {
+              const parent = completeVariablesData.values.find(
+                (v: any) => v.name === parentName,
+              );
+              return (
+                parent &&
+                !parent.isLoading &&
+                !parent.isVariableLoadingPending &&
+                parent.value !== null
+              );
+            });
 
-        const immediateChildren =
-          variablesDependencyGraph[varName]?.childVariables || [];
-        const allChildren: string[] = [...immediateChildren];
+            if (parentsLoaded) {
+              await loadSingleVariableDataByName(variable);
+              // Force UI update after each variable load
+              forceComponentUpdate();
+            }
+          }
+        };
 
-        for (const childName of immediateChildren) {
-          const childrenOfChild = getAllAffectedVariables(childName, visited);
-          allChildren.push(...childrenOfChild);
-        }
-
-        return Array.from(new Set(allChildren));
-      };
-
-      // Get all affected variables in dependency order
-      const affectedVariables = getAllAffectedVariables(currentVariable.name);
-
-      // Reset and mark all affected variables for update
-      const variablesToUpdate = variablesData.values.filter((v: any) =>
-        affectedVariables.includes(v.name),
-      );
-
-      // Reset all affected variables
-      variablesToUpdate.forEach((variable: any) => {
-        variable.isVariableLoadingPending = true;
-        variable.isLoading = true;
-        if (variable.multiSelect) {
-          variable.value = [];
-        } else {
-          variable.value = null;
-        }
-      });
-
-      // Load variables in dependency order
-      for (const varName of affectedVariables) {
-        const variable = variablesData.values.find(
-          (v: any) => v.name === varName,
+        // First load all global variables
+        const globalVariables = completeVariablesData.values.filter(
+          (v: any) => !v.scope || v.scope === "global",
         );
-        if (variable) {
-          await loadSingleVariableDataByName(variable);
-        }
-      }
 
-      // Emit updated data
-      emitVariablesData();
-    };
-
-    // Add computed property for filtered variables with improved visibility logic
-    const filteredVariables = computed(() => {
-      return variablesData.values.filter((item: any) => {
-        // If variable is hidden on dashboard, don't show it
-        if (item.hideOnDashboard) return false;
+        // Sort global variables by dependency
+        const independentGlobals = globalVariables.filter(
+          (v: any) => !variablesDependencyGraph[v.name]?.parentVariables?.length,
+        );
+        const dependentGlobals = globalVariables.filter(
+          (v: any) => variablesDependencyGraph[v.name]?.parentVariables?.length > 0,
+        );
 
         // Load globals
         await loadVariablesInOrder(independentGlobals);
@@ -1157,13 +1142,13 @@ export default defineComponent({
 
         // Load tab variables
         const tabVariables = completeVariablesData.values.filter(
-          (v) => v.scope === "tabs" && v.tabs?.includes(props.currentTabId),
+          (v: any) => v.scope === "tabs" && v.tabs?.includes(props.currentTabId),
         );
         await loadVariablesInOrder(tabVariables);
 
         // Load panel variables
         const panelVariables = completeVariablesData.values.filter(
-          (v) =>
+          (v: any) =>
             v.scope === "panels" &&
             v.tabs?.includes(props.currentTabId) &&
             v.panels?.includes(props.currentPanelId),
@@ -1185,11 +1170,23 @@ export default defineComponent({
       }
     };
 
+    // Add computed property for filtered variables
+    // const filteredVariables = computed(() => {
+    //   return variablesData.values.filter((item: any) => {
+    //     // If variable is hidden on dashboard, don't show it
+    //     if (item.hideOnDashboard) return false;
+
+    //     // Additional filtering logic can be added here
+    //     return true;
+    //   });
+    // });
+
     // Add watchers for debugging (optional)
     watch(
       () => props.currentTabId,
       (newTabId) => {
         console.debug("Current Tab ID changed:", newTabId);
+        loadAllVariablesData();
       },
     );
 
@@ -1197,6 +1194,7 @@ export default defineComponent({
       () => props.currentPanelId,
       (newPanelId) => {
         console.debug("Current Panel ID changed:", newPanelId);
+        loadAllVariablesData();
       },
     );
 
@@ -1205,6 +1203,7 @@ export default defineComponent({
       changeInitialVariableValues,
       onVariablesValueUpdated,
       loadVariableOptions,
+      loadAllVariablesData,
     };
   },
 });
