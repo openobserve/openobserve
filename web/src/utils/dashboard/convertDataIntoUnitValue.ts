@@ -942,7 +942,10 @@ export function buildSQLQueryFromInput(
     : `${sqlArgs[0]}`;
 }
 
-export function buildSQLJoinsFromInput(joins: any[]): string {
+export function buildSQLJoinsFromInput(
+  joins: any[],
+  defaultStream: any,
+): string {
   if (!joins || joins.length === 0) {
     return ""; // No joins, return empty string
   }
@@ -952,13 +955,7 @@ export function buildSQLJoinsFromInput(joins: any[]): string {
   for (const join of joins) {
     const { stream, streamAlias, joinType, conditions } = join;
 
-    if (
-      !stream ||
-      !streamAlias ||
-      !joinType ||
-      !conditions ||
-      conditions.length === 0
-    ) {
+    if (!stream || !joinType || !conditions || conditions.length === 0) {
       // Invalid join, return empty string
       return "";
     }
@@ -968,18 +965,18 @@ export function buildSQLJoinsFromInput(joins: any[]): string {
     for (const condition of conditions) {
       const { leftField, rightField, operation, logicalOperator } = condition;
 
-      if (!leftField || !rightField || !operation) {
+      if (!leftField?.field || !rightField?.field || !operation) {
         // Invalid condition, return empty string
         return "";
       }
 
       const leftFieldStr = leftField.streamAlias
         ? `${leftField.streamAlias}.${leftField.field}`
-        : leftField.field;
+        : `${defaultStream}.${leftField.field}`;
 
       const rightFieldStr = rightField.streamAlias
         ? `${rightField.streamAlias}.${rightField.field}`
-        : rightField.field;
+        : `${defaultStream}.${rightField.field}`;
 
       joinConditionStrings.push(
         `${leftFieldStr} ${operation} ${rightFieldStr}`,
@@ -991,7 +988,7 @@ export function buildSQLJoinsFromInput(joins: any[]): string {
 
     // Construct the JOIN SQL statement
     joinClauses.push(
-      `${joinType.toUpperCase()} JOIN "${stream}" AS ${streamAlias} ON ${joinConditionsSQL}`,
+      `${joinType.toUpperCase()} JOIN "${stream}" AS ${streamAlias ?? defaultStream} ON ${joinConditionsSQL}`,
     );
   }
 
@@ -1376,12 +1373,12 @@ const validateCustomQueryFields = (
   );
 
   if (customQueryXFieldError.length) {
-    errors.push(
-      ...customQueryXFieldError.map(
-        (it: any) =>
-          `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`,
-      ),
-    );
+    // errors.push(
+    //   ...customQueryXFieldError.map(
+    //     (it: any) =>
+    //       `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`,
+    //   ),
+    // );
   }
 
   const customQueryYFieldError = panelData?.data?.queries?.[
@@ -1395,12 +1392,12 @@ const validateCustomQueryFields = (
   );
 
   if (customQueryYFieldError.length) {
-    errors.push(
-      ...customQueryYFieldError.map(
-        (it: any) =>
-          `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`,
-      ),
-    );
+    // errors.push(
+    //   ...customQueryYFieldError.map(
+    //     (it: any) =>
+    //       `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`,
+    //   ),
+    // );
   }
 };
 
@@ -1424,12 +1421,12 @@ const validateStreamFields = (
   );
 
   if (customQueryXFieldError.length) {
-    errors.push(
-      ...customQueryXFieldError.map(
-        (it: any) =>
-          `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`,
-      ),
-    );
+    // errors.push(
+    //   ...customQueryXFieldError.map(
+    //     (it: any) =>
+    //       `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`,
+    //   ),
+    // );
   }
 
   const customQueryYFieldError = panelData?.data?.queries?.[
@@ -1439,12 +1436,12 @@ const validateStreamFields = (
   );
 
   if (customQueryYFieldError.length) {
-    errors.push(
-      ...customQueryYFieldError.map(
-        (it: any) =>
-          `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`,
-      ),
-    );
+    // errors.push(
+    //   ...customQueryYFieldError.map(
+    //     (it: any) =>
+    //       `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`,
+    //   ),
+    // );
   }
 };
 
