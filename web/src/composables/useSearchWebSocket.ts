@@ -122,17 +122,20 @@ const useSearchWebSocket = () => {
         // Store the current socketId as inactive and clear it
         // console.log("socketMeta ----------",traces[response.content.trace_id].socketId, socketMeta.value[traces[response.content.trace_id].socketId as string].isReadOnly);
 
-        const isReadOnly = socketMeta.value[traces[response.content.trace_id].socketId as string].isReadOnly;
+        const currentSocketId = traces[response.content.trace_id]?.socketId;
+        if (!currentSocketId) return;
+
+        const isReadOnly = socketMeta.value[traces[response.content.trace_id]?.socketId as string]?.isReadOnly;
+                
         if (!isReadOnly) {
           // console.log("rest socket");
           inactiveSocketId.value = socketId.value;
           socketId.value = null;        
           isInDrainMode.value = true;
+          socketMeta.value[traces[response.content.trace_id].socketId as string].isReadOnly = true;
         }
 
         const traceIdToRetry = response.content.trace_id;
-
-        socketMeta.value[traces[response.content.trace_id].socketId as string].isReadOnly = true;
 
         if (!isReadOnly) await resetAuthToken();
 
