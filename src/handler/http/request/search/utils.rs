@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::HttpResponse;
+use actix_web::{HttpResponse, http::StatusCode};
 use config::meta::stream::StreamType;
+use infra::errors;
 use o2_openfga::meta::mapping::OFGA_MODELS;
 
 use crate::common::{
@@ -59,4 +60,53 @@ pub async fn check_stream_permissions(
         }
     }
     None
+}
+
+pub fn map_error_to_http_response(err: errors::Error, trace_id: String) -> HttpResponse {
+    match err {
+        errors::Error::ErrorCode(code) => match code {
+            errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests().json(
+                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+            ),
+            errors::ErrorCodes::SearchTimeout(_) => HttpResponse::RequestTimeout().json(
+                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+            ),
+            errors::ErrorCodes::SearchFieldNotFound(_) => HttpResponse::BadRequest().json(
+                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+            ),
+            errors::ErrorCodes::SearchSQLNotValid(_) => HttpResponse::BadRequest().json(
+                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+            ),
+            errors::ErrorCodes::SearchStreamNotFound(_) => HttpResponse::BadRequest().json(
+                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+            ),
+            errors::ErrorCodes::FullTextSearchFieldNotFound => HttpResponse::BadRequest().json(
+                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+            ),
+            errors::ErrorCodes::SearchFunctionNotDefined(_) => HttpResponse::BadRequest().json(
+                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+            ),
+            errors::ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => HttpResponse::BadRequest()
+                .json(meta::http::HttpResponse::error_code_with_trace_id(
+                    code,
+                    Some(trace_id),
+                )),
+            errors::ErrorCodes::SearchSQLExecuteError(_) => HttpResponse::BadRequest().json(
+                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+            ),
+            errors::ErrorCodes::InvalidParams(_) => HttpResponse::BadRequest().json(
+                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+            ),
+            errors::ErrorCodes::ServerInternalError(_)
+            | errors::ErrorCodes::SearchParquetFileNotFound => {
+                HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+                )
+            }
+        },
+        _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+            StatusCode::INTERNAL_SERVER_ERROR.into(),
+            err.to_string(),
+        )),
+    }
 }

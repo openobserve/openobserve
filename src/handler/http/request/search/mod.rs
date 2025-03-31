@@ -33,7 +33,6 @@ use config::{
     },
 };
 use hashbrown::HashMap;
-use infra::errors;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
@@ -283,10 +282,7 @@ pub async fn search(
             Ok(v) => v,
             Err(e) => {
                 return Ok(HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        e.to_string(),
-                    ),
+                    meta::http::HttpResponse::error(StatusCode::BAD_REQUEST.into(), e.to_string()),
                 ));
             }
         };
@@ -364,22 +360,7 @@ pub async fn search(
                 "",
             );
             log::error!("[trace_id {trace_id}] search error: {}", err);
-            Ok(match err {
-                errors::Error::ErrorCode(code) => match code {
-                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                        .json(meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        )),
-                    _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                    ),
-                },
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            })
+            return Ok(utils::map_error_to_http_response(err, trace_id));
         }
     }
 }
@@ -473,22 +454,7 @@ pub async fn around_v1(
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
             log::error!("search around error: {:?}", err);
-            Ok(match err {
-                errors::Error::ErrorCode(code) => match code {
-                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                        .json(meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        )),
-                    _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                    ),
-                },
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            })
+            return Ok(utils::map_error_to_http_response(err, trace_id));
         }
     }
 }
@@ -592,22 +558,7 @@ pub async fn around_v2(
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
             log::error!("search around error: {:?}", err);
-            Ok(match err {
-                errors::Error::ErrorCode(code) => match code {
-                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                        .json(meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        )),
-                    _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                    ),
-                },
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            })
+            return Ok(utils::map_error_to_http_response(err, trace_id));
         }
     }
 }
@@ -924,25 +875,7 @@ async fn values_v1(
             Err(err) => {
                 http_report_metrics(start, org_id, stream_type, "500", "_values/v1", "", "");
                 log::error!("search values error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            )),
-                        _ => HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            ),
-                        ),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
+                return Ok(utils::map_error_to_http_response(err, trace_id));
             }
         };
         query_results.push((field.to_string(), resp_search));
@@ -1137,15 +1070,7 @@ pub async fn search_partition(
                 "",
             );
             log::error!("search error: {:?}", err);
-            Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                ),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            })
+            return Ok(utils::map_error_to_http_response(err, trace_id));
         }
     }
 }
@@ -1309,15 +1234,7 @@ pub async fn search_history(
                 "",
             );
             log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                ),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
+            return Ok(utils::map_error_to_http_response(err, trace_id));
         }
     };
 
