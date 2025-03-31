@@ -124,6 +124,16 @@ watch(
         },
       });
     }
+    //this condition is added to avoid the unnecessarily showing the quota tab when the user is not in the meta org and trying to access the quota tab
+    //this is fallback to users tab when the user is not in the meta org and trying to access the quota tab
+    if(value == "quota" && store.state.selectedOrganization.identifier !== '_meta'){
+      router.push({
+        name: "users",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    }
   },
   {
     immediate: true,

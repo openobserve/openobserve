@@ -649,58 +649,58 @@ export default defineComponent ({
                 sortable: true,
                 style: 'width: 200px !important; '
             }
-            ];
-            const roleLimitsColumns: any = [
-            {
-                name: "role_name",
-                field: "role_name",
-                label: t("quota.roleName"),
-                align: "left",
-                sortable: true,
+        ];
+        const roleLimitsColumns: any = [
+        {
+            name: "role_name",
+            field: "role_name",
+            label: t("quota.roleName"),
+            align: "left",
+            sortable: true,
 
-            },
-            {
-                name: "list",
-                field: "list",
-                label: t("quota.listLimit"),
-                align: "center",
-                sortable: true,
-                style: 'width: 200px !important; '
-            },
-            {
-                name: "get",
-                field: "get",
-                label: t("quota.getLimit"),
-                align: "center",
-                sortable: true,
-                style: 'width: 200px !important; '
-            },
-            {
-                name: "create",
-                field: "create",
-                label: t("quota.createLimit"),
-                align: "center",
-                sortable: true,
-                style: 'width: 200px !important; '
+        },
+        {
+            name: "list",
+            field: "list",
+            label: t("quota.listLimit"),
+            align: "center",
+            sortable: true,
+            style: 'width: 200px !important; '
+        },
+        {
+            name: "get",
+            field: "get",
+            label: t("quota.getLimit"),
+            align: "center",
+            sortable: true,
+            style: 'width: 200px !important; '
+        },
+        {
+            name: "create",
+            field: "create",
+            label: t("quota.createLimit"),
+            align: "center",
+            sortable: true,
+            style: 'width: 200px !important; '
 
-            },
-            {
-                name: "update",
-                field: "update",
-                label: t("quota.updateLimit"),
-                align: "center",
-                sortable: true,
-                style: 'width: 200px !important; '
-            },
-            {
-                name: "delete",
-                field: "delete",
-                label: t("quota.deleteLimit"),
-                align: "center",
-                sortable: true,
-                style: 'width: 200px !important; '
-            }
-            ];
+        },
+        {
+            name: "update",
+            field: "update",
+            label: t("quota.updateLimit"),
+            align: "center",
+            sortable: true,
+            style: 'width: 200px !important; '
+        },
+        {
+            name: "delete",
+            field: "delete",
+            label: t("quota.deleteLimit"),
+            align: "center",
+            sortable: true,
+            style: 'width: 200px !important; '
+        }
+        ];
         const activeTab = ref<string>("api-limits");
         const searchQuery = ref<string>("");
         const apiLimitsRows = ref<any[]>([]);
@@ -1079,6 +1079,7 @@ export default defineComponent ({
             }
             else{
                 roleLevelModuleRows.value  =  await getRoleLimitsByOrganization(selectedOrganization.value.value, openedRole.value);
+                filterModulesBasedOnCategory();
             }
             isSavingJson.value = false;
     } catch (error: any) {
@@ -1285,7 +1286,12 @@ export default defineComponent ({
         }
     }
     const discardChangesRoleSwitch = () => {
+
         showConfirmDialogRowSwitch.value = false;
+        expandedRole.value = toBeExpandedRow.value.role_name;
+        expandedRow.value = toBeExpandedRow.value.uuid;
+        toBeExpandedRow.value = null;
+
     }
     const transformData = (data: any) => {
         return data.reduce((acc: any, item: any) => {
@@ -1406,90 +1412,90 @@ export default defineComponent ({
             filteredRoleLevelModuleRows.value = roleLevelModuleRows.value;
         }
     }
-        return {
-            t,
-            selectedOrganization,
-            organizations,
-            updateOrganization,
-            isOrgLoading,
-            activeTab,
-            updateActiveTab ,
-            tabs,
-            editTable,
-            searchQuery,
-            resultTotal,
-            perPageOptions,
-            rolesLimitRows,
-            rolesColumns,
-            apiLimitsRows,
-            apiLimitsColumns,
-            pagination,
-            editTableWithInput,
-            store,
-            handleInputChange,
-            changedValues,
-            cancelChanges,
-            saveChanges,
-            isEdited,
-            generateColumns,
-            loading,
-            isBulkUpdate,
-            outlinedFileDownload,
-            outlinedFileUpload,
-            uploadedRules,
-            outlinedInsertDriveFile,
-            getImageURL,
-            fileListToDisplay,
-            downloadTemplate,
-            uploadTemplate,
-            uploadError,
-            uploadingRules,
-            closeBulkUpdate,
-            focusedInputId,
-            onFocus,
-            generateUniqueId,
-            filteredData,
-            roleLimitsColumns,
-            triggerExpand,
-            expandedRow,
-            roleLevelModuleRows,
-            roleLevelLoading,
-            getRoleLimitsByOrganization,
-            selectedApiCategory,
-            rolesToBeDisplayed,
-            isApiCategoryLoading,
-            filteredRoleLevelModuleRows,
-            restrictToNumbers,
-            preventNonNumericPaste,
-            expandedRole,
-            showConfirmDialogTabSwitch,
-            showConfirmDialogRowSwitch,
-            nextTab,
-            saveChangesAndTabSwitch,
-            discardChangesTabSwitch,
-            saveChangesAndRoleSwitch,
-            discardChangesRoleSwitch,
-            toBeExpandedRow,
-            activeType,
-            updateActiveType,
-            jsonStrToDisplay,
-            nextType,
-            showConfirmDialogTypeSwitch,
-            saveChangesAndTypeSwitch,
-            discardChangesTypeSwitch,
-            saveJsonChanges,
-            cancelJsonChanges,
-            isSavingJson,
-            filteredOrganizations,
-            filterOrganizations,
-            filteredApiCategoryToDisplayOptions,
-            filterApiCategoriesToDisplayOptions,
-            changePagination,
-            selectedPerPage,
-            qTable,
-            organizationToDisplay,
-            filterModulesBasedOnCategory
-        }
+    return {
+        t,
+        selectedOrganization,
+        organizations,
+        updateOrganization,
+        isOrgLoading,
+        activeTab,
+        updateActiveTab ,
+        tabs,
+        editTable,
+        searchQuery,
+        resultTotal,
+        perPageOptions,
+        rolesLimitRows,
+        rolesColumns,
+        apiLimitsRows,
+        apiLimitsColumns,
+        pagination,
+        editTableWithInput,
+        store,
+        handleInputChange,
+        changedValues,
+        cancelChanges,
+        saveChanges,
+        isEdited,
+        generateColumns,
+        loading,
+        isBulkUpdate,
+        outlinedFileDownload,
+        outlinedFileUpload,
+        uploadedRules,
+        outlinedInsertDriveFile,
+        getImageURL,
+        fileListToDisplay,
+        downloadTemplate,
+        uploadTemplate,
+        uploadError,
+        uploadingRules,
+        closeBulkUpdate,
+        focusedInputId,
+        onFocus,
+        generateUniqueId,
+        filteredData,
+        roleLimitsColumns,
+        triggerExpand,
+        expandedRow,
+        roleLevelModuleRows,
+        roleLevelLoading,
+        getRoleLimitsByOrganization,
+        selectedApiCategory,
+        rolesToBeDisplayed,
+        isApiCategoryLoading,
+        filteredRoleLevelModuleRows,
+        restrictToNumbers,
+        preventNonNumericPaste,
+        expandedRole,
+        showConfirmDialogTabSwitch,
+        showConfirmDialogRowSwitch,
+        nextTab,
+        saveChangesAndTabSwitch,
+        discardChangesTabSwitch,
+        saveChangesAndRoleSwitch,
+        discardChangesRoleSwitch,
+        toBeExpandedRow,
+        activeType,
+        updateActiveType,
+        jsonStrToDisplay,
+        nextType,
+        showConfirmDialogTypeSwitch,
+        saveChangesAndTypeSwitch,
+        discardChangesTypeSwitch,
+        saveJsonChanges,
+        cancelJsonChanges,
+        isSavingJson,
+        filteredOrganizations,
+        filterOrganizations,
+        filteredApiCategoryToDisplayOptions,
+        filterApiCategoriesToDisplayOptions,
+        changePagination,
+        selectedPerPage,
+        qTable,
+        organizationToDisplay,
+        filterModulesBasedOnCategory
+    }
 
     }
 })
