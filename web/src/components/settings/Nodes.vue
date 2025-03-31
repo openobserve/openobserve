@@ -377,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('nodes.applyFilter')" 
               class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm" 
               color="secondary"
-              @click="applyFilter(filterQuery)"
+              @click="applyFilter()"
             >
             </q-btn>
           </div>
@@ -407,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="col-auto flex">
                 <q-btn :label="t('common.refresh')" class="text-bold text-capitalize q-mr-sm" 
-                color="secondary" style="height: 40px;" @click="getData"></q-btn>
+                color="secondary" style="height: 40px;" @click="getData(true)"></q-btn>
                 <q-input
                   v-model="filterQuery"
                   filled
@@ -537,6 +537,7 @@ export default defineComponent({
     const qTable: any = ref(null);
     const loading = ref(false);
     const splitterModel = ref(250);
+    const filterQuery = ref("");
     const columns = ref<QTableProps["columns"]>([
       {
         name: "name",
@@ -718,7 +719,7 @@ export default defineComponent({
         };
     }
 
-    const getData = () => {
+    const getData = (filterFlag: boolean = false) => {
       loading.value = true;
       const dismiss = $q.notify({
         spinner: true,
@@ -727,20 +728,9 @@ export default defineComponent({
 
       CommonService.list_nodes(store.state.selectedOrganization.identifier)
         .then((response) => {
-          // let temp = response.data;
-          // temp["test"] = JSON.parse(JSON.stringify(temp["openobserve"]))
-          // temp["test"]["zo1"][0].name="test name";
-          // console.log(temp)
-          // const responseData = temp;
           const responseData = response.data;
           const { flattenedData, uniqueValues } = flattenObject(responseData);
           
-          // let i=0;
-          // while (i<100) {
-          //   flattenedData.push(flattenedData[0]);
-          //   i++;
-          // }
-
           regionRows.value = uniqueValues.regions.map(name => ({ name }))
           clusterRows.value = uniqueValues.clusters.map(name => ({ name }))
           nodetypeRows.value = uniqueValues.nodeTypes.map(name => ({ name }))
@@ -749,6 +739,9 @@ export default defineComponent({
           originalData.value = flattenedData;
           resultTotal.value = flattenedData.length;
           loading.value = false;
+          if(filterFlag) {
+            applyFilter();
+          }
           dismiss();
         })
         .catch((error) => {
@@ -766,10 +759,10 @@ export default defineComponent({
         });
     };
 
-    getData();
+    getData(false);
 
-    const applyFilter = (filterQuery: string) => {
-      let terms = filterQuery.toLowerCase();
+    const applyFilter = () => {
+      let terms = filterQuery.value.toLowerCase();
       const data = originalData.value.filter((row: any) => {
           const matchesSearch = row.name.toLowerCase().includes(terms);
           const matchesRegion = selectedRegions.value.length === 0 || selectedRegions.value.some((region: any) => region.name === row.region);
@@ -842,7 +835,7 @@ export default defineComponent({
       applyFilter,
       clearAll,
       filterColumns: [{ name: "name", label: "Name", field: "name", align: "left" }],
-      filterQuery: ref(""),
+      filterQuery,
       filterData(rows: any, terms: string) {
         const filtered = [];
         terms = terms.toLowerCase();
