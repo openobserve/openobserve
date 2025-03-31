@@ -36,6 +36,7 @@ use crate::{
     meta::cluster,
     utils::{file::get_file_meta, sysinfo},
 };
+use crate::meta::meta_store::MetaStore;
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
@@ -2595,6 +2596,16 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_ratelimit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+
+    if cfg.ratelimit.ratelimit_enabled {
+        let meta_store: MetaStore = cfg.common.queue_store.as_str().into();
+        if meta_store != MetaStore::Nats {
+            return Err(anyhow::anyhow!(
+                "ZO_QUEUE_STORE must be nats when ratelimit is enabled"
+            ));
+        }
+    }
+
     if cfg.ratelimit.ratelimit_rule_refresh_interval < 2 {
         return Err(anyhow::anyhow!(
             "ratelimit rules refresh interval must be greater than or equal to 2 seconds"
