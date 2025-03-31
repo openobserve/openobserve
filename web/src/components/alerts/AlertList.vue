@@ -1239,31 +1239,35 @@ export default defineComponent({
         });
       }
     };
-    const showAddUpdateFn = (props: any) => {
+    const showAddUpdateFn = async (props: any) => {
+      //made this async because we need to wait for the router to navigate
+      //so that we can get the alert_type from the query params
       formData.value = props.row;
       let action;
-      if (!props.row) {
+      try {
+        if (!props.row) {
         isUpdated.value = false;
         action = "Add Alert";
-        router.push({
+        await router.push({
           name: "alertList",
           query: {
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
             folder: activeFolderId.value,
+            alert_type: activeTab.value
           },
         });
       } else {
         isUpdated.value = true;
         action = "Update Alert";
-        router.push({
+        await router.push({
           name: "alertList",
           query: {
             alert_id: props.row.id,
             action: "update",
             name: props.row.name,
             org_identifier: store.state.selectedOrganization.identifier,
-            folder: activeFolderId.value,
+            folder: activeFolderId.value
           },
         });
       }
@@ -1276,6 +1280,10 @@ export default defineComponent({
           page: "Alerts",
         });
       }
+      } catch (error) {
+        console.error('Navigation failed:', error);
+      }
+
     };
     const refreshList = async (folderId: string) => {
       //here we are fetching the alerts from the server because after creating the alert we should get the latest alerts
