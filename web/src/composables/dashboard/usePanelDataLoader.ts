@@ -564,11 +564,6 @@ export const usePanelDataLoader = (
   };
 
   const handleHistogramResponse = async (payload: any, searchRes: any) => {
-    console.log(
-      "handleHistogramResponse",
-      searchRes.content.trace_id,
-      searchRes.content,
-    );
     // remove past error detail
     state.errorDetail = "";
 
@@ -639,7 +634,6 @@ export const usePanelDataLoader = (
       return;
     }
 
-    console.log("sendSearchMessage", payload.traceId);
 
     sendSearchMessageBasedOnRequestId({
       type: "search",
@@ -695,8 +689,6 @@ export const usePanelDataLoader = (
   };
 
   const handleSearchReset = (payload: any, traceId?: string) => {
-    console.log("handleSearchReset", traceId);
-
     loadData();
   };
 
@@ -722,7 +714,6 @@ export const usePanelDataLoader = (
       const { traceId } = generateTraceContext();
       addTraceId(traceId);
 
-      console.log("getDataThroughWebSocket", traceId);
       const payload: {
         queryReq: any;
         type: "search" | "histogram" | "pageCount";
@@ -1169,7 +1160,6 @@ export const usePanelDataLoader = (
               );
               state.annotations = annotations;
               if (isWebSocketEnabled()) {
-                console.log("getDataThroughWebSocket");
                 await getDataThroughWebSocket(
                   query,
                   it,
