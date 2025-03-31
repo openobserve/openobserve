@@ -52,7 +52,7 @@ struct QueryParams {
 #[cfg(feature = "enterprise")]
 impl QueryParams {
     fn get_org_id(&self) -> String {
-        match self.org_id.as_str() {
+        match self.org_id.to_uppercase().as_str() {
             QUOTA_PAGE_GLOBAL_RULES_ORG => DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string(),
             _ => self.org_id.to_string(),
         }

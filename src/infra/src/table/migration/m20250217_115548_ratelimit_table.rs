@@ -1,7 +1,7 @@
+use sea_orm::DbBackend;
 use sea_orm_migration::prelude::*;
 
-const RULE_ID: &str = "rule_id_idx";
-const RESOURCE_KEY: &str = "resource_key_idx";
+const RESOURCE_KEY: &str = "rkey_idx";
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -13,26 +13,23 @@ impl MigrationTrait for Migration {
             .create_table(create_ratelimit_table_statement())
             .await?;
 
-        manager
-            .create_index(create_ratelimit_rule_id_idx_stmnt())
-            .await?;
-
-        manager
-            .create_index(create_ratelimit_resource_key_idx_stmnt())
-            .await?;
+        match manager.get_database_backend() {
+            DbBackend::MySql => {
+                manager
+                    .create_index(create_ratelimit_resource_key_idx_stmnt_mysql())
+                    .await?;
+            }
+            _ => {
+                manager
+                    .create_index(create_ratelimit_resource_key_idx_stmnt())
+                    .await?;
+            }
+        }
 
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_index(
-                Index::drop()
-                    .name(RULE_ID)
-                    .table(RateLimitRules::Table)
-                    .to_owned(),
-            )
-            .await?;
         manager
             .drop_index(
                 Index::drop()
@@ -53,7 +50,7 @@ fn create_ratelimit_table_statement() -> TableCreateStatement {
         .if_not_exists()
         .col(
             ColumnDef::new(RateLimitRules::RuleId)
-                .string_len(256)
+                .string_len(64)
                 .primary_key()
                 .not_null(),
         )
@@ -80,7 +77,7 @@ fn create_ratelimit_table_statement() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(RateLimitRules::ApiGroupName)
-                .string_len(1024)
+                .string_len(256)
                 .not_null(),
         )
         .col(
@@ -101,28 +98,26 @@ fn create_ratelimit_table_statement() -> TableCreateStatement {
         .to_owned()
 }
 
-fn create_ratelimit_rule_id_idx_stmnt() -> IndexCreateStatement {
-    sea_query::Index::create()
-        .if_not_exists()
-        .name(RULE_ID)
-        .table(RateLimitRules::Table)
-        .col(RateLimitRules::RuleId)
-        .unique()
-        .to_owned()
-}
-
 fn create_ratelimit_resource_key_idx_stmnt() -> IndexCreateStatement {
     sea_query::Index::create()
-        .if_not_exists()
         .name(RESOURCE_KEY)
         .table(RateLimitRules::Table)
         .col(RateLimitRules::Org)
-        .col(RateLimitRules::RuleType)
         .col(RateLimitRules::UserRole)
         .col(RateLimitRules::UserId)
         .col(RateLimitRules::ApiGroupName)
         .col(RateLimitRules::ApiGroupOperation)
         .unique()
+        .to_owned()
+}
+
+fn create_ratelimit_resource_key_idx_stmnt_mysql() -> IndexCreateStatement {
+    sea_query::Index::create()
+        .name(RESOURCE_KEY)
+        .table(RateLimitRules::Table)
+        .col(RateLimitRules::Org)
+        .col(RateLimitRules::UserRole)
+        .col(RateLimitRules::UserId)
         .to_owned()
 }
 

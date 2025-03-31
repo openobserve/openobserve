@@ -206,7 +206,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
     }
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let current_timestamp = now().timestamp();
+    let current_time = config::utils::time::now_micros();
 
     // Start transaction
     let txn = client
@@ -275,7 +275,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                         api_group_name: Set(rule.api_group_name.unwrap_or_default()),
                         api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
                         threshold: Set(rule.threshold),
-                        created_at: Set(current_timestamp),
+                        created_at: Set(current_time),
                     };
                     log::debug!("add_upsert_batch insert active_model: {:?} ", active_model);
                     if let Err(e) = Entity::insert(active_model).exec(&txn).await {
