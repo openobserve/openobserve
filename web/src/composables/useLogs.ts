@@ -4875,6 +4875,8 @@ const useLogs = () => {
         }
       }
 
+      console.log("getDataThroughWebSocket", structuredClone(queryReq));
+
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       const requestId = initializeWebSocketConnection(payload);
 
@@ -4932,7 +4934,10 @@ const useLogs = () => {
   };
 
 
-  const handleSearchReset = async (data: any) => {
+  const handleSearchReset = async (data: any, traceId?: string) => {
+
+    console.log("handleSearchReset", traceId, structuredClone(data));
+
     // reset query data
     try {
       if(data.type === "search") {
