@@ -159,6 +159,7 @@ const defaultObject = {
     showSearchScheduler: false,
     toggleFunction: false, // DEPRECATED use showTransformEditor instead
     isActionsEnabled: false,
+    resetPlotChart: false,
   },
   data: {
     query: <any>"",
@@ -2592,6 +2593,7 @@ const useLogs = () => {
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
+      searchObj.meta.resetPlotChart = true;
       if (searchObj.data.isOperationCancelled) {
         searchObj.loadingHistogram = false;
         searchObj.data.isOperationCancelled = false;
@@ -4873,6 +4875,8 @@ const useLogs = () => {
         }
       }
 
+      console.log("getDataThroughWebSocket", structuredClone(queryReq));
+
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       const requestId = initializeWebSocketConnection(payload);
 
@@ -4930,7 +4934,10 @@ const useLogs = () => {
   };
 
 
-  const handleSearchReset = async (data: any) => {
+  const handleSearchReset = async (data: any, traceId?: string) => {
+
+    console.log("handleSearchReset", traceId, structuredClone(data));
+
     // reset query data
     try {
       if(data.type === "search") {

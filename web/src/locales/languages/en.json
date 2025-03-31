@@ -80,7 +80,8 @@
     "back": "Back",
     "save": "Save",
     "update": "Update",
-    "favourite": "Favorite"
+    "favourite": "Favorite",
+    "refresh": "Refresh"
   },
   "search": {
     "metrics": "Metrics",
@@ -934,7 +935,7 @@
   },
   "alerts": {
     "header": "Alerts",
-    "add": "Add alert",
+    "add": "Add Alert",
     "edit": "Edit",
     "clone": "Clone alert",
     "search": "Search Alert",
@@ -996,7 +997,8 @@
     "view":"View",
     "webhook":"Web Hook",
     "email":"Email",
-    "action":"Action"
+    "action":"Action",
+    "all":"All"
   },
   "alert_templates": {
     "header": "Templates",
@@ -1082,7 +1084,8 @@
     "traceIdFieldName": "Trace ID Field Name",
     "spanIdFieldName": "Span ID Field Name",
     "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
-    "cipherKeys": "Cipher Keys"
+    "cipherKeys": "Cipher Keys",
+    "nodes": "Nodes"
   },
   "reports": {
     "header": "Reports",
@@ -1175,5 +1178,29 @@
     "storeType": "Store Type",
     "mechanismType": "Mechanism Type",
     "actions": "Actions"
+  },
+  "nodes": {
+    "header": "All Nodes",
+    "search": "Search Node",
+    "name": "Node Name",
+    "version": "Version",
+    "cpu": "CPU %",
+    "memory": "Memory %",
+    "tcp": "TCP",
+    "filter_header": "Filters",
+    "clear_all": "Clear All",
+    "region": "Region",
+    "cluster": "Cluster",
+    "nodetype": "Node Type",
+    "status": "Status",
+    "cpuusage": "CPU Usage(%)",
+    "memoryusage": "Memory Usage(%)",
+    "tcpusage": "TCP",
+    "establishedLabel": "Established",
+    "closewaitLabel": "Close Wait",
+    "waittimeLabel": "Time Wait",
+    "applyFilter": "Apply Filters",
+    "searchCluster": "Search Cluster",
+    "searchRegion": "Search Region"
   }
 }

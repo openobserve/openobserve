@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filled
           borderless
           data-test="folder-search"
-          placeholder="Search Folders"
+          placeholder="Search Folder"
           style="width: 100%;"
           clearable
         >

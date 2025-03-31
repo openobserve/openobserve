@@ -17,6 +17,7 @@ from pages.pipeline_page import PipelinePage
 from pages.report_page import ReportPage
 from pages.savedview_page import SavedViewPage
 from pages.serviceaccount_page import ServiceAccountPage
+from pages.search_page import SearchPage
 
 
 # Use environment variable
@@ -36,6 +37,7 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
     report_page = ReportPage(session, base_url, org_id)
     savedview_page = SavedViewPage(session, base_url, org_id)
     serviceaccount_page = ServiceAccountPage(session, base_url, org_id)
+    search_page = SearchPage(session, base_url, org_id) 
 
     for i in range(num_objects):
 
@@ -106,6 +108,10 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
         alert_sql = f"alert_sql_{alert_page.Unique_value_alert}_{i}"
         alert_page.create_standard_alert_sql(session, base_url, user_email, user_password, org_id, stream_name, template_name_webhook, destination_name_webhook, alert_sql)
 
+        # Create search
+        search_page.search_partition_logs_query_2_hours_stream(session, base_url, user_email, user_password, org_id, stream_name)   
+        search_page.search_cache_logs_query_2_hours_stream(session, base_url, user_email, user_password, org_id, stream_name)
+        search_page.search_histogram_logs_query_2_hours_stream(session, base_url, user_email, user_password, org_id, stream_name)
 
     # Created all objects successfully by admin user
 
@@ -177,5 +183,8 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
         alert_sql_admin = f"alert_sql_admin_{alert_page.Unique_value_alert}_{i}"
         alert_page.create_standard_alert_sql(session, base_url, email_address_admin, "12345678", org_id, stream_name, template_name_webhook, destination_name_webhook, alert_sql_admin)
 
-
+        # Create search
+        search_page.search_partition_logs_query_2_hours_stream(session, base_url, email_address_admin, "12345678", org_id, stream_name)   
+        search_page.search_cache_logs_query_2_hours_stream(session, base_url, email_address_admin, "12345678", org_id, stream_name)
+        search_page.search_histogram_logs_query_2_hours_stream(session, base_url, email_address_admin, "12345678", org_id, stream_name)
         

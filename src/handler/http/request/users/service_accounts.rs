@@ -42,6 +42,7 @@ pub async fn exchange_token(
             body: "".to_string(),
             query_params: req.query_string().to_string(),
             response_code: 200,
+            error_msg: None,
         }),
     };
     match result {

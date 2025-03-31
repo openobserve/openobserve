@@ -121,6 +121,7 @@ struct ConfigResponse<'a> {
     all_fields_name: String,
     usage_enabled: bool,
     usage_publish_interval: i64,
+    ingestion_url: String,
     websocket_enabled: bool,
     ingestion_url: String,
     min_auto_refresh_interval: u32,
@@ -312,6 +313,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         all_fields_name: cfg.common.column_all.to_string(),
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
+        ingestion_url: cfg.common.ingestion_url.to_string(),
         websocket_enabled: cfg.websocket.enabled,
         ingestion_url: cfg.common.ingestion_url.to_string(),
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
@@ -417,6 +419,7 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
             query_params: "".to_string(),
             body: "".to_string(),
             response_code: 200,
+            error_msg: None,
         }),
     })
     .await;
@@ -473,6 +476,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             body: "".to_string(),
             query_params: req.query_string().to_string(),
             response_code: 302,
+            error_msg: None,
         }),
     };
 
@@ -751,6 +755,7 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
                 query_params: req.query_string().to_string(),
                 body: "".to_string(),
                 response_code: 200,
+                error_msg: None,
             }),
         })
         .await;

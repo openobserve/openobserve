@@ -129,6 +129,7 @@ async fn audit_middleware(
                     body,
                     query_params,
                     response_code: res.response().status().as_u16(),
+                    error_msg: None,
                 }),
             })
             .await;
