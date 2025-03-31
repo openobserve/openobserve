@@ -73,8 +73,8 @@ def test_e2e_query(create_session, base_url):
 
     # print(resp_get_allalerts.content)
     assert (
-        resp_get_allsearch.status_code == 500
-    ), f"Sql mode added 500, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+        resp_get_allsearch.status_code == 400
+    ), f"Sql mode added 400, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
 def test_e2e_limitadded(create_session, base_url):
