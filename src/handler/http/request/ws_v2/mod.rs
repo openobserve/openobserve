@@ -55,7 +55,7 @@ pub async fn websocket(
         .to_string();
 
     #[cfg(feature = "enterprise")]
-    let cookie_expiry = if cfg.websocket.check_cookie_expiry && cfg.common.local_mode {
+    let cookie_expiry = if cfg.common.local_mode {
         let (cookie_expiry, _) = extract_auth_expiry_and_user_id(&req).await;
         cookie_expiry.map(|expiry| expiry.timestamp_micros())
     } else {
