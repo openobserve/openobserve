@@ -680,15 +680,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 router::http::create_http_client().expect("Failed to create http tls client");
             let factory = web::scope(&cfg.common.base_uri);
             #[cfg(feature = "enterprise")]
-            let factory = if o2_openfga::config::get_config().enabled {
-                factory.wrap(
-                    o2_ratelimit::middleware::RateLimitController::new_with_extractor(Some(
-                        router::ratelimit::resource_extractor::default_extractor,
-                    )),
-                )
-            } else {
-                factory
-            };
+            let factory = factory.wrap(
+                o2_ratelimit::middleware::RateLimitController::new_with_extractor(Some(
+                    router::ratelimit::resource_extractor::default_extractor,
+                )),
+            );
 
             app = app
                 .service(
@@ -804,15 +800,11 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 router::http::create_http_client().expect("Failed to create http tls client");
             let factory = web::scope(&cfg.common.base_uri);
             #[cfg(feature = "enterprise")]
-            let factory = if o2_openfga::config::get_config().enabled {
-                factory.wrap(
-                    o2_ratelimit::middleware::RateLimitController::new_with_extractor(Some(
-                        router::ratelimit::resource_extractor::default_extractor,
-                    )),
-                )
-            } else {
-                factory
-            };
+            let factory = factory.wrap(
+                o2_ratelimit::middleware::RateLimitController::new_with_extractor(Some(
+                    router::ratelimit::resource_extractor::default_extractor,
+                )),
+            );
 
             app = app
                 .service(
