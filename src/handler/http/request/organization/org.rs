@@ -494,3 +494,132 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
 
     Ok(response)
 }
+
+/// GetClusterInfo
+///
+/// This endpoint returns detailed information about the OpenObserve cluster, organized by
+/// regions and clusters. It provides comprehensive visibility into cluster status and can be used for:
+///
+/// - Monitoring cluster health and status across regions
+/// - Viewing current workload information including pending jobs
+/// - Identifying potential bottlenecks or issues
+/// - Checking resource utilization across nodes
+/// - Filtering information by region when using a multi-region setup
+///
+/// NOTE: This endpoint is only accessible through the "_meta" organization and requires
+/// the user to have access to this special organization.
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetMetaOrganizationClusterInfo",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Must be '_meta'"),
+        ("regions" = String, Query, description = "Optional comma-separated list of regions to filter by (e.g., 'us-east-1,us-west-2')")
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ClusterInfoResponse),
+        (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/cluster/info")]
+async fn cluster_info(
+    org_id: web::Path<String>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> Result<HttpResponse, Error> {
+    let org = org_id.into_inner();
+
+    // Ensure this API is only available for the "_meta" organization
+    if org != config::META_ORG_ID {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            http::StatusCode::FORBIDDEN.into(),
+            "This API is only available for the _meta organization".to_string(),
+        )));
+    }
+
+    // Extract regions from query params
+    let regions = query.get("regions").map_or_else(Vec::new, |regions_str| {
+        regions_str
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect()
+    });
+
+    // Configure and populate the response based on environment
+    #[cfg(feature = "enterprise")]
+    let response = if get_o2_config().super_cluster.enabled {
+        // Super cluster is enabled, get info from super cluster
+        match get_super_cluster_info(&regions).await {
+            Ok(response) => response,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        }
+    } else {
+        // Super cluster not enabled, get local info
+        get_local_cluster_info().await
+    };
+
+    #[cfg(not(feature = "enterprise"))]
+    let response = get_local_cluster_info().await;
+
+    // Return the response
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Helper function to collect cluster info from the local cluster
+async fn get_local_cluster_info() -> ClusterInfoResponse {
+    let mut response = ClusterInfoResponse::new();
+
+    let pending_jobs = infra_file_list::get_pending_jobs_count().await?;
+    response.add_cluster_info(pending_jobs, "local".to_string());
+
+    response
+}
+
+#[cfg(feature = "enterprise")]
+/// Helper function to collect cluster info from all clusters in a super cluster
+async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoResponse, anyhow::Error> {
+    let mut response = ClusterInfoResponse::new();
+
+    // Get all nodes in the super cluster
+    let cluster_nodes = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
+        "cluster_info",
+        regions.to_vec(),
+        vec![],
+    )
+    .await
+    {
+        Ok(nodes) => nodes,
+        Err(e) => {
+            log::error!("Failed to get super cluster nodes: {:?}", e);
+            return Ok(response); // Return empty response instead of failing
+        }
+    };
+
+    // For each node in the super cluster
+    for node in cluster_nodes {
+        let region = node.get_region();
+        let cluster_name = node.get_cluster_name();
+
+        // Fetch cluster info from this cluster node
+        match crate::service::cluster_info::get_super_cluster_info(node).await {
+            Ok(cluster_info) => {
+                response.add_cluster_info(cluster_info, region.clone());
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to get cluster info from cluster {}: {:?}",
+                    cluster_name,
+                    e
+                );
+                // Return error
+                return Err(anyhow::anyhow!("Failed to get cluster info: {:?}", e));
+            }
+        }
+    }
+
+    Ok(response)
+}

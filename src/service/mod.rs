@@ -39,6 +39,7 @@ pub mod promql;
 pub mod schema;
 pub mod search;
 pub mod websocket_events;
+pub mod cluster_info;
 
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;

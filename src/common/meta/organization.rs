@@ -201,9 +201,9 @@ pub struct NodeListRequest {
     pub regions: Vec<String>,
 }
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct RegionInfo {
+pub struct RegionInfo<T> {
     #[serde(flatten)]
-    pub clusters: std::collections::HashMap<String, Vec<Node>>,
+    pub clusters: std::collections::HashMap<String, T>,
 }
 
 /// Response struct for node listing with nested hierarchy
@@ -215,7 +215,7 @@ pub struct RegionInfo {
 #[derive(Serialize, Deserialize, Default)]
 pub struct NodeListResponse {
     #[serde(flatten)]
-    pub regions: std::collections::HashMap<String, RegionInfo>,
+    pub regions: std::collections::HashMap<String, RegionInfo<Vec<Node>>>,
 }
 
 impl NodeListResponse {
@@ -252,10 +252,24 @@ impl NodeListResponse {
     }
 }
 
-// We can also add helper functions for the region and cluster structs
-impl RegionInfo {
-    /// Adds a cluster to this region if it doesn't exist
-    pub fn add_cluster(&mut self, cluster_name: String) -> &mut Vec<Node> {
-        self.clusters.entry(cluster_name).or_default()
+/// Response struct for cluster info
+/// 
+/// Contains a three-level hierarchy with a flat format:
+/// 1. Regions at the top level as object keys
+/// 2. Clusters within each region as object keys
+#[derive(Serialize, Deserialize, Default)]
+pub struct ClusterInfoResponse {
+    pub regions: std::collections::HashMap<String, RegionInfo<GetClusterInfoResponse>>,
+}
+
+
+impl ClusterInfoResponse {
+    pub fn add_cluster_info(&mut self, cluster_info: GetClusterInfoResponse, region_name:String) {
+        let region_entry = self.regions.entry(region_name).or_insert_with(|| RegionInfo {
+            clusters: std::collections::HashMap::new(),
+        });
+
+        let cluster_entry = region_entry.clusters.entry(cluster_info.cluster_name).or_default();
+        cluster_entry.push(cluster_info);
     }
 }
