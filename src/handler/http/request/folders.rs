@@ -211,7 +211,7 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
 
 /// GetFolderByName
 ///
-/// {"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",

@@ -107,8 +107,7 @@ impl std::fmt::Display for RatelimitRuleType {
 
 impl RatelimitRule {
     pub fn get_resource(&self) -> String {
-        format!(
-            "{}:{}:{}:{}:{}:{}",
+        get_resource_from_params(
             self.get_org(),
             self.get_rule_type(),
             self.get_user_role(),

@@ -78,7 +78,7 @@ pub async fn create_annotations(
 
 /// Get Timed Annotations
 ///
-/// {"ratelimit_module":"Dashboards", "ratelimit_module_operation":"list"}
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     get,
     context_path = "/api",
@@ -138,7 +138,7 @@ pub async fn get_annotations(
 
 /// Delete Timed Annotations
 ///
-/// {"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     delete,
     tag = "Dashboards",
@@ -188,7 +188,7 @@ pub async fn delete_annotations(
 
 /// Update Timed Annotations
 ///
-/// {"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     put,
     tag = "Dashboards",
@@ -242,7 +242,7 @@ pub async fn update_annotations(
 
 /// Delete Timed Annotation Panels
 ///
-/// {"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     delete,
     tag = "Dashboards",

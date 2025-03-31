@@ -72,7 +72,7 @@ pub async fn save_template(
 
 /// UpdateTemplate
 ///
-/// {"ratelimit_module":"Templates", "ratelimit_module_operation":"update"}
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -105,7 +105,7 @@ pub async fn update_template(
 
 /// GetTemplateByName
 ///
-/// {"ratelimit_module":"Templates", "ratelimit_module_operation":"get"}
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -133,7 +133,7 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
 
 /// ListTemplates
 ///
-/// {"ratelimit_module":"Templates", "ratelimit_module_operation":"list"}
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -188,7 +188,7 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
 
 /// DeleteTemplate
 ///
-/// {"ratelimit_module":"Templates", "ratelimit_module_operation":"delete"}
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",

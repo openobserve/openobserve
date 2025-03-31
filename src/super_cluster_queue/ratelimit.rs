@@ -32,10 +32,13 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
     let rule = RuleEntry::try_from(&bytes)?;
 
     match msg.message_type {
-        MessageType::RatelimitAdd => match infra::table::ratelimit::add(rule).await {
+        MessageType::RatelimitAdd => match infra::table::ratelimit::add(rule.clone()).await {
             Ok(_) => Ok(()),
             Err(e) if e.to_string() == RULE_EXISTS => {
-                log::warn!("[SUPER_CLUSTER:RATELIMIT] Rule already exists, ignoring");
+                log::warn!(
+                    "[SUPER_CLUSTER:RATELIMIT] Rule already exists, ignoring, rule: {:?}",
+                    rule
+                );
                 Ok(())
             }
             Err(e) => Err(e),

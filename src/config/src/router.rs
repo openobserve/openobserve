@@ -43,7 +43,9 @@ const FIXED_QUERIER_ROUTES: [&str; 3] = ["/summary", "/schema", "/streams"];
 
 #[inline]
 pub fn is_querier_route(path: &str) -> bool {
-    QUERIER_ROUTES.iter().any(|x| path.contains(x))
+    QUERIER_ROUTES
+        .iter()
+        .any(|x| path == *x || path.starts_with(&format!("{}/", x)))
 }
 
 #[inline]

@@ -71,7 +71,7 @@ pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse,
 
 /// ListSavedViews - Retrieve the list of saved views.
 ///
-/// {"ratelimit_module":"Saved Views", "ratelimit_module_operation":"list"}
+/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
@@ -104,7 +104,7 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
 
 /// DeleteSavedViews - Delete a view associated with this given org.
 ///
-/// {"ratelimit_module":"Saved Views", "ratelimit_module_operation":"delete"}
+/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
@@ -142,7 +142,7 @@ pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpRespon
 
 /// CreateSavedViews - Create a view for later retrieval associated with the given search.
 ///
-/// {"ratelimit_module":"Saved Views", "ratelimit_module_operation":"create"}
+/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
@@ -185,7 +185,7 @@ pub async fn create_view(
 
 /// UpdateSavedViews - Update a saved view
 ///
-/// {"ratelimit_module":"Saved Views", "ratelimit_module_operation":"update"}
+/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
