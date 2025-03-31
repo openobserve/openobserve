@@ -23,7 +23,7 @@ use arrow::{
 use arrow_schema::Schema;
 use chrono::{Datelike, Timelike};
 use config::{
-    PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE, PARQUET_PAGE_SIZE,
+    PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
     cluster::{self, LOCAL_NODE},
     get_config, get_parquet_compression,
 };
@@ -118,7 +118,6 @@ fn get_writer(schema: Arc<Schema>, buf: &mut Vec<u8>) -> AsyncArrowWriter<&mut V
     let cfg = get_config();
     let writer_props = WriterProperties::builder()
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
-        .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
         .set_compression(get_parquet_compression(&cfg.common.parquet_compression));
 

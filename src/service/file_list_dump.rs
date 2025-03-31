@@ -190,6 +190,7 @@ pub async fn get_file_list_entries_in_range(
         None,
         None,
         vec![],
+        false,
     )
     .await?;
 
