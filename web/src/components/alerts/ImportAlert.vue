@@ -695,9 +695,7 @@ export default defineComponent({
           allAlertsCreated = false;
         }
       }
-
       if (allAlertsCreated) {
-        emit("update:alerts");
         q.notify({
           message: "Alert(s) imported successfully",
           color: "positive",
@@ -1008,9 +1006,9 @@ export default defineComponent({
         }
       });
 
-      //this condition is added to avoid the error when the updated_at is a number 
+      //this condition is added to avoid the error when the updated_at is not a number 
       //with the new alert api the updated_at is a nummer 
-      if( typeof input.updated_at == 'number'){
+      if( typeof input.updated_at !== 'number'){
         input.updated_at = null;
       }
 
