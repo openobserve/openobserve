@@ -406,6 +406,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("nodes.header") }}
               </div>
               <div class="col-auto flex">
+                <q-btn :label="t('common.refresh')" class="text-bold text-capitalize q-mr-sm" 
+                color="secondary" style="height: 40px;" @click="getData"></q-btn>
                 <q-input
                   v-model="filterQuery"
                   filled
@@ -419,8 +421,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-icon name="search" />
                   </template>
                 </q-input>
-                <q-btn :label="t('common.refresh')" class="text-bold text-capitalize q-ml-sm q-pa-xs" 
-                color="secondary" @click="getData"></q-btn>
               </div>
               <div class="col-auto flex q-ml-md pagination-align">
                 <QTablePagination
