@@ -300,12 +300,12 @@ const tabs = reactive ([
     value: "all",
   },
   {
-    label: "Realtime",
-    value: "realtime",
-  },
-  {
     label: "Scheduled",
     value: "scheduled",
+  },
+  {
+    label: "Real-Time",
+    value: "realtime",
   },
 ]);
 
@@ -314,8 +314,7 @@ const perPageOptions: any = [
   { label: "10", value: 10 },
   { label: "20", value: 20 },
   { label: "50", value: 50 },
-  { label: "100", value: 100 },
-  { label: "All", value: 0 },
+  { label: "100", value: 100 }
 ];
 const resultTotal = ref<number>(0);
 const maxRecordToReturn = ref<number>(100);
