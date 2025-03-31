@@ -101,8 +101,10 @@ pub async fn submit_job(
             .unwrap_or("")
             .to_string();
 
-        let query =
-            web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+        let query = match web::Query::<HashMap<String, String>>::from_query(in_req.query_string()) {
+            Ok(q) => q,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        };
         let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
         let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);

@@ -67,7 +67,7 @@ async fn handle_rule_operation(
     operation: RuleOperation,
     db_operation: impl Future<Output = Result<(), anyhow::Error>>,
 ) -> Result<(), RatelimitError> {
-    let db_result = db_operation.await.map_err(RatelimitError::DbError);
+    db_operation.await.map_err(RatelimitError::DbError)?;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::infra::config::get_config()
@@ -83,7 +83,7 @@ async fn handle_rule_operation(
         }
     }
 
-    db_result
+    Ok(())
 }
 
 async fn sync_to_super_cluster(

@@ -73,7 +73,9 @@ async fn validate_ratelimit_updater(
     update_type: &str,
     rules: &RatelimitRuleUpdater,
 ) -> Result<(), anyhow::Error> {
-    let global_default_rules = get_default_rules().await.unwrap();
+    let global_default_rules = get_default_rules()
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     // module-level is org-level
     let org_level_rules = infra::table::ratelimit::fetch_rules(

@@ -202,7 +202,7 @@ pub async fn update_action_details(
             if let Ok(res) = crate::service::organization::get_passcode(Some(&org_id), &sa).await {
                 res.passcode
             } else {
-                return Ok(HttpResponse::BadRequest().body("Failed to fetch passcode"));
+                return Ok(MetaHttpResponse::bad_request("Failed to fetch passcode"));
             };
 
         req.service_account = Some(sa);

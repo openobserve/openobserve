@@ -342,7 +342,7 @@ pub async fn get_role_permissions(
 )]
 #[get("/{org_id}/roles/{role_id}/permissions/{resource}")]
 pub async fn get_role_permissions(
-    _path: web::Path<(String, String)>,
+    _path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

@@ -26,7 +26,7 @@ const QUERIER_ROUTES: [&str; 20] = [
     "/_search",
     "/_around",
     "/_values",
-    "/functions?page_num=",
+    "/functions",
     "/prometheus/api/v1/series",
     "/prometheus/api/v1/query",
     "/prometheus/api/v1/query_range",
