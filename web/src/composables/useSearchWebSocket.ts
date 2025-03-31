@@ -341,9 +341,8 @@ const useSearchWebSocket = () => {
   const resetAuthToken = async () => {
     // console.log("reset auth token");
     isInDrainMode.value = true;
-    return new Promise(async (resolve) => {
-      // Added timeout to test the auth token refresh
-      setTimeout(() => {
+    return new Promise(async (resolve, reject) => {
+      authService.refresh_token().then((res: any) => {
         isInDrainMode.value = false;
         // Retry the request
         Object.keys(traces).forEach((traceId) => {
@@ -357,29 +356,13 @@ const useSearchWebSocket = () => {
             });
           }
         });
-        resolve("");
-      }, 500)
-      // authService.refresh_token().then((res: any) => {
-      //   isInDrainMode.value = false;
-      //   // Retry the request
-      //   Object.keys(traces).forEach((traceId) => {
-      //     if(!traces[traceId].isInitiated) {
-      //       initiateSocketConnection(traces[traceId].data, {
-      //         open: traces[traceId].open[0],
-      //         message: traces[traceId].message[0],
-      //         close: traces[traceId].close[0],
-      //         error: traces[traceId].error[0],
-      //         reset: traces[traceId].reset[0],
-      //       });
-      //     }
-      //   });
-      //   resolve(res);
-      // }).catch((err: any) => {
-      //   console.error("Error in refreshing auth token", err);
-      //   reject(err);
-      // }).finally(() => {
-      //   isInDrainMode.value = false;
-      // });
+        resolve(res);
+      }).catch((err: any) => {
+        console.error("Error in refreshing auth token", err);
+        reject(err);
+      }).finally(() => {
+        isInDrainMode.value = false;
+      });
     })
   }
 
