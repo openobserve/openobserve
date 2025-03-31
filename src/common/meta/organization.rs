@@ -252,6 +252,11 @@ impl NodeListResponse {
     }
 }
 
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+pub struct ClusterInfo {
+    pub pending_jobs: u64,
+}
+
 /// Response struct for cluster info
 /// 
 /// Contains a three-level hierarchy with a flat format:
@@ -259,17 +264,16 @@ impl NodeListResponse {
 /// 2. Clusters within each region as object keys
 #[derive(Serialize, Deserialize, Default)]
 pub struct ClusterInfoResponse {
-    pub regions: std::collections::HashMap<String, RegionInfo<GetClusterInfoResponse>>,
+    pub regions: std::collections::HashMap<String, RegionInfo<ClusterInfo>>,
 }
 
 
 impl ClusterInfoResponse {
-    pub fn add_cluster_info(&mut self, cluster_info: GetClusterInfoResponse, region_name:String) {
+    pub fn add_cluster_info(&mut self, cluster_info: ClusterInfo, cluster_name: String, region_name: String) {
         let region_entry = self.regions.entry(region_name).or_insert_with(|| RegionInfo {
             clusters: std::collections::HashMap::new(),
         });
 
-        let cluster_entry = region_entry.clusters.entry(cluster_info.cluster_name).or_default();
-        cluster_entry.push(cluster_info);
+        region_entry.clusters.insert(cluster_name, cluster_info);
     }
 }

@@ -20,7 +20,7 @@ use infra::errors::{Error, ErrorCodes};
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
     self, metrics_client::MetricsClient, node_service_client::NodeServiceClient,
-    search_client::SearchClient,
+    search_client::SearchClient, cluster_info_service_client::ClusterInfoServiceClient,
 };
 use tonic::{
     Request, Status,

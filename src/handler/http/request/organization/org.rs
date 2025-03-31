@@ -27,8 +27,8 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                CUSTOM, DEFAULT_ORG, NodeListResponse, OrgDetails, OrgUser, Organization,
-                OrganizationResponse, PasscodeResponse, RumIngestionResponse, THRESHOLD,
+                CUSTOM, DEFAULT_ORG, NodeListResponse, OrgDetails, OrgUser, Organization, ClusterInfo,
+                ClusterInfoResponse, OrganizationResponse, PasscodeResponse, RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{UserEmail, is_root_user},
@@ -551,38 +551,54 @@ async fn cluster_info(
 
     // Configure and populate the response based on environment
     #[cfg(feature = "enterprise")]
-    let response = if get_o2_config().super_cluster.enabled {
+    let cluster_info_response = if get_o2_config().super_cluster.enabled {
         // Super cluster is enabled, get info from super cluster
         match get_super_cluster_info(&regions).await {
-            Ok(response) => response,
+            Ok(resp) => resp,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         }
     } else {
         // Super cluster not enabled, get local info
-        get_local_cluster_info().await
+        match get_local_cluster_info().await {
+            Ok(resp) => resp,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        }
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let response = get_local_cluster_info().await;
+    let cluster_info_response = match get_local_cluster_info().await {
+        Ok(resp) => resp,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
 
     // Return the response
-    Ok(HttpResponse::Ok().json(response))
+    Ok(HttpResponse::Ok().json(cluster_info_response))
 }
 
 /// Helper function to collect cluster info from the local cluster
-async fn get_local_cluster_info() -> ClusterInfoResponse {
-    let mut response = ClusterInfoResponse::new();
+async fn get_local_cluster_info() -> Result<ClusterInfoResponse, anyhow::Error> {
+    let mut response = ClusterInfoResponse::default();
+    
+    let pending_jobs_map = infra::file_list::get_pending_jobs_count().await?;
+    let local_cluster = config::get_cluster_name();
+    
+    // Sum up all pending jobs across all organizations and stream types
+    let total_pending_jobs: u64 = pending_jobs_map
+        .values()
+        .flat_map(|inner_map| inner_map.values())
+        .map(|&count| count as u64)
+        .sum();
+        
+    let cluster_info_obj = ClusterInfo { pending_jobs: total_pending_jobs };
+    response.add_cluster_info(cluster_info_obj, local_cluster, "openobserve".to_string());
 
-    let pending_jobs = infra_file_list::get_pending_jobs_count().await?;
-    response.add_cluster_info(pending_jobs, "local".to_string());
-
-    response
+    Ok(response)
 }
 
 #[cfg(feature = "enterprise")]
 /// Helper function to collect cluster info from all clusters in a super cluster
 async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoResponse, anyhow::Error> {
-    let mut response = ClusterInfoResponse::new();
+    let mut response = ClusterInfoResponse::default();
 
     // Get all nodes in the super cluster
     let cluster_nodes = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
@@ -598,16 +614,16 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
             return Ok(response); // Return empty response instead of failing
         }
     };
-
+    
     // For each node in the super cluster
     for node in cluster_nodes {
         let region = node.get_region();
         let cluster_name = node.get_cluster_name();
-
+        
         // Fetch cluster info from this cluster node
         match crate::service::cluster_info::get_super_cluster_info(node).await {
-            Ok(cluster_info) => {
-                response.add_cluster_info(cluster_info, region.clone());
+            Ok(cluster_info_obj) => {
+                response.add_cluster_info(cluster_info_obj, cluster_name.clone(), region.clone());
             }
             Err(e) => {
                 log::error!(
@@ -620,6 +636,6 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
             }
         }
     }
-
+    
     Ok(response)
 }

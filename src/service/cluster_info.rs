@@ -18,12 +18,18 @@ use std::sync::Arc;
 use proto::cluster_rpc::{EmptyRequest, GetClusterInfoResponse, CompactionInfo};
 use tonic::{Request, Response, Status};
 use infra::file_list as infra_file_list;
-
-use crate::common::infra::cluster;
+use crate::common::meta::organization::ClusterInfo;
+use config::meta::cluster::NodeInfo;
 
 pub struct ClusterInfoService;
 
-
+pub fn convert_response_to_cluster_info(response: GetClusterInfoResponse) -> ClusterInfo {
+    ClusterInfo {
+        pending_jobs: response.compaction_info.as_ref()
+            .map(|info| info.pending_jobs)
+            .unwrap_or_default(),
+    }
+}
 
 #[tonic::async_trait]
 impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for ClusterInfoService {
@@ -32,7 +38,14 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
         _request: Request<EmptyRequest>,
     ) -> Result<Response<GetClusterInfoResponse>, Status> {
         // Fetch the jobs information from the database
-        let jobs = infra_file_list::get_pending_jobs_count().await?;
+        let jobs = match infra_file_list::get_pending_jobs_count().await {
+            Ok(jobs) => jobs,
+            Err(e) => {
+                log::error!("Failed to get pending jobs count: {:?}", e);
+                return Err(Status::internal(format!("Failed to get pending jobs count: {:?}", e)));
+            }
+        };
+        
         Ok(Response::new(GetClusterInfoResponse {
             compaction_info: Some(CompactionInfo {
                 pending_jobs: jobs.len() as u64,
@@ -43,12 +56,12 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
     }
 }
 
-pub async fn get_super_cluster_info(node: Arc<dyn NodeInfo>) -> Result<GetClusterInfoResponse, anyhow::Error> {
+pub async fn get_super_cluster_info(node: Arc<dyn NodeInfo>) -> Result<ClusterInfo, anyhow::Error> {
     let empty_request = EmptyRequest {};
     let mut request = Request::new(empty_request.clone());
     let mut client = super::grpc::make_grpc_cluster_info_client(&mut request, &node).await?;
     let response = match client.get_cluster_info(Request::new(empty_request)).await {
-        Ok(remote_response) => remote_response.into_inner(),
+        Ok(response) => convert_response_to_cluster_info(response.into_inner()),
         Err(err) => {
             log::error!(
                 "Failed to get cluster info from cluster node {}: {:?}",
@@ -63,4 +76,8 @@ pub async fn get_super_cluster_info(node: Arc<dyn NodeInfo>) -> Result<GetCluste
     };
 
     Ok(response)
+}
+
+pub fn cluster_info_service() -> proto::cluster_rpc::cluster_info_service_server::ClusterInfoServiceServer<ClusterInfoService> {
+    proto::cluster_rpc::cluster_info_service_server::ClusterInfoServiceServer::new(ClusterInfoService)
 }
