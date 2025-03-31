@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, http::StatusCode};
+use actix_web::HttpResponse;
 use config::meta::stream::StreamType;
-use infra::errors;
 use o2_openfga::meta::mapping::OFGA_MODELS;
 
 use crate::common::{
