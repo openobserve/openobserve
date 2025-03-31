@@ -71,32 +71,17 @@ pub fn map_error_to_http_response(err: errors::Error, trace_id: String) -> HttpR
             errors::ErrorCodes::SearchTimeout(_) => HttpResponse::RequestTimeout().json(
                 meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
             ),
-            errors::ErrorCodes::SearchFieldNotFound(_) => HttpResponse::BadRequest().json(
+            errors::ErrorCodes::InvalidParams(_)
+            | errors::ErrorCodes::SearchSQLExecuteError(_)
+            | errors::ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
+            | errors::ErrorCodes::SearchFunctionNotDefined(_)
+            | errors::ErrorCodes::FullTextSearchFieldNotFound
+            | errors::ErrorCodes::SearchFieldNotFound(_)
+            | errors::ErrorCodes::SearchSQLNotValid(_)
+            | errors::ErrorCodes::SearchStreamNotFound(_) => HttpResponse::BadRequest().json(
                 meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
             ),
-            errors::ErrorCodes::SearchSQLNotValid(_) => HttpResponse::BadRequest().json(
-                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-            ),
-            errors::ErrorCodes::SearchStreamNotFound(_) => HttpResponse::BadRequest().json(
-                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-            ),
-            errors::ErrorCodes::FullTextSearchFieldNotFound => HttpResponse::BadRequest().json(
-                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-            ),
-            errors::ErrorCodes::SearchFunctionNotDefined(_) => HttpResponse::BadRequest().json(
-                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-            ),
-            errors::ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => HttpResponse::BadRequest()
-                .json(meta::http::HttpResponse::error_code_with_trace_id(
-                    code,
-                    Some(trace_id),
-                )),
-            errors::ErrorCodes::SearchSQLExecuteError(_) => HttpResponse::BadRequest().json(
-                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-            ),
-            errors::ErrorCodes::InvalidParams(_) => HttpResponse::BadRequest().json(
-                meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-            ),
+
             errors::ErrorCodes::ServerInternalError(_)
             | errors::ErrorCodes::SearchParquetFileNotFound => {
                 HttpResponse::InternalServerError().json(
