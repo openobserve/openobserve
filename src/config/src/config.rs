@@ -33,10 +33,9 @@ use lettre::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    meta::cluster,
+    meta::{cluster, meta_store::MetaStore},
     utils::{file::get_file_meta, sysinfo},
 };
-use crate::meta::meta_store::MetaStore;
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
@@ -2596,7 +2595,6 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_ratelimit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-
     if cfg.ratelimit.ratelimit_enabled {
         let meta_store: MetaStore = cfg.common.queue_store.as_str().into();
         if meta_store != MetaStore::Nats {
