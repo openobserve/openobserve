@@ -61,7 +61,7 @@ use openobserve::{
     },
     job, router,
     service::{
-        db, metadata, node::NodeService, search::SEARCH_SERVER, self_reporting,
+        db, metadata, node::NodeService, cluster_info::ClusterInfoService, search::SEARCH_SERVER, self_reporting,
         tls::http_tls_config,
     },
 };
@@ -77,6 +77,7 @@ use proto::cluster_rpc::{
     event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
+    cluster_info_service_server::ClusterInfoServiceServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
@@ -552,6 +553,11 @@ async fn init_common_grpc_server(
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    let cluster_info_svc = ClusterInfoServiceServer::new(ClusterInfoService)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
     log::info!(
         "starting gRPC server {} at {}",
@@ -580,6 +586,7 @@ async fn init_common_grpc_server(
         .add_service(streams_svc)
         .add_service(flight_svc)
         .add_service(node_svc)
+        .add_service(cluster_info_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");

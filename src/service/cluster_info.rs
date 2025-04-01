@@ -83,10 +83,3 @@ pub async fn get_super_cluster_info(node: Arc<dyn NodeInfo>) -> Result<ClusterIn
 
     Ok(response)
 }
-
-pub fn cluster_info_service()
--> proto::cluster_rpc::cluster_info_service_server::ClusterInfoServiceServer<ClusterInfoService> {
-    proto::cluster_rpc::cluster_info_service_server::ClusterInfoServiceServer::new(
-        ClusterInfoService,
-    )
-}
