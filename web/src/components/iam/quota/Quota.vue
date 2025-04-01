@@ -761,7 +761,12 @@ export default defineComponent ({
             }
             //these are the modules that are displayed in the dropdown 
             //to select the api category that user can use to filter the api limits
-            apiCategories.value = await getModulesToDisplay(selectedOrganization.value.value);
+            if(!store.state.modulesToDisplay[selectedOrganization.value.value]){
+                apiCategories.value = await getModulesToDisplay(selectedOrganization.value.value);
+            }
+            else{
+                apiCategories.value = store.state.modulesToDisplay[selectedOrganization.value.value];
+            }
         }
 
 
@@ -787,8 +792,11 @@ export default defineComponent ({
 
     })
     watch (()=>selectedOrganization.value, async (newVal) => {
-        if(newVal){
+        if(newVal && !store.state.modulesToDisplay[newVal.value]){
              apiCategories.value = await getModulesToDisplay(newVal.value);
+        }
+        else{
+            apiCategories.value = store.state.modulesToDisplay[newVal.value];
         }
     })
 
@@ -798,8 +806,8 @@ export default defineComponent ({
         if(activeTab.value === "api-limits"){
             const newArray = [...filteredOrganizations.value];
             newArray.unshift({
-                label: "GLOBAL RULES META",
-                value: "GLOBAL_RULES_META"
+                label: "global rules",
+                value: "global_rules"
             });
             return newArray;
         }
@@ -885,11 +893,11 @@ export default defineComponent ({
             await getRolesByOrganization();
             //here we are checking if the organization is global_rules_meta then we need to reset the selectedOrganization
             //because in role limit we dont have something called global_rules_meta org
-            if(router.currentRoute.value.query.quota_org == "global_rules_meta"){
+            if(router.currentRoute.value.query.quota_org == "global_rules"){
                 selectedOrganization.value = ""
                 $q.notify({
                     type: "negative",
-                    message: "Global rules meta is not available for role limits",
+                    message: "Global rules is not available for role limits",
                     timeout: 3000,
                 })
             }
@@ -1009,6 +1017,9 @@ export default defineComponent ({
             else{
                 response = await ratelimitService.update_batch(selectedOrganization.value.value, payload,"role",user_role);
             }
+            if(selectedOrganization.value.value == "global_rules"){
+                resetStore();
+            }
             // Here you would call your API to save the changes
             if(response.status === 200){
                 uploadError.value = '';
@@ -1063,6 +1074,9 @@ export default defineComponent ({
             }
             else{
                 response = await ratelimitService.update_batch(selectedOrganization.value.value, payload,"role",user_role);
+            }
+            if(selectedOrganization.value.value == "global_rules"){
+                resetStore();
             }
             // Here you would call your API to save the changes
             if(response.status === 200){
@@ -1413,6 +1427,10 @@ export default defineComponent ({
         else{
             filteredRoleLevelModuleRows.value = roleLevelModuleRows.value;
         }
+    }
+    const resetStore = () =>{
+        store.dispatch("setApiLimitsByOrgId", {});
+        store.dispatch("setRoleLimitsByOrgIdByRole", {});
     }
     return {
         t,

@@ -84,7 +84,7 @@ export default createStore({
     webSocketUrl: "",
     allApiLimitsByOrgId: {},
     allRoleLimitsByOrgIdByRole: {},
-    modulesToDisplay: [],
+    modulesToDisplay: {},
   },
   mutations: {
     login(state, payload) {

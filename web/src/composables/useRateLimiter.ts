@@ -56,6 +56,11 @@ import rateLimiterService from "@/services/rate_limit";
         ...store.state.allApiLimitsByOrgId,
         [orgId]: transformedData,
       });
+      //this is done because once we update the api limits , we need to reset the role limits so that when we can fetch the latest roles limits from the api (updated one)
+      store.dispatch("setRoleLimitsByOrgIdByRole", {
+        ...store.state.allRoleLimitsByOrgIdByRole,
+        [orgId]: [],
+      });
       return transformedData;
   } catch (error) {
     
@@ -100,7 +105,6 @@ import rateLimiterService from "@/services/rate_limit";
           [rolename]: transformedData,
         },
       });
-      console.log(store.state.allRoleLimitsByOrgIdByRole,'store.state.allRoleLimitsByOrgIdByRole')
       return transformedData;
   } catch (error) {
       console.log(error);
@@ -114,7 +118,11 @@ import rateLimiterService from "@/services/rate_limit";
         label: role,
         value: role
       }));
-      store.dispatch("setModulesToDisplay", modulesToDisplay);
+      //this is done to store the modules to display for the organization
+      store.dispatch("setModulesToDisplay", {
+        ...store.state.modulesToDisplay,
+        [orgId]: modulesToDisplay,
+      });
       return modulesToDisplay;
       } catch (error) {
       }
