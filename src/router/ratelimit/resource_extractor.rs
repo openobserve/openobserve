@@ -50,10 +50,17 @@ pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleRes
     let path_columns = path.split('/').collect::<Vec<&str>>();
     let (path, org_id) = (
         path.to_string(),
-        path_columns
-            .first()
-            .map(|s| s.to_string())
-            .unwrap_or_default(),
+        if path.starts_with("v2") {
+            path_columns
+                .get(1)
+                .map(|s| s.to_string())
+                .unwrap_or_default()
+        } else {
+            path_columns
+                .first()
+                .map(|s| s.to_string())
+                .unwrap_or_default()
+        },
     );
     let openapi_path = extract_openapi_path(req);
     Box::pin(async move {
