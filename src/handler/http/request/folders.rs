@@ -276,6 +276,8 @@ pub mod deprecated {
     use super::*;
 
     /// CreateFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"create"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -318,6 +320,8 @@ pub mod deprecated {
     }
 
     /// UpdateFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"update"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -358,6 +362,8 @@ pub mod deprecated {
     }
 
     /// ListFolders
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"list"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -397,6 +403,8 @@ pub mod deprecated {
     }
 
     /// GetFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -428,6 +436,8 @@ pub mod deprecated {
     }
 
     /// GetFolderByName
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -459,6 +469,8 @@ pub mod deprecated {
     }
 
     /// DeleteFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"delete"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
