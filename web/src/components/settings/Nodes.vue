@@ -652,8 +652,8 @@ export default defineComponent({
       qTable.value.setPagination(pagination.value);
     };
 
-    function flattenObject(data) {
-        const result = [];
+    function flattenObject(data: any) {
+        const result: any = [];
         const uniqueValues = {
             regions: new Set(),
             clusters: new Set(),
@@ -675,7 +675,7 @@ export default defineComponent({
             for (const cluster in data[region]) {
                 uniqueValues.clusters.add(cluster);
 
-                data[region][cluster].forEach((node) => {
+                data[region][cluster].forEach((node: any) => {
                     // Calculate memory usage percentage
                     const percentageMemoryUsage = (node.metrics.memory_usage > 0)
                         ? Math.round((node.metrics.memory_usage / node.metrics.memory_total) * 100)
@@ -685,7 +685,7 @@ export default defineComponent({
                     const cpuUsage = Math.round(node.metrics.cpu_usage);
 
                     // Extract unique node types from role array
-                    node.role.forEach((r) => uniqueValues.nodeTypes.add(r));
+                    node.role.forEach((r: any) => uniqueValues.nodeTypes.add(r));
 
                     // Extract unique statuses
                     uniqueValues.statuses.add(node.status);
