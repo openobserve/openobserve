@@ -34,9 +34,11 @@ use utoipa::OpenApi;
 
 use crate::{
     common::utils::auth::extract_auth_str,
-    handler::http::{auth::validator::get_user_email_from_auth_str, router::openapi::ApiDoc},
+    handler::http::{
+        auth::validator::get_user_email_from_auth_str,
+        request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG, router::openapi::ApiDoc,
+    },
 };
-use crate::handler::http::request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG;
 
 fn extract_org_id(path: &str) -> String {
     let path_columns = path.split('/').collect::<Vec<&str>>();
@@ -91,7 +93,7 @@ pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleRes
                 );
                 let (default_rule, custom_rules) = find_default_and_custom_rules(
                     &org_id,
-                    user_roles,
+                    user_roles.clone(),
                     api_group_name.as_str(),
                     api_group_operation.as_str(),
                     &user_email,
@@ -99,7 +101,13 @@ pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleRes
                 )
                 .await;
                 log::debug!(
-                    "found default_rule: {:?}, custom_rules: {:?}",
+                    "org_id{}, user_roles:{:?}, api_group_name:{}, api_group_operation:{}, user_email:{}, default_resource:{}, found default_rule: {:?}, custom_rules: {:?}",
+                    &org_id,
+                    user_roles,
+                    api_group_name,
+                    api_group_operation.as_str(),
+                    user_email,
+                    default_resource,
                     &default_rule,
                     &custom_rules
                 );
