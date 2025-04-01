@@ -229,7 +229,3 @@ pub async fn get_node_list(node: Arc<dyn NodeInfo>) -> Result<Vec<ConfigNode>, a
 
     Ok(nodes)
 }
-
-pub fn node_service() -> proto::cluster_rpc::node_service_server::NodeServiceServer<NodeService> {
-    proto::cluster_rpc::node_service_server::NodeServiceServer::new(NodeService)
-}
