@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                     </q-select>
                     <div
-                    v-if="selectedOrganization"
                      class="quota-tabs">
                         <q-tabs
                         data-test="quota-tabs"
@@ -748,6 +747,9 @@ export default defineComponent ({
                 value: router.currentRoute.value.query.quota_org
             }
         }
+        else if(organizations.value.length > 0){
+            selectedOrganization.value = organizations.value[0];
+        }
         if(selectedOrganization.value){
             if(activeTab.value === "api-limits"){
                 //here we are getting the api limits for the selected organization
@@ -887,20 +889,16 @@ export default defineComponent ({
         activeTab.value = tab;
         //
         if (tab === "role-limits") {
+            //here we are checking if the organization is global_rules_meta then we need to reset the selectedOrganization to the first valid organization
+            //as we dont support global_rules_meta in role limits
+            if(router.currentRoute.value.query.quota_org == "global_rules"){
+                selectedOrganization.value = organizations.value[0];
+            }
             //here we are getting the roles from the api
             //as we are not storing the roles in the store
             //so we need to get the roles from the api
             await getRolesByOrganization();
-            //here we are checking if the organization is global_rules_meta then we need to reset the selectedOrganization
-            //because in role limit we dont have something called global_rules_meta org
-            if(router.currentRoute.value.query.quota_org == "global_rules"){
-                selectedOrganization.value = ""
-                $q.notify({
-                    type: "negative",
-                    message: "Global rules is not available for role limits",
-                    timeout: 3000,
-                })
-            }
+
         }
         if (tab === "api-limits" ) {
             if(!store.state.allApiLimitsByOrgId[selectedOrganization.value.value]){
