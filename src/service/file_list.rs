@@ -39,6 +39,7 @@ use crate::service::file_list_dump;
     fields(org_id = org_id, stream_name = stream_name)
 )]
 pub async fn query(
+    trace_id: &str,
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -55,6 +56,14 @@ pub async fn query(
         None,
     )
     .await?;
+    let dumped_files = file_list_dump::get_file_list_entries_in_range(
+        trace_id,
+        org_id,
+        stream_name,
+        stream_type,
+        (time_min, time_max),
+    )
+    .await?;
     let mut file_keys = Vec::with_capacity(files.len());
     for file in files {
         file_keys.push(FileKey {
@@ -63,6 +72,22 @@ pub async fn query(
             deleted: false,
             segment_ids: None,
         });
+    }
+    for file in dumped_files {
+        file_keys.push(FileKey {
+            key: "files/".to_string() + &file.stream + "/" + &file.date + "/" + &file.file,
+            meta: FileMeta {
+                min_ts: file.min_ts,
+                max_ts: file.max_ts,
+                records: file.records,
+                original_size: file.original_size,
+                compressed_size: file.compressed_size,
+                index_size: file.index_size,
+                flattened: file.flattened,
+            },
+            deleted: file.deleted,
+            segment_ids: None,
+        })
     }
     Ok(file_keys)
 }
@@ -95,6 +120,9 @@ pub async fn query_by_date(
             segment_ids: None,
         });
     }
+    // we don't need to query from dump here, because
+    // we expected all dumped files to be already compacted,
+    // and the compaction marks old files as deleted, which is not possible with dump
     Ok(file_keys)
 }
 
@@ -181,6 +209,7 @@ pub async fn query_by_ids(
 
     // query from file_list_dump
     let dumped_files = file_list_dump::get_file_list_entries_in_range(
+        trace_id,
         org,
         stream,
         stream_type,
@@ -252,6 +281,7 @@ pub async fn query_by_ids(
     fields(org_id = org_id, stream_name = stream_name)
 )]
 pub async fn query_ids(
+    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -259,6 +289,7 @@ pub async fn query_ids(
 ) -> Result<Vec<file_list::FileId>> {
     let mut files = file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
     let dumped_files = super::file_list_dump::get_file_list_entries_in_range(
+        trace_id,
         org_id,
         stream_name,
         stream_type,

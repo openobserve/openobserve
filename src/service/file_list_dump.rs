@@ -14,8 +14,6 @@ use super::search::datafusion::exec::prepare_datafusion_context;
 use crate::service::search::datafusion::exec::create_parquet_table;
 
 const HOUR_IN_MILI: i64 = 3600 * 1000;
-// TODO (YJDoc2) combine this with job
-pub const FILE_LIST_CACHE_DIR_NAME: &str = "_oo_file_list_dump";
 
 #[inline]
 fn round_down_to_hour(v: i64) -> i64 {
@@ -137,46 +135,30 @@ fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
 }
 
 pub async fn get_file_list_entries_in_range(
+    trace_id: &str,
     org: &str,
     stream: &str,
     stream_type: StreamType,
     range: (i64, i64),
 ) -> Result<Vec<FileRecord>, errors::Error> {
-    let trace_id = "qbced".to_string();
     let stream_key = format!("{org}/{stream_type}/{stream}");
     let dump_files = get_dump_files_in_range(org, &stream_key, range).await?;
 
+    let dir_name = super::super::job::FILE_LIST_CACHE_DIR_NAME;
     let dump_files: Vec<_> = dump_files
         .into_iter()
         .map(|f| FileKey {
-            key: format!(
-                "files/{org}/{}/{}/{}",
-                FILE_LIST_CACHE_DIR_NAME, stream_key, f.file
-            ),
+            key: format!("files/{org}/{}/{}/{}", dir_name, stream_key, f.file),
             meta: f.file_meta(),
             deleted: false,
             segment_ids: None,
         })
         .collect();
 
-    let schema = Arc::new(Schema::new(vec![
-        Field::new("id", arrow_schema::DataType::Int64, false),
-        Field::new("org", arrow_schema::DataType::Utf8, false),
-        Field::new("stream", arrow_schema::DataType::Utf8, false),
-        Field::new("date", arrow_schema::DataType::Utf8, false),
-        Field::new("file", arrow_schema::DataType::Utf8, false),
-        Field::new("deleted", arrow_schema::DataType::Boolean, false),
-        Field::new("flattened", arrow_schema::DataType::Boolean, false),
-        Field::new("min_ts", arrow_schema::DataType::Int64, false),
-        Field::new("max_ts", arrow_schema::DataType::Int64, false),
-        Field::new("records", arrow_schema::DataType::Int64, false),
-        Field::new("original_size", arrow_schema::DataType::Int64, false),
-        Field::new("compressed_size", arrow_schema::DataType::Int64, false),
-        Field::new("index_size", arrow_schema::DataType::Int64, true),
-    ]));
+    let schema = super::super::job::FILE_LIST_SCHEMA.clone();
 
     let session = config::meta::search::Session {
-        id: trace_id.clone(), // todo
+        id: trace_id.to_string(),
         storage_type: config::meta::search::StorageType::Memory,
         work_group: None,
         target_partitions: 16,
@@ -210,6 +192,5 @@ pub async fn get_file_list_entries_in_range(
         .flat_map(|rb| record_batch_to_file_record(rb))
         .collect();
 
-    super::search::datafusion::storage::file_list::clear(&trace_id);
     Ok(ret)
 }

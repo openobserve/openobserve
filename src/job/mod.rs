@@ -44,6 +44,7 @@ pub(crate) mod syslog_server;
 mod telemetry;
 
 pub use file_downloader::queue_background_download;
+pub use file_list_dump::{FILE_LIST_CACHE_DIR_NAME, FILE_LIST_SCHEMA};
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 pub async fn init() -> Result<(), anyhow::Error> {

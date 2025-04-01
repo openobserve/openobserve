@@ -28,9 +28,27 @@ use config::{
     get_config, get_parquet_compression,
 };
 use infra::{file_list::FileRecord, table::file_list_dump::FileListDump};
+use once_cell::sync::Lazy;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 
 const HOUR_IN_MS: i64 = 3600 * 1000;
+pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
+    Arc::new(Schema::new(vec![
+        Field::new("id", arrow_schema::DataType::Int64, false),
+        Field::new("org", arrow_schema::DataType::Utf8, false),
+        Field::new("stream", arrow_schema::DataType::Utf8, false),
+        Field::new("date", arrow_schema::DataType::Utf8, false),
+        Field::new("file", arrow_schema::DataType::Utf8, false),
+        Field::new("deleted", arrow_schema::DataType::Boolean, false),
+        Field::new("flattened", arrow_schema::DataType::Boolean, false),
+        Field::new("min_ts", arrow_schema::DataType::Int64, false),
+        Field::new("max_ts", arrow_schema::DataType::Int64, false),
+        Field::new("records", arrow_schema::DataType::Int64, false),
+        Field::new("original_size", arrow_schema::DataType::Int64, false),
+        Field::new("compressed_size", arrow_schema::DataType::Int64, false),
+        Field::new("index_size", arrow_schema::DataType::Int64, true),
+    ]))
+});
 pub const FILE_LIST_CACHE_DIR_NAME: &str = "_oo_file_list_dump";
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -50,8 +68,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
 
         // TOD (YJDoc2) check nats lock needed or not for multiple compactors
-        // TODO (YJDoc2) move sleep to start?
         // TODO (YJDoc2) set config limit to min old time for picking up jobs
+        // TODO (YJDoc2) split into threads
         let pending = infra::file_list::get_pending_dump_jobs().await?;
 
         for (job_id, org, stream, offset) in pending {
@@ -94,24 +112,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
     log::info!("[COMPACTOR:JOB] job::files::file_list_dump is stopped");
     Ok(())
-}
-
-fn get_schema() -> Schema {
-    Schema::new(vec![
-        Field::new("id", arrow_schema::DataType::Int64, false),
-        Field::new("org", arrow_schema::DataType::Utf8, false),
-        Field::new("stream", arrow_schema::DataType::Utf8, false),
-        Field::new("date", arrow_schema::DataType::Utf8, false),
-        Field::new("file", arrow_schema::DataType::Utf8, false),
-        Field::new("deleted", arrow_schema::DataType::Boolean, false),
-        Field::new("flattened", arrow_schema::DataType::Boolean, false),
-        Field::new("min_ts", arrow_schema::DataType::Int64, false),
-        Field::new("max_ts", arrow_schema::DataType::Int64, false),
-        Field::new("records", arrow_schema::DataType::Int64, false),
-        Field::new("original_size", arrow_schema::DataType::Int64, false),
-        Field::new("compressed_size", arrow_schema::DataType::Int64, false),
-        Field::new("index_size", arrow_schema::DataType::Int64, true),
-    ])
 }
 
 fn get_writer(schema: Arc<Schema>, buf: &mut Vec<u8>) -> AsyncArrowWriter<&mut Vec<u8>> {
@@ -172,8 +172,7 @@ async fn generate_cache_file(
         field_flattened.append_value(file.flattened);
     }
 
-    // TODO(YJDoc2) extract schema to static arc
-    let schema = Arc::new(get_schema());
+    let schema = FILE_LIST_SCHEMA.clone();
 
     let batch = RecordBatch::try_new(
         schema.clone(),

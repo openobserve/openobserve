@@ -420,7 +420,13 @@ async fn delete_from_file_list(
     stream_name: &str,
     time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
+    let task_id = tokio::task::id();
+    let fake_trace_id = format!(
+        "delete_from_file_list-{}-{}-{}",
+        task_id, time_range.0, time_range.1
+    );
     let files = file_list::query(
+        &fake_trace_id,
         org_id,
         stream_name,
         stream_type,
@@ -429,6 +435,8 @@ async fn delete_from_file_list(
         time_range.1,
     )
     .await?;
+    // we have to do this manually here, otherwise it will not get cleared.
+    super::super::search::datafusion::storage::file_list::clear(&fake_trace_id);
     if files.is_empty() {
         return Ok(());
     }

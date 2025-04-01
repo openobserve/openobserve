@@ -23,8 +23,6 @@ use crate::{
     errors,
 };
 
-// TODO(YJDoc2) : also add count of entries in a file as col in table?
-
 // DBKey to set file_list_dump keys
 pub const FILE_LIST_DUMP_PREFIX: &str = "/file_list_dump/";
 
