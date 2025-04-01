@@ -94,6 +94,7 @@ impl Telemetry {
 }
 
 pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String, json::Value> {
+    let cfg = get_config();
     let mem_info = sysinfo::mem::get_memory_stats();
     data.insert("cpu_count".to_string(), sysinfo::cpu::get_cpu_num().into());
     data.insert("total_memory".to_string(), mem_info.total_memory.into());
@@ -109,9 +110,12 @@ pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String,
     );
     data.insert(
         "host_name".to_string(),
-        get_config().common.instance_name.clone().into(),
+        cfg.common.instance_name.clone().into(),
     );
-
+    data.insert(
+        "meta_store".to_string(),
+        cfg.common.meta_store.clone().into(),
+    );
     data.insert("zo_version".to_string(), config::VERSION.to_owned().into());
 
     data.clone()

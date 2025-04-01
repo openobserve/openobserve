@@ -560,6 +560,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 hide-selected
                 :input-debounce="400"
               />
+              <SelectFolderDropDown
+                  :type="'alerts'"
+                  @folder-selected="updateFolderIdToBeCloned"
+                  :activeFolderId="folderIdToBeCloned"
+                  />
               <div class="flex justify-center q-mt-lg">
                 <q-btn
                   data-test="clone-alert-cancel-btn"
@@ -651,6 +656,7 @@ import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { toRaw } from "vue";
 import { nextTick } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -666,6 +672,7 @@ export default defineComponent({
     FolderList,
     MoveAcrossFolders,
     AppTabs,
+    SelectFolderDropDown,
   },
   emits: [
     "updated:fields",
@@ -827,6 +834,7 @@ export default defineComponent({
     const searchAcrossFolders = ref<any>(false);
     const filteredResults: Ref<any[]> = ref([]);
     const selectedAlertToMove: Ref<any> = ref({});
+    const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
     const getAlertsByFolderId = async (store: any, folderId: any) => {
       try {
         //this is the condition where we are fetching the alerts from the server 
@@ -1016,6 +1024,7 @@ export default defineComponent({
     watch(
       () => activeFolderId.value,
       async (newVal) => {
+        folderIdToBeCloned.value = newVal;
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
         if(newVal == router.currentRoute.value.query.folder){
@@ -1189,13 +1198,14 @@ export default defineComponent({
         if (toBeClonedAlert.value?.id) {
           delete toBeClonedAlert.value?.id;
         }
+        //here using the folderIdToBeCloned.value because we need to clone the alert in the folder which is selected by the user
         alertsService
           .create_by_alert_id(
             store.state.selectedOrganization.identifier,
             toBeClonedAlert.value,
-            activeFolderId.value,
+            folderIdToBeCloned.value,
           )
-          .then((res) => {
+          .then(async (res) => {
             dismiss();
             if (res.data.code == 200) {
               $q.notify({
@@ -1204,7 +1214,8 @@ export default defineComponent({
                 timeout: 2000,
               });
               showForm.value = false;
-              getAlertsFn(store, activeFolderId.value);
+              await getAlertsFn(store, folderIdToBeCloned.value);
+              activeFolderId.value = folderIdToBeCloned.value;
             } else {
               $q.notify({
                 type: "negative",
@@ -1765,6 +1776,9 @@ export default defineComponent({
     const refreshImportedAlerts = async (store: any, folderId: any) => {
       await getAlertsFn(store, folderId);
     };
+    const updateFolderIdToBeCloned = (folderId: any) => {
+      folderIdToBeCloned.value = folderId.value;
+    };
 
 
     return {
@@ -1867,6 +1881,8 @@ export default defineComponent({
       tabs,
       filterAlertsByTab,
       refreshImportedAlerts,
+      folderIdToBeCloned,
+      updateFolderIdToBeCloned,
     };
   },
 });

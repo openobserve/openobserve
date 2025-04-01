@@ -809,20 +809,29 @@ pub async fn root_user_exists() -> bool {
     }
 }
 
-pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
+pub(crate) async fn create_root_user(org_id: &str, user_req: UserRequest) -> Result<(), Error> {
     let cfg = get_config();
     let salt = ider::uuid();
-    let password = get_hash(&usr_req.password, &salt);
-    let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
-    let token = generate_random_string(16);
-    let rum_token = format!("rum{}", generate_random_string(16));
-    let user = usr_req.to_new_dbuser(
+    let password = get_hash(&user_req.password, &salt);
+    let password_ext = get_hash(&user_req.password, &cfg.auth.ext_auth_salt);
+    let token = user_req
+        .token
+        .clone()
+        .unwrap_or_else(|| generate_random_string(16));
+    let rum_token = format!(
+        "rum{}",
+        user_req
+            .token
+            .clone()
+            .unwrap_or_else(|| generate_random_string(16))
+    );
+    let user = user_req.to_new_dbuser(
         password,
         salt,
         org_id.replace(' ', "_"),
         token,
         rum_token,
-        usr_req.is_external,
+        user_req.is_external,
         password_ext,
     );
     db::user::set(&user).await.unwrap();
@@ -936,6 +945,7 @@ mod tests {
                 first_name: "user".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
+                token: None,
             },
             "admin@zo.dev",
         )

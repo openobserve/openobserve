@@ -71,6 +71,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
+                token: if cfg.auth.root_user_token.is_empty() {
+                    None
+                } else {
+                    Some(cfg.auth.root_user_token.clone())
+                },
             },
         )
         .await;

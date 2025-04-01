@@ -551,6 +551,8 @@ pub struct Auth {
     pub root_user_email: String,
     #[env_config(name = "ZO_ROOT_USER_PASSWORD")]
     pub root_user_password: String,
+    #[env_config(name = "ZO_ROOT_USER_TOKEN")]
+    pub root_user_token: String,
     #[env_config(name = "ZO_COOKIE_MAX_AGE", default = 2592000)] // seconds, 30 days
     pub cookie_max_age: i64,
     #[env_config(name = "ZO_COOKIE_SAME_SITE_LAX", default = true)]

@@ -2961,6 +2961,7 @@ mod tests {
             auth: config::Auth {
                 root_user_email: String::default(),
                 root_user_password: String::default(),
+                root_user_token: String::default(),
                 cookie_max_age: i64::default(),
                 cookie_same_site_lax: bool::default(),
                 cookie_secure_only: bool::default(),

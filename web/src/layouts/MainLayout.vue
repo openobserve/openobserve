@@ -807,6 +807,27 @@ export default defineComponent({
       }
     });
 
+    const updateActionsMenu = () => {
+      if (isActionsEnabled.value) {
+        const alertIndex = linksList.value.findIndex(
+          (link) => link.name === "alertList",
+        );
+
+        const actionExists = linksList.value.some(
+          (link) => link.name === "actionScripts",
+        );
+
+        if (alertIndex !== -1 && !actionExists) {
+          linksList.value.splice(alertIndex + 1, 0, {
+            title: t("menu.actions"),
+            icon: outlinedCode,
+            link: "/actions",
+            name: "actionScripts",
+          });
+        }
+      }
+    };
+
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
@@ -1192,27 +1213,6 @@ export default defineComponent({
 
     const openSlack = () => {
       window.open(slackURL, "_blank");
-    };
-
-    const updateActionsMenu = () => {
-      if (isActionsEnabled.value) {
-        const alertIndex = linksList.value.findIndex(
-          (link) => link.name === "alertList",
-        );
-
-        const actionExists = linksList.value.some(
-          (link) => link.name === "actionScripts",
-        );
-
-        if (alertIndex !== -1 && !actionExists) {
-          linksList.value.splice(alertIndex + 1, 0, {
-            title: t("menu.actions"),
-            icon: outlinedCode,
-            link: "/actions",
-            name: "actionScripts",
-          });
-        }
-      }
     };
 
     return {
