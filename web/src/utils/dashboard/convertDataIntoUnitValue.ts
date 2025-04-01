@@ -1020,7 +1020,11 @@ export function addMissingArgs(fields: any): any {
       // If the argument is missing, add it
       const argType = argDef.type[0]; // Always take the first type
       const defaultValue =
-        argDef.defaultValue !== undefined ? argDef.defaultValue : "";
+        argDef.defaultValue !== undefined
+          ? argDef.defaultValue
+          : argType === "field"
+            ? {}
+            : "";
 
       updatedArgs.push({
         type: argType,
