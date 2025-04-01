@@ -1047,7 +1047,6 @@ export default defineComponent ({
 
     const cancelJsonChanges = () => {
         changedValues.value = {};
-        jsonStrToDisplay.value = '';
         editTable.value = false;
     };
 
