@@ -40,7 +40,7 @@ use {
 #[cfg(feature = "enterprise")]
 const QUOTA_PAGE_REQUIRED_ORG: &str = "_meta";
 #[cfg(feature = "enterprise")]
-const QUOTA_PAGE_GLOBAL_RULES_ORG: &str = "GLOBAL_RULES";
+const QUOTA_PAGE_GLOBAL_RULES_ORG: &str = "global_rules";
 
 #[cfg(feature = "enterprise")]
 #[derive(Debug, Clone, Deserialize)]
@@ -52,7 +52,7 @@ struct QueryParams {
 #[cfg(feature = "enterprise")]
 impl QueryParams {
     fn get_org_id(&self) -> String {
-        match self.org_id.to_uppercase().as_str() {
+        match self.org_id.to_lowercase().as_str() {
             QUOTA_PAGE_GLOBAL_RULES_ORG => DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string(),
             _ => self.org_id.to_string(),
         }
