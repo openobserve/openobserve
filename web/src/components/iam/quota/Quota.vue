@@ -820,9 +820,11 @@ export default defineComponent ({
         if(activeTab.value === "api-limits"){
             if(!store.state.allApiLimitsByOrgId[selectedOrganization.value.value]){
                 apiLimitsRows.value = await getApiLimitsByOrganization(selectedOrganization.value.value);
+                resultTotal.value = apiLimitsRows.value.length;
             }
             else{
                 apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
+                resultTotal.value = apiLimitsRows.value.length;
             }
         }
         else if(activeTab.value === "role-limits"){
@@ -1024,6 +1026,7 @@ export default defineComponent ({
         editTable.value = false;
         if(activeTab.value === "api-limits"){
                 apiLimitsRows.value = await getApiLimitsByOrganization(selectedOrganization.value.value);
+                resultTotal.value = apiLimitsRows.value.length;
             }
             else if(activeTab.value === "role-limits"){                    
                 roleLevelModuleRows.value  =  await getRoleLimitsByOrganization(selectedOrganization.value.value, openedRole.value);
@@ -1075,6 +1078,7 @@ export default defineComponent ({
         editTable.value = false;
         if(activeTab.value === "api-limits"){
                 apiLimitsRows.value = await getApiLimitsByOrganization(selectedOrganization.value.value);
+                resultTotal.value = apiLimitsRows.value.length;
             }
             else{
                 roleLevelModuleRows.value  =  await getRoleLimitsByOrganization(selectedOrganization.value.value, openedRole.value);
