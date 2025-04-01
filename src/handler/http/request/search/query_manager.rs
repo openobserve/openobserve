@@ -108,6 +108,8 @@ pub async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Result<Http
 
     #[cfg(not(feature = "enterprise"))]
     {
+        let _ = org_id;
+        let _ = trace_ids;
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
