@@ -26,6 +26,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { useRouter } from "vue-router";
 import { nextTick } from "vue";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
 const store = useStore();
 const { t } = useI18n();
@@ -35,6 +36,8 @@ const router = useRouter();
 const activeTab = ref("users");
 
 const iamRouteTabsRef: any = ref(null);
+
+const { isMetaOrg } = useIsMetaOrg();
 
 const tabs = ref([
   {
@@ -126,7 +129,7 @@ watch(
     }
     //this condition is added to avoid the unnecessarily showing the quota tab when the user is not in the meta org and trying to access the quota tab
     //this is fallback to users tab when the user is not in the meta org and trying to access the quota tab
-    if(value == "quota" && store.state.selectedOrganization.identifier !== '_meta'){
+    if(value == "quota" && !isMetaOrg.value){
       router.push({
         name: "users",
         query: {
@@ -164,7 +167,7 @@ function setTabs() {
     let filteredTabs = tabs.value.filter((tab) => cloud.includes(tab.name));
 
     if (store.state.zoConfig.rbac_enabled) {
-      if(store.state.selectedOrganization.identifier === '_meta'){
+      if(isMetaOrg.value){
         rbac.push("quota")
       }
       filteredTabs = [
