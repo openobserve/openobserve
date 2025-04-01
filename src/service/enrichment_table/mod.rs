@@ -95,20 +95,51 @@ pub async fn save_enrichment_data(
         );
     }
 
-    let stats = stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables);
-    let enrichment_table_max_size = cfg.limit.enrichment_table_max_size;
+    // Estimate the size of the payload in json format in bytes
+    let mut bytes_in_payload = 0;
+    for p in payload.iter() {
+        match json::to_value(p) {
+            Ok(v) => bytes_in_payload += json::estimate_json_bytes(&v),
+            Err(_) => {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    "Invalid JSON payload: Could not convert file data into valid JSON object"
+                        .to_string(),
+                )));
+            }
+        }
+    }
+
+    let current_size_in_bytes = if append_data {
+        let size = enrichment_table::get_table_size(org_id, &stream_name).await;
+        if size > 0 {
+            size as f64
+        } else {
+            stats::get_stream_stats(org_id, &stream_name, StreamType::EnrichmentTables).storage_size
+        }
+    } else {
+        // If we are not appending data, we do not need to check the current size
+        // we will simply use the payload size to check if it exceeds the max size
+        0.0
+    };
+    let enrichment_table_max_size = cfg.limit.enrichment_table_max_size as f64;
     log::info!(
         "enrichment table [{stream_name}] saving stats: {:?} vs max_table_size {}",
-        stats,
+        current_size_in_bytes,
         enrichment_table_max_size
     );
-    if (stats.storage_size / SIZE_IN_MB) > enrichment_table_max_size as f64 {
+    let total_expected_size_in_bytes = current_size_in_bytes + bytes_in_payload as f64;
+    let total_expected_size_in_mb = total_expected_size_in_bytes / SIZE_IN_MB;
+    // if appending data, we need to check if the storage size exceeds the max size
+    // if not, we can append the data
+    // if it does, we need to return an error
+    if append_data && total_expected_size_in_mb > enrichment_table_max_size {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 format!(
-                    "enrichment table [{stream_name}] storage size {} exceeds max storage size {}",
-                    stats.storage_size, enrichment_table_max_size
+                    "enrichment table [{stream_name}] total expected storage size {} exceeds max storage size {}",
+                    total_expected_size_in_mb, enrichment_table_max_size
                 ),
             )),
         );
@@ -246,6 +277,15 @@ pub async fn save_enrichment_data(
         UsageType::EnrichmentTable,
         0,
         started_at,
+    )
+    .await;
+
+    // The stream_stats table takes some time to update, so we need to update the enrichment table
+    // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
+    let _ = enrichment_table::update_table_size(
+        org_id,
+        &stream_name,
+        total_expected_size_in_bytes as usize,
     )
     .await;
 
