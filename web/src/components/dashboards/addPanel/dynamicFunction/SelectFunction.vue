@@ -369,7 +369,7 @@ export default {
             // need to consider `min` config for each arg
             Array.from({ length: arg.min ?? 1 }).map(() => ({
               type: arg.type[0],
-              value: arg?.defaultValue,
+              value: arg.type[0] === "field" ? {} : arg?.defaultValue,
             })),
           );
         }
