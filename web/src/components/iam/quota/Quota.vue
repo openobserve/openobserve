@@ -756,9 +756,8 @@ export default defineComponent ({
             }
             else{
                 //here we are getting the role limits for the selected organization
-                    getRolesByOrganization();
+                   await getRolesByOrganization();
 
-                resultTotal.value = rolesLimitRows.value.length
             }
             //these are the modules that are displayed in the dropdown 
             //to select the api category that user can use to filter the api limits
@@ -828,7 +827,7 @@ export default defineComponent ({
             }
         }
         else if(activeTab.value === "role-limits"){
-                getRolesByOrganization();
+                await getRolesByOrganization();
         }
     }
     const getOrganizations = async () => {
@@ -884,7 +883,6 @@ export default defineComponent ({
             //as we are not storing the roles in the store
             //so we need to get the roles from the api
             await getRolesByOrganization();
-            resultTotal.value = rolesLimitRows.value.length;
             //here we are checking if the organization is global_rules_meta then we need to reset the selectedOrganization
             //because in role limit we dont have something called global_rules_meta org
             if(router.currentRoute.value.query.quota_org == "global_rules_meta"){
@@ -950,6 +948,7 @@ export default defineComponent ({
                 update: 10,
                 delete: 10
             }));
+            resultTotal.value = rolesLimitRows.value.length;
         }
         catch(error){
             console.log(error);
