@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :model-value="cpuUsage"
                       @change="val => { cpuUsage = val }"
                       :min="0"
-                      :max="100"
+                      :max="maxCPUUsage"
                       label-side
                       size="25px"
                       class="tw-w-[85%] q-mt-md q-ml-md"
@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :model-value="memoryUsage"
                       @change="val => { memoryUsage = val }"
                       :min="0"
-                      :max="100"
+                      :max="maxMemoryUsage"
                       label-side
                       size="25px"
                       class="tw-w-[85%] q-mt-md q-ml-md"
@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="qTable"
           :rows="tabledata"
           :columns="columns"
-          row-key="id"
+          :row-key="(row: any) => 'node_data_row_key_' + row.name"
           :pagination="pagination"
           :filter="filterQuery"
           :filter-method="filterData"
@@ -652,8 +652,8 @@ export default defineComponent({
       qTable.value.setPagination(pagination.value);
     };
 
-    function flattenObject(data: any) {
-        const result: any = [];
+    function flattenObject(data) {
+        const result = [];
         const uniqueValues = {
             regions: new Set(),
             clusters: new Set(),
@@ -661,48 +661,52 @@ export default defineComponent({
             statuses: new Set()
         };
 
+        const maxValues = {
+            tcpConnsEstablished: { value: 0 },
+            tcpConnsCloseWait: { value: 0 },
+            tcpConnsTimeWait: { value: 0 },
+            percentageMemoryUsage: { value: 0 },
+            cpuUsage: { value: 0 }
+        };
+
         for (const region in data) {
             uniqueValues.regions.add(region);
+
             for (const cluster in data[region]) {
                 uniqueValues.clusters.add(cluster);
-                data[region][cluster].forEach((node: any) => {
-                    node.metrics["percentage_memory_usage"] = (node.metrics.memory_usage > 0) ? Math.round((node.metrics.memory_usage/node.metrics.memory_total) * 100) : 0;
-                    node.metrics["cpu_usage"] = Math.round(node.metrics["cpu_usage"])
-                    const { metrics, role, status, ...nodeData } = node;
-                    
+
+                data[region][cluster].forEach((node) => {
+                    // Calculate memory usage percentage
+                    const percentageMemoryUsage = (node.metrics.memory_usage > 0)
+                        ? Math.round((node.metrics.memory_usage / node.metrics.memory_total) * 100)
+                        : 0;
+
+                    // Round CPU usage
+                    const cpuUsage = Math.round(node.metrics.cpu_usage);
+
                     // Extract unique node types from role array
-                    role.forEach((r: any) => uniqueValues.nodeTypes.add(r));
-                    
+                    node.role.forEach((r) => uniqueValues.nodeTypes.add(r));
+
                     // Extract unique statuses
-                    uniqueValues.statuses.add(status);
+                    uniqueValues.statuses.add(node.status);
 
-                    if(node.tcp_conns_established > maxEstablished.value) {
-                      maxEstablished.value = node.tcp_conns_established;
-                    }
+                    console.log(node)
+                    // Update max values
+                    maxValues.tcpConnsEstablished.value = Math.max(maxValues.tcpConnsEstablished.value, node.metrics.tcp_conns_established);
+                    maxValues.tcpConnsCloseWait.value = Math.max(maxValues.tcpConnsCloseWait.value, node.metrics.tcp_conns_close_wait);
+                    maxValues.tcpConnsTimeWait.value = Math.max(maxValues.tcpConnsTimeWait.value, node.metrics.tcp_conns_time_wait);
+                    maxValues.percentageMemoryUsage.value = Math.max(maxValues.percentageMemoryUsage.value, percentageMemoryUsage);
+                    maxValues.cpuUsage.value = Math.max(maxValues.cpuUsage.value, cpuUsage);
 
-                    if(node.tcp_conns_close_wait > maxClosewait.value) {
-                      maxClosewait.value = node.tcp_conns_close_wait;
-                    }
-
-                    if(node.tcp_conns_time_wait > maxWaittime.value) {
-                      maxWaittime.value = node.tcp_conns_time_wait;
-                    }
-
-                    if(node.percentage_memory_usage > maxMemoryUsage.value) {
-                      maxMemoryUsage.value = node.percentage_memory_usage;
-                    }
-
-                    if(node.cpu_usage > maxCPUUsage.value) {
-                      maxCPUUsage.value = node.cpu_usage;
-                    }
-                    
                     result.push({
                         region,
                         cluster,
-                        status,
-                        role,
-                        ...nodeData,
-                        ...metrics,
+                        status: node.status,
+                        role: node.role,
+                        ...node,
+                        ...node.metrics,
+                        percentage_memory_usage: percentageMemoryUsage,
+                        cpu_usage: cpuUsage
                     });
                 });
             }
@@ -715,9 +719,11 @@ export default defineComponent({
                 clusters: Array.from(uniqueValues.clusters),
                 nodeTypes: Array.from(uniqueValues.nodeTypes),
                 statuses: Array.from(uniqueValues.statuses)
-            }
+            },
+            maxValues
         };
     }
+
 
     const getData = (filterFlag: boolean = false) => {
       loading.value = true;
@@ -729,7 +735,7 @@ export default defineComponent({
       CommonService.list_nodes(store.state.selectedOrganization.identifier)
         .then((response) => {
           const responseData = response.data;
-          const { flattenedData, uniqueValues } = flattenObject(responseData);
+          const { flattenedData, uniqueValues, maxValues } = flattenObject(responseData);
           
           regionRows.value = uniqueValues.regions.map(name => ({ name }))
           clusterRows.value = uniqueValues.clusters.map(name => ({ name }))
@@ -739,6 +745,11 @@ export default defineComponent({
           originalData.value = flattenedData;
           resultTotal.value = flattenedData.length;
           loading.value = false;
+          maxCPUUsage.value = cpuUsage.value.max = maxValues.cpuUsage.value;
+          maxMemoryUsage.value = memoryUsage.value.max = maxValues.percentageMemoryUsage.value;
+          maxEstablished.value = establishedUsage.value.max = maxValues.tcpConnsEstablished.value;
+          maxClosewait.value = closewaitUsage.value.max = maxValues.tcpConnsCloseWait.value;
+          maxWaittime.value = waittimeUsage.value.max = maxValues.tcpConnsTimeWait.value;
           if(filterFlag) {
             applyFilter();
           }
@@ -774,7 +785,6 @@ export default defineComponent({
           const matchesEstablished = row.tcp_conns_established >= establishedUsage.value.min && row.tcp_conns_established <= establishedUsage.value.max;
           const matchesCloseWait = row.tcp_conns_close_wait >= closewaitUsage.value.min && row.tcp_conns_close_wait <= closewaitUsage.value.max;
           const matchesWaitTime = row.tcp_conns_time_wait >= waittimeUsage.value.min && row.tcp_conns_time_wait <= waittimeUsage.value.max;
-          
           return matchesSearch && matchesRegion && matchesCluster && matchesNodeType && matchesStatus && matchesCPU && matchesMemory && matchesEstablished && matchesCloseWait && matchesWaitTime;
       });
 
@@ -829,6 +839,8 @@ export default defineComponent({
       establishedUsage,
       closewaitUsage,
       waittimeUsage,
+      maxCPUUsage,
+      maxMemoryUsage,
       maxEstablished,
       maxClosewait,
       maxWaittime,
