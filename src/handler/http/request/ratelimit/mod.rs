@@ -40,7 +40,7 @@ use {
 #[cfg(feature = "enterprise")]
 const QUOTA_PAGE_REQUIRED_ORG: &str = "_meta";
 #[cfg(feature = "enterprise")]
-const QUOTA_PAGE_GLOBAL_RULES_ORG: &str = "global_rules";
+pub const QUOTA_PAGE_GLOBAL_RULES_ORG: &str = "global_rules";
 
 #[cfg(feature = "enterprise")]
 #[derive(Debug, Clone, Deserialize)]

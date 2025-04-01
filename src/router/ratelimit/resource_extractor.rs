@@ -36,7 +36,26 @@ use crate::{
     common::utils::auth::extract_auth_str,
     handler::http::{auth::validator::get_user_email_from_auth_str, router::openapi::ApiDoc},
 };
+use crate::handler::http::request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG;
 
+fn extract_org_id(path: &str) -> String {
+    let path_columns = path.split('/').collect::<Vec<&str>>();
+    if path_columns.len() <= 1 {
+        return QUOTA_PAGE_GLOBAL_RULES_ORG.to_string();
+    }
+
+    if path.starts_with("v1/") || path.starts_with("v2/") || path.starts_with("v3/") {
+        path_columns
+            .get(1)
+            .map(|s| s.to_string())
+            .unwrap_or_default()
+    } else {
+        path_columns
+            .first()
+            .map(|s| s.to_string())
+            .unwrap_or_default()
+    }
+}
 pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleResult> {
     let auth_str = extract_auth_str(req.request());
     let local_path = req.path().to_string();
@@ -47,21 +66,8 @@ pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleRes
         None => &local_path,
     };
 
-    let path_columns = path.split('/').collect::<Vec<&str>>();
-    let (path, org_id) = (
-        path.to_string(),
-        if path.starts_with("v2") {
-            path_columns
-                .get(1)
-                .map(|s| s.to_string())
-                .unwrap_or_default()
-        } else {
-            path_columns
-                .first()
-                .map(|s| s.to_string())
-                .unwrap_or_default()
-        },
-    );
+    let (path, org_id) = (path.to_string(), extract_org_id(path));
+
     let openapi_path = extract_openapi_path(req);
     Box::pin(async move {
         let user_email = get_user_email_from_auth_str(&auth_str)
