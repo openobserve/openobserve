@@ -120,6 +120,7 @@ pub async fn save(
         password: generate_random_string(16),
         role: meta::user::UserRole::ServiceAccount,
         is_external: false,
+        token: None,
     };
 
     users::post_user(&org_id, user, &initiator_id).await
