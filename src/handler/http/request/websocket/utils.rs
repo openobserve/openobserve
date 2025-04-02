@@ -99,7 +99,7 @@ pub mod sessions_cache_utils {
     };
 
     pub async fn run_gc_ws_sessions() {
-        log::info!("[WS_GC] Running garbage collector for websocket sessions");
+        log::debug!("[WS_GC] Running garbage collector for websocket sessions");
         let cfg = get_config();
         let interval_secs = cfg.websocket.session_gc_interval_secs;
 
@@ -109,7 +109,7 @@ pub mod sessions_cache_utils {
         tokio::spawn(async move {
             loop {
                 interval.tick().await;
-                log::info!("[WS_GC] Running garbage collector for websocket sessions");
+                log::debug!("[WS_GC] Running garbage collector for websocket sessions");
 
                 // Use catch_unwind to prevent task from crashing
                 if let Err(e) = std::panic::AssertUnwindSafe(cleanup_expired_sessions())
@@ -131,7 +131,7 @@ pub mod sessions_cache_utils {
     }
 
     async fn cleanup_expired_sessions() {
-        log::info!("[WS_GC] Session cache len at start: {}", WS_SESSIONS.len());
+        log::debug!("[WS_GC] Session cache len at start: {}", WS_SESSIONS.len());
         let expired: Vec<String> = WS_SESSIONS
             .iter()
             .filter(|entry| entry.value().is_expired())
@@ -161,7 +161,7 @@ pub mod sessions_cache_utils {
             log::info!("[WS_GC] Removed expired session: {}", session_id);
         }
 
-        log::info!("[WS_GC] Remaining active sessions: {}", len_sessions());
+        log::debug!("[WS_GC] Remaining active sessions: {}", len_sessions());
     }
 
     fn cleanup_searches_for_session(session_id: &str) {
