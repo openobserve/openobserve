@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <NoOrganizationSelected />
         </div>
-        <div v-else-if="(activeTab == 'api-limits' || activeTab == 'role-limits') && !loading && !apiLimitsRows.length">
+        <div v-else-if="(activeTab == 'api-limits' || activeTab == 'role-limits') && !loading &&( !apiLimitsRows.length || !rolesLimitRows.length)">
             <NoData />
         </div>
         <div class="flex justify-end w-full tw-ml-auto floating-buttons  q-pr-md"
