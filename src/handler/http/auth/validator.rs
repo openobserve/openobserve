@@ -1130,6 +1130,7 @@ mod tests {
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
+                token: None,
             },
         )
         .await
@@ -1146,6 +1147,7 @@ mod tests {
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: true,
+                token: None,
             },
             init_user,
         )

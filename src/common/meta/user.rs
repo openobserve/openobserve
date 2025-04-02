@@ -36,6 +36,8 @@ pub struct UserRequest {
     /// Is the user created via ldap flow.
     #[serde(default)]
     pub is_external: bool,
+    #[serde(skip_serializing)]
+    pub token: Option<String>,
 }
 
 impl UserRequest {

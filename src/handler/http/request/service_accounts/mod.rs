@@ -123,6 +123,7 @@ pub async fn save(
             custom_role: None,
         },
         is_external: false,
+        token: None,
     };
 
     users::post_user(&org_id, user, &initiator_id).await

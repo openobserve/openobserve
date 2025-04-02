@@ -255,7 +255,11 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             }),
                             first_name: Some("root".to_owned()),
                             last_name: Some("".to_owned()),
-                            token: None,
+                            token: if cfg.auth.root_user_token.is_empty() {
+                                None
+                            } else {
+                                Some(cfg.auth.root_user_token.clone())
+                            },
                         },
                     )
                     .await?;
