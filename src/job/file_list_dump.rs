@@ -21,15 +21,18 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::Schema;
-use chrono::{Datelike, Timelike};
+use chrono::{Datelike, Timelike, Utc};
 use config::{
     PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
     cluster::{self, LOCAL_NODE},
     get_config, get_parquet_compression,
+    meta::stream::StreamType,
 };
 use infra::{file_list::FileRecord, table::file_list_dump::FileListDump};
 use once_cell::sync::Lazy;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
+
+use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
 const HOUR_IN_MS: i64 = 3600 * 1000;
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
@@ -51,6 +54,47 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
 });
 pub const FILE_LIST_CACHE_DIR_NAME: &str = "_oo_file_list_dump";
 
+// TODO(YJDoc2)
+async fn lock_offset(org: &str, stream: &str, offset: i64) -> Option<()> {
+    let (_, node) = db::compact::files::get_offset(org, StreamType::Filelist, stream).await;
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+        return None; // other node is processing
+    }
+
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
+        let lock_key = format!(
+            "/file_list_dump/{}/{}/{}/{}",
+            org,
+            StreamType::Filelist,
+            stream,
+            offset
+        );
+        let locker = match infra::dist_lock::lock(&lock_key, 0).await {
+            Ok(l) => l,
+            Err(_) => return None,
+        };
+        // check the working node again, maybe other node locked it first
+        let (_, node) = db::compact::files::get_offset(org, StreamType::Filelist, stream).await;
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
+            let _ = infra::dist_lock::unlock(&locker).await;
+            return None; // other node is processing
+        }
+        // set to current node
+        let _ = db::compact::files::set_offset(
+            org,
+            StreamType::Filelist,
+            stream,
+            0,
+            Some(&LOCAL_NODE.uuid.clone()),
+        )
+        .await;
+        let _ = infra::dist_lock::unlock(&locker).await;
+        drop(locker);
+    }
+    Some(())
+}
+
 pub async fn run() -> Result<(), anyhow::Error> {
     // cache generation is only done on compactor
     if !LOCAL_NODE.is_compactor() {
@@ -67,14 +111,21 @@ pub async fn run() -> Result<(), anyhow::Error> {
             break;
         }
 
-        // TOD (YJDoc2) check nats lock needed or not for multiple compactors
-        // TODO (YJDoc2) set config limit to min old time for picking up jobs
         // TODO (YJDoc2) split into threads
         let pending = infra::file_list::get_pending_dump_jobs().await?;
+        let threshold_hour = Utc::now().timestamp_millis()
+            - (config.common.file_list_dump_min_hour as i64 * HOUR_IN_MS);
 
         for (job_id, org, stream, offset) in pending {
             let start = offset;
             let end = offset + HOUR_IN_MS * 1000;
+            if end >= threshold_hour {
+                continue;
+            }
+            if let None = lock_offset(&org, &format!("file_list_dump/{}", stream), offset).await {
+                // someone else is processing this.
+                continue;
+            }
             let files = infra::file_list::get_entries_in_range(&org, &stream, start, end).await?;
             let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
             if let Err(e) = generate_cache_file(&org, &stream, (start, end), files).await {
@@ -101,6 +152,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     );
                 }
             }
+            let _ = db::compact::files::del_offset(
+                &org,
+                StreamType::Filelist,
+                &format!("file_list_dump/{}", stream),
+            )
+            .await;
         }
 
         // sleep

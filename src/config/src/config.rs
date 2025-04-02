@@ -1066,6 +1066,8 @@ pub struct Common {
     pub file_list_dump_enabled: bool,
     #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]
     pub file_list_dump_dual_write: bool,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_MIN_HOUR", default = true)]
+    pub file_list_dump_min_hour: usize,
 }
 
 #[derive(EnvConfig)]
