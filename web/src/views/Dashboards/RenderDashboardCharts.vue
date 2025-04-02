@@ -945,7 +945,7 @@ export default defineComponent({
     // References to the variable selectors
     const globalVariablesRef = ref(null);
     const tabVariablesRef = ref(null);
-    const panelVariablesRef = ref(null); // Now correctly stored as an array
+    const panelVariablesRef = ref(null); 
 
     const handleDependencyUpdate = ({
       source,
