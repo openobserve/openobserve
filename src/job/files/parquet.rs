@@ -1426,7 +1426,6 @@ pub(crate) async fn create_tantivy_index(
     let start = std::time::Instant::now();
     let caller = format!("[{caller}:JOB]");
 
-    log::info!("{} start to create tantivy index", caller);
     let dir = PuffinDirWriter::new();
     let index = generate_tantivy_index(
         dir.clone(),
@@ -1439,7 +1438,6 @@ pub(crate) async fn create_tantivy_index(
     if index.is_none() {
         return Ok(0);
     }
-    log::info!("{} create tantivy index success", caller);
     let puffin_bytes = dir.to_puffin_bytes()?;
     let index_size = puffin_bytes.len();
 
@@ -1467,7 +1465,6 @@ pub(crate) async fn create_tantivy_index(
             return Err(e.into());
         }
     }
-    log::info!("{} write fst bytes into disk success", caller);
     Ok(index_size)
 }
 
@@ -1479,7 +1476,6 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     index_fields: &[String],
     schema: Arc<Schema>,
 ) -> Result<Option<tantivy::Index>, anyhow::Error> {
-    log::info!("start to generate tantivy index");
     let mut tantivy_schema_builder = tantivy::schema::SchemaBuilder::new();
     let schema_fields = schema
         .fields()
@@ -1542,7 +1538,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         .context("failed to create index builder")?;
 
     // docs per row to be added in the tantivy index
-    log::info!("start to create tantivy index");
+    log::debug!("start write documents to tantivy index");
     let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<tantivy::TantivyDocument>>(4);
     let task: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
         let mut total_num_rows = 0;
@@ -1581,8 +1577,8 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                     Ok(f) => f,
                     Err(_) => fts_field.unwrap(),
                 };
-                for i in 0..num_rows {
-                    docs[i].add_text(field, column_data.value(i));
+                for (i, doc) in docs.iter_mut().enumerate() {
+                    doc.add_text(field, column_data.value(i));
                 }
             }
 
@@ -1607,7 +1603,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     if total_num_rows == 0 {
         return Ok(None);
     }
-    log::info!("add documents to index success");
+    log::debug!("write documents to tantivy index success");
 
     let index = index_writer.finalize().map_err(|e| {
         log::error!(
@@ -1616,8 +1612,6 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         );
         anyhow::anyhow!("Failed to finalize the index writer: {}", e)
     })?;
-
-    log::info!("create tantivy index file success");
 
     Ok(Some(index))
 }

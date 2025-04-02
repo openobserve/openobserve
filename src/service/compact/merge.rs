@@ -1122,7 +1122,7 @@ async fn generate_inverted_index(
                 full_text_search_fields,
                 index_fields,
                 schema,
-                 reader,
+                reader,
             )
             .await.map_err(|e| {
                 anyhow::anyhow!(
