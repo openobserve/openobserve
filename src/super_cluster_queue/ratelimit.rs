@@ -14,12 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use infra::{
-    errors::Error,
+    errors::{Error, Result},
     table::ratelimit::{RULE_EXISTS, RULE_NOT_FOUND, RuleEntry},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
-pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
+pub async fn process(msg: Message) -> Result<()> {
     log::debug!(
         "[SUPER_CLUSTER:RATELIMIT] LOCAL_NODE:{:?}, Processing message: {:?}",
         config::cluster::LOCAL_NODE,
@@ -29,7 +29,7 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
     let bytes = msg
         .value
         .ok_or(Error::Message("Message missing value".to_string()))?;
-    let rule = RuleEntry::try_from(&bytes)?;
+    let rule = RuleEntry::try_from(&bytes).map_err(|e| Error::Message(e.to_string()))?;
 
     match msg.message_type {
         MessageType::RatelimitAdd => match infra::table::ratelimit::add(rule.clone()).await {
@@ -41,7 +41,7 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
                 );
                 Ok(())
             }
-            Err(e) => Err(e),
+            Err(e) => Err(Error::Message(e.to_string())),
         },
         MessageType::RatelimitUpdate => match infra::table::ratelimit::update(rule).await {
             Ok(_) => Ok(()),
@@ -49,17 +49,17 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
                 log::warn!("[SUPER_CLUSTER:RATELIMIT] Rule not found for update, ignoring");
                 Ok(())
             }
-            Err(e) => Err(e),
+            Err(e) => Err(Error::Message(e.to_string())),
         },
         MessageType::RatelimitDelete => {
             let RuleEntry::Single(rule) = rule else {
                 log::error!("[SUPER_CLUSTER:RATELIMIT] Invalid message: {:?}", rule);
-                return Err(anyhow::anyhow!("Invalid rule entry type".to_string()));
+                return Err(Error::Message("Invalid rule entry type".to_string()));
             };
 
             match infra::table::ratelimit::delete(
                 rule.rule_id
-                    .ok_or_else(|| anyhow::anyhow!("Missing rule_id"))?,
+                    .ok_or_else(|| Error::Message("Missing rule_id".to_string()))?,
             )
             .await
             {
@@ -68,7 +68,7 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
                     log::warn!("[SUPER_CLUSTER:RATELIMIT] Rule not found for deletion, ignoring");
                     Ok(())
                 }
-                Err(e) => Err(e),
+                Err(e) => Err(Error::Message(e.to_string())),
             }
         }
         _ => {
@@ -77,7 +77,7 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
                 msg.message_type,
                 msg.key
             );
-            Err(anyhow::anyhow!("Invalid message type".to_string()))
+            Err(Error::Message("Invalid message type".to_string()))
         }
     }
 }
