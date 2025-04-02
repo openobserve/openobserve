@@ -1533,7 +1533,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
 
     // docs per row to be added in the tantivy index
     log::debug!("start write documents to tantivy index");
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<tantivy::TantivyDocument>>(4);
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<tantivy::TantivyDocument>>(2);
     let task: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
         let mut total_num_rows = 0;
         loop {
