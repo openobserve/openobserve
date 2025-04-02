@@ -346,7 +346,7 @@
     "searchGroup": "Search Group",
     "object": "Object",
     "serviceAccounts": "Service Accounts",
-    "quota": "Quota"
+    "quota": "Quotas"
   },
   "ticket": {
     "header": "Support Tickets",
@@ -1178,11 +1178,11 @@
     "actions": "Actions"
   },
   "quota":{
-    "header": "Quota",
+    "header": "Quotas",
     "api-limits": "API Limits",
     "role-limits": "Role Limits",
-    "api-search": "Search Modules",
-    "role-search": "Search Roles",
+    "api-search": "Search Module",
+    "role-search": "Search Role",
     "moduleName": "Module Name",
     "roleName": "Roles",
     "listLimit": "List (Req/s)",

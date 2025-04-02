@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'"
        style="min-height: inherit">
         <div :style="{ height: '100%', marginTop: 0 }" class="app-table-container" >
-            <div class="q-mx-md">
+            <div class="q-px-md q-pt-sm">
                 <div
-                    class="q-table__title full-width "
+                    class="q-table__title full-width q-pb-sm "
                     data-test="user-title-text"
                 >
                     {{ t("quota.header") }}
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="selectedOrganization"
                         :options="organizationToDisplay"
                         @filter="filterOrganizations"
-                        placeholder="Select Org"
+                        placeholder="Select Organization"
                         :popup-content-style="{ textTransform: 'lowercase' }"
                         color="input-border"
                         bg-color="input-bg"
