@@ -188,57 +188,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #no-data></template>
 
-                <template #bottom="scope">
-                    <q-table-pagination
-                    :scope="scope"
-                    :resultTotal="resultTotal"
-                    position="bottom"
-                    :perPageOptions="perPageOptions"
-                    @update:changeRecordPerPage="changePagination"
-                />
-                </template>
+            <template #bottom="scope">
+                <q-table-pagination
+                :scope="scope"
+                :resultTotal="resultTotal"
+                position="bottom"
+                :perPageOptions="perPageOptions"
+                @update:changeRecordPerPage="changePagination"
+            />
+            </template>
 
-                <template v-slot:body-cell="props">
-                <q-td  :props="props" v-if="editTable" 
-                :style="{
-                        backgroundColor: editTable && props.col.name !== 'module_name' ? store.state.theme === 'dark' ? '#212121' : '#f1f1ee' : 'transparent',
-                        }"
-                >
-                    <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'" contenteditable="true"
-                    debounce="500"
-                    :class="{
-                        'editable-cell': editTable && props.col.name !== 'module_name',
-                        'edited-input': isEdited(props.row.module_name, props.col.name)
+            <template v-slot:body-cell="props">
+            <q-td  :props="props" v-if="editTable" 
+            :style="{
+                    backgroundColor: editTable && props.col.name !== 'module_name' ? store.state.theme === 'dark' ? '#212121' : '#f1f1ee' : 'transparent',
                     }"
-                    @input="(event: any) => handleInputChange('' , props.row.module_name , props.row[props.col.name], props.col.name, event.target.innerText)"
-                    @keypress="restrictToNumbers"
-                    @paste="preventNonNumericPaste"
-                    >
-                        {{ changedValues[props.row.module_name]?.[props.col.name] ?? props.row[props.col.name]}}
-                    </div>
-                        <div v-else-if="props.col.name == 'module_name'"> 
-                        {{ props.row[ props.col.name ] }}
-                    </div>
-                    <div
-                    :disabled="true" v-else-if="props.row[props.col.name] == '-'">
-                    -
-                    </div>
-                </q-td>
-                <q-td  :props="props" v-else>
-                    <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'">
-                        {{ props.row[ props.col.name ] }}
-                    </div>
-                        <div v-else-if="props.col.name == 'module_name'"> 
-                        {{ props.row[ props.col.name ] }}
-                    </div>
-                    <div v-else-if="props.row[props.col.name] == '-'">
-                    -
-                    </div>
-                </q-td>
-                </template>
+            >
+                <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'" contenteditable="true"
+                debounce="500"
+                :class="{
+                    'editable-cell': editTable && props.col.name !== 'module_name',
+                    'edited-input': isEdited(props.row.module_name, props.col.name)
+                }"
+                @input="(event: any) => handleInputChange('' , props.row.module_name , props.row[props.col.name], props.col.name, event.target.innerText)"
+                @keypress="restrictToNumbers"
+                @paste="preventNonNumericPaste"
+                >
+                    {{ changedValues[props.row.module_name]?.[props.col.name] ?? props.row[props.col.name]}}
+                </div>
+                    <div v-else-if="props.col.name == 'module_name'"> 
+                    {{ props.row[ props.col.name ] }}
+                </div>
+                <div
+                :disabled="true" v-else-if="props.row[props.col.name] == '-'">
+                -
+                </div>
+            </q-td>
+            <q-td  :props="props" v-else>
+                <div v-if="props.col.name != 'module_name' && props.row[props.col.name] != '-'">
+                    {{ props.row[ props.col.name ] }}
+                </div>
+                    <div v-else-if="props.col.name == 'module_name'"> 
+                    {{ props.row[ props.col.name ] }}
+                </div>
+                <div v-else-if="props.row[props.col.name] == '-'">
+                -
+                </div>
+            </q-td>
+            </template>
             </q-table>
             <div class="q-mt-md" v-if="activeTab == 'api-limits'  && activeType == 'json'" style="height: calc(100vh - 245px); ">
-            <!-- here add the queryeditor -->
             <query-editor
                     data-test="json-view-roles-editor"
                     ref="queryEditorRef"
@@ -374,28 +373,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
             </q-table>
-        <div class="q-mt-md" v-if="activeTab == 'role-limits' && activeType == 'json'" style="height: calc(100vh - 245px);">
-           <!-- here add the queryeditor -->
-           <query-editor
-                data-test="json-view-roles-editor"
-                ref="queryEditorRef"
-                editor-id="json-view-roles-editor"
-                class="monaco-editor"
-                :debounceTime="300"
-                v-model:query="jsonStrToDisplay"
-                language="json"
-                style="height: 100%;"
-                :read-only="!editTable"
-              />
-        </div>
+            <div class="q-mt-md" v-if="activeTab == 'role-limits' && activeType == 'json'" style="height: calc(100vh - 245px);">
+                <query-editor
+                    data-test="json-view-roles-editor"
+                    ref="queryEditorRef"
+                    editor-id="json-view-roles-editor"
+                    class="monaco-editor"
+                    :debounceTime="300"
+                    v-model:query="jsonStrToDisplay"
+                    language="json"
+                    style="height: 100%;"
+                    :read-only="!editTable"
+                    />
+            </div>
         <div v-if=" (activeTab == 'api-limits' || activeTab == 'role-limits') && loading && !apiLimitsRows.length" class="flex justify-center items-center">
             <q-spinner-hourglass color="primary" size="lg" />
         </div>
-        <div v-else-if=" ((activeTab == 'api-limits'  || activeTab == 'role-limits') && !loading && !selectedOrganization )">
-
+        <div v-else-if=" ((activeTab == 'api-limits') && !loading && !selectedOrganization )">
             <NoOrganizationSelected />
         </div>
-        <div v-else-if="(activeTab == 'api-limits' || activeTab == 'role-limits') && !loading &&( !apiLimitsRows.length || !rolesLimitRows.length)">
+        <div v-else-if="((activeTab == 'role-limits') && !loading && !selectedOrganization )">
+            <NoOrganizationSelected />
+        </div>
+        <div v-else-if="(activeTab == 'api-limits') && !loading && !apiLimitsRows.length">
+            <NoData />
+        </div>
+        <div v-else-if="(activeTab == 'role-limits') && !loading && !rolesLimitRows.length">
             <NoData />
         </div>
         <div class="flex justify-end w-full tw-ml-auto floating-buttons  q-pr-md"
@@ -439,75 +442,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
         </div>
         
-
-        <q-dialog v-model="isBulkUpdate">   
-            <q-card style="height: 394px !important; width: 500px;"> 
-                <q-card-section style="height: 100px !important;">
-                    <div class="flex items-center justify-between">
-                        <div class="text-h6">Bulk Update</div>
-                        <q-btn icon="close" size="sm" flat dense @click="closeBulkUpdate" />
-                    </div>
-                    <div class="q-mt-xs"
-                    :class="store.state.theme === 'dark' ? 'text-grey' : 'text-grey-9'"
-                     >
-                        To perform bulk updates, download the provided JSON file, edit the default values within it, and then re-upload the modified file back into the system.
-                    </div>
-                </q-card-section>
-
-                <q-card-section style="height: 180px !important;" >
-                   <div style="border: 1px solid #E0E0E0; border-radius: 2px;" class=" tw-border tw-border-solid tw-border-grey   full-width full-height q-mt-sm">
-
-                    <div  class="flex justify-center items-center full-width full-height">
-                        <q-file
-                        style="height: 100%  !important;  z-index: 1000;"
-                        v-model="uploadedRules"
-                        accept=".json"
-                        label="Upload JSON file"
-                        multiple
-                        class=" full-height full-width cursor-pointer file-upload-input tw-border tw-border-solid tw-border-grey "
-                        borderless
-                        >
-                        <template v-slot:label >
-                            <div v-if="!uploadedRules" class="flex full-width full-height items-center " style="flex-direction: column;">   
-                                <q-img :src="getImageURL('images/common/hard-drive.svg')" style="width: 48px; height: 48px;" />
-                                <div class="q-mt-md">
-                                    <div class=" flex text-center full-width items-center justify-center q-mt-sm" :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-9'">Click or drag the file to this area to upload</div>
-                                    <div class="     flex text-center full-width items-center justify-center q-mt-sm" :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-9'">Maximum file size: 2MB</div>
-                                </div>
-                            </div>
-                        </template>
-                        <template v-slot:file="scope" >
-                            <div class="full-width full-height flex items-center justify-center">
-                                {{ fileListToDisplay }}
-                            </div>
-                        </template>
-                        </q-file>
-                    </div>
-                    
-                        </div>
-                        </q-card-section>
-                <q-card-section style="height: 32px !important; padding-top: 0px !important;" >
-                    <div style="background-color: #FFDEDE; color: #931B1E; border-radius: 5px;" v-if="uploadError && !uploadingRules" class="full-width  flex items-center q-py-xs  " >
-                        <q-icon name="warning" class="q-mx-sm" style="color: #931B1E;" />{{ uploadError }}
-                        <!-- error section / uploading notification section -->
-                   </div>
-                </q-card-section>
-                <div>
-                    <q-card-actions align="right"  >
-                    <q-btn label="Update" class="text-bold" padding="sm md" no-caps  @click="uploadTemplate" :disable="uploadingRules" >
-                        <q-icon :name="outlinedFileUpload" />
-                    </q-btn>
-                    <q-btn label="Download"  padding="sm md" no-caps  class="text-bold no-border "
-                    style="border-radius: 8px !important;"
-                  color="secondary"
-                   @click="downloadTemplate" >
-                        <q-icon :name="outlinedFileDownload" />
-                    </q-btn>
-                </q-card-actions>
-                </div>
-               
-            </q-card>
-        </q-dialog>
         </div>
 
         <ConfirmDialog
