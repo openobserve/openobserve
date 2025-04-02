@@ -251,8 +251,8 @@ export default defineComponent({
         .then((res) => {
           // this.updatePaymentResponse = res.data.data.url;
           // setInterval(this.retrieveHostedPage, 5000);
-          if(res.data?.data?.url) {
-            window.location.href = res.data.data.url;
+          if(res.data?.url) {
+            window.location.href = res.data.url;
           }
         })
         .catch((e) => {
