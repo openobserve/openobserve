@@ -29,12 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="white"
           text-color="black"
           no-caps
-          :label="t('billing.manageCards')"
-          @click="
-            onChangePaymentDetail(
-              currentPlanDetail.customer_id
-            )
-          "
+          :label="t('billing.manageSubscription')"
+          @click="onChangePaymentDetail(currentPlanDetail.customer_id)"
         />
       </div>
     </div>
@@ -79,12 +75,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card style="width: 500px">
         <q-card-section class="row items-center q-pb-none">
           <div class="text-body1 text-weight-medium">
-            {{ t("billing.manageCards") }}
+            {{ t("billing.manageSubscription") }}
           </div>
           <q-space />
-          <q-btn icon="close"
-flat round
-dense v-close-popup="true" />
+          <q-btn icon="close" flat round dense v-close-popup="true" />
         </q-card-section>
         <q-card-section>
           <iframe
@@ -109,9 +103,7 @@ dense v-close-popup="true" />
             {{ t("billing.subscriptionCheckout") }}
           </div>
           <q-space />
-          <q-btn icon="close"
-flat round
-dense v-close-popup="true" />
+          <q-btn icon="close" flat round dense v-close-popup="true" />
         </q-card-section>
 
         <q-card-section>
@@ -251,7 +243,7 @@ export default defineComponent({
         .then((res) => {
           // this.updatePaymentResponse = res.data.data.url;
           // setInterval(this.retrieveHostedPage, 5000);
-          if(res.data?.url) {
+          if (res.data?.url) {
             window.location.href = res.data.url;
           }
         })

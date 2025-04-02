@@ -123,7 +123,7 @@
     "exportLogs": "Export logs",
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
-    "legendLabel":"Legends",
+    "legendLabel": "Legends",
     "logs": "Logs",
     "enrichmentTables": "Enrichment Tables",
     "savedViewsLabel": "Saved View",
@@ -466,8 +466,8 @@
     "storeOriginalData": "Store Original Data",
     "approxPartition": "Use Stream Stats for Partitioning",
     "indexSize": "Index Size",
-    "extendedStartDate":"Start Date",
-    "extendedEndDate":"End Date"
+    "extendedStartDate": "Start Date",
+    "extendedEndDate": "End Date"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -908,7 +908,7 @@
     "status": "Status",
     "action": "Action",
     "usage": "Usage",
-    "manageCards": "Manage Cards",
+    "manageSubscription": "Manage Subscription",
     "subscriptionCheckout": "Subscription checkout",
     "everythingDeveloperPlan": "Everything in Basic Plan, plus:",
     "messageDataNotFound": "Data not found",
@@ -988,17 +988,17 @@
     "title": "Title",
     "createFunction": "Create Function",
     "newFunctionAssociationMsg": "Note: The function will be created, then you will be redirected to the previous form to associate the newly created function with the pipeline.",
-    "createdBy":"Created By",
-    "createdAt":"Created At",
-    "lastRunAt":"Last Run At",
-    "lastSuccessfulAt":"Last Successfull At",
-    "status":"Status",
+    "createdBy": "Created By",
+    "createdAt": "Created At",
+    "lastRunAt": "Last Run At",
+    "lastSuccessfulAt": "Last Successfull At",
+    "status": "Status",
     "numOfEvents": "Number of Events",
-    "view":"View",
-    "webhook":"Web Hook",
-    "email":"Email",
-    "action":"Action",
-    "all":"All"
+    "view": "View",
+    "webhook": "Web Hook",
+    "email": "Email",
+    "action": "Action",
+    "all": "All"
   },
   "alert_templates": {
     "header": "Templates",
@@ -1039,7 +1039,7 @@
     "action": "Action"
   },
   "pipeline_destinations": {
-    "header":"Pipeline Destinations"
+    "header": "Pipeline Destinations"
   },
   "metrics": {
     "searchMetric": "Search for a Metric",
@@ -1143,9 +1143,9 @@
     "deleteTitle": "Delete",
     "deleteText": "Are you sure you want to delete file ?",
     "uploadCodeZip": "Upload Code ZIP File",
-    "update":"Update Action",
-    "type":"Execution Type",
-    "serviceAccount":"Service Account",
+    "update": "Update Action",
+    "type": "Execution Type",
+    "serviceAccount": "Service Account",
     "search": "Search Action",
     "timezone": "Timezone",
     "zipFileRequired": "ZIP File is required!",
