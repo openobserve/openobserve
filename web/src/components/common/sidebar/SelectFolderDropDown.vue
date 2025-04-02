@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-select>
 
       <q-btn
-        class="q-mb-md text-bold"
+        class="q-mb-md text-bold add-folder-btn"
         :data-test="`${type}-folder-move-new-add`"
         label="+"
         text-color="light-text"
