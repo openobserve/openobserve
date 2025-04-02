@@ -452,7 +452,7 @@ pub async fn filter_file_list_by_tantivy_index(
     };
 
     log::info!(
-        "[trace_id {}] search->tantivy: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
+        "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -538,7 +538,15 @@ pub async fn filter_file_list_by_tantivy_index(
                     idx_optimize_rule,
                     &file,
                 )
-                .await;
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, error: {:?}",
+                        file.key,
+                        e
+                    );
+                    e
+                });
                 drop(permit);
                 ret
             });
@@ -546,10 +554,20 @@ pub async fn filter_file_list_by_tantivy_index(
         }
 
         // Wait for all tasks to complete
-        for result in try_join_all(tasks)
-            .await
-            .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?
-        {
+        let tasks = match try_join_all(tasks).await {
+            Ok(results) => results,
+            Err(e) => {
+                log::error!(
+                    "[trace_id {}] search->tantivy: error filtering via index, error: {:?}",
+                    query.trace_id,
+                    e
+                );
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    e.to_string(),
+                )));
+            }
+        };
+        for result in tasks {
             let result: anyhow::Result<(String, Option<BitVec>, usize)> = result;
             // Each result corresponds to a file in the file list
             match result {
@@ -669,7 +687,10 @@ async fn search_tantivy_index(
     let (tantivy_index, tantivy_reader) = match indexer {
         Some((indexer, reader)) => (indexer, reader),
         None => {
-            log::debug!("init cache for puffin file: {}", ttv_file_name);
+            log::debug!(
+                "[trace_id {trace_id}] init cache for tantivy file: {}",
+                ttv_file_name
+            );
             let reader_directory: Box<dyn Directory> = if cfg.common.inverted_index_tantivy_mode
                 == InvertedIndexTantivyMode::Mmap.to_string()
             {
