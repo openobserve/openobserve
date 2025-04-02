@@ -202,7 +202,8 @@ export default defineComponent({
               org_identifier: store.state.selectedOrganization.identifier,
             },
           });
-        } else {
+        } 
+        else {
           settingsTab.value = "general";
           router.push({
             path: "/settings/general",
@@ -211,6 +212,18 @@ export default defineComponent({
             },
           });
         }
+      }
+      else if (router.currentRoute.value.name === "nodes") {
+        if(!isMetaOrg.value || config.isEnterprise === "false") {
+          settingsTab.value = "general";
+          router.push({
+            path: "/settings/general",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          });
+        }
+
       }
     };
 
