@@ -111,11 +111,11 @@ pub async fn save_enrichment_data(
     }
 
     let current_size_in_bytes = if append_data {
-        let size = enrichment_table::get_table_size(org_id, &stream_name).await;
+        let size = enrichment_table::get_table_size(org_id, stream_name).await;
         if size > 0 {
             size as f64
         } else {
-            stats::get_stream_stats(org_id, &stream_name, StreamType::EnrichmentTables).storage_size
+            stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables).storage_size
         }
     } else {
         // If we are not appending data, we do not need to check the current size
@@ -284,7 +284,7 @@ pub async fn save_enrichment_data(
     // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
     let _ = enrichment_table::update_table_size(
         org_id,
-        &stream_name,
+        stream_name,
         total_expected_size_in_bytes as usize,
     )
     .await;
