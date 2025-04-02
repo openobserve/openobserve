@@ -297,7 +297,7 @@ const columns: any = [
   {
     name: "display_name",
     field: "display_name",
-    label: t("common.name"),
+    label: t("quota.moduleName"),
     align: "left",
     sortable: true,
   },
@@ -336,15 +336,6 @@ const columns: any = [
     style: { width: "80px" },
   },
   {
-    name: "AllowDelete",
-    field: "permission",
-    label: t("iam.delete"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: { width: "80px" },
-  },
-  {
     name: "AllowPost",
     field: "permission",
     label: t("iam.create"),
@@ -362,6 +353,15 @@ const columns: any = [
     slotName: "permission",
     style: { width: "80px" },
   },
+  {
+    name: "AllowDelete",
+    field: "permission",
+    label: t("iam.delete"),
+    align: "center",
+    slot: true,
+    slotName: "permission",
+    style: { width: "80px" },
+  }
 ];
 
 const expandPermission = async (resource: any) => {
