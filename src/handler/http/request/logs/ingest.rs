@@ -57,6 +57,18 @@ pub async fn bulk(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+
+    // log the slow request that takes more than 100ms
+    let req_start_time = in_req
+        .headers()
+        .get("o2_req_time")
+        .map(|v| v.to_str().unwrap_or("0").parse::<i64>().unwrap_or(0))
+        .unwrap_or_default();
+    let now = config::utils::time::now_micros();
+    if req_start_time > 0 && now - req_start_time > 100_000 {
+        log::warn!("before_bulk_processing: took {} ms", now - req_start_time);
+    }
+    
     Ok(
         match logs::bulk::ingest(**thread_id, &org_id, body, user_email).await {
             Ok(v) => MetaHttpResponse::json(v),
