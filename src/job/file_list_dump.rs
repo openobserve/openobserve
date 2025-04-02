@@ -31,6 +31,10 @@ use config::{
 use infra::{file_list::FileRecord, table::file_list_dump::FileListDump};
 use once_cell::sync::Lazy;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
+use tokio::sync::{
+    Mutex,
+    mpsc::{Receiver, Sender},
+};
 
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
@@ -54,7 +58,27 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
 });
 pub const FILE_LIST_CACHE_DIR_NAME: &str = "_oo_file_list_dump";
 
-// TODO(YJDoc2)
+type JobInfo = (i64, String, String, i64);
+
+struct DownloadQueue {
+    sender: Sender<JobInfo>,
+    receiver: Arc<Mutex<Receiver<JobInfo>>>,
+}
+
+impl DownloadQueue {
+    fn new(sender: Sender<JobInfo>, receiver: Arc<Mutex<Receiver<JobInfo>>>) -> Self {
+        Self { sender, receiver }
+    }
+}
+
+const FILE_LIST_DUMP_QUEUE_SIZE: usize = 10000;
+const FILE_LIST_DUMP_THREAD_COUNT: usize = 25;
+static FILE_LIST_DUMP_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
+    let (tx, rx) = tokio::sync::mpsc::channel::<JobInfo>(FILE_LIST_DUMP_QUEUE_SIZE);
+    DownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
+});
+
+// TODO(YJDoc2) clean up and fix
 async fn lock_offset(org: &str, stream: &str, offset: i64) -> Option<()> {
     let (_, node) = db::compact::files::get_offset(org, StreamType::Filelist, stream).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
@@ -106,68 +130,107 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    // spawn threads which will do the actual dumping
+    for _ in 0..FILE_LIST_DUMP_THREAD_COUNT {
+        let rx = FILE_LIST_DUMP_CHANNEL.receiver.clone();
+        tokio::spawn(async move {
+            loop {
+                let ret = rx.lock().await.recv().await;
+                match ret {
+                    None => {
+                        log::debug!("[FILE_LIST_DUMP:JOB] Receiving channel is closed");
+                        break;
+                    }
+                    Some((job_id, org, stream, offset)) => {
+                        if let Err(e) = dump(job_id, &org, &stream, offset).await {
+                            log::error!(
+                                "error in dumping files {org}/{stream} offset {offset} : {e}"
+                            );
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // loop and keep checking on file_list_jobs for next dump jobs
     loop {
         if cluster::is_offline() {
             break;
         }
 
-        // TODO (YJDoc2) split into threads
         let pending = infra::file_list::get_pending_dump_jobs().await?;
         let threshold_hour = Utc::now().timestamp_millis()
             - (config.common.file_list_dump_min_hour as i64 * HOUR_IN_MS);
 
         for (job_id, org, stream, offset) in pending {
-            let start = offset;
             let end = offset + HOUR_IN_MS * 1000;
             if end >= threshold_hour {
                 continue;
             }
-            if let None = lock_offset(&org, &format!("file_list_dump/{}", stream), offset).await {
-                // someone else is processing this.
-                continue;
-            }
-            let files = infra::file_list::get_entries_in_range(&org, &stream, start, end).await?;
-            let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
-            if let Err(e) = generate_cache_file(&org, &stream, (start, end), files).await {
-                log::error!("[COMPACTOR:JOB] file_list dump file generation error : {e}");
-            } else {
-                log::info!("successfully dumped file list {org}/{stream} offset {offset}");
-                // we remove files only if not dual writing
-                if !config.common.file_list_dump_dual_write {
-                    if let Err(e) = remove_files_from_file_list(&ids).await {
-                        log::error!(
-                            "error in removing dumped files from file_list, error : {}, ids {:?}",
-                            e,
-                            ids
-                        )
-                    } else {
-                        log::info!(
-                            "successfully removed dumped files from file_list for {org}/{stream} offset {offset}"
-                        );
-                    }
-                }
-                if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
-                    log::error!(
-                        "error in setting dumped = true for job with id {job_id}, error : {e}"
-                    );
-                }
-            }
-            let _ = db::compact::files::del_offset(
-                &org,
-                StreamType::Filelist,
-                &format!("file_list_dump/{}", stream),
-            )
-            .await;
+            FILE_LIST_DUMP_CHANNEL
+                .sender
+                .send((job_id, org, stream, offset))
+                .await?;
         }
-
         // sleep
-        // because we depend on the compact jobs, we run with the same interval
+        // because we depend on the compact jobs, we run it at 1/3 interval of
+        // either compact interval or job cleanup interval, whichever is smaller
+        // that way we can be sure that we will run at least twice before jobs are cleaned up
+        // and we won't miss a job.
+        let interval = (std::cmp::min(
+            config.compact.interval as i64,
+            config.compact.job_clean_wait_time,
+        ) / 3)
+            + 1;
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.interval,
+            interval.try_into().unwrap(),
         ))
         .await;
     }
     log::info!("[COMPACTOR:JOB] job::files::file_list_dump is stopped");
+    Ok(())
+}
+
+async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), anyhow::Error> {
+    let config = get_config();
+    let start = offset;
+    let end = offset + HOUR_IN_MS * 1000;
+
+    if let None = lock_offset(&org, &format!("file_list_dump/{}", stream), offset).await {
+        // someone else is processing this.
+        return Ok(());
+    }
+    let files = infra::file_list::get_entries_in_range(&org, &stream, start, end).await?;
+    let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
+    if let Err(e) = generate_cache_file(&org, &stream, (start, end), files).await {
+        log::error!("[COMPACTOR:JOB] file_list dump file generation error : {e}");
+    } else {
+        log::info!("successfully dumped file list {org}/{stream} offset {offset}");
+        // we remove files only if not dual writing
+        if !config.common.file_list_dump_dual_write {
+            if let Err(e) = remove_files_from_file_list(&ids).await {
+                log::error!(
+                    "error in removing dumped files from file_list, error : {}, ids {:?}",
+                    e,
+                    ids
+                )
+            } else {
+                log::info!(
+                    "successfully removed dumped files from file_list for {org}/{stream} offset {offset}"
+                );
+            }
+        }
+        if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
+            log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
+        }
+    }
+    let _ = db::compact::files::del_offset(
+        &org,
+        StreamType::Filelist,
+        &format!("file_list_dump/{}", stream),
+    )
+    .await;
     Ok(())
 }
 
