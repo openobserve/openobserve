@@ -766,26 +766,6 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static NODE_OPEN_FDS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new("node_open_fds", "Number of open file descriptors")
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-pub static NODE_TCP_CONN_RESETS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new("node_tcp_conn_resets", "Number of TCP connection resets")
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -992,12 +972,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(NODE_OPEN_FDS.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(NODE_TCP_CONN_RESETS.clone()))
         .expect("Metric registered");
 }
 
