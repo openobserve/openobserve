@@ -20,8 +20,10 @@ use std::{
 
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    http::header,
     Error,
 };
+use config::utils::time::now_micros;
 use futures_util::future::LocalBoxFuture;
 
 pub struct SlowLog {
@@ -77,7 +79,7 @@ where
 
     forward_ready!(service);
 
-    fn call(&self, req: ServiceRequest) -> Self::Future {
+    fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let start = Instant::now();
         let remote_addr = match req.headers().contains_key("X-Forwarded-For")
             || req.headers().contains_key("Forwarded")
@@ -96,8 +98,18 @@ where
             .unwrap_or("")
             .to_string();
         let method = req.method().to_string();
+        let body_size = match req.headers().get("Content-Length") {
+            Some(size) => size.to_str().unwrap_or("0").parse::<usize>().unwrap_or(0),
+            None => 0,
+        };
         let threshold = Duration::from_secs(self.threshold_secs);
         let circuit_breaker_enabled = self.circuit_breaker_enabled;
+
+        // add current time to the request headers
+        req.headers_mut().insert(
+            header::HeaderName::from_static("o2_req_time"),
+            header::HeaderValue::from_str(&now_micros().to_string()).unwrap(),
+        );
 
         let fut = self.service.call(req);
 
@@ -113,10 +125,11 @@ where
             // log the slow request
             if duration > threshold {
                 log::warn!(
-                    "slow request detected - remote_addr: {}, method: {}, path: {}, took: {:.6}",
+                    "slow request detected - remote_addr: {}, method: {}, path: {}, size: {}, took: {:.6}",
                     remote_addr,
                     method,
                     path,
+                    body_size,
                     duration.as_secs_f64()
                 );
             }

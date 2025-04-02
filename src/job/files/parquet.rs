@@ -1571,9 +1571,11 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                     Ok(f) => f,
                     Err(_) => fts_field.unwrap(),
                 };
-                for i in 0..num_rows {
-                    docs[i].add_text(field, column_data.value(i));
+                for (i, doc) in docs.iter_mut().enumerate() {
+                    doc.add_text(field, column_data.value(i));
                 }
+                // yield, this operation is time-consuming
+                // tokio::task::yield_now().await;
             }
 
             tx.send(docs).await?;

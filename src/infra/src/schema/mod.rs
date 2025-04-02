@@ -208,7 +208,10 @@ pub async fn get_settings(
     // Get from DB without holding any locks
     let settings = match get(org_id, stream_name, stream_type).await {
         Ok(schema) => unwrap_stream_settings(&schema),
-        Err(_) => None,
+        Err(e) => {
+            log::error!("Error getting stream settings: {e}");
+            None
+        }
     };
 
     // Only acquire write lock if we have settings to update
