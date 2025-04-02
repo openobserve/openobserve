@@ -320,7 +320,7 @@ export default defineComponent({
 
       // Clear and replace the array to ensure Vue detects the change
       filteredVariablesData.values.length = 0;
-      newFilteredValues.forEach((v) => {
+      newFilteredValues.forEach((v: any) => {
         // Create a fresh copy to ensure reactivity
         filteredVariablesData.values.push({ ...v });
       });
@@ -395,7 +395,7 @@ export default defineComponent({
     };
 
     // Emit dependency update to notify other components
-    const emitDependencyUpdate = (sourceName, affectedVariables) => {
+    const emitDependencyUpdate = (sourceName: any, affectedVariables: any) => {
       emit("variable-dependency-update", {
         source: sourceName,
         affected: affectedVariables,
@@ -1143,7 +1143,7 @@ export default defineComponent({
         });
         // Load variables in dependency order
 
-        const loadVariablesInOrder = async (variables) => {
+        const loadVariablesInOrder = async (variables: any) => {
           for (const variable of variables) {
             try {
               const parentVariables =
@@ -1268,14 +1268,14 @@ export default defineComponent({
     };
 
     // Add to the setup function in VariablesValueSelector component
-    const refreshFromDependencyUpdate = (updatedCompleteData) => {
+    const refreshFromDependencyUpdate = (updatedCompleteData: any) => {
       // Make a deep copy of the updated data to avoid reference issues
       const updatedDataCopy = JSON.parse(JSON.stringify(updatedCompleteData));
 
       // Update relevant variables from the complete data
-      completeVariablesData.values.forEach((variable, index) => {
+      completeVariablesData.values.forEach((variable: any, index: any) => {
         const updatedVar = updatedDataCopy.values.find(
-          (v) => v.name === variable.name,
+          (v: any) => v.name === variable.name,
         );
 
         if (updatedVar) {
