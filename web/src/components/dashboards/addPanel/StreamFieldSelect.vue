@@ -5,10 +5,9 @@
         filled
         v-model="internalModel"
         :options="options"
-        label="Select a Field"
         option-label="name"
         option-value="name"
-        :display-value="internalModel?.field"
+        :display-value="internalModel?.field ?? 'Select a Field'"
         map-options
       >
         <template v-slot:option="scope">
