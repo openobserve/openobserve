@@ -15,6 +15,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
     get_config,
@@ -46,9 +47,22 @@ pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new
 pub static STREAM_RECORD_ID_GENERATOR: Lazy<RwHashMap<String, SnowflakeIdGenerator>> =
     Lazy::new(Default::default);
 
+// atmoic version of cache
+type StreamSettingsCache = hashbrown::HashMap<String, StreamSettings>;
+static STREAM_SETTINGS_ATOMIC: Lazy<ArcSwap<StreamSettingsCache>> =
+    Lazy::new(|| ArcSwap::from(Arc::new(hashbrown::HashMap::new())));
+
 pub async fn init() -> Result<()> {
     history::init().await?;
     Ok(())
+}
+
+pub fn get_stream_settings_atomic(key: &str) -> Option<StreamSettings> {
+    STREAM_SETTINGS_ATOMIC.load().get(key).cloned()
+}
+
+pub fn set_stream_settings_atomic(settings: StreamSettingsCache) {
+    STREAM_SETTINGS_ATOMIC.store(Arc::new(settings));
 }
 
 pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
@@ -187,7 +201,7 @@ pub async fn get_settings(
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
 
     // Try to get from read lock first
-    if let Some(settings) = STREAM_SETTINGS.read().await.get(&key).cloned() {
+    if let Some(settings) = get_stream_settings_atomic(&key) {
         return Some(settings);
     }
 
@@ -201,11 +215,13 @@ pub async fn get_settings(
     if let Some(ref s) = settings {
         // Check cache again before updating as another thread might have updated while we were
         // reading DB
-        let mut write_guard = STREAM_SETTINGS.write().await;
-        if !write_guard.contains_key(&key) {
-            write_guard.insert(key, s.clone());
+        let mut w = STREAM_SETTINGS.write().await;
+        if !w.contains_key(&key) {
+            w.insert(key, s.clone());
         }
-        drop(write_guard);
+        let arc_data = w.clone();
+        drop(w);
+        set_stream_settings_atomic(arc_data);
     }
 
     settings

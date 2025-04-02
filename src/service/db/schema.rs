@@ -346,7 +346,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
+                let arc_data = w.clone();
                 drop(w);
+                infra::schema::set_stream_settings_atomic(arc_data);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
                 w.insert(
                     item_key.to_string(),
@@ -427,7 +429,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let mut w = STREAM_SETTINGS.write().await;
                 w.remove(item_key);
                 w.shrink_to_fit();
+                let arc_data = w.clone();
                 drop(w);
+                infra::schema::set_stream_settings_atomic(arc_data);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
                     super::compact::files::del_offset(org_id, stream_type, stream_name).await
@@ -494,7 +498,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);
+        let arc_data = w.clone();
         drop(w);
+        infra::schema::set_stream_settings_atomic(arc_data);
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
         w.insert(
             item_key.to_string(),
