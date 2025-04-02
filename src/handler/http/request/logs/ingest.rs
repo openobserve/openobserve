@@ -68,7 +68,7 @@ pub async fn bulk(
     if req_start_time > 0 && now - req_start_time > 100_000 {
         log::warn!("before_bulk_processing: took {} ms", now - req_start_time);
     }
-    
+
     Ok(
         match logs::bulk::ingest(**thread_id, &org_id, body, user_email).await {
             Ok(v) => MetaHttpResponse::json(v),

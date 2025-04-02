@@ -125,10 +125,11 @@ where
             // log the slow request
             if duration > threshold {
                 log::warn!(
-                    "slow request detected - remote_addr: {}, method: {}, path: {}, took: {:.6}",
+                    "slow request detected - remote_addr: {}, method: {}, path: {}, size: {}, took: {:.6}",
                     remote_addr,
                     method,
                     path,
+                    body_size,
                     duration.as_secs_f64()
                 );
             }
