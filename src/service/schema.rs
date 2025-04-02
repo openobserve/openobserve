@@ -372,9 +372,8 @@ async fn handle_diff_schema(
     }
     let mut w = STREAM_SETTINGS.write().await;
     w.insert(cache_key.clone(), stream_setting);
-    let arc_data = w.clone();
+    infra::schema::set_stream_settings_atomic(w.clone());
     drop(w);
-    infra::schema::set_stream_settings_atomic(arc_data);
 
     // update thread cache
     let final_schema = generate_schema_for_defined_schema_fields(

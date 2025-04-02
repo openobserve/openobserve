@@ -222,9 +222,8 @@ pub async fn get_settings(
         if !w.contains_key(&key) {
             w.insert(key, s.clone());
         }
-        let arc_data = w.clone();
+        set_stream_settings_atomic(w.clone());
         drop(w);
-        set_stream_settings_atomic(arc_data);
     }
 
     settings
