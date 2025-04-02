@@ -16,6 +16,7 @@
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use config::{
     meta::{
+        cluster::RoleGroup,
         search::{self, Response, SearchPartitionRequest},
         stream::StreamType,
     },
