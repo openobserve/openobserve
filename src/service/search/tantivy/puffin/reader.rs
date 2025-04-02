@@ -162,11 +162,14 @@ impl PuffinFooterBytesReader {
                 self.source.size
             ));
         }
-        let payload_start = self.source.size - FOOTER_SIZE as usize - self.payload_size as usize;
-        let payload_end = self.source.size - FOOTER_SIZE as usize;
-        let payload =
-            infra::cache::storage::get_range(&self.source.location, payload_start..payload_end)
-                .await?;
+        let payload = infra::cache::storage::get_range(
+            &self.source.location,
+            (self.source.size
+                - FOOTER_SIZE as usize
+                - self.payload_size as usize
+                - MAGIC_SIZE as usize)..(self.source.size - FOOTER_SIZE as usize),
+        )
+        .await?;
 
         // check the footer magic
         ensure!(
