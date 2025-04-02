@@ -35,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selectedTimeDate="currentTimeObj['__global']"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
-      ref="variablesValueSelectorRef"
+      @variable-dependency-update="handleDependencyUpdate"
+      ref="globalVariablesRef"
       class="global-variables-selector"
     />
 
@@ -58,6 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selectedTimeDate="currentTimeObj['__global']"
       :initialVariableValues="initialVariableValues"
       @variablesData="tabVariablesDataUpdated"
+      @variable-dependency-update="handleDependencyUpdate"
+      ref="tabVariablesRef"
       class="tab-variables-selector q-mt-sm"
     />
 
@@ -90,6 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @variablesData="
               (data) => panelVariablesDataUpdated(data, panels[0].id)
             "
+            @variable-dependency-update="handleDependencyUpdate"
+            ref="panelVariablesRef"
             class="panel-variables-selector"
           />
         </div>
@@ -172,6 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @variablesData="
                   (data) => panelVariablesDataUpdated(data, item.id)
                 "
+                @variable-dependency-update="handleDependencyUpdate"
+                ref="panelVariablesRef"
                 class="panel-variables-selector"
               />
             </div>
@@ -244,6 +251,7 @@ import {
   ref,
   watch,
   onMounted,
+  nextTick,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -934,6 +942,95 @@ export default defineComponent({
       panelVariablesCache.clear();
     });
 
+    // References to the variable selectors
+    const globalVariablesRef = ref(null);
+    const tabVariablesRef = ref(null);
+    const panelVariablesRef = ref(null); // Now correctly stored as an array
+
+    const handleDependencyUpdate = ({
+      source,
+      affected,
+      updatedCompleteData,
+      scope,
+    }) => {
+      console.log(
+        `Dependency update received from ${source} in scope ${scope}`,
+      );
+
+      if (!props.dashboardData?.variables?.list) return;
+
+      // Find affected variables
+      const affectedVars = props.dashboardData.variables.list.filter(
+        (variable) => affected.includes(variable.name),
+      );
+
+      // Track updates for each scope
+      let updateTabs = false;
+      let updateGlobal = false;
+      let affectedPanels = new Map(); // Map of affected panels to their variables
+
+      affectedVars.forEach((variable) => {
+        if (variable.scope === "global") updateGlobal = true;
+        if (variable.scope === "tabs") updateTabs = true;
+        if (variable.scope === "panels" && variable.panels) {
+          variable.panels.forEach((panelId) => {
+            if (!affectedPanels.has(panelId)) affectedPanels.set(panelId, []);
+            affectedPanels.get(panelId).push(variable.name); // Store affected variable names
+          });
+        }
+      });
+
+      // Update Global Variables if needed
+      if (updateGlobal && globalVariablesRef.value) {
+        console.log("Updating global variables...");
+        nextTick(() => {
+          globalVariablesRef.value.refreshFromDependencyUpdate(
+            updatedCompleteData,
+          );
+        });
+      }
+
+      // Update Tab Variables if needed
+      if (updateTabs && tabVariablesRef.value) {
+        console.log("Updating tab variables...");
+        nextTick(() => {
+          tabVariablesRef.value.refreshFromDependencyUpdate(
+            updatedCompleteData,
+          );
+        });
+      }
+
+      // Update only affected Panel Variables
+      if (affectedPanels.size > 0) {
+        nextTick(() => {
+          if (Array.isArray(panelVariablesRef.value)) {
+            panelVariablesRef.value.forEach((panelRef) => {
+              if (!panelRef || !panelRef.refreshFromDependencyUpdate) return;
+
+              const panelId = panelRef.currentPanelId;
+              const affectedVariables = affectedPanels.get(panelId);
+
+              if (affectedVariables) {
+                console.log(
+                  `Updating panel ${panelId} variables:`,
+                  affectedVariables,
+                );
+                panelRef.refreshFromDependencyUpdate({
+                  ...updatedCompleteData,
+                  onlyUpdate: affectedVariables, // Pass only affected variables
+                });
+              }
+            });
+          } else if (panelVariablesRef.value?.refreshFromDependencyUpdate) {
+            console.log("Updating single panel variables...");
+            panelVariablesRef.value.refreshFromDependencyUpdate(
+              updatedCompleteData,
+            );
+          }
+        });
+      }
+    };
+
     return {
       store,
       addPanelData,
@@ -973,6 +1070,10 @@ export default defineComponent({
       getGlobalOnlyVariables,
       getTabOnlyVariables,
       getPanelOnlyVariablesConfig,
+      handleDependencyUpdate,
+      globalVariablesRef,
+      tabVariablesRef,
+      panelVariablesRef,
     };
   },
   methods: {

@@ -133,7 +133,7 @@ export default defineComponent({
       default: null,
     },
   },
-  emits: ["variablesData"],
+  emits: ["variablesData", "variable-dependency-update"],
   components: {
     VariableQueryValueSelector,
     VariableAdHocValueSelector,
@@ -193,18 +193,16 @@ export default defineComponent({
       isVariablesLoading: false,
       values: [],
     });
-
     // variables dependency graph - built from complete variables list
     let variablesDependencyGraph: any = {};
-
     // track old variables data
-    const oldVariablesData: any = {};
-
+    const oldVariablesData: any = reactive({});
     // currently executing promise
     // obj will have variable name as key
     // and reject object of promise as value
     const currentlyExecutingPromises: any = {};
 
+    // Initialize variables data from props
     const initializeVariablesData = () => {
       // Reset both complete and filtered data
       completeVariablesData.isVariablesLoading = false;
@@ -258,7 +256,7 @@ export default defineComponent({
         // Add to complete variables data
         completeVariablesData.values.push(variableData);
         // set old variables data
-        oldVariablesData[item.name] = initialValue;
+        oldVariablesData[item.name] = JSON.parse(JSON.stringify(initialValue));
       });
       // if showDynamicFilters is true, add the Dynamic filters variable
       if (props.showDynamicFilters) {
@@ -320,8 +318,12 @@ export default defineComponent({
         },
       );
 
-      // Force a complete replacement of the array for reactivity
-      filteredVariablesData.values = [...newFilteredValues];
+      // Clear and replace the array to ensure Vue detects the change
+      filteredVariablesData.values.length = 0;
+      newFilteredValues.forEach((v) => {
+        // Create a fresh copy to ensure reactivity
+        filteredVariablesData.values.push({ ...v });
+      });
     };
 
     const rejectAllPromises = () => {
@@ -387,10 +389,19 @@ export default defineComponent({
       },
       { deep: true },
     );
-
+    // Emit updated variables data to parent
     const emitVariablesData = () => {
-      instance?.proxy?.$forceUpdate();
       emit("variablesData", JSON.parse(JSON.stringify(filteredVariablesData)));
+    };
+
+    // Emit dependency update to notify other components
+    const emitDependencyUpdate = (sourceName, affectedVariables) => {
+      emit("variable-dependency-update", {
+        source: sourceName,
+        affected: affectedVariables,
+        updatedCompleteData: JSON.parse(JSON.stringify(completeVariablesData)),
+        scope: props.scope,
+      });
     };
 
     // it is used to change/update initial variables values from outside the component
@@ -878,9 +889,11 @@ export default defineComponent({
           isVariableLoadingPending: false,
           options: variableObject.options, // Include options too
         });
-        oldVariablesData[name] = variableObject.value;
 
-        // Update loading states
+        oldVariablesData[name] = JSON.parse(
+          JSON.stringify(variableObject.value),
+        );
+
         completeVariablesData.isVariablesLoading =
           completeVariablesData.values.some(
             (val: any) => val.isLoading || val.isVariableLoadingPending,
@@ -894,7 +907,8 @@ export default defineComponent({
           variablesDependencyGraph[name]?.childVariables || [];
         if (
           childVariables.length > 0 &&
-          oldVariablesData[name] !== variableObject.value
+          JSON.stringify(oldVariablesData[name]) !==
+            JSON.stringify(variableObject.value)
         ) {
           const childVariableObjects = completeVariablesData.values.filter(
             (variable: any) => childVariables.includes(variable.name),
@@ -929,6 +943,7 @@ export default defineComponent({
     let isLoading = false;
     const skipAPILoad = ref(false);
 
+    // Force component update to ensure Vue reactivity
     const forceComponentUpdate = () => {
       // Create new arrays to force Vue reactivity
       completeVariablesData.values = [...completeVariablesData.values];
@@ -1029,6 +1044,9 @@ export default defineComponent({
       updateFilteredVariables();
       forceComponentUpdate();
 
+      // Emit dependency update to notify other components
+      emitDependencyUpdate(currentVariable.name, affectedVariables);
+
       // Emit updated data
       nextTick(() => {
         emitVariablesData();
@@ -1064,6 +1082,7 @@ export default defineComponent({
         panels: [] as any[],
       };
 
+      // First, categorize variables by scope
       variableNames.forEach((name) => {
         const variable = completeVariablesData.values.find(
           (v: any) => v.name === name,
@@ -1098,12 +1117,11 @@ export default defineComponent({
         }
       };
 
-      // Load in sequence
+      // Process variables in order: global -> tabs -> panels
       await loadVariablesInScope(scopedVariables.global);
       await loadVariablesInScope(scopedVariables.tabs);
       await loadVariablesInScope(scopedVariables.panels);
     };
-
     const loadAllVariablesData = async (isInitialLoad = false) => {
       if (isLoading || (!isInitialLoad && skipAPILoad.value)) {
         return;
@@ -1123,9 +1141,9 @@ export default defineComponent({
         completeVariablesData.values.forEach((variable: any) => {
           variable.isVariableLoadingPending = true;
         });
-
         // Load variables in dependency order
-        const loadVariablesInOrder = async (variables: any[]) => {
+
+        const loadVariablesInOrder = async (variables) => {
           for (const variable of variables) {
             try {
               const parentVariables =
@@ -1249,6 +1267,43 @@ export default defineComponent({
       }
     };
 
+    // Add to the setup function in VariablesValueSelector component
+    const refreshFromDependencyUpdate = (updatedCompleteData) => {
+      // Make a deep copy of the updated data to avoid reference issues
+      const updatedDataCopy = JSON.parse(JSON.stringify(updatedCompleteData));
+
+      // Update relevant variables from the complete data
+      completeVariablesData.values.forEach((variable, index) => {
+        const updatedVar = updatedDataCopy.values.find(
+          (v) => v.name === variable.name,
+        );
+
+        if (updatedVar) {
+          completeVariablesData.values[index] = {
+            ...completeVariablesData.values[index],
+            value: updatedVar.value,
+            options: updatedVar.options || [],
+            isLoading: updatedVar.isLoading,
+            isVariableLoadingPending: updatedVar.isVariableLoadingPending,
+          };
+
+          // Update oldVariablesData as well
+          oldVariablesData[variable.name] = JSON.parse(
+            JSON.stringify(updatedVar.value),
+          );
+        }
+      });
+
+      // Update filtered view
+      updateFilteredVariables();
+
+      // Force component update
+      forceComponentUpdate();
+
+      // Emit updated data
+      emitVariablesData();
+    };
+
     // Modify the watchers to prevent double firing
     watch(
       [() => props.currentTabId, () => props.currentPanelId],
@@ -1268,6 +1323,7 @@ export default defineComponent({
       onVariablesValueUpdated,
       loadVariableOptions,
       loadAllVariablesData,
+      refreshFromDependencyUpdate,
     };
   },
 });
