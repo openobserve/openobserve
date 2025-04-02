@@ -796,7 +796,7 @@ async fn handle_derived_stream_triggers(
             trigger.module_key
         );
         return Err(anyhow::anyhow!(
-            "[SCHEDULER trace_id {trace_id}] Invalid module_key format: {}. ",
+            "[SCHEDULER trace_id {trace_id}] Invalid module_key format: {}.",
             trigger.module_key
         ));
     }
