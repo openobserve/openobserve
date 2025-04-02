@@ -2412,22 +2412,28 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       .flat()
       .filter((fieldObj: any) => !fieldObj.isDerived);
 
-    const array = fields.map((field, i) => {
-      let selector = "";
+    const array = fields
+      .map((field, i) => {
+        let selector = "";
 
-      selector += buildSQLQueryFromInput(
-        field,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields?.stream,
-      );
-      // } else {
-      //   selector += `${field?.column}`;
-      // }
+        const fieldExpression = buildSQLQueryFromInput(
+          field,
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields?.stream,
+        );
 
-      selector += ` as "${field?.alias}"${i == fields.length - 1 ? " " : ", "}`;
-      return selector;
-    });
+        // Skip fields that return empty expressions
+        if (!fieldExpression) {
+          return null;
+        }
+
+        selector += fieldExpression;
+        selector += ` as "${field?.alias}"${i == fields.length - 1 ? " " : ", "}`;
+        return selector;
+      })
+      .filter(Boolean); // Remove null entries
+
     query += array?.join("");
 
     // 2. Stream, Join query
@@ -2593,54 +2599,25 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       console.warn("Map value field is required but not provided");
       return "";
     }
-    let query = "";
+    let query = "SELECT ";
 
     if (name && value_for_maps) {
-      // query = `SELECT ${name.column} as "${name.alias}", `;
-      query = `SELECT ${buildSQLQueryFromInput(
+      const sqlField = buildSQLQueryFromInput(
         name,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields?.stream,
-      )} as "${name.alias}",  `;
+      );
 
-      if (value_for_maps?.functionName) {
-        // switch (value_for_maps.functionName) {
-        //   case "p50":
-        //     query += `approx_percentile_cont(${value_for_maps.column}, 0.5) as ${value_for_maps.alias}`;
-        //     break;
-        //   case "p90":
-        //     query += `approx_percentile_cont(${value_for_maps.column}, 0.9) as ${value_for_maps.alias}`;
-        //     break;
-        //   case "p95":
-        //     query += `approx_percentile_cont(${value_for_maps.column}, 0.95) as ${value_for_maps.alias}`;
-        //     break;
-        //   case "p99":
-        //     query += `approx_percentile_cont(${value_for_maps.column}, 0.99) as ${value_for_maps.alias}`;
-        //     break;
-        //   case "count-distinct":
-        //     query += `count(distinct(${value_for_maps.column})) as "${value_for_maps.alias}"`;
-        //     break;
-        //   default:
-        //     query += `${value_for_maps.functionName}(${value_for_maps.column}) as "${value_for_maps.alias}"`;
-        //     break;
-        // }
+      query += sqlField ? `${sqlField} as "${name.alias}",  ` : "";
 
-        query += `${buildSQLQueryFromInput(
-          value_for_maps,
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.stream,
-        )} as "${value_for_maps.alias}"`;
-      } else {
-        // query += `${value_for_maps.column} as "${value_for_maps.alias}"`;
-        query += `${buildSQLQueryFromInput(
-          value_for_maps,
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.stream,
-        )} as "${value_for_maps.alias}"`;
-      }
+      const sqlValue = buildSQLQueryFromInput(
+        value_for_maps,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields?.stream,
+      );
+      query += sqlValue ? `${sqlValue} as "${value_for_maps.alias}"` : "";
 
       query += ` FROM "${
         dashboardPanelData.data.queries[
@@ -2722,64 +2699,60 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].fields;
 
     if (latitude && !latitude.isDerived && longitude && !longitude.isDerived) {
-      query += `SELECT ${buildSQLQueryFromInput(
+      const sqlLatitude = buildSQLQueryFromInput(
         latitude,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields?.stream,
-      )} as ${latitude.alias}, ${buildSQLQueryFromInput(
+      );
+      const sqlLongitude = buildSQLQueryFromInput(
         longitude,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields?.stream,
-      )} as ${longitude.alias}`;
+      );
+      query =
+        sqlLatitude && sqlLongitude
+          ? `SELECT ${sqlLatitude} as "${latitude.alias}", ${sqlLongitude} as "${longitude.alias}"`
+          : sqlLatitude
+            ? `SELECT ${sqlLatitude} as "${latitude.alias}"`
+            : sqlLongitude
+              ? `SELECT ${sqlLongitude} as "${longitude.alias}"`
+              : `SELECT `;
       // query += `SELECT ${latitude.column} as ${latitude.alias}, ${longitude.column} as ${longitude.alias}`;
     } else if (latitude && !latitude.isDerived) {
-      query += `SELECT ${buildSQLQueryFromInput(
+      const sqlLatitude = buildSQLQueryFromInput(
         latitude,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields?.stream,
-      )} as ${latitude.alias}`;
+      );
+      query = sqlLatitude
+        ? `SELECT ${sqlLatitude} as "${latitude.alias}"`
+        : `SELECT `;
       // query += `SELECT ${latitude.column} as ${latitude.alias}`;
     } else if (longitude && !longitude.isDerived) {
-      query += `SELECT ${buildSQLQueryFromInput(
+      const sqlLongitude = buildSQLQueryFromInput(
         longitude,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields?.stream,
-      )} as ${longitude.alias}`;
+      );
+      query = sqlLongitude
+        ? `SELECT ${sqlLongitude} as "${longitude.alias}"`
+        : `SELECT `;
       // query += `SELECT ${longitude.column} as ${longitude.alias}`;
     }
 
     if (query) {
       if (weight && !weight.isDerived) {
-        // switch (weight?.functionName) {
-        //   case "p50":
-        //     query += `, approx_percentile_cont(${weight.column}, 0.5) as ${weight.alias}`;
-        //     break;
-        //   case "p90":
-        //     query += `, approx_percentile_cont(${weight.column}, 0.9) as ${weight.alias}`;
-        //     break;
-        //   case "p95":
-        //     query += `, approx_percentile_cont(${weight.column}, 0.95) as ${weight.alias}`;
-        //     break;
-        //   case "p99":
-        //     query += `, approx_percentile_cont(${weight.column}, 0.99) as ${weight.alias}`;
-        //     break;
-        //   case "count-distinct":
-        //     query += `, count(distinct(${weight.column})) as ${weight.alias}`;
-        //     break;
-        //   default:
-        //     query += `, ${weight.functionName}(${weight.column}) as ${weight.alias}`;
-        //     break;
-        // }
-        query += `, ${buildSQLQueryFromInput(
+        const sqlWeight = buildSQLQueryFromInput(
           weight,
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.stream,
-        )} as ${weight.alias}`;
+        );
+        query += sqlWeight ? `, ${sqlWeight} as "${weight.alias}"` : `, `;
       }
       query += ` FROM "${
         dashboardPanelData.data.queries[
@@ -2878,26 +2851,29 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     if (source && !source.isDerived) {
       // selectFields.push(`${source.column} as ${source.alias}`);
-      selectFields.push(
-        `${buildSQLQueryFromInput(
-          source,
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.stream,
-        )} as ${source.alias}`,
+      const sqlSource = buildSQLQueryFromInput(
+        source,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields?.stream,
       );
+
+      if (sqlSource) {
+        selectFields.push(`${sqlSource} as ${source.alias}`);
+      }
     }
 
     if (target && !target.isDerived) {
       // selectFields.push(`${target.column} as ${target.alias}`);
-      selectFields.push(
-        `${buildSQLQueryFromInput(
-          target,
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.stream,
-        )} as ${target.alias}`,
+      const sqlTarget = buildSQLQueryFromInput(
+        target,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields?.stream,
       );
+      if (sqlTarget) {
+        selectFields.push(`${sqlTarget} as ${target.alias}`);
+      }
     }
 
     if (value && !value.isDerived) {
@@ -2928,14 +2904,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       //     );
       //     break;
       // }
-      selectFields.push(
-        `${buildSQLQueryFromInput(
-          value,
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.stream,
-        )} as ${value.alias}`,
+      const sqlValue = buildSQLQueryFromInput(
+        value,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields?.stream,
       );
+      if (sqlValue) {
+        selectFields.push(`${sqlValue} as "${value.alias}"`);
+      }
+      // selectFields.push(
     }
 
     // Adding the selected fields to the query
