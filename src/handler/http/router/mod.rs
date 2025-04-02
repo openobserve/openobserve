@@ -122,11 +122,8 @@ async fn audit_middleware(
                 String::from_utf8(request_body.to_vec()).unwrap_or_default()
             };
             let error_header = res.response().headers().get(ERROR_HEADER);
-            let error_msg = if let Some(error_header) = error_header {
-                Some(error_header.to_str().unwrap_or_default().to_string())
-            } else {
-                None
-            };
+            let error_msg = error_header
+                .map(|error_header| error_header.to_str().unwrap_or_default().to_string());
             // Remove the error header from the response
             // We can't read the response body at this point, hence need to rely
             // on the error header to get the error message. Since, this is not required
