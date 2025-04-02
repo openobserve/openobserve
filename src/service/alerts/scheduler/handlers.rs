@@ -790,11 +790,21 @@ async fn handle_derived_stream_triggers(
 
     // module_key format: stream_type/org_id/pipeline_name/pipeline_id
     let columns = trigger.module_key.split('/').collect::<Vec<_>>();
-    assert_eq!(columns.len(), 4);
+    if columns.len() < 4 {
+        log::warn!(
+            "[SCHEDULER trace_id {trace_id}] Invalid module_key format: {}.",
+            trigger.module_key
+        );
+        return Err(anyhow::anyhow!(
+            "[SCHEDULER trace_id {trace_id}] Invalid module_key format: {}.",
+            trigger.module_key
+        ));
+    }
     let stream_type: StreamType = columns[0].into();
     let org_id = columns[1];
     let pipeline_name = columns[2];
-    let pipeline_id = columns[3];
+    // Handles the case where the pipeline name contains a `/`
+    let pipeline_id = columns[columns.len() - 1];
 
     let Ok(pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
         log::warn!(
