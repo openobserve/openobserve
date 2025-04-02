@@ -1198,6 +1198,14 @@ export default defineComponent({
         if (toBeClonedAlert.value?.id) {
           delete toBeClonedAlert.value?.id;
         }
+        //overriding the owner from the alert payload because the current logged in user will be the owner of the cloned alert
+        if(toBeClonedAlert.value?.owner){
+          toBeClonedAlert.value.owner = store.state.userInfo.email;
+        }
+        //overriding the last_edited_by from the alert payload because the current logged in user will be the last_edited_by of the cloned alert
+        if(toBeClonedAlert.value?.last_edited_by){
+          toBeClonedAlert.value.last_edited_by = store.state.userInfo.email;
+        }
         //here using the folderIdToBeCloned.value because we need to clone the alert in the folder which is selected by the user
         alertsService
           .create_by_alert_id(
