@@ -78,9 +78,9 @@ export class Dash_create {
     await this.submitDashboardButton.click();
     await this.addPanelButton.click();
   }
-async streamSelect(){
-    this.streamDropdown = page.locator("label").filter({ hasText: "Streamarrow_drop_down" }).locator("i");
-    this.streamOption = page.getByRole("option", { name: "e2e_automate" });
+async streamSelect(page){
+    this.streamDropdown = page.locator("label").filter({ hasText: "Streamarrow_drop_down" }).locator("i").click();
+    this.streamOption = page.getByRole("option", { name: "e2e_automate" }).click();
 }
 
 async setDateFilter() {

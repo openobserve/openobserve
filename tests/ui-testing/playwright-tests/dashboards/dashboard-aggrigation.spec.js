@@ -49,11 +49,15 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .click();
+
+
     await page
       .locator("label")
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
+
+
     await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
@@ -120,7 +124,8 @@ test.describe("dashboard filter testcases", () => {
     // Navigate to dashboards
     const dashboard = new Dash_create(page);
      await dashboard.createDashbaord();
-    await dashboard.streamSelect();
+    await dashboard.streamSelect(page);
+    await dashboard.
 
 
     
