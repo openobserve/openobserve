@@ -167,6 +167,7 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
         &job.org_id,
         stream_type,
         &partition_req,
+        Some(RoleGroup::Interactive),
         true,
     )
     .await?;
@@ -216,6 +217,7 @@ async fn run_partition_job(
         stream_type,
         Some(job.user_id.clone()),
         &req,
+        Some(RoleGroup::Interactive),
     )
     .await;
     if let Err(e) = res {

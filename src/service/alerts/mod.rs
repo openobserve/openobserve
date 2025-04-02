@@ -24,6 +24,7 @@ use config::{
             AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition,
             TriggerEvalResults,
         },
+        cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -376,7 +377,16 @@ impl QueryConditionExt for QueryCondition {
                 use_cache: None,
                 local_mode: None,
             };
-            SearchService::search(&trace_id, org_id, stream_type, None, &req).await
+           // SearchService::search(&trace_id, org_id, stream_type, None, &req).await
+           SearchService::grpc_search::grpc_search(
+            &trace_id,
+            org_id,
+            stream_type,
+            None,
+            &req,
+            Some(RoleGroup::Background),
+        )
+        .await
         };
 
         // Resp hits can be of two types -
