@@ -34,8 +34,8 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                CUSTOM, ClusterInfo, ClusterInfoResponse, DEFAULT_ORG, NodeListResponse, OrgRenameBody,
-                OrgDetails, OrgUser, Organization, OrganizationResponse, PasscodeResponse,
+                ClusterInfo, ClusterInfoResponse, NodeListResponse, OrgDetails, OrgRenameBody,
+                OrgUser, Organization, OrganizationResponse, PasscodeResponse,
                 RumIngestionResponse, THRESHOLD,
             },
         },

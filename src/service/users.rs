@@ -1100,7 +1100,7 @@ pub async fn list_user_invites(user_id: &str) -> Result<HttpResponse, Error> {
 
 pub(crate) async fn create_root_user(
     org_id: &str,
-    usr_req: UserRequest,
+    user_req: UserRequest,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let salt = ider::uuid();

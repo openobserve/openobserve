@@ -83,6 +83,8 @@ pub struct PostUserRequest {
     /// Is the user created via ldap flow.
     #[serde(default)]
     pub is_external: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
 }
 
 impl From<&PostUserRequest> for UserRequest {
@@ -94,6 +96,7 @@ impl From<&PostUserRequest> for UserRequest {
             password: user.password.clone(),
             role: UserOrgRole::from(&user.role),
             is_external: user.is_external,
+            token: user.token.clone(),
         }
     }
 }
