@@ -4866,6 +4866,7 @@ dependencies = [
  "aes-siv",
  "ahash 0.8.11",
  "anyhow",
+ "arc-swap",
  "async-nats",
  "async-recursion",
  "async-trait",

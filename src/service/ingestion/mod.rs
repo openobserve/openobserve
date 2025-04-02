@@ -633,6 +633,7 @@ mod tests {
         let settings = unwrap_stream_settings(&schema).unwrap();
         let mut w = STREAM_SETTINGS.write().await;
         w.insert("default/logs/olympics".to_string(), settings);
+        infra::schema::set_stream_settings_atomic(w.clone());
         drop(w);
         let keys = get_stream_partition_keys("default", &StreamType::Logs, "olympics").await;
         assert_eq!(

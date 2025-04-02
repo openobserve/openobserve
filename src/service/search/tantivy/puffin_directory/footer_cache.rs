@@ -105,8 +105,8 @@ impl FooterCache {
     }
 
     pub(crate) fn from_bytes(bytes: OwnedBytes) -> tantivy::Result<Self> {
-         // parse version
-         if bytes.len() < FOOTER_VERSION_LEN + FOOTER_OFFSET_LEN {
+        // parse version
+        if bytes.len() < FOOTER_VERSION_LEN + FOOTER_OFFSET_LEN {
             return Err(tantivy::TantivyError::InvalidArgument(format!(
                 "Invalid footer cache size: expected size {} vs actual size {}",
                 FOOTER_VERSION_LEN + FOOTER_OFFSET_LEN,
