@@ -48,6 +48,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_cipher_keys_migration = false;
     let mut need_action_scripts_migration = false;
     let mut need_alert_folders_migration = false;
+    let mut need_ratelimit_migration = false;
     let mut existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
             Ok(Some(model)) => Some(model),
@@ -138,6 +139,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
         let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
         let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
+        let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
+        let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
         if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
             need_migrate_index_streams = true;
         }
@@ -153,6 +156,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
             log::info!("[OFGA:Local] Alert folders migration needed");
             need_alert_folders_migration = true;
+        }
+
+        if meta_version > v0_0_15 && existing_model_version < v0_0_16 {
+            log::info!("[OFGA:Local] Ratelimit migration needed");
+            need_ratelimit_migration = true;
         }
     }
 
@@ -260,6 +268,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     if need_alert_folders_migration {
                         get_ownership_all_org_tuple(org_name, "alert_folders", &mut tuples);
                         get_ownership_tuple(org_name, "alert_folders", DEFAULT_FOLDER, &mut tuples);
+                    }
+                    if need_ratelimit_migration {
+                        get_ownership_all_org_tuple(org_name, "ratelimit", &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {
