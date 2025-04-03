@@ -247,7 +247,7 @@ pub async fn create_org(
     org.name = org.name.trim().to_owned();
 
     #[cfg(feature = "cloud")]
-    if !is_add_user_allowed_for_org("", user_email).await {
+    if !is_root_user(user_email) && !is_add_user_allowed_for_org(None, user_email).await {
         return Err(anyhow::anyhow!(
             "User can not be member of more than one free organization"
         ));
@@ -480,7 +480,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     let invite = org_invites::get_by_token_user(invite_token, user_email).await?;
 
     let now = chrono::Utc::now().timestamp_micros();
-    if !is_add_user_allowed_for_org(&invite.org_id, user_email).await {
+    if !is_add_user_allowed_for_org(Some(&invite.org_id), user_email).await {
         return Err(anyhow::anyhow!(
             "User is already part of a free organization"
         ));
@@ -523,29 +523,33 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 }
 
 #[cfg(feature = "cloud")]
-pub async fn is_add_user_allowed_for_org(org_id: &str, user_email: &str) -> bool {
+pub async fn is_add_user_allowed_for_org(org_id: Option<&str>, user_email: &str) -> bool {
     use o2_enterprise::enterprise::cloud::billings as cloud_billings;
 
-    let subscription_type = cloud_billings::get_org_subscription_type(org_id, user_email)
-        .await
-        .unwrap_or_default();
-    let mut is_already_part_of_free_org = false;
-    let member_orgs = list_orgs_by_user(user_email).await.unwrap_or_default();
-    if member_orgs.is_empty() {
-        return true;
-    }
-    for member_org in member_orgs {
-        if let Ok(Some(subscription_type)) =
-            cloud_billings::get_org_subscription_type(&member_org.identifier, user_email).await
+    if let Some(org) = org_id {
+        if cloud_billings::get_subscription(user_email, org)
+            .await
+            .map(|cb| cb.subscription_type.is_free_sub())
+            .unwrap_or(true)
         {
-            if subscription_type.is_free_sub() {
-                is_already_part_of_free_org = true;
-                break;
-            }
+            return false;
+        }
+    };
+
+    let mut is_already_a_free_org = false;
+    let member_orgs = list_orgs_by_user(user_email).await.unwrap_or_default();
+    for member_org in member_orgs {
+        let org_sub_type = cloud_billings::get_subscription(user_email, &member_org.identifier)
+            .await
+            .map(|cb| cb.subscription_type)
+            .unwrap_or_default();
+        if org_sub_type.is_free_sub() {
+            is_already_a_free_org = true;
+            break;
         }
     }
 
-    !subscription_type.is_some_and(|sub| sub.is_free_sub() && is_already_part_of_free_org)
+    !is_already_a_free_org
 }
 
 pub async fn get_org(org: &str) -> Option<Organization> {

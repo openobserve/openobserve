@@ -94,7 +94,7 @@ pub async fn get_organization_usage_threshold(
     user_email: &str,
 ) -> Result<org_usage::OrgUsageThreshold, billings::BillingError> {
     let subscription_type = billings::get_org_subscription_type(org_id, user_email)
-        .await?
+        .await
         .unwrap_or_default();
 
     if subscription_type.is_free_sub() {
