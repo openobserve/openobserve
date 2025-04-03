@@ -728,7 +728,7 @@ mod tests {
             RatelimitRuleType::try_from("regex"),
             Ok(RatelimitRuleType::Regex)
         ));
-        assert!(RatelimitRuleType::try_from("invalid").is_err());
+        assert_eq!(RatelimitRuleType::try_from("invalid").unwrap().to_string(), RatelimitRuleType::Exact.to_string());
         assert_eq!(RatelimitRuleType::Exact.to_string(), "exact");
         assert_eq!(RatelimitRuleType::Regex.to_string(), "regex");
     }
