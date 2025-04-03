@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
 use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
-use arrow_schema::{Field, Schema};
 use config::meta::stream::{FileKey, StreamType};
 use hashbrown::HashMap;
 use infra::{

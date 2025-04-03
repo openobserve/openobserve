@@ -28,11 +28,12 @@ use config::{
     get_config, get_parquet_compression,
     meta::stream::StreamType,
 };
+use hashbrown::HashSet;
 use infra::{file_list::FileRecord, table::file_list_dump::FileListDump};
 use once_cell::sync::Lazy;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use tokio::sync::{
-    Mutex,
+    Mutex, RwLock,
     mpsc::{Receiver, Sender},
 };
 
@@ -77,6 +78,8 @@ static FILE_LIST_DUMP_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
     let (tx, rx) = tokio::sync::mpsc::channel::<JobInfo>(FILE_LIST_DUMP_QUEUE_SIZE);
     DownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
 });
+
+static ONGOING_JOB_IDS: Lazy<RwLock<HashSet<i64>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 async fn lock_stream(org: &str, stream: &str) -> Option<()> {
     // we make this dummy stream name, because the actual file_list stream will also
@@ -149,6 +152,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 "error in dumping files {org}/{stream} offset {offset} : {e}"
                             );
                         }
+                        let mut ongoing = ONGOING_JOB_IDS.write().await;
+                        ongoing.remove(&job_id);
+                        drop(ongoing);
                     }
                 }
             }
@@ -162,18 +168,39 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
 
         let pending = infra::file_list::get_pending_dump_jobs().await?;
-        let threshold_hour = Utc::now().timestamp_millis()
-            - (config.common.file_list_dump_min_hour as i64 * HOUR_IN_MS);
+        let threshold_hour = Utc::now().timestamp_micros()
+            - (config.common.file_list_dump_min_hour as i64 * HOUR_IN_MS * 1000);
 
+        let ongoing = ONGOING_JOB_IDS.read().await;
+        let pending = pending
+            .into_iter()
+            .filter(|(id, _, _, offset)| {
+                let end = offset + HOUR_IN_MS * 1000;
+                if end >= threshold_hour {
+                    return false;
+                }
+                // if we already have that job in queue, we should not re-queue it
+                !ongoing.contains(id)
+            })
+            .collect::<Vec<_>>();
+        // it is important to drop this here, as the worker threads will
+        // also write lock this in order to remove successful jobs
+        // if we don't drop, we can deadlock if the queue gets full, because
+        // worker will block on this lock, queue is full, and we block on queue to have space
+        // but no worker free to remove from queue.
+        drop(ongoing);
         for (job_id, org, stream, offset) in pending {
-            let end = offset + HOUR_IN_MS * 1000;
-            if end >= threshold_hour {
-                continue;
-            }
-            FILE_LIST_DUMP_CHANNEL
+            if let Err(e) = FILE_LIST_DUMP_CHANNEL
                 .sender
                 .send((job_id, org, stream, offset))
-                .await?;
+                .await
+            {
+                log::error!("error in sending dump job to worker thread for {job_id} : {e}");
+            } else {
+                let mut ongoing = ONGOING_JOB_IDS.write().await;
+                ongoing.insert(job_id);
+                drop(ongoing);
+            }
         }
         // sleep
         // because we depend on the compact jobs, we run it at 1/3 interval of
