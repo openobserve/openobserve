@@ -39,7 +39,7 @@ use crate::{
 };
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    use o2_openfga::{authorizer::authz::get_tuple_for_new_index, get_all_init_tuples};
+    use o2_openfga::get_all_init_tuples;
 
     let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
@@ -176,26 +176,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
             o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), store_id);
 
             let mut tuples = vec![];
-            let r = infra::schema::STREAM_SCHEMAS.read().await;
             let mut orgs = HashSet::new();
-            for key in r.keys() {
-                if !key.contains('/') {
-                    continue;
-                }
-                let split_key = key.split('/').collect::<Vec<&str>>();
-                let org_name = split_key[0];
-                orgs.insert(org_name);
-                if need_migrate_index_streams
-                    && split_key.len() > 2
-                    && split_key[1] == "index"
-                    && !migrate_native_objects
-                {
-                    get_tuple_for_new_index(org_name, split_key[2], &mut tuples);
-                }
+            for user in USERS.iter() {
+                orgs.insert(user.value().org.to_string());
             }
             log::info!("[OFGA:Local] Migrating native objects");
             if migrate_native_objects {
-                for org_name in orgs {
+                for org_name in orgs.iter() {
                     get_org_creation_tuples(
                         org_name,
                         &mut tuples,
@@ -238,7 +225,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 }
             } else {
                 log::info!("[OFGA:Local] Migrating index streams");
-                for org_name in orgs {
+                for org_name in orgs.iter() {
                     if need_migrate_index_streams {
                         get_index_creation_tuples(org_name, &mut tuples).await;
                     }
@@ -309,7 +296,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                 }
             }
-            drop(r);
         }
         Err(e) => {
             log::error!("Error setting OFGA model: {:?}", e);
