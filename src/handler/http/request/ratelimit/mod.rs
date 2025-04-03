@@ -491,7 +491,7 @@ async fn parse_and_validate_ratelimit_payload(
         for (inner_key, inner_value) in inner_obj {
             let number = inner_value.as_i64().ok_or_else(|| {
                 format!(
-                    "Value for key '{}' in group '{}' must be an integer",
+                    "Value for key '{}' in group '{}' must be an i32",
                     inner_key, outer_key
                 )
             })?;
