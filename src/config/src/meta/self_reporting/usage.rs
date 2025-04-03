@@ -73,6 +73,7 @@ pub struct TriggerData {
     pub evaluation_took_in_secs: Option<f64>,
     pub source_node: Option<String>,
     pub query_took: Option<i64>,
+    pub scheduler_trace_id: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
