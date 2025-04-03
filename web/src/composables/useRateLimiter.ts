@@ -117,7 +117,7 @@ import rateLimiterService from "@/services/rate_limit";
       const modulesToDisplay = response.data.map((role: any) => ({
         label: role,
         value: role
-      }));
+      })).sort((a: any, b: any) => a.label.localeCompare(b.label));
       //this is done to store the modules to display for the organization
       store.dispatch("setModulesToDisplay", {
         ...store.state.modulesToDisplay,

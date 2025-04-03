@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :loading="isApiCategoryLoading"
                         v-model="selectedApiCategory"
                         :options="filteredApiCategoryToDisplayOptions"
-                        placeholder="Select Api Category"
+                        placeholder="Select API Category"
                         color="input-border"
                         style="padding: 0px;"
                         bg-color="input-bg"
