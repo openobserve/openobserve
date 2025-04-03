@@ -32,18 +32,18 @@ test.describe("dashboard filter testcases", () => {
     );
     await orgNavigation;
   });
-  
-  test("1Should update the query when adding different types of aggregations and verify that the query is updated correctly.", async ({
+
+  test("Should update the query when adding different types of aggregations and verify that the query is updated correctly.", async ({
     page,
   }) => {
     // Navigate to dashboards
     const dashboardObject = new DashboardClass(page, "kubernetes_namespace_name");
 
-     await dashboardObject.createDashbaord();
+     await dashboardObject.createDashboard();
     //  await dashboardObject.setDateFilter();
         await dashboardObject.streamSelect(page);
         await dashboardObject.configureYAxis();
-        await dashboardObject.aggrigation();
+        await dashboardObject.aggregation();
         await dashboardObject.clickApplyButton();
         await dashboardObject.verifyQueryInspector();
         await dashboardObject.savePanel();

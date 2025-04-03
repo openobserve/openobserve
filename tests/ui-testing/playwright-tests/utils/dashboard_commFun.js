@@ -68,7 +68,7 @@ export class DashboardClass {
 
 
 
-  async createDashbaord() {
+  async createDashboard() {
     await this.dashboardMenuLink.click();
     await waitForDashboardPage(this.page);
     await this.addDashboardButton.click();
@@ -78,8 +78,8 @@ export class DashboardClass {
     await this.addPanelButton.click();
   }
 async streamSelect(page){
-    this.streamDropdown = page.locator("label").filter({ hasText: "Streamarrow_drop_down" }).locator("i").click();
-    this.streamOption = page.getByRole("option", { name: "e2e_automate" }).click();
+  await this.streamDropdown.click();
+  await this.streamOption.click();
 }
 
 async setDateFilter() {
@@ -96,7 +96,7 @@ async configureYAxis() {
     await this.yAxisDropdown.click();
 }
 
-async aggrigation(){
+async aggregation(){
     await this.yAxisDistinctOption.click();   
 }
 
@@ -113,9 +113,9 @@ async verifyQueryInspector() {
 
 }
 
-  async savePanel(Dashbaord_panel) {
+  async savePanel(Dashboard_panel) {
         await this.panelNameField.click();
-        await this.panelNameField.fill("Dashbaord_panel");
+        await this.panelNameField.fill("Dashboard_panel");
         await this.panelSaveButton.click();
     }
 
