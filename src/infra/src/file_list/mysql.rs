@@ -421,7 +421,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["query_by_date", "file_list"])
+            .with_label_values(&["query_by_date", "file_list", ""])
             .inc();
         let start = std::time::Instant::now();
         let (date_start, date_end) = date_range.unwrap_or(("".to_string(), "".to_string()));
@@ -918,7 +918,7 @@ UPDATE stream_stats
         // delete files which already marked deleted
         if let Some((_min_id, max_id)) = pk_value {
             DB_QUERY_NUMS
-                .with_label_values(&["clean_deleted", "file_list"])
+                .with_label_values(&["clean_deleted", "file_list", ""])
                 .inc();
             let start = std::time::Instant::now();
             if let Err(e) = sqlx::query("DELETE FROM file_list WHERE deleted IS TRUE AND id <= ?;")

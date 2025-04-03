@@ -360,7 +360,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
         let mut lock_tx = lock_pool.begin().await?;
         DB_QUERY_NUMS
-            .with_label_values(&["get_lock", "scheduled_jobs"])
+            .with_label_values(&["get_lock", "scheduled_jobs", ""])
             .inc();
         match sqlx::query_scalar::<_, i64>(&lock_sql)
             .fetch_one(&mut *lock_tx)
@@ -434,7 +434,7 @@ FOR UPDATE;
                     log::error!("[SCHEDULER] rollback select jobs for update error: {}", e);
                 }
                 DB_QUERY_NUMS
-                    .with_label_values(&["release_lock", "scheduled_jobs"])
+                    .with_label_values(&["release_lock", "scheduled_jobs", ""])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                     log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
@@ -458,7 +458,7 @@ FOR UPDATE;
                 log::error!("[SCHEDULER] rollback scheduler pull error: {}", e);
             }
             DB_QUERY_NUMS
-                .with_label_values(&["release_lock", "scheduled_jobs"])
+                .with_label_values(&["release_lock", "scheduled_jobs", ""])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                 log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
@@ -499,7 +499,7 @@ WHERE id IN ({});",
                 log::error!("[MYSQL] rollback update scheduled jobs status error: {}", e);
             }
             DB_QUERY_NUMS
-                .with_label_values(&["release_lock", "scheduled_jobs"])
+                .with_label_values(&["release_lock", "scheduled_jobs", ""])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                 log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
@@ -517,7 +517,7 @@ WHERE id IN ({});",
         if let Err(e) = tx.commit().await {
             log::error!("[SCHEDULER] commit scheduler pull update error: {}", e);
             DB_QUERY_NUMS
-                .with_label_values(&["release_lock", "scheduled_jobs"])
+                .with_label_values(&["release_lock", "scheduled_jobs", ""])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                 log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
@@ -532,7 +532,7 @@ WHERE id IN ({});",
         }
 
         DB_QUERY_NUMS
-            .with_label_values(&["release_lock", "scheduled_jobs"])
+            .with_label_values(&["release_lock", "scheduled_jobs", ""])
             .inc();
         if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
             log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);

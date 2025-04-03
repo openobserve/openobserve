@@ -380,7 +380,7 @@ RETURNING *;"#;
         };
         let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
         DB_QUERY_NUMS
-            .with_label_values(&["get_lock", "scheduled_jobs"])
+            .with_label_values(&["get_lock", "scheduled_jobs", ""])
             .inc();
         if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
             if let Err(e) = tx.rollback().await {
@@ -390,7 +390,7 @@ RETURNING *;"#;
         }
 
         DB_QUERY_NUMS
-            .with_label_values(&["update", "scheduled_jobs"])
+            .with_label_values(&["update", "scheduled_jobs", ""])
             .inc();
         let jobs: Vec<Trigger> = match sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
