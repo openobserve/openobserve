@@ -411,6 +411,17 @@ export default defineComponent({
     ) => {
       rejectAllPromises();
 
+      // NOTE: need to re-initialize variables data
+      completeVariablesData.isVariablesLoading = false;
+      completeVariablesData.values = [];
+      filteredVariablesData.isVariablesLoading = false;
+      filteredVariablesData.values = [];
+
+      // set initial variables values
+      props.initialVariableValues.value = newInitialVariableValues;
+
+      // make list of variables using variables config list
+
       initializeVariablesData();
 
       // load all variables
