@@ -236,6 +236,7 @@ pub struct FilterCondition {
     pub value: Option<String>,
     pub logical_operator: String,
     pub filter_type: String,
+    pub type_of_column: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
