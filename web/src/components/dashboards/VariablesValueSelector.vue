@@ -1279,21 +1279,21 @@ export default defineComponent({
     };
 
     // Add to the setup function in VariablesValueSelector component
-    const refreshFromDependencyUpdate = (updatedCompleteData: any) => {
-      // Make a deep copy of the updated data to avoid reference issues
-      const updatedDataCopy = JSON.parse(JSON.stringify(updatedCompleteData));
-
-      // Update relevant variables from the complete data
+    const refreshFromDependencyUpdate = (
+      updatedCompleteData: any,
+      affectedVariables: any,
+    ) => {
+      // Only update variables that are in the affected list
       completeVariablesData.values.forEach((variable: any, index: any) => {
-        const updatedVar = updatedDataCopy.values.find(
-          (v: any) => v.name === variable.name,
+        const updatedVar = updatedCompleteData.values.find(
+          (v: any) => v.name === variable.name && affectedVariables.includes(v.name),
         );
 
         if (updatedVar) {
           completeVariablesData.values[index] = {
             ...completeVariablesData.values[index],
-            value: updatedVar.value,
-            options: updatedVar.options || [],
+            value: JSON.parse(JSON.stringify(updatedVar.value)),
+            options: updatedVar.options ? [...updatedVar.options] : [],
             isLoading: updatedVar.isLoading,
             isVariableLoadingPending: updatedVar.isVariableLoadingPending,
           };

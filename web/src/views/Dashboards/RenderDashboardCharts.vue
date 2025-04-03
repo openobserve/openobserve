@@ -945,7 +945,7 @@ export default defineComponent({
     // References to the variable selectors
     const globalVariablesRef = ref(null);
     const tabVariablesRef = ref(null);
-    const panelVariablesRef = ref(null); 
+    const panelVariablesRef = ref(null);
 
     const handleDependencyUpdate = ({
       source,
@@ -953,81 +953,114 @@ export default defineComponent({
       updatedCompleteData,
       scope,
     }) => {
-      console.log(
-        `Dependency update received from ${source} in scope ${scope}`,
-      );
-
-      if (!props.dashboardData?.variables?.list) return;
-
-      // Find affected variables
-      const affectedVars = props.dashboardData.variables.list.filter(
-        (variable) => affected.includes(variable.name),
-      );
-
-      // Track updates for each scope
-      let updateTabs = false;
-      let updateGlobal = false;
-      let affectedPanels = new Map(); // Map of affected panels to their variables
-
-      affectedVars.forEach((variable) => {
-        if (variable.scope === "global") updateGlobal = true;
-        if (variable.scope === "tabs") updateTabs = true;
-        if (variable.scope === "panels" && variable.panels) {
-          variable.panels.forEach((panelId) => {
-            if (!affectedPanels.has(panelId)) affectedPanels.set(panelId, []);
-            affectedPanels.get(panelId).push(variable.name); // Store affected variable names
-          });
-        }
-      });
-
-      // Update Global Variables if needed
-      if (updateGlobal && globalVariablesRef.value) {
-        console.log("Updating global variables...");
-        nextTick(() => {
-          globalVariablesRef.value.refreshFromDependencyUpdate(
-            updatedCompleteData,
+      // Get only the variables that belong to this scope
+      const getPanelScopedAffectedVars = (panelId) => {
+        return affected.filter((name) => {
+          const variable = props.dashboardData.variables.list.find(
+            (v) => v.name === name,
+          );
+          return (
+            variable &&
+            variable.scope === "panels" &&
+            variable.tabs?.includes(selectedTabId.value) &&
+            variable.panels?.includes(panelId)
           );
         });
-      }
+      };
 
-      // Update Tab Variables if needed
-      if (updateTabs && tabVariablesRef.value) {
-        console.log("Updating tab variables...");
-        nextTick(() => {
-          tabVariablesRef.value.refreshFromDependencyUpdate(
-            updatedCompleteData,
+      const getTabScopedAffectedVars = () => {
+        return affected.filter((name) => {
+          const variable = props.dashboardData.variables.list.find(
+            (v) => v.name === name,
+          );
+          return (
+            variable &&
+            variable.scope === "tabs" &&
+            variable.tabs?.includes(selectedTabId.value)
           );
         });
-      }
+      };
 
-      // Update only affected Panel Variables
-      if (affectedPanels.size > 0) {
-        nextTick(() => {
-          if (Array.isArray(panelVariablesRef.value)) {
-            panelVariablesRef.value.forEach((panelRef) => {
-              if (!panelRef || !panelRef.refreshFromDependencyUpdate) return;
-
-              const panelId = panelRef.currentPanelId;
-              const affectedVariables = affectedPanels.get(panelId);
-
-              if (affectedVariables) {
-                console.log(
-                  `Updating panel ${panelId} variables:`,
-                  affectedVariables,
-                );
-                panelRef.refreshFromDependencyUpdate({
-                  ...updatedCompleteData,
-                  onlyUpdate: affectedVariables, // Pass only affected variables
-                });
-              }
+      if (scope === "global" && globalVariablesRef.value) {
+        // Handle tab variables affected by global changes
+        if (tabVariablesRef.value) {
+          const tabScopedAffected = getTabScopedAffectedVars();
+          if (tabScopedAffected.length > 0) {
+            nextTick(() => {
+              tabVariablesRef.value.refreshFromDependencyUpdate(
+                updatedCompleteData,
+                tabScopedAffected,
+              );
             });
-          } else if (panelVariablesRef.value?.refreshFromDependencyUpdate) {
-            console.log("Updating single panel variables...");
+          }
+        }
+
+        // Handle panel variables affected by global changes
+        if (Array.isArray(panelVariablesRef.value)) {
+          panelVariablesRef.value.forEach((panelRef, index) => {
+            const panelId = panels.value[index]?.id;
+            if (panelRef && panelId) {
+              const panelScopedAffected = getPanelScopedAffectedVars(panelId);
+              if (panelScopedAffected.length > 0) {
+                panelRef.refreshFromDependencyUpdate(
+                  updatedCompleteData,
+                  panelScopedAffected,
+                );
+              }
+            }
+          });
+        } else if (panelVariablesRef.value && panels.value[0]?.id) {
+          const panelScopedAffected = getPanelScopedAffectedVars(
+            panels.value[0].id,
+          );
+          if (panelScopedAffected.length > 0) {
             panelVariablesRef.value.refreshFromDependencyUpdate(
               updatedCompleteData,
+              panelScopedAffected,
             );
           }
-        });
+        }
+      } else if (scope === "tabs" && tabVariablesRef.value) {
+        // Handle panel variables affected by tab changes
+        if (Array.isArray(panelVariablesRef.value)) {
+          panelVariablesRef.value.forEach((panelRef, index) => {
+            const panelId = panels.value[index]?.id;
+            if (panelRef && panelId) {
+              const panelScopedAffected = getPanelScopedAffectedVars(panelId);
+              if (panelScopedAffected.length > 0) {
+                nextTick(() => {
+                  panelRef.refreshFromDependencyUpdate(
+                    updatedCompleteData,
+                    panelScopedAffected,
+                  );
+                });
+              }
+            }
+          });
+        } else if (panelVariablesRef.value && panels.value[0]?.id) {
+          const panelScopedAffected = getPanelScopedAffectedVars(
+            panels.value[0].id,
+          );
+          if (panelScopedAffected.length > 0) {
+            panelVariablesRef.value.refreshFromDependencyUpdate(
+              updatedCompleteData,
+              panelScopedAffected,
+            );
+          }
+        }
+      } else if (scope === "panels" && panelVariablesRef.value) {
+        // Check if any tab variables are affected by panel changes (less common case)
+        if (tabVariablesRef.value) {
+          const tabScopedAffected = getTabScopedAffectedVars();
+          if (tabScopedAffected.length > 0) {
+            nextTick(() => {
+              tabVariablesRef.value.refreshFromDependencyUpdate(
+                updatedCompleteData,
+                tabScopedAffected,
+              );
+            });
+          }
+        }
       }
     };
 
