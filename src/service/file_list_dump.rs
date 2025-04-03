@@ -191,3 +191,15 @@ pub async fn get_file_list_entries_in_range(
 
     Ok(ret)
 }
+
+pub async fn delete_all_for_stream(org: &str, stream: &str) -> Result<(), errors::Error> {
+    infra::table::file_list_dump::delete_all_for_stream(org, stream).await
+}
+
+pub async fn delete_in_time_range(
+    org: &str,
+    stream: &str,
+    range: (i64, i64),
+) -> Result<(), errors::Error> {
+    infra::table::file_list_dump::delete_in_time_range(org, stream, range).await
+}
