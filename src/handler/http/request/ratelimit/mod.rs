@@ -16,8 +16,6 @@
 use std::io::Error;
 
 use actix_web::{HttpResponse, get, put, web};
-use config::meta::ratelimit::RatelimitRuleUpdater;
-use futures_util::StreamExt;
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
@@ -26,7 +24,8 @@ use {
         service::{ratelimit, ratelimit::rule::RatelimitError},
     },
     actix_web::http,
-    config::meta::ratelimit::RatelimitRule,
+    config::meta::ratelimit::{RatelimitRule, RatelimitRuleUpdater},
+    futures_util::StreamExt,
     infra::table::ratelimit::RuleEntry,
     o2_ratelimit::dataresource::{
         default_rules::{
@@ -386,7 +385,7 @@ pub async fn list_role_ratelimit(
 pub async fn update_ratelimit(
     path: web::Path<String>,
     query: web::Query<QueryParams>,
-    mut payload: web::Payload,
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))] mut payload: web::Payload,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -472,6 +471,7 @@ pub async fn update_ratelimit(
     }
 }
 
+#[cfg(feature = "enterprise")]
 async fn parse_and_validate_ratelimit_payload(
     bytes: web::BytesMut,
 ) -> Result<RatelimitRuleUpdater, String> {
