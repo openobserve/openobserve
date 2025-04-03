@@ -1,13 +1,13 @@
 const { expect } = require("@playwright/test");
-import { randomDashboardName } from "../dashboards/dashboard-aggrigation.spec.js";
+import { randomDashboardName } from "../dashboards/dashboard-aggrigation1.spec.js";
 import {
   waitForDashboardPage,
   applyQueryButton,
   deleteDashboard,
 } from "../utils/dashCreation.js";
 
-export class Dash_create {
-  constructor(page) {
+export class DashboardClass {
+  constructor(page, yAxis) {
     this.page = page;
 
      // Dashboard Locators
@@ -25,14 +25,16 @@ export class Dash_create {
 
     // Date-Time Filters
      this.waitforEnable = page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
-        timeout: 5000,});
+        timeout: 15000});
         this.dateTimeButton = page.locator('[data-test="date-time-btn"]');
         this.relativeTimeButton = page.locator('[data-test="date-time-relative-6-w-btn"]');
+
         this.applyTimeButton = page.locator('[data-test="date-time-apply-btn"]');
         this.dashboardApplyButton = page.locator('[data-test="dashboard-apply"]');
 
-    // Field Selection
-    this.yAxisField = page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_namespace_name"] [data-test="dashboard-add-y-data"]');
+
+    // Field Selection    
+    this.yAxisField = page.locator(`[data-test="field-list-item-logs-e2e_automate-${yAxis}"] [data-test="dashboard-add-y-data"]`);
     this.yAxisOption = page.locator('[data-test="dashboard-y-item-kubernetes_namespace_name"]');
     this.yAxisDropdown = page.locator('[data-test="dashboard-y-item-dropdown"]');
 
@@ -44,27 +46,24 @@ export class Dash_create {
     this.dashboardApplyButton = page.locator('[data-test="dashboard-apply"]'); 
 
 
-    // Query Inspector
-    this.queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]').getByText('distinct');
-    this.queryInspectorButton = page.locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]');
-    this.queryInspectorCell = page.getByRole("cell", {
-        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(distinct(kubernetes_namespace_name)) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
-        exact: true
-    });
-    this.queryInspectorClose = page.locator('[data-test="query-inspector-close-btn"]');
+  // Query Inspector Locators
+     this.queryEditor = this.page.locator('[data-test="dashboard-panel-query-editor"]').getByText('distinct');
+    this.queryInspectorButton = this.page.locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]');
+    this.queryInspectorCell = this.page.getByRole("cell", {
+     name: 'SELECT histogram(_timestamp) as "x_axis_1", count(distinct(kubernetes_namespace_name)) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+     exact: true
+     }).first();
+    this.queryInspectorClose = this.page.locator('[data-test="query-inspector-close-btn"]');
 
 
     // Panel Save
     this.panelNameField = page.locator('[data-test="dashboard-panel-name"]');
     this.panelSaveButton = page.locator('[data-test="dashboard-panel-save"]');
 
+
     // Dashboard Navigation
     this.backButton = page.locator('[data-test="dashboard-back-btn"]');
-
-
     this.dashbaorBackbutton = page.locator('[data-test="dashboard-back-btn"]');
-
-
   }
 
 
@@ -84,11 +83,10 @@ async streamSelect(page){
 }
 
 async setDateFilter() {
-    this.waitforEnable = page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
-        timeout: 5000,});
+    await this.waitforEnable;
     await this.dateTimeButton.click();
     await this.relativeTimeButton.click();
-    await this.applyTimeButton.click();
+    // await this.applyTimeButton.click();
     await this.dashboardApplyButton.click();
 }
 
@@ -99,7 +97,7 @@ async configureYAxis() {
 }
 
 async aggrigation(){
-    await this.yAxisDistinctOption.click();
+    await this.yAxisDistinctOption.click();   
 }
 
 async clickApplyButton() {
@@ -108,25 +106,21 @@ async clickApplyButton() {
 }
 
 async verifyQueryInspector() {
-    this.queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]').getByText('distinct');
-    this.queryInspectorButton = page.locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]');
-    this.queryInspectorCell = page.getByRole("cell", {
-        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(distinct(kubernetes_namespace_name)) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
-        exact: true
-    });
-    this.queryInspectorClose = page.locator('[data-test="query-inspector-close-btn"]');
+ 
+    await this.queryInspectorButton.click(); 
+    await this.queryInspectorCell.waitFor({ state: 'visible', timeout: 5000 }); 
+    await this.queryInspectorClose.click(); 
+
 }
 
   async savePanel(Dashbaord_panel) {
         await this.panelNameField.click();
-        await this.panelNameField.fill(Dashbaord_panel);
+        await this.panelNameField.fill("Dashbaord_panel");
         await this.panelSaveButton.click();
     }
 
-
     async deleteDashboard(){
-await this.dashbaorBackbutton.click()
-        await deleteDashboard(page, randomDashboardName);
-
-    }
+      await this.dashbaorBackbutton.click();
+      await deleteDashboard(this.page, randomDashboardName);
+  }
 }
