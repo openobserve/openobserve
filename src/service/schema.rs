@@ -418,6 +418,7 @@ async fn handle_diff_schema(
     }
     let mut w = STREAM_SETTINGS.write().await;
     w.insert(cache_key.clone(), stream_setting);
+    infra::schema::set_stream_settings_atomic(w.clone());
     drop(w);
 
     // update thread cache

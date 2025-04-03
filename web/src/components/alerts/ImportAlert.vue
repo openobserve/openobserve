@@ -1048,6 +1048,11 @@ export default defineComponent({
         input.trigger_condition.tolerance_in_secs = null;
       }
       input.folder_id = folderId;
+      //assigning the owner from the alert payload because the current logged in user will be the owner of the alert
+        input.owner = store.state.userInfo.email;
+      //assigning the last_edited_by from the alert payload because the current logged in user will be the last_edited_by of the alert
+        input.last_edited_by = store.state.userInfo.email;
+      
       try {
         await alertsService.create_by_alert_id(
           store.state.selectedOrganization.identifier,

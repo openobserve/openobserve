@@ -61,8 +61,8 @@ use openobserve::{
     },
     job, router,
     service::{
-        db, metadata, node::NodeService, cluster_info::ClusterInfoService, search::SEARCH_SERVER, self_reporting,
-        tls::http_tls_config,
+        cluster_info::ClusterInfoService, db, metadata, node::NodeService, search::SEARCH_SERVER,
+        self_reporting, tls::http_tls_config,
     },
 };
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
@@ -74,10 +74,10 @@ use opentelemetry_proto::tonic::collector::{
 };
 use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
 use proto::cluster_rpc::{
-    event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
+    cluster_info_service_server::ClusterInfoServiceServer, event_server::EventServer,
+    ingest_server::IngestServer, metrics_server::MetricsServer,
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
-    cluster_info_service_server::ClusterInfoServiceServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
