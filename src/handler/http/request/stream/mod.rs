@@ -67,7 +67,10 @@ async fn schema(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let schema = stream::get_stream(&org_id, &stream_name, stream_type).await;
@@ -284,7 +287,10 @@ async fn delete_fields(
     fields: web::Json<StreamDeleteFields>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query);
     match stream::delete_fields(
@@ -331,7 +337,10 @@ async fn delete(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     stream::delete_stream(&org_id, &stream_name, stream_type).await
@@ -531,7 +540,10 @@ async fn delete_stream_cache(
             "Result Cache is disabled".to_string(),
         )));
     }
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let path = if stream_name.eq("_all") {
