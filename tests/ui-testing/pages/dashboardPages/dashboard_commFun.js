@@ -1,12 +1,12 @@
 const { expect } = require("@playwright/test");
-import { randomDashboardName } from "../dashboards/dashboard-aggrigation1.spec.js";
+import { randomDashboardName } from "../../playwright-tests/dashboards/dashboard-aggrigation1.spec.js";
 import {
   waitForDashboardPage,
   applyQueryButton,
   deleteDashboard,
-} from "../utils/dashCreation.js";
+} from "../../playwright-tests/utils/dashCreation.js";
 
-export class DashboardClass {
+export class Dashboard{
   constructor(page, yAxis) {
     this.page = page;
 

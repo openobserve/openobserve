@@ -12,7 +12,7 @@ import {
   deleteDashboard,
 } from "../utils/dashCreation.js";
 
-import { DashboardClass } from "../utils/dashboard_commFun.js";
+import { Dashboard } from "../../pages/dashboardPages/dashboard_commFun.js";
 
 export const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -37,7 +37,7 @@ test.describe("dashboard filter testcases", () => {
     page,
   }) => {
     // Navigate to dashboards
-    const dashboardObject = new DashboardClass(page, "kubernetes_namespace_name");
+    const dashboardObject = new Dashboard(page, "kubernetes_namespace_name");
 
      await dashboardObject.createDashboard();
     //  await dashboardObject.setDateFilter();
