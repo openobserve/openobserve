@@ -52,7 +52,8 @@ impl TryFrom<&Bytes> for RatelimitRule {
     }
 }
 
-pub type RatelimitRuleUpdater = HashMap<String, HashMap<String, i32>>;
+#[derive(Debug)]
+pub struct RatelimitRuleUpdater(pub HashMap<String, HashMap<String, i32>>);
 
 impl RatelimitRule {
     pub fn from_updater(
@@ -61,6 +62,7 @@ impl RatelimitRule {
         updater: &RatelimitRuleUpdater,
     ) -> Vec<RatelimitRule> {
         updater
+            .0
             .iter()
             .flat_map(|(group_name, operations)| {
                 operations

@@ -17,6 +17,7 @@ use std::io::Error;
 
 use actix_web::{HttpResponse, get, put, web};
 use config::meta::ratelimit::RatelimitRuleUpdater;
+use futures_util::StreamExt;
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
@@ -95,7 +96,7 @@ async fn validate_ratelimit_updater(
         })
         .collect();
 
-    for (api_group_name, operations) in rules.iter() {
+    for (api_group_name, operations) in rules.0.iter() {
         for (operation, threshold) in operations.iter() {
             // Validate operation format
             let operation = ApiGroupOperation::try_from(operation.as_str());
@@ -385,7 +386,7 @@ pub async fn list_role_ratelimit(
 pub async fn update_ratelimit(
     path: web::Path<String>,
     query: web::Query<QueryParams>,
-    updater: web::Json<RatelimitRuleUpdater>,
+    mut payload: web::Payload,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -397,10 +398,26 @@ pub async fn update_ratelimit(
             )));
         }
 
+        let mut bytes = web::BytesMut::new();
+        while let Some(item) = payload.next().await {
+            bytes.extend_from_slice(
+                &item.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?,
+            );
+        }
+
+        let updater = match parse_and_validate_ratelimit_payload(bytes).await {
+            Ok(updater) => updater,
+            Err(e) => {
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "Invalid payload: {}",
+                    e
+                )));
+            }
+        };
+
         let query = query.into_inner();
         let org_id = query.get_org_id();
 
-        let updater = updater.into_inner();
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
             let openapi_info = crate::handler::http::router::openapi::openapi_info().await;
             o2_ratelimit::dataresource::default_rules::init_ratelimit_api_mapping(openapi_info)
@@ -450,7 +467,54 @@ pub async fn update_ratelimit(
     {
         drop(path);
         let _ = query;
-        drop(updater);
+        drop(payload);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
+}
+
+async fn parse_and_validate_ratelimit_payload(
+    bytes: web::BytesMut,
+) -> Result<RatelimitRuleUpdater, String> {
+    let value: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+    let obj = value
+        .as_object()
+        .ok_or_else(|| "Root must be an object".to_string())?;
+
+    let mut result = HashMap::new();
+
+    for (outer_key, outer_value) in obj {
+        let inner_obj = outer_value
+            .as_object()
+            .ok_or_else(|| format!("Value for key '{}' must be an object", outer_key))?;
+
+        let mut inner_map = HashMap::new();
+
+        for (inner_key, inner_value) in inner_obj {
+            let number = inner_value.as_i64().ok_or_else(|| {
+                format!(
+                    "Value for key '{}' in group '{}' must be an integer",
+                    inner_key, outer_key
+                )
+            })?;
+
+            if number > i32::MAX as i64 || number < 0 {
+                return Err(format!(
+                    "Rate limit value {} for key '{}' in group '{}' exceeds i32 range [{}, {}]",
+                    number,
+                    inner_key,
+                    outer_key,
+                    0,
+                    i32::MAX
+                ));
+            }
+
+            inner_map.insert(inner_key.clone(), number as i32);
+        }
+
+        result.insert(outer_key.clone(), inner_map);
+    }
+
+    Ok(RatelimitRuleUpdater(result))
 }
