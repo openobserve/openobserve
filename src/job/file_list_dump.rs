@@ -78,27 +78,29 @@ static FILE_LIST_DUMP_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
     DownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
 });
 
-// TODO(YJDoc2) clean up and fix
-async fn lock_offset(org: &str, stream: &str, offset: i64) -> Option<()> {
-    let (_, node) = db::compact::files::get_offset(org, StreamType::Filelist, stream).await;
+async fn lock_stream(org: &str, stream: &str) -> Option<()> {
+    // we make this dummy stream name, because the actual file_list stream will also
+    // be used by compactor to compact the dump files
+    let stream_name = format!("file_list_dump/{stream}");
+    let (_, node) = db::compact::files::get_offset(org, StreamType::Filelist, &stream_name).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return None; // other node is processing
     }
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
         let lock_key = format!(
-            "/file_list_dump/{}/{}/{}/{}",
+            "/file_list_dump/{}/{}/{}",
             org,
             StreamType::Filelist,
             stream,
-            offset
         );
-        let locker = match infra::dist_lock::lock(&lock_key, 0).await {
+        let locker = match infra::dist_lock::lock(&lock_key, 10).await {
             Ok(l) => l,
             Err(_) => return None,
         };
         // check the working node again, maybe other node locked it first
-        let (_, node) = db::compact::files::get_offset(org, StreamType::Filelist, stream).await;
+        let (_, node) =
+            db::compact::files::get_offset(org, StreamType::Filelist, &stream_name).await;
         if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
             let _ = infra::dist_lock::unlock(&locker).await;
@@ -108,8 +110,8 @@ async fn lock_offset(org: &str, stream: &str, offset: i64) -> Option<()> {
         let _ = db::compact::files::set_offset(
             org,
             StreamType::Filelist,
-            stream,
-            0,
+            &stream_name,
+            0, // we don't care about the actual offset
             Some(&LOCAL_NODE.uuid.clone()),
         )
         .await;
@@ -197,7 +199,7 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
     let start = offset;
     let end = offset + HOUR_IN_MS * 1000;
 
-    if let None = lock_offset(&org, &format!("file_list_dump/{}", stream), offset).await {
+    if let None = lock_stream(org, stream).await {
         // someone else is processing this.
         return Ok(());
     }
@@ -225,12 +227,6 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
             log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
         }
     }
-    let _ = db::compact::files::del_offset(
-        &org,
-        StreamType::Filelist,
-        &format!("file_list_dump/{}", stream),
-    )
-    .await;
     Ok(())
 }
 
