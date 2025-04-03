@@ -36,6 +36,8 @@ impl From<DestinationError> for HttpResponse {
 }
 
 /// CreateDestination
+///
+/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -70,6 +72,8 @@ pub async fn save_destination(
 }
 
 /// UpdateDestination
+///
+/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -104,6 +108,8 @@ pub async fn update_destination(
 }
 
 /// GetDestination
+///
+/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -130,6 +136,8 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
 }
 
 /// ListDestinations
+///
+/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -189,6 +197,8 @@ async fn list_destinations(
 }
 
 /// DeleteDestination
+///
+/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",

@@ -28,6 +28,8 @@ use crate::{
 };
 
 /// Shorten a URL
+///
+/// #{"ratelimit_module":"ShortUrl", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     post,
     context_path = "/api",
@@ -81,6 +83,8 @@ pub async fn shorten(org_id: web::Path<String>, body: web::Bytes) -> Result<Http
 }
 
 /// Retrieve the original URL from a short_id
+///
+/// #{"ratelimit_module":"ShortUrl", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     get,
     context_path = "/short",

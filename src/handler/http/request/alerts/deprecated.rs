@@ -38,6 +38,8 @@ use crate::{
 };
 
 /// CreateAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"create"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -82,6 +84,8 @@ pub async fn save_alert(
 }
 
 /// UpdateAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -121,6 +125,8 @@ pub async fn update_alert(
 }
 
 /// ListStreamAlerts
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"list"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -175,6 +181,8 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
 }
 
 /// ListAlerts
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"list"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -279,6 +287,8 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
 }
 
 /// GetAlertByName
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"get"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -328,6 +338,8 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
 }
 
 /// DeleteAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"delete"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -359,6 +371,8 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
 }
 
 /// EnableAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -397,6 +411,8 @@ async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpReques
 }
 
 /// TriggerAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",

@@ -14,20 +14,24 @@
 
 use std::io::Error;
 
-use actix_http::header::HeaderMap;
-use actix_web::{HttpResponse, get, post, web};
-use itertools::Itertools;
-use o2_enterprise::enterprise::actions::{action_manager::trigger_action, meta::TriggerSource};
-use tracing::{Level, span};
-
-use crate::{
-    common::utils::{
-        auth::{UserEmail, check_permissions},
-        http::get_or_create_trace_id,
+use actix_web::{HttpResponse, get, web};
+#[cfg(feature = "enterprise")]
+use {
+    crate::{
+        common::utils::{
+            auth::{UserEmail, check_permissions},
+            http::get_or_create_trace_id,
+        },
+        handler::http::models::action::TestActionRequest,
     },
-    handler::http::models::action::TestActionRequest,
+    actix_http::header::HeaderMap,
+    actix_web::post,
+    itertools::Itertools,
+    o2_enterprise::enterprise::actions::{action_manager::trigger_action, meta::TriggerSource},
+    tracing::{Level, span},
 };
 
+#[cfg(feature = "enterprise")]
 /// Test Action
 #[utoipa::path(
     context_path = "/api",
