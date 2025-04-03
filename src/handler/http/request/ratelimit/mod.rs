@@ -407,10 +407,7 @@ pub async fn update_ratelimit(
         let updater = match parse_and_validate_ratelimit_payload(bytes).await {
             Ok(updater) => updater,
             Err(e) => {
-                return Ok(MetaHttpResponse::bad_request(format!(
-                    "Invalid payload: {}",
-                    e
-                )));
+                return Ok(MetaHttpResponse::bad_request(e.to_string()));
             }
         };
 
@@ -501,7 +498,7 @@ async fn parse_and_validate_ratelimit_payload(
 
             if number > i32::MAX as i64 || number < 0 {
                 return Err(format!(
-                    "Rate limit value {} for key '{}' in group '{}' exceeds i32 range [{}, {}]",
+                    "The Rate limit value of {} for the key '{}' in group '{}' exceeds the allowed integer range of [{}, {}]",
                     number,
                     inner_key,
                     outer_key,
