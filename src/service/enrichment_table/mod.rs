@@ -318,6 +318,7 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     // delete stream settings cache
     let mut w = STREAM_SETTINGS.write().await;
     w.remove(&key);
+    infra::schema::set_stream_settings_atomic(w.clone());
     drop(w);
 
     // delete record_id generator if present

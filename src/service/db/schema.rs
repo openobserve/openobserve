@@ -352,6 +352,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
+                infra::schema::set_stream_settings_atomic(w.clone());
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
                 w.insert(
@@ -433,6 +434,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let mut w = STREAM_SETTINGS.write().await;
                 w.remove(item_key);
                 w.shrink_to_fit();
+                infra::schema::set_stream_settings_atomic(w.clone());
                 drop(w);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
@@ -500,6 +502,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);
+        infra::schema::set_stream_settings_atomic(w.clone());
         drop(w);
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
         w.insert(

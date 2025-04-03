@@ -631,12 +631,9 @@ fn update_node_status_metrics() -> NodeMetrics {
     config::metrics::NODE_TCP_CONNECTIONS
         .with_label_values(&["time_wait"])
         .set(node_status.tcp_conns_time_wait as i64);
-    config::metrics::NODE_OPEN_FDS
-        .with_label_values(&[])
-        .set(node_status.open_fds as i64);
-    config::metrics::NODE_TCP_CONN_RESETS
-        .with_label_values(&[])
-        .set(node_status.tcp_conn_resets as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["resets"])
+        .set(node_status.tcp_conns_resets as i64);
 
     node_status
 }

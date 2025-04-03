@@ -760,21 +760,23 @@ async fn process_node(
                 count += 1;
             }
 
-            let mut remote_stream = remote_stream.clone();
-            remote_stream.org_id = org_id.into();
-            let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
-            if let Err(e) = writer.write_wal(records).await {
-                let err_msg = format!(
-                    "DestinationNode error persisting data to be ingested externally: {}",
-                    e
-                );
-                if let Err(send_err) = error_sender
-                    .send((node.id.to_string(), node.node_type(), err_msg))
-                    .await
-                {
-                    log::error!(
-                        "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+            if !records.is_empty() {
+                let mut remote_stream = remote_stream.clone();
+                remote_stream.org_id = org_id.into();
+                let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
+                if let Err(e) = writer.write_wal(records).await {
+                    let err_msg = format!(
+                        "DestinationNode error persisting data to be ingested externally: {}",
+                        e
                     );
+                    if let Err(send_err) = error_sender
+                        .send((node.id.to_string(), node.node_type(), err_msg))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                        );
+                    }
                 }
             }
 
