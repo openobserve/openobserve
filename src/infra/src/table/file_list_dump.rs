@@ -170,3 +170,33 @@ pub async fn clear() -> Result<(), errors::Error> {
 
     Ok(())
 }
+
+pub async fn delete_all_for_stream(org: &str, stream: &str) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .filter(Column::Stream.eq(stream))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_in_time_range(
+    org: &str,
+    stream: &str,
+    range: (i64, i64),
+) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .filter(Column::Stream.eq(stream))
+        .filter(Column::StartTs.gte(range.0))
+        .filter(Column::EndTs.lte(range.1))
+        .exec(client)
+        .await?;
+    Ok(())
+}
