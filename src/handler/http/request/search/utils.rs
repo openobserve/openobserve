@@ -15,10 +15,12 @@
 
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::{
-        infra::config::USERS,
-        meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::auth::{AuthExtractor, is_root_user},
+    crate::{
+        common::{
+            meta::http::HttpResponse as MetaHttpResponse,
+            utils::auth::{AuthExtractor, is_root_user},
+        },
+        service::users::get_user,
     },
     actix_web::HttpResponse,
     config::meta::{stream::StreamType, user::User},
