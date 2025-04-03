@@ -15,17 +15,20 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
-use infra::table::cipher::CipherEntry;
+use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates};
-
-#[cfg(feature = "enterprise")]
-use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};
-use crate::common::{
-    meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-    utils::auth::{remove_ownership, set_ownership},
+use {
+    crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
+    crate::common::{
+        meta::authz::Authz,
+        utils::auth::{remove_ownership, set_ownership},
+    },
+    actix_web::http,
+    infra::table::cipher::CipherEntry,
+    o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates},
 };
+
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Store a key credential in db
 #[utoipa::path(
@@ -50,8 +53,8 @@ use crate::common::{
 #[post("/{org_id}/cipher_keys")]
 pub async fn save(
     org_id: web::Path<String>,
-    in_req: HttpRequest,
     body: web::Bytes,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -112,6 +115,9 @@ pub async fn save(
     }
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(org_id);
+        drop(in_req);
+        drop(body);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
 }
@@ -135,10 +141,7 @@ pub async fn save(
     tag = "Key"
 )]
 #[get("/{org_id}/cipher_keys/{key_name}")]
-pub async fn get(
-    _req: HttpRequest,
-    path: web::Path<(String, String)>,
-) -> Result<HttpResponse, Error> {
+pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let (org_id, key_name) = path.into_inner();
@@ -169,7 +172,10 @@ pub async fn get(
         Ok(HttpResponse::Ok().json(res))
     }
     #[cfg(not(feature = "enterprise"))]
-    Ok(MetaHttpResponse::forbidden("not supported"))
+    {
+        drop(path);
+        Ok(MetaHttpResponse::forbidden("not supported"))
+    }
 }
 
 /// list all keys for given org
@@ -187,7 +193,7 @@ pub async fn get(
     tag = "Key"
 )]
 #[get("/{org_id}/cipher_keys")]
-pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let org_id = path.into_inner();
@@ -217,7 +223,10 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
         Ok(HttpResponse::Ok().json(res))
     }
     #[cfg(not(feature = "enterprise"))]
-    Ok(MetaHttpResponse::forbidden("not supported"))
+    {
+        drop(path);
+        Ok(MetaHttpResponse::forbidden("not supported"))
+    }
 }
 
 /// delete key credentials for given key name
@@ -238,10 +247,7 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
     tag = "Keys"
 )]
 #[delete("/{org_id}/cipher_keys/{key_name}")]
-pub async fn delete(
-    _req: HttpRequest,
-    path: web::Path<(String, String)>,
-) -> Result<HttpResponse, Error> {
+pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let (org_id, key_name) = path.into_inner();
@@ -263,7 +269,10 @@ pub async fn delete(
         }
     }
     #[cfg(not(feature = "enterprise"))]
-    Ok(MetaHttpResponse::forbidden("not supported"))
+    {
+        drop(path);
+        Ok(MetaHttpResponse::forbidden("not supported"))
+    }
 }
 
 /// update the credentials for given key
@@ -291,9 +300,9 @@ pub async fn delete(
 )]
 #[put("/{org_id}/cipher_keys/{name}")]
 pub async fn update(
-    in_req: HttpRequest,
-    body: web::Bytes,
     path: web::Path<(String, String)>,
+    body: web::Bytes,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -378,6 +387,9 @@ pub async fn update(
     }
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(in_req);
+        drop(path);
+        drop(body);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
 }

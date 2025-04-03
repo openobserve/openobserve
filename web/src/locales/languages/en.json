@@ -345,7 +345,8 @@
     "searchRole": "Search Role",
     "searchGroup": "Search Group",
     "object": "Object",
-    "serviceAccounts": "Service Accounts"
+    "serviceAccounts": "Service Accounts",
+    "quota": "Quotas"
   },
   "ticket": {
     "header": "Support Tickets",
@@ -368,7 +369,9 @@
     "updateTicket": "Update Ticket",
     "inputTextHolder": "Type here.",
     "selectHolder": "Select...",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "noOrganizationSelected": "No Organization Selected",
+    "selectOrganizationForQuota": "Select an Organization to set quotas"
   },
   "organization": {
     "header": "Organizations",
@@ -1173,6 +1176,22 @@
     "storeType": "Store Type",
     "mechanismType": "Mechanism Type",
     "actions": "Actions"
+  },
+  "quota":{
+    "header": "Quotas",
+    "api-limits": "API Limits",
+    "role-limits": "Role Limits",
+    "api-search": "Search Module",
+    "role-search": "Search Role",
+    "moduleName": "Module Name",
+    "roleName": "Roles",
+    "listLimit": "List (Req/s)",
+    "getLimit": "Get (Req/s)",
+    "createLimit": "Create (Req/s)",
+    "updateLimit": "Update (Req/s)",
+    "deleteLimit": "Delete (Req/s)",
+    "table": "Table",
+    "json": "JSON"
   },
   "nodes": {
     "header": "All Nodes",

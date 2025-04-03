@@ -30,6 +30,8 @@ pub async fn toggle_state(details: web::Json<SyslogServer>) -> Result<HttpRespon
 }
 
 /// CreateSyslogRoute
+///
+/// #{"ratelimit_module":"Syslog Routes", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Syslog Routes",
@@ -55,6 +57,8 @@ pub async fn create_route(details: web::Json<SyslogRoute>) -> Result<HttpRespons
 }
 
 /// UpdateSyslogRoute
+///
+/// #{"ratelimit_module":"Syslog Routes", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Syslog Routes",
@@ -86,6 +90,8 @@ async fn update_route(
 }
 
 /// ListSyslogRoutes
+///
+/// #{"ratelimit_module":"Syslog Routes", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
    tag = "Syslog Routes",
@@ -106,6 +112,8 @@ async fn list_routes() -> impl Responder {
 }
 
 /// DeleteSyslogRoute
+///
+/// #{"ratelimit_module":"Syslog Routes", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
    tag = "Syslog Routes",

@@ -82,6 +82,9 @@ export default createStore({
     hiddenMenus: [],
     sessionId: "",
     webSocketUrl: "",
+    allApiLimitsByOrgId: {},
+    allRoleLimitsByOrgIdByRole: {},
+    modulesToDisplay: {},
   },
   mutations: {
     login(state, payload) {
@@ -211,6 +214,15 @@ export default createStore({
     setHiddenMenus(state, payload) {
       state.hiddenMenus = payload;
     },
+    setApiLimitsByOrgId(state, payload) {
+      state.allApiLimitsByOrgId = payload;
+    },
+    setRoleLimitsByOrgIdByRole(state, payload) {
+      state.allRoleLimitsByOrgIdByRole = payload;
+    },
+    setModulesToDisplay(state, payload) {
+      state.modulesToDisplay = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -338,6 +350,15 @@ export default createStore({
     },
     setHiddenMenus(context, payload) {
       context.commit("setHiddenMenus", payload);
+    },
+    setApiLimitsByOrgId(context, payload) {
+      context.commit("setApiLimitsByOrgId", payload);
+    },
+    setRoleLimitsByOrgIdByRole(context, payload) {
+      context.commit("setRoleLimitsByOrgIdByRole", payload);
+    },
+    setModulesToDisplay(context, payload) {
+      context.commit("setModulesToDisplay", payload);
     },
   },
   modules: {},

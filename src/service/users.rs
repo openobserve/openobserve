@@ -14,8 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::io::Error;
+#[cfg(feature = "enterprise")]
+use std::time::{Duration, Instant};
 
 use actix_web::{HttpResponse, http};
+#[cfg(feature = "enterprise")]
+use config::meta::ratelimit::CachedUserRoles;
 use config::{get_config, ider, utils::rand::generate_random_string};
 #[cfg(feature = "enterprise")]
 use o2_openfga::{
@@ -23,6 +27,8 @@ use o2_openfga::{
 };
 use regex::Regex;
 
+#[cfg(feature = "enterprise")]
+use crate::common::infra::config::USER_ROLES_CACHE;
 use crate::{
     common::{
         infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
@@ -830,6 +836,56 @@ pub(crate) async fn create_root_user(org_id: &str, user_req: UserRequest) -> Res
     );
     db::user::set(&user).await.unwrap();
     Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn get_user_roles(user_email: &str, org_id: Option<&str>) -> Vec<String> {
+    if let Some(roles) = check_cache(user_email).await {
+        return get_user_roles_by_org_id(roles, org_id);
+    }
+
+    let roles = o2_openfga::authorizer::roles::get_roles_for_user(user_email).await;
+    update_cache(user_email, roles.clone()).await;
+
+    get_user_roles_by_org_id(roles, org_id)
+}
+#[cfg(feature = "enterprise")]
+fn get_user_roles_by_org_id(roles: Vec<String>, org_id: Option<&str>) -> Vec<String> {
+    match org_id {
+        Some(org_id) => roles
+            .iter()
+            .filter_map(|role| {
+                let parts: Vec<&str> = role.split('/').collect();
+                if parts.first() == Some(&org_id) {
+                    parts.get(1).map(|s| s.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect(),
+        None => roles,
+    }
+}
+#[cfg(feature = "enterprise")]
+async fn check_cache(user_email: &str) -> Option<Vec<String>> {
+    let cache = USER_ROLES_CACHE.read().await;
+    if let Some(cached) = cache.get(user_email) {
+        if cached.expires_at > Instant::now() {
+            return Some(cached.roles.clone());
+        }
+    }
+    None
+}
+#[cfg(feature = "enterprise")]
+async fn update_cache(user_email: &str, roles: Vec<String>) {
+    let mut cache = USER_ROLES_CACHE.write().await;
+    cache.insert(
+        user_email.to_string(),
+        CachedUserRoles {
+            roles,
+            expires_at: Instant::now() + Duration::from_secs(60),
+        },
+    );
 }
 
 #[cfg(test)]

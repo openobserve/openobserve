@@ -53,6 +53,8 @@ use crate::{
 pub mod service_accounts;
 
 /// ListUsers
+///
+/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -91,6 +93,8 @@ pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<Ht
 }
 
 /// CreateUser
+///
+/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -133,6 +137,8 @@ pub async fn save(
 }
 
 /// UpdateUser
+///
+/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -179,6 +185,8 @@ pub async fn update(
 }
 
 /// AddUserToOrganization
+///
+/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -227,6 +235,8 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     auth_cookie
 }
 /// RemoveUserFromOrganization
+///
+/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -254,6 +264,8 @@ pub async fn delete(
 }
 
 /// AuthenticateUser
+///
+/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/auth",
     tag = "Auth",
@@ -639,7 +651,9 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     }
 }
 
-/// ListUsers
+/// ListUserRoles
+///
+/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",

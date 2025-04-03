@@ -37,6 +37,8 @@ pub mod node;
 pub mod organization;
 pub mod pipeline;
 pub mod promql;
+#[cfg(feature = "enterprise")]
+pub mod ratelimit;
 pub mod schema;
 pub mod search;
 pub mod websocket_events;

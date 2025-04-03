@@ -18,6 +18,7 @@ pub mod config;
 pub mod ider;
 pub mod meta;
 pub mod metrics;
+pub mod router;
 pub mod utils;
 
 pub use config::*;
