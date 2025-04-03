@@ -19,6 +19,7 @@ use ::config::{
         cluster::{Role, RoleGroup},
         promql::RequestRangeQuery,
     },
+    router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
     utils::rand::get_rand_element,
 };
 use actix_web::{
@@ -34,90 +35,12 @@ use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 mod ws;
 pub(crate) mod ws_v2;
 
-/// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 21] = [
-    ("config", 0),                            // /config
-    ("summary", 2),                           // /api/{org_id}/summary
-    ("organizations", 1),                     // /api/organizations
-    ("settings", 2),                          // /api/{org_id}/settings/...
-    ("schema", 3),                            // /api/{org_id}/streams/{stream_name}/schema
-    ("streams", 2),                           // /api/{org_id}/streams/...
-    ("traces/latest", 3),                     // /api/{org_id}/{stream_name}/traces/latest
-    ("clusters", 1),                          // /api/clusters
-    ("query_manager", 2),                     // /api/{org_id}/query_manager/...
-    ("ws", 2),                                // /api/{org_id}/ws
-    ("_search", 2),                           // /api/{org_id}/_search
-    ("_around", 3),                           // /api/{org_id}/{stream_name}/_around
-    ("_values", 3),                           // /api/{org_id}/{stream_name}/_values
-    ("functions?page_num=", 2),               // /api/{org_id}/functions
-    ("prometheus/api/v1/series", 2),          // /api/{org_id}/prometheus/api/v1/series
-    ("prometheus/api/v1/query", 2),           // /api/{org_id}/prometheus/api/v1/query
-    ("prometheus/api/v1/query_range", 2),     // /api/{org_id}/prometheus/api/v1/query_range
-    ("prometheus/api/v1/query_exemplars", 2), // /api/{org_id}/prometheus/api/v1/query_exemplars
-    ("prometheus/api/v1/metadata", 2),        // /api/{org_id}/prometheus/api/v1/metadata
-    ("prometheus/api/v1/labels", 2),          // /api/{org_id}/prometheus/api/v1/labels
-    ("prometheus/api/v1/label/", 2),          /* /api/{org_id}/prometheus/api/v1/label/
-                                               * {label_name}/
-                                               * values */
-];
-const QUERIER_ROUTES_BY_BODY: [&str; 2] = [
-    "/prometheus/api/v1/query_range",
-    "/prometheus/api/v1/query_exemplars",
-];
-const FIXED_QUERIER_ROUTES: [&str; 3] = ["/summary", "/schema", "/streams"];
-const INGESTER_ROUTES: [&str; 11] = [
-    "/_bulk",
-    "/_multi",
-    "/_json",
-    "/_kinesis_firehose",
-    "/_sub",
-    "/v1/logs",
-    "/ingest/metrics/_json",
-    "/v1/metrics",
-    "/traces",
-    "/v1/traces",
-    "/traces/latest",
-];
-
 struct URLDetails {
     is_error: bool,
     error: Option<String>,
     path: String,
     full_url: String,
     node_addr: String,
-}
-
-#[inline]
-fn is_querier_route(path: &str) -> bool {
-    QUERIER_ROUTES.iter().any(|(route, skip_segments)| {
-        if path.contains(route) {
-            let segments = path
-                .split('/')
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>();
-            // check if we have enough segments
-            if segments.len() <= *skip_segments {
-                return false;
-            }
-            let route_part = segments[*skip_segments..].join("/");
-            route_part.starts_with(route)
-                && INGESTER_ROUTES
-                    .iter()
-                    .all(|ingest_route| !route_part.ends_with(ingest_route))
-        } else {
-            false
-        }
-    })
-}
-
-#[inline]
-fn is_querier_route_by_body(path: &str) -> bool {
-    QUERIER_ROUTES_BY_BODY.iter().any(|x| path.contains(x))
-}
-
-#[inline]
-fn is_fixed_querier_route(path: &str) -> bool {
-    FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x))
 }
 
 #[route(

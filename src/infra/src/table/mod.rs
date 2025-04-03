@@ -34,6 +34,7 @@ pub mod folders;
 mod migration;
 pub mod org_users;
 pub mod organizations;
+pub mod ratelimit;
 pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;

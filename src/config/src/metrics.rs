@@ -669,7 +669,7 @@ pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
         Opts::new("db_query_nums", "db query number")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["operation", "table"],
+        &["operation", "table", "key"],
     )
     .expect("Metric created")
 });
@@ -762,26 +762,6 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["state"],
-    )
-    .expect("Metric created")
-});
-
-pub static NODE_OPEN_FDS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new("node_open_fds", "Number of open file descriptors")
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-pub static NODE_TCP_CONN_RESETS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new("node_tcp_conn_resets", "Number of TCP connection resets")
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
-        &[],
     )
     .expect("Metric created")
 });
@@ -993,12 +973,6 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
         .expect("Metric registered");
-    registry
-        .register(Box::new(NODE_OPEN_FDS.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(NODE_TCP_CONN_RESETS.clone()))
-        .expect("Metric registered");
 }
 
 fn create_const_labels() -> HashMap<String, String> {
@@ -1016,6 +990,14 @@ pub fn gather() -> String {
     TextEncoder::new()
         .encode(&registry.gather(), &mut buffer)
         .unwrap();
+
+    // process metrics
+    let mut process_metrics = vec![];
+    TextEncoder::new()
+        .encode(&prometheus::gather(), &mut process_metrics)
+        .unwrap();
+    buffer.extend_from_slice(&process_metrics);
+
     String::from_utf8(buffer).unwrap()
 }
 

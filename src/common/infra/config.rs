@@ -24,6 +24,7 @@ use config::{
         folder::Folder,
         function::Transform,
         promql::ClusterLeader,
+        ratelimit::CachedUserRoles,
         stream::StreamParams,
         user::User,
     },
@@ -104,5 +105,7 @@ pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::d
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
 // TODO: Implement rate limiting for maximum number of sessions
 pub static WS_SESSIONS: Lazy<RwHashMap<String, WsSession>> = Lazy::new(DashMap::default);
+pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
+    Lazy::new(Default::default);
 // Global registry for search requests by `trace_id`
 pub static WS_SEARCH_REGISTRY: Lazy<DashMap<String, SearchState>> = Lazy::new(DashMap::new);

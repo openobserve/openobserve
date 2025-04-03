@@ -1115,14 +1115,14 @@ async fn generate_inverted_index(
         index_format,
         InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
     ) {
-        let (schema, mut reader) = get_recordbatch_reader_from_bytes(buf).await?;
+        let (schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
         let index_size =  create_tantivy_index(
                 "COMPACTOR",
                 new_file_key,
                 full_text_search_fields,
                 index_fields,
                 schema,
-                &mut reader,
+                reader,
             )
             .await.map_err(|e| {
                 anyhow::anyhow!(

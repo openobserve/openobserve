@@ -69,6 +69,8 @@ pub async fn remote_write(
 }
 
 /// prometheus instant queries
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 #[utoipa::path(
     context_path = "/api",
@@ -224,6 +226,8 @@ async fn query(
 }
 
 /// prometheus range queries
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 #[utoipa::path(
     context_path = "/api",
@@ -301,6 +305,8 @@ pub async fn query_range_post(
 }
 
 /// prometheus query exemplars
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
 #[utoipa::path(
     context_path = "/api",
@@ -517,6 +523,8 @@ async fn query_range(
 }
 
 /// prometheus query metric metadata
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
     context_path = "/api",
@@ -577,6 +585,8 @@ pub async fn metadata(
 }
 
 /// prometheus finding series by label matchers
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 #[utoipa::path(
     context_path = "/api",
@@ -719,6 +729,8 @@ async fn series(
 }
 
 /// prometheus getting label names
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
 #[utoipa::path(
     context_path = "/api",
@@ -815,6 +827,8 @@ async fn labels(
 }
 
 /// prometheus query label values
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
 #[utoipa::path(
     context_path = "/api",
@@ -927,6 +941,8 @@ fn validate_metadata_params(
 }
 
 /// prometheus formatting query expressions
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
 #[utoipa::path(
     context_path = "/api",

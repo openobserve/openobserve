@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{get_config, meta::stream::StreamType};
+#[cfg(feature = "enterprise")]
+use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use utoipa::{Modify, OpenApi, openapi::security::SecurityScheme};
 
 use crate::{common::meta, handler::http::request};
@@ -140,6 +142,56 @@ use crate::{common::meta, handler::http::request};
         request::clusters::list_clusters,
         request::short_url::shorten,
         request::short_url::retrieve,
+        request::ratelimit::list_module_ratelimit,
+        request::ratelimit::list_role_ratelimit,
+        request::ratelimit::update_ratelimit,
+        request::service_accounts::list,
+        request::service_accounts::save,
+        request::service_accounts::update,
+        request::service_accounts::delete,
+        request::service_accounts::get_api_token,
+        request::pipeline::save_pipeline,
+        request::pipeline::list_pipelines,
+        request::pipeline::list_streams_with_pipeline,
+        request::pipeline::delete_pipeline,
+        request::pipeline::update_pipeline,
+        request::pipeline::enable_pipeline,
+        request::dashboards::reports::create_report,
+        request::dashboards::reports::update_report,
+        request::dashboards::reports::list_reports,
+        request::dashboards::reports::get_report,
+        request::dashboards::reports::delete_report,
+        request::dashboards::reports::enable_report,
+        request::dashboards::reports::trigger_report,
+        request::actions::action::upload_zipped_action,
+        request::actions::action::delete_action,
+        request::actions::action::serve_action_zip,
+        request::actions::action::update_action_details,
+        request::actions::action::list_actions,
+        request::actions::action::get_action_from_id,
+        request::authz::fga::create_role,
+        request::authz::fga::delete_role,
+        request::authz::fga::get_roles,
+        request::authz::fga::update_role,
+        request::authz::fga::get_role_permissions,
+        request::authz::fga::get_users_with_role,
+        request::authz::fga::create_group,
+        request::authz::fga::update_group,
+        request::authz::fga::get_groups,
+        request::authz::fga::get_group_details,
+        request::authz::fga::delete_group,
+        request::keys::save,
+        request::keys::get,
+        request::keys::list,
+        request::keys::delete,
+        request::keys::update,
+        request::search::search_job::submit_job,
+        request::search::search_job::list_status,
+        request::search::search_job::get_status,
+        request::search::search_job::cancel_job,
+        request::search::search_job::get_job_result,
+        request::search::search_job::delete_job,
+        request::search::search_job::retry_job,
     ),
     components(
         schemas(
@@ -288,7 +340,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::promql::Metadata,
             config::meta::promql::MetricType,
             // Functions
-
          ),
     ),
     modifiers(&SecurityAddon),
@@ -310,6 +361,7 @@ use crate::{common::meta, handler::http::request};
         (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
         (name = "Clusters", description = "Super cluster operations"),
         (name = "Short Url", description = "Short Url Service"),
+        (name = "Ratelimit", description = "Ratelimit operations"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -334,4 +386,49 @@ impl Modify for SecurityAddon {
             )),
         );
     }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn openapi_info() -> OpenapiInfo {
+    let api = ApiDoc::openapi();
+
+    // Group endpoints by tags with full operation details
+    let mut tag_operations: OpenapiInfo = std::collections::HashMap::new();
+
+    for (path, path_item) in &api.paths.paths {
+        for (method, operation) in path_item.operations.clone() {
+            let tags = operation
+                .tags
+                .clone()
+                .unwrap_or_else(|| vec!["untagged".to_string()]);
+
+            let method = match method {
+                utoipa::openapi::PathItemType::Get => "GET",
+                utoipa::openapi::PathItemType::Post => "POST",
+                utoipa::openapi::PathItemType::Put => "PUT",
+                utoipa::openapi::PathItemType::Delete => "DELETE",
+                utoipa::openapi::PathItemType::Patch => "PATCH",
+                utoipa::openapi::PathItemType::Head => "HEAD",
+                utoipa::openapi::PathItemType::Options => "OPTIONS",
+                utoipa::openapi::PathItemType::Trace => "TRACE",
+                utoipa::openapi::PathItemType::Connect => "CONNECT",
+            };
+
+            let operation_info = (
+                method.to_string(),
+                path.clone(),
+                operation.clone().description,
+                tags.clone(),
+            );
+
+            for tag in tags {
+                tag_operations
+                    .entry(tag)
+                    .or_default()
+                    .push(operation_info.clone());
+            }
+        }
+    }
+
+    tag_operations
 }

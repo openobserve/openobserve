@@ -45,6 +45,8 @@ use crate::{
 };
 
 /// GetOrganizations
+///
+/// #{"ratelimit_module":"Organizations", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -132,6 +134,8 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
 }
 
 /// GetOrganizationSummary
+///
+/// #{"ratelimit_module":"Summary", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -154,6 +158,8 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 }
 
 /// GetIngestToken
+///
+/// #{"ratelimit_module":"Ingestion Token", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -190,6 +196,8 @@ async fn get_user_passcode(
 }
 
 /// UpdateIngestToken
+///
+/// #{"ratelimit_module":"Ingestion Token", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -226,6 +234,8 @@ async fn update_user_passcode(
 }
 
 /// GetRumIngestToken
+///
+/// #{"ratelimit_module":"Rumtokens", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -262,6 +272,8 @@ async fn get_user_rumtoken(
 }
 
 /// UpdateRumIngestToken
+///
+/// #{"ratelimit_module":"Rumtokens", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -298,6 +310,8 @@ async fn update_user_rumtoken(
 }
 
 /// CreateRumIngestToken
+///
+/// #{"ratelimit_module":"Rumtokens", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -334,6 +348,8 @@ async fn create_user_rumtoken(
 }
 
 /// CreateOrganization
+///
+/// #{"ratelimit_module":"Organizations", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",

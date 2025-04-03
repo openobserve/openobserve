@@ -402,7 +402,7 @@ impl FromRequest for AuthExtractor {
                     OFGA_MODELS.get("organizations").unwrap().key,
                     org_id
                 )
-            } else if method.eq("PUT")
+            } else if (method.eq("PUT") && !path_columns[1].starts_with("ratelimit"))
                 || method.eq("DELETE")
                 || path_columns[1].eq("reports")
                 || path_columns[1].eq("savedviews")
@@ -440,6 +440,12 @@ impl FromRequest for AuthExtractor {
             } else {
                 // for things like dashboards and folders etc,
                 // this will take form org:dashboard or org:folders
+
+                // handle ratelimit:org
+                if method.eq("GET") && path_columns[1].starts_with("ratelimit") {
+                    method = "LIST".to_string();
+                }
+
                 format!(
                     "{}:{}",
                     OFGA_MODELS

@@ -36,6 +36,8 @@ use crate::{
 };
 
 /// Organization specific settings
+///
+/// #{"ratelimit_module":"Settings", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -112,6 +114,8 @@ async fn create(
 }
 
 /// Retrieve organization specific settings
+///
+/// #{"ratelimit_module":"Settings", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",

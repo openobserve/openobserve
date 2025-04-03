@@ -24,6 +24,8 @@ use {
 };
 
 /// ListClusters
+///
+/// #{"ratelimit_module":"Clusters", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Clusters",

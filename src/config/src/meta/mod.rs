@@ -28,6 +28,7 @@ pub mod organization;
 pub mod otlp;
 pub mod pipeline;
 pub mod promql;
+pub mod ratelimit;
 pub mod search;
 pub mod self_reporting;
 pub mod short_url;

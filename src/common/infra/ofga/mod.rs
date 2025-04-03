@@ -43,7 +43,7 @@ use crate::{
 };
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    use o2_openfga::{authorizer::authz::get_tuple_for_new_index, get_all_init_tuples};
+    use o2_openfga::get_all_init_tuples;
 
     let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
@@ -52,6 +52,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_cipher_keys_migration = false;
     let mut need_action_scripts_migration = false;
     let mut need_alert_folders_migration = false;
+    let mut need_ratelimit_migration = false;
     let mut existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
             Ok(Some(model)) => Some(model),
@@ -142,6 +143,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
         let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
         let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
+        let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
+        let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
         if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
             need_migrate_index_streams = true;
         }
@@ -157,6 +160,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
             log::info!("[OFGA:Local] Alert folders migration needed");
             need_alert_folders_migration = true;
+        }
+
+        if meta_version > v0_0_15 && existing_model_version < v0_0_16 {
+            log::info!("[OFGA:Local] Ratelimit migration needed");
+            need_ratelimit_migration = true;
         }
     }
 
@@ -182,26 +190,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
 
             let mut tuples = vec![];
-            let r = infra::schema::STREAM_SCHEMAS.read().await;
             let mut orgs = HashSet::new();
-            for key in r.keys() {
-                if !key.contains('/') {
-                    continue;
-                }
-                let split_key = key.split('/').collect::<Vec<&str>>();
-                let org_name = split_key[0];
-                orgs.insert(org_name);
-                if need_migrate_index_streams
-                    && split_key.len() > 2
-                    && split_key[1] == "index"
-                    && !migrate_native_objects
-                {
-                    get_tuple_for_new_index(org_name, split_key[2], &mut tuples);
-                }
+            for user in USERS.iter() {
+                orgs.insert(user.value().org.to_string());
             }
             log::info!("[OFGA:Local] Migrating native objects");
             if migrate_native_objects {
-                for org_name in orgs {
+                for org_name in orgs.iter() {
                     get_org_creation_tuples(
                         org_name,
                         &mut tuples,
@@ -245,7 +240,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 }
             } else {
                 log::info!("[OFGA:Local] Migrating index streams");
-                for org_name in orgs {
+                for org_name in orgs.iter() {
                     if need_migrate_index_streams {
                         get_index_creation_tuples(org_name, &mut tuples).await;
                     }
@@ -275,6 +270,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     if need_alert_folders_migration {
                         get_ownership_all_org_tuple(org_name, "alert_folders", &mut tuples);
                         get_ownership_tuple(org_name, "alert_folders", DEFAULT_FOLDER, &mut tuples);
+                    }
+                    if need_ratelimit_migration {
+                        get_ownership_all_org_tuple(org_name, "ratelimit", &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {
@@ -313,7 +311,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                 }
             }
-            drop(r);
         }
         Err(e) => {
             log::error!("Error setting OFGA model: {:?}", e);

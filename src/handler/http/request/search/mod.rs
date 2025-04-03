@@ -62,12 +62,9 @@ use crate::{
 pub(crate) mod around;
 pub(crate) mod error_utils;
 pub mod multi_streams;
-#[cfg(feature = "enterprise")]
 pub mod query_manager;
 pub mod saved_view;
-#[cfg(feature = "enterprise")]
 pub mod search_job;
-#[cfg(feature = "enterprise")]
 pub(crate) mod utils;
 
 async fn can_use_distinct_stream(
@@ -134,6 +131,8 @@ async fn can_use_distinct_stream(
 }
 
 /// SearchStreamData
+///
+/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -367,6 +366,8 @@ pub async fn search(
 }
 
 /// SearchAround
+///
+/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -461,6 +462,8 @@ pub async fn around_v1(
 }
 
 /// SearchAroundV2
+///
+/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -565,6 +568,8 @@ pub async fn around_v2(
 }
 
 /// SearchTopNValues
+///
+/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -971,6 +976,8 @@ async fn values_v1(
 }
 
 /// SearchStreamPartition
+///
+/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -1077,6 +1084,8 @@ pub async fn search_partition(
 }
 
 /// Search History
+///
+/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",

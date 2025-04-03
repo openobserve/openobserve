@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
 pub mod actions;
 pub mod alerts;
 pub mod authz;
@@ -25,7 +24,6 @@ pub mod enrichment_table;
 #[allow(deprecated)]
 pub mod folders;
 pub mod functions;
-#[cfg(feature = "enterprise")]
 pub mod keys;
 pub mod kv;
 pub mod logs;
@@ -33,6 +31,7 @@ pub mod metrics;
 pub mod organization;
 pub mod pipeline;
 pub mod promql;
+pub mod ratelimit;
 pub mod rum;
 #[cfg(feature = "enterprise")]
 pub mod script_server;

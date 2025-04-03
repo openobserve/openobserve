@@ -37,6 +37,8 @@ use crate::{
 };
 
 /// ListServiceAccounts
+///
+/// #{"ratelimit_module":"Service Accounts", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "ServiceAccounts",
@@ -89,6 +91,8 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
 }
 
 /// CreateServiceAccount
+///
+/// #{"ratelimit_module":"Service Accounts", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "ServiceAccounts",
@@ -130,6 +134,8 @@ pub async fn save(
 }
 
 /// UpdateServiceAccount
+///
+/// #{"ratelimit_module":"Service Accounts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "ServiceAccounts",
@@ -208,6 +214,8 @@ pub async fn update(
 }
 
 /// RemoveServiceAccount
+///
+/// #{"ratelimit_module":"Service Accounts", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "ServiceAccounts",
@@ -235,6 +243,8 @@ pub async fn delete(
 }
 
 /// GetAPIToken
+///
+/// #{"ratelimit_module":"Service Accounts", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
      tag = "ServiceAccounts",
