@@ -33,10 +33,10 @@ use o2_openfga::{
 };
 
 use super::db::org_users::get_cached_user_org;
-#[cfg(feature = "cloud")]
-use crate::common::meta::user::{InviteStatus, UserInvite, UserInviteList};
 #[cfg(feature = "enterprise")]
 use crate::common::infra::config::USER_ROLES_CACHE;
+#[cfg(feature = "cloud")]
+use crate::common::meta::user::{InviteStatus, UserInvite, UserInviteList};
 use crate::{
     common::{
         infra::config::{ORG_USERS, ROOT_USER, USERS_RUM_TOKEN},
@@ -1195,57 +1195,7 @@ async fn check_cache(user_email: &str) -> Option<Vec<String>> {
     }
     None
 }
-#[cfg(feature = "enterprise")]
-async fn update_cache(user_email: &str, roles: Vec<String>) {
-    let mut cache = USER_ROLES_CACHE.write().await;
-    cache.insert(
-        user_email.to_string(),
-        CachedUserRoles {
-            roles,
-            expires_at: Instant::now() + Duration::from_secs(60),
-        },
-    );
-}
 
-#[cfg(feature = "enterprise")]
-pub async fn get_user_roles(user_email: &str, org_id: Option<&str>) -> Vec<String> {
-    if let Some(roles) = check_cache(user_email).await {
-        return get_user_roles_by_org_id(roles, org_id);
-    }
-
-    let roles = o2_openfga::authorizer::roles::get_roles_for_user(user_email).await;
-    update_cache(user_email, roles.clone()).await;
-
-    get_user_roles_by_org_id(roles, org_id)
-}
-
-#[cfg(feature = "enterprise")]
-fn get_user_roles_by_org_id(roles: Vec<String>, org_id: Option<&str>) -> Vec<String> {
-    match org_id {
-        Some(org_id) => roles
-            .iter()
-            .filter_map(|role| {
-                let parts: Vec<&str> = role.split('/').collect();
-                if parts.first() == Some(&org_id) {
-                    parts.get(1).map(|s| s.to_string())
-                } else {
-                    None
-                }
-            })
-            .collect(),
-        None => roles,
-    }
-}
-#[cfg(feature = "enterprise")]
-async fn check_cache(user_email: &str) -> Option<Vec<String>> {
-    let cache = USER_ROLES_CACHE.read().await;
-    if let Some(cached) = cache.get(user_email) {
-        if cached.expires_at > Instant::now() {
-            return Some(cached.roles.clone());
-        }
-    }
-    None
-}
 #[cfg(feature = "enterprise")]
 async fn update_cache(user_email: &str, roles: Vec<String>) {
     let mut cache = USER_ROLES_CACHE.write().await;
