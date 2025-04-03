@@ -160,10 +160,10 @@ impl From<RatelimitError> for HttpResponse {
 
 /// listApiModule
 ///
-/// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"list"}#
+/// #{"ratelimit_module":"Quotas", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
-    tag = "Ratelimit",
+    tag = "Quotas",
     operation_id = "listApiModule",
     security(
         ("Authorization"= [])
@@ -208,10 +208,10 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
 
 /// listModuleRatelimitRule
 ///
-/// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"list"}#
+/// #{"ratelimit_module":"Quotas", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
-    tag = "Ratelimit",
+    tag = "Quotas",
     operation_id = "listModuleRatelimitRule",
     security(
         ("Authorization"= [])
@@ -276,10 +276,10 @@ pub async fn list_module_ratelimit(
 
 /// listRoleRatelimitRule
 ///
-/// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"list"}#
+/// #{"ratelimit_module":"Quotas", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
-    tag = "Ratelimit",
+    tag = "Quotas",
     operation_id = "listRoleRatelimitRule",
     security(
         ("Authorization"= [])
@@ -361,10 +361,10 @@ pub async fn list_role_ratelimit(
 
 /// UpdateRatelimitRule
 ///
-/// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"update"}#
+/// #{"ratelimit_module":"Quotas", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
-    tag = "Ratelimit",
+    tag = "Quotas",
     operation_id = "UpdateRatelimitRule",
     security(
         ("Authorization"= [])
