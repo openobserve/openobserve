@@ -222,9 +222,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :name="
                       props.row.type == 'Utf8'
                         ? 'text_fields'
-                        : props.row.type == 'Int64'
-                          ? 'tag'
-                          : 'toggle_off'
+                        : props.row.type == 'Boolean'
+                          ? 'toggle_off'
+                          : 'tag'
                     "
                     color="grey-6"
                     class="q-mr-xs"

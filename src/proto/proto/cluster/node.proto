@@ -30,8 +30,7 @@ message NodeMetrics {
   uint64 tcp_conns_established = 6;
   uint64 tcp_conns_close_wait = 7;
   uint64 tcp_conns_time_wait = 8;
-  uint64 open_fds = 9;
-  uint64 tcp_conn_resets = 10;
+  uint64 tcp_conns_resets = 10;
 }
 
 // Node representation

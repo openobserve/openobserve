@@ -281,7 +281,7 @@ async-nats = "0.39"
 once_cell = "1.20"
 ordered-float = { version = "4.5.0", features = ["serde"] }
 parking_lot = "0.12"
-prometheus = "0.13"
+prometheus = { version = "0.13", features = ["process"] }
 prost = "0.13.1"
 rand = "0.8"
 rayon = "1.10"
@@ -368,4 +368,4 @@ utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "063cabbbf4bc6f75794fa0ccd3b0bd5c074f0e35" }
 vrl = { version = "0.22", features = ["value", "compiler", "test"] }
 zstd = "0.13"
-zip = "2.2.2"
+zip = "2.5.0"

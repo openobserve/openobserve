@@ -601,6 +601,7 @@ pub async fn delete_stream(
     // delete stream settings cache
     let mut w = STREAM_SETTINGS.write().await;
     w.remove(&key);
+    infra::schema::set_stream_settings_atomic(w.clone());
     drop(w);
 
     // delete stream record id generator cache

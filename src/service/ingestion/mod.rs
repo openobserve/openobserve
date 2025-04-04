@@ -257,7 +257,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             evaluation_took_in_secs: None,
             source_node: Some(LOCAL_NODE.name.clone()),
             query_took: None,
-            trigger_trace_id: None,
+            scheduler_trace_id: None,
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
@@ -633,6 +633,7 @@ mod tests {
         let settings = unwrap_stream_settings(&schema).unwrap();
         let mut w = STREAM_SETTINGS.write().await;
         w.insert("default/logs/olympics".to_string(), settings);
+        infra::schema::set_stream_settings_atomic(w.clone());
         drop(w);
         let keys = get_stream_partition_keys("default", &StreamType::Logs, "olympics").await;
         assert_eq!(

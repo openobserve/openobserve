@@ -114,6 +114,13 @@ impl PuffinFooterBytesReader {
 impl PuffinFooterBytesReader {
     async fn parse(mut self) -> Result<PuffinMeta> {
         // read footer
+        if self.source.size < FOOTER_SIZE as usize {
+            return Err(anyhow!(
+                "Unexpected footer size: expected size {} vs actual size {}",
+                FOOTER_SIZE,
+                self.source.size
+            ));
+        }
         let footer = infra::cache::storage::get_range(
             &self.source.location,
             (self.source.size - FOOTER_SIZE as usize)..self.source.size,
@@ -148,6 +155,13 @@ impl PuffinFooterBytesReader {
         self.payload_size = i32::from_le_bytes(payload_size) as u64;
 
         // read the payload
+        if self.source.size < FOOTER_SIZE as usize + self.payload_size as usize {
+            return Err(anyhow!(
+                "Unexpected payload size: expected size {} vs actual size {}",
+                FOOTER_SIZE + self.payload_size,
+                self.source.size
+            ));
+        }
         let payload = infra::cache::storage::get_range(
             &self.source.location,
             (self.source.size

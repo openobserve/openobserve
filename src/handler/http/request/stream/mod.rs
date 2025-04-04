@@ -40,6 +40,8 @@ use crate::{
 };
 
 /// GetSchema
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -65,7 +67,10 @@ async fn schema(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let schema = stream::get_stream(&org_id, &stream_name, stream_type).await;
@@ -119,6 +124,8 @@ async fn schema(
 }
 
 /// CreateStreamSettings
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -161,6 +168,8 @@ async fn settings(
 }
 
 /// UpdateStreamSettings
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -252,6 +261,8 @@ async fn update_settings(
 }
 
 /// DeleteStreamFields
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -276,7 +287,10 @@ async fn delete_fields(
     fields: web::Json<StreamDeleteFields>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query);
     match stream::delete_fields(
@@ -299,6 +313,8 @@ async fn delete_fields(
 }
 
 /// DeleteStream
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -321,13 +337,18 @@ async fn delete(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     stream::delete_stream(&org_id, &stream_name, stream_type).await
 }
 
 /// ListStreams
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -488,6 +509,9 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     }))
 }
 
+/// StreamDeleteCache
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -516,7 +540,10 @@ async fn delete_stream_cache(
             "Result Cache is disabled".to_string(),
         )));
     }
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let path = if stream_name.eq("_all") {

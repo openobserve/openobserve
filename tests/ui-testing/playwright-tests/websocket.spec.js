@@ -202,4 +202,22 @@ test.describe("Websocket for logs", () => {
         
     });
 
+    test("Histogram should be displayed if it is enabled again and data is available", async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexStreamDefault();
+        await logsPage.enableSQLMode();
+        await logsPage.clearAndFillQueryEditor('SELECT count(_timestamp)  FROM "default" where code = 200');
+        await page.waitForTimeout(1000);
+        await logsPage.selectRunQuery();
+        await expect(page.locator('[data-test="logs-search-result-bar-chart"] canvas')).toBeVisible();
+        await logsPage.toggleHistogram();
+        await logsPage.selectRunQuery();
+        await expect(page.locator('[data-test="logs-search-result-bar-chart"] canvas')).not.toBeVisible();
+        await logsPage.toggleHistogram();
+        await logsPage.selectRunQuery();
+        await expect(page.locator('[data-test="logs-search-result-bar-chart"] canvas')).toBeVisible();
+        
+    });
+
 });

@@ -106,8 +106,7 @@ mod tests {
                 tcp_conns_established: connections,
                 tcp_conns_close_wait: 3,
                 tcp_conns_time_wait: 5,
-                open_fds: 1,
-                tcp_conn_resets: 1,
+                tcp_conns_resets: 1,
             },
             version: config::VERSION.to_string(),
         }

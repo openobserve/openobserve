@@ -8,6 +8,7 @@ license.workspace = true
 aes-siv.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
+arc-swap.workspace = true
 async-recursion.workspace = true
 async-trait.workspace = true
 base64.workspace = true

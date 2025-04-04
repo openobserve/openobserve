@@ -1919,7 +1919,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
    * @param value - the value to format
    * @returns the formatted value
    */
-  const formatValue = (value: any): string | null => {
+
+  const formatValue = (value: any, column: string): string | null => {
+    const columnType = dashboardPanelData.meta.stream.selectedStreamFields.find(
+      (it: any) => it.name == column,
+    )?.type;
     if (value == null) {
       // if value is null or undefined, return it as is
       return value;
@@ -1933,7 +1937,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     // escape any single quotes in the value
     tempValue = escapeSingleQuotes(tempValue);
     // add double quotes around the value
-    tempValue = `'${tempValue}'`;
+    tempValue = columnType == "Utf8" ? `'${tempValue}'` : `${tempValue}`;
     return tempValue;
   };
 
@@ -1977,6 +1981,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
      * @returns {string} - the condition as a string.
      */
     const buildCondition = (condition: any) => {
+      const columnType =
+        dashboardPanelData.meta.stream.selectedStreamFields.find(
+          (it: any) => it.name == condition.column,
+        )?.type;
       if (condition.filterType === "group") {
         const groupConditions = condition.conditions
           .map(buildCondition)
@@ -1996,7 +2004,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         return groupConditions.length ? `(${groupQuery})` : "";
       } else if (condition.type === "list" && condition.values?.length > 0) {
         return `${condition.column} IN (${condition.values
-          .map((value: any) => formatValue(value))
+          .map((value: any) => formatValue(value, condition.column))
           .join(", ")})`;
       } else if (condition.type === "condition" && condition.operator != null) {
         let selectFilter = "";
@@ -2019,28 +2027,32 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             condition.value,
           )})`;
         } else if (condition.operator === "match_all") {
-          selectFilter += `match_all(${formatValue(condition.value)})`;
+          selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
         } else if (condition.operator === "match_all_raw") {
-          selectFilter += `match_all_raw(${formatValue(condition.value)})`;
+          selectFilter += `match_all_raw(${formatValue(condition.value, condition.column)})`;
         } else if (condition.operator === "match_all_raw_ignore_case") {
           selectFilter += `match_all_raw_ignore_case(${formatValue(
             condition.value,
+            condition.column,
           )})`;
         } else if (condition.operator === "str_match") {
           selectFilter += `str_match(${condition.column}, ${formatValue(
             condition.value,
+            condition.column,
           )})`;
         } else if (condition.operator === "str_match_ignore_case") {
           selectFilter += `str_match_ignore_case(${
             condition.column
-          }, ${formatValue(condition.value)})`;
+          }, ${formatValue(condition.value, condition.column)})`;
         } else if (condition.operator === "re_match") {
           selectFilter += `re_match(${condition.column}, ${formatValue(
             condition.value,
+            condition.column,
           )})`;
         } else if (condition.operator === "re_not_match") {
           selectFilter += `re_not_match(${condition.column}, ${formatValue(
             condition.value,
+            condition.column,
           )})`;
         } else if (condition.value != null && condition.value !== "") {
           selectFilter += `${condition.column} `;
@@ -2053,23 +2065,37 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             case ">=":
               selectFilter += `${condition.operator} ${formatValue(
                 condition.value,
+                condition.column,
               )}`;
               break;
             case "Contains":
-              selectFilter += `LIKE '%${condition.value}%'`;
+              selectFilter +=
+                columnType === "Utf8"
+                  ? `LIKE '%${condition.value}%'`
+                  : `LIKE %${condition.value}%`;
               break;
             case "Not Contains":
-              selectFilter += `NOT LIKE '%${condition.value}%'`;
+              selectFilter +=
+                columnType === "Utf8"
+                  ? `NOT LIKE '%${condition.value}%'`
+                  : `NOT LIKE %${condition.value}%`;
               break;
             case "Starts With":
-              selectFilter += `LIKE '${condition.value}%'`;
+              selectFilter +=
+                columnType === "Utf8"
+                  ? `LIKE '${condition.value}%'`
+                  : `LIKE ${condition.value}%`;
               break;
             case "Ends With":
-              selectFilter += `LIKE '%${condition.value}'`;
+              selectFilter +=
+                columnType === "Utf8"
+                  ? `LIKE '%${condition.value}'`
+                  : `LIKE %${condition.value}`;
               break;
             default:
               selectFilter += `${condition.operator} ${formatValue(
                 condition.value,
+                condition.column,
               )}`;
               break;
           }
@@ -2299,7 +2325,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         field?.havingConditions?.[0]?.operator &&
         field?.havingConditions?.[0]?.value !== undefined &&
         field?.havingConditions?.[0]?.value !== null &&
-        field?.havingConditions?.[0]?.value !== "" 
+        field?.havingConditions?.[0]?.value !== ""
       ) {
         const columnName = field.alias;
         havingClauses.push(
@@ -2704,6 +2730,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery
     ) {
+      if (!dashboardPanelData.meta.stream.selectedStreamFields?.length) {
+        return;
+      }
+
       let query = "";
       if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart();

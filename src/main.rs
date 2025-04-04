@@ -61,8 +61,8 @@ use openobserve::{
     },
     job, router,
     service::{
-        db, metadata, node::NodeService, cluster_info::ClusterInfoService, search::SEARCH_SERVER, self_reporting,
-        tls::http_tls_config,
+        cluster_info::ClusterInfoService, db, metadata, node::NodeService, search::SEARCH_SERVER,
+        self_reporting, tls::http_tls_config,
     },
 };
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
@@ -74,10 +74,10 @@ use opentelemetry_proto::tonic::collector::{
 };
 use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
 use proto::cluster_rpc::{
-    event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
+    cluster_info_service_server::ClusterInfoServiceServer, event_server::EventServer,
+    ingest_server::IngestServer, metrics_server::MetricsServer,
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
-    cluster_info_service_server::ClusterInfoServiceServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
@@ -685,10 +685,18 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
                 router::http::create_http_client().expect("Failed to create http tls client");
+            let factory = web::scope(&cfg.common.base_uri);
+            #[cfg(feature = "enterprise")]
+            let factory = factory.wrap(
+                o2_ratelimit::middleware::RateLimitController::new_with_extractor(Some(
+                    router::ratelimit::resource_extractor::default_extractor,
+                )),
+            );
+
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
-                    web::scope(&cfg.common.base_uri)
+                    factory
                         .wrap(middlewares::SlowLog::new(
                             cfg.limit.http_slow_log_threshold,
                             cfg.limit.circuit_breaker_enabled,
@@ -797,10 +805,18 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
                 router::http::create_http_client().expect("Failed to create http tls client");
+            let factory = web::scope(&cfg.common.base_uri);
+            #[cfg(feature = "enterprise")]
+            let factory = factory.wrap(
+                o2_ratelimit::middleware::RateLimitController::new_with_extractor(Some(
+                    router::ratelimit::resource_extractor::default_extractor,
+                )),
+            );
+
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
-                    web::scope(&cfg.common.base_uri)
+                    factory
                         .wrap(middlewares::SlowLog::new(
                             cfg.limit.http_slow_log_threshold,
                             cfg.limit.circuit_breaker_enabled,
@@ -1176,5 +1192,10 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
     }
 
     o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
+    if config::get_config().ratelimit.ratelimit_enabled && o2_openfga::config::get_config().enabled
+    {
+        o2_ratelimit::init(openobserve::handler::http::router::openapi::openapi_info().await)
+            .await?;
+    }
     Ok(())
 }

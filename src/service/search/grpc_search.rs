@@ -37,9 +37,9 @@ pub async fn grpc_search(
     in_req: &search::Request,
     node_group: Option<RoleGroup>,
 ) -> Result<search::Response, Error> {
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
-        Some(nodes) => nodes,
-        None => {
+    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(node_group).await {
+        Some(nodes) if !nodes.is_empty() => nodes,
+        _ => {
             log::error!("search->grpc: no querier node online");
             return Err(server_internal_error("no querier node online"));
         }
@@ -109,7 +109,7 @@ pub async fn grpc_search_partition(
     node_group: Option<RoleGroup>,
     skip_max_query_range: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
+    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(node_group).await {
         Some(nodes) => nodes,
         None => {
             log::error!("search->grpc: no querier node online");

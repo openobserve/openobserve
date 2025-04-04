@@ -25,6 +25,8 @@ use crate::{
 };
 
 /// Create Timed Annotations
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     post,
     context_path = "/api",
@@ -75,6 +77,8 @@ pub async fn create_annotations(
 }
 
 /// Get Timed Annotations
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     get,
     context_path = "/api",
@@ -133,6 +137,8 @@ pub async fn get_annotations(
 }
 
 /// Delete Timed Annotations
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     delete,
     tag = "Dashboards",
@@ -181,6 +187,8 @@ pub async fn delete_annotations(
 }
 
 /// Update Timed Annotations
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     put,
     tag = "Dashboards",
@@ -233,6 +241,8 @@ pub async fn update_annotations(
 }
 
 /// Delete Timed Annotation Panels
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     delete,
     tag = "Dashboards",

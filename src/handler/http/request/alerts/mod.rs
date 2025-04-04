@@ -83,6 +83,8 @@ impl From<AlertError> for HttpResponse {
 }
 
 /// CreateAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -124,6 +126,8 @@ pub async fn create_alert(
 }
 
 /// GetAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -159,6 +163,8 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// UpdateAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -197,6 +203,8 @@ pub async fn update_alert(
 }
 
 /// DeleteAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -225,6 +233,8 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// ListAlerts
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -284,6 +294,8 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
 }
 
 /// EnableAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -323,6 +335,8 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
 }
 
 /// TriggerAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -352,6 +366,8 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// MoveAlerts
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",

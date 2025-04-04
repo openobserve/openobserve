@@ -36,6 +36,8 @@ impl From<PipelineError> for HttpResponse {
 }
 
 /// CreatePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipeline",
@@ -73,6 +75,8 @@ pub async fn save_pipeline(
 }
 
 /// ListPipelines
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -128,6 +132,8 @@ async fn list_pipelines(
 }
 
 /// GetStreamsWithPipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -155,6 +161,8 @@ async fn list_streams_with_pipeline(
 }
 
 /// DeletePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -187,6 +195,8 @@ async fn delete_pipeline(
 }
 
 /// UpdatePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -219,6 +229,8 @@ pub async fn update_pipeline(
 }
 
 /// EnablePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
