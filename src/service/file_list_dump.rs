@@ -1,7 +1,8 @@
 use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
+use chrono::Utc;
 use config::{
     get_config,
-    meta::stream::{FileKey, StreamType},
+    meta::stream::{FileKey, FileListDeleted, StreamType},
 };
 use hashbrown::HashMap;
 use infra::{
@@ -197,14 +198,71 @@ pub async fn get_file_list_entries_in_range(
     Ok(ret)
 }
 
-pub async fn delete_all_for_stream(org: &str, stream: &str) -> Result<(), errors::Error> {
-    infra::table::file_list_dump::delete_all_for_stream(org, stream).await
+async fn move_and_delete(
+    org: &str,
+    stream_type: StreamType,
+    stream: &str,
+    range: (i64, i64),
+) -> Result<(), errors::Error> {
+    let stream_key = format!(
+        "{org}/{}/{org}_{stream_type}_{stream}",
+        StreamType::Filelist
+    );
+    let list = infra::file_list::get_entries_in_range(org, &stream_key, range.0, range.1).await?;
+    let del_items: Vec<_> = list
+        .into_iter()
+        .map(|f| FileListDeleted {
+            file: format!("files/{}/{}/{}", stream_key, f.date, f.file),
+            index_file: false,
+            flattened: false,
+        })
+        .collect();
+
+    let mut inserted_into_deleted = false;
+
+    for _ in 0..5 {
+        if !inserted_into_deleted {
+            if let Err(e) =
+                infra::file_list::batch_add_deleted(org, Utc::now().timestamp_micros(), &del_items)
+                    .await
+            {
+                log::error!(
+                    "[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {}",
+                    e
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
+            }
+        }
+        inserted_into_deleted = true;
+        let items: Vec<_> = del_items.iter().map(|item| item.file.clone()).collect();
+        if let Err(e) = infra::file_list::batch_remove(&items).await {
+            log::error!(
+                "[FILE_LIST_DUMP] batch_delete to db failed, retrying: {}",
+                e
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        break;
+    }
+
+    Ok(())
+}
+
+pub async fn delete_all_for_stream(
+    org: &str,
+    stream_type: StreamType,
+    stream: &str,
+) -> Result<(), errors::Error> {
+    move_and_delete(org, stream_type, stream, (0, Utc::now().timestamp_micros())).await
 }
 
 pub async fn delete_in_time_range(
     org: &str,
+    stream_type: StreamType,
     stream: &str,
     range: (i64, i64),
 ) -> Result<(), errors::Error> {
-    infra::table::file_list_dump::delete_in_time_range(org, stream, range).await
+    move_and_delete(org, stream_type, stream, range).await
 }

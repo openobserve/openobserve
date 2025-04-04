@@ -277,8 +277,7 @@ pub async fn delete_all(
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
-    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-    super::super::file_list_dump::delete_all_for_stream(org_id, &stream_key).await?;
+    super::super::file_list_dump::delete_all_for_stream(org_id, stream_type, &stream_name).await?;
     log::info!(
         "deleted file list for: {}/{}/{}/all",
         org_id,
@@ -373,10 +372,11 @@ pub async fn delete_by_date(
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, time_range).await?;
-    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
     super::super::file_list_dump::delete_in_time_range(
         org_id,
-        &stream_key,
+        stream_type,
+        stream_name,
         (date_start.timestamp_micros(), date_end.timestamp_micros()),
     )
     .await?;
