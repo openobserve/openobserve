@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-separator />
     <div class="flex" style="height: calc(100vh - 162px); overflow: auto">
-      <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 1024px">
+      <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 100%">
         <q-form
           class="create-report-form"
           ref="addActionScriptFormRef"
@@ -194,6 +194,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="14px"
                   />
                 </div>
+
+                <iframe
+                  v-if="originalActionScriptData.length"
+                  id="vscode-iframe"
+                  :src="`${store.state.API_ENDPOINT}/web/vscode?id=${actionId}&name=${formData.name}`"
+                  sandbox="allow-scripts allow-same-origin"
+                  class="q-mt-md"
+                  style="width: 100%; height: max(700px, calc(100vh - 200px))"
+                />
+
                 <div
                   v-if="isEditingActionScript && formData.fileNameToShow == ''"
                   class="q-pt-md q-mt-xs q-pl-md"
@@ -596,7 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch } from "vue";
+import { ref, nextTick, onMounted, watch, onBeforeUnmount } from "vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -758,7 +768,15 @@ onBeforeMount(async () => {
   await handleActionScript();
 });
 
+const getOrigin = computed(() => {
+  return window.location.href;
+});
+
 const onSubmit = () => {};
+
+const actionId = computed(() => {
+  return router.currentRoute.value.query?.id;
+});
 
 const scheduling = ref({
   date: "",
@@ -1214,8 +1232,133 @@ const getServiceAccounts = async () => {
   }
 };
 
-onMounted(async () => {
+onBeforeMount(async () => {
   await getServiceAccounts();
+
+  await getActionZipFile();
+});
+
+const getActionZipFile = async () => {
+  try {
+    const response = await actions.get_zip_file(
+      store.state.selectedOrganization.identifier,
+      router.currentRoute.value.query?.id as string,
+    );
+    const data = await response?.data?.arrayBuffer();
+    const content = new Uint8Array(data);
+
+    console.log("content", content);
+    // Save to IndexedDB
+    const db = await openDB();
+    const transaction = db.transaction(storeName, "readwrite");
+    const dbStore = transaction.objectStore(storeName);
+
+    console.log("dbStore", dbStore, "db", db);
+
+    await dbStore.add({
+      id: router.currentRoute.value.query?.id,
+      data: content,
+      path: "zipFiles",
+      hash: await generateHash(content),
+    });
+
+    console.log("Zip file saved to IndexedDB");
+  } catch (err) {
+    console.error("Error saving zip file:", err);
+  }
+};
+
+// const saveZipToIndexDB = async (zipFile: any) => {
+//   const db = await openDB();
+// };
+
+const generateHash = async (content: Uint8Array): Promise<string> => {
+  const buffer = await crypto.subtle.digest("SHA-256", content);
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+let dbName = "memfsCache";
+let storeName = "files";
+
+const openDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 1);
+
+    request.onerror = () => reject(new Error("Failed to open IndexedDB"));
+    request.onsuccess = () => resolve(request.result);
+
+    request.onupgradeneeded = (event: any) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(storeName)) {
+        const store = db.createObjectStore(storeName, { keyPath: "id" });
+        console.log("store", store);
+        store.createIndex("path", "path", { unique: true });
+        store.createIndex("hash", "hash", { unique: false });
+      }
+    };
+  });
+};
+
+// In your parent application (port 8081)
+const vscodeIframe = document.querySelector(
+  "#vscode-iframe",
+) as HTMLIFrameElement;
+
+const vscodeIframeOrigin = "http://localhost:8080";
+
+console.log("vscodeIframe", vscodeIframe);
+
+// Send message to VS Code iframe
+function sendMessageToVSCode(message) {
+  if (vscodeIframe && vscodeIframe.contentWindow) {
+    vscodeIframe.contentWindow.postMessage(message, vscodeIframeOrigin);
+  }
+}
+
+async function setupVSCodeMessageListener() {
+  window.addEventListener("message", async (event) => {
+    console.log("message event ======================", event);
+
+    if (!event?.data) return;
+
+    if (event.data.type === "requestIndexedDB") {
+      console.log("VS Code Webview requested IndexedDB data");
+
+      const db = await indexedDB.open("MyDatabase", 1);
+      const tx = db.result.transaction("MyStore", "readonly");
+      const store = tx.objectStore("MyStore");
+      const allData = await store.getAll();
+
+      // Send IndexedDB data back to Webview
+      event.source.postMessage({ type: "indexedDBData", data: allData });
+    }
+
+    if (event.data.type === "storeIndexedDB") {
+      console.log(
+        "VS Code Webview wants to store data in IndexedDB:",
+        event.data,
+      );
+
+      const db = await indexedDB.open("MyDatabase", 1);
+      const tx = db.result.transaction("MyStore", "readwrite");
+      const store = tx.objectStore("MyStore");
+      store.put(event.data.value, event.data.key);
+
+      tx.oncomplete = () => {
+        console.log("Data stored in IndexedDB");
+      };
+    }
+  });
+}
+
+onBeforeUnmount(() => {
+  window.removeEventListener("message", setupVSCodeMessageListener);
+});
+
+onMounted(async () => {
+  await setupVSCodeMessageListener();
 });
 </script>
 
