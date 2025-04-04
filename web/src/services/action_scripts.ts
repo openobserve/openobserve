@@ -36,6 +36,17 @@ const actions = {
       `/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`,
     );
   },
+  get_zip_file: (org_identifier: string, action_id: string) => {
+    return http().get(
+      `/api/${org_identifier}/actions/download/${action_id}`,
+      {
+        responseType: "blob",
+        headers: {
+          "Content-Type": "application/zip",
+        },
+      },
+    );
+  },
 };
 
 export default actions;
