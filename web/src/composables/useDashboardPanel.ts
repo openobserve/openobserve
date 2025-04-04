@@ -1924,7 +1924,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const columnType = dashboardPanelData.meta.stream.selectedStreamFields.find(
       (it: any) => it.name == column,
     )?.type;
-    console.log("columnType", columnType);
     if (value == null) {
       // if value is null or undefined, return it as is
       return value;
@@ -2732,11 +2731,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].customQuery
     ) {
       if (!dashboardPanelData.meta.stream.selectedStreamFields?.length) {
-        console.log("Schema not loaded yet, skipping query generation");
         return;
       }
-      console.log("Generating SQL query for chart type:", dashboardPanelData.data.type);
-      
+
       let query = "";
       if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart();
