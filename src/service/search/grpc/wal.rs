@@ -421,24 +421,9 @@ pub async fn search_memtable(
             .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
             .collect::<Vec<_>>();
 
-        // split record_batches into chunks by cpu_num
-        let chunk_size = record_batches.len().div_ceil(cfg.limit.cpu_num);
-        let mut new_batches = Vec::with_capacity(cfg.limit.cpu_num);
-        let mut current_group = Vec::new();
-        for batch in record_batches {
-            if current_group.len() >= chunk_size {
-                new_batches.push(current_group);
-                current_group = Vec::new();
-            }
-            current_group.push(batch);
-        }
-        if !current_group.is_empty() {
-            new_batches.push(current_group);
-        }
-
         let table = match NewMemTable::try_new(
-            new_batches[0][0].schema().clone(),
-            new_batches,
+            record_batches[0].schema().clone(),
+            vec![record_batches],
             diff_fields,
             sorted_by_time,
             index_condition.clone(),
