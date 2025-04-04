@@ -1,5 +1,5 @@
 const { expect } = require("@playwright/test");
-import { randomDashboardName } from "../../playwright-tests/dashboards/dashboard-aggrigation1.spec.js";
+import { randomDashboardName } from "../../playwright-tests/dashboards/dashboard-aggregation.spec.js.spec.js";
 import {
   waitForDashboardPage,
   applyQueryButton,
@@ -63,8 +63,8 @@ async setDateFilter() {
     await this.waitforEnable;
     await this.dateTimeButton.click();
     await this.relativeTimeButton.click();
-    // await this.applyTimeButton.click();
-    await this.dashboardApplyButton.click();
+    await this.applyTimeButton.click();
+    // await this.dashboardApplyButton.click();
 }
 
 async clickApplyButton() {

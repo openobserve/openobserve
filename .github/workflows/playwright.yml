@@ -121,7 +121,7 @@ jobs:
             "reportsUpdated.spec.js",
             "reportsUpdated2.spec.js",
             "dashboards/dashboard-filter.spec.js",
-            "dashboards/dashboard-aggrigation1.spec.js",
+            "dashboards/dashboard-aggregation.spec.js",
             "join.spec.js",
             "changeOrg.spec.js",
             "serviceAccount.spec.js",

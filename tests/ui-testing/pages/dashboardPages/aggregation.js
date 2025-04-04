@@ -1,5 +1,5 @@
 const { expect } = require("@playwright/test");
-import { randomDashboardName } from "../../playwright-tests/dashboards/dashboard-aggrigation1.spec.js";
+import { randomDashboardName } from "../../playwright-tests/dashboards/dashboard-aggregation.spec.js.spec.js";
 import {
   waitForDashboardPage,
   applyQueryButton,
@@ -24,23 +24,13 @@ export class Aggregations{
      this.queryEditor = this.page.locator('[data-test="dashboard-panel-query-editor"]').getByText('distinct');
      this.queryInspectorButton = this.page.locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]');
     this.queryInspectorCell = this.page.getByRole("cell", {
-        name: `SELECT histogram(_timestamp) as "x_axis_1", ${aggrigation_options}(${yAxis}) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`,
+        name: `SELECT histogram(_timestamp) as "x_axis_1", ${aggrigation_options === "Count (Distinct)" ? 'count(distinct' : aggrigation_options.toLowerCase()}(${yAxis})${aggrigation_options === "Count (Distinct)" ? ')' : ""} as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`,
         exact: true
-    }).first();
-
-
-    // this.queryInspectorCell = this.page.getByRole("cell", {
-    //     name: new RegExp(
-    //       `SELECT histogram\\(_timestamp\\) as "x_axis_1",\\s*${aggrigation_options}\\(${yAxis}\\) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`,
-    //       "i" // 'i' flag makes it case-insensitive
-    //     ),
-    //     exact: true
-    //   }).first();
-    
+    }).first();    
     this.queryInspectorClose = this.page.locator('[data-test="query-inspector-close-btn"]');
-
-
   }
+
+  // Methods
 
 async configureYAxis() {
     await this.yAxisField.click();

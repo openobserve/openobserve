@@ -33,23 +33,6 @@ test.describe("dashboard filter testcases", () => {
     await orgNavigation;
   });
 
-  test("Should update the query when adding different types of aggregations and verify that the query is updated correctly.", async ({
-    page,
-  }) => {
-    // Navigate to dashboards
-    const dashboardObject = new Dashboard(page, "kubernetes_namespace_name");
-
-     await dashboardObject.createDashboard();
-    //  await dashboardObject.setDateFilter();
-        await dashboardObject.streamSelect(page);
-        await dashboardObject.configureYAxis();
-        await dashboardObject.aggregation();
-        await dashboardObject.clickApplyButton();
-        await dashboardObject.verifyQueryInspector();
-        await dashboardObject.savePanel();
-        await dashboardObject.deleteDashboard();
-  });
-
   test("Should update the query when adding 'Sum' aggregation types and verify.", async ({ page }) => {
     // Navigate to dashboards
     const dashboardObject = new Dashboard(page);
@@ -80,4 +63,52 @@ test.describe("dashboard filter testcases", () => {
     await dashboardObject.deleteDashboard();
   });
 
+  test("Should update the query when adding 'Count (Distinct)' aggregations and verify that the query is updated correctly.", async ({
+    page,
+  }) => {
+    const dashboardObject = new Dashboard(page);
+    const aggregationObject = new Aggregations(page, "kubernetes_namespace_name", "Count (Distinct)");
+
+    await dashboardObject.createDashboard();
+    await dashboardObject.streamSelect();
+    await aggregationObject.configureYAxis();
+    await aggregationObject.aggregation();
+    await dashboardObject.clickApplyButton();
+    await aggregationObject.verifyQueryInspector();
+    await dashboardObject.savePanel(randomDashboardName);
+    await dashboardObject.deleteDashboard();
+  });
+  test("Should update the query when adding 'Max' aggregations and verify that the query is updated correctly.", async ({
+    page,
+  }) => {
+    const dashboardObject = new Dashboard(page);
+    const aggregationObject = new Aggregations(page, "code", "Max");
+
+    await dashboardObject.createDashboard();
+    await dashboardObject.streamSelect();
+    await aggregationObject.configureYAxis();
+    await aggregationObject.aggregation();
+    await dashboardObject.clickApplyButton();
+    await aggregationObject.verifyQueryInspector();
+    await dashboardObject.savePanel(randomDashboardName);
+    await dashboardObject.deleteDashboard();
+  });
+  test("cShould update the query when adding 'Max' aggregations and verify that the query is updated correctly.", async ({
+    page,
+  }) => {
+    const dashboardObject = new Dashboard(page);
+    const aggregationObject = new Aggregations(page, "code", "Max");
+
+    await dashboardObject.createDashboard();
+    await dashboardObject.streamSelect();
+    await aggregationObject.configureYAxis();
+    await aggregationObject.aggregation();
+
+    await dashboardObject.setDateFilter();
+
+    await dashboardObject.clickApplyButton();
+    await aggregationObject.verifyQueryInspector();
+    await dashboardObject.savePanel(randomDashboardName);
+    await dashboardObject.deleteDashboard();
+  });
 });
