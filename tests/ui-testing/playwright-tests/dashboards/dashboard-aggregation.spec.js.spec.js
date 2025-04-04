@@ -34,7 +34,6 @@ test.describe("dashboard filter testcases", () => {
   });
 
   test("Should update the query when adding 'Sum' aggregation types and verify.", async ({ page }) => {
-    // Navigate to dashboards
     const dashboardObject = new Dashboard(page);
     const aggregationObject = new Aggregations(page, "code", "sum");
 
@@ -49,7 +48,6 @@ test.describe("dashboard filter testcases", () => {
   });
     
   test("Should update the query when adding 'average' aggregation types and verify.", async ({ page }) => {
-    // Navigate to dashboards
     const dashboardObject = new Dashboard(page);
     const aggregationObject = new Aggregations(page, "kubernetes_namespace_name", "avg");
 
@@ -83,29 +81,10 @@ test.describe("dashboard filter testcases", () => {
   }) => {
     const dashboardObject = new Dashboard(page);
     const aggregationObject = new Aggregations(page, "code", "Max");
-
     await dashboardObject.createDashboard();
     await dashboardObject.streamSelect();
     await aggregationObject.configureYAxis();
     await aggregationObject.aggregation();
-    await dashboardObject.clickApplyButton();
-    await aggregationObject.verifyQueryInspector();
-    await dashboardObject.savePanel(randomDashboardName);
-    await dashboardObject.deleteDashboard();
-  });
-  test("cShould update the query when adding 'Max' aggregations and verify that the query is updated correctly.", async ({
-    page,
-  }) => {
-    const dashboardObject = new Dashboard(page);
-    const aggregationObject = new Aggregations(page, "code", "Max");
-
-    await dashboardObject.createDashboard();
-    await dashboardObject.streamSelect();
-    await aggregationObject.configureYAxis();
-    await aggregationObject.aggregation();
-
-    await dashboardObject.setDateFilter();
-
     await dashboardObject.clickApplyButton();
     await aggregationObject.verifyQueryInspector();
     await dashboardObject.savePanel(randomDashboardName);
