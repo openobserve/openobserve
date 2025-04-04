@@ -1,10 +1,12 @@
 use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
-use config::meta::stream::{FileKey, StreamType};
+use config::{
+    get_config,
+    meta::stream::{FileKey, StreamType},
+};
 use hashbrown::HashMap;
 use infra::{
     errors,
     file_list::{FileRecord, calculate_max_ts_upper_bound},
-    table::{self, file_list_dump::FileListDump},
 };
 
 use super::search::datafusion::exec::prepare_datafusion_context;
@@ -21,11 +23,11 @@ async fn get_dump_files_in_range(
     org: &str,
     stream: &str,
     range: (i64, i64),
-) -> Result<Vec<FileListDump>, errors::DbError> {
+) -> Result<Vec<FileRecord>, errors::Error> {
     let start = round_down_to_hour(range.0);
     let end = round_down_to_hour(range.1) + HOUR_IN_MILI * 1000;
 
-    let list = table::file_list_dump::get_all_in_range(org, stream, start, end).await?;
+    let list = infra::file_list::get_entries_in_range(org, stream, start, end).await?;
 
     Ok(list)
 }
@@ -138,15 +140,17 @@ pub async fn get_file_list_entries_in_range(
     stream_type: StreamType,
     range: (i64, i64),
 ) -> Result<Vec<FileRecord>, errors::Error> {
-    let stream_key = format!("{org}/{stream_type}/{stream}");
+    let cfg = get_config();
+    let stream_key = format!(
+        "{org}/{}/{org}_{stream_type}_{stream}",
+        StreamType::Filelist
+    );
     let dump_files = get_dump_files_in_range(org, &stream_key, range).await?;
-
-    let dir_name = super::super::job::FILE_LIST_CACHE_DIR_NAME;
     let dump_files: Vec<_> = dump_files
         .into_iter()
         .map(|f| FileKey {
-            key: format!("files/{org}/{}/{}/{}", dir_name, stream_key, f.file),
-            meta: f.file_meta(),
+            key: format!("files/{}/{}/{}", stream_key, f.date, f.file),
+            meta: (&f).into(),
             deleted: false,
             segment_ids: None,
         })
@@ -158,7 +162,7 @@ pub async fn get_file_list_entries_in_range(
         id: trace_id.to_string(),
         storage_type: config::meta::search::StorageType::Memory,
         work_group: None,
-        target_partitions: 16,
+        target_partitions: cfg.limit.cpu_num,
     };
     let tbl = create_parquet_table(
         &session,
@@ -175,6 +179,7 @@ pub async fn get_file_list_entries_in_range(
 
     let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
 
+    let stream_key = format!("{org}/{stream_type}/{stream}");
     let query = format!(
         "SELECT * FROM file_list WHERE org= '{org}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",
         range.0, max_ts_upper_bound, range.1

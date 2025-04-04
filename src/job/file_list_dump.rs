@@ -26,10 +26,13 @@ use config::{
     PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
     cluster::{self, LOCAL_NODE},
     get_config, get_parquet_compression,
-    meta::stream::StreamType,
+    meta::stream::{FileMeta, StreamType},
 };
 use hashbrown::HashSet;
-use infra::{file_list::FileRecord, table::file_list_dump::FileListDump};
+use infra::{
+    file_list::FileRecord,
+    schema::{STREAM_SCHEMAS_LATEST, SchemaCache},
+};
 use once_cell::sync::Lazy;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use tokio::sync::{
@@ -226,16 +229,29 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
     let start = offset;
     let end = offset + HOUR_IN_MS * 1000;
 
+    if stream.contains(StreamType::Filelist.as_str()) {
+        // we do not want to dump the dumped files
+        infra::file_list::set_job_dumped_status(job_id, true).await?;
+        return Ok(());
+    }
+
     if let None = lock_stream(org, stream).await {
         // someone else is processing this.
         return Ok(());
     }
     let files = infra::file_list::get_entries_in_range(&org, &stream, start, end).await?;
+    if files.is_empty() {
+        if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
+            log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
+        }
+        return Ok(());
+    }
     let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
+    let count = files.len();
     if let Err(e) = generate_cache_file(&org, &stream, (start, end), files).await {
         log::error!("[COMPACTOR:JOB] file_list dump file generation error : {e}");
     } else {
-        log::info!("successfully dumped file list {org}/{stream} offset {offset}");
+        log::info!("successfully dumped file list {org}/{stream} offset {offset} count {count}");
         // we remove files only if not dual writing
         if !config.common.file_list_dump_dual_write {
             if let Err(e) = remove_files_from_file_list(&ids).await {
@@ -252,6 +268,35 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
         }
         if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
             log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
+        }
+
+        let stream_key = format!(
+            "{}/{}/{}",
+            org,
+            StreamType::Filelist,
+            stream.replace('/', "_")
+        );
+        let schema_exists = STREAM_SCHEMAS_LATEST
+            .read()
+            .await
+            .get(&stream_key)
+            .is_some();
+        if !schema_exists {
+            if let Err(e) = super::db::schema::merge(
+                org,
+                &stream.replace('/', "_"),
+                StreamType::Filelist,
+                &FILE_LIST_SCHEMA,
+                Some(Utc::now().timestamp_micros()),
+            )
+            .await
+            {
+                log::error!("erroring in saving file list schema for {stream_key} to db : {e}");
+            }
+
+            let cache = SchemaCache::new(FILE_LIST_SCHEMA.as_ref().to_owned());
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.insert(stream_key.clone(), cache);
         }
     }
     Ok(())
@@ -352,22 +397,25 @@ async fn generate_cache_file(
         config::ider::generate()
     );
 
-    let file_key = format!(
-        "files/{org}/{}/{stream}/{}",
-        FILE_LIST_CACHE_DIR_NAME, file_name
+    let stream_key = format!(
+        "{}/{}/{}",
+        org,
+        StreamType::Filelist,
+        stream.replace('/', "_")
     );
-    let entry = FileListDump {
-        id: 0, // will be set by db
-        org: org.to_string(),
-        stream: stream.to_string(),
-        start_ts: range.0,
-        end_ts: range.1,
-        file: file_name,
+    let file_key = format!("files/{stream_key}/{file_name}");
+
+    let meta = FileMeta {
+        min_ts: range.0,
+        max_ts: range.1,
         records: batch_size as i64,
         original_size: buf.len() as i64,
         compressed_size: buf.len() as i64,
+        index_size: 0,
+        flattened: false,
     };
+
     infra::storage::put(&file_key, buf.into()).await?;
-    infra::table::file_list_dump::add_dump_file(entry).await?;
+    infra::file_list::add(&file_key, &meta).await?;
     Ok(())
 }

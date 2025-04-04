@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::stream::FileMeta;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 
 use super::{entity::file_list_dump::*, get_lock};
@@ -67,108 +67,6 @@ impl Into<FileListDump> for Model {
             compressed_size: self.compressed_size,
         }
     }
-}
-
-pub async fn add_dump_file(entry: FileListDump) -> Result<(), errors::Error> {
-    let record = ActiveModel {
-        org: Set(entry.org),
-        stream: Set(entry.stream),
-        start_ts: Set(entry.start_ts),
-        end_ts: Set(entry.end_ts),
-        file: Set(entry.file),
-        records: Set(entry.records),
-        original_size: Set(entry.original_size),
-        compressed_size: Set(entry.compressed_size),
-        ..Default::default()
-    };
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match Entity::insert(record).exec(client).await {
-        Ok(_) => {}
-        Err(e) => {
-            drop(_lock);
-            match e.sql_err() {
-                Some(SqlErr::UniqueConstraintViolation(_)) => {
-                    return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
-                }
-                _ => {
-                    return Err(e.into());
-                }
-            }
-        }
-    }
-    drop(_lock);
-
-    Ok(())
-}
-
-pub async fn remove(org: &str, stream: &str, file: &str) -> Result<(), errors::Error> {
-    let record = ActiveModel {
-        org: Set(org.to_string()),
-        stream: Set(stream.to_string()),
-        file: Set(file.to_string()),
-        ..Default::default()
-    };
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::delete(record).exec(client).await?;
-
-    drop(_lock);
-
-    Ok(())
-}
-
-pub async fn get(
-    org: &str,
-    stream: &str,
-    file: &str,
-) -> Result<Option<FileListDump>, errors::DbError> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let entity = Entity::find()
-        .filter(Column::Org.eq(org))
-        .filter(Column::Stream.eq(stream))
-        .filter(Column::File.eq(file))
-        .into_model::<Model>()
-        .one(client)
-        .await
-        .map_err(|e| errors::DbError::SeaORMError(e.to_string()))?;
-    Ok(entity.map(|s| s.into()))
-}
-
-pub async fn get_all_in_range(
-    org: &str,
-    stream: &str,
-    min_ts: i64,
-    max_ts: i64,
-) -> Result<Vec<FileListDump>, errors::DbError> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let entities = Entity::find()
-        .filter(Column::Org.eq(org))
-        .filter(Column::Stream.eq(stream))
-        .filter(Column::StartTs.lte(max_ts))
-        .filter(Column::EndTs.gte(min_ts))
-        .into_model::<Model>()
-        .all(client)
-        .await
-        .map_err(|e| errors::DbError::SeaORMError(e.to_string()))?;
-
-    Ok(entities.into_iter().map(|e| e.into()).collect())
-}
-
-pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::delete_many().exec(client).await?;
-
-    Ok(())
 }
 
 pub async fn delete_all_for_stream(org: &str, stream: &str) -> Result<(), errors::Error> {
