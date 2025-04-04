@@ -15,13 +15,15 @@
 
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::{
-        infra::config::USERS,
-        meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::auth::{AuthExtractor, is_root_user},
+    crate::{
+        common::{
+            meta::http::HttpResponse as MetaHttpResponse,
+            utils::auth::{AuthExtractor, is_root_user},
+        },
+        service::users::get_user,
     },
     actix_web::HttpResponse,
-    config::meta::stream::StreamType,
+    config::meta::{stream::StreamType, user::User},
     o2_openfga::meta::mapping::OFGA_MODELS,
 };
 
@@ -34,7 +36,7 @@ pub async fn check_stream_permissions(
     stream_type: &StreamType,
 ) -> Option<HttpResponse> {
     if !is_root_user(user_id) {
-        let user: meta::user::User = USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+        let user: User = get_user(Some(org_id), user_id).await.unwrap();
         let stream_type_str = stream_type.as_str();
 
         if !crate::handler::http::auth::validator::check_permissions(
