@@ -485,7 +485,12 @@
     "streamTitle": "Associate Stream",
     "conditionTitle": "Associate Condition",
     "query": "Associate Query",
-    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?"
+    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
+    "import":"Import",
+    "export":"Export",
+    "edit":"Edit",
+    "delete":"Delete",
+    "view":"View"
   },
   "function": {
     "header": "Functions",
