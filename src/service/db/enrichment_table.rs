@@ -20,13 +20,15 @@ use config::{
     meta::stream::StreamType,
     utils::{json, time::BASE_TIME},
 };
-use infra::{cache::stats, db};
+use infra::{cache::stats, db as infra_db};
 use vrl::prelude::NotNan;
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
-    service::{enrichment::StreamTable, search as SearchService},
+    service::{db as db_service, enrichment::StreamTable, search as SearchService},
 };
+
+pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
     let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
@@ -96,8 +98,48 @@ fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
     }
 }
 
+/// Update the size of the enrichment table in bytes
+pub async fn update_table_size(
+    org_id: &str,
+    name: &str,
+    size: usize,
+) -> Result<(), infra::errors::Error> {
+    db_service::put(
+        &format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}"),
+        size.to_string().into(),
+        false,
+        None,
+    )
+    .await
+}
+
+/// Delete the size of the enrichment table in bytes
+pub async fn delete_table_size(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
+    db_service::delete(
+        &format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}"),
+        false,
+        false,
+        None,
+    )
+    .await
+}
+
+/// Get the size of the enrichment table in bytes
+pub async fn get_table_size(org_id: &str, name: &str) -> usize {
+    let size = match db_service::get(&format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}")).await
+    {
+        Ok(size) => size,
+        Err(e) => {
+            log::error!("get_table_size error: {:?}", e);
+            return 0;
+        }
+    };
+    let size = String::from_utf8_lossy(&size);
+    size.parse::<usize>().unwrap_or(0)
+}
+
 pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra_db::get_coordinator().await;
     let key: String = format!(
         "/enrichment_table/{org_id}/{}/{}",
         StreamType::EnrichmentTables,
@@ -107,7 +149,7 @@ pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra_db::get_coordinator().await;
     let key: String = format!(
         "/enrichment_table/{org_id}/{}/{}",
         StreamType::EnrichmentTables,
@@ -118,7 +160,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/enrichment_table/";
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra_db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching stream enrichment_table");
@@ -131,7 +173,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            db::Event::Put(ev) => {
+            infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
@@ -149,8 +191,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     },
                 );
             }
-            db::Event::Delete(_) => {}
-            db::Event::Empty => {}
+            infra_db::Event::Delete(ev) => {
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                if let Some((key, _)) = ENRICHMENT_TABLES.remove(item_key) {
+                    log::info!("deleted enrichment table: {}", key);
+                }
+            }
+            infra_db::Event::Empty => {}
         }
     }
     Ok(())

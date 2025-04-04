@@ -33,6 +33,7 @@ use config::{
     SIZE_IN_MB,
 };
 use futures::{StreamExt, TryStreamExt};
+use hashbrown::HashSet;
 use infra::{
     cache::stats,
     schema::{
@@ -94,20 +95,51 @@ pub async fn save_enrichment_data(
         );
     }
 
-    let stats = stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables);
-    let max_enrichment_table_size = cfg.limit.max_enrichment_table_size;
+    // Estimate the size of the payload in json format in bytes
+    let mut bytes_in_payload = 0;
+    for p in payload.iter() {
+        match json::to_value(p) {
+            Ok(v) => bytes_in_payload += json::estimate_json_bytes(&v),
+            Err(_) => {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    "Invalid JSON payload: Could not convert file data into valid JSON object"
+                        .to_string(),
+                )));
+            }
+        }
+    }
+
+    let current_size_in_bytes = if append_data {
+        let size = enrichment_table::get_table_size(org_id, stream_name).await;
+        if size > 0 {
+            size as f64
+        } else {
+            stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables).storage_size
+        }
+    } else {
+        // If we are not appending data, we do not need to check the current size
+        // we will simply use the payload size to check if it exceeds the max size
+        0.0
+    };
+    let enrichment_table_max_size = cfg.limit.max_enrichment_table_size as f64;
     log::info!(
         "enrichment table [{stream_name}] saving stats: {:?} vs max_table_size {}",
-        stats,
-        max_enrichment_table_size
+        current_size_in_bytes,
+        enrichment_table_max_size
     );
-    if (stats.storage_size / SIZE_IN_MB) > max_enrichment_table_size as f64 {
+    let total_expected_size_in_bytes = current_size_in_bytes + bytes_in_payload as f64;
+    let total_expected_size_in_mb = total_expected_size_in_bytes / SIZE_IN_MB;
+    // if appending data, we need to check if the storage size exceeds the max size
+    // if not, we can append the data
+    // if it does, we need to return an error
+    if append_data && total_expected_size_in_mb > enrichment_table_max_size {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 format!(
-                    "enrichment table [{stream_name}] storage size {} exceeds max storage size {}",
-                    stats.storage_size, max_enrichment_table_size
+                    "enrichment table [{stream_name}] total expected storage size {} exceeds max storage size {}",
+                    total_expected_size_in_mb, enrichment_table_max_size
                 ),
             )),
         );
@@ -247,6 +279,15 @@ pub async fn save_enrichment_data(
     )
     .await;
 
+    // The stream_stats table takes some time to update, so we need to update the enrichment table
+    // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
+    let _ = enrichment_table::update_table_size(
+        org_id,
+        stream_name,
+        total_expected_size_in_bytes as usize,
+    )
+    .await;
+
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
         StatusCode::OK.into(),
         "Saved enrichment table".to_string(),
@@ -294,8 +335,10 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
 
 pub async fn extract_multipart(
     mut payload: Multipart,
+    append_data: bool,
 ) -> Result<Vec<json::Map<String, json::Value>>, Error> {
     let mut records = Vec::new();
+    let mut headers_set = HashSet::new();
     while let Ok(Some(mut field)) = payload.try_next().await {
         let Some(content_disposition) = field.content_disposition() else {
             continue;
@@ -317,6 +360,7 @@ pub async fn extract_multipart(
             .map(|x| {
                 let mut x = x.trim().to_string();
                 format_key(&mut x);
+                headers_set.insert(x.clone());
                 x
             })
             .collect::<Vec<_>>()
@@ -337,6 +381,21 @@ pub async fn extract_multipart(
                 records.push(json_record);
             }
         }
+    }
+
+    if records.is_empty() && !headers_set.is_empty() && !append_data {
+        // If the records are empty, that means user has uploaded only headers, not the data
+        // So, we can assume that the user wants to upload an enrichment table with no row data.
+        // The headers are the columns of the enrichment table. Lets push a json
+        // with the headers as the keys and empty strings as the values.
+
+        // This way we will still have the headers in the enrichment table.
+        // And the enrichment table will not be deleted.
+        let mut json_record = json::Map::new();
+        for header in headers_set {
+            json_record.insert(header, json::Value::String("".to_string()));
+        }
+        records.push(json_record);
     }
 
     Ok(records)
