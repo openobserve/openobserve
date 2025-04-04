@@ -1676,6 +1676,26 @@ mod tests {
     }
 
     #[test]
+    fn test_index_visitor5() {
+        let sql = "SELECT * FROM t WHERE (foo = 'b' OR foo = 'c') AND foo = 'd' AND ((match_all('good') AND match_all('bar')) OR (match_all('foo') AND name = 'c'))";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        statement.visit(&mut index_visitor);
+        let expected = "((_all:good AND _all:bar) OR (_all:foo AND name=c))";
+        let expected_sql = "SELECT * FROM t WHERE (foo = 'b' OR foo = 'c') AND (foo = 'd')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
     fn test_track_total_hits1() {
         let sql = "SELECT * FROM t WHERE name = 'a'";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)

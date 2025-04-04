@@ -119,6 +119,15 @@ pub fn conjunction(exprs: Vec<&Expr>) -> Option<Expr> {
     } else {
         // conjuction all expr in exprs
         let mut expr = exprs[0].clone();
+        if matches!(
+            expr,
+            Expr::BinaryOp {
+                op: BinaryOperator::Or,
+                ..
+            }
+        ) {
+            expr = Expr::Nested(Box::new(expr));
+        }
         for e in exprs.into_iter().skip(1) {
             expr = Expr::BinaryOp {
                 left: Box::new(expr),
