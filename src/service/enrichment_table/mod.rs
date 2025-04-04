@@ -122,7 +122,7 @@ pub async fn save_enrichment_data(
         // we will simply use the payload size to check if it exceeds the max size
         0.0
     };
-    let enrichment_table_max_size = cfg.limit.enrichment_table_max_size as f64;
+    let enrichment_table_max_size = cfg.limit.max_enrichment_table_size as f64;
     log::info!(
         "enrichment table [{stream_name}] saving stats: {:?} vs max_table_size {}",
         current_size_in_bytes,

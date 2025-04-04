@@ -784,11 +784,11 @@ async fn handle_derived_stream_triggers(
     let columns = trigger.module_key.split('/').collect::<Vec<_>>();
     if columns.len() < 4 {
         log::warn!(
-            "[SCHEDULER trace_id {trace_id}] Invalid module_key format: {}.",
+            "[SCHEDULER trace_id {scheduler_trace_id}] Invalid module_key format: {}.",
             trigger.module_key
         );
         return Err(anyhow::anyhow!(
-            "[SCHEDULER trace_id {trace_id}] Invalid module_key format: {}.",
+            "[SCHEDULER trace_id {scheduler_trace_id}] Invalid module_key format: {}.",
             trigger.module_key
         ));
     }
