@@ -289,7 +289,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
             }
         }
         // wait for a while to reduce the databases load
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        tokio::task::yield_now().await;
     }
 
     // Commit transaction

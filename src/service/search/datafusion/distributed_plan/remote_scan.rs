@@ -427,6 +427,7 @@ struct FlightStream {
     is_querier: bool,
     files: i64,
     scan_size: i64,
+    num_rows: usize,
     partial_err: Arc<Mutex<String>>,
     start: std::time::Instant,
     timeout: u64,
@@ -454,6 +455,7 @@ impl FlightStream {
             is_querier,
             files,
             scan_size,
+            num_rows: 0,
             partial_err,
             start,
             timeout,
@@ -490,6 +492,7 @@ impl Stream for FlightStream {
                     self.schema.clone(),
                     &dictionaries_by_field,
                 )?;
+                self.num_rows += record_batch.num_rows();
                 Poll::Ready(Some(Ok(record_batch)))
             }
             Poll::Ready(None) => Poll::Ready(None),
@@ -513,12 +516,13 @@ impl Stream for FlightStream {
 impl Drop for FlightStream {
     fn drop(&mut self) {
         log::info!(
-            "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, took: {} ms",
+            "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
             self.trace_id,
             self.node_addr,
             self.is_querier,
             self.files,
             self.scan_size / 1024 / 1024,
+            self.num_rows,
             self.start.elapsed().as_millis(),
         );
     }
