@@ -1982,9 +1982,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
      * @returns {string} - the condition as a string.
      */
     const buildCondition = (condition: any) => {
-      const columnType = dashboardPanelData.meta.stream.selectedStreamFields.find(
-        (it: any) => it.name == condition.column,
-      )?.type;
+      const columnType =
+        dashboardPanelData.meta.stream.selectedStreamFields.find(
+          (it: any) => it.name == condition.column,
+        )?.type;
       if (condition.filterType === "group") {
         const groupConditions = condition.conditions
           .map(buildCondition)
@@ -2069,16 +2070,28 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               )}`;
               break;
             case "Contains":
-              selectFilter += columnType === "Utf8" ? `LIKE '%${condition.value}%'` : `LIKE %${condition.value}%`;
+              selectFilter +=
+                columnType === "Utf8"
+                  ? `LIKE '%${condition.value}%'`
+                  : `LIKE %${condition.value}%`;
               break;
             case "Not Contains":
-              selectFilter += columnType === "Utf8" ? `NOT LIKE '%${condition.value}%'` : `NOT LIKE %${condition.value}%`;
+              selectFilter +=
+                columnType === "Utf8"
+                  ? `NOT LIKE '%${condition.value}%'`
+                  : `NOT LIKE %${condition.value}%`;
               break;
             case "Starts With":
-              selectFilter += columnType === "Utf8" ? `LIKE '${condition.value}%'` : `LIKE ${condition.value}%`;
+              selectFilter +=
+                columnType === "Utf8"
+                  ? `LIKE '${condition.value}%'`
+                  : `LIKE ${condition.value}%`;
               break;
             case "Ends With":
-              selectFilter += columnType === "Utf8" ? `LIKE '%${condition.value}'` : `LIKE %${condition.value}`;
+              selectFilter +=
+                columnType === "Utf8"
+                  ? `LIKE '%${condition.value}'`
+                  : `LIKE %${condition.value}`;
               break;
             default:
               selectFilter += `${condition.operator} ${formatValue(
@@ -2718,6 +2731,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery
     ) {
+      if (!dashboardPanelData.meta.stream.selectedStreamFields?.length) {
+        console.log("Schema not loaded yet, skipping query generation");
+        return;
+      }
+      console.log("Generating SQL query for chart type:", dashboardPanelData.data.type);
+      
       let query = "";
       if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart();
