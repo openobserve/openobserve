@@ -29,10 +29,14 @@ struct WebAssets;
 pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileResponse> {
     let mut path = path.as_str();
 
-    if !path.starts_with("src/")
+    if path.eq("vscode") {
+        path = "vscode/index.html";
+    } 
+    else if !path.starts_with("src/")
         && !path.starts_with("assets/")
         && !path.starts_with("monacoeditorwork/")
         && !path.eq("favicon.ico")
+        && !path.starts_with("vscode/")
     {
         path = "index.html";
     }
