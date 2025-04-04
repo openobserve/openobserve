@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{cmp::Reverse, collections::BinaryHeap, io::Error};
 
 use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use arrow_schema::Schema;
@@ -650,6 +650,228 @@ pub async fn values(
     .await
 }
 
+#[allow(dead_code)]
+async fn build_values_request_per_field(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    query: HashMap<String, String>,
+    _use_cache: bool,
+) -> Result<Vec<(config::meta::search::Request, StreamType, i64)>, Error> {
+    let query_fn = query
+        .get("query_fn")
+        .and_then(|v| base64::decode_url(v).ok())
+        .map(|vrl| {
+            if !vrl.trim().ends_with('.') {
+                format!("{} \n .", vrl)
+            } else {
+                vrl
+            }
+        });
+
+    let regions = query.get("regions").map_or(vec![], |regions| {
+        regions
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
+    let clusters = query.get("clusters").map_or(vec![], |clusters| {
+        clusters
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
+
+    let schema = infra::schema::get(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or(Schema::empty());
+    let fields = query.get("fields").map_or(vec![], |v| {
+        v.split(',')
+            .map(|s| s.to_string())
+            .filter(|field| schema.field_with_name(field).is_ok())
+            .collect::<Vec<_>>()
+    });
+
+    let no_count = match query.get("no_count") {
+        None => false,
+        Some(v) => {
+            let v = v.to_lowercase();
+            v == "true" || v == "1"
+        }
+    };
+
+    let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
+        BASE_TIME.timestamp_micros()
+    } else {
+        query
+            .get("start_time")
+            .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+    };
+
+    if start_time == 0 {
+        return Err(Error::other("start_time is empty"));
+    }
+
+    let end_time = if stream_type.eq(&StreamType::EnrichmentTables) {
+        now_micros()
+    } else {
+        query
+            .get("end_time")
+            .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+    };
+
+    if end_time == 0 {
+        return Err(Error::other("end_time is empty"));
+    }
+
+    let (start_time, end_time) = if start_time == end_time {
+        (start_time - 1, end_time + 1)
+    } else {
+        (start_time, end_time)
+    };
+
+    let mut uses_fn = false;
+    let (sql_where, can_use_distinct_stream) = match query.get("filter") {
+        None => {
+            if let Some(v) = query.get("sql") {
+                if let Ok(sql) = base64::decode_url(v) {
+                    uses_fn = functions::get_all_transform_keys(org_id)
+                        .await
+                        .iter()
+                        .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
+                    let sql_where_from_query = SearchService::sql::pickup_where(&sql, None)
+                        .map_err(Error::other)
+                        .and_then(|v| {
+                            v.map(|v| {
+                                if v.is_empty() {
+                                    "".to_string()
+                                } else {
+                                    format!("WHERE {}", v)
+                                }
+                            })
+                            .ok_or(Error::other("sql is empty"))
+                        })?;
+
+                    let can_use_distinct_stream = can_use_distinct_stream(
+                        org_id,
+                        stream_name,
+                        stream_type,
+                        &fields,
+                        &sql,
+                        start_time,
+                    )
+                    .await;
+                    (sql_where_from_query, can_use_distinct_stream)
+                } else {
+                    ("".to_string(), false)
+                }
+            } else {
+                ("".to_string(), false)
+            }
+        }
+        Some(v) => {
+            if v.is_empty() {
+                ("".to_string(), false)
+            } else {
+                let columns = v.splitn(2, '=').collect::<Vec<_>>();
+                if columns.len() < 2 {
+                    return Err(Error::other("Invalid filter format"));
+                }
+                let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
+                let sql_where = format!("WHERE {} IN ('{}')", columns[0], vals);
+
+                // Define the default_sql here
+                let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
+
+                let can_use_distinct_stream = can_use_distinct_stream(
+                    org_id,
+                    stream_name,
+                    stream_type,
+                    &fields,
+                    &format!("{} {}", default_sql, sql_where),
+                    start_time,
+                )
+                .await;
+
+                (sql_where, can_use_distinct_stream)
+            }
+        }
+    };
+
+    let size = query
+        .get("size")
+        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
+
+    let timeout = query
+        .get("timeout")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+
+    // Get config from function instead of using cfg directly
+    let config = get_config();
+    let use_cache = config.common.result_cache_enabled
+        && get_use_cache_from_request(&web::Query(query.clone()));
+
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql: String::new(), // Will be populated per field in the loop below
+            from: 0,
+            size: config::meta::sql::MAX_LIMIT,
+            start_time,
+            end_time,
+            uses_zo_fn: uses_fn,
+            query_fn: query_fn.clone(),
+            ..Default::default()
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions,
+        clusters,
+        timeout,
+        search_type: Some(SearchEventType::Values),
+        search_event_context: None,
+        use_cache: Some(use_cache),
+        local_mode: None,
+    };
+
+    let distinct_prefix = if can_use_distinct_stream {
+        format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
+    } else {
+        "".to_string()
+    };
+
+    let count_fn = if can_use_distinct_stream {
+        "SUM(count)".to_string()
+    } else {
+        "COUNT(*)".to_string()
+    };
+
+    let actual_stream_type = if can_use_distinct_stream {
+        StreamType::Metadata
+    } else {
+        stream_type
+    };
+
+    let mut requests = Vec::new();
+    for field in fields {
+        let sql = if no_count {
+            format!(
+                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
+            )
+        } else {
+            format!(
+                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
+            )
+        };
+
+        let mut req = req.clone();
+        req.query.sql = sql;
+        requests.push((req, actual_stream_type, size));
+    }
+
+    Ok(requests)
+}
+
 // If all fields requested in the query AND fields from the
 // sql query in the query are stored in distinct stream,
 // this will search on the distinct stream, otherwise
@@ -672,14 +894,16 @@ async fn values_v1(
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
     };
-    let mut query_fn = query
+    let query_fn = query
         .get("query_fn")
-        .and_then(|v| base64::decode_url(v).ok());
-    if let Some(vrl_function) = &query_fn {
-        if !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{} \n .", vrl_function));
-        }
-    }
+        .and_then(|v| base64::decode_url(v).ok())
+        .map(|vrl_function| {
+            if !vrl_function.trim().ends_with('.') {
+                format!("{} \n .", vrl_function)
+            } else {
+                vrl_function
+            }
+        });
 
     let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
     let mut query_sql = match query.get("filter") {
@@ -728,9 +952,6 @@ async fn values_v1(
         }
     };
 
-    let size = query
-        .get("size")
-        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
     // EnrichmentTable need query without time range
     let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
         BASE_TIME.timestamp_micros()
@@ -891,6 +1112,12 @@ async fn values_v1(
     let mut resp = config::meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();
     let mut work_group_set = Vec::with_capacity(query_results.len());
+
+    // Get the size from query parameter for limiting results
+    let size = query
+        .get("size")
+        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
+
     for (key, ret) in query_results {
         let mut top_hits: HashMap<String, i64> = HashMap::default();
         for row in ret.hits {
@@ -905,27 +1132,65 @@ async fn values_v1(
             let key_num = top_hits.entry(key).or_insert(0);
             *key_num += num;
         }
-        let mut top_hits = top_hits.into_iter().collect::<Vec<_>>();
-        if no_count {
-            top_hits.sort_by(|a, b| a.0.cmp(&b.0));
-        } else {
-            top_hits.sort_by(|a, b| b.1.cmp(&a.1));
-        }
-        let top_hits = top_hits
-            .into_iter()
-            .take(size as usize)
-            .map(|(k, v)| {
-                let mut item = json::Map::new();
-                item.insert("zo_sql_key".to_string(), json::Value::String(k));
-                item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
-                json::Value::Object(item)
-            })
-            .collect::<Vec<_>>();
 
-        let mut field_value: json::Map<String, json::Value> = json::Map::new();
-        field_value.insert("field".to_string(), json::Value::String(key));
-        field_value.insert("values".to_string(), json::Value::Array(top_hits));
-        hit_values.push(json::Value::Object(field_value));
+        // Use a min heap (BinaryHeap with Reverse) to find top k elements
+        let mut min_heap: BinaryHeap<Reverse<(i64, String)>> =
+            BinaryHeap::with_capacity(size as usize);
+
+        if no_count {
+            // For alphabetical sorting, collect all entries first
+            let mut all_entries: Vec<_> = top_hits.into_iter().collect();
+            all_entries.sort_by(|a, b| a.0.cmp(&b.0));
+            all_entries.truncate(size as usize);
+
+            let top_hits = all_entries
+                .into_iter()
+                .map(|(k, v)| {
+                    let mut item = json::Map::new();
+                    item.insert("zo_sql_key".to_string(), json::Value::String(k));
+                    item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
+                    json::Value::Object(item)
+                })
+                .collect::<Vec<_>>();
+
+            let mut field_value: json::Map<String, json::Value> = json::Map::new();
+            field_value.insert("field".to_string(), json::Value::String(key));
+            field_value.insert("values".to_string(), json::Value::Array(top_hits));
+            hit_values.push(json::Value::Object(field_value));
+        } else {
+            // For value-based sorting, use a min heap to get top k elements
+            for (k, v) in top_hits {
+                if min_heap.len() < size as usize {
+                    // If heap not full, just add
+                    min_heap.push(Reverse((v, k)));
+                } else if !min_heap.is_empty() && v > min_heap.peek().unwrap().0.0 {
+                    // If current value is larger than smallest in heap, replace it
+                    min_heap.pop();
+                    min_heap.push(Reverse((v, k)));
+                }
+            }
+
+            // Convert heap to vector and sort in descending order
+            let mut top_elements: Vec<_> =
+                min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
+            top_elements.sort_by(|a, b| b.1.cmp(&a.1));
+
+            let top_hits = top_elements
+                .into_iter()
+                .map(|(k, v)| {
+                    let mut item = json::Map::new();
+                    item.insert("zo_sql_key".to_string(), json::Value::String(k));
+                    item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
+                    json::Value::Object(item)
+                })
+                .collect::<Vec<_>>();
+
+            let mut field_value: json::Map<String, json::Value> = json::Map::new();
+            field_value.insert("field".to_string(), json::Value::String(key));
+            field_value.insert("values".to_string(), json::Value::Array(top_hits));
+            hit_values.push(json::Value::Object(field_value));
+        }
+
         resp.scan_size = std::cmp::max(resp.scan_size, ret.scan_size);
         resp.scan_records = std::cmp::max(resp.scan_records, ret.scan_records);
         resp.cached_ratio = std::cmp::max(resp.cached_ratio, ret.cached_ratio);
