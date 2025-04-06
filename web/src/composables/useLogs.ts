@@ -4586,7 +4586,7 @@ const useLogs = () => {
         });
       }
       // additionally, if union is there then it will have _next object which will have the table name it should check recursuvely as user can write multiple union
-      else if (parsedSQL?._next) {
+      if (parsedSQL?._next) {
         let nextTable = parsedSQL._next;
         while (nextTable) {
           // Map through each "from" array in the _next object, as it can contain multiple tables
@@ -4600,7 +4600,7 @@ const useLogs = () => {
       }
       //for simple query get the table name from the parsedSQL object
       // this will handle joins as well
-      else if (parsedSQL?.from) {
+      if (parsedSQL?.from) {
         parsedSQL.from.map((stream: any) => {
           // Check if 'expr' and 'ast' exist, then access 'from' to get the table
           if (stream.expr?.ast?.from) {
