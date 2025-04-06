@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="index-table q-mt-xs"
     >
       <h3
-        data-test="logs-search-no-stream-selected-text"
+        data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none"
       >
         <q-icon name="info" color="primary" size="xs" /> No field
