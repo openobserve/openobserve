@@ -66,7 +66,6 @@ const onMessage = (socketId: string, event: MessageEvent) => {
 };
 
 const onClose = (socketId: string, event: CloseEvent) => {
-  console.log(document.cookie)
   console.log("onClose", socketId, event.code, event.reason);
   clearInterval(pingIntervals[socketId]);
   delete pingIntervals[socketId];
@@ -81,7 +80,6 @@ const onError = (socketId: string, event: Event) => {
 
 // Message and handler functions
 const sendMessage = (socketId: string, message: string) => {
-  console.log(document.cookie)
   const socket = sockets[socketId];
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(message);
