@@ -186,7 +186,7 @@ Function
 SSO (Single Sign On)
 ![SSO](./screenshots/sso.png)
 
-RBAC (Role BAsed Access Control)
+RBAC (Role Based Access Control)
 ![RBAC](./screenshots/iam_rbac.png)
 
 
