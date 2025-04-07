@@ -1597,6 +1597,10 @@ const useLogs = () => {
         searchObjDebug["partitionEndTime"] = performance.now();
       }
 
+      //reset the plot chart when the query is run 
+      //this is to avoid the issue of chart not updating when histogram is disabled and enabled and clicking the run query button
+      searchObj.meta.resetPlotChart = true;
+
       if (queryReq != null) {
         // in case of live refresh, reset from to 0
         if (
@@ -1762,7 +1766,6 @@ const useLogs = () => {
               }
 
               await generateHistogramSkeleton();
-
               for (const partition of partitions) {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
@@ -2593,7 +2596,6 @@ const useLogs = () => {
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
-      searchObj.meta.resetPlotChart = true;
       if (searchObj.data.isOperationCancelled) {
         searchObj.loadingHistogram = false;
         searchObj.data.isOperationCancelled = false;
