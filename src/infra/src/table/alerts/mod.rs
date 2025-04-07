@@ -20,6 +20,7 @@ use config::meta::{
     alerts::{
         QueryCondition as MetaQueryCondition, TriggerCondition as MetaTriggerCondition,
         alert::{Alert as MetaAlert, ListAlertsParams},
+        ConditionList as MetaConditionList, 
     },
     folder::{Folder as MetaFolder, FolderType},
     stream::StreamType as MetaStreamType,
@@ -115,7 +116,10 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.updated_at = updated_at_utc;
         alert.query_condition = MetaQueryCondition {
             query_type: query_type.into(),
-            conditions: query_conditions.map(|cs| cs.into_iter().map(|c| c.into()).collect()),
+            conditions: query_conditions
+            .map(|cs| MetaConditionList::LegacyConditions(cs.into_iter()
+            .map(|c| MetaConditionList::EndCondition(Into::<config::meta::alerts::Condition>::into(c)))
+            .collect::<Vec<MetaConditionList>>())),
             sql: value.query_sql,
             promql: value.query_promql,
             promql_condition: query_promql_condition.map(|c| c.into()),
@@ -592,11 +596,6 @@ fn update_mutable_fields(
     let query_conditions = alert
         .query_condition
         .conditions
-        .map(|cs| {
-            cs.into_iter()
-                .map(intermediate::QueryCondition::from)
-                .collect_vec()
-        })
         .map(serde_json::to_value)
         .transpose()?;
     let query_sql = alert.query_condition.sql.filter(|s| !s.is_empty());
