@@ -220,12 +220,13 @@ pub async fn save_enrichment_data(
         .as_ref()
         .clone()
         .with_metadata(HashMap::new());
+    let schema = Arc::new(schema);
     let schema_key = schema.hash_key();
     buf.insert(
         hour_key,
         SchemaRecords {
             schema_key,
-            schema: Arc::new(schema),
+            schema: schema.clone(),
             records,
             records_size,
         },
@@ -253,7 +254,7 @@ pub async fn save_enrichment_data(
         };
 
     // notify update
-    if stream_schema.has_fields {
+    if !schema.fields().is_empty() {
         if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
             log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
         };
