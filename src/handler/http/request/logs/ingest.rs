@@ -58,7 +58,7 @@ pub async fn bulk(
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
 
-    // log start process time
+    // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
         config::utils::time::now_micros()
     } else {
@@ -114,7 +114,7 @@ pub async fn multi(
     let (org_id, stream_name) = path.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
 
-    // log start process time
+    // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
         config::utils::time::now_micros()
     } else {
@@ -185,7 +185,7 @@ pub async fn json(
     let (org_id, stream_name) = path.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
 
-    // log start process time
+    // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
         config::utils::time::now_micros()
     } else {
