@@ -854,7 +854,7 @@ export default defineComponent({
           ? rawStreamNames.join(",")
           : rawStreamNames[0];
       const queryObject = {
-        stream_type: "logs",
+        stream_type: row.stream_type ?? "logs",
         stream: stream_name,
         from: from,
         to: to,
