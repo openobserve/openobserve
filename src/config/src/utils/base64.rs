@@ -50,7 +50,7 @@ pub fn decode_url(s: &str) -> Result<String, Error> {
 }
 
 // Add this helper function to detect base64 strings
-pub fn check_base64(s: &str) -> bool {
+pub fn _check_base64(s: &str) -> bool {
     if s.is_empty() {
         return false;
     }
