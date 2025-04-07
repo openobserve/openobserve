@@ -4569,7 +4569,6 @@ const useLogs = () => {
   const setSelectedStreams = (value: string) => {
     try {
       const parsedSQL = fnParsedSQL();
-      console.log(parsedSQL, "parsedSQL")
 
       if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from.length === 0) {
         console.error("Failed to parse SQL query:", value);
@@ -4585,7 +4584,7 @@ const useLogs = () => {
           console.log("inside withobj", obj)
           // Map through each "from" array in the _next object, as it can contain multiple tables
           if (obj?.stmt?.from) {
-            console.log(obj.stmt.from)
+            console.log(obj.stmt.from, "obj.stmt.from")
             obj?.stmt?.from.forEach((stream: { table: string }) => {
               console.log(stream.table , "stream");
               newSelectedStreams.push(stream.table);
@@ -4595,8 +4594,13 @@ const useLogs = () => {
         });
       }
       // additionally, if union is there then it will have _next object which will have the table name it should check recursuvely as user can write multiple union
-      if (parsedSQL?._next) {
+      else if (parsedSQL?._next) {
+        //get the first table if it is next 
+        //this is to handle the union queries when user selects the multi stream selection the first table will be there in from array
+        newSelectedStreams.push(...parsedSQL.from.map((stream: any) => {
+          return stream.table}));
         let nextTable = parsedSQL._next;
+        //this will handle the union queries
         while (nextTable) {
           // Map through each "from" array in the _next object, as it can contain multiple tables
           if (nextTable.from) {
@@ -4609,7 +4613,7 @@ const useLogs = () => {
       }
       //for simple query get the table name from the parsedSQL object
       // this will handle joins as well
-      if (parsedSQL?.from) {
+      else if (parsedSQL?.from) {
         parsedSQL.from.map((stream: any) => {
           // Check if 'expr' and 'ast' exist, then access 'from' to get the table
           if (stream.expr?.ast?.from) {
