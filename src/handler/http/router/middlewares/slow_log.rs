@@ -21,7 +21,6 @@ use std::{
 use actix_web::{
     Error,
     dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
-    http::header,
 };
 use config::utils::time::now_micros;
 use futures_util::future::LocalBoxFuture;
@@ -79,8 +78,10 @@ where
 
     forward_ready!(service);
 
-    fn call(&self, mut req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
         let start = Instant::now();
+        let start_time = now_micros();
+
         let remote_addr = match req.headers().contains_key("X-Forwarded-For")
             || req.headers().contains_key("Forwarded")
         {
@@ -105,36 +106,41 @@ where
         let threshold = Duration::from_secs(self.threshold_secs);
         let circuit_breaker_enabled = self.circuit_breaker_enabled;
 
-        // add current time to the request headers
-        req.headers_mut().insert(
-            header::HeaderName::from_static("o2_req_time"),
-            header::HeaderValue::from_str(&now_micros().to_string()).unwrap(),
-        );
-
         let fut = self.service.call(req);
 
         Box::pin(async move {
-            let res = fut.await?;
+            let resp = fut.await?;
             let duration = start.elapsed();
 
             // watch the request duration
+            let took_time = duration.as_millis();
             if circuit_breaker_enabled {
-                crate::service::circuit_breaker::watch_request(duration.as_millis() as u64);
+                crate::service::circuit_breaker::watch_request(took_time as u64);
             }
 
             // log the slow request
             if duration > threshold {
+                // get the process time in the queue
+                let process_time = resp
+                    .headers()
+                    .get("o2_process_time")
+                    .map(|v| v.to_str().unwrap_or("0").parse::<i64>().unwrap_or(0));
+                let wait_time_str = match process_time {
+                    Some(v) if v > 0 => format!(" wait_time: {} ms, ", (v - start_time) / 1000),
+                    _ => "".to_string(),
+                };
                 log::warn!(
-                    "slow request detected - remote_addr: {}, method: {}, path: {}, size: {}, took: {:.6}",
+                    "slow request detected - remote_addr: {}, method: {}, path: {}, size: {},{} took: {} ms",
                     remote_addr,
                     method,
                     path,
                     body_size,
-                    duration.as_secs_f64()
+                    wait_time_str,
+                    took_time
                 );
             }
 
-            Ok(res)
+            Ok(resp)
         })
     }
 }
