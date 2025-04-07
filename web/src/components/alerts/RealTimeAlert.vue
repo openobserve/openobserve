@@ -16,8 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <fields-input
-      class="q-mt-md"
+    <div class="  tw-w-full row alert-setup-container q-mt-sm " style="width: calc(100vw - 600px); margin-left: 8px;">
+    <AlertsContainer 
+      name="query"
+      v-model:is-expanded="expandState.realTimeMode"
+      label="Query Mode - Quick"
+      subLabel="What should trigger the alert."
+      class="tw-mt-1 tw-w-full col-12"
+      @update:is-expanded="()=>emits('update:expandState', expandState)"
+    />
+    <fields-input-with-multi
+    v-if="expandState.realTimeMode"
+      class="q-mt-md q-px-lg"
       :stream-fields="columns"
       :fields="conditions"
       @add="addField"
@@ -27,15 +37,212 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       :enableNewValueMode="enableNewValueMode"
     />
+    </div>
+
+    <div class="  q-mt-md tw-w-full row alert-setup-container " style="width: calc(100vw - 600px); margin-left: 8px;">
+    <AlertsContainer 
+      name="thresholds"
+      v-model:is-expanded="expandState.thresholds"
+      label="Thresholds"
+      subLabel="set the rythm for alerts."
+      class="tw-mt-1 tw-w-full col-12"
+      @update:is-expanded="()=>emits('update:expandState', expandState)"
+    />
+    <div v-if="expandState.thresholds" class="q-px-lg">
+    <div class="col-12 flex justify-start items-center q-mt-xs">
+              <div
+                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
+                data-test="add-alert-delay-title"
+                style="width: 190px"
+              >
+                {{ t("alerts.silenceNotification") + " *" }}
+                <q-icon
+                  :name="outlinedInfo"
+                  size="17px"
+                  class="q-ml-xs cursor-pointer"
+                  :class="
+                    store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  "
+                >
+                  <q-tooltip
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                  >
+                    <span style="font-size: 14px">
+                      If the alert triggers then how long should it wait before
+                      sending another notification.
+                      <br />
+                      e.g. if the alert triggers at 4:00 PM and the silence
+                      notification is set to 10 minutes then it will not send
+                      another notification until 4:10 PM even if the alert is
+                      still after 1 minute. This is to avoid spamming the user
+                      with notifications.</span
+                    >
+                  </q-tooltip>
+                </q-icon>
+              </div>
+              <div style="min-height: 58px">
+                <div class="col-8 row justify-left align-center q-gutter-sm">
+                  <div
+                    class="flex items-center"
+                    style="border: 1px solid rgba(0, 0, 0, 0.05)"
+                  >
+                    <div
+                      data-test="add-alert-delay-input"
+                      style="width: 87px; margin-left: 0 !important"
+                      class="silence-notification-input"
+                    >
+                      <q-input
+                        v-model="triggerData.silence"
+                        type="number"
+                        dense
+                        filled
+                        min="0"
+                        style="background: none"
+                        @update:model-value="updateTrigger"
+                      />
+                    </div>
+                    <div
+                      data-test="add-alert-delay-unit"
+                      style="
+                        min-width: 90px;
+                        margin-left: 0 !important;
+                        background: #f2f2f2;
+                        height: 40px;
+                      "
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'bg-grey-10'
+                          : 'bg-grey-2'
+                      "
+                      class="flex justify-center items-center"
+                    >
+                      {{ t("alerts.minutes") }}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  data-test="add-alert-delay-error"
+                  v-if="triggerData.silence < 0"
+                  class="text-red-8 q-pt-xs"
+                  style="font-size: 11px; line-height: 12px"
+                >
+                  Field is required!
+                </div>
+              </div>
+    </div>
+    <div class="o2-input flex justify-start items-start q-mt-sm">
+              <div
+                data-test="add-alert-destination-title"
+                class="text-bold q-pb-sm"
+                style="width: 190px"
+              >
+                {{ t("alerts.destination") + " *" }}
+              </div>
+              <div data-test="add-alert-destination-select">
+                <q-select
+                  v-model="destinations"
+                  :options="formattedDestinations"
+                  color="input-border"
+                  bg-color="input-bg "
+                  class="no-case"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  multiple
+                  use-input
+                  fill-input
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  style="width: 200px"
+                  @update:model-value="updateDestinations"
+                >
+                  <template v-slot:option="option">
+                    <q-list dense>
+                      <q-item
+                        tag="label"
+                        :data-test="`add-alert-destination-${option.opt}-select-item`"
+                      >
+                        <q-item-section avatar>
+                          <q-checkbox
+                            size="xs"
+                            dense
+                            v-model="destinations"
+                            :val="option.opt"
+                            @update:model-value="updateDestinations"
+                          />
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label class="ellipsis"
+                            >{{ option.opt }}
+                          </q-item-label>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </template>
+                </q-select>
+              </div>
+              <div class="q-pl-sm">
+                <q-btn
+                  data-test="create-destination-btn"
+                  icon="refresh"
+                  title="Refresh latest Destinations"
+                  class="text-bold no-border"
+                  no-caps
+                  flat
+                  dense
+                  @click="$emit('refresh:destinations')"
+                />
+              </div>
+              <div class="q-pl-sm">
+                <q-btn
+                  data-test="create-destination-btn"
+                  label="Add New Destination"
+                  class="text-bold no-border"
+                  color="primary"
+                  no-caps
+                  @click="routeToCreateDestination"
+                />
+              </div>
+    </div>
+    </div>
+
+   </div>
+
   </div>
 </template>
 
 <script lang="ts" setup>
 import FieldsInput from "./FieldsInput.vue";
+import AlertsContainer from "./AlertsContainer.vue";
+import FieldsInputWithMulti from "./FieldsInputWithMulti.vue";
+import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 
-defineProps(["columns", "conditions","enableNewValueMode"]);
+import { useStore } from "vuex";
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import { useRouter } from "vue-router";
 
-const emits = defineEmits(["field:add", "field:remove", "input:update"]);
+const { t } = useI18n();
+
+const store = useStore();
+
+const router = useRouter();
+
+const props = defineProps(["columns", "conditions","enableNewValueMode", "expandState", "trigger", "destinations", "formattedDestinations"]);
+
+const emits = defineEmits(["field:add", "field:remove", "input:update", "update:expandState", "update:trigger", "refresh:destinations", "update:destinations"]);
+
+const triggerData = ref(props.trigger);
+
+const destinations = ref(props.destinations);
+
+const formattedDestinations = ref(props.formattedDestinations);
+
+const updateTrigger = () => {
+  emits("update:trigger", triggerData.value);
+};
 
 const addField = (field: any) => {
   emits("field:add", field);
@@ -45,6 +252,20 @@ const addField = (field: any) => {
 const removeField = (field: any) => {
   emits("field:remove", field);
   emits("input:update", "conditions", field);
+};
+const routeToCreateDestination = () => {
+      const url = router.resolve({
+        name: "alertDestinations",
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      }).href;
+      window.open(url, "_blank");
+    };
+
+const updateDestinations = (destinations: any[]) => {
+  emits("update:destinations", destinations);
 };
 </script>
 
