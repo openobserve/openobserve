@@ -49,6 +49,12 @@ pub fn decode_url(s: &str) -> Result<String, Error> {
     decode(&s)
 }
 
+// Add this helper function to detect base64 strings
+pub fn check_base64(s: &str) -> bool {
+    s.chars()
+        .all(|c| matches!(c, 'A'..='Z' | 'a'..='z' | '0'..='9' ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

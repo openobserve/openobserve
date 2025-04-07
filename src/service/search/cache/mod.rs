@@ -80,11 +80,13 @@ pub async fn search(
     };
 
     let mut req = in_req.clone();
-    let mut query_fn = req
-        .query
-        .query_fn
-        .as_ref()
-        .and_then(|v| base64::decode_url(v).ok());
+    let mut query_fn = req.query.query_fn.as_ref().and_then(|v| {
+        if base64::check_base64(v) {
+            base64::decode_url(v).ok()
+        } else {
+            Some(v.to_string())
+        }
+    });
 
     // calculate hash for the query
     let mut hash_body = vec![origin_sql.to_string()];
