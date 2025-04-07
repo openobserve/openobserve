@@ -51,8 +51,37 @@ pub fn decode_url(s: &str) -> Result<String, Error> {
 
 // Add this helper function to detect base64 strings
 pub fn check_base64(s: &str) -> bool {
-    s.chars()
-        .all(|c| matches!(c, 'A'..='Z' | 'a'..='z' | '0'..='9' ))
+    if s.is_empty() {
+        return false;
+    }
+    if s.len() % 4 != 0 {
+        return false;
+    }
+
+    // Check if all characters are valid Base64 characters
+    let valid_chars = s.chars().all(
+        |c| matches!(c, 'A'..='Z' | 'a'..='z' | '0'..='9' | '+' | '/' | '=' | '-' | '_' | '.'  ),
+    );
+
+    if !valid_chars {
+        return false;
+    }
+
+    // Check that '=' only appears at the end
+    let padding_index = s.find('=');
+    if let Some(idx) = padding_index {
+        if !s[idx..].chars().all(|c| c == '=') {
+            return false;
+        }
+    }
+
+    // Check that there are at most 2 '=' characters
+    let padding_count = s.chars().filter(|&c| c == '=').count();
+    if padding_count > 2 {
+        return false;
+    }
+
+    true
 }
 
 #[cfg(test)]
