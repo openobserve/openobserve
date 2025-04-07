@@ -29,7 +29,7 @@
                     "function"
                 ],
                 "defaultValue": null,
-                "required": true
+                "required": false
             }
         ]
     },
