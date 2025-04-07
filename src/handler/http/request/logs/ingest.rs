@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{http, post, web, HttpRequest, HttpResponse};
+use actix_web::{http, http::header, post, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::meta::{
@@ -58,29 +58,32 @@ pub async fn bulk(
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
 
-    // log the slow request that takes more than 100ms
-    let req_start_time = in_req
-        .headers()
-        .get("o2_req_time")
-        .map(|v| v.to_str().unwrap_or("0").parse::<i64>().unwrap_or(0))
-        .unwrap_or_default();
-    let now = config::utils::time::now_micros();
-    if req_start_time > 0 && now - req_start_time > 100_000 {
-        log::warn!("before_bulk_processing: took {} ms", now - req_start_time);
+    // log start processing time
+    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
+        config::utils::time::now_micros()
+    } else {
+        0
+    };
+
+    let mut resp = match logs::bulk::ingest(**thread_id, &org_id, body, user_email).await {
+        Ok(v) => MetaHttpResponse::json(v),
+        Err(e) => {
+            log::error!("Error processing request {org_id}/_bulk: {:?}", e);
+            HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            ))
+        }
+    };
+
+    if process_time > 0 {
+        resp.headers_mut().insert(
+            header::HeaderName::from_static("o2_process_time"),
+            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
+        );
     }
 
-    Ok(
-        match logs::bulk::ingest(**thread_id, &org_id, body, user_email).await {
-            Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => {
-                log::error!("Error processing request {org_id}/_bulk: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        },
-    )
+    Ok(resp)
 }
 
 /// _multi ingestion API
@@ -110,33 +113,48 @@ pub async fn multi(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    Ok(
-        match logs::ingest::ingest(
-            **thread_id,
-            &org_id,
-            &stream_name,
-            IngestionRequest::Multi(&body),
-            user_email,
-            None,
-        )
-        .await
-        {
-            Ok(v) => match v.code {
-                503 => HttpResponse::ServiceUnavailable().json(v),
-                _ => MetaHttpResponse::json(v),
-            },
-            Err(e) => {
-                log::error!(
-                    "Error processing request {org_id}/{stream_name}/_multi: {:?}",
-                    e
-                );
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        },
+
+    // log start processing time
+    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
+        config::utils::time::now_micros()
+    } else {
+        0
+    };
+
+    let mut resp = match logs::ingest::ingest(
+        **thread_id,
+        &org_id,
+        &stream_name,
+        IngestionRequest::Multi(&body),
+        user_email,
+        None,
     )
+    .await
+    {
+        Ok(v) => match v.code {
+            503 => HttpResponse::ServiceUnavailable().json(v),
+            _ => MetaHttpResponse::json(v),
+        },
+        Err(e) => {
+            log::error!(
+                "Error processing request {org_id}/{stream_name}/_multi: {:?}",
+                e
+            );
+            HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            ))
+        }
+    };
+
+    if process_time > 0 {
+        resp.headers_mut().insert(
+            header::HeaderName::from_static("o2_process_time"),
+            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
+        );
+    }
+
+    Ok(resp)
 }
 
 /// _json ingestion API
@@ -166,33 +184,48 @@ pub async fn json(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    Ok(
-        match logs::ingest::ingest(
-            **thread_id,
-            &org_id,
-            &stream_name,
-            IngestionRequest::JSON(&body),
-            user_email,
-            None,
-        )
-        .await
-        {
-            Ok(v) => match v.code {
-                503 => HttpResponse::ServiceUnavailable().json(v),
-                _ => MetaHttpResponse::json(v),
-            },
-            Err(e) => {
-                log::error!(
-                    "Error processing request {org_id}/{stream_name}/_json: {:?}",
-                    e
-                );
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        },
+
+    // log start processing time
+    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
+        config::utils::time::now_micros()
+    } else {
+        0
+    };
+
+    let mut resp = match logs::ingest::ingest(
+        **thread_id,
+        &org_id,
+        &stream_name,
+        IngestionRequest::JSON(&body),
+        user_email,
+        None,
     )
+    .await
+    {
+        Ok(v) => match v.code {
+            503 => HttpResponse::ServiceUnavailable().json(v),
+            _ => MetaHttpResponse::json(v),
+        },
+        Err(e) => {
+            log::error!(
+                "Error processing request {org_id}/{stream_name}/_json: {:?}",
+                e
+            );
+            HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            ))
+        }
+    };
+
+    if process_time > 0 {
+        resp.headers_mut().insert(
+            header::HeaderName::from_static("o2_process_time"),
+            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
+        );
+    }
+
+    Ok(resp)
 }
 
 /// _kinesis_firehose ingestion API
