@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width q-mx-lg">
+  <div class="full-width q-mx-lg"  >
     <div class="row items-center no-wrap q-mx-md q-my-sm">
       <div class="flex items-center">
         <div
@@ -46,19 +46,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="addAlertFormRef"
       class="q-px-lg q-my-md"
       style="
-        max-height: calc(100vh - 138px);
+        max-height: calc(100vh - 166px);
         overflow: auto;
         scroll-behavior: smooth;
       "
     >
-      <div class="row justify-start items-start" style="width: 900px">
-        <div :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+      <div class="row flex tw-gap-5 items-start" style="width: 100%">
+        <div class="col" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
           <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <!-- alerts setup  section -->
             <div
-              class="flex justify-start items-center q-pb-sm q-col-gutter-md flex-wrap "
+              class="flex q-mt-lg justify-start items-center q-pb-sm q-col-gutter-md flex-wrap "
             >
-            <div class=" q-mt-xl  q-px-lg tw-w-full row alert-setup-container" style="width: calc(100vw - 600px);">
+            <div class="  q-px-lg tw-w-full row alert-setup-container" style="width: calc(100vw - 600px);">
               <AlertsContainer 
                 name="query"
                 v-model:is-expanded="expandState.alertSetup"
@@ -67,6 +67,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw-mt-1 tw-w-full col-12"
             />
              <div v-show="expandState.alertSetup" class="tw-w-full ">
+              <div class="q-gutter-sm q-px-lg q-py-sm">
+              <q-radio
+                data-test="add-alert-scheduled-alert-radio"
+                v-bind:readonly="beingUpdated"
+                v-bind:disable="beingUpdated"
+                v-model="formData.is_real_time"
+                :checked="formData.is_real_time"
+                val="false"
+                :label="t('alerts.scheduled')"
+                class="q-ml-none"
+              />
+              <q-radio
+                data-test="add-alert-realtime-alert-radio"
+                v-bind:readonly="beingUpdated"
+                v-bind:disable="beingUpdated"
+                v-model="formData.is_real_time"
+                :checked="!formData.is_real_time"
+                val="true"
+                :label="t('alerts.realTime')"
+                class="q-ml-none"
+              />
+            </div>
               <div
                 data-test="add-alert-name-input row"
                 class="alert-name-input o2-input flex justify-between items-center q-px-lg tw-gap-10"
@@ -173,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               v-if="formData.is_real_time === 'true'"
-              class="q-py-sm showLabelOnTop text-bold text-h7"
+              class=""
               data-test="add-alert-query-input-title"
             >
               <real-time-alert
@@ -182,10 +204,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @field:add="addField"
                 @field:remove="removeField"
                 @input:update="onInputUpdate"
+                :expandState = expandState
+                @update:expandState="updateExpandState"
+                :trigger="formData.trigger_condition"
+                :destinations="formData.destinations"
+                :formattedDestinations="getFormattedDestinations"
+                @refresh:destinations="refreshDestinations"
+                @update:destinations="updateDestinations"
               />
             </div>
+            <div v-else>
               <scheduled-alert
-                  v-else
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
                 :conditions="formData.query_condition.conditions"
@@ -194,11 +223,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :sqlQueryErrorMsg="sqlQueryErrorMsg"
                 :vrlFunctionError="vrlFunctionError"
                 :showTimezoneWarning="showTimezoneWarning"
+                :destinations="formData.destinations"
+                :formattedDestinations="getFormattedDestinations"
                 v-model:trigger="formData.trigger_condition"
                 v-model:sql="formData.query_condition.sql"
                 v-model:promql="formData.query_condition.promql"
                 v-model:query_type="formData.query_condition.type"
                 v-model:aggregation="formData.query_condition.aggregation"
+                v-model:silence="formData.trigger_condition.silence"
                 v-model:promql_condition="
                   formData.query_condition.promql_condition
                 "
@@ -209,196 +241,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:isAggregationEnabled="isAggregationEnabled"
                 v-model:showVrlFunction="showVrlFunction"
                 @field:add="addField"
+                @field:addConditionGroup="addConditionGroup"
                 @field:remove="removeField"
                 @input:update="onInputUpdate"
                 @validate-sql="validateSqlQuery"
                 @update:showVrlFunction="updateFunctionVisibility"
                 @update:multi_time_range="updateMultiTimeRange"
                 @update:expandState="updateExpandState"
+                @update:silence="updateSilence"
+                @refresh:destinations="refreshDestinations"
+                @update:destinations="updateDestinations"
                 class="q-mt-sm"
               />
-                          
-            <div class="q-gutter-sm">
-              <q-radio
-                data-test="add-alert-scheduled-alert-radio"
-                v-bind:readonly="beingUpdated"
-                v-bind:disable="beingUpdated"
-                v-model="formData.is_real_time"
-                :checked="formData.is_real_time"
-                val="false"
-                :label="t('alerts.scheduled')"
-                class="q-ml-none"
-              />
-              <q-radio
-                data-test="add-alert-realtime-alert-radio"
-                v-bind:readonly="beingUpdated"
-                v-bind:disable="beingUpdated"
-                v-model="formData.is_real_time"
-                :checked="!formData.is_real_time"
-                val="true"
-                :label="t('alerts.realTime')"
-                class="q-ml-none"
-              />
             </div>
+  
+              <!-- this section needs to be moved to the scheduled and relatime alert components -->
 
-            <div class="col-12 flex justify-start items-center q-mt-xs">
-              <div
-                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
-                data-test="add-alert-delay-title"
-                style="width: 190px"
-              >
-                {{ t("alerts.silenceNotification") + " *" }}
-                <q-icon
-                  :name="outlinedInfo"
-                  size="17px"
-                  class="q-ml-xs cursor-pointer"
-                  :class="
-                    store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-                  "
-                >
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                  >
-                    <span style="font-size: 14px">
-                      If the alert triggers then how long should it wait before
-                      sending another notification.
-                      <br />
-                      e.g. if the alert triggers at 4:00 PM and the silence
-                      notification is set to 10 minutes then it will not send
-                      another notification until 4:10 PM even if the alert is
-                      still after 1 minute. This is to avoid spamming the user
-                      with notifications.</span
-                    >
-                  </q-tooltip>
-                </q-icon>
-              </div>
-              <div style="min-height: 58px">
-                <div class="col-8 row justify-left align-center q-gutter-sm">
-                  <div
-                    class="flex items-center"
-                    style="border: 1px solid rgba(0, 0, 0, 0.05)"
-                  >
-                    <div
-                      data-test="add-alert-delay-input"
-                      style="width: 87px; margin-left: 0 !important"
-                      class="silence-notification-input"
-                    >
-                      <q-input
-                        v-model="formData.trigger_condition.silence"
-                        type="number"
-                        dense
-                        filled
-                        min="0"
-                        style="background: none"
-                      />
-                    </div>
-                    <div
-                      data-test="add-alert-delay-unit"
-                      style="
-                        min-width: 90px;
-                        margin-left: 0 !important;
-                        background: #f2f2f2;
-                        height: 40px;
-                      "
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'bg-grey-10'
-                          : 'bg-grey-2'
-                      "
-                      class="flex justify-center items-center"
-                    >
-                      {{ t("alerts.minutes") }}
-                    </div>
-                  </div>
-                </div>
-                <div
-                  data-test="add-alert-delay-error"
-                  v-if="formData.trigger_condition.silence < 0"
-                  class="text-red-8 q-pt-xs"
-                  style="font-size: 11px; line-height: 12px"
-                >
-                  Field is required!
-                </div>
-              </div>
-            </div>
+            <!-- additional setup starts here -->
+            <div
+              class="flex q-mt-lg justify-start items-center q-pb-sm q-col-gutter-md flex-wrap "
+            >
+            <div class="  q-px-lg tw-w-full row alert-setup-container" style="width: calc(100vw - 600px);">
 
-            <div class="o2-input flex justify-start items-start q-mt-sm">
-              <div
-                data-test="add-alert-destination-title"
-                class="text-bold q-pb-sm"
-                style="width: 190px"
-              >
-                {{ t("alerts.destination") + " *" }}
-              </div>
-              <div data-test="add-alert-destination-select">
-                <q-select
-                  v-model="formData.destinations"
-                  :options="getFormattedDestinations"
-                  color="input-border"
-                  bg-color="input-bg "
-                  class="no-case"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  multiple
-                  use-input
-                  fill-input
-                  :rules="[(val: any) => !!val || 'Field is required!']"
-                  style="width: 200px"
-                >
-                  <template v-slot:option="option">
-                    <q-list dense>
-                      <q-item
-                        tag="label"
-                        :data-test="`add-alert-destination-${option.opt}-select-item`"
-                      >
-                        <q-item-section avatar>
-                          <q-checkbox
-                            size="xs"
-                            dense
-                            v-model="formData.destinations"
-                            :val="option.opt"
-                          />
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label class="ellipsis"
-                            >{{ option.opt }}
-                          </q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </template>
-                </q-select>
-              </div>
-              <div class="q-pl-sm">
-                <q-btn
-                  data-test="create-destination-btn"
-                  icon="refresh"
-                  title="Refresh latest Destinations"
-                  class="text-bold no-border"
-                  no-caps
-                  flat
-                  dense
-                  @click="$emit('refresh:destinations')"
-                />
-              </div>
-              <div class="q-pl-sm">
-                <q-btn
-                  data-test="create-destination-btn"
-                  label="Create Destination"
-                  class="text-bold no-border"
-                  color="secondary"
-                  no-caps
-                  @click="routeToCreateDestination"
-                />
-              </div>
-            </div>
-
-            <div class="q-mt-md">
-              <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
+              <AlertsContainer 
+                name="advanced"
+                v-model:is-expanded="expandState.advancedSetup"
+                label="Advanced Setup"
+                subLabel="Go deeper with custom options"
+                class="tw-mt-1 tw-w-full col-12"
+            />
+            <div class="tw-w-full row q-px-lg" >
+              <div v-if="expandState.advancedSetup" class="q-mt-md tw-w-full">
               <variables-input
                 class="o2-input"
                 :variables="formData.context_attributes"
@@ -407,44 +280,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <div class="o2-input">
-              <div data-test="add-alert-description-input">
+            <div v-if="expandState.advancedSetup" class=" tw-w-full">
+              <div data-test="add-alert-description-input tw-w-full ">
+                <div class="flex items-center q-mb-sm">
+                  <span class="text-bold custom-input-label">Description</span>
+                </div>
                 <q-input
                   v-model="formData.description"
-                  :label="t('alerts.description')"
                   color="input-border"
                   bg-color="input-bg"
-                  class="showLabelOnTop q-mb-sm"
+                  class="showLabelOnTop q-mb-sm q-text-area-input"
                   stack-label
                   outlined
                   filled
                   dense
                   tabindex="0"
-                  style="width: 550px"
+                  style="width: 100%; resize: none;"
+                  type="textarea"
+                  placeholder="Type something"
+                  rows="5"
+                  
                 />
               </div>
-              <div data-test="add-alert-row-input">
+              <div data-test="add-alert-row-input tw-w-full">
+                <div class="flex items-center q-mb-sm">
+                  <span class="text-bold custom-input-label">Row Template</span>
+                  <q-btn
+                    style="color: #A0A0A0;"
+                    no-caps
+                    padding="xs"
+                    class="q-ml-xs"
+                    size="sm"
+                    flat
+                    icon="info_outline"
+                  >
+                <q-tooltip>
+               Row Template is used to format the alert message.
+              </q-tooltip>
+          </q-btn>
+          </div>
                 <q-input
                   v-model="formData.row_template"
-                  :label="t('alerts.row')"
                   color="input-border"
                   bg-color="input-bg"
-                  class="showLabelOnTop"
+                  class="q-text-area-input-row-template "
                   stack-label
                   outlined
                   filled
                   dense
                   tabindex="0"
-                  style="width: 550px"
-                />
+                  style="width: 100%; resize: none;"
+                  type="textarea"
+                  placeholder="e.g - Alert was triggered at {timestamp} "
+                  rows="5"
+                >
+                
+              </q-input>
               </div>
             </div>
+            </div>
 
-            <div class="flex justify-start q-mt-lg">
+            </div>
+            </div>
+            
+
+
+
+
+          </q-form>
+
+        </div>
+        <div
+          style="width: 440px; height: 300px; position: sticky; top: 0 
+          "
+          class=" col-2"
+        >
+          <preview-alert
+            style="border: 1px solid #ececec"
+            ref="previewAlertRef"
+            :formData="formData"
+            :query="previewQuery"
+            :selectedTab="scheduledAlertRef?.tab || 'custom'"
+            :isAggregationEnabled="isAggregationEnabled"
+          />
+
+        </div>
+        
+      </div>
+
+    </div>
+    <div class="flex justify-end items-center q-px-lg tw-w-full" style="position: sticky; background-color: #212121; bottom: 0 !important; top: 0; height: 60px !important;">
               <q-btn
                 data-test="add-alert-cancel-btn"
                 v-close-popup="true"
-                class="q-mb-md text-bold"
+                class=" text-bold"
                 :label="t('alerts.cancel')"
                 text-color="light-text"
                 padding="sm md"
@@ -454,32 +383,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="add-alert-submit-btn"
                 :label="t('alerts.save')"
-                class="q-mb-md text-bold no-border q-ml-md"
+                class=" text-bold no-border q-ml-md"
                 color="secondary"
                 padding="sm xl"
                 type="submit"
+                @click="onSubmit"
                 no-caps
               />
             </div>
-          </q-form>
-        </div>
-        <div
-          style="width: 400px; height: 200px; position: sticky; top: 0"
-          class="q-mb-lg q-px-md"
-        >
-          <div class="text-bold q-pb-xs">Preview</div>
-          <preview-alert
-            style="border: 1px solid #ececec"
-            ref="previewAlertRef"
-            :formData="formData"
-            :query="previewQuery"
-            :selectedTab="scheduledAlertRef?.tab || 'custom'"
-            :isAggregationEnabled="isAggregationEnabled"
-          />
-        </div>
-      </div>
-    </div>
+
   </div>
+
+  
 
 
 </template>
@@ -536,6 +451,7 @@ const defaultValue: any = () => {
     query_condition: {
       conditions: [
         {
+          parentId: "1233",
           column: "",
           operator: "=",
           value: "",
@@ -600,14 +516,14 @@ export default defineComponent({
   },
   emits: ["update:list", "cancel:hideform", "refresh:destinations"],
   components: {
-    ScheduledAlert: defineAsyncComponent(() => import("./ScheduledAlert.vue")),
+    ScheduledAlert: defineAsyncComponent(() => import("./ScheduledAlertLatest.vue")),
     RealTimeAlert: defineAsyncComponent(() => import("./RealTimeAlert.vue")),
     VariablesInput: defineAsyncComponent(() => import("./VariablesInput.vue")),
     PreviewAlert: defineAsyncComponent(() => import("./PreviewAlert.vue")),
     SelectFolderDropDown,
     AlertsContainer,
   },
-  setup(props) {
+  setup(props, { emit }) {
     const store: any = useStore();
     let beingUpdated: boolean = false;
     const addAlertForm: any = ref(null);
@@ -633,6 +549,9 @@ export default defineComponent({
     const expandState = ref({
       alertSetup: true,
       queryMode: true,
+      advancedSetup: true,
+      realTimeMode: true,
+      thresholds: true,
     });
     var triggerOperators: any = ref([
 
@@ -862,13 +781,53 @@ export default defineComponent({
 
     const addField = () => {
       formData.value.query_condition.conditions.push({
-        column: "",
-        operator: "=",
-        value: "",
-        id: getUUID(),
-        condition:"AND",
+        parent_id: getUUID(),
+        uuid: getUUID(),
+        column: null,
+        operator: null,
+        value: null,
+        condition: 'AND',
       });
     };
+
+
+      const addConditionGroup = (depth: number) => {
+        const newGroup = {
+          level:"root",
+          uuid: getUUID(),
+          condition: 'AND', // Default logical condition
+          children: [
+                {
+                  uuid: getUUID(), // Assuming you have a function to generate UUIDs
+                  column: null,
+                  operator: null,
+                  value: null,
+                  condition: 'AND', // Default condition
+                }
+          ]
+        };
+
+        if (depth === 0) {
+          formData.value.query_condition.conditions.push(newGroup);
+        } else {
+          const targetGroup = findTargetGroup(formData.value.query_condition.conditions, depth);
+          if (targetGroup) {
+            targetGroup.push(newGroup);
+          }
+        }
+      };
+      const findTargetGroup = (list: any[], depth: number, index: number = 0): any[] | null => {
+          let target = list;
+
+          for (let i = 0; i < depth; i++) {
+            if (target[index]?.children) {
+              target = target[index].children;
+            } else {
+              return null;
+            }
+          }
+          return target;
+        };
 
     const removeField = (field: any) => {
       formData.value.query_condition.conditions =
@@ -1297,6 +1256,11 @@ export default defineComponent({
         formData.value.query_condition.multi_time_range = value;
       }
     };
+    const updateSilence = (value: any) => {
+      if (value) {
+        formData.value.trigger_condition.silence = value;
+      }
+    }
 
     const routeToCreateDestination = () => {
       const url = router.resolve({
@@ -1323,6 +1287,13 @@ export default defineComponent({
     const updateExpandState = (value: any) => {
       expandState.value = value;
     };
+
+    const refreshDestinations = () => {
+      emit("refresh:destinations");
+    }
+    const updateDestinations = (destinations: any[]) => {
+      formData.value.destinations = destinations;
+    }
 
     return {
       t,
@@ -1357,6 +1328,7 @@ export default defineComponent({
       filteredStreams,
       filterStreams,
       addField,
+      addConditionGroup,
       removeField,
       removeVariable,
       addVariable,
@@ -1395,6 +1367,9 @@ export default defineComponent({
       alertType,
       expandState,
       updateExpandState,
+      updateSilence,
+      refreshDestinations,
+      updateDestinations
     };
   },
 
@@ -1696,6 +1671,7 @@ export default defineComponent({
     background-color: rgba(255, 255, 255, 0.07) !important;
   }
 }
+
 .dark-mode{
   .alert-setup-container{
   background-color: #212121;
@@ -1703,6 +1679,17 @@ export default defineComponent({
   margin-left: 24px;
   border-radius: 4px;
   border: 1px solid #343434;
+}
+.q-text-area-input > div > div  { 
+  background-color:rgb(30, 31, 31) !important;
+  border: 1px solid $input-border !important;
+}
+.q-text-area-input-row-template > div > div  { 
+  background-color:rgb(30, 31, 31) !important;
+  border: 1px solid $input-border !important;
+}
+.custom-input-label{
+  color: #BDBDBD;
 }
 }
 .light-mode{
@@ -1713,13 +1700,34 @@ export default defineComponent({
     border-radius: 4px;
     border: 1px solid #CBCBCB;
   }
+  .custom-input-label{
+    color: #5C5C5C;
+  }
   .q-field--labeled.showLabelOnTop.q-field .q-field__control{
     border: 1px solid #444444;
   }
   .add-folder-btn{
     border: 1px solid #444444;
   }
+  .q-text-area-input > div > div  { 
+  background-color:rgb(211, 213, 213) !important;
+  border: 1px solid black !important;
 
 }
+.q-text-area-input-row-template > div > div  { 
+  background-color:rgb(211, 213, 213) !important;
+  border: 1px solid black !important;
+}
+}
+.q-text-area-input > div > div > div > textarea{  
+    height: 80px !important;
+    resize: none !important;
+}
+.q-text-area-input-row-template > div > div > div > textarea{
+  height: 160px !important;
+  resize: none !important;
+}
+
+
 
 </style>
