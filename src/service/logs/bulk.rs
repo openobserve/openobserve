@@ -321,6 +321,7 @@ pub async fn ingest(
                 *fn_num = Some(0); // no pl -> no func
             }
         }
+        tokio::task::coop::consume_budget().await;
     }
 
     // batch process records through pipeline
@@ -492,7 +493,9 @@ pub async fn ingest(
                                 .entry(destination_stream.clone())
                                 .or_insert((Vec::new(), None));
                             ts_data.push((timestamp, local_val));
-                            *fn_num = Some(function_no)
+                            *fn_num = Some(function_no);
+
+                            tokio::task::coop::consume_budget().await;
                         }
                     }
                 }

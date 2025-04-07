@@ -850,8 +850,8 @@ pub struct Common {
     pub mmdb_data_dir: String,
     #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
     pub mmdb_disable_download: bool,
-    #[env_config(name = "ZO_MMDB_UPDATE_DURATION", default = "86400")] // Everyday to test
-    pub mmdb_update_duration: u64,
+    #[env_config(name = "ZO_MMDB_UPDATE_DURATION_DAYS", default = 30)] // default 30 days
+    pub mmdb_update_duration_days: u64,
     #[env_config(
         name = "ZO_MMDB_GEOLITE_CITYDB_URL",
         default = "https://geoip.zinclabs.dev/GeoLite2-City.mmdb"
