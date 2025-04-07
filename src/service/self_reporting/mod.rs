@@ -38,10 +38,11 @@ use tokio::sync::oneshot;
 
 mod ingestion;
 mod queues;
+#[cfg(feature = "marketplace")]
+pub mod search;
 
 pub async fn run() {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
+    if !should_report_usage() {
         return;
     }
 
@@ -186,8 +187,7 @@ pub async fn report_request_usage_stats(
 }
 
 async fn publish_usage(usages: Vec<UsageData>) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
+    if !should_report_usage() {
         return;
     }
 
@@ -204,8 +204,7 @@ async fn publish_usage(usages: Vec<UsageData>) {
 }
 
 pub async fn publish_triggers_usage(trigger: TriggerData) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
+    if !should_report_usage() {
         return;
     }
 
@@ -225,8 +224,7 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
 }
 
 pub async fn publish_error(error_data: ErrorData) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
+    if !should_report_usage() {
         return;
     }
 
@@ -250,9 +248,7 @@ pub async fn flush() {
     #[cfg(feature = "enterprise")]
     flush_audit().await;
 
-    let cfg = get_config();
-    // only ingester and querier nodes report usage
-    if !cfg.common.usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
+    if !should_report_usage() {
         return;
     }
 
@@ -311,6 +307,16 @@ async fn publish_audit(
     req: cluster_rpc::IngestionRequest,
 ) -> Result<cluster_rpc::IngestionResponse, anyhow::Error> {
     crate::service::ingestion::ingestion_service::ingest(req).await
+}
+
+/// `marketplace` feature flag must report usage
+/// or enabled by env for other feature flags
+/// &
+/// Only ingester or querier nodes report usage
+#[inline]
+fn should_report_usage() -> bool {
+    (cfg!(feature = "marketplace") || get_config().common.usage_enabled)
+        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier())
 }
 
 #[inline]
