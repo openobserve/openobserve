@@ -1544,6 +1544,7 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
 }
 
 pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
+    #[allow(deprecated)]
     let meta = match meta {
         Some(v) => v,
         None => match MetaSql::new(sql) {

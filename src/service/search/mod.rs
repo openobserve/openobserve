@@ -24,7 +24,7 @@ use config::{
         cluster::RoleGroup,
         search,
         self_reporting::usage::{RequestStats, UsageType},
-        sql::{OrderBy, SqlOperator, TableReferenceExt},
+        sql::{resolve_stream_names, OrderBy, SqlOperator, TableReferenceExt},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
     metrics,
@@ -234,8 +234,8 @@ pub async fn search(
             };
 
             if report_usage {
-                let stream_name = match config::meta::sql::Sql::new(&req_query.sql) {
-                    Ok(v) => v.source.to_string(),
+                let stream_name = match resolve_stream_names(&req_query.sql) {
+                    Ok(v) => v.join(","),
                     Err(e) => {
                         log::error!("report_usage: parse sql error: {:?}", e);
                         "".to_string()
@@ -347,6 +347,7 @@ pub async fn search_multi(
     let mut sqls = vec![];
     let mut index = 0;
 
+    #[allow(deprecated)]
     for mut req in queries {
         stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
             Ok(v) => v.source.to_string(),

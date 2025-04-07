@@ -149,6 +149,7 @@ pub struct Limit<'a>(pub &'a SqlExpr);
 pub struct Where<'a>(pub &'a Option<SqlExpr>);
 
 impl Sql {
+    #[deprecated(since = "0.14.5", note = "use service::search::Sql::new instead")]
     pub fn new(sql: &str) -> Result<Sql, anyhow::Error> {
         if sql.is_empty() {
             return Err(anyhow::anyhow!("SQL is empty"));

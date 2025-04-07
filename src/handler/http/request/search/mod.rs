@@ -95,6 +95,7 @@ async fn can_use_distinct_stream(
     });
 
     // all the fields used in the query sent must be in the distinct stream
+    #[allow(deprecated)]
     let query_fields: Vec<_> = match config::meta::sql::Sql::new(query_sql) {
         // if sql is invalid, we let it follow the original search and fail
         Err(_) => return false,
