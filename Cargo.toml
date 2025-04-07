@@ -111,11 +111,7 @@ jsonwebtoken = "9.3"
 log.workspace = true
 maxminddb = "0.25"
 memchr.workspace = true
-mimalloc = { version = "0.1", default-features = false, optional = true }
-o2_dex = { version = "0.1.0", path = "../o2-enterprise/o2_dex", optional = true }
-o2_enterprise = { version = "0.1.0", path = "../o2-enterprise/o2_enterprise", optional = true, default-features = false }
-o2_openfga = { version = "0.1.0", path = "../o2-enterprise/o2_openfga", optional = true }
-o2_ratelimit = { version = "0.1.0", path = "../o2-enterprise/o2_ratelimit", optional = true }
+mimalloc = { version = "0.1.43", default-features = false, optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
