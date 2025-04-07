@@ -20,6 +20,7 @@ use async_recursion::async_recursion;
 use config::{
     get_config,
     meta::{cluster::NodeInfo, search::ScanStats, sql::TableReferenceExt},
+    metrics,
     utils::json,
 };
 use datafusion::{
@@ -84,6 +85,10 @@ pub async fn search(
 
     // 2. get nodes
     let nodes = get_cluster_nodes(trace_id, req_regions, req_clusters).await?;
+
+    metrics::QUERY_RUNNING_NUMS
+        .with_label_values(&[&sql.org_id])
+        .inc();
 
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     if super::super::SEARCH_SERVER
