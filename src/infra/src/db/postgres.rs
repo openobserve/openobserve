@@ -328,15 +328,15 @@ impl super::Db for PostgresDb {
                     .with_label_values(&["insert", "meta", ""])
                     .inc();
                 sqlx::query(
-                r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
-            )
-            .bind(&module)
-            .bind(&key1)
-            .bind(&key2)
-            .bind(start_dt.unwrap_or_default())
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-            .execute(&mut *tx)
-            .await
+                    r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
+                )
+                    .bind(&module)
+                    .bind(&key1)
+                    .bind(&key2)
+                    .bind(start_dt.unwrap_or_default())
+                    .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+                    .execute(&mut *tx)
+                    .await
             };
             if let Err(e) = ret {
                 if let Err(e) = tx.rollback().await {
@@ -356,13 +356,13 @@ impl super::Db for PostgresDb {
             if let Err(e) = sqlx::query(
                 r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
             )
-            .bind(&module)
-            .bind(&key1)
-            .bind(&key2)
-            .bind(new_start_dt.unwrap_or_default())
-            .bind(String::from_utf8(new_value.to_vec()).unwrap_or_default())
-            .execute(&mut *tx)
-            .await
+                .bind(&module)
+                .bind(&key1)
+                .bind(&key2)
+                .bind(new_start_dt.unwrap_or_default())
+                .bind(String::from_utf8(new_value.to_vec()).unwrap_or_default())
+                .execute(&mut *tx)
+                .await
             {
                 if let Err(e) = tx.rollback().await {
                     log::error!("[POSTGRES] rollback get_for_update error: {}", e);
