@@ -45,7 +45,7 @@ static FILE_DOWNLOAD_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // move files
-    for _ in 0..cfg.limit.query_thread_num {
+    for _ in 0..cfg.limit.file_download_thread_num {
         let rx = FILE_DOWNLOAD_CHANNEL.receiver.clone();
         tokio::spawn(async move {
             loop {
