@@ -355,6 +355,7 @@ impl Writer {
                 continue;
             }
             wal.write(&entry).context(WalSnafu)?;
+            tokio::task::coop::consume_budget().await;
         }
         drop(wal);
 
@@ -370,6 +371,7 @@ impl Writer {
                 continue;
             }
             mem.write(entry.schema.clone().unwrap(), entry, batch)?;
+            tokio::task::coop::consume_budget().await;
         }
         drop(mem);
 

@@ -250,7 +250,7 @@ arrow-schema = { version = "54.1.0", features = ["serde"] }
 parquet = { version = "54.1.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.11.2", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.53.0", features = ["serde", "visitor"] }
-dotenv_config = "0.2.1"
+dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
 env_logger = "0.10"
 etcd-client = { version = "0.12", features = ["tls"] }

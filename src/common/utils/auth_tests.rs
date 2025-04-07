@@ -3090,7 +3090,7 @@ mod tests {
                 usage_publish_interval: i64::default(),
                 mmdb_data_dir: String::default(),
                 mmdb_disable_download: bool::default(),
-                mmdb_update_duration: u64::default(),
+                mmdb_update_duration_days: u64::default(),
                 mmdb_geolite_citydb_url: String::default(),
                 mmdb_geolite_asndb_url: String::default(),
                 mmdb_geolite_citydb_sha256_url: String::default(),
