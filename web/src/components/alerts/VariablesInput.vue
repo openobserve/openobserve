@@ -15,22 +15,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="col-12 q-py-sm variables-input">
+  <div class="col-12 q-py-sm variables-input "
+  :class="{
+    'flex justify-between items-center tw-w-1/2': variables.length == 0,
+  }"
+  >
+    <div class="q-pb-xs custom-input-label text-bold">Variable
+          <q-btn
+          style="color: #A0A0A0;"
+              no-caps
+              padding="xs"
+              class=""
+              size="sm"
+              flat
+              icon="info_outline"
+            >
+              <q-tooltip>
+              Variables are used to pass data from the alert to the destination.
+            </q-tooltip>
+          </q-btn>
+        </div>
     <template v-if="!variables.length">
-      <q-btn
-        data-test="alert-variables-add-btn"
-        label="Add Variable"
-        size="sm"
-        class="text-bold add-variable"
-        icon="add"
-        style="
-          border-radius: 4px;
-          text-transform: capitalize;
-          background: #f2f2f2 !important;
-          color: #000 !important;
-        "
-        @click="addVariable"
-      />
+      <div class="flex justify-between items-center">
+
+        <q-btn
+          data-test="alert-variables-add-btn"
+          label="Add Variable"
+          size="sm"
+          class="text-bold add-variable no-border q-py-sm"
+          icon="add"
+          color="primary"
+          style="
+            border-radius: 4px;
+            text-transform: capitalize;
+            color: #fff !important;
+            font-size: 12px;
+          "
+          @click="addVariable"
+        />
+      </div>
     </template>
     <template v-else>
       <div
@@ -107,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { defineProps } from "vue";
 import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { outlinedDelete, outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 
 const props = defineProps({

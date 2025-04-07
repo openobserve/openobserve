@@ -1,3 +1,4 @@
+@ -0,0 +1,270 @@
 <!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
@@ -15,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div style="width: calc(100vw - 600px);">
     <template v-if="!fields.length">
       <q-btn
         data-test="alert-conditions-add-btn"
@@ -37,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(field, index) in fields as any"
         :key="field.uuid"
-        class='flex justify-start items-end q-col-gutter-sm q-pb-sm'
+        class='flex justify-start items-start q-col-gutter-sm q-pb-sm'
         :data-test='`alert-conditions-${index + 1}`'
       >
       <span style="width: 70px;" v-if="index === 0" class="q-pb-md  tw-text-gray-500">if</span>
@@ -56,7 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </span>
 
+        <div v-if="field.children" class="q-mt-sm" style="background-color: #2B2B2B; width: calc(100vw - 600px);">
+          <FieldsInputWithMulti :fields="field.children" :streamFields="streamFields" :enableNewValueMode="enableNewValueMode" />
+        </div>
+
         <div
+        v-if="!field.children"
           data-test="alert-conditions-select-column"
           class="q-ml-none o2-input"
         >
@@ -83,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div
+        v-if="!field.children"
           data-test="alert-conditions-operator-select"
           class="q-ml-none o2-input"
         >
@@ -98,11 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 120px"
+            style="min-width: 220px"
             @update:model-value="emits('input:update', 'conditions', field)"
           />
         </div>
         <div
+        v-if="!field.children"
           data-test="alert-conditions-value-input"
           class="q-ml-none flex items-end o2-input"
         >
@@ -119,11 +127,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 150px"
+            style="min-width: 220px"
             @update:model-value="emits('input:update', 'conditions', field)"
           />
         </div>
         <div
+        v-if="!field.children"
           class="q-ml-none alerts-condition-action"
           style="margin-bottom: 12px"
         >
@@ -142,6 +151,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           
         </div>
+
+
+
 
       </div>
      <div class="flex justify-start items-center">
