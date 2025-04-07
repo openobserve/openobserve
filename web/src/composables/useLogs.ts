@@ -890,6 +890,13 @@ const useLogs = () => {
           histogramQuery = histogramQuery.replace(/`/g, '"');
           req.aggs.histogram = histogramQuery;
 
+          //check if query is valid or not , if the query is invalid --> empty query
+
+          if(Array.isArray(parsedSQL) && parsedSQL.length == 0){
+            notificationMsg.value = "SQL query is missing or invalid. Please submit a valid SQL statement.";
+            return false;
+          }
+
           if (!parsedSQL?.columns?.length) {
             notificationMsg.value = "No column found in selected stream.";
             return false;
@@ -1588,7 +1595,7 @@ const useLogs = () => {
       searchObjDebug["buildSearchStartTime"] = performance.now();
       const queryReq: any = buildSearch();
       searchObjDebug["buildSearchEndTime"] = performance.now();
-      if (queryReq == false && searchObj.meta.sqlMode == false) {
+      if (queryReq == false) {
         throw new Error(notificationMsg.value || "Something went wrong.");
       }
       // reset query data and get partition detail for given query.
