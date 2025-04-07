@@ -28,26 +28,25 @@ use o2_enterprise::enterprise::{
 };
 use o2_openfga::{
     authorizer::authz::{
-        add_tuple_for_pipeline, get_index_creation_tuples, get_org_creation_tuples,
-        get_ownership_all_org_tuple, get_ownership_tuple, get_user_role_tuple, update_tuples,
+        add_tuple_for_pipeline, get_org_creation_tuples, get_ownership_all_org_tuple,
+        get_ownership_tuple, get_user_role_tuple, update_tuples,
     },
     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
 };
 
 use crate::{
     common::{
-        infra::config::{ORG_USERS, USERS},
+        infra::config::{ORG_USERS, ORGANIZATIONS, USERS},
         meta::organization::DEFAULT_ORG,
     },
     service::db,
 };
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    use o2_openfga::{authorizer::authz::get_tuple_for_new_index, get_all_init_tuples};
+    use o2_openfga::get_all_init_tuples;
 
     let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
-    let mut need_migrate_index_streams = false;
     let mut need_pipeline_migration = false;
     let mut need_cipher_keys_migration = false;
     let mut need_action_scripts_migration = false;
@@ -135,7 +134,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let meta_version = version_compare::Version::from(&meta.version).unwrap();
         let existing_model_version =
             version_compare::Version::from(&existing_model.version).unwrap();
-        let v0_0_4 = version_compare::Version::from("0.0.4").unwrap();
         let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
         let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
         let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
@@ -145,9 +143,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
         let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
         let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
-        if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
-            need_migrate_index_streams = true;
-        }
         if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
             need_pipeline_migration = true;
         }
@@ -190,22 +185,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
 
             let mut tuples = vec![];
-            let r = infra::schema::STREAM_SCHEMAS.read().await;
+            let r = ORGANIZATIONS.read().await;
             let mut orgs = HashSet::new();
-            for key in r.keys() {
-                if !key.contains('/') {
-                    continue;
-                }
-                let split_key = key.split('/').collect::<Vec<&str>>();
-                let org_name = split_key[0];
-                orgs.insert(org_name);
-                if need_migrate_index_streams
-                    && split_key.len() > 2
-                    && split_key[1] == "index"
-                    && !migrate_native_objects
-                {
-                    get_tuple_for_new_index(org_name, split_key[2], &mut tuples);
-                }
+            for org_name in r.keys() {
+                orgs.insert(org_name.to_owned());
             }
             log::info!("[OFGA:Local] Migrating native objects");
             if migrate_native_objects {
@@ -254,9 +237,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
             } else {
                 log::info!("[OFGA:Local] Migrating index streams");
                 for org_name in orgs.iter() {
-                    if need_migrate_index_streams {
-                        get_index_creation_tuples(org_name, &mut tuples).await;
-                    }
                     if need_cipher_keys_migration {
                         get_ownership_all_org_tuple(org_name, "cipher_keys", &mut tuples);
                     }
