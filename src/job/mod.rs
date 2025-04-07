@@ -131,7 +131,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() || LOCAL_NODE.is_single_node() {
         tokio::task::spawn(async move { db::session::watch().await });
     }
-    if !LOCAL_NODE.is_compactor() && !LOCAL_NODE.is_router() {
+    if LOCAL_NODE.is_alert_manager() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_ingester() {
         tokio::task::spawn(async move { db::enrichment_table::watch().await });
     }
 
