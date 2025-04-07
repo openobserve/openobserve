@@ -22,9 +22,9 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["marketplace"]
-enterprise = ["dep:o2_enterprise", "dep:o2_openfga", "dep:o2_dex"]
-marketplace = ["enterprise"]
+default = []
+enterprise = []
+marketplace = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pprof"]
@@ -115,6 +115,7 @@ mimalloc = { version = "0.1", default-features = false, optional = true }
 o2_dex = { version = "0.1.0", path = "../o2-enterprise/o2_dex", optional = true }
 o2_enterprise = { version = "0.1.0", path = "../o2-enterprise/o2_enterprise", optional = true, default-features = false }
 o2_openfga = { version = "0.1.0", path = "../o2-enterprise/o2_openfga", optional = true }
+o2_ratelimit = { version = "0.1.0", path = "../o2-enterprise/o2_ratelimit", optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
