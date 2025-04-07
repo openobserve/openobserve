@@ -897,7 +897,7 @@ const useLogs = () => {
             return false;
           }
 
-          if (!parsedSQL?.columns?.length) {
+          if (!parsedSQL?.columns?.length && !searchObj.meta.sqlMode) {
             notificationMsg.value = "No column found in selected stream.";
             return false;
           }
@@ -4266,9 +4266,11 @@ const useLogs = () => {
 
       // Update selectedStreamFields once
       searchObj.data.stream.selectedStreamFields = allStreamFields;
-
+      //check if allStreamFields is empty or not 
+      //if empty then we are displaying no events found... message on the UI instead of throwing in an error format
       if (allStreamFields.length === 0) {
-        searchObj.data.errorMsg = t("search.noFieldFound");
+
+        // searchObj.data.errorMsg = t("search.noFieldFound");
         return;
       }
 
