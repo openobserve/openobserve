@@ -67,7 +67,12 @@ export default {
         fields.value.rawQuery = "";
       } else {
         fields.value.functionName = null;
-        fields.value.args = [];
+        fields.value.args = [
+          {
+            type: "field",
+            value: {},
+          },
+        ];
       }
     };
 

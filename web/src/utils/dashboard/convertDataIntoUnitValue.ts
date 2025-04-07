@@ -623,6 +623,143 @@ const validateChartFieldsConfiguration = (
     default:
       break;
   }
+
+  // need to validate all the fields based on the selected aggregation function
+  // get all the fields that are not derived and type is build
+  const aggregationFunctionError = [
+    ...fields?.y,
+    ...fields?.x,
+    ...fields?.breakdown,
+    ...fields?.z,
+    fields?.source,
+    fields?.target,
+    fields?.value,
+    fields?.name,
+    fields?.value_for_maps,
+    fields?.latitude,
+    fields?.longitude,
+  ].filter((it: any) => it && !it.isDerived && it.type == "build");
+
+  if (aggregationFunctionError.length) {
+    //  loop on each fields config
+    // compare with function validation schema
+    // if validation fails, push error
+    aggregationFunctionError.forEach((it: any) => {
+      // get the selected function schema
+      const selectedFunction: any = functionValidation.find(
+        (fn: any) => fn.functionName === it.functionName,
+      );
+
+      // if function is not found, push error
+      if (!selectedFunction) {
+        errors.push(`${it.alias || "Field"}: Invalid aggregation function`);
+        return; // Skip further validation if function is invalid
+      }
+
+      //  check if args are valid based on selected function schema
+      const args = it.args;
+      const argsDefinition = selectedFunction.args;
+
+      // NOTE: Need to consider the case where there can be optional arguments or there can be N number of arguments
+      // WARNING: This needs to be test properly
+      // Proper validation of arguments
+      const allowAddArgAtValue = selectedFunction.allowAddArgAt;
+      const hasVariableArgs = !!allowAddArgAtValue;
+
+      // Parse the allowAddArgAt value to determine variable argument position
+      let variableArgPosition = -1;
+      if (hasVariableArgs) {
+        if (allowAddArgAtValue === "n") {
+          variableArgPosition = 0; // All arguments can be variable
+        } else if (allowAddArgAtValue.startsWith("n-")) {
+          // Format is "n-1", "n-2", etc.
+          const offset = parseInt(allowAddArgAtValue.substring(2));
+          variableArgPosition = argsDefinition.length - offset;
+        }
+      }
+
+      // Special handling for functions with min requirements
+      // Find the argDefinition that has the min property
+      const minArgDef = argsDefinition.find((def: any) => "min" in def);
+      const minPosition = minArgDef ? argsDefinition.indexOf(minArgDef) : -1;
+
+      // If min is specified and position is valid, check the requirement
+      if (minArgDef && minPosition !== -1) {
+        // For variable args, we count all arguments from the variable position
+        const relevantArgsCount =
+          hasVariableArgs && variableArgPosition <= minPosition
+            ? args.length - variableArgPosition + 1 // +1 because we count the variable position itself
+            : args.length;
+
+        if (relevantArgsCount < minArgDef.min) {
+          errors.push(
+            `${it.alias || "Field"}: Requires at least ${minArgDef.min} arguments`,
+          );
+        }
+      }
+
+      // Validate all provided arguments have correct types
+      args.forEach((arg: any, index: number) => {
+        if (!arg) return; // Skip undefined args
+
+        // Determine which arg definition to use for validation
+        let argDefIndex = index;
+
+        // For variable arguments
+        if (hasVariableArgs && index >= variableArgPosition) {
+          // Use the definition at the variable position
+          argDefIndex = variableArgPosition;
+        }
+
+        // Handle out-of-bounds index for non-variable args or unknown formats
+        if (argDefIndex >= argsDefinition.length) {
+          if (!hasVariableArgs) {
+            errors.push(`${it.alias || "Field"}: Too many arguments provided`);
+            return;
+          }
+          // Default to the variable argument definition
+          argDefIndex = variableArgPosition;
+        }
+
+        const allowedTypes = argsDefinition[argDefIndex].type;
+
+        // Check if current argument type is among the allowed types
+        if (arg && !allowedTypes.includes(arg.type)) {
+          errors.push(
+            `${it.alias || "Field"}: Argument ${index + 1} has invalid type (expected: ${allowedTypes.join(" or ")})`,
+          );
+          return;
+        }
+
+        // TODO: Need to handle all other types of arguments
+        // Additional validation for field type arguments
+        if (arg.type === "field") {
+          // Validate field value structure
+          if (
+            !arg.value ||
+            typeof arg.value !== "object" ||
+            !("field" in arg.value)
+          ) {
+            errors.push(
+              `${it.alias || "Field"}: Argument ${index + 1} is a field but haven't selected any field`,
+            );
+          }
+        }
+      });
+
+      // Check for missing required arguments
+      argsDefinition.forEach((argDef: any, index: number) => {
+        // Skip checking variable arg positions except the first instance
+        if (hasVariableArgs && index > variableArgPosition) return;
+
+        if (argDef.required && (index >= args.length || !args[index])) {
+          errors.push(
+            `${it.alias || "Field"}: Missing required argument at position ${index + 1}`,
+          );
+        }
+      });
+    });
+  }
 };
 
 // export const validateSQLPanelFields = (
