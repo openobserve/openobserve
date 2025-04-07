@@ -84,9 +84,9 @@ pub async fn search(
         .query
         .query_fn
         .as_ref()
-        .and_then(|v| match base64::decode_url(v) {
-            Ok(v) => Some(v),
-            Err(_) => Some(v.to_string()),
+        .map(|v| match base64::decode_url(v) {
+            Ok(v) => v,
+            Err(_) => v.to_string(),
         });
 
     // calculate hash for the query
