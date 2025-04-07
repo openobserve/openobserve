@@ -3006,9 +3006,7 @@ mod tests {
                 session_max_lifetime_secs: i64::default(),
                 session_gc_interval_secs: i64::default(),
                 ping_interval_secs: i64::default(),
-                check_cookie_expiry: bool::default(),
                 health_check_interval: i64::default(),
-                is_session_drain_enabled: bool::default(),
             },
             route: config::Route {
                 timeout: u64::default(),
@@ -3092,7 +3090,7 @@ mod tests {
                 usage_publish_interval: i64::default(),
                 mmdb_data_dir: String::default(),
                 mmdb_disable_download: bool::default(),
-                mmdb_update_duration: u64::default(),
+                mmdb_update_duration_days: u64::default(),
                 mmdb_geolite_citydb_url: String::default(),
                 mmdb_geolite_asndb_url: String::default(),
                 mmdb_geolite_citydb_sha256_url: String::default(),
@@ -3136,6 +3134,8 @@ mod tests {
                 swagger_enabled: bool::default(),
                 fake_es_version: String::default(),
                 min_auto_refresh_interval: u32::default(),
+                feature_ingester_none_compression: bool::default(),
+                ingestion_url: String::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3267,6 +3267,7 @@ mod tests {
                 job_run_timeout: i64::default(),
                 job_clean_wait_time: i64::default(),
                 pending_jobs_metric_interval: u64::default(),
+                max_group_files: usize::default(),
             },
             memory_cache: config::MemoryCache {
                 enabled: bool::default(),

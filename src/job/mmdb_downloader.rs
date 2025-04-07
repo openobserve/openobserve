@@ -38,8 +38,10 @@ pub static MMDB_INIT_NOTIFIER: Lazy<Arc<Notify>> = Lazy::new(|| Arc::new(Notify:
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
     std::fs::create_dir_all(&cfg.common.mmdb_data_dir)?;
-    // should run it every 24 hours
-    let mut interval = time::interval(time::Duration::from_secs(cfg.common.mmdb_update_duration));
+    // should run it every x days
+    let mut interval = time::interval(time::Duration::from_secs(
+        cfg.common.mmdb_update_duration_days * 86400,
+    ));
 
     loop {
         interval.tick().await;
