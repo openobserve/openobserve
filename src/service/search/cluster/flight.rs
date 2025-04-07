@@ -140,9 +140,9 @@ pub async fn search(
         .unwrap_or(None);
     let mut nodes = get_online_querier_nodes(trace_id, node_group).await?;
 
-    // local mode, only use local node as querier for the query
+    // local mode, only use local node as querier node
     if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
-        nodes = vec![LOCAL_NODE.clone()];
+        nodes.retain(|n| n.is_ingester() || n.name.eq(&LOCAL_NODE.name));
     }
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
