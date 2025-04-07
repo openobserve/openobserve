@@ -126,7 +126,7 @@ where
                     .get("o2_process_time")
                     .map(|v| v.to_str().unwrap_or("0").parse::<i64>().unwrap_or(0));
                 let wait_time_str = match process_time {
-                    Some(v) if v > 0 => format!(" wait_time: {} ms, ", (v - start_time) / 1000),
+                    Some(v) if v > 0 => format!(" wait_time: {} ms,", (v - start_time) / 1000),
                     _ => "".to_string(),
                 };
                 log::warn!(
