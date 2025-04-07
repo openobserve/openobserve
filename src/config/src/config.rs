@@ -1911,7 +1911,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.limit.file_download_thread_num == 0 {
-        cfg.limit.file_download_thread_num = cfg.limit.query_thread_num;
+        cfg.limit.file_download_thread_num = cpu_num;
     }
 
     // HACK for move_file_thread_num equal to CPU core
