@@ -61,6 +61,7 @@ pub trait QueryConditionExt: Sync + Send + 'static {
         (start_time, end_time): (Option<i64>, i64),
         search_type: Option<SearchEventType>,
         search_event_context: Option<SearchEventContext>,
+        trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error>;
 }
 
@@ -106,12 +107,16 @@ impl QueryConditionExt for QueryCondition {
         (start_time, end_time): (Option<i64>, i64),
         search_type: Option<SearchEventType>,
         search_event_context: Option<SearchEventContext>,
+        trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error> {
         let mut eval_results = TriggerEvalResults {
             end_time,
             ..Default::default()
         };
-        let trace_id = ider::generate_trace_id();
+        let trace_id = match trace_id {
+            Some(id) => id,
+            None => ider::generate_trace_id(),
+        };
         let sql = match self.query_type {
             QueryType::Custom => {
                 let (Some(stream_name), Some(v)) = (stream_name, self.conditions.as_ref()) else {
