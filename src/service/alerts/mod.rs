@@ -61,6 +61,7 @@ pub trait QueryConditionExt: Sync + Send + 'static {
         (start_time, end_time): (Option<i64>, i64),
         search_type: Option<SearchEventType>,
         search_event_context: Option<SearchEventContext>,
+        trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error>;
 }
 
@@ -106,6 +107,7 @@ impl QueryConditionExt for QueryCondition {
         (start_time, end_time): (Option<i64>, i64),
         search_type: Option<SearchEventType>,
         search_event_context: Option<SearchEventContext>,
+        trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error> {
         let mut eval_results = TriggerEvalResults {
             end_time,
@@ -247,7 +249,10 @@ impl QueryConditionExt for QueryCondition {
         } else {
             std::cmp::max(100, trigger_condition.threshold)
         };
-        let trace_id = ider::uuid();
+        let trace_id = match trace_id {
+            Some(id) => id,
+            None => ider::uuid(),
+        };
 
         let req_start = std::time::Instant::now();
         let resp = if self.multi_time_range.is_some()
