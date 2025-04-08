@@ -157,6 +157,7 @@ pub async fn save_enrichment_data(
 
     if stream_schema.has_fields && !append_data {
         delete_enrichment_table(org_id, stream_name, StreamType::EnrichmentTables).await;
+        stream_schema_map.remove(stream_name);
     }
 
     let mut records = vec![];
