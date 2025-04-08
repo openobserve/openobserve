@@ -24,7 +24,7 @@ use config::{
         cluster::RoleGroup,
         search,
         self_reporting::usage::{RequestStats, UsageType},
-        sql::{OrderBy, SqlOperator, TableReferenceExt},
+        sql::{OrderBy, SqlOperator, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
     metrics,
@@ -233,8 +233,8 @@ pub async fn search(
             };
 
             if report_usage {
-                let stream_name = match config::meta::sql::Sql::new(&req_query.sql) {
-                    Ok(v) => v.source.to_string(),
+                let stream_name = match resolve_stream_names(&req_query.sql) {
+                    Ok(v) => v.join(","),
                     Err(e) => {
                         log::error!("ParseSQLError(report_usage: parse sql error: {:?})", e);
                         "".to_string()
@@ -342,16 +342,16 @@ pub async fn search_multi(
         }
     }
     let queries_len = queries.len();
-    let mut stream_name = "".to_string();
+    let mut stream_names = vec![];
     let mut sqls = vec![];
     let mut index = 0;
 
     for mut req in queries {
-        stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
-            Ok(v) => v.source.to_string(),
+        stream_names = match resolve_stream_names(&req.query.sql) {
+            Ok(v) => v,
             Err(e) => {
                 log::error!("ParseSQLError(search_multi: parse sql error: {:?})", e);
-                "".to_string()
+                vec![]
             }
         };
         sqls.push(req.query.sql.clone());
@@ -453,7 +453,7 @@ pub async fn search_multi(
                         },
                         json::Value::Array(multi_res.hits),
                         org_id,
-                        &[stream_name.clone()],
+                        &stream_names,
                     );
                     ret_val
                         .as_array()
@@ -489,7 +489,7 @@ pub async fn search_multi(
                                 },
                                 hit,
                                 org_id,
-                                &[stream_name.clone()],
+                                &stream_names,
                             );
                             (!ret_val.is_null())
                                 .then_some(config::utils::flatten::flatten(ret_val).unwrap())
@@ -534,7 +534,7 @@ pub async fn search_multi(
         report_request_usage_stats(
             req_stats,
             org_id,
-            &stream_name,
+            &stream_names.join(","),
             stream_type,
             UsageType::Functions,
             0, // The request stats already contains function event
@@ -1320,6 +1320,7 @@ mod tests {
             ),
         ];
 
+        #[allow(deprecated)]
         for (tsql, expected) in sqls {
             let meta = sql::Sql::new(tsql).unwrap();
             let filter = generate_filter_from_quick_text(&meta.quick_text);
