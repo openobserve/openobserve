@@ -84,7 +84,7 @@ services:
       - ./data:/data
 ```
 
-For running OpenObserve Enteprise using Docker Compose, see: [docker-compose.yml](/deploy/compose/docker-compose-enterprise.yml)
+For running OpenObserve Enterprise using Docker Compose, see: [docker-compose.yml](/deploy/compose/docker-compose-enterprise.yml)
 
 For other ways to quickly install OpenObserve or use OpenObserve cloud, check [quickstart documentation](https://openobserve.ai/docs/quickstart).
 
