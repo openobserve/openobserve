@@ -16,7 +16,10 @@
 pub mod disk;
 pub mod memory;
 
-use std::{collections::VecDeque, ops::Range};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    ops::Range,
+};
 
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
@@ -33,6 +36,7 @@ pub enum CacheType {
 enum CacheStrategy {
     Lru(LruCache<String, usize>),
     Fifo((VecDeque<(String, usize)>, HashSet<String>)),
+    FileTime(BTreeMap<String, usize>, HashSet<String>),
 }
 
 impl CacheStrategy {
@@ -43,18 +47,26 @@ impl CacheStrategy {
                 VecDeque::with_capacity(INITIAL_CACHE_SIZE),
                 HashSet::with_capacity(INITIAL_CACHE_SIZE),
             )),
+            "filetime" | "file_time" => {
+                CacheStrategy::FileTime(BTreeMap::new(), HashSet::with_capacity(INITIAL_CACHE_SIZE))
+            }
             _ => CacheStrategy::Lru(LruCache::new_unbounded()),
         }
     }
 
-    fn insert(&mut self, key: String, value: usize) {
+    fn insert(&mut self, key: String, size: usize) {
         match self {
             CacheStrategy::Lru(cache) => {
-                cache.insert(key, value);
+                cache.insert(key, size);
             }
             CacheStrategy::Fifo((queue, set)) => {
                 set.insert(key.clone());
-                queue.push_back((key, value));
+                queue.push_back((key, size));
+            }
+            CacheStrategy::FileTime(map, set) => {
+                let time = get_file_time(&key).unwrap_or(config::utils::time::now_micros() as u64);
+                set.insert(key.clone());
+                map.insert(format!("{}/{}", time, key), size);
             }
         }
     }
@@ -66,31 +78,21 @@ impl CacheStrategy {
                 if queue.is_empty() {
                     return None;
                 }
-                let (key, size) = queue.pop_front().unwrap();
-                set.remove(&key);
-                Some((key, size))
+                queue.pop_front().map(|(key, size)| {
+                    set.remove(&key);
+                    (key, size)
+                })
             }
-        }
-    }
-
-    fn contains_key(&self, key: &str) -> bool {
-        match self {
-            CacheStrategy::Lru(cache) => cache.contains_key(key),
-            CacheStrategy::Fifo((_, set)) => set.contains(key),
-        }
-    }
-
-    fn len(&self) -> usize {
-        match self {
-            CacheStrategy::Lru(cache) => cache.len(),
-            CacheStrategy::Fifo((queue, _)) => queue.len(),
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        match self {
-            CacheStrategy::Lru(cache) => cache.is_empty(),
-            CacheStrategy::Fifo((queue, _)) => queue.is_empty(),
+            CacheStrategy::FileTime(map, set) => {
+                if map.is_empty() {
+                    return None;
+                }
+                map.pop_first().map(|(key, size)| {
+                    let (_, key) = key.split_once('/').unwrap();
+                    set.remove(key);
+                    (key.to_string(), size)
+                })
+            }
         }
     }
 
@@ -112,6 +114,43 @@ impl CacheStrategy {
                 }
                 None
             }
+            CacheStrategy::FileTime(map, set) => {
+                if map.is_empty() {
+                    return None;
+                }
+                let keys = map.extract_if(|k, _v| k.ends_with(key)).collect::<Vec<_>>();
+                if keys.is_empty() {
+                    return None;
+                }
+                let (key, size) = &keys[0];
+                let (_, key) = key.split_once('/').unwrap();
+                set.remove(key);
+                Some((key.to_string(), *size))
+            }
+        }
+    }
+
+    fn contains_key(&self, key: &str) -> bool {
+        match self {
+            CacheStrategy::Lru(cache) => cache.contains_key(key),
+            CacheStrategy::Fifo((_, set)) => set.contains(key),
+            CacheStrategy::FileTime(_, set) => set.contains(key),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            CacheStrategy::Lru(cache) => cache.len(),
+            CacheStrategy::Fifo((queue, _)) => queue.len(),
+            CacheStrategy::FileTime(map, _) => map.len(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            CacheStrategy::Lru(cache) => cache.is_empty(),
+            CacheStrategy::Fifo((queue, _)) => queue.is_empty(),
+            CacheStrategy::FileTime(map, _) => map.is_empty(),
         }
     }
 }
@@ -214,15 +253,54 @@ pub async fn get_size_opts(file: &str, remote: bool) -> object_store::Result<usi
     })
 }
 
+/// get the file time from the file name
+///
+/// metrics_cache:
+/// metrics_results/2025/04/08/06/
+/// 17caf18281f2a17c76a803a9cd59a207_1744091424000000_1744091426789749_1744089728661252.pb
+/// log_cache:
+/// results/default/logs/default/16042959487540176184_30_zo_sql_key/
+/// 1744081170000000_1744081170000000_1_0.json
+/// parquet_cache:
+/// files/default/logs/disk/2025/04/08/06/7315292721030106704.parquet
+fn get_file_time(file: &str) -> Option<u64> {
+    let file = file.split('/').next_back()?;
+    let time = file.split('.').next()?;
+    if !time.contains('_') {
+        return time.parse::<u64>().ok();
+    }
+
+    let columns = time.split('_').collect::<Vec<_>>();
+    if columns.is_empty() {
+        return None;
+    }
+    if let Ok(time) = columns[0].parse::<u64>() {
+        return Some(time);
+    }
+    if columns.len() < 2 {
+        return None;
+    }
+    if let Ok(time) = columns[1].parse::<u64>() {
+        return Some(time);
+    }
+    if columns.len() < 3 {
+        return None;
+    }
+    if let Ok(time) = columns[2].parse::<u64>() {
+        return Some(time);
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_lru_cache_miss() {
+    fn test_file_data_lru_cache_miss() {
         let mut cache = CacheStrategy::new("lru");
-        let key1 = "a";
-        let key2 = "b";
+        let key1 = "a/b/1.parquet";
+        let key2 = "b/c/2.parquet";
         cache.insert(key1.to_string(), 1);
         cache.insert(key2.to_string(), 2);
         cache.contains_key(key1);
@@ -232,15 +310,47 @@ mod tests {
     }
 
     #[test]
-    fn test_fifo_cache_miss() {
+    fn test_file_data_fifo_cache_miss() {
         let mut cache = CacheStrategy::new("fifo");
-        let key1 = "a";
-        let key2 = "b";
+        let key1 = "a/b/1.parquet";
+        let key2 = "b/c/2.parquet";
         cache.insert(key1.to_string(), 1);
         cache.insert(key2.to_string(), 2);
         cache.contains_key(key1);
         cache.remove();
         assert!(!cache.contains_key(key1));
         assert!(cache.contains_key(key2));
+    }
+
+    #[test]
+    fn test_file_data_file_time_cache_miss() {
+        let mut cache = CacheStrategy::new("file_time");
+        let key_small = "b/c/2024.parquet";
+        let key_big = "a/b/2025.parquet";
+        let key_other = "a/b/2023.parquet";
+        cache.insert(key_small.to_string(), 1);
+        cache.insert(key_big.to_string(), 2);
+        cache.insert(key_other.to_string(), 3);
+        cache.contains_key(key_small);
+        cache.remove();
+        cache.remove();
+        assert!(!cache.contains_key(key_small));
+        assert!(!cache.contains_key(key_other));
+        assert!(cache.contains_key(key_big));
+    }
+
+    #[test]
+    fn test_file_data_get_file_time() {
+        let file = "metrics_results/2025/04/08/06/17caf18281f2a17c76a803a9cd59a207_1744091424000000_1744091426789749_1744089728661252.pb";
+        let time = get_file_time(file);
+        assert_eq!(time, Some(1744091424000000));
+
+        let file = "results/default/logs/default/16042959487540176184_30_zo_sql_key/1744081170000000_1744081170000000_1_0.json";
+        let time = get_file_time(file);
+        assert_eq!(time, Some(1744081170000000));
+
+        let file = "files/default/logs/disk/2022/10/03/10/7315292721030106704.parquet";
+        let time = get_file_time(file);
+        assert_eq!(time, Some(7315292721030106704));
     }
 }

@@ -1450,7 +1450,7 @@ pub struct Compact {
 pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = true)]
     pub enabled: bool,
-    // Memory data cache strategy, default is lru, other value is fifo
+    // Memory data cache strategy, default is lru, other value is fifo, file_time
     #[env_config(name = "ZO_MEMORY_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
     // Memory data cache bucket num, multiple bucket means multiple locker, default is 0
