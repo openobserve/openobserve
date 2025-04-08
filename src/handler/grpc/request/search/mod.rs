@@ -159,6 +159,32 @@ impl Search for Searcher {
         }
     }
 
+    async fn search_multi(
+        &self,
+        req: Request<SearchRequest>,
+    ) -> Result<Response<SearchResponse>, Status> {
+        let req = req.into_inner();
+        let request = json::from_slice::<search::MultiStreamRequest>(&req.request)
+            .map_err(|e| Status::internal(format!("failed to parse search request: {e}")))?;
+        let stream_type = StreamType::from(req.stream_type.as_str());
+        let ret =
+            SearchService::search_multi(&req.trace_id, &req.org_id, stream_type, None, &request)
+                .await;
+
+        match ret {
+            Ok(ret) => {
+                let response = json::to_vec(&ret).map_err(|e| {
+                    Status::internal(format!("failed to serialize search response: {e}"))
+                })?;
+                Ok(Response::new(SearchResponse {
+                    trace_id: req.trace_id,
+                    response,
+                }))
+            }
+            Err(e) => Err(Status::internal(format!("search failed: {e}"))),
+        }
+    }
+
     async fn search_partition(
         &self,
         req: Request<SearchPartitionRequest>,
