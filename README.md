@@ -61,12 +61,12 @@ For a full list of features, check the [documentation](https://openobserve.ai/do
 ### 🐳 Docker:
 ```bash
 docker run -d \
-      --name openobserve \
-      -v $PWD/data:/data \
-      -p 5080:5080 \
-      -e ZO_ROOT_USER_EMAIL="root@example.com" \
-      -e ZO_ROOT_USER_PASSWORD="Complexpass#123" \
-      public.ecr.aws/zinclabs/openobserve:latest
+  --name openobserve \
+  -v $PWD/data:/data \
+  -p 5080:5080 \
+  -e ZO_ROOT_USER_EMAIL="root@example.com" \
+  -e ZO_ROOT_USER_PASSWORD="Complexpass#123" \
+  public.ecr.aws/zinclabs/openobserve:latest
 ```
 
 ### 🐙 Docker Compose:
@@ -81,10 +81,10 @@ services:
     ports:
       - "5080:5080"
     volumes:
-      - data:/data
-volumes:
-  data:
+      - ./data:/data
 ```
+
+For running OpenObserve Enteprise using Docker Compose, see: [docker-compose.yml](/deploy/compose/docker-compose-enterprise.yml)
 
 For other ways to quickly install OpenObserve or use OpenObserve cloud, check [quickstart documentation](https://openobserve.ai/docs/quickstart).
 

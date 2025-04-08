@@ -1,0 +1,43 @@
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve-enterprise:latest
+    restart: unless-stopped
+    depends_on:
+      - openfga
+    volumes:
+      - ./data/openobserve:/data
+    environment:
+      ZO_ROOT_USER_EMAIL: "root@example.com"
+      ZO_ROOT_USER_PASSWORD: "Complexpass#123"
+      O2_OPENFGA_ENABLED: true
+      O2_OPENFGA_BASE_URL: "http://openfga:8080"
+    ports:
+      - "5080:5080"
+
+  openfga_migrate:
+    image: openfga/openfga:latest
+    container_name: migrate
+    user: root
+    command: migrate --verbose
+    volumes:
+      - ./data/openfga:/data
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=sqlite
+      - OPENFGA_DATASTORE_URI=file:/root/openfga.db
+
+  openfga:
+    depends_on:
+      openfga_migrate:
+        condition: service_completed_successfully
+    image: openfga/openfga:latest
+    container_name: openfga
+    user: root
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=sqlite
+      - OPENFGA_DATASTORE_URI=file:/root/openfga.db
+    volumes:
+      - ./data/openfga:/data
+    command: run
+    expose:
+      - 8080
+      - 8081
