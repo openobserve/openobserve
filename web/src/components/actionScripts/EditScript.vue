@@ -196,11 +196,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <iframe
-                  v-if="
-                    originalActionScriptData.length && isEditingActionScript
-                  "
+                  v-if="originalActionScriptData.length"
                   id="vscode-iframe"
-                  :src="`${store.state.API_ENDPOINT}/web/vscode?id=${actionId}&name=${formData.name}`"
+                  :src="`${store.state.API_ENDPOINT}/web/vscode?id=${actionId || 'untitled'}&name=${formData.name || 'untitled'}`"
                   sandbox="allow-scripts allow-same-origin"
                   class="q-mt-md"
                   style="width: 100%; height: max(700px, calc(100vh - 200px))"
