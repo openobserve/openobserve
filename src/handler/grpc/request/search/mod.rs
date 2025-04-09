@@ -164,8 +164,10 @@ impl Search for Searcher {
         req: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
         let req = req.into_inner();
-        let request = json::from_slice::<search::MultiStreamRequest>(&req.request)
-            .map_err(|e| Status::internal(format!("failed to parse multi-stream search request: {e}")))?;
+        let request =
+            json::from_slice::<search::MultiStreamRequest>(&req.request).map_err(|e| {
+                Status::internal(format!("failed to parse multi-stream search request: {e}"))
+            })?;
         let stream_type = StreamType::from(req.stream_type.as_str());
         let ret =
             SearchService::search_multi(&req.trace_id, &req.org_id, stream_type, None, &request)
