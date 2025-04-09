@@ -273,6 +273,18 @@ impl QuerierConnection {
         // flush in case of any remaining trace_ids
         self.response_router.flush().await;
 
+        // Send close message to the querier for graceful shutdown
+        let mut write_guard = self.write.lock().await;
+        if let Some(write) = write_guard.as_mut() {
+            if let Err(e) = write.close().await {
+                log::warn!(
+                    "[WS::QuerierConnection] failed to send close frame to querier during cleanup: {}",
+                    e
+                );
+            }
+            *write_guard = None;
+        }
+
         // remove the connection from the pool
         QuerierConnectionPool::clean_up(&self.querier_name).await;
     }
