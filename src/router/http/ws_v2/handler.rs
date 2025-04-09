@@ -547,8 +547,10 @@ pub async fn get_querier_connection(
             Ok(conn) => return Ok(conn),
             Err(e) => {
                 log::error!(
-                    "[WS::Router::Handler] error getting or creating querier connection: {e} try number: {}",
-                    try_num
+                    "[WS::Router::Handler] error getting or creating querier connection: {e} try number: {}, router_node: {}, querier_name: {}",
+                    try_num,
+                    get_config().common.instance_name,
+                    querier_name
                 );
                 session_manager
                     .remove_querier_connection(&querier_name)
