@@ -35,7 +35,10 @@ use super::{
 };
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::extract_auth_expiry_and_user_id;
-use crate::service::websocket_events::{WsClientEvents, WsServerEvents};
+use crate::{
+    common::utils::websocket::get_ping_interval_secs_with_jitter,
+    service::websocket_events::{WsClientEvents, WsServerEvents},
+};
 
 pub type ClientId = String;
 pub type QuerierName = String;
@@ -103,7 +106,7 @@ impl WsHandler {
         // Spawn message handling tasks between client and router
         actix_web::rt::spawn(async move {
             let mut ping_interval = tokio::time::interval(tokio::time::Duration::from_secs(
-                cfg.websocket.ping_interval_secs as _,
+                get_ping_interval_secs_with_jitter() as _,
             ));
             ping_interval.tick().await; // first tick is immediate
 
