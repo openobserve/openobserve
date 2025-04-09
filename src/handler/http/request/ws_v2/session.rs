@@ -130,6 +130,12 @@ impl WsSession {
 }
 
 pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String, path: String) {
+    log::info!(
+        "[WS_HANDLER]: Starting WebSocket session for req_id: {}, path: {}",
+        req_id,
+        path
+    );
+
     let cfg = get_config();
     let mut ping_interval =
         tokio::time::interval(Duration::from_secs(cfg.websocket.ping_interval_secs as u64));
@@ -142,16 +148,24 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                 if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
                     session.update_activity();
                     if !session.is_client_cookie_valid() {
-                        log::error!("[WS_HANDLER]: Session cookie expired");
+                        log::error!("[WS_HANDLER]: Session cookie expired for req_id: {}", req_id);
                         break;
                     }
                 }
 
                 match msg {
                     Ok(actix_ws::Message::Ping(bytes)) => {
+                        log::debug!(
+                            "[WS_HANDLER]: Received ping from client for req_id: {}",
+                            req_id
+                        );
                         if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
                             if let Err(e) = session.pong(&bytes).await {
-                                log::error!("[WS_HANDLER]: Failed to send pong: {}", e);
+                                log::error!(
+                                    "[WS_HANDLER]: Failed to send pong to client for req_id: {}, error: {}",
+                                    req_id,
+                                    e
+                                );
                                 break;
                             }
                         } else {
@@ -160,7 +174,10 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                         }
                     }
                     Ok(actix_ws::Message::Pong(_)) => {
-                        log::debug!("[WS_HANDLER] Received pong from {}", req_id);
+                        log::debug!(
+                            "[WS_HANDLER]: Received pong from client for req_id: {}",
+                            req_id
+                        );
                     }
                     Ok(actix_ws::Message::Text(msg)) => {
                         log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received message: {}",
@@ -188,16 +205,34 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                         close_reason = reason;
                         break;
                     }
+                    Err(e) => {
+                        log::error!("[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}", req_id, get_config().common.instance_name, e);
+                        break;
+                    }
                     _ => ()
                 }
             }
             // Heartbeat to keep the connection alive
             _ = ping_interval.tick() => {
                 if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                    log::debug!(
+                        "[WS_HANDLER]: Sending heartbeat ping to client for req_id: {}",
+                        req_id
+                    );
                     if let Err(e) = session.ping(&[]).await {
-                        log::error!("[WS_HANDLER] Failed to send ping: {}", e);
+                        log::error!(
+                            "[WS_HANDLER]: Failed to send ping to client for req_id: {}, error: {}. Connection will be closed.",
+                            req_id,
+                            e
+                        );
                         break;
                     }
+                } else {
+                    log::warn!(
+                        "[WS_HANDLER]: Session not found for req_id: {} during heartbeat. Connection will be closed.",
+                        req_id
+                    );
+                    break;
                 }
             }
         }
@@ -406,6 +441,12 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
 }
 
 async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
+    log::info!(
+        "[WS_HANDLER]: Beginning cleanup for req_id: {}, close_reason: {:?}",
+        req_id,
+        close_reason
+    );
+
     if let Some(mut session) = sessions_cache_utils::get_mut_session(req_id) {
         if let Some(reason) = close_reason.as_ref() {
             log::info!(
@@ -428,7 +469,7 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
     // Remove the session from the cache
     sessions_cache_utils::remove_session(req_id);
     log::info!(
-        "[WS_HANDLER]: req_id: {} Session removed from cache. Remaining sessions: {}",
+        "[WS_HANDLER]: req_id: {} Session cleanup completed. Remaining sessions: {}",
         req_id,
         sessions_cache_utils::len_sessions()
     );

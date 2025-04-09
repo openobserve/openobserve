@@ -44,7 +44,9 @@ impl QuerierConnectionPool {
             return if conn.is_connected().await {
                 Ok(conn.clone())
             } else {
-                log::error!("[WS::ConnectionPool] connection to querier {querier_name} is disconnected.");
+                log::error!(
+                    "[WS::ConnectionPool] connection to querier {querier_name} is disconnected."
+                );
                 Err(WsError::ConnectionDisconnected)
             };
         }
