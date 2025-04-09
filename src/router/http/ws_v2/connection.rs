@@ -35,6 +35,7 @@ use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, protocol::Message as WsMessage},
 };
 
+use super::pool::QuerierConnectionPool;
 use crate::{
     common::{infra::cluster, utils::websocket::get_ping_interval_secs_with_jitter},
     router::http::ws_v2::{
@@ -224,8 +225,7 @@ impl QuerierConnection {
         }
 
         // reaches here when connection is closed/error from the querier side
-        // flush in case of any remaining trace_ids
-        self.response_router.flush().await;
+        self.clean_up().await;
     }
 
     async fn health_check(&self) {
@@ -248,8 +248,7 @@ impl QuerierConnection {
             }
         }
 
-        // flush in case of any remaining trace_ids
-        self.response_router.flush().await;
+        self.clean_up().await;
     }
 
     pub async fn is_active_trace_id(&self, trace_id: &TraceId) -> bool {
@@ -260,7 +259,7 @@ impl QuerierConnection {
             .contains_key(trace_id)
     }
 
-    pub async fn send_ping(&self) -> WsResult<()> {
+    pub async fn _send_ping(&self) -> WsResult<()> {
         let mut write_guard = self.write.lock().await;
         if let Some(write) = write_guard.as_mut() {
             if let Err(e) = write.send(WsMessage::Ping(vec![])).await {
@@ -268,6 +267,14 @@ impl QuerierConnection {
             }
         }
         Ok(())
+    }
+
+    async fn clean_up(&self) {
+        // flush in case of any remaining trace_ids
+        self.response_router.flush().await;
+
+        // remove the connection from the pool
+        QuerierConnectionPool::clean_up(&self.querier_name).await;
     }
 }
 

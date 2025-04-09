@@ -15,14 +15,14 @@
 
 use std::sync::Arc;
 
-use config::{RwAHashMap, get_config};
+use config::RwAHashMap;
 
 use super::{
     connection::{Connection, QuerierConnection},
     error::*,
+    get_ws_handler,
     handler::QuerierName,
 };
-use crate::common::utils::websocket::get_ping_interval_secs_with_jitter;
 
 #[derive(Debug)]
 pub struct QuerierConnectionPool {
@@ -60,36 +60,6 @@ impl QuerierConnectionPool {
         }
     }
 
-    pub async fn maintain_connections(&self) {
-        let cfg = get_config();
-        loop {
-            let mut to_remove = Vec::new();
-
-            let read_guard = self.connections.read().await;
-            for (querier_name, conn) in read_guard.iter() {
-                if let Err(e) = conn.send_ping().await {
-                    log::error!(
-                        "[WS::ConnectionPool] failed to send ping to querier {} from: {}: {}",
-                        querier_name,
-                        cfg.common.instance_name,
-                        e
-                    );
-                    to_remove.push(querier_name.clone());
-                }
-            }
-            drop(read_guard);
-
-            for querier in to_remove {
-                self.remove_querier_connection(&querier).await;
-            }
-
-            tokio::time::sleep(tokio::time::Duration::from_secs(
-                get_ping_interval_secs_with_jitter() as _,
-            ))
-            .await;
-        }
-    }
-
     pub async fn _shutdown(&self) {
         let mut writer_guard = self.connections.write().await;
         for (querier_name, conn) in writer_guard.drain() {
@@ -106,5 +76,13 @@ impl QuerierConnectionPool {
     ) -> Option<Arc<QuerierConnection>> {
         let read_guard = self.connections.read().await;
         read_guard.get(querier_name).cloned()
+    }
+
+    pub async fn clean_up(querier_name: &QuerierName) {
+        let ws_handler = get_ws_handler().await;
+        ws_handler
+            .connection_pool
+            .remove_querier_connection(querier_name)
+            .await;
     }
 }
