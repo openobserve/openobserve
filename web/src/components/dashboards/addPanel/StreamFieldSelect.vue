@@ -1,6 +1,6 @@
 <template>
-  <div class="q-pa-md">
-    <div class="q-gutter-md">
+  <div>
+    <div>
       <q-select
         filled
         v-model="internalModel"
@@ -9,6 +9,7 @@
         option-value="name"
         :display-value="internalModel?.field ?? 'Select a Field'"
         map-options
+        dense
       >
         <template v-slot:option="scope">
           <q-expansion-item
