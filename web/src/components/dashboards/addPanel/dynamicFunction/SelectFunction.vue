@@ -93,6 +93,7 @@
             placeholder="Enter string"
             :required="isRequired(fields.functionName, argIndex)"
             class="tw-w-52"
+            dense
           />
 
           <q-input
@@ -102,6 +103,7 @@
             placeholder="Enter number"
             :required="isRequired(fields.functionName, argIndex)"
             class="tw-w-52"
+            dense
           />
 
           <SelectFunction

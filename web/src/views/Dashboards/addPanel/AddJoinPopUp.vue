@@ -15,47 +15,41 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div class="o2-input" data-test="dashboard-join-pop-up">
+  <div data-test="dashboard-join-pop-up" style="width: 500px">
     <div>
       <div
         class="tw-flex tw-flex-row tw-w-full tw-gap-10 items-center q-table__title q-mr-md"
       >
         <q-select
-          behavior="menu"
-          borderless
           dense
-          outlined
           filled
           v-model="mainStream"
           :options="[]"
           :disable="true"
           label="Joining Stream"
-          class="tw-w-52"
-          stack-label
+          class="q-py-md tw-w-1/3"
           data-test="dashboard-config-panel-join-from"
         />
 
         <q-select
-          outlined
           filled
+          dense
           v-model="modelValue.joinType"
           :options="joinOptions"
           label="With Join Type"
           class="q-py-md tw-w-1/3"
-          stack-label
           data-test="dashboard-config-panel-join-type"
         />
 
         <q-select
-          outlined
           filled
+          dense
           v-model="modelValue.stream"
           :options="streamOptions"
           emit-value
           map-options
           label="On Stream"
           class="q-py-md tw-w-1/3"
-          stack-label
           data-test="dashboard-config-panel-join-to"
         />
       </div>
@@ -317,29 +311,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.selected {
-  background-color: var(--q-primary) !important;
-  font-weight: bold;
-  color: white;
-}
-.dropdownDiv {
-  display: flex;
-  align-items: center;
-  margin: 10px 0px;
-  width: 100%;
-}
-
-.dropdownLabel {
-  width: 150px;
-}
-
-.dropdown {
-  min-width: 100%;
-}
-
-:deep(.no-case .q-field__native > :first-child) {
-  text-transform: none !important;
-}
-</style>
