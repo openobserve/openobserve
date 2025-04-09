@@ -88,7 +88,7 @@ pub async fn handle_values_request(
         let search_query = search_req.query.clone().into();
         
         let sql = Sql::new(&search_query, org_id, stream_type, search_req.search_type).await?;
-        let order_by = dbg!(sql.order_by).first().map(|v| v.1).unwrap_or_default();
+        let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
         
         if search_req.query.from == 0 {
             let c_resp =
