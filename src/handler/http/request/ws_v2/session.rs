@@ -209,7 +209,10 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                         log::error!("[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}", req_id, get_config().common.instance_name, e);
                         break;
                     }
-                    _ => ()
+                    _ => {
+                        log::error!("[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}", req_id, get_config().common.instance_name, "Unknown error");
+                        break;
+                    }
                 }
             }
             // Heartbeat to keep the connection alive
