@@ -41,12 +41,21 @@ pub(super) static ERROR_QUEUE: Lazy<Arc<ReportingQueue>> =
 
 fn initialize_usage_queue() -> ReportingQueue {
     let cfg = get_config();
-    let timeout = time::Duration::from_secs(
-        cfg.common
-            .usage_publish_interval
-            .try_into()
-            .expect("Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer"),
-    );
+    let timeout =
+        {
+            let timeout =
+                time::Duration::from_secs(cfg.common.usage_publish_interval.try_into().expect(
+                    "Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer",
+                ));
+
+            // marketplace image must report usage within an hour
+            // setting it to be 10 mins
+            match cfg!(feature = "marketplace") {
+                true => std::cmp::min(timeout, time::Duration::from_secs(30)),
+                false => timeout,
+            }
+        };
+
     let batch_size = cfg.common.usage_batch_size;
 
     let (msg_sender, msg_receiver) = mpsc::channel::<ReportingMessage>(

@@ -27,6 +27,11 @@ use config::{
 use crate::service::search as SearchService;
 
 pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Vec<json::Value>> {
+    // TODO(taiming): remove_me
+    log::warn!(
+        "[get_usage] grpc_token: {}",
+        config::meta::cluster::get_internal_grpc_token()
+    );
     let req = SearchRequest {
         query: Query {
             sql,

@@ -70,7 +70,7 @@ pub async fn run() {
         return;
     }
 
-    log::debug!("[SELF-REPORTING] successfully initialized reporting queues");
+    log::info!("[SELF-REPORTING] successfully initialized reporting queues");
 }
 
 pub async fn report_request_usage_stats(
@@ -92,7 +92,7 @@ pub async fn report_request_usage_stats(
             .inc_by((stats.size * SIZE_IN_MB) as u64);
     }
 
-    if !get_config().common.usage_enabled {
+    if !should_report_usage() {
         return;
     }
 
@@ -351,4 +351,15 @@ pub fn http_report_metrics(
             search_group,
         ])
         .inc();
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn get_feature() {
+        println!("res: {}", should_report_usage());
+    }
 }
