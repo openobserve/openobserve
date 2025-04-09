@@ -1,1 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" id="Nats-Icon--Streamline-Svg-Logos" height="24" width="24"><desc>Nats Icon Streamline Icon: https://streamlinehq.com</desc><path fill="#34a574" d="M12 0.25h11.349775v9.20115H12V0.25Z" stroke-width="0.25"></path><path fill="#27aae1" d="M0.6501475 0.25H11.999925v9.20115H0.6501475V0.25Z" stroke-width="0.25"></path><path fill="#8dc63f" d="M23.34965 9.4596V18.66075H15.88425v5.089275L10.33155 18.6776l1.668325 -0.067425V9.4596h11.349775Z" stroke-width="0.25"></path><path fill="#375c93" d="M11.999925 9.4596v10.70045l-1.66835 -1.48245H0.6501475v-9.218H11.999925Z" stroke-width="0.25"></path><path fill="#ffffff" d="M16.701725 12.14745V4.5304h2.71315v9.84995H15.303025L7.00345 6.62845v7.760325H4.28185V4.5304h4.255125l8.16475 7.61705Z" stroke-width="0.25"></path></svg>
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 512 512" width="800px" height="800px">
+  <desc>Nats Icon Streamline Icon: https://streamlinehq.com</desc>
+  <path fill="#34a574" d="M256 5.333h241.795v221.428H256V5.333Z" stroke-width="5.333"></path>
+  <path fill="#27aae1" d="M13.869 5.333H256v221.428H13.869V5.333Z" stroke-width="5.333"></path>
+  <path fill="#8dc63f" d="M498.795 226.01v187.415H338.814v54.279L219.46 226.136l36.795-1.487v-219.316h241.795Z" stroke-width="5.333"></path>
+  <path fill="#375c93" d="M256 226.01v219.316l-36.795-32.045H13.869v-199.316H256Z" stroke-width="5.333"></path>
+  <path fill="#ffffff" d="M356.698 289.768V108.76h58.667v213.332H337.778L154.063 143.894v168.89H94.708V108.76h94.558l181.432 181.008Z" stroke-width="5.333"></path>
+</svg>
