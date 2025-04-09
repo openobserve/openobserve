@@ -457,8 +457,8 @@ fn get_default_querier_request(http_url: &str) -> WsResult<tungstenite::http::Re
         }
     }
 
-    // TODO: v2 ws endpoint should be agnostic from `org` and `12345678`
-    let parsed_url = parsed_url.to_string() + "api/default/ws/v2/12345678";
+    let instance_name = get_config().common.instance_name.clone();
+    let parsed_url = parsed_url.to_string() + "api/default/ws/v2/" + &instance_name;
 
     let mut ws_req = parsed_url
         .into_client_request()
