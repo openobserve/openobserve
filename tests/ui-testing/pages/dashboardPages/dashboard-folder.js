@@ -43,7 +43,6 @@ export default class DashboardFolder {
     // Ensure visible
     await folderCard.waitFor({ state: 'visible', timeout: 10000 });
     await folderCard.click()
-  // await page.waitForTimeout(1000);
     await folderCard.hover(); 
 
     // Click the more (3 dots) icon
@@ -71,9 +70,8 @@ async editFolderName(oldName, newName) {
   // Make sure it's visible
   await folderCard.waitFor({ state: 'visible', timeout: 10000 });
   await folderCard.scrollIntoViewIfNeeded();
-  await folderCard.click({ timeout: 1000 });
+  await folderCard.click();
   await folderCard.click()
-  // await page.waitForTimeout(1000);
   await folderCard.hover();
 
   // Click the more (3-dots) icon
@@ -84,7 +82,6 @@ async editFolderName(oldName, newName) {
   // Click edit folder
   await page.locator('[data-test="dashboard-edit-folder-icon"]').click();  
   await page.locator('[data-test="dashboard-folder-add-name"]').click();
-  // await page.waitForTimeout(5000);
 
    // Clear existing name  
  const nameInput = await page.locator('[data-test="dashboard-folder-add-name"]');
