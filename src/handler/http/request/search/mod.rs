@@ -650,17 +650,17 @@ pub async fn values(
     .await
 }
 
-#[allow(dead_code)]
-async fn build_values_request_per_field(
+pub type FieldName = String;
+
+pub async fn build_search_request_per_field(
+    req: &config::meta::search::ValuesRequest,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    query: HashMap<String, String>,
-    _use_cache: bool,
-) -> Result<Vec<(config::meta::search::Request, StreamType, i64)>, Error> {
-    let query_fn = query
-        .get("query_fn")
-        .and_then(|v| base64::decode_url(v).ok())
+) -> Result<Vec<(config::meta::search::Request, StreamType, FieldName)>, Error> {
+    let query_fn = req.vrl_fn
+        .as_ref()
+        .and_then(|v| base64::decode_url(v.as_ref()).ok())
         .map(|vrl| {
             if !vrl.trim().ends_with('.') {
                 format!("{} \n .", vrl)
@@ -669,45 +669,25 @@ async fn build_values_request_per_field(
             }
         });
 
-    let regions = query.get("regions").map_or(vec![], |regions| {
-        regions
-            .split(',')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()
-    });
-    let clusters = query.get("clusters").map_or(vec![], |clusters| {
-        clusters
-            .split(',')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()
-    });
+    let regions = req.regions.clone();
+    let clusters = req.clusters.clone();
 
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap_or(Schema::empty());
-    let fields = query.get("fields").map_or(vec![], |v| {
-        v.split(',')
-            .map(|s| s.to_string())
-            .filter(|field| schema.field_with_name(field).is_ok())
-            .collect::<Vec<_>>()
-    });
+    let fields = req.fields
+        .iter()
+        .filter(|field| schema.field_with_name(field).is_ok())
+        .cloned()
+        .collect::<Vec<_>>();
 
-    let no_count = match query.get("no_count") {
-        None => false,
-        Some(v) => {
-            let v = v.to_lowercase();
-            v == "true" || v == "1"
-        }
-    };
+
+    let no_count = req.no_count;
 
     let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
         BASE_TIME.timestamp_micros()
     } else {
-        query
-            .get("start_time")
-            .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+        req.start_time.unwrap_or(0)
     };
 
     if start_time == 0 {
@@ -717,9 +697,7 @@ async fn build_values_request_per_field(
     let end_time = if stream_type.eq(&StreamType::EnrichmentTables) {
         now_micros()
     } else {
-        query
-            .get("end_time")
-            .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+        req.end_time.unwrap_or(0)
     };
 
     if end_time == 0 {
@@ -733,27 +711,22 @@ async fn build_values_request_per_field(
     };
 
     let mut uses_fn = false;
-    let (sql_where, can_use_distinct_stream) = match query.get("filter") {
+    let (sql_where, can_use_distinct_stream) = match req.filter.as_ref() {
         None => {
-            if let Some(v) = query.get("sql") {
-                if let Ok(sql) = base64::decode_url(v) {
+            if !req.sql.is_empty() {
+                if let Ok(sql) = base64::decode_url(&req.sql) {
                     uses_fn = functions::get_all_transform_keys(org_id)
                         .await
                         .iter()
                         .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
-                    let sql_where_from_query = SearchService::sql::pickup_where(&sql, None)
-                        .map_err(Error::other)
-                        .and_then(|v| {
-                            v.map(|v| {
-                                if v.is_empty() {
-                                    "".to_string()
-                                } else {
-                                    format!("WHERE {}", v)
-                                }
-                            })
-                            .ok_or(Error::other("sql is empty"))
-                        })?;
 
+                            // pick up where clause from sql
+                    let sql_where_from_query = match SearchService::sql::pickup_where(&sql, None) {
+                        Ok(v) => v.unwrap_or_default(),
+                        Err(e) => {
+                            return Err(Error::other(e));
+                        }
+                    };
                     let can_use_distinct_stream = can_use_distinct_stream(
                         org_id,
                         stream_name,
@@ -800,18 +773,7 @@ async fn build_values_request_per_field(
         }
     };
 
-    let size = query
-        .get("size")
-        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
-
-    let timeout = query
-        .get("timeout")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
-
-    // Get config from function instead of using cfg directly
-    let config = get_config();
-    let use_cache = config.common.result_cache_enabled
-        && get_use_cache_from_request(&web::Query(query.clone()));
+    let timeout = req.timeout.unwrap_or(0);
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -830,7 +792,7 @@ async fn build_values_request_per_field(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: Some(use_cache),
+        use_cache: Some(req.use_cache),
         local_mode: None,
     };
 
@@ -866,7 +828,7 @@ async fn build_values_request_per_field(
 
         let mut req = req.clone();
         req.query.sql = sql;
-        requests.push((req, actual_stream_type, size));
+        requests.push((req, actual_stream_type, field));
     }
 
     Ok(requests)
@@ -896,7 +858,7 @@ async fn values_v1(
     };
     let query_fn = query
         .get("query_fn")
-        .and_then(|v| base64::decode_url(v).ok())
+        .and_then(|v| base64::decode_url(v.as_ref()).ok())
         .map(|vrl_function| {
             if !vrl_function.trim().ends_with('.') {
                 format!("{} \n .", vrl_function)

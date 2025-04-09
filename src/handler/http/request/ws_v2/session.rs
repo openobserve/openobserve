@@ -19,7 +19,7 @@ use actix_http::ws::{CloseCode, CloseReason};
 use actix_ws::{MessageStream, Session};
 use config::{
     get_config,
-    meta::websocket::{SearchEventReq, SearchResultType},
+    meta::websocket::{SearchEventReq, SearchResultType, ValuesEventReq},
 };
 use futures::StreamExt;
 use infra::errors::{self, Error};
@@ -44,7 +44,7 @@ use crate::{
     },
     // router::http::ws_v2::types::StreamMessage,
     service::websocket_events::{
-        WsClientEvents, WsServerEvents, handle_search_request, search_registry_utils::SearchState,
+        WsClientEvents, WsServerEvents, handle_search_request, handle_values_request, search_registry_utils::SearchState,
         sessions_cache_utils,
     },
 };
@@ -321,6 +321,43 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     handle_search_event(
                         search_req,
                         &search_req.org_id,
+                        user_id,
+                        req_id,
+                        path.clone(),
+                    )
+                    .await;
+                }
+                WsClientEvents::Values(ref values_req) => {
+                    #[allow(unused_mut)]
+                    let mut user_id = user_id;
+                    // verify user_id for handling stream permissions
+                    #[cfg(feature = "enterprise")]
+                    {
+                        user_id = if get_config().common.local_mode {
+                            // single node mode, use user_id from the http request header
+                            user_id
+                        } else {
+                            // cluster mode, use user_id from the ws event added by the router
+                            if let Some(user_id) = &values_req.user_id {
+                                user_id
+                            } else {
+                                log::error!("[WS_HANDLER]: User id not found in values request");
+                                let err_res = WsServerEvents::error_response(
+                                    errors::Error::Message(
+                                        "User id not found in values request".to_string(),
+                                    ),
+                                    Some(req_id.to_string()),
+                                    Some(values_req.trace_id.clone()),
+                                    Default::default(),
+                                );
+                                let _ = send_message(req_id, err_res.to_json()).await;
+                                return;
+                            }
+                        };
+                    }
+                    handle_values_event(
+                        values_req,
+                        &values_req.org_id,
                         user_id,
                         req_id,
                         path.clone(),
@@ -713,4 +750,119 @@ async fn cleanup_search_resources(trace_id: &str) {
     w.remove(trace_id);
     drop(w);
     log::debug!("[WS_HANDLER]: trace_id: {}, Resources cleaned up", trace_id);
+}
+
+// Main values handler
+async fn handle_values_event(
+    values_req: &ValuesEventReq,
+    org_id: &str,
+    user_id: &str,
+    req_id: &str,
+    #[allow(unused_variables)] path: String,
+) {
+    let (cancel_tx, mut cancel_rx) = mpsc::channel(1);
+
+    let org_id = org_id.to_string();
+    let user_id = user_id.to_string();
+    let req_id = req_id.to_string();
+    let trace_id = values_req.trace_id.clone();
+    let trace_id_for_task = trace_id.clone();
+    let values_req = values_req.clone();
+
+    #[cfg(feature = "enterprise")]
+    let is_audit_enabled = get_o2_config().common.audit_enabled;
+
+    #[cfg(feature = "enterprise")]
+    let client_msg = WsClientEvents::Values(values_req.clone());
+
+    // Register running values search BEFORE spawning the values task
+    WS_SEARCH_REGISTRY.insert(
+        trace_id.clone(),
+        SearchState::Running {
+            cancel_tx,
+            req_id: req_id.to_string(),
+        },
+    );
+
+    // Create a vector to accumulate results
+    let mut accumulated_results: Vec<SearchResultType> = Vec::new();
+
+    // Spawn the values task
+    tokio::spawn(async move {
+        // Handle the values request
+        // If values search is cancelled, the task will exit
+        // Otherwise, the task will complete and the results will be sent to the client
+        // The task will also update the values state to completed
+        // The task will also cleanup the values search resources
+        tokio::select! {
+            values_result = handle_values_request(
+                &org_id,
+                &user_id,
+                &req_id,
+                values_req.clone(),
+                &mut accumulated_results,
+            ) => {
+                match values_result {
+                    Ok(_) => {
+                        if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
+                            *state = SearchState::Completed {
+                                req_id: req_id.to_string(),
+                            };
+                        }
+
+                        // Add audit before closing
+                        #[cfg(feature = "enterprise")]
+                        if is_audit_enabled {
+                            audit(AuditMessage {
+                                user_email: user_id,
+                                org_id,
+                                _timestamp: chrono::Utc::now().timestamp(),
+                                protocol: Protocol::Ws(WsMeta {
+                                    path: path.clone(),
+                                    message_type: client_msg.get_type(),
+                                    content: client_msg.to_json(),
+                                    close_reason: "".to_string(),
+                                }),
+                            })
+                            .await;
+                        }
+
+                        cleanup_search_resources(&trace_id_for_task).await;
+                    }
+                    Err(e) => {
+                        // Convert anyhow::Error to our Error type
+                        let error = Error::Message(e.to_string());
+                        let _ = handle_search_error(error, &req_id, &trace_id_for_task).await;
+                        
+                        // Add audit before closing
+                        #[cfg(feature = "enterprise")]
+                        if is_audit_enabled {
+                          audit(AuditMessage {
+                                  user_email: user_id,
+                                  org_id,
+                                  _timestamp: chrono::Utc::now().timestamp(),
+                                  protocol: Protocol::Ws(WsMeta {
+                                      path: path.clone(),
+                                      message_type: client_msg.get_type(),
+                                      content: client_msg.to_json(),
+                                      close_reason: "".to_string(),
+                                  }),
+                              })
+                              .await;
+                        }
+
+                        // Even if the values search is cancelled, we need to cleanup the resources
+                        cleanup_search_resources(&trace_id_for_task).await;
+                    }
+                }
+            }
+            _ = cancel_rx.recv() => {
+                // if values search is cancelled, update the state
+                // the cancel handler will close the session
+
+                // Just cleanup resources when cancelled
+                cleanup_search_resources(&trace_id_for_task).await;
+            }
+        }
+    });
 }
