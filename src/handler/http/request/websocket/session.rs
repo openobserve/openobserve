@@ -37,7 +37,9 @@ use crate::service::{
     websocket_events::{handle_cancel, search_registry_utils},
 };
 use crate::{
-    common::infra::config::WS_SEARCH_REGISTRY,
+    common::{
+        infra::config::WS_SEARCH_REGISTRY, utils::websocket::get_ping_interval_secs_with_jitter,
+    },
     service::websocket_events::{
         WsClientEvents, WsServerEvents, handle_search_request, search_registry_utils::SearchState,
         sessions_cache_utils,
@@ -51,9 +53,9 @@ pub async fn run(
     org_id: String,
     path: String,
 ) {
-    let cfg = get_config();
-    let mut ping_interval =
-        tokio::time::interval(Duration::from_secs(cfg.websocket.ping_interval_secs as u64));
+    let mut ping_interval = tokio::time::interval(Duration::from_secs(
+        get_ping_interval_secs_with_jitter() as _,
+    ));
     let mut close_reason: Option<CloseReason> = None;
 
     loop {

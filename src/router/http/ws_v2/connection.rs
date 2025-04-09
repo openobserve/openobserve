@@ -36,7 +36,7 @@ use tokio_tungstenite::{
 };
 
 use crate::{
-    common::infra::cluster,
+    common::{infra::cluster, utils::websocket::get_ping_interval_secs_with_jitter},
     router::http::ws_v2::{
         error::*,
         handler::{QuerierName, TraceId},
@@ -229,9 +229,8 @@ impl QuerierConnection {
     }
 
     async fn health_check(&self) {
-        let cfg = get_config();
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            cfg.websocket.health_check_interval as _,
+            get_ping_interval_secs_with_jitter() as _,
         ));
 
         loop {
@@ -259,6 +258,16 @@ impl QuerierConnection {
             .read()
             .await
             .contains_key(trace_id)
+    }
+
+    pub async fn send_ping(&self) -> WsResult<()> {
+        let mut write_guard = self.write.lock().await;
+        if let Some(write) = write_guard.as_mut() {
+            if let Err(e) = write.send(WsMessage::Ping(vec![])).await {
+                return Err(WsError::ConnectionError(e.to_string()));
+            }
+        }
+        Ok(())
     }
 }
 
