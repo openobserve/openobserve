@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use std::sync::Arc;
 
 use actix_http::StatusCode;
 use async_trait::async_trait;
@@ -54,7 +51,6 @@ pub trait Connection: Send + Sync {
     async fn connect(node_name: &str, http_url: &str) -> WsResult<Arc<Self>>;
     async fn disconnect(&self);
     async fn send_message(&self, message: WsClientEvents) -> WsResult<()>;
-    async fn is_connected(&self) -> bool;
 }
 
 #[derive(Debug)]
@@ -63,7 +59,6 @@ pub struct QuerierConnection {
     write: Arc<Mutex<Option<SplitSink<WsStreamType, WsMessage>>>>,
     shutdown_tx: Sender<()>,
     response_router: Arc<ResponseRouter>,
-    is_connected: Arc<AtomicBool>,
 }
 
 impl Drop for QuerierConnection {
@@ -229,8 +224,6 @@ impl QuerierConnection {
         }
 
         // reaches here when connection is closed/error from the querier side
-        // mark the connection disconnected and exist
-        self.is_connected.store(false, Ordering::SeqCst);
         // flush in case of any remaining trace_ids
         self.response_router.flush().await;
     }
@@ -256,8 +249,6 @@ impl QuerierConnection {
             }
         }
 
-        // mark the connection disconnected and exist
-        self.is_connected.store(false, Ordering::SeqCst);
         // flush in case of any remaining trace_ids
         self.response_router.flush().await;
     }
@@ -343,38 +334,24 @@ impl Connection for QuerierConnection {
 
         // Setting up components needed for the two tasks
         let response_router = ResponseRouter::new();
-        let is_connected = Arc::new(AtomicBool::new(true));
 
         let conn: Arc<QuerierConnection> = Arc::new(Self {
             querier_name: node_name.to_string(),
             write,
             shutdown_tx,
             response_router,
-            is_connected,
         });
 
         // Spawn task to listen to querier responses
         let conn_t1 = conn.clone();
         tokio::spawn(async move {
             let _ = conn_t1.listen_to_querier_response(read, shutdown_rx).await;
-            if !conn_t1.is_connected().await {
-                log::info!(
-                    "[WS::QuerierConnection] connection to querier {} closed",
-                    conn_t1.querier_name
-                );
-            }
         });
 
         // Spawn health check task
         let conn_t2 = conn.clone();
         tokio::spawn(async move {
             let _ = conn_t2.health_check().await;
-            if !conn_t2.is_connected().await {
-                log::info!(
-                    "[WS::QuerierConnection] connection to querier {} closed",
-                    conn_t2.querier_name
-                );
-            }
         });
 
         Ok(conn)
@@ -410,7 +387,6 @@ impl Connection for QuerierConnection {
                     log::error!(
                         "[WS::QuerierConnection] error sending messages via connection {e}. Mark the connection disconnected"
                     );
-                    self.is_connected.store(false, Ordering::SeqCst);
                     Err(WsError::ConnectionError(format!(
                         "[WS::QuerierConnection] error sending messages via connection {e}"
                     )))
@@ -418,14 +394,6 @@ impl Connection for QuerierConnection {
             }
         } else {
             Err(WsError::ConnectionError("Not connected".into()))
-        }
-    }
-
-    async fn is_connected(&self) -> bool {
-        if self.write.lock().await.is_some() {
-            self.is_connected.load(Ordering::SeqCst)
-        } else {
-            false
         }
     }
 }

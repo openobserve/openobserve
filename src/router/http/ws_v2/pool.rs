@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::{RwAHashMap, get_config};
+use config::RwAHashMap;
 
 use super::{
     connection::{Connection, QuerierConnection},
@@ -40,18 +40,7 @@ impl QuerierConnectionPool {
         querier_name: &QuerierName,
     ) -> WsResult<Arc<QuerierConnection>> {
         if let Some(conn) = self.connections.read().await.get(querier_name) {
-            // double check if the connection is still connected
-            // FIXME: this is a hack to get around the fact that the connection is not being checked
-            // FIXME: remove once test is completed
             return Ok(conn.clone());
-            // return if conn.is_connected().await {
-            //     Ok(conn.clone())
-            // } else {
-            //     log::error!(
-            //         "[WS::ConnectionPool] connection to querier {querier_name} is disconnected."
-            //     );
-            //     Err(WsError::ConnectionDisconnected)
-            // };
         }
 
         // Create new connection
@@ -67,36 +56,6 @@ impl QuerierConnectionPool {
         if let Some(conn) = self.connections.write().await.remove(querier_name) {
             log::warn!("[WS::ConnectionPool] removing connection to querier {querier_name}");
             conn.disconnect().await;
-        }
-    }
-
-    pub async fn maintain_connections(&self) {
-        let cfg = get_config();
-        loop {
-            let mut to_remove = Vec::new();
-
-            let read_guard = self.connections.read().await;
-            for (querier_name, conn) in read_guard.iter() {
-                if !conn.is_connected().await {
-                    // Just drop it. A new connection will be made to the querier when chosen again
-                    to_remove.push(querier_name.clone());
-                }
-            }
-            drop(read_guard);
-
-            // Remove connections that failed to reconnect
-            for querier in to_remove {
-                log::warn!(
-                    "[WS::ConnectionPool] Removing disconnected connection to querier: {}",
-                    querier
-                );
-                self.remove_querier_connection(&querier).await;
-            }
-
-            tokio::time::sleep(tokio::time::Duration::from_secs(
-                cfg.websocket.health_check_interval as _,
-            ))
-            .await;
         }
     }
 

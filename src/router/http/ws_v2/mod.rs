@@ -102,10 +102,5 @@ async fn init() -> Arc<WsHandler> {
     let connection_pool = Arc::new(QuerierConnectionPool::new());
     let handler = Arc::new(WsHandler::new(session_manager, connection_pool.clone()));
 
-    // Start connection maintenance task
-    tokio::spawn(async move {
-        connection_pool.maintain_connections().await;
-    });
-
     handler
 }
