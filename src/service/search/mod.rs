@@ -724,6 +724,7 @@ pub async fn search_partition(
         }
     }
 
+    // Calculate original step with all factors considered
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
     if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
@@ -736,6 +737,8 @@ pub async fn search_partition(
     if part_num > 1000 {
         part_num = 1000;
     }
+
+    // Calculate step with all constraints
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
     if step < min_step {
@@ -753,24 +756,42 @@ pub async fn search_partition(
         };
     }
 
+    // Mini partition configuration
+    let mini_partition_duration_secs = cfg.limit.mini_search_partition_duration_secs;
+    let mini_partition_count = cfg.limit.mini_search_partition_count;
+    let mini_partition_size_microseconds = mini_partition_duration_secs * 1_000_000;
+
     // Generate partitions by DESC order
-    let mut partitions = Vec::with_capacity(part_num);
+    let mut partitions = Vec::with_capacity(part_num + mini_partition_count);
     let mut end = req.end_time;
-    let mut last_partition_step = end % min_step;
-    let duration = req.end_time - req.start_time;
-    while end > req.start_time {
-        let mut start = max(end - step, req.start_time);
-        if last_partition_step > 0 && duration > min_step && part_num > 1 {
-            partitions.push([end - last_partition_step, end]);
-            start -= last_partition_step;
-            end -= last_partition_step;
-        } else {
-            start = max(start - last_partition_step, req.start_time);
+
+    // Create mini partitions first for faster initial results
+    for _ in 0..mini_partition_count {
+        if end <= req.start_time {
+            break;
         }
-        partitions.push([start, end]);
+
+        let start = max(
+            end - mini_partition_size_microseconds as i64,
+            req.start_time,
+        );
+        if start < end {
+            partitions.push([start, end]);
+        }
         end = start;
-        last_partition_step = 0;
     }
+
+    // Calculate remaining time range
+    let remaining_time = end - req.start_time;
+    if remaining_time > 0 {
+        while end > req.start_time {
+            let start = max(end - step, req.start_time);
+            partitions.push([start, end]);
+            end = start;
+        }
+    }
+
+    // Handle edge case of empty partitions
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
     }

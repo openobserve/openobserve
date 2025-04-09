@@ -1400,6 +1400,18 @@ pub struct Limit {
         help = "maximum series to display in charts"
     )]
     pub max_dashboard_series: usize,
+    #[env_config(
+        name = "ZO_MINI_SEARCH_PARTITION_DURATION_SECS",
+        default = 60,
+        help = "Duration of each mini search partition in seconds"
+    )]
+    pub mini_search_partition_duration_secs: u64,
+    #[env_config(
+        name = "ZO_MINI_SEARCH_PARTITION_COUNT",
+        default = 1,
+        help = "Number of mini search partitions to create"
+    )]
+    pub mini_search_partition_count: usize,
 }
 
 #[derive(EnvConfig)]
