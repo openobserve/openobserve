@@ -543,6 +543,7 @@ pub async fn get_querier_connection(
     role_group: Option<RoleGroup>,
 ) -> WsResult<Arc<QuerierConnection>> {
     let interval = tokio::time::Duration::from_secs(1);
+    let mut consistent_hash_trace_id = trace_id.clone();
     // Retry max of 3 times to get a valid querier connection
     for try_num in 0..3 {
         // Get or assign querier for this trace_id included in message
@@ -552,7 +553,11 @@ pub async fn get_querier_connection(
         {
             Some(querier_name) => querier_name,
             None => {
-                let querier_name = select_querier(trace_id, role_group).await?;
+                if try_num > 0 {
+                    // to get a different querier for each retry
+                    consistent_hash_trace_id.push_str(try_num.to_string().as_str());
+                }
+                let querier_name = select_querier(&consistent_hash_trace_id, role_group).await?;
                 session_manager
                     .set_querier_for_trace(client_id, trace_id, &querier_name)
                     .await?;
