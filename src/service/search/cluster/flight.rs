@@ -49,10 +49,7 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{
-        infra::cluster as infra_cluster,
-        utils::search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    },
+    common::infra::cluster as infra_cluster,
     service::search::{
         DATAFUSION_RUNTIME,
         datafusion::{
@@ -66,6 +63,7 @@ use crate::{
             table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
         },
         generate_filter_from_equal_items,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         request::Request,
         sql::Sql,
         utils::{AsyncDefer, ScanStatsVisitor},

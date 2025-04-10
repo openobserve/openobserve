@@ -27,9 +27,7 @@ use hashbrown::HashSet;
 use infra::{errors::Result, file_list, storage};
 use rayon::slice::ParallelSliceMut;
 
-use crate::common::utils::search_inspector::{
-    SearchInspectorFieldsBuilder, search_inspector_fields,
-};
+use crate::service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields};
 
 #[tracing::instrument(
     name = "service::file_list::query",

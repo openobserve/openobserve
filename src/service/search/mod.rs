@@ -61,15 +61,9 @@ use {
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{
-        self,
-        infra::cluster as infra_cluster,
-        utils::{
-            search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-            stream::get_settings_max_query_range,
-        },
-    },
+    common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
     handler::grpc::request::search::Searcher,
+    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
 pub(crate) mod cache;
@@ -78,6 +72,7 @@ pub(crate) mod datafusion;
 pub(crate) mod grpc;
 pub(crate) mod grpc_search;
 pub(crate) mod index;
+pub mod inspector;
 pub(crate) mod request;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]

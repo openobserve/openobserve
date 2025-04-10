@@ -39,16 +39,14 @@ use infra::errors::{Error, ErrorCodes};
 use ingester::WAL_PARQUET_METADATA;
 
 use crate::{
-    common::{
-        infra::wal,
-        utils::search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    },
+    common::infra::wal,
     service::{
         db, file_list,
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
             generate_filter_from_equal_items, generate_search_schema_diff,
             index::IndexCondition,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             match_source,
         },
     },

@@ -45,25 +45,23 @@ use itertools::Itertools;
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 
-use crate::{
-    common::utils::search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    service::{
-        db,
-        search::{
-            datafusion::{
-                distributed_plan::{
-                    NewEmptyExecVisitor, ReplaceTableScanExec,
-                    codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-                    empty_exec::NewEmptyExec,
-                },
-                exec::{prepare_datafusion_context, register_udf},
-                plan::tantivy_count_exec::TantivyCountExec,
-                table_provider::uniontable::NewUnionTable,
+use crate::service::{
+    db,
+    search::{
+        datafusion::{
+            distributed_plan::{
+                NewEmptyExecVisitor, ReplaceTableScanExec,
+                codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+                empty_exec::NewEmptyExec,
             },
-            index::IndexCondition,
-            match_file,
-            request::FlightSearchRequest,
+            exec::{prepare_datafusion_context, register_udf},
+            plan::tantivy_count_exec::TantivyCountExec,
+            table_provider::uniontable::NewUnionTable,
         },
+        index::IndexCondition,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        match_file,
+        request::FlightSearchRequest,
     },
 };
 

@@ -56,9 +56,12 @@ use super::{
     codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
     node::RemoteScanNode,
 };
-use crate::{
-    common::utils::search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    service::{grpc::get_cached_channel, search::MetadataMap},
+use crate::service::{
+    grpc::get_cached_channel,
+    search::{
+        MetadataMap,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    },
 };
 
 /// Execution plan for empty relation with produce_one_row=false

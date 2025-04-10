@@ -47,10 +47,12 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use crate::service::search::SEARCH_SERVER;
 use crate::{
-    common::utils::search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     handler::grpc::MetadataMap,
     service::search::{
-        grpc::flight as grpcFlight, request::FlightSearchRequest, utils::AsyncDefer,
+        grpc::flight as grpcFlight,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        request::FlightSearchRequest,
+        utils::AsyncDefer,
     },
 };
 

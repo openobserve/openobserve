@@ -47,7 +47,6 @@ use tokio::sync::Semaphore;
 use tracing::Instrument;
 
 use crate::{
-    common::utils::search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     job,
     service::{
         db, file_list,
@@ -55,6 +54,7 @@ use crate::{
             datafusion::exec,
             generate_search_schema_diff,
             index::IndexCondition,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             tantivy::puffin_directory::{
                 caching_directory::CachingDirectory,
                 convert_puffin_file_to_tantivy_dir,

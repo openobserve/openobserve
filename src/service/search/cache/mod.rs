@@ -40,14 +40,14 @@ use tracing::Instrument;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-        utils::{
-            functions,
-            http::get_work_group,
-            search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        },
+        utils::{functions, http::get_work_group},
     },
     service::{
-        search::{self as SearchService, cache::cacher::check_cache},
+        search::{
+            self as SearchService,
+            cache::cacher::check_cache,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
