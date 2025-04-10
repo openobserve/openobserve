@@ -1455,11 +1455,7 @@ pub(crate) async fn create_tantivy_index(
             );
         }
         Err(e) => {
-            log::error!(
-                "{} generated tantivy index file error: {}",
-                caller,
-                e
-            );
+            log::error!("{} generated tantivy index file error: {}", caller, e);
             return Err(e.into());
         }
     }

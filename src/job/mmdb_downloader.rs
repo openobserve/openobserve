@@ -181,10 +181,6 @@ async fn update_maxmind_table(fname: &str) {
                 *geoip_asn = Some(Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap());
             };
         }
-        Err(e) => log::warn!(
-            "Failed to update maxmind table with path: {}, {}",
-            fname,
-            e
-        ),
+        Err(e) => log::warn!("Failed to update maxmind table with path: {}, {}", fname, e),
     }
 }
