@@ -310,17 +310,16 @@ impl WsHandler {
                         Some(message) = response_rx.recv() => {
                             match message {
                                 WsServerEvents::Ping(ping) => {
-                                    log::debug!("[WS::Router::Handler]: pinging client");
+                                    log::debug!("[WS::Router::Handler]: pinging client_id: {}", client_id);
                                     if let Err(e) = ws_session.pong(&ping).await {
                                         log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
+                                         // cleanup
+                                         if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Close(Some(CloseReason::from(CloseCode::Normal))))).await {
+                                             log::error!(
+                                                 "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, error: {}", client_id, e
+                                             );
+                                         }
                                     }
-                                    // cleanup
-                                    if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Close(Some(CloseReason::from(CloseCode::Normal))))).await {
-                                        log::error!(
-                                            "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, error: {}", client_id, e
-                                        );
-                                    }
-
                                 }
                                 WsServerEvents::Pong(pong) => {
                                     log::debug!("[WS::Router::Handler]: Pong received from client : {:?}", pong);
