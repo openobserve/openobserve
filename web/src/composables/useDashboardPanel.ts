@@ -369,6 +369,28 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     dashboardPanelData.meta.streamFields.groupedFields = groupedFields;
   };
 
+  const getAllSelectedStreams = () => {
+    // get all streams
+    // mainStream + all join streams
+
+    return [
+      {
+        stream:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream,
+      },
+      ...((
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.joins ?? []
+      )?.map((join: any) => ({
+        stream: join.stream,
+        streamAlias: join.streamAlias,
+      })) ?? []),
+    ];
+  };
+
   const isAddXAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
       case "pie":
@@ -1506,13 +1528,18 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
-  const loadFilterItem = (name: any) => {
+  const loadFilterItem = ({ streamAlias, field: name }: any) => {
+    // get stream name from streamAlias
+    const streamName =
+      getAllSelectedStreams().find((it: any) => it.streamAlias == streamAlias)
+        ?.stream ??
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.stream;
+
     StreamService.fieldValues({
       org_identifier: store.state.selectedOrganization.identifier,
-      stream_name:
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream,
+      stream_name: streamName,
       start_time: new Date(
         dashboardPanelData?.meta?.dateTime?.["start_time"]?.toISOString(),
       ).getTime(),
@@ -1535,6 +1562,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.meta.filterValue.push({
           column: name,
+          streamName: streamName,
           value: res?.data?.hits?.[0]?.values
             .map((it: any) => it.zo_sql_key)
             .filter((it: any) => it)
@@ -3002,7 +3030,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery
     ) {
-      if (!dashboardPanelData.meta.stream.selectedStreamFields?.length) {
+      if (!dashboardPanelData?.meta?.streamFields?.groupedFields?.length) {
         return;
       }
 
@@ -3335,6 +3363,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     generateLabelFromName,
     selectedStreamFieldsBasedOnUserDefinedSchema,
     updateGroupedFields,
+    getAllSelectedStreams,
   };
 };
 export default useDashboardPanelData;
