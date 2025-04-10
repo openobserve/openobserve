@@ -53,6 +53,17 @@ pub async fn search(
     let meta = Sql::new_from_req(&req, &query).await?;
     let sql = Arc::new(meta);
 
+    for s in sql.stream_names.iter() {
+        let schema =
+            infra::schema::get_cache(&sql.org_id, &s.stream_name(), sql.stream_type).await?;
+        if schema.schema().fields().is_empty() {
+            let mut result = search::Response::new(sql.offset, sql.limit);
+            result.function_error = vec![format!("Stream not found {}", &s.stream_name())];
+            result.is_partial = true;
+            return Ok(result);
+        }
+    }
+
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
