@@ -148,7 +148,7 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
             Some(msg) = msg_stream.next() => {
                 // Update activity and check cookie_expiry on any message
                 if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
-                    let mut session = session.lock().await;
+                    let mut session = session.write().await;
                     session.update_activity();
                     if !session.is_client_cookie_valid() {
                         log::error!("[WS_HANDLER]: Session cookie expired for req_id: {}", req_id);
@@ -165,7 +165,7 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                             req_id
                         );
                         if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
-                            let mut session = session.lock().await;
+                            let mut session = session.write().await;
                             if let Err(e) = session.pong(&bytes).await {
                                 log::error!(
                                     "[WS_HANDLER]: Failed to send pong to client for req_id: {}, error: {}",
@@ -230,7 +230,7 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                         "[WS_HANDLER]: Sending heartbeat ping to client for req_id: {}",
                         req_id
                     );
-                    let mut session = session.lock().await;
+                    let mut session = session.write().await;
                     if let Err(e) = session.ping(&[]).await {
                         log::error!(
                             "[WS_HANDLER]: Failed to send ping to client for req_id: {}, error: {}. Connection will be closed.",
@@ -431,8 +431,8 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
                 return;
             };
-            let mut session = session.lock().await;
-            let _ = session.close(close_reason).await;
+            let mut session = session.write().await;
+            let _ = session.close(close_reason);
             drop(session);
         }
     }
@@ -450,7 +450,7 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
 
     log::debug!("[WS_HANDLER]: req_id: {} sending message: {}", req_id, msg);
 
-    let mut session = session.lock().await;
+    let mut session = session.write().await;
     let _ = session.text(msg).await.map_err(|e| {
         log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
         Error::Message(e.to_string())
@@ -475,7 +475,7 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
             );
         }
 
-        let mut session = session.lock().await;
+        let mut session = session.write().await;
         // Attempt to close the session
         if let Err(e) = session.close(close_reason).await {
             log::error!(

@@ -92,7 +92,7 @@ pub mod sessions_cache_utils {
     use actix_ws::{CloseCode, CloseReason};
     use config::get_config;
     use futures::FutureExt;
-    use tokio::sync::Mutex;
+    use tokio::sync::RwLock;
 
     use super::search_registry_utils::SearchState;
     use crate::{
@@ -142,7 +142,7 @@ pub mod sessions_cache_utils {
 
         for session_id in session_ids {
             if let Some(session) = r.get(&session_id) {
-                let session_lock = session.lock().await;
+                let session_lock = session.read().await;
                 if session_lock.is_expired() {
                     expired.push(session_id);
                 }
@@ -160,7 +160,7 @@ pub mod sessions_cache_utils {
             if let Some(session) = get_session(&session_id).await {
                 log::info!("[WS_GC] Closing expired session: {}", session_id);
 
-                let mut session = session.lock().await;
+                let mut session = session.write().await;
                 if let Err(e) = session
                     .close(Some(CloseReason {
                         code: CloseCode::Normal,
@@ -219,7 +219,7 @@ pub mod sessions_cache_utils {
     }
 
     /// Insert a new session into the cache
-    pub async fn insert_session(session_id: &str, session: Arc<Mutex<WsSession>>) {
+    pub async fn insert_session(session_id: &str, session: Arc<RwLock<WsSession>>) {
         let mut w = WS_SESSIONS.write().await;
         w.insert(session_id.to_string(), session);
         drop(w);
@@ -233,10 +233,10 @@ pub mod sessions_cache_utils {
     }
 
     // Return a mutable reference to the session
-    pub async fn get_session(session_id: &str) -> Option<Arc<Mutex<WsSession>>> {
-        let w = WS_SESSIONS.read().await;
-        let session = w.get(session_id).cloned();
-        drop(w);
+    pub async fn get_session(session_id: &str) -> Option<Arc<RwLock<WsSession>>> {
+        let r = WS_SESSIONS.read().await;
+        let session = r.get(session_id).cloned();
+        drop(r);
         session
     }
 

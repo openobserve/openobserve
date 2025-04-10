@@ -33,7 +33,7 @@ use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock as TokioRwLock;
 use vector_enrichment::TableRegistry;
 
 use crate::{
@@ -98,7 +98,7 @@ pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::d
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
 // TODO: Implement rate limiting for maximum number of sessions
 // Querier Connection Pool
-pub static WS_SESSIONS: Lazy<RwAHashMap<String, Arc<Mutex<WsSession>>>> =
+pub static WS_SESSIONS: Lazy<RwAHashMap<String, Arc<TokioRwLock<WsSession>>>> =
     Lazy::new(Default::default);
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
