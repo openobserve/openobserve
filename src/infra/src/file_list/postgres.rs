@@ -345,7 +345,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS
-            .with_label_values(&["update", "file_list"])
+            .with_label_values(&["update", "file_list", ""])
             .inc();
         sqlx::query(
             r#"UPDATE file_list SET compressed_size = $1 WHERE stream = $2 AND date = $3 AND file = $4;"#,
