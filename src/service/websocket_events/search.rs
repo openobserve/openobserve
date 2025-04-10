@@ -620,85 +620,12 @@ async fn process_delta(
             // `result_cache_ratio` will be 0 for delta search
             let result_cache_ratio = search_res.result_cache_ratio;
 
-            if req.search_type == SearchEventType::Values {
-                let mut hit_values: Vec<Value> = Vec::new();
-                let hits = search_res.hits.clone();
-                let ctx = req.values_event_context.unwrap_or(ValuesEventContext {
-                    top_k: Some(10),
-                    no_count: false,
-                    field: "".to_string(),
-                });
-
-                if ctx.field.is_empty() {
-                    return Err(Error::Message("field is empty".to_string()));
-                }
-
-                let k_limit = ctx.top_k.unwrap();
-                let no_count = ctx.no_count;
-
-                let mut search_result_hits = Vec::new();
-                for hit in hits {
-                    let key = hit.get("zo_sql_key").map(|v| v.as_str().unwrap_or("").to_string()).unwrap_or_default();
-                    let num = hit.get("zo_sql_num").map(|v| v.as_i64().unwrap_or(0)).unwrap_or_default();
-                    search_result_hits.push((key, num));
-                }
-
-                if no_count {
-                    // For alphabetical sorting, collect all entries first
-                    let mut all_entries: Vec<_> = search_result_hits.into_iter().collect();
-                    all_entries.sort_by(|a, b| a.0.cmp(&b.0));
-                    all_entries.truncate(k_limit as usize);
-        
-                    let top_hits = all_entries
-                        .into_iter()
-                        .map(|(k, v)| {
-                            let mut item = Map::new();
-                            item.insert("zo_sql_key".to_string(), Value::String(k));
-                            item.insert("zo_sql_num".to_string(), Value::Number(v.into()));
-                            Value::Object(item)
-                        })
-                        .collect::<Vec<_>>();
-        
-                    let mut field_value: Map<String, Value> = Map::new();
-                    field_value.insert("field".to_string(), Value::String(ctx.field.clone()));
-                    field_value.insert("values".to_string(), Value::Array(top_hits));
-                    hit_values.push(Value::Object(field_value));
-                } else {
-                    // For value-based sorting, use a min heap to get top k elements
-                    let mut min_heap: BinaryHeap<Reverse<(i64, String)>> = BinaryHeap::with_capacity(k_limit as usize);
-                    for (k, v) in search_result_hits {
-                        if min_heap.len() < k_limit as usize {
-                            // If heap not full, just add
-                            min_heap.push(Reverse((v, k)));
-                        } else if !min_heap.is_empty() && v > min_heap.peek().unwrap().0.0 {
-                            // If current value is larger than smallest in heap, replace it
-                            min_heap.pop();
-                            min_heap.push(Reverse((v, k)));
-                        }
-                    }
-        
-                    // Convert heap to vector and sort in descending order
-                    let mut top_elements: Vec<_> =
-                        min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
-                    top_elements.sort_by(|a, b| b.1.cmp(&a.1));
-        
-                    let top_hits = top_elements
-                        .into_iter()
-                        .map(|(k, v)| {
-                            let mut item = Map::new();
-                            item.insert("zo_sql_key".to_string(), Value::String(k));
-                            item.insert("zo_sql_num".to_string(), Value::Number(v.into()));
-                            Value::Object(item)
-                        })
-                        .collect::<Vec<_>>();
-        
-                    let mut field_value: Map<String, Value> = Map::new();
-                    field_value.insert("field".to_string(), Value::String(ctx.field.clone()));
-                    field_value.insert("values".to_string(), Value::Array(top_hits));
-                    hit_values.push(Value::Object(field_value));
-                }
-
-                search_res.hits = hit_values;
+            if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
+                log::debug!("Getting top k values for partition {idx}");
+                let top_k_values = tokio::task::spawn_blocking(move || {
+                    get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
+                }).await.unwrap();
+                search_res.hits = top_k_values?;
             }
 
             let ws_search_res = WsServerEvents::SearchResponse {
@@ -996,6 +923,14 @@ pub async fn do_partitioned_search(
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
             }
 
+            if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
+                log::debug!("Getting top k values for partition {idx}");
+                let top_k_values = tokio::task::spawn_blocking(move || {
+                    get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
+                }).await.unwrap();
+                search_res.hits = top_k_values?;
+            }
+
             // Send the cached response
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.to_string(),
@@ -1166,4 +1101,86 @@ pub async fn write_results_to_cache(
     }
 
     Ok(())
+}
+
+/// This function will compute top k values for values request
+/// This is a com
+pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<Vec<Value>, Error> {
+    let mut top_k_values: Vec<Value> = Vec::new();
+    
+    if ctx.field.is_empty() {
+        log::error!("Field is empty for values search");
+        return Err(Error::Message("field is empty".to_string()));
+    }
+
+    let k_limit = ctx.top_k.unwrap_or(10);
+    let no_count = ctx.no_count;
+
+    let mut search_result_hits = Vec::new();
+    for hit in hits {
+        let key = hit.get("zo_sql_key")
+            .and_then(|v| v.as_str().map(|s| s.to_string()))
+            .unwrap_or_default();
+        let num = hit.get("zo_sql_num")
+            .and_then(|v| v.as_i64())
+            .unwrap_or_default();
+        search_result_hits.push((key, num));
+    }
+
+    if no_count {
+        // For alphabetical sorting, collect all entries first
+        let mut all_entries: Vec<_> = search_result_hits;
+        all_entries.sort_by(|a, b| a.0.cmp(&b.0));
+        all_entries.truncate(k_limit as usize);
+
+        let top_hits = all_entries
+            .into_iter()
+            .map(|(k, v)| {
+                let mut item = Map::new();
+                item.insert("zo_sql_key".to_string(), Value::String(k));
+                item.insert("zo_sql_num".to_string(), Value::Number(v.into()));
+                Value::Object(item)
+            })
+            .collect::<Vec<_>>();
+
+        let mut field_value: Map<String, Value> = Map::new();
+        field_value.insert("field".to_string(), Value::String(ctx.field.clone()));
+        field_value.insert("values".to_string(), Value::Array(top_hits));
+        top_k_values.push(Value::Object(field_value));
+    } else {
+        // For value-based sorting, use a min heap to get top k elements
+        let mut min_heap: BinaryHeap<Reverse<(i64, String)>> = BinaryHeap::with_capacity(k_limit as usize);
+        for (k, v) in search_result_hits {
+            if min_heap.len() < k_limit as usize {
+                // If heap not full, just add
+                min_heap.push(Reverse((v, k)));
+            } else if !min_heap.is_empty() && v > min_heap.peek().unwrap().0.0 {
+                // If current value is larger than smallest in heap, replace it
+                min_heap.pop();
+                min_heap.push(Reverse((v, k)));
+            }
+        }
+
+        // Convert heap to vector and sort in descending order
+        let mut top_elements: Vec<_> =
+            min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
+        top_elements.sort_by(|a, b| b.1.cmp(&a.1));
+
+        let top_hits = top_elements
+            .into_iter()
+            .map(|(k, v)| {
+                let mut item = Map::new();
+                item.insert("zo_sql_key".to_string(), Value::String(k));
+                item.insert("zo_sql_num".to_string(), Value::Number(v.into()));
+                Value::Object(item)
+            })
+            .collect::<Vec<_>>();
+
+        let mut field_value: Map<String, Value> = Map::new();
+        field_value.insert("field".to_string(), Value::String(ctx.field.clone()));
+        field_value.insert("values".to_string(), Value::Array(top_hits));
+        top_k_values.push(Value::Object(field_value));
+    }
+
+    Ok(top_k_values)
 }
