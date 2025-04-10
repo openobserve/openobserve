@@ -230,6 +230,10 @@ impl FileData {
                 self.choose_multi_dir(key.as_str()),
                 key
             );
+            log::debug!(
+                "[trace_id {trace_id}] File disk cache gc remove file: {}",
+                key
+            );
             if let Err(e) = fs::remove_file(&file_path) {
                 log::error!(
                     "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
@@ -577,33 +581,27 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .with_label_values(&[columns[1], columns[2]])
                             .add(data_size as i64);
                     } else if file_key.starts_with("results") {
+                        let Some((org_id, stream_type, query_key, meta)) =
+                            parse_result_cache_key(&file_key)
+                        else {
+                            log::error!("parse result cache key error: {}", file_key);
+                            continue;
+                        };
+
                         let mut w = RESULT_FILES[idx].write().await;
                         w.cur_size += data_size;
                         w.data.insert(file_key.clone(), data_size);
                         drop(w);
-                        // metrics
-                        let columns = file_key.split('/').collect::<Vec<&str>>();
 
+                        // metrics
                         metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                            .with_label_values(&[columns[1], columns[2]])
+                            .with_label_values(&[org_id.as_str(), stream_type.as_str()])
                             .add(data_size as i64);
 
-                        let columns = file_key.split('/').collect::<Vec<&str>>();
-                        let query_key = format!(
-                            "{}_{}_{}_{}",
-                            columns[1], columns[2], columns[3], columns[4]
-                        );
-                        let meta = columns[5].split('_').collect::<Vec<&str>>();
-                        let is_aggregate = meta[2] == "1";
-                        let is_descending = meta[3] == "1";
-                        result_cache.entry(query_key).or_insert_with(Vec::new).push(
-                            ResultCacheMeta {
-                                start_time: meta[0].parse().unwrap(),
-                                end_time: meta[1].parse().unwrap(),
-                                is_aggregate,
-                                is_descending,
-                            },
-                        );
+                        result_cache
+                            .entry(query_key)
+                            .or_insert_with(Vec::new)
+                            .push(meta);
                     } else if file_key.starts_with("metrics_results") {
                         // metrics
                         metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
@@ -730,6 +728,35 @@ fn get_bucket_idx(file: &str) -> usize {
         let h = gxhash::new().sum64(file);
         (h as usize) % cfg.disk_cache.bucket_num
     }
+}
+
+// parse the result cache key from the file name
+// returns (org_id, stream_type, query_key, ResultCacheMeta)
+// results/default/logs/default/16042959487540176184_30_zo_sql_key/
+// 1744081170000000_1744081170000000_1_0.json
+pub fn parse_result_cache_key(file: &str) -> Option<(String, String, String, ResultCacheMeta)> {
+    let columns = file.split('/').collect::<Vec<&str>>();
+    if columns.len() < 6 {
+        return None;
+    }
+    let org_id = columns[1].to_string();
+    let stream_type = columns[2].to_string();
+    let query_key = format!(
+        "{}_{}_{}_{}",
+        columns[1], columns[2], columns[3], columns[4]
+    );
+
+    let meta = columns[5].split('_').collect::<Vec<&str>>();
+    let is_aggregate = meta[2] == "1";
+    let is_descending = meta[3] == "1";
+    let meta = ResultCacheMeta {
+        start_time: meta[0].parse().unwrap(),
+        end_time: meta[1].parse().unwrap(),
+        is_aggregate,
+        is_descending,
+    };
+
+    Some((org_id, stream_type, query_key, meta))
 }
 
 #[cfg(test)]
@@ -885,5 +912,23 @@ mod tests {
         assert!(file_data.size().0 > 0);
 
         assert_eq!(file_data.get(&file_key, None).await, Some(content))
+    }
+
+    #[tokio::test]
+    async fn test_parse_result_cache_key() {
+        let file_key = "results/default/logs/default/16042959487540176184_30_zo_sql_key/1744081170000000_1744081170000000_1_0.json";
+        let Some((org_id, stream_type, query_key, meta)) = parse_result_cache_key(file_key) else {
+            panic!("parse result cache key error");
+        };
+        assert_eq!(org_id, "default");
+        assert_eq!(stream_type, "logs");
+        assert_eq!(
+            query_key,
+            "default_logs_default_16042959487540176184_30_zo_sql_key"
+        );
+        assert_eq!(meta.start_time, 1744081170000000);
+        assert_eq!(meta.end_time, 1744081170000000);
+        assert_eq!(meta.is_aggregate, true);
+        assert_eq!(meta.is_descending, false);
     }
 }

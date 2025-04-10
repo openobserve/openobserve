@@ -25,7 +25,7 @@ use config::{
     get_config,
     utils::{
         hash::{gxhash, Sum64},
-        time::{now, now_micros, second_micros},
+        time::{get_ymdh_from_micros, now_micros, second_micros},
     },
 };
 use hashbrown::HashMap;
@@ -206,6 +206,7 @@ pub async fn get(
 
 pub async fn set(
     trace_id: &str,
+    org_id: &str,
     query: &str,
     start: i64,
     end: i64,
@@ -321,7 +322,7 @@ pub async fn set(
     let bytes_data = resp.encode_to_vec();
 
     // store the series to disk cache
-    let cache_key = get_cache_item_key(&key, start, new_end);
+    let cache_key = get_cache_item_key(&key, org_id, start, new_end);
     infra::cache::file_data::disk::set(trace_id, &cache_key, bytes_data.into())
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
@@ -380,10 +381,11 @@ fn get_hash_key(query: &str, step: i64) -> String {
     config::utils::md5::hash(&format!("{}-{}", query, step))
 }
 
-fn get_cache_item_key(prefix: &str, start: i64, end: i64) -> String {
+fn get_cache_item_key(prefix: &str, org: &str, start: i64, end: i64) -> String {
     format!(
-        "metrics_results/{}/{}_{}_{}_{}.pb",
-        now().format("%Y/%m/%d/%H"),
+        "metrics_results/{}/{}/{}_{}_{}_{}.pb",
+        org,
+        get_ymdh_from_micros(start),
         prefix,
         start,
         end,
@@ -496,6 +498,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_promql_cache_set_and_get() {
+        let org = "default";
         let trace_id = "test_trace1";
         let query = "test_query1";
         let end = now_micros();
@@ -526,7 +529,7 @@ mod tests {
         let expected_value = range_values.first().unwrap().clone();
 
         // Test setting cache
-        let set_result = set(trace_id, query, start, end, step, range_values).await;
+        let set_result = set(trace_id, org_id, query, start, end, step, range_values).await;
         assert!(set_result.is_ok());
 
         // Test getting cache
@@ -547,6 +550,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_promql_cache_max_items() {
+        let org = "default";
         let trace_id = "test_trace2";
         let query = "test_query2";
         let end = now_micros();
@@ -567,7 +571,16 @@ mod tests {
                 time_window: None,
             }];
 
-            let set_result = set(trace_id, query, start, end, step, range_values.clone()).await;
+            let set_result = set(
+                trace_id,
+                org_id,
+                query,
+                start,
+                end,
+                step,
+                range_values.clone(),
+            )
+            .await;
             assert!(set_result.is_ok());
         }
 
