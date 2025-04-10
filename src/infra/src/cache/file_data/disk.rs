@@ -229,6 +229,10 @@ impl FileData {
                 self.choose_multi_dir(key.as_str()),
                 key
             );
+            log::debug!(
+                "[trace_id {trace_id}] File disk cache gc remove file: {}",
+                key
+            );
             if let Err(e) = fs::remove_file(&file_path) {
                 log::error!(
                     "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",

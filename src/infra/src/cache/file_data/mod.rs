@@ -36,21 +36,27 @@ pub enum CacheType {
 
 enum CacheStrategy {
     Lru(LruCache<String, usize>),
-    Fifo((VecDeque<(String, usize)>, HashSet<String>)),
-    FileTime(BTreeMap<String, usize>, HashSet<String>),
+    Fifo(VecDeque<(String, usize)>, HashSet<String>),
+    FileTime(
+        BTreeMap<u64, usize>,
+        Vec<LruCache<String, usize>>,
+        HashSet<String>,
+    ),
 }
 
 impl CacheStrategy {
     fn new(name: &str) -> Self {
         match name.to_lowercase().as_str() {
             "lru" => CacheStrategy::Lru(LruCache::new_unbounded()),
-            "fifo" => CacheStrategy::Fifo((
+            "fifo" => CacheStrategy::Fifo(
                 VecDeque::with_capacity(INITIAL_CACHE_SIZE),
                 HashSet::with_capacity(INITIAL_CACHE_SIZE),
-            )),
-            "filetime" | "file_time" => {
-                CacheStrategy::FileTime(BTreeMap::new(), HashSet::with_capacity(INITIAL_CACHE_SIZE))
-            }
+            ),
+            "filetime" | "file_time" => CacheStrategy::FileTime(
+                BTreeMap::new(),
+                Vec::new(),
+                HashSet::with_capacity(INITIAL_CACHE_SIZE),
+            ),
             _ => CacheStrategy::Lru(LruCache::new_unbounded()),
         }
     }
@@ -60,14 +66,18 @@ impl CacheStrategy {
             CacheStrategy::Lru(cache) => {
                 cache.insert(key, size);
             }
-            CacheStrategy::Fifo((queue, set)) => {
+            CacheStrategy::Fifo(queue, set) => {
                 set.insert(key.clone());
                 queue.push_back((key, size));
             }
-            CacheStrategy::FileTime(map, set) => {
-                let time = get_file_time(&key).unwrap_or(config::utils::time::now_micros() as u64);
+            CacheStrategy::FileTime(map, cache, set) => {
+                let time = get_file_time(&key).unwrap_or(0);
                 set.insert(key.clone());
-                map.insert(format!("{}/{}", time, key), size);
+                let cache_idx = map.entry(time).or_insert_with(|| {
+                    cache.push(LruCache::new_unbounded());
+                    cache.len() - 1
+                });
+                cache[*cache_idx].insert(key, size);
             }
         }
     }
@@ -75,7 +85,7 @@ impl CacheStrategy {
     fn remove(&mut self) -> Option<(String, usize)> {
         match self {
             CacheStrategy::Lru(cache) => cache.remove_lru(),
-            CacheStrategy::Fifo((queue, set)) => {
+            CacheStrategy::Fifo(queue, set) => {
                 if queue.is_empty() {
                     return None;
                 }
@@ -84,15 +94,21 @@ impl CacheStrategy {
                     (key, size)
                 })
             }
-            CacheStrategy::FileTime(map, set) => {
+            CacheStrategy::FileTime(map, cache, set) => {
                 if map.is_empty() {
                     return None;
                 }
-                map.pop_first().map(|(key, size)| {
-                    let (_, key) = key.split_once('/').unwrap();
-                    set.remove(key);
-                    (key.to_string(), size)
-                })
+                let mut idx = None;
+                for (_, val) in map.iter() {
+                    if !cache[*val].is_empty() {
+                        idx = Some(*val);
+                        break;
+                    }
+                }
+                let idx = idx?;
+                let (key, size) = cache[idx].remove_lru()?;
+                set.remove(&key);
+                Some((key, size))
             }
         }
     }
@@ -100,7 +116,7 @@ impl CacheStrategy {
     fn remove_key(&mut self, key: &str) -> Option<(String, usize)> {
         match self {
             CacheStrategy::Lru(cache) => cache.remove_entry(key),
-            CacheStrategy::Fifo((queue, set)) => {
+            CacheStrategy::Fifo(queue, set) => {
                 if queue.is_empty() {
                     return None;
                 }
@@ -115,18 +131,15 @@ impl CacheStrategy {
                 }
                 None
             }
-            CacheStrategy::FileTime(map, set) => {
+            CacheStrategy::FileTime(map, cache, set) => {
                 if map.is_empty() {
                     return None;
                 }
-                let keys = map.extract_if(|k, _v| k.ends_with(key)).collect::<Vec<_>>();
-                if keys.is_empty() {
-                    return None;
-                }
-                let (key, size) = &keys[0];
-                let (_, key) = key.split_once('/').unwrap();
-                set.remove(key);
-                Some((key.to_string(), *size))
+                let time = get_file_time(&key).unwrap_or(0);
+                let idx = map.get(&time).map(|v| *v)?;
+                let (key, size) = cache[idx].remove_entry(key)?;
+                set.remove(&key);
+                Some((key, size))
             }
         }
     }
@@ -134,24 +147,24 @@ impl CacheStrategy {
     fn contains_key(&self, key: &str) -> bool {
         match self {
             CacheStrategy::Lru(cache) => cache.contains_key(key),
-            CacheStrategy::Fifo((_, set)) => set.contains(key),
-            CacheStrategy::FileTime(_, set) => set.contains(key),
+            CacheStrategy::Fifo(_, set) => set.contains(key),
+            CacheStrategy::FileTime(_, _, set) => set.contains(key),
         }
     }
 
     fn len(&self) -> usize {
         match self {
             CacheStrategy::Lru(cache) => cache.len(),
-            CacheStrategy::Fifo((queue, _)) => queue.len(),
-            CacheStrategy::FileTime(map, _) => map.len(),
+            CacheStrategy::Fifo(queue, _) => queue.len(),
+            CacheStrategy::FileTime(_, _, set) => set.len(),
         }
     }
 
     fn is_empty(&self) -> bool {
         match self {
             CacheStrategy::Lru(cache) => cache.is_empty(),
-            CacheStrategy::Fifo((queue, _)) => queue.is_empty(),
-            CacheStrategy::FileTime(map, _) => map.is_empty(),
+            CacheStrategy::Fifo(queue, _) => queue.is_empty(),
+            CacheStrategy::FileTime(map, ..) => map.is_empty(),
         }
     }
 }
