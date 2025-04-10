@@ -429,10 +429,8 @@ pub struct WebSocket {
     pub session_max_lifetime_secs: i64,
     #[env_config(name = "ZO_WEBSOCKET_SESSION_GC_INTERVAL_SECS", default = 60)]
     pub session_gc_interval_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 15)]
+    #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 30)]
     pub ping_interval_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_HEALTH_CHECK_INTERVAL_SECS", default = 60)]
-    pub health_check_interval: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1450,7 +1448,7 @@ pub struct Compact {
 pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = true)]
     pub enabled: bool,
-    // Memory data cache strategy, default is lru, other value is fifo
+    // Memory data cache strategy, default is lru, other value is fifo, time_lru
     #[env_config(name = "ZO_MEMORY_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
     // Memory data cache bucket num, multiple bucket means multiple locker, default is 0
@@ -1485,7 +1483,7 @@ pub struct MemoryCache {
 pub struct DiskCache {
     #[env_config(name = "ZO_DISK_CACHE_ENABLED", default = true)]
     pub enabled: bool,
-    // Disk data cache strategy, default is lru, other value is fifo
+    // Disk data cache strategy, default is lru, other value is fifo, time_lru
     #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
     // Disk data cache bucket num, multiple bucket means multiple locker, default is 0
