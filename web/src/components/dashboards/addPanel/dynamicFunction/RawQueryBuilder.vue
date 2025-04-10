@@ -15,6 +15,7 @@
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
       stack-label
+      disable
       filled
       dense
       label-slot

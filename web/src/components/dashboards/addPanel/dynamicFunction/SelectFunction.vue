@@ -176,7 +176,7 @@ export default {
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData, selectedStreamFieldsBasedOnUserDefinedSchema } =
+    const { dashboardPanelData, selectedStreamFieldsBasedOnUserDefinedSchema, getAllSelectedStreams } =
       useDashboardPanelData(dashboardPanelDataPageKey);
 
     // const schemaOptions = computed(() =>
@@ -398,27 +398,7 @@ export default {
       }
     };
 
-    const getAllSelectedStreams = () => {
-      // get all streams
-      // mainStream + all join streams
-
-      return [
-        {
-          stream:
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream,
-        },
-        ...((
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.joins ?? []
-        )?.map((join: any) => ({
-          stream: join.stream,
-          streamAlias: join.streamAlias,
-        })) ?? []),
-      ];
-    };
+  
 
     return {
       fields,
