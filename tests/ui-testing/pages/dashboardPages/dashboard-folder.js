@@ -13,7 +13,7 @@ export default class DashboardFolder {
     return this.page.getByRole("row", { name: new RegExp(`.*${folderName}`) });
   }
 
-  //Dashbaord folder search
+  //Dashboard folder search
   async searchFolder(folderName) {
     await this.folderSearchInput.click();
     await this.folderSearchInput.fill(folderName);
