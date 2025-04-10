@@ -48,8 +48,10 @@ impl SessionManager {
     ) {
         let r = self.sessions.read().await;
         if r.get(client_id).is_some() {
+            drop(r);
             return;
         }
+        drop(r);
 
         let session_info = SessionInfo {
             querier_mappings: HashMap::default(),
