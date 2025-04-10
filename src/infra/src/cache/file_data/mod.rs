@@ -37,7 +37,7 @@ pub enum CacheType {
 enum CacheStrategy {
     Lru(LruCache<String, usize>),
     Fifo(VecDeque<(String, usize)>, HashSet<String>),
-    FileTime(
+    TimeLru(
         BTreeMap<u64, usize>,
         Vec<LruCache<String, usize>>,
         HashSet<String>,
@@ -52,7 +52,7 @@ impl CacheStrategy {
                 VecDeque::with_capacity(INITIAL_CACHE_SIZE),
                 HashSet::with_capacity(INITIAL_CACHE_SIZE),
             ),
-            "filetime" | "file_time" => CacheStrategy::FileTime(
+            "time_lru" => CacheStrategy::TimeLru(
                 BTreeMap::new(),
                 Vec::new(),
                 HashSet::with_capacity(INITIAL_CACHE_SIZE),
@@ -70,7 +70,7 @@ impl CacheStrategy {
                 set.insert(key.clone());
                 queue.push_back((key, size));
             }
-            CacheStrategy::FileTime(map, cache, set) => {
+            CacheStrategy::TimeLru(map, cache, set) => {
                 let time = get_file_time(&key).unwrap_or(0);
                 set.insert(key.clone());
                 let cache_idx = map.entry(time).or_insert_with(|| {
@@ -94,7 +94,7 @@ impl CacheStrategy {
                     (key, size)
                 })
             }
-            CacheStrategy::FileTime(map, cache, set) => {
+            CacheStrategy::TimeLru(map, cache, set) => {
                 if map.is_empty() {
                     return None;
                 }
@@ -131,7 +131,7 @@ impl CacheStrategy {
                 }
                 None
             }
-            CacheStrategy::FileTime(map, cache, set) => {
+            CacheStrategy::TimeLru(map, cache, set) => {
                 if map.is_empty() {
                     return None;
                 }
@@ -148,7 +148,7 @@ impl CacheStrategy {
         match self {
             CacheStrategy::Lru(cache) => cache.contains_key(key),
             CacheStrategy::Fifo(_, set) => set.contains(key),
-            CacheStrategy::FileTime(_, _, set) => set.contains(key),
+            CacheStrategy::TimeLru(_, _, set) => set.contains(key),
         }
     }
 
@@ -156,7 +156,7 @@ impl CacheStrategy {
         match self {
             CacheStrategy::Lru(cache) => cache.len(),
             CacheStrategy::Fifo(queue, _) => queue.len(),
-            CacheStrategy::FileTime(_, _, set) => set.len(),
+            CacheStrategy::TimeLru(_, _, set) => set.len(),
         }
     }
 
@@ -164,7 +164,7 @@ impl CacheStrategy {
         match self {
             CacheStrategy::Lru(cache) => cache.is_empty(),
             CacheStrategy::Fifo(queue, _) => queue.is_empty(),
-            CacheStrategy::FileTime(map, ..) => map.is_empty(),
+            CacheStrategy::TimeLru(map, ..) => map.is_empty(),
         }
     }
 }
@@ -333,8 +333,8 @@ mod tests {
     }
 
     #[test]
-    fn test_file_data_file_time_cache_miss() {
-        let mut cache = CacheStrategy::new("file_time");
+    fn test_file_data_time_lru_cache_miss() {
+        let mut cache = CacheStrategy::new("time_lru");
         let key_small = "files/default/logs/b/2025/04/08/01/1.parquet";
         let key_big = "files/default/logs/b/2099/04/08/02/2.parquet";
         let key_other = "files/default/logs/b/2025/04/08/03/2.parquet";
