@@ -811,6 +811,8 @@ export default defineComponent({
     });
 
     const dashboards = computed(function () {
+      selected.value = [];
+      selectedDashboardIds.value = [];
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         const dashboardList = toRaw(
           store.state.organizationData?.allDashboardList[
