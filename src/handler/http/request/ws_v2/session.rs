@@ -335,7 +335,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     log::info!(
                         "[WS_HANDLER]: trace_id: {}, Cancellation flag set to: {:?}",
                         trace_id,
-                        search_registry_utils::is_cancelled(&trace_id)
+                        search_registry_utils::is_cancelled(&trace_id).await
                     );
 
                     let res = handle_cancel(&trace_id, &org_id).await;
@@ -521,13 +521,15 @@ async fn handle_search_event(
     let client_msg = WsClientEvents::Search(Box::new(search_req.clone()));
 
     // Register running search BEFORE spawning the search task
-    WS_SEARCH_REGISTRY.insert(
+    let mut w = WS_SEARCH_REGISTRY.write().await;
+    w.insert(
         trace_id.clone(),
         SearchState::Running {
             cancel_tx,
             req_id: req_id.to_string(),
         },
     );
+    drop(w);
 
     // Spawn the search task
     tokio::spawn(async move {
@@ -547,11 +549,15 @@ async fn handle_search_event(
             ) => {
                 match search_result {
                     Ok(_) => {
-                        if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
-                            *state = SearchState::Completed {
+                        let mut w = WS_SEARCH_REGISTRY.write().await;
+                        w.entry(trace_id_for_task.clone())
+                            .and_modify(|state| *state = SearchState::Completed {
                                 req_id: req_id.to_string(),
-                            };
-                        }
+                            })
+                            .or_insert(SearchState::Completed {
+                                req_id: req_id.to_string(),
+                            });
+                        drop(w);
 
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
@@ -610,18 +616,19 @@ async fn handle_search_event(
 // Cancel handler
 #[cfg(feature = "enterprise")]
 async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
-    if let Some(mut entry) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
-        let state = entry.value_mut();
+    let mut w = WS_SEARCH_REGISTRY.write().await;
+    if let Some(state) = w.get_mut(trace_id) {
         let cancel_tx = match state {
             SearchState::Running { cancel_tx, .. } => cancel_tx.clone(),
             state => {
                 let err_msg = format!("Cannot cancel search in state: {:?}", state);
                 log::warn!("[WS_HANDLER]: {}", err_msg);
+                drop(w);
                 return Err(anyhow::anyhow!(err_msg));
             }
         };
 
-        *entry.value_mut() = SearchState::Cancelled {
+        *state = SearchState::Cancelled {
             req_id: trace_id.to_string(),
         };
 
@@ -631,6 +638,8 @@ async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
 
         log::info!("[WS_HANDLER]: Search cancelled for trace_id: {}", trace_id);
     }
+    drop(w);
+
     Ok(())
 }
 
@@ -643,11 +652,17 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
             trace_id
         );
         // Update state to cancelled before returning
-        if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
-            *state = SearchState::Cancelled {
+        let mut w = WS_SEARCH_REGISTRY.write().await;
+        w.entry(trace_id.to_string())
+            .and_modify(|state| {
+                *state = SearchState::Cancelled {
+                    req_id: trace_id.to_string(),
+                }
+            })
+            .or_insert(SearchState::Cancelled {
                 req_id: trace_id.to_string(),
-            };
-        }
+            });
+        drop(w);
         return None;
     }
 
@@ -668,17 +683,25 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
     };
 
     // Update registry state
-    if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
-        *state = SearchState::Completed {
+    let mut w = WS_SEARCH_REGISTRY.write().await;
+    w.entry(trace_id.to_string())
+        .and_modify(|state| {
+            *state = SearchState::Completed {
+                req_id: trace_id.to_string(),
+            }
+        })
+        .or_insert(SearchState::Completed {
             req_id: trace_id.to_string(),
-        };
-    }
+        });
+    drop(w);
 
     Some(close_reason)
 }
 
 // Add cleanup function
 async fn cleanup_search_resources(trace_id: &str) {
-    WS_SEARCH_REGISTRY.remove(trace_id);
+    let mut w = WS_SEARCH_REGISTRY.write().await;
+    w.remove(trace_id);
+    drop(w);
     log::debug!("[WS_HANDLER]: trace_id: {}, Resources cleaned up", trace_id);
 }

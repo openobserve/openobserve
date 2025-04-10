@@ -348,19 +348,21 @@ impl ResponseRouter {
 
     pub async fn route_response(&self, message: WsServerEvents) -> WsResult<()> {
         let trace_id = message.get_trace_id();
+        let sender = {
+            let r = self.routes.read().await;
+            r.get(&trace_id).cloned()
+        };
 
-        let r = self.routes.read().await;
-        if let Some(resp_sender) = r.get(&trace_id) {
-            resp_sender
-                .send(message)
-                .await
-                .map_err(|_| WsError::ResponseChannelClosed(trace_id.clone()))?;
-        } else {
-            drop(r);
-            return Err(WsError::ResponseChannelNotFound(trace_id.clone()));
+        match sender {
+            None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
+            Some(resp_sender) => {
+                resp_sender
+                    .send(message)
+                    .await
+                    .map_err(|_| WsError::ResponseChannelClosed(trace_id.clone()))?;
+                Ok(())
+            }
         }
-        drop(r);
-        Ok(())
     }
 }
 
