@@ -73,11 +73,11 @@ impl CacheStrategy {
             CacheStrategy::TimeLru(map, cache, set) => {
                 let time = get_file_time(&key).unwrap_or(0);
                 set.insert(key.clone());
-                let cache_idx = map.entry(time).or_insert_with(|| {
+                let idx = map.entry(time).or_insert_with(|| {
                     cache.push(LruCache::new_unbounded());
                     cache.len() - 1
                 });
-                cache[*cache_idx].insert(key, size);
+                cache[*idx].insert(key, size);
             }
         }
     }
