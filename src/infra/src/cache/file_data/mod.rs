@@ -175,14 +175,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+pub async fn download(trace_id: &str, file: &str) -> Result<usize, anyhow::Error> {
     let cfg = config::get_config();
     if cfg.memory_cache.enabled {
         memory::download(trace_id, file).await
     } else if cfg.disk_cache.enabled {
         disk::download(trace_id, file).await
     } else {
-        Ok(())
+        Ok(0)
     }
 }
 
