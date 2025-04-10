@@ -338,7 +338,7 @@ pub static QUERY_DISK_METRICS_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(||
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[],
+        &["organization"],
     )
     .expect("Metric created")
 });

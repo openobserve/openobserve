@@ -65,6 +65,17 @@ pub fn second_micros(n: i64) -> i64 {
 }
 
 #[inline(always)]
+pub fn get_ymdh_from_micros(n: i64) -> String {
+    let n = if n > 0 {
+        n
+    } else {
+        Utc::now().timestamp_micros()
+    };
+    let t = Utc.timestamp_nanos(n * 1000);
+    t.format("%Y/%m/%d/%H").to_string()
+}
+
+#[inline(always)]
 pub fn parse_i64_to_timestamp_micros(v: i64) -> i64 {
     if v == 0 {
         return Utc::now().timestamp_micros();
@@ -413,5 +424,16 @@ mod tests {
         for i in 0..t.len() {
             assert_eq!(end_of_the_day(t[i]), d[i]);
         }
+    }
+
+    #[test]
+    fn test_get_ymdhms_from_micros() {
+        let n = 1609459200000000;
+        let s = get_ymdh_from_micros(n);
+        assert_eq!(s, "2021/01/01/00");
+
+        let n = 1744077663427000;
+        let s = get_ymdh_from_micros(n);
+        assert_eq!(s, "2025/04/08/02");
     }
 }

@@ -367,9 +367,19 @@ pub async fn search(
         res.function_error = if res.function_error.is_empty() {
             vec![partial_err.to_string()]
         } else {
-            res.function_error.push(partial_err.to_string());
+            // check if the error is about the stream not found
+            let mut skip_warning = false;
+            for err in &res.function_error {
+                if err.starts_with("Stream not found") {
+                    skip_warning = true;
+                    break;
+                }
+            }
+            if !skip_warning {
+                res.function_error.push(partial_err.to_string());
+            }
             res.function_error
-        };
+        }
     }
     if !range_error.is_empty() {
         res.is_partial = true;

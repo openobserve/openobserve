@@ -56,6 +56,7 @@ const useIngestion = () => {
     cassandra: "https://short.openobserve.ai/database/cassandra",
     aerospike: "https://short.openobserve.ai/database/aerospike",
     dynamoDB: "https://short.openobserve.ai/database/dynamodb",
+    databricks: "https://short.openobserve.ai/databricks",
   };
 
   const securityContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json
@@ -127,6 +128,8 @@ Access Key: [BASIC_PASSCODE]`;
     airflow: "https://short.openobserve.ai/others/airflow",
     airbyte: "https://short.openobserve.ai/others/airbyte",
     cribl: "https://short.openobserve.ai/cribl",
+    vercel: "https://short.openobserve.ai/vercel",
+    heroku: "https://short.openobserve.ai/heroku",
   };
 
   return {

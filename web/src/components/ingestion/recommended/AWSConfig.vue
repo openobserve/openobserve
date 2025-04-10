@@ -95,6 +95,10 @@ Access Key: [BASIC_PASSCODE]`;
         link: "https://short.openobserve.ai/aws/cloudwatch-logs",
       },
       {
+        name: "Cost and Usage Reports (CUR)",
+        link: "https://short.openobserve.ai/aws-cur",
+      },
+      {
         name: "Eventbridge/Cloudwatch Events",
         link: "https://short.openobserve.ai/aws/eventbridge",
       },

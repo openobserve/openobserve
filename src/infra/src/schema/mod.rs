@@ -85,8 +85,12 @@ pub async fn get_cache(
     }
 
     // Get from DB without holding any locks
-    let schema = get_from_db(org_id, stream_name, stream_type).await?;
-    let schema = SchemaCache::new(schema);
+    let db_schema = get_from_db(org_id, stream_name, stream_type).await?;
+    // if the schema is empty, return an empty schema , Don't write to cache
+    if db_schema.fields().is_empty() && db_schema.metadata().is_empty() {
+        return Ok(SchemaCache::new(db_schema));
+    }
+    let schema = SchemaCache::new(db_schema);
 
     // Only acquire write lock after DB read is complete
     let mut write_guard = STREAM_SCHEMAS_LATEST.write().await;

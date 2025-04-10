@@ -32,9 +32,6 @@ pub enum WsError {
     #[error("Connection error: {0}")]
     ConnectionError(String),
 
-    #[error("Pooled connection disconnected")]
-    ConnectionDisconnected,
-
     #[error("Session not found: {0}")]
     SessionNotFound(String),
 
@@ -63,7 +60,6 @@ impl ResponseError for WsError {
             WsError::ProtocolError(_) => StatusCode::BAD_REQUEST,
             WsError::SerdeError(_) => StatusCode::BAD_REQUEST,
             WsError::ConnectionError(_) => StatusCode::SERVICE_UNAVAILABLE,
-            WsError::ConnectionDisconnected => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::SessionNotFound(_) => StatusCode::BAD_REQUEST,
             WsError::QuerierUrlInvalid(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::QuerierWSUrlError(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -131,10 +127,7 @@ impl WsError {
     }
 
     pub fn should_client_retry(&self) -> bool {
-        matches!(
-            self,
-            WsError::ConnectionError(_) | WsError::ConnectionDisconnected
-        )
+        matches!(self, WsError::ConnectionError(_))
     }
 
     pub fn into_ws_server_events(

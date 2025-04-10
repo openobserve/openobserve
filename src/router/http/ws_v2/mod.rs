@@ -100,12 +100,5 @@ pub async fn remove_querier_from_handler(querier_name: &str) {
 async fn init() -> Arc<WsHandler> {
     let session_manager = Arc::new(SessionManager::default());
     let connection_pool = Arc::new(QuerierConnectionPool::new());
-    let handler = Arc::new(WsHandler::new(session_manager, connection_pool.clone()));
-
-    // Start connection maintenance task
-    tokio::spawn(async move {
-        connection_pool.maintain_connections().await;
-    });
-
-    handler
+    Arc::new(WsHandler::new(session_manager, connection_pool.clone()))
 }

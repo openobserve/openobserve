@@ -147,6 +147,30 @@ export default defineComponent({
         label: t("ingestion.cribl"),
         contentClass: "tab_content",
       },
+      {
+        name: "vercel",
+        to: {
+          name: "vercel",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/vercel.svg"),
+        label: t("ingestion.vercel"),
+        contentClass: "tab_content",
+      },
+      {
+        name: "heroku",
+        to: {
+          name: "heroku",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/heroku.svg"),
+        label: t("ingestion.heroku"),
+        contentClass: "tab_content",
+      },
       // {
       //   name: "airbyte",
       //   to: {

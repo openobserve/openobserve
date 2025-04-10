@@ -278,6 +278,18 @@ export default defineComponent({
         icon: "img:" + getImageURL("images/ingestion/dynamodb.png"),
         label: t("ingestion.dynamodb"),
         contentClass: "tab_content",
+      },
+      {
+        name: "databricks",
+        to: {
+          name: "databricks",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/databricks.svg"),
+        label: t("ingestion.databricks"),
+        contentClass: "tab_content",
       }
     ];
 

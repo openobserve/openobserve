@@ -15,11 +15,15 @@
 
 use std::ops::ControlFlow;
 
-use config::meta::{
-    search::{SearchEventContext, SearchEventType},
-    websocket::SearchResultType,
+use config::{
+    get_config,
+    meta::{
+        search::{SearchEventContext, SearchEventType},
+        websocket::SearchResultType,
+    },
 };
 use infra::errors::Error;
+use rand::Rng;
 use sqlparser::{
     ast::{Expr, FunctionArguments, Statement, visit_statements_mut},
     dialect::PostgreSqlDialect,
@@ -138,6 +142,12 @@ pub fn _calc_result_cache_ratio(accumulated_results: &[SearchResultType]) -> usi
         return 0; // avoid division by zero
     }
     ((cache_hits as f64 / total_hits as f64) * 100.0).round() as usize
+}
+
+pub fn get_ping_interval_secs_with_jitter() -> i64 {
+    let base_interval = get_config().websocket.ping_interval_secs;
+    let jitter = rand::thread_rng().gen_range(0..10) as i64;
+    base_interval + jitter
 }
 
 #[cfg(test)]

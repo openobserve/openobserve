@@ -18,6 +18,8 @@ use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
 use o2_dex::meta::auth::RoleRequest;
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::common::meta::user::{UserGroup, UserGroupRequest, UserRoleRequest};
 
 #[cfg(feature = "enterprise")]
@@ -49,7 +51,9 @@ pub async fn create_role(
     let user_req = user_req.into_inner();
 
     match o2_openfga::authorizer::roles::create_role(&user_req.name, &org_id).await {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Ok(_) => Ok(MetaHttpResponse::ok(
+            serde_json::json!({"successful": "true"}),
+        )),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
 }
@@ -104,7 +108,9 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
     let (org_id, role_name) = path.into_inner();
 
     match o2_openfga::authorizer::roles::delete_role(&org_id, &role_name).await {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Ok(_) => Ok(MetaHttpResponse::ok(
+            serde_json::json!({"successful": "true"}),
+        )),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
 }
@@ -433,7 +439,9 @@ pub async fn create_group(
     )
     .await
     {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Ok(_) => Ok(MetaHttpResponse::ok(
+            serde_json::json!({"successful": "true"}),
+        )),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
 }
@@ -502,7 +510,9 @@ pub async fn update_group(
     )
     .await
     {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Ok(_) => Ok(MetaHttpResponse::ok(
+            serde_json::json!({"successful": "true"}),
+        )),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
 }
@@ -711,7 +721,9 @@ pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpRespo
     let (org_id, group_name) = path.into_inner();
 
     match o2_openfga::authorizer::groups::delete_group(&org_id, &group_name).await {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Ok(_) => Ok(MetaHttpResponse::ok(
+            serde_json::json!({"successful": "true"}),
+        )),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
 }
