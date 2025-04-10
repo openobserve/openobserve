@@ -32,14 +32,15 @@ use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
 
 #[cfg(feature = "enterprise")]
+use crate::common::infra::cluster::get_cached_online_router_nodes;
+#[cfg(feature = "enterprise")]
 use crate::service::{
     self_reporting::audit,
     websocket_events::{handle_cancel, search_registry_utils},
 };
 use crate::{
     common::{
-        infra::{cluster::get_cached_online_router_nodes, config::WS_SEARCH_REGISTRY},
-        utils::websocket::get_ping_interval_secs_with_jitter,
+        infra::config::WS_SEARCH_REGISTRY, utils::websocket::get_ping_interval_secs_with_jitter,
     },
     // router::http::ws_v2::types::StreamMessage,
     service::websocket_events::{
