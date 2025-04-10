@@ -147,18 +147,18 @@ export default defineComponent({
         label: t("ingestion.kafka"),
         contentClass: "tab_content",
       },
-      // {
-      //   name: "nats",
-      //   to: {
-      //     name: "nats",
-      //     query: {
-      //       org_identifier: store.state.selectedOrganization.identifier,
-      //     },
-      //   },
-      //   icon: "img:" + getImageURL("images/ingestion/nats.svg"),
-      //   label: t("ingestion.nats"),
-      //   contentClass: "tab_content",
-      // },
+      {
+        name: "nats",
+        to: {
+          name: "nats",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/nats.svg"),
+        label: t("ingestion.nats"),
+        contentClass: "tab_content",
+      },
     ];
 
     // create computed property to filter tabs
