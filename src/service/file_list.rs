@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         search::ScanStats,
@@ -25,6 +26,10 @@ use config::{
 use hashbrown::HashSet;
 use infra::{errors::Result, file_list, storage};
 use rayon::slice::ParallelSliceMut;
+
+use crate::common::utils::search_inspector::{
+    SearchInspectorFieldsBuilder, search_inspector_fields,
+};
 
 #[tracing::instrument(
     name = "service::file_list::query",
@@ -116,9 +121,25 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
             .map(|(id, ..)| *id)
             .collect::<HashSet<_>>();
         log::info!(
-            "[trace_id {trace_id}] file_list get cached_ids: {}, took: {} ms",
-            cached_ids.len(),
-            start.elapsed().as_millis()
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] file_list get cached_ids: {}, took: {} ms",
+                    cached_ids.len(),
+                    start.elapsed().as_millis()
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .node_role(LOCAL_NODE.role.clone())
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component(
+                        "service::file_list::query_by_ids file_list get cached_ids".to_string()
+                    )
+                    .step(12)
+                    .duration(start.elapsed().as_millis() as usize)
+                    .search_cached_ids(cached_ids.len())
+                    .search_remote_db_left_ids(ids.len() - cached_ids.len())
+                    .build()
+            )
         );
 
         FILE_LIST_CACHE_HIT_COUNT
@@ -160,9 +181,23 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         })
         .collect::<Vec<_>>();
     log::info!(
-        "[trace_id {trace_id}] file_list query from db: {}, took: {} ms",
-        db_files.len(),
-        start.elapsed().as_millis()
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] file_list query from db: {}, took: {} ms",
+                db_files.len(),
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("service::file_list::query_by_ids file_list query from db".to_string())
+                .step(12)
+                .duration(start.elapsed().as_millis() as usize)
+                .search_remote_db_files(db_files.len())
+                .search_remote_db_query_took(start.elapsed().as_millis() as usize)
+                .build()
+        )
     );
 
     // 3. set the local cache
@@ -172,10 +207,27 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
             log::error!("[trace_id {trace_id}] file_list set cache failed: {:?}", e);
         }
+
         log::info!(
-            "[trace_id {trace_id}] file_list set cached_ids: {}, took: {} ms",
-            db_files.len(),
-            start.elapsed().as_millis()
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] file_list set cached_ids: {}, took: {} ms",
+                    db_files.len(),
+                    start.elapsed().as_millis()
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .node_role(LOCAL_NODE.role.clone())
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component(
+                        "service::file_list::query_by_ids file_list set cached_ids".to_string()
+                    )
+                    .step(12)
+                    .duration(start.elapsed().as_millis() as usize)
+                    .search_cached_ids(db_files.len())
+                    .search_set_cached_ids_took(start.elapsed().as_millis() as usize)
+                    .build()
+            )
         );
     }
 

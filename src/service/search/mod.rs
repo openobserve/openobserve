@@ -19,7 +19,9 @@ use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
-    TIMESTAMP_COL_NAME, get_config, ider,
+    TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config, ider,
     meta::{
         cluster::RoleGroup,
         search,
@@ -59,7 +61,14 @@ use {
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
+    common::{
+        self,
+        infra::cluster as infra_cluster,
+        utils::{
+            search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+            stream::get_settings_max_query_range,
+        },
+    },
     handler::grpc::request::search::Searcher,
 };
 
@@ -185,7 +194,20 @@ pub async fn search(
         Ok(Err(e)) => Err(e),
         Err(e) => Err(Error::Message(e.to_string())),
     };
-    log::info!("[trace_id {trace_id}] in leader task finish");
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] in leader task finish"),
+            SearchInspectorFieldsBuilder::new()
+                .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("service:search leader".to_string())
+                .step(0)
+                .duration(start.elapsed().as_millis() as usize)
+                .search_leader_spend_time(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     // remove task because task if finished
     let mut _work_group = None;

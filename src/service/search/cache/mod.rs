@@ -17,7 +17,9 @@ use std::str::FromStr;
 
 use chrono::{TimeZone, Utc};
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
@@ -38,7 +40,11 @@ use tracing::Instrument;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-        utils::{functions, http::get_work_group},
+        utils::{
+            functions,
+            http::get_work_group,
+            search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        },
     },
     service::{
         search::{self as SearchService, cache::cacher::check_cache},
@@ -166,11 +172,6 @@ pub async fn search(
             "[trace_id {trace_id}] Query deltas are: {:?}",
             c_resp.deltas
         );
-        log::info!(
-            "[trace_id {trace_id}] Query original start time: {}, end time : {}",
-            req.query.start_time,
-            req.query.end_time
-        );
     }
 
     // Result caching check ends, start search
@@ -234,9 +235,35 @@ pub async fn search(
 
         let mut tasks = Vec::new();
 
-        log::info!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas);
         c_resp.deltas.sort();
         c_resp.deltas.dedup();
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas),
+                SearchInspectorFieldsBuilder::new()
+                    .node_role(LOCAL_NODE.role.clone())
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("service:search:cacher:search deltas".to_string())
+                    .step(1)
+                    .duration(start.elapsed().as_millis() as usize)
+                    .search_cache_spend_time(start.elapsed().as_millis() as usize)
+                    .search_cache_reduce_time((
+                        (req.query.end_time - req.query.start_time) as usize,
+                        c_resp
+                            .deltas
+                            .iter()
+                            .map(|d| (d.delta_end_time - d.delta_start_time) as usize)
+                            .sum()
+                    ))
+                    .build()
+            )
+        );
+        log::info!(
+            "[trace_id {trace_id}] Query original start time: {}, end time : {}",
+            req.query.start_time,
+            req.query.end_time
+        );
 
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let mut req = req.clone();

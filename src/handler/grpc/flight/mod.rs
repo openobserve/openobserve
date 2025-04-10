@@ -30,7 +30,7 @@ use arrow_flight::{
     encode::FlightDataEncoderBuilder, error::FlightError, flight_service_server::FlightService,
 };
 use arrow_schema::Schema;
-use config::{meta::search::ScanStats, metrics};
+use config::{cluster::LOCAL_NODE, meta::search::ScanStats, metrics};
 use datafusion::{
     common::{DataFusionError, Result},
     execution::SendableRecordBatchStream,
@@ -47,6 +47,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use crate::service::search::SEARCH_SERVER;
 use crate::{
+    common::utils::search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     handler::grpc::MetadataMap,
     service::search::{
         grpc::flight as grpcFlight, request::FlightSearchRequest, utils::AsyncDefer,
@@ -107,6 +108,24 @@ impl FlightService for FlightServiceImpl {
         }
 
         let result = get_ctx_and_physical_plan(&trace_id, &req).await;
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] flight->do_get: get_ctx_and_physical_plan took: {} ms",
+                    _start.elapsed().as_millis(),
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .node_role(LOCAL_NODE.role.clone())
+                    .component(
+                        "service:search:flight::do_get get_ctx_and_physical_plan".to_string()
+                    )
+                    .step(0)
+                    .duration(_start.elapsed().as_millis() as usize)
+                    .search_get_ctx_and_physical_plan_took(_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
 
         #[cfg(feature = "enterprise")]
         if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {

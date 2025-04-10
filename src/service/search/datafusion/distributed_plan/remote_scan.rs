@@ -27,6 +27,7 @@ use arrow_flight::{
 };
 use arrow_schema::{Schema, SchemaRef};
 use config::{
+    cluster::LOCAL_NODE,
     meta::search::{ScanStats, SearchEventType},
     utils::rand::generate_random_string,
 };
@@ -55,7 +56,10 @@ use super::{
     codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
     node::RemoteScanNode,
 };
-use crate::service::{grpc::get_cached_channel, search::MetadataMap};
+use crate::{
+    common::utils::search_inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    service::{grpc::get_cached_channel, search::MetadataMap},
+};
 
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
@@ -515,15 +519,29 @@ impl Stream for FlightStream {
 
 impl Drop for FlightStream {
     fn drop(&mut self) {
-        log::info!(
-            "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
-            self.trace_id,
-            self.node_addr,
-            self.is_querier,
-            self.files,
-            self.scan_size / 1024 / 1024,
-            self.num_rows,
-            self.start.elapsed().as_millis(),
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+                self.trace_id,
+                self.node_addr,
+                self.is_querier,
+                self.files,
+                self.scan_size / 1024 / 1024,
+                self.num_rows,
+                self.start.elapsed().as_millis(),
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_role(LOCAL_NODE.role.clone())
+                .node_name(self.node_addr.clone())
+                .component(
+                    "service:search:datafution:distributed_plan FlightStream drop".to_string(),
+                )
+                .step(12)
+                .duration(self.start.elapsed().as_millis() as usize)
+                .search_flighstream_files(self.files as usize)
+                .search_flighstream_num_rows(self.num_rows)
+                .search_flighstream_scan_size(self.scan_size as usize)
+                .build(),
         );
     }
 }
