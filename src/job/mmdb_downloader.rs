@@ -153,7 +153,7 @@ async fn update_maxmind_client() {
         Err(e) => log::warn!(
             "Failed to update maxmind client with path: {}, {}",
             city_fname,
-            e.to_string()
+            e
         ),
     }
 }
@@ -184,7 +184,7 @@ async fn update_maxmind_table(fname: &str) {
         Err(e) => log::warn!(
             "Failed to update maxmind table with path: {}, {}",
             fname,
-            e.to_string()
+            e
         ),
     }
 }

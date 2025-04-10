@@ -1109,7 +1109,7 @@ async fn generate_inverted_index(
                 log::error!(
                     "generate_index_on_compactor write to file list: {}, err: {}, need delete files: {:?}",
                     file_name,
-                    e.to_string(),
+                    e,
                     retain_file_list
                 );
             }
