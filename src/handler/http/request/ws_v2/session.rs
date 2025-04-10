@@ -38,7 +38,8 @@ use crate::service::{
 };
 use crate::{
     common::{
-        infra::config::WS_SEARCH_REGISTRY, utils::websocket::get_ping_interval_secs_with_jitter,
+        infra::{cluster::get_cached_online_router_nodes, config::WS_SEARCH_REGISTRY},
+        utils::websocket::get_ping_interval_secs_with_jitter,
     },
     // router::http::ws_v2::types::StreamMessage,
     service::websocket_events::{
@@ -286,7 +287,20 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                             user_id
                         } else {
                             // cluster mode, use user_id from the ws event added by the router
-                            if let Some(user_id) = &search_req.user_id {
+                            let router_nodes = get_cached_online_router_nodes().await;
+                            let user_id = router_nodes.and_then(|nodes| {
+                                if nodes.is_empty() {
+                                    // if router nodes are not found, use the user_id from the
+                                    // search request
+                                    // since its a single node, running enterprise
+                                    Some(user_id)
+                                } else {
+                                    None
+                                }
+                            });
+                            if let Some(user_id) = user_id {
+                                user_id
+                            } else if let Some(user_id) = &search_req.user_id {
                                 user_id
                             } else {
                                 log::error!("[WS_HANDLER]: User id not found in search request");
