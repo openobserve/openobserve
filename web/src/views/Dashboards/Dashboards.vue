@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <MoveDashboardToAnotherFolder
             @updated="handleDashboardMoved"
-            :dashboard-id="selectedDashboardIdToMove"
+            :dashboard-ids="selectedDashboardIdToMove"
             :activeFolderId="activeFolderToMove"
           />
         </q-dialog>
@@ -883,7 +883,7 @@ export default defineComponent({
     };
 
     const showMoveDashboardPanel = (dashboard: any) => {
-      selectedDashboardIdToMove.value = dashboard.id;
+      selectedDashboardIdToMove.value = [dashboard.id];
       selectedDashboardToMove.value = dashboard;
       showMoveDashboardDialog.value = true;
     };
@@ -980,7 +980,7 @@ export default defineComponent({
     }, 600);
 
     const activeFolderToMove = computed(()=>{
-      return selectedDashboardToMove.value.folder_id ? selectedDashboardToMove.value.folder_id : activeFolderId.value;
+      return selectedDashboardToMove.value?.folder_id ? selectedDashboardToMove.value?.folder_id : activeFolderId.value;
     })
     const clearSearchHistory = () => {
       searchQuery.value = "";
@@ -1028,7 +1028,11 @@ export default defineComponent({
       selected.value = [];
     }
     const moveMultipleDashboards = () => {
-      console.log(selectedDashboardIds.value,'selected value')
+      //here we are showing the move dashboard dialog for multiple dashboards
+      //we are assigning the selected dashboard ids to the props of move dashboard dialog
+      showMoveDashboardDialog.value = true;
+      selectedDashboardIdToMove.value = selectedDashboardIds.value;
+
     }
 
 
