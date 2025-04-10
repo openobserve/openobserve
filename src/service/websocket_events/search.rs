@@ -40,7 +40,7 @@ use crate::{
             },
         },
     },
-    handler::http::request::websocket::session::send_message,
+    handler::http::request::ws_v2::session::send_message,
     service::{
         search::{
             self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,

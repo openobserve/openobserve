@@ -429,10 +429,8 @@ pub struct WebSocket {
     pub session_max_lifetime_secs: i64,
     #[env_config(name = "ZO_WEBSOCKET_SESSION_GC_INTERVAL_SECS", default = 60)]
     pub session_gc_interval_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 15)]
+    #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 30)]
     pub ping_interval_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_HEALTH_CHECK_INTERVAL_SECS", default = 60)]
-    pub health_check_interval: i64,
 }
 
 #[derive(EnvConfig)]
