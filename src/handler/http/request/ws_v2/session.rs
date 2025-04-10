@@ -432,7 +432,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 return;
             };
             let mut session = session.write().await;
-            let _ = session.close(close_reason);
+            let _ = session.close(close_reason).await;
             drop(session);
         }
     }
