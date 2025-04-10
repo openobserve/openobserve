@@ -550,13 +550,11 @@ async fn handle_search_event(
                 match search_result {
                     Ok(_) => {
                         let mut w = WS_SEARCH_REGISTRY.write().await;
-                        w.entry(trace_id_for_task.clone())
-                            .and_modify(|state| *state = SearchState::Completed {
+                        if let Some(state) = w.get_mut(&trace_id_for_task) {
+                            *state = SearchState::Completed {
                                 req_id: req_id.to_string(),
-                            })
-                            .or_insert(SearchState::Completed {
-                                req_id: req_id.to_string(),
-                            });
+                            };
+                        }
                         drop(w);
 
                         // Add audit before closing
@@ -653,15 +651,11 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
         );
         // Update state to cancelled before returning
         let mut w = WS_SEARCH_REGISTRY.write().await;
-        w.entry(trace_id.to_string())
-            .and_modify(|state| {
-                *state = SearchState::Cancelled {
-                    req_id: trace_id.to_string(),
-                }
-            })
-            .or_insert(SearchState::Cancelled {
-                req_id: trace_id.to_string(),
-            });
+        if let Some(state) = w.get_mut(trace_id) {
+            *state = SearchState::Cancelled {
+                req_id: req_id.to_string(),
+            };
+        }
         drop(w);
         return None;
     }
