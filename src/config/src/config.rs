@@ -1483,7 +1483,7 @@ pub struct MemoryCache {
 pub struct DiskCache {
     #[env_config(name = "ZO_DISK_CACHE_ENABLED", default = true)]
     pub enabled: bool,
-    // Disk data cache strategy, default is lru, other value is fifo
+    // Disk data cache strategy, default is lru, other value is fifo, time_lru
     #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
     // Disk data cache bucket num, multiple bucket means multiple locker, default is 0

@@ -135,8 +135,8 @@ impl CacheStrategy {
                 if map.is_empty() {
                     return None;
                 }
-                let time = get_file_time(&key).unwrap_or(0);
-                let idx = map.get(&time).map(|v| *v)?;
+                let time = get_file_time(key).unwrap_or(0);
+                let idx = map.get(&time).copied()?;
                 let (key, size) = cache[idx].remove_entry(key)?;
                 set.remove(&key);
                 Some((key, size))
