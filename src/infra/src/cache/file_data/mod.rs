@@ -21,6 +21,7 @@ use std::{
     ops::Range,
 };
 
+use config::utils::time::get_ymdh_from_micros;
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 
@@ -256,40 +257,36 @@ pub async fn get_size_opts(file: &str, remote: bool) -> object_store::Result<usi
 /// get the file time from the file name
 ///
 /// metrics_cache:
-/// metrics_results/2025/04/08/06/
+/// metrics_results/default/2025/04/08/06/
 /// 17caf18281f2a17c76a803a9cd59a207_1744091424000000_1744091426789749_1744089728661252.pb
 /// log_cache:
 /// results/default/logs/default/16042959487540176184_30_zo_sql_key/
-/// 1744081170000000_1744081170000000_1_0.json
-/// parquet_cache:
+/// 1744081170000000_1744081170000000_1_0.json parquet_cache:
 /// files/default/logs/disk/2025/04/08/06/7315292721030106704.parquet
 fn get_file_time(file: &str) -> Option<u64> {
-    let file = file.split('/').next_back()?;
-    let time = file.split('.').next()?;
-    if !time.contains('_') {
-        return time.parse::<u64>().ok();
-    }
-
-    let columns = time.split('_').collect::<Vec<_>>();
-    if columns.is_empty() {
+    let parts = file.split('/').collect::<Vec<_>>();
+    if parts.len() < 6 {
         return None;
     }
-    if let Ok(time) = columns[0].parse::<u64>() {
-        return Some(time);
-    }
-    if columns.len() < 2 {
-        return None;
-    }
-    if let Ok(time) = columns[1].parse::<u64>() {
-        return Some(time);
-    }
-    if columns.len() < 3 {
-        return None;
-    }
-    if let Ok(time) = columns[2].parse::<u64>() {
-        return Some(time);
-    }
-    None
+    let date = match parts[0] {
+        "metrics_results" => {
+            format!("{}{}{}{}", parts[2], parts[3], parts[4], parts[5])
+        }
+        "results" => {
+            let (_, _, _, meta) = disk::parse_result_cache_key(file)?;
+            get_ymdh_from_micros(meta.start_time).replace("/", "")
+        }
+        "files" => {
+            if parts.len() < 8 {
+                return None;
+            }
+            format!("{}{}{}{}", parts[4], parts[5], parts[6], parts[7])
+        }
+        _ => {
+            return None;
+        }
+    };
+    date.parse::<u64>().ok()
 }
 
 #[cfg(test)]
@@ -299,8 +296,8 @@ mod tests {
     #[test]
     fn test_file_data_lru_cache_miss() {
         let mut cache = CacheStrategy::new("lru");
-        let key1 = "a/b/1.parquet";
-        let key2 = "b/c/2.parquet";
+        let key1 = "files/default/logs/b/2025/04/08/06/1.parquet";
+        let key2 = "files/default/logs/b/2025/04/08/06/2.parquet";
         cache.insert(key1.to_string(), 1);
         cache.insert(key2.to_string(), 2);
         cache.contains_key(key1);
@@ -312,8 +309,8 @@ mod tests {
     #[test]
     fn test_file_data_fifo_cache_miss() {
         let mut cache = CacheStrategy::new("fifo");
-        let key1 = "a/b/1.parquet";
-        let key2 = "b/c/2.parquet";
+        let key1 = "files/default/logs/b/2025/04/08/06/1.parquet";
+        let key2 = "files/default/logs/b/2025/04/08/06/2.parquet";
         cache.insert(key1.to_string(), 1);
         cache.insert(key2.to_string(), 2);
         cache.contains_key(key1);
@@ -325,9 +322,9 @@ mod tests {
     #[test]
     fn test_file_data_file_time_cache_miss() {
         let mut cache = CacheStrategy::new("file_time");
-        let key_small = "b/c/2024.parquet";
-        let key_big = "a/b/2025.parquet";
-        let key_other = "a/b/2023.parquet";
+        let key_small = "files/default/logs/b/2025/04/08/01/1.parquet";
+        let key_big = "files/default/logs/b/2099/04/08/02/2.parquet";
+        let key_other = "files/default/logs/b/2025/04/08/03/2.parquet";
         cache.insert(key_small.to_string(), 1);
         cache.insert(key_big.to_string(), 2);
         cache.insert(key_other.to_string(), 3);
@@ -341,16 +338,16 @@ mod tests {
 
     #[test]
     fn test_file_data_get_file_time() {
-        let file = "metrics_results/2025/04/08/06/17caf18281f2a17c76a803a9cd59a207_1744091424000000_1744091426789749_1744089728661252.pb";
+        let file = "metrics_results/default/2025/04/08/06/17caf18281f2a17c76a803a9cd59a207_1744091424000000_1744091426789749_1744089728661252.pb";
         let time = get_file_time(file);
-        assert_eq!(time, Some(1744091424000000));
+        assert_eq!(time, Some(2025040806));
 
         let file = "results/default/logs/default/16042959487540176184_30_zo_sql_key/1744081170000000_1744081170000000_1_0.json";
         let time = get_file_time(file);
-        assert_eq!(time, Some(1744081170000000));
+        assert_eq!(time, Some(2025040802));
 
         let file = "files/default/logs/disk/2022/10/03/10/7315292721030106704.parquet";
         let time = get_file_time(file);
-        assert_eq!(time, Some(7315292721030106704));
+        assert_eq!(time, Some(2022100310));
     }
 }
