@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="header-item">#</div>
           <div class="header-item">{{ t("dashboard.name") }}</div>
           <div class="header-item">{{ t("dashboard.type") }}</div>
+          <div class="header-item">Scope</div>
           <div class="header-item q-ml-lg q-pl-lg">
             {{ t("dashboard.actions") }}
           </div>
@@ -92,6 +93,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="item-name">{{ variable.name }}</div>
               <div>
                 {{ getVariableTypeLabel(variable.type) }}
+              </div>
+              <div class="item-scope">
+                <div class="scope-info">
+                  <q-badge
+                    color="primary"
+                    v-if="getScopeType(variable) === 'global'"
+                  >
+                    Global
+                  </q-badge>
+                  <q-badge
+                    color="secondary"
+                    v-else-if="getScopeType(variable) === 'tabs'"
+                  >
+                    {{ variable.tabs?.length || 0 }} Tabs
+                  </q-badge>
+                  <q-badge
+                    color="teal"
+                    v-else-if="getScopeType(variable) === 'panels'"
+                  >
+                    {{ variable.panels?.length || 0 }} Panels
+                  </q-badge>
+
+                  <q-tooltip
+                    v-if="
+                      getScopeType(variable) === 'tabs' && variable.tabs?.length
+                    "
+                  >
+                    <div>Applied to tabs:</div>
+                    <div v-for="tabId in variable.tabs" :key="tabId">
+                      {{ getTabName(tabId) }}
+                    </div>
+                  </q-tooltip>
+
+                  <q-tooltip
+                    v-if="
+                      getScopeType(variable) === 'panels' &&
+                      variable.panels?.length
+                    "
+                  >
+                    <div>Applied to panels:</div>
+                    <div v-for="panelId in variable.panels" :key="panelId">
+                      {{ getPanelName(panelId) }}
+                    </div>
+                  </q-tooltip>
+                </div>
               </div>
               <div class="item-actions">
                 <q-btn
@@ -235,6 +281,37 @@ export default defineComponent({
       return variableTypes.find((vType) => vType.value === type)?.label || type;
     };
 
+    // Function to determine the scope type of a variable
+    const getScopeType = (variable: any) => {
+      if (variable.panels && variable.panels.length > 0) {
+        return "panels";
+      } else if (variable.tabs && variable.tabs.length > 0) {
+        return "tabs";
+      } else {
+        return "global";
+      }
+    };
+
+    // Function to get tab name by ID
+    const getTabName = (tabId: string) => {
+      const tab = dashboardVariableData.data.tabs?.find(
+        (t: any) => t.tabId === tabId,
+      );
+      return tab ? tab.name : tabId;
+    };
+
+    // Function to get panel name by ID
+    const getPanelName = (panelId: string) => {
+      // Look through all tabs to find the panel
+      for (const tab of dashboardVariableData.data.tabs || []) {
+        const panel = tab.panels?.find((p: any) => p.id === panelId);
+        if (panel) {
+          return `${tab.name} > ${panel.title || panel.id}`;
+        }
+      }
+      return panelId;
+    };
+
     const handleDragEnd = async () => {
       try {
         dashboardVariableData.data.variables = {
@@ -363,6 +440,9 @@ export default defineComponent({
       dragOptions,
       handleDragEnd,
       getVariableTypeLabel,
+      getScopeType,
+      getTabName,
+      getPanelName,
     };
   },
 });
@@ -411,11 +491,23 @@ export default defineComponent({
 
 .draggable-content {
   display: grid;
-  grid-template-columns: 80px minmax(200px, 1fr) 150px 120px;
+  grid-template-columns: 80px minmax(150px, 1fr) 150px 120px 120px;
   align-items: center;
 
   .item-name {
     padding-right: 16px;
+  }
+
+  .item-scope {
+    .scope-info {
+      display: flex;
+      align-items: center;
+
+      .q-badge {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+      }
+    }
   }
 
   .item-actions {
