@@ -179,7 +179,8 @@ async fn get_parquet_metadata(file: &str) -> Result<(usize, Arc<ParquetMetaData>
     let mut data = get_range(file, file_size - parquet::file::FOOTER_SIZE..file_size).await?;
     let mut buf = [0_u8; parquet::file::FOOTER_SIZE];
     data.copy_to_slice(&mut buf);
-    let metadata_len = ParquetMetaDataReader::decode_footer(&buf)?;
+    let metadata_len =
+        ParquetMetaDataReader::decode_footer_tail(&buf).map(|footer| footer.metadata_length())?;
 
     // read metadata
     let data = get_range(
