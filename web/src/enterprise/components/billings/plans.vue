@@ -171,9 +171,9 @@ export default defineComponent({
     PlanCard,
   },
   emits: ["update:freeSubscription", "update:proSubscription"],
-  mounted() {
+  async mounted() {
     this.loading = true;
-    this.loadSubscription();
+    await this.loadSubscription();
   },
   methods: {
     subscribeFreePlan() {
@@ -189,8 +189,8 @@ export default defineComponent({
         BillingService.resume_subscription(
           this.store.state.selectedOrganization.identifier,
         )
-          .then((res) => {
-            this.loadSubscription(true);
+          .then(async (res) => {
+            await this.loadSubscription(true);
           })
           .catch((e) => {
             this.proLoading = false;
@@ -217,14 +217,23 @@ export default defineComponent({
           });
       }
     },
-    onUnsubscribe() {
+    async onUnsubscribe() {
       this.freeLoading = true;
       BillingService.unsubscribe(
         this.store.state.selectedOrganization.identifier,
       )
-        .then((res) => {
-          this.loadSubscription();
-          this.$router.go(0);
+        .then(async (res: any) => {
+          if(res.status == 200){
+            this.$q.notify({
+              type: "positive",
+              message: res.data,
+              timeout: 5000,
+            });
+            await this.loadSubscription();
+            setTimeout(() => {
+              this.$router.go(0);
+            }, 1000);
+            }
         })
         .catch((e) => {
           this.freeLoading = false;
@@ -255,64 +264,61 @@ export default defineComponent({
           });
         });
     },
-    loadSubscription(fromPro = false) {
-      BillingService.list_subscription(
-        this.store.state.selectedOrganization.identifier,
-      )
-        .then((res) => {
-          this.currentPlanDetail = res.data;
+   async loadSubscription(fromPro = false) {
+    try{
+      const res = await BillingService.list_subscription(this.store.state.selectedOrganization.identifier);
+        this.currentPlanDetail = res.data;
 
-          if (res.data.subscription_type !== "") {
-            if (res.data.subscription_type == config.paidPlan) {
-              this.planType = config.paidPlan;
-              const localOrg: any = useLocalOrganization();
-              localOrg.value.subscription_type = config.paidPlan;
-              useLocalOrganization(localOrg.value);
-              this.store.dispatch("setSelectedOrganization", localOrg.value);
-              this.store.dispatch("setQuotaThresholdMsg", "");
-            } else if (res.data.subscription_type == config.freePlan) {
-              this.planType = config.freePlan;
-              const localOrg: any = useLocalOrganization();
-              localOrg.value.subscription_type = config.freePlan;
-              useLocalOrganization(localOrg.value);
-              this.store.dispatch("setSelectedOrganization", localOrg.value);
-            } else if (res.data.subscription_type == config.enterprisePlan) {
-              this.planType = config.enterprisePlan;
-              const localOrg: any = useLocalOrganization();
-              localOrg.value.subscription_type = config.enterprisePlan;
-              useLocalOrganization(localOrg.value);
-              this.store.dispatch("setSelectedOrganization", localOrg.value);
-              this.store.dispatch("setQuotaThresholdMsg", "");
-            }
-          } else {
-            this.$q.notify({
-              type: "warning",
-              message: "Please subscribe to one of the plan.",
-              timeout: 5000,
-            });
+        if (res.data.subscription_type !== "") {
+          if (res.data.subscription_type == config.paidPlan) {
+            this.planType = config.paidPlan;
+            const localOrg: any = useLocalOrganization();
+            localOrg.value.subscription_type = config.paidPlan;
+            useLocalOrganization(localOrg.value);
+            this.store.dispatch("setSelectedOrganization", localOrg.value);
+            this.store.dispatch("setQuotaThresholdMsg", "");
+          } else if (res.data.subscription_type == config.freePlan) {
+            this.planType = config.freePlan;
+            const localOrg: any = useLocalOrganization();
+            localOrg.value.subscription_type = config.freePlan;
+            useLocalOrganization(localOrg.value);
+            this.store.dispatch("setSelectedOrganization", localOrg.value);
+          } else if (res.data.subscription_type == config.enterprisePlan) {
+            this.planType = config.enterprisePlan;
+            const localOrg: any = useLocalOrganization();
+            localOrg.value.subscription_type = config.enterprisePlan;
+            useLocalOrganization(localOrg.value);
+            this.store.dispatch("setSelectedOrganization", localOrg.value);
+            this.store.dispatch("setQuotaThresholdMsg", "");
           }
-          this.loading = false;
-          this.freeLoading = false;
-          this.proLoading = false;
-          this.$router.push({
-            name: "plans",
-            query: {
-              update_org: Date.now(),
-              org_identifier: this.store.state.selectedOrganization.identifier,
-            },
-          });
-        })
-        .catch((e) => {
-          this.loading = false;
-          this.freeLoading = false;
-          this.proLoading = false;
-
+        } else {
           this.$q.notify({
-            type: "negative",
-            message: e.message,
+            type: "warning",
+            message: "Please subscribe to one of the plan.",
             timeout: 5000,
           });
+        }
+        this.loading = false;
+        this.freeLoading = false;
+        this.proLoading = false;
+        this.$router.push({
+          name: "plans",
+          query: {
+            update_org: Date.now(),
+            org_identifier: this.store.state.selectedOrganization.identifier,
+          },
         });
+    } catch (e) {
+      this.loading = false;
+      this.freeLoading = false;
+      this.proLoading = false;
+
+      this.$q.notify({
+        type: "negative",
+        message: e.message,
+        timeout: 5000,
+      });
+    }
     },
   },
   setup() {
