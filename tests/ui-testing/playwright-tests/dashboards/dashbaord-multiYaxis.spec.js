@@ -9,6 +9,8 @@ import {
   deleteDashboard,
 } from "../utils/dashCreation.js";
 
+import ChartTypeSelector from "../../pages/dashbaordChart.js";
+
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
@@ -31,6 +33,8 @@ test.describe("dashboard filter testcases", () => {
   test("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
     page,
   }) => {
+    const chartTypeSelector = new ChartTypeSelector(page);
+
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -49,5 +53,17 @@ test.describe("dashboard filter testcases", () => {
 
     await page.waitForTimeout(2000);
     await button.click();
+
+    // select the chart
+
+    await chartTypeSelector.selectChartType("line");
+
+    await page.waitForTimeout(2000);
+
+    await chartTypeSelector.selectStreamType("logs");
+
+    await chartTypeSelector.selectStream("e2e_automate");
+
+    await page.waitForTimeout(2000);
   });
 });
