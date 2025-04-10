@@ -42,6 +42,7 @@ export default class DashboardFolder {
     await folderCard.waitFor({ state: "visible", timeout: 10000 });
     await folderCard.scrollIntoViewIfNeeded();
     await folderCard.click();
+    await page.waitForTimeout(200); // Slight pause to allow hover
     await folderCard.click();
     await folderCard.hover();
 

@@ -1,22 +1,10 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
 import { login } from "../utils/dashLogin.js";
-import { ingestion, removeUTFCharacters } from "../utils/dashIngestion.js";
-import {
-  waitForDashboardPage,
-  applyQueryButton,
-  deleteDashboard,
-} from "../utils/dashCreation.js";
+import { ingestion } from "../utils/dashIngestion.js";
+import { waitForDashboardPage } from "../utils/dashCreation.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardFolder from "../../pages/dashboardPages/dashboard-folder.js";
-
-const randomDashboardName =
-  "Dashboard_" + Math.random().toString(36).substr(2, 9);
-
-export function generateUniqueFolderName(prefix = "u") {
-  return `${prefix}_${Date.now()}`;
-}
 
 test.describe.configure({ mode: "parallel" });
 
@@ -45,14 +33,18 @@ test.describe("dashboard folder testcases", () => {
 
     //  Define folderName first
     const folderName = dashboardFolders.generateUniqueFolderName("t");
+
     // Create the folder
     await dashboardFolders.createFolder(folderName);
 
     // Search to confirm it exists
     await dashboardFolders.searchFolder(folderName);
 
+    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+
     //  Delete folder
     await dashboardFolders.deleteFolder(folderName);
+    await expect(page.locator(`text=${folderName}`)).toHaveCount(0);
   });
 
   test("should create and Edit folder name and verify it's updated", async ({
@@ -66,15 +58,20 @@ test.describe("dashboard folder testcases", () => {
 
     //  Define folderName first
     const folderName = dashboardFolders.generateUniqueFolderName("t");
+
     // Create the folder
     await dashboardFolders.createFolder(folderName);
 
     // Search to confirm it exists
     await dashboardFolders.searchFolder(folderName);
+    await expect(page.locator(`text=${folderName}`)).toBeVisible();
 
     const updatedName = folderName + "_updated";
     await dashboardFolders.editFolderName(folderName, updatedName);
     await dashboardFolders.searchFolder(updatedName);
+    await expect(page.locator(`text=${updatedName}`)).toBeVisible();
+
     await dashboardFolders.deleteFolder(updatedName);
+    await expect(page.locator(`text=${folderName}`)).toHaveCount(0);
   });
 });
