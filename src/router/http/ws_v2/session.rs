@@ -46,7 +46,8 @@ impl SessionManager {
         client_id: &ClientId,
         cookie_expiry: Option<DateTime<Utc>>,
     ) {
-        if self.sessions.read().await.get(client_id).is_some() {
+        let r = self.sessions.read().await;
+        if r.get(client_id).is_some() {
             return;
         }
 
@@ -61,6 +62,7 @@ impl SessionManager {
         if !write_guard.contains_key(client_id) {
             write_guard.insert(client_id.clone(), session_info.clone());
         }
+        drop(write_guard);
     }
 
     pub async fn update_session_activity(&self, client_id: &ClientId) {
@@ -68,14 +70,17 @@ impl SessionManager {
         if let Some(session_info) = write_guard.get_mut(client_id) {
             session_info.last_active = chrono::Utc::now();
         }
+        drop(write_guard);
     }
 
     pub async fn remove_trace_id(&self, client_id: &str, trace_id: &str) {
         let querier_name = {
             let mut session_write = self.sessions.write().await;
-            session_write
+            let removed_querier_name = session_write
                 .get_mut(client_id)
-                .and_then(|session_info| session_info.querier_mappings.remove(trace_id))
+                .and_then(|session_info| session_info.querier_mappings.remove(trace_id));
+            drop(session_write);
+            removed_querier_name
         };
 
         if let Some(querier_name) = querier_name {
@@ -95,20 +100,20 @@ impl SessionManager {
                     mapping_write.remove(&querier_name);
                 }
             }
+            drop(mapping_write);
         }
     }
 
     pub async fn reached_max_idle_time(&self, client_id: &ClientId) -> bool {
-        self.sessions
-            .read()
-            .await
-            .get(client_id)
-            .is_none_or(|session_info| {
-                Utc::now()
-                    .signed_duration_since(session_info.last_active)
-                    .num_seconds()
-                    > config::get_config().websocket.session_idle_timeout_secs
-            })
+        let r = self.sessions.read().await;
+        let is_none = r.get(client_id).is_none_or(|session_info| {
+            Utc::now()
+                .signed_duration_since(session_info.last_active)
+                .num_seconds()
+                > config::get_config().websocket.session_idle_timeout_secs
+        });
+        drop(r);
+        is_none
     }
 
     pub async fn unregister_client(&self, client_id: &ClientId) {
@@ -124,16 +129,20 @@ impl SessionManager {
                     }
                 }
             }
+            drop(mapped_querier_write);
         }
     }
 
     pub async fn is_client_cookie_valid(&self, client_id: &ClientId) -> bool {
-        match self.sessions.read().await.get(client_id) {
+        let r = self.sessions.read().await;
+        let is_valid = match r.get(client_id) {
             Some(session_info) => session_info
                 .cookie_expiry
                 .is_none_or(|expiry| expiry > Utc::now()),
             None => false, // not set is treated as unauthenticated
-        }
+        };
+        drop(r);
+        is_valid
     }
 
     pub async fn remove_querier_connection(&self, querier_name: &str) {
@@ -141,19 +150,23 @@ impl SessionManager {
             let (mapped_read, sessions_read) =
                 tokio::join!(self.mapped_queriers.read(), self.sessions.read());
 
-            match mapped_read.get(querier_name) {
+            let client_ids = match mapped_read.get(querier_name) {
                 Some(_) => sessions_read.keys().cloned().collect::<Vec<_>>(),
-                None => return,
-            }
+                None => {
+                    drop(mapped_read);
+                    drop(sessions_read);
+                    return;
+                }
+            };
+            drop(mapped_read);
+            drop(sessions_read);
+            client_ids
         };
 
         // Remove from mapped_querier
-        let trace_ids = self
-            .mapped_queriers
-            .write()
-            .await
-            .remove(querier_name)
-            .unwrap(); // existence validated
+        let mut write_guard = self.mapped_queriers.write().await;
+        let trace_ids = write_guard.remove(querier_name).unwrap(); // existence validated
+        drop(write_guard);
 
         // Batch update sessions
         let mut session_write = self.sessions.write().await;
@@ -165,6 +178,7 @@ impl SessionManager {
                 session_info.querier_mappings.shrink_to_fit();
             }
         }
+        drop(session_write);
     }
 
     pub async fn set_querier_for_trace(
@@ -173,21 +187,19 @@ impl SessionManager {
         trace_id: &TraceId,
         querier_name: &QuerierName,
     ) -> WsResult<()> {
-        self.sessions
-            .write()
-            .await
-            .get_mut(client_id)
+        let mut w = self.sessions.write().await;
+        w.get_mut(client_id)
             .ok_or(WsError::SessionNotFound(format!("client_id {}", client_id)))?
             .querier_mappings
             .insert(trace_id.clone(), querier_name.clone());
+        drop(w);
 
         // mapped_queriers
-        self.mapped_queriers
-            .write()
-            .await
-            .entry(querier_name.clone())
+        let mut w = self.mapped_queriers.write().await;
+        w.entry(querier_name.clone())
             .or_insert_with(HashSet::new)
             .insert(trace_id.clone());
+        drop(w);
         Ok(())
     }
 
@@ -196,41 +208,44 @@ impl SessionManager {
         client_id: &ClientId,
         trace_id: &TraceId,
     ) -> WsResult<Option<QuerierName>> {
-        Ok(self
-            .sessions
-            .read()
-            .await
+        let r = self.sessions.read().await;
+        let querier_name = r
             .get(client_id)
             .ok_or(WsError::SessionNotFound(format!("client_id {}", client_id)))?
             .querier_mappings
             .get(trace_id)
-            .cloned())
+            .cloned();
+        drop(r);
+        Ok(querier_name)
     }
 
     pub async fn get_querier_connections(&self, client_id: &ClientId) -> Vec<QuerierName> {
-        self.sessions
-            .read()
-            .await
+        let r = self.sessions.read().await;
+        let querier_names = r
             .get(client_id)
             .map(|session_info| session_info.querier_mappings.values().cloned().collect())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        drop(r);
+        querier_names
     }
 
     pub async fn get_trace_ids(&self, client_id: &ClientId) -> Vec<TraceId> {
-        self.sessions
-            .read()
-            .await
+        let r = self.sessions.read().await;
+        let trace_ids = r
             .get(client_id)
             .map(|session_info| session_info.querier_mappings.keys().cloned().collect())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        drop(r);
+        trace_ids
     }
 
     pub async fn is_session_drain_state(&self, client_id: &ClientId) -> Arc<AtomicBool> {
-        self.sessions
-            .read()
-            .await
+        let r = self.sessions.read().await;
+        let is_session_drain_state = r
             .get(client_id)
             .map(|session_info| session_info.is_session_drain_state.clone())
-            .unwrap_or(Arc::new(AtomicBool::new(false)))
+            .unwrap_or(Arc::new(AtomicBool::new(false)));
+        drop(r);
+        is_session_drain_state
     }
 }

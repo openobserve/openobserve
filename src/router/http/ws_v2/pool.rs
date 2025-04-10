@@ -45,15 +45,16 @@ impl QuerierConnectionPool {
             log::info!(
                 "[WS::ConnectionPool] returning existing connection to querier {querier_name}"
             );
+            let conn = conn.clone();
             drop(r);
-            return Ok(conn.clone());
+            return Ok(conn);
         }
         drop(r);
 
         // Create new connection
         let conn = super::connection::create_connection(querier_name).await?;
 
-        let w = self.connections.write().await;
+        let mut w = self.connections.write().await;
         w.insert(querier_name.to_string(), conn.clone());
         drop(w);
 
@@ -66,7 +67,7 @@ impl QuerierConnectionPool {
     }
 
     pub async fn remove_querier_connection(&self, querier_name: &str) {
-        let w = self.connections.write().await;
+        let mut w = self.connections.write().await;
         if let Some(conn) = w.remove(querier_name) {
             log::warn!("[WS::ConnectionPool] removing connection to querier {querier_name}");
             conn.disconnect().await;
@@ -82,6 +83,7 @@ impl QuerierConnectionPool {
             );
             conn.disconnect().await;
         }
+        drop(writer_guard);
     }
 
     pub async fn get_active_connection(

@@ -85,7 +85,8 @@ impl Drop for ResponseRouter {
 impl ResponseRouter {
     pub async fn flush(&self) {
         let mut count = 0;
-        for (trace_id, sender) in self.routes.write().await.drain() {
+        let mut write_guard = self.routes.write().await;
+        for (trace_id, sender) in write_guard.drain() {
             // Send error response to client
             let _ = sender
                 .send(WsServerEvents::Error {
@@ -100,7 +101,7 @@ impl ResponseRouter {
                 .await;
             count += 1;
         }
-
+        drop(write_guard);
         log::info!("[WS::QuerierConnection::ResponseRouter] flushed {count} routes",);
     }
 }
@@ -117,11 +118,9 @@ pub async fn create_connection(querier_name: &QuerierName) -> WsResult<Arc<Queri
 
 impl QuerierConnection {
     pub async fn register_request(&self, trace_id: TraceId, response_tx: Sender<WsServerEvents>) {
-        self.response_router
-            .routes
-            .write()
-            .await
-            .insert(trace_id, response_tx);
+        let mut write_guard = self.response_router.routes.write().await;
+        write_guard.insert(trace_id, response_tx);
+        drop(write_guard);
     }
 
     pub async fn unregister_request(&self, trace_id: &TraceId) {
@@ -129,6 +128,7 @@ impl QuerierConnection {
         write_guard.remove(trace_id);
         write_guard.shrink_to_fit();
         log::debug!("[WS::Connection] removed trace_id {trace_id} from response_router-routes");
+        drop(write_guard);
     }
 
     async fn listen_to_querier_response(
@@ -238,6 +238,7 @@ impl QuerierConnection {
             let mut write_guard = self.write.lock().await;
             match write_guard.as_mut() {
                 None => {
+                    drop(write_guard);
                     break;
                 }
                 Some(w) => {
@@ -246,30 +247,33 @@ impl QuerierConnection {
                             "[WS::QuerierConnection] failed to send ping message to querier {}",
                             self.querier_name
                         );
+                        drop(write_guard);
                         break;
                     }
                 }
             }
+            drop(write_guard);
         }
 
         self.clean_up(true).await;
     }
 
     pub async fn is_active_trace_id(&self, trace_id: &TraceId) -> bool {
-        self.response_router
-            .routes
-            .read()
-            .await
-            .contains_key(trace_id)
+        let r = self.response_router.routes.read().await;
+        let is_active = r.contains_key(trace_id);
+        drop(r);
+        is_active
     }
 
     pub async fn _send_ping(&self) -> WsResult<()> {
         let mut write_guard = self.write.lock().await;
         if let Some(write) = write_guard.as_mut() {
             if let Err(e) = write.send(WsMessage::Ping(vec![])).await {
+                drop(write_guard);
                 return Err(WsError::ConnectionError(e.to_string()));
             }
         }
+        drop(write_guard);
         Ok(())
     }
 
@@ -294,6 +298,7 @@ impl QuerierConnection {
             }
             *write_guard = None;
         }
+        drop(write_guard);
 
         log::info!(
             "[WS::QuerierConnection] removing connection from the pool: {}, force_remove: {}",
@@ -337,22 +342,25 @@ impl ResponseRouter {
                 }
             });
             write_guard.shrink_to_fit();
+            drop(write_guard);
         }
     }
 
     pub async fn route_response(&self, message: WsServerEvents) -> WsResult<()> {
         let trace_id = message.get_trace_id();
 
-        match self.routes.read().await.get(&trace_id) {
-            None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
-            Some(resp_sender) => {
-                resp_sender
-                    .send(message)
-                    .await
-                    .map_err(|_| WsError::ResponseChannelClosed(trace_id.clone()))?;
-                Ok(())
-            }
+        let r = self.routes.read().await;
+        if let Some(resp_sender) = r.get(&trace_id) {
+            resp_sender
+                .send(message)
+                .await
+                .map_err(|_| WsError::ResponseChannelClosed(trace_id.clone()))?;
+        } else {
+            drop(r);
+            return Err(WsError::ResponseChannelNotFound(trace_id.clone()));
         }
+        drop(r);
+        Ok(())
     }
 }
 
@@ -409,6 +417,7 @@ impl Connection for QuerierConnection {
             _ = write.close().await;
             *write_guard = None;
         }
+        drop(write_guard);
         _ = self.shutdown_tx.send(()).await;
     }
 
@@ -425,18 +434,21 @@ impl Connection for QuerierConnection {
                         trace_id,
                         self.querier_name
                     );
+                    drop(write_guard);
                     Ok(())
                 }
                 Err(e) => {
                     log::error!(
                         "[WS::QuerierConnection] error sending messages via connection {e}. Mark the connection disconnected"
                     );
+                    drop(write_guard);
                     Err(WsError::ConnectionError(format!(
                         "[WS::QuerierConnection] error sending messages via connection {e}"
                     )))
                 }
             }
         } else {
+            drop(write_guard);
             Err(WsError::ConnectionError("Not connected".into()))
         }
     }

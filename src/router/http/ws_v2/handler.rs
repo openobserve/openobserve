@@ -18,13 +18,12 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
-    time::Instant,
 };
 
 use actix_http::StatusCode;
 use actix_web::{Error, HttpRequest, HttpResponse, web};
 use actix_ws::{CloseCode, CloseReason};
-use config::{RwHashMap, get_config, meta::cluster::RoleGroup, utils::json};
+use config::{get_config, meta::cluster::RoleGroup, utils::json};
 use futures_util::StreamExt;
 
 use super::{
@@ -48,7 +47,7 @@ pub type TraceId = String;
 pub struct WsHandler {
     pub session_manager: Arc<SessionManager>,
     pub connection_pool: Arc<QuerierConnectionPool>,
-    pub request_timings: Arc<RwHashMap<TraceId, Instant>>,
+    // pub request_timings: Arc<RwAHashMap<TraceId, Instant>>,
 }
 
 impl Drop for WsHandler {
@@ -65,7 +64,7 @@ impl WsHandler {
         Self {
             session_manager,
             connection_pool,
-            request_timings: Arc::new(Default::default()),
+            // request_timings: Arc::new(Default::default()),
         }
     }
 
@@ -101,7 +100,7 @@ impl WsHandler {
             tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
-        let request_timings = self.request_timings.clone();
+        // let request_timings = self.request_timings.clone();
 
         // Before spawning the async task, clone the drain state
         let is_session_drain_state = session_manager.is_session_drain_state(&client_id).await;
@@ -254,7 +253,9 @@ impl WsHandler {
                                                 .await;
 
                                             // Record start time for this trace_id
-                                            request_timings.insert(trace_id.clone(), Instant::now());
+                                            // let mut write_guard = request_timings.write().await;
+                                            // write_guard.insert(trace_id.clone(), Instant::now());
+                                            // drop(write_guard);
 
                                             if let Err(e) = querier_conn.send_message(message).await
                                             {
@@ -341,15 +342,17 @@ impl WsHandler {
                                         session_manager.remove_trace_id(&client_id, &trace_id).await;
 
                                         // Track Search Request Duration
-                                        if let Some((_, start_time)) = request_timings.remove(&trace_id) {
-                                            let duration = start_time.elapsed();
-                                            log::info!(
-                                                "[WS::Router::Handler] Request completed for client_id: {}, trace_id: {}, duration: {:?}",
-                                                client_id,
-                                                trace_id,
-                                                duration
-                                            );
-                                        }
+                                        // let mut write_guard = request_timings.write().await;
+                                        // if let Some(start_time) = write_guard.remove(&trace_id) {
+                                        //     let duration = start_time.elapsed();
+                                        //     log::info!(
+                                        //         "[WS::Router::Handler] Request completed for client_id: {}, trace_id: {}, duration: {:?}",
+                                        //         client_id,
+                                        //         trace_id,
+                                        //         duration
+                                        //     );
+                                        // }
+                                        // drop(write_guard);
                                     }
                                 }
                             }
@@ -455,14 +458,16 @@ impl WsHandler {
                                                             session_manager.remove_trace_id(&client_id, &trace_id).await;
 
                                                             // Track Search Request Duration
-                                                            if let Some((_, start_time)) = request_timings.remove(&trace_id) {
-                                                                let duration = start_time.elapsed();
-                                                                log::info!(
-                                                                    "[WS::Router::Handler] Request completed - trace_id: {}, duration: {:?}",
-                                                                    trace_id,
-                                                                    duration
-                                                                );
-                                                            }
+                                                            // let mut write_guard = request_timings.write().await;
+                                                            // if let Some(start_time) = write_guard.remove(&trace_id) {
+                                                            //     let duration = start_time.elapsed();
+                                                            //     log::info!(
+                                                            //         "[WS::Router::Handler] Request completed - trace_id: {}, duration: {:?}",
+                                                            //         trace_id,
+                                                            //         duration
+                                                            //     );
+                                                            // }
+                                                            // drop(write_guard);
 
                                                             // Check if this was the last trace_id
                                                             let remaining_trace_ids = session_manager.get_trace_ids(&client_id).await;
