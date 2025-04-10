@@ -110,9 +110,9 @@ export default defineComponent({
       type: String,
       default: "default",
     },
-    dashboardId: {
-      type: String,
-      default: "",
+    dashboardIds: {
+      type: Array,
+      default: [],
     },
   },
   emits: ["updated"],
@@ -135,11 +135,12 @@ export default defineComponent({
         if (!valid) {
           return false;
         }
+        // here  we send dashboard ids as array so it will work for both single and multiple dashboards move
 
         try {
           await moveDashboardToAnotherFolder(
             store,
-            props.dashboardId,
+            props.dashboardIds,
             props.activeFolderId,
             selectedFolder.value.value
           );
