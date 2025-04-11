@@ -13,13 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::storage::get;
+use bytes::Bytes;
+use crate::storage::{get, put};
 
 pub async fn test_s3_config() -> Result<(), anyhow::Error> {
+    let test_file = "test/test2/s3_test.txt";
     // Test download
-    if let Err(e) = get("test/test2/s3_test.txt").await {
+    if let Err(e) = get(test_file).await {
         if !e.to_string().contains("404") {
             return Err(anyhow::anyhow!("S3 download test failed: {:?}", e));
+        } else {
+            let test_content = Bytes::from("Hello, S3!");
+            // Test upload
+            if let Err(e) = put(test_file, test_content.clone()).await {
+                return Err(anyhow::anyhow!("S3 upload test failed: {:?}", e));
+            }
         }
     }
 
