@@ -219,8 +219,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #no-data>
             <NoData />
           </template>
-<!-- `            header selection which on click selects all the dashboards -->
-`          <template #header-selection="scope">
+          <!-- header selection which on click selects all the dashboards -->
+          <template #header-selection="scope">
             <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
           </template>
           <!-- body selection which on click selects the dashboard -->
@@ -607,7 +607,6 @@ export default defineComponent({
         //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder 
         //the selected dashboards are not shown
         selected.value = [];
-        selectedDashboardIds.value = [];
         try {
           const response = await getAllDashboardsByFolderId(
             store,
@@ -812,7 +811,6 @@ export default defineComponent({
 
     const dashboards = computed(function () {
       selected.value = [];
-      selectedDashboardIds.value = [];
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         const dashboardList = toRaw(
           store.state.organizationData?.allDashboardList[
@@ -1018,16 +1016,21 @@ export default defineComponent({
       htmlA.click();
     };
     const multipleExportDashboard = async () => {
-
-      selectedDashboardIds.value.forEach(async (dashboardId,index) => {
-        await downloadDashboard(dashboardId,index);
-      });
+      //using Promise.all to download all dashboards in parallel
+      //this will make sure that the success message is shown after all the dashboards are downloaded
+      try {
+        await Promise.all(selectedDashboardIds.value.map(async (dashboardId, index) => {
+        await downloadDashboard(dashboardId, index);
+      }));
 
       showPositiveNotification(`${selectedDashboardIds.value.length} Dashboards exported successfully.`);
       //resetting the selected dashboards
       //to avoid further export of same dashboards
-      selectedDashboardIds.value = [];
       selected.value = [];
+      } catch (error) {
+        showErrorNotification(error?.message ?? "Error exporting dashboards");
+      }
+
     }
     const moveMultipleDashboards = () => {
       //here we are showing the move dashboard dialog for multiple dashboards
