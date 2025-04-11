@@ -237,7 +237,9 @@ export default defineComponent({
       const router = useRouter();
 
       onMounted(async () => {
-        await getFoldersListByType(store, "alerts");
+        if(store.state.organizationData.foldersByType.length == 0) {
+          await getFoldersListByType(store, "alerts");
+        }
         if(router.currentRoute.value.query.folder) {
           activeFolderId.value = router.currentRoute.value.query.folder;
         }
