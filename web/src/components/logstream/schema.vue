@@ -260,7 +260,7 @@ class="indexDetailsContainer" style="height: 100vh">
                     <q-tooltip 
                     style="font-size: 14px; width: 250px;"
                     >
-                    Pre-user defined schema fields show only the schema fields that existed before the stream was configured to use a user-defined schema.
+                    Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema.
                     </q-tooltip>
                   </q-icon>
                 </div>
@@ -838,7 +838,7 @@ export default defineComponent({
       if(!hasUserDefinedSchema.value){
         return 'All Fields'
       }
-      return 'Pre-User Defined Schema Fields'
+      return 'Other Fields'
     })
 
     const streamIndexType = [
