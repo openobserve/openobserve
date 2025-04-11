@@ -971,7 +971,6 @@ export default defineComponent({
             });
           }
           dismiss();
-        
       } catch (error) {
           console.error(error);
           dismiss();
