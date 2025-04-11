@@ -111,6 +111,11 @@ use tracing_subscriber::{
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let cfg = get_config();
+    // check s3 config
+    if let Err(e) = infra::storage::s3_test::test_s3_config().await {
+        panic!("s3 test failed. please check your s3 config, err: {e}")
+    }
+
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(
