@@ -1610,7 +1610,7 @@ pub fn get_alert_start_end_time(
     }
     (alert_start_time, alert_end_time)
 }
-
+#[allow(dead_code)]
 fn format_variable_value(val: String) -> String {
     val.chars()
         .flat_map(|c| c.escape_default())
@@ -1645,7 +1645,7 @@ impl VarValue<'_> {
             self.len()
         };
         match self {
-            VarValue::Str(v) => format_variable_value(v.chars().take(n).collect()),
+            VarValue::Str(v) => v.chars().take(n).collect(),
             VarValue::Vector(v) => v[0..n].join(if is_email { "" } else { "\\n" }),
         }
     }
