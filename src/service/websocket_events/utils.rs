@@ -319,7 +319,7 @@ pub mod search_registry_utils {
 )]
 pub enum WsClientEvents {
     Search(Box<SearchEventReq>),
-    Values(ValuesEventReq),
+    Values(Box<ValuesEventReq>),
     #[cfg(feature = "enterprise")]
     Cancel {
         trace_id: String,

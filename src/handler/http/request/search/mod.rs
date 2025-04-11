@@ -652,11 +652,36 @@ pub async fn values(
 
 pub type FieldName = String;
 
+/// Builds a search request per field
+/// 
+/// This function builds a search request per field based on the given request and parameters.
+/// Search request can basically be of two types:
+///     1. Search on distinct values stream
+///     2. Search on original data stream
+/// If the field is a distinct field, we will search of the distinct values stream.
+/// Otherwise, we will search on the original data stream.
+/// 
+/// The `use_result_cache` parameter is used to determine the projection of the SQL query.
+/// This flag will toggle the resultant requests between streaming aggregations and result cache.
+/// By default, this function will produce an SQL which utilizes `Streaming Aggregations` to send the results to the client.
+/// The SQL will be a simple aggregation query in case streaming aggregations are used.
+/// If `use_result_cache` is set to true, the SQL projectoin will include a histogram which will allow the use of result cache.
+/// 
+/// Another parameter is `no_count` which is used to determine if the count is needed or not.
+/// `no_count` is used when only distinct values (sorted in alphabetical order) are needed but not the frequency of the values.
+/// For example, Dashboards, where we show the values listed in alphabetical order.
+/// 
+/// Since values request can contain multiple fields, we return a vector of requests.
+/// Each request is a tuple of `Request`, `StreamType`, and `FieldName`.
+/// The `Request` contains the SQL query, from, size, start_time, end_time, etc.
+/// The `StreamType` is the type of the stream to search on.
+/// The `FieldName` is the name of the field to search on.
 pub async fn build_search_request_per_field(
     req: &config::meta::search::ValuesRequest,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    use_result_cache: bool,
 ) -> Result<Vec<(config::meta::search::Request, StreamType, FieldName)>, Error> {
     let query_fn = req.vrl_fn
         .as_ref()
@@ -816,14 +841,19 @@ pub async fn build_search_request_per_field(
 
     let mut requests = Vec::new();
     for field in fields {
-        let sql = if no_count {
-            format!(
+        let sql = match (no_count, use_result_cache) {
+            (true, true) => format!(
+                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
+            ),
+            (true, false) => format!(
                 "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
-            )
-        } else {
-            format!(
+            ),
+            (false, true) => format!(
+                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
+            ),
+            (false, false) => format!(
                 "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC"
-            )
+            ),
         };
 
         let mut req = req.clone();

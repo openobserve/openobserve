@@ -773,7 +773,7 @@ async fn handle_values_event(
     let is_audit_enabled = get_o2_config().common.audit_enabled;
 
     #[cfg(feature = "enterprise")]
-    let client_msg = WsClientEvents::Values(values_req.clone());
+    let client_msg = WsClientEvents::Values(Box::new(values_req.clone()));
 
     // Register running values search BEFORE spawning the values task
     let mut w = WS_SEARCH_REGISTRY.write().await;
