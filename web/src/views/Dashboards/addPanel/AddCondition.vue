@@ -209,7 +209,7 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { getAllSelectedStreams } = useDashboardPanelData(
+    const { getAllSelectedStreams, buildCondition } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
     const { t } = useI18n();
@@ -273,47 +273,49 @@ export default defineComponent({
     const filterOptions = ["AND", "OR"];
 
     const computedLabel = (condition: any) => {
-      if (condition.operator === "match_all") {
-        return condition.operator + "(" + condition.value + ")";
-      } else if (condition.operator === "str_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "str_match_ignore_case") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "re_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "re_not_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else {
-        return props.condition.column;
-      }
+      // if (condition.operator === "match_all") {
+      //   return condition.operator + "(" + condition.value + ")";
+      // } else if (condition.operator === "str_match") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else if (condition.operator === "str_match_ignore_case") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else if (condition.operator === "re_match") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else if (condition.operator === "re_not_match") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else {
+      //   return props.condition.column;
+      // }
+      const builtCondition = buildCondition(condition);
+      return builtCondition === "" ? condition.column.field : builtCondition;
     };
 
     const emitLogicalOperatorChange = (newOperator: string) => {

@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     padding="sm"
-                    @click="addFilteredItem(props.row.name)"
+                    @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     padding="sm"
-                    @click="addFilteredItem(props.row.name)"
+                    @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
@@ -434,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-btn>
                   <q-btn
                     padding="sm"
-                    @click="addFilteredItem(props.row.name)"
+                    @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
@@ -503,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     padding="sm"
-                    @click="addFilteredItem(props.row.name)"
+                    @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
