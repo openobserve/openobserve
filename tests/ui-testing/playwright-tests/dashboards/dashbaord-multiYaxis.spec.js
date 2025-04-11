@@ -9,7 +9,7 @@ import {
   deleteDashboard,
 } from "../utils/dashCreation.js";
 
-import ChartTypeSelector from "../../pages/dashbaordChart.js";
+import ChartTypeSelector from "../../pages/dashboardPages/dashboardChart.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -64,6 +64,9 @@ test.describe("dashboard filter testcases", () => {
 
     await chartTypeSelector.selectStream("e2e_automate");
 
+    await page.waitForTimeout(2000);
+
+    await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
     await page.waitForTimeout(2000);
   });
 });
