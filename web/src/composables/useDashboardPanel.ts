@@ -1516,7 +1516,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       });
 
       dashboardPanelData.meta.filterValue.push({
-        column: {
+        filterItem: {
           field: filterItem.name,
           streamAlias: filterItem.streamAlias,
         },
@@ -1570,15 +1570,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       .then((res: any) => {
         const find = dashboardPanelData.meta.filterValue.findIndex(
           (it: any) =>
-            it.column.field === filterItem.field &&
-            it.column.streamAlias === filterItem.streamAlias,
+            it.filterItem.field === filterItem.field &&
+            it.filterItem.streamAlias === filterItem.streamAlias,
         );
         if (find >= 0) {
           dashboardPanelData.meta.filterValue.splice(find, 1);
         }
         dashboardPanelData.meta.filterValue.push({
-          column: filterItem,
-          streamName: streamName,
+          filterItem: filterItem,
           value: res?.data?.hits?.[0]?.values
             .map((it: any) => it.zo_sql_key)
             .filter((it: any) => it)
