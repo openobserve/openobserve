@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @updated:dataZoom="onChartUpdate"
         />
         
-        <div v-else-if="searchObj.meta.showHistogram && (Object.keys(plotChart)?.length == 0)">
+        <div v-else-if="searchObj.meta.showHistogram && (Object.keys(plotChart)?.length == 0) && searchObj.loadingHistogram == false && searchObj.loading == false">
           <h3
             class="text-center"
             style="margin: 30px 0px"
@@ -124,8 +124,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           class="q-pb-lg"
-          style="top: 50px; position: absolute; left: 45%"
-          v-if="searchObj.loadingHistogram == true"
+          style=" left: 45%; margin: 30px 0px"
+          v-if="(searchObj.loadingHistogram == true && searchObj.meta.showHistogram) || (searchObj.loading == true && searchObj.meta.showHistogram) && ( plotChart && Object.keys(plotChart)?.length == 0) "
+          
         >
           <q-spinner-hourglass
             color="primary"
