@@ -24,8 +24,10 @@
         class="q-pl-sm"
         :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
       >
-        <!-- @show="(e: any) => loadFilterItem(condition.column)" -->
-        <q-menu class="q-pa-md">
+        <q-menu
+          class="q-pa-md"
+          @show="(e: any) => loadFilterItem(condition.column)"
+        >
           <div style="display: flex">
             <!-- <q-select
               v-model="condition.column"
@@ -218,20 +220,11 @@ export default defineComponent({
       useSelectAutoComplete(toRef(props, "schemaOptions"), "label");
 
     const filteredListOptions = computed(() => {
-      // get stream name from streamAlias
-      const streamName =
-        getAllSelectedStreams().find(
-          (it: any) => it.streamAlias == props?.condition?.column?.streamAlias,
-        )?.stream ??
-        props.dashboardPanelData.data.queries[
-          props.dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream;
-
       const options = props.dashboardPanelData.meta.filterValue
         .find(
           (it: any) =>
-            it.column == props?.condition?.column?.field &&
-            it?.streamName == streamName,
+            it.filterItem.field == props?.condition?.column?.field &&
+            it.filterItem.streamAlias == props?.condition?.column?.streamAlias,
         )
         ?.value?.filter((option: any) =>
           option?.toLowerCase().includes(searchTerm.value.toLowerCase()),
