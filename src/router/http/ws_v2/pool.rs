@@ -40,19 +40,24 @@ impl QuerierConnectionPool {
         &self,
         querier_name: &QuerierName,
     ) -> WsResult<Arc<QuerierConnection>> {
-        if let Some(conn) = self.connections.read().await.get(querier_name) {
+        let r = self.connections.read().await;
+        if let Some(conn) = r.get(querier_name) {
             log::info!(
                 "[WS::ConnectionPool] returning existing connection to querier {querier_name}"
             );
-            return Ok(conn.clone());
+            let conn = conn.clone();
+            drop(r);
+            return Ok(conn);
         }
+        drop(r);
 
         // Create new connection
         let conn = super::connection::create_connection(querier_name).await?;
-        self.connections
-            .write()
-            .await
-            .insert(querier_name.to_string(), conn.clone());
+
+        let mut w = self.connections.write().await;
+        w.insert(querier_name.to_string(), conn.clone());
+        drop(w);
+
         log::info!("[WS::ConnectionPool] created new connection to querier {querier_name}");
         QuerierConnectionPool::print_all_connections(
             format!("after create new {}", querier_name).as_str(),
@@ -62,10 +67,12 @@ impl QuerierConnectionPool {
     }
 
     pub async fn remove_querier_connection(&self, querier_name: &str) {
-        if let Some(conn) = self.connections.write().await.remove(querier_name) {
+        let mut w = self.connections.write().await;
+        if let Some(conn) = w.remove(querier_name) {
             log::warn!("[WS::ConnectionPool] removing connection to querier {querier_name}");
             conn.disconnect().await;
         }
+        drop(w);
     }
 
     pub async fn _shutdown(&self) {
@@ -76,6 +83,7 @@ impl QuerierConnectionPool {
             );
             conn.disconnect().await;
         }
+        drop(writer_guard);
     }
 
     pub async fn get_active_connection(
@@ -83,7 +91,9 @@ impl QuerierConnectionPool {
         querier_name: &QuerierName,
     ) -> Option<Arc<QuerierConnection>> {
         let read_guard = self.connections.read().await;
-        read_guard.get(querier_name).cloned()
+        let conn = read_guard.get(querier_name).cloned();
+        drop(read_guard);
+        conn
     }
 
     pub async fn clean_up(querier_name: &QuerierName) {
@@ -106,14 +116,10 @@ impl QuerierConnectionPool {
     pub async fn print_all_connections(helper_txt: &str) {
         let ws_handler = get_ws_handler().await;
         let ws_handler_clone = ws_handler.clone();
-        for (querier_name, _) in ws_handler_clone
-            .connection_pool
-            .connections
-            .read()
-            .await
-            .iter()
-        {
+        let r = ws_handler_clone.connection_pool.connections.read().await;
+        for (querier_name, _) in r.iter() {
             log::info!("[WS::ConnectionPool]   {helper_txt}: {querier_name}");
         }
+        drop(r);
     }
 }

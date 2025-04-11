@@ -154,7 +154,7 @@ pub mod sessions_cache_utils {
         // close and remove expired sessions
         for session_id in expired {
             // Clean up associated searches first
-            cleanup_searches_for_session(&session_id);
+            cleanup_searches_for_session(&session_id).await;
 
             // Close and remove session
             if let Some(session) = get_session(&session_id).await {
@@ -183,20 +183,23 @@ pub mod sessions_cache_utils {
         );
     }
 
-    fn cleanup_searches_for_session(session_id: &str) {
-        let searches_to_remove: Vec<String> = WS_SEARCH_REGISTRY
+    async fn cleanup_searches_for_session(session_id: &str) {
+        let r = WS_SEARCH_REGISTRY.read().await;
+        let searches_to_remove: Vec<String> = r
             .iter()
-            .filter_map(|entry| {
-                if entry.value().get_req_id() == session_id {
-                    Some(entry.key().clone())
+            .filter_map(|(key, state)| {
+                if state.get_req_id() == session_id {
+                    Some(key.clone())
                 } else {
                     None
                 }
             })
             .collect();
+        drop(r);
 
         for trace_id in searches_to_remove {
-            if let Some((_, state)) = WS_SEARCH_REGISTRY.remove(&trace_id) {
+            let mut w = WS_SEARCH_REGISTRY.write().await;
+            if let Some(state) = w.remove(&trace_id) {
                 match state {
                     SearchState::Running { cancel_tx, req_id } => {
                         let _ = cancel_tx.try_send(());
@@ -215,6 +218,7 @@ pub mod sessions_cache_utils {
                     }
                 }
             }
+            drop(w);
         }
     }
 
@@ -283,10 +287,13 @@ pub mod search_registry_utils {
     }
 
     // Add this function to check if a search is cancelled
-    pub fn is_cancelled(trace_id: &str) -> Option<bool> {
-        WS_SEARCH_REGISTRY
+    pub async fn is_cancelled(trace_id: &str) -> Option<bool> {
+        let r = WS_SEARCH_REGISTRY.read().await;
+        let is_cancelled = r
             .get(trace_id)
-            .map(|state| matches!(*state, SearchState::Cancelled { .. }))
+            .map(|state| matches!(*state, SearchState::Cancelled { .. }));
+        drop(r);
+        is_cancelled
     }
 }
 
