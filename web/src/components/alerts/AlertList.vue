@@ -108,7 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <FolderList
             type="alerts"
             @update:activeFolderId="updateActiveFolderId"
-            :alertsLoading="alertsLoading"
           />
         </template>
         <template #after>
@@ -836,10 +835,6 @@ export default defineComponent({
     const filteredResults: Ref<any[]> = ref([]);
     const selectedAlertToMove: Ref<any> = ref({});
     const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
-    //alertsLoading is used to disable the folderList when the alerts are loading
-    //because if users tries to load the alerts and switch the folder then again switch to other folder due to time taken by the server to fetch the alerts
-    //it may show the old folder alerts in new folders 
-    const alertsLoading = ref(false);
     const getAlertsByFolderId = async (store: any, folderId: any) => {
       try {
         //this is the condition where we are fetching the alerts from the server 
@@ -868,7 +863,6 @@ export default defineComponent({
       //for a moment also so we are not filtering the alerts by the activeTab 
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
-      alertsLoading.value = true;
       if (query){
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];
@@ -977,9 +971,7 @@ export default defineComponent({
             });
           }
           dismiss();
-          alertsLoading.value = false;
       } catch (error) {
-        alertsLoading.value = false;
           console.error(error);
           dismiss();
           $q.notify({
@@ -1894,7 +1886,6 @@ export default defineComponent({
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
-      alertsLoading,
     };
   },
 });

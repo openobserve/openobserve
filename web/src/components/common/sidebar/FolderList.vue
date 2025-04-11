@@ -54,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="tab_content full-width"
         class="test-class"
         :data-test="`dashboard-folder-tab-${tab.folderId}`"
-        :disable="alertsLoading"
         >
         <div class="folder-item full-width row justify-between no-wrap">
             <span class="folder-name" :title="tab.name">{{
@@ -214,10 +213,6 @@ export default defineComponent({
       type: {
         type: String,
         default: "alerts",
-      },
-      alertsLoading: {
-        type: Boolean,
-        default: false,
       },
     },
     emits: ['update:folders', 'update:activeFolderId'],
