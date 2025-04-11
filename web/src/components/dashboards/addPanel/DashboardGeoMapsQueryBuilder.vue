@@ -595,7 +595,7 @@ export default defineComponent({
             addWeight(dragElement);
             break;
           case "f":
-            addFilteredItem(dragElement?.name);
+            addFilteredItem(dragElement);
             break;
         }
       } else {

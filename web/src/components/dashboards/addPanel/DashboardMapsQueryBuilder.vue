@@ -469,7 +469,7 @@ export default defineComponent({
             addMapValue(dragElement);
             break;
           case "f":
-            addFilteredItem(dragElement?.name);
+            addFilteredItem(dragElement);
             break;
         }
       } else {

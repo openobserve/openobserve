@@ -1276,7 +1276,7 @@ export default defineComponent({
               addBreakDownAxisItem(dragElement);
               break;
             case "f":
-              addFilteredItem(dragElement?.name);
+              addFilteredItem(dragElement);
               break;
           }
           reorderItems(
