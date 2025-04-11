@@ -26,7 +26,7 @@ use infra::errors::Error;
 use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::utils::stream::get_max_query_range,
-    handler::http::request::websocket::session::send_message,
+    handler::http::request::ws_v2::session::send_message,
     service::{
         search::{cache, sql::Sql},
         websocket_events::{WsServerEvents, search::{

@@ -776,13 +776,15 @@ async fn handle_values_event(
     let client_msg = WsClientEvents::Values(values_req.clone());
 
     // Register running values search BEFORE spawning the values task
-    WS_SEARCH_REGISTRY.insert(
+    let mut w = WS_SEARCH_REGISTRY.write().await;
+    w.insert(
         trace_id.clone(),
         SearchState::Running {
             cancel_tx,
             req_id: req_id.to_string(),
         },
     );
+    drop(w);
 
     // Create a vector to accumulate results
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
@@ -804,11 +806,13 @@ async fn handle_values_event(
             ) => {
                 match values_result {
                     Ok(_) => {
-                        if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
+                        let mut w = WS_SEARCH_REGISTRY.write().await;
+                        if let Some(state) = w.get_mut(&trace_id_for_task) {
                             *state = SearchState::Completed {
                                 req_id: req_id.to_string(),
                             };
                         }
+                        drop(w);
 
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
