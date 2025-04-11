@@ -116,6 +116,38 @@ function migrateFields(
   }
 }
 
+/**
+ * Migrates filter conditions by recursively processing nested structures
+ * Converts string column fields to objects with streamAlias and field properties
+ * @param filter The filter object to migrate
+ * @returns The migrated filter object
+ */
+function migrateFilterConditions(filter: any): any {
+  if (!filter) return filter;
+
+  if (filter.conditions && Array.isArray(filter.conditions)) {
+    // Process each condition recursively
+    filter.conditions = filter.conditions.map((condition: any) => {
+      // If it's a group, recursively process it
+      if (condition.filterType === "group") {
+        return migrateFilterConditions(condition);
+      }
+
+      // For regular conditions, convert string column to object with streamAlias and field
+      if (typeof condition.column === "string") {
+        condition.column = {
+          streamAlias: undefined,
+          field: condition.column,
+        };
+      }
+
+      return condition;
+    });
+  }
+
+  return filter;
+}
+
 export function convertDashboardSchemaVersion(data: any) {
   if (!data) {
     return;
@@ -278,6 +310,13 @@ export function convertDashboardSchemaVersion(data: any) {
                 migrateV5FieldsToV6,
               );
             });
+
+            // Migrate the filters
+            // all column which is currently string will be converted to object with streamAlias and field
+            // make sure that conditions can be array based on filterType
+            queryItem.fields.filter = migrateFilterConditions(
+              queryItem.fields.filter,
+            );
           });
         });
       });
