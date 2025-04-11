@@ -166,6 +166,7 @@ pub async fn search(
                 ),
                 SearchInspectorFieldsBuilder::new()
                     .node_role(LOCAL_NODE.role.clone())
+                    .node_name(LOCAL_NODE.name.clone())
                     .component(
                         "service:search:grpc:storage inverted index reduced file_list num"
                             .to_string()
@@ -286,6 +287,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
                 .component("service:search:grpc:storage cache took".to_string())
                 .step(12)
                 .duration(cache_start.elapsed().as_millis() as usize)
@@ -366,6 +368,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
                 .component("service:search:grpc:storage create tables took".to_string())
                 .step(9)
                 .duration(start.elapsed().as_millis() as usize)
@@ -530,6 +533,7 @@ pub async fn filter_file_list_by_tantivy_index(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
                 .component("service:search:grpc:storage tantivy took".to_string())
                 .step(8)
                 .duration(start.elapsed().as_millis() as usize)
@@ -735,6 +739,7 @@ pub async fn filter_file_list_by_tantivy_index(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
                 .component(
                     "service:search:grpc:storage tantivy hits for index_condition".to_string()
                 )

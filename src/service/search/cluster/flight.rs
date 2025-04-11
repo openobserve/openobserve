@@ -122,6 +122,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
                 .component("service:search:flight:leader get file id".to_string())
                 .step(2)
                 .duration(file_id_list_took)
@@ -181,6 +182,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
                 .component("service:search:flight:leader get nodes".to_string())
                 .step(3)
                 .duration(start.elapsed().as_millis() as usize)
@@ -498,6 +500,7 @@ pub async fn run_datafusion(
                 format!("[trace_id {trace_id}] flight->search: datafusion collect done"),
                 SearchInspectorFieldsBuilder::new()
                     .node_role(LOCAL_NODE.role.clone())
+                    .node_name(LOCAL_NODE.name.clone())
                     .component(
                         "service:search:cluster:flight:run_datafusion collect done".to_string()
                     )

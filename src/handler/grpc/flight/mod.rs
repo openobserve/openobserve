@@ -119,6 +119,7 @@ impl FlightService for FlightServiceImpl {
                 ),
                 SearchInspectorFieldsBuilder::new()
                     .node_role(LOCAL_NODE.role.clone())
+                    .node_name(LOCAL_NODE.name.clone())
                     .component(
                         "service:search:flight::do_get get_ctx_and_physical_plan".to_string()
                     )

@@ -223,6 +223,7 @@ pub async fn search(
                 ),
                 SearchInspectorFieldsBuilder::new()
                     .node_role(LOCAL_NODE.role.clone())
+                    .node_name(LOCAL_NODE.name.clone())
                     .component(
                         "service:search:grpc:flight:do_get::search get file_list by ids"
                             .to_string()
@@ -375,6 +376,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
                 .component(
                     "service:search:grpc:flight:do_get::search generated physical plan".to_string()
                 )
