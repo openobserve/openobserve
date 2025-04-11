@@ -103,4 +103,4 @@ pub static WS_SESSIONS: Lazy<RwAHashMap<String, Arc<TokioRwLock<WsSession>>>> =
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
 // Global registry for search requests by `trace_id`
-pub static WS_SEARCH_REGISTRY: Lazy<DashMap<String, SearchState>> = Lazy::new(DashMap::new);
+pub static WS_SEARCH_REGISTRY: Lazy<RwAHashMap<String, SearchState>> = Lazy::new(Default::default);

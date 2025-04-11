@@ -525,11 +525,15 @@ pub async fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
 pub async fn get_cached_node_by_name(name: &str) -> Option<Node> {
     let r = NODES.read().await;
     if r.is_empty() {
+        drop(r);
         return None;
     }
-    r.iter()
+    let node = r
+        .iter()
         .find(|(_uuid, node)| node.name == name)
-        .map(|(_uuid, node)| node.clone())
+        .map(|(_uuid, node)| node.clone());
+    drop(r);
+    node
 }
 
 #[inline(always)]

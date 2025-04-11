@@ -19,7 +19,7 @@ use ::config::{
         cluster::{Role, RoleGroup},
         promql::RequestRangeQuery,
     },
-    router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
+    router::{INGESTER_ROUTES, is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
     utils::rand::get_rand_element,
 };
 use actix_web::{
@@ -155,7 +155,11 @@ async fn dispatch(
 
     // check if the request is a websocket request
     let path_columns: Vec<&str> = path.split('/').collect();
-    if path_columns.get(3).unwrap_or(&"").starts_with("ws") {
+    if *path_columns.get(3).unwrap_or(&"") == "ws"
+        && INGESTER_ROUTES
+            .iter()
+            .all(|ingest_route| !path.ends_with(ingest_route))
+    {
         return proxy_ws(req, payload, start).await;
     }
 
