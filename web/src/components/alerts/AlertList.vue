@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       round
                       flat
                       :title="t('alerts.edit')"
-                      @click="editAlert(props.row)"
+                      @click.stop="editAlert(props.row)"
                     ></q-btn>
                     <q-btn
                       icon="content_copy"
