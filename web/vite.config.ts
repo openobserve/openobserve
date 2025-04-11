@@ -185,43 +185,5 @@ export default defineConfig({
       plugins: [NodeGlobalsPolyfillPlugin({ buffer: true })],
       target: "es2020",
     },
-  },
-  test: {
-    enable: true,
-    global: true,
-    setupFiles: "src/test/unit/helpers/setupTests.ts",
-    deps: {
-      inline: ["monaco-editor", "vitest-canvas-mock"],
-    },
-    coverage: {
-      reporter: ["text", "json", "html"],
-      all: true,
-      exclude: [
-        "coverage/**",
-        "dist/**",
-        "packages/*/test{,s}/**",
-        "cypress/**",
-        "src/test/**",
-        "test{,s}/**",
-        "test{,-*}.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/*{.,-}spec.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/__tests__/**",
-        "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*",
-        "**/.{eslint,mocha,prettier}rc.{js,cjs,yml}",
-        "quasar.conf.js",
-        "env.d.ts",
-      ],
-    },
-    threads: false,
-    environment: "jsdom",
-    cache: false,
-    maxConcurrency: 20,
-    update: false,
-    environmentOptions: {
-      jsdom: {
-        resources: "usable",
-      },
-    },
-  },
+  }
 });
