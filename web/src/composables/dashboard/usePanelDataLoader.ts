@@ -309,7 +309,10 @@ export const usePanelDataLoader = (
 
     state.isOperationCancelled = true;
 
-    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+    if (
+      isWebSocketEnabled(store.state) &&
+      state.searchRequestTraceIds
+    ) {
       try {
         // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {
@@ -1159,7 +1162,7 @@ export const usePanelDataLoader = (
                 Number(endISOTimestamp),
               );
               state.annotations = annotations;
-              if (isWebSocketEnabled()) {
+              if (isWebSocketEnabled(store.state)) {
                 await getDataThroughWebSocket(
                   query,
                   it,
@@ -1854,7 +1857,7 @@ export const usePanelDataLoader = (
     }
 
     // for websocket
-    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+    if (isWebSocketEnabled(store.state) && state.searchRequestTraceIds) {
       try {
         // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {
