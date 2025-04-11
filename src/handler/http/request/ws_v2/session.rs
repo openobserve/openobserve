@@ -32,6 +32,8 @@ use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
 
 #[cfg(feature = "enterprise")]
+use crate::common::infra::cluster::get_cached_online_router_nodes;
+#[cfg(feature = "enterprise")]
 use crate::service::{
     self_reporting::audit,
     websocket_events::{handle_cancel, search_registry_utils},
@@ -147,12 +149,15 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
         tokio::select! {
             Some(msg) = msg_stream.next() => {
                 // Update activity and check cookie_expiry on any message
-                if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
+                    let mut session = session.write().await;
                     session.update_activity();
                     if !session.is_client_cookie_valid() {
                         log::error!("[WS_HANDLER]: Session cookie expired for req_id: {}", req_id);
+                        drop(session);
                         break;
                     }
+                    drop(session);
                 }
 
                 match msg {
@@ -161,15 +166,18 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                             "[WS_HANDLER]: Received ping from client for req_id: {}",
                             req_id
                         );
-                        if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                        if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
+                            let mut session = session.write().await;
                             if let Err(e) = session.pong(&bytes).await {
                                 log::error!(
                                     "[WS_HANDLER]: Failed to send pong to client for req_id: {}, error: {}",
                                     req_id,
                                     e
                                 );
+                                drop(session);
                                 break;
                             }
+                            drop(session);
                         } else {
                             log::error!("[WS_HANDLER]: Session not found for ping response");
                             break;
@@ -219,19 +227,22 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
             }
             // Heartbeat to keep the connection alive
             _ = ping_interval.tick() => {
-                if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
                     log::debug!(
                         "[WS_HANDLER]: Sending heartbeat ping to client for req_id: {}",
                         req_id
                     );
+                    let mut session = session.write().await;
                     if let Err(e) = session.ping(&[]).await {
                         log::error!(
                             "[WS_HANDLER]: Failed to send ping to client for req_id: {}, error: {}. Connection will be closed.",
                             req_id,
                             e
                         );
+                        drop(session);
                         break;
                     }
+                    drop(session);
                 } else {
                     log::warn!(
                         "[WS_HANDLER]: Session not found for req_id: {} during heartbeat. Connection will be closed.",
@@ -277,7 +288,20 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                             user_id
                         } else {
                             // cluster mode, use user_id from the ws event added by the router
-                            if let Some(user_id) = &search_req.user_id {
+                            let router_nodes = get_cached_online_router_nodes().await;
+                            let user_id = router_nodes.and_then(|nodes| {
+                                if nodes.is_empty() {
+                                    // if router nodes are not found, use the user_id from the
+                                    // search request
+                                    // since its a single node, running enterprise
+                                    Some(user_id)
+                                } else {
+                                    None
+                                }
+                            });
+                            if let Some(user_id) = user_id {
+                                user_id
+                            } else if let Some(user_id) = &search_req.user_id {
                                 user_id
                             } else {
                                 log::error!("[WS_HANDLER]: User id not found in search request");
@@ -326,7 +350,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     log::info!(
                         "[WS_HANDLER]: trace_id: {}, Cancellation flag set to: {:?}",
                         trace_id,
-                        search_registry_utils::is_cancelled(&trace_id)
+                        search_registry_utils::is_cancelled(&trace_id).await
                     );
 
                     let res = handle_cancel(&trace_id, &org_id).await;
@@ -416,19 +440,21 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 code: CloseCode::Error,
                 description: None,
             });
-            let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
+            let session = if let Some(session) = sessions_cache_utils::get_session(req_id).await {
                 session
             } else {
                 log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
                 return;
             };
+            let mut session = session.write().await;
             let _ = session.close(close_reason).await;
+            drop(session);
         }
     }
 }
 
 pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
-    let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
+    let session = if let Some(session) = sessions_cache_utils::get_session(req_id).await {
         session
     } else {
         return Err(Error::Message(format!(
@@ -439,10 +465,13 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
 
     log::debug!("[WS_HANDLER]: req_id: {} sending message: {}", req_id, msg);
 
-    session.text(msg).await.map_err(|e| {
+    let mut session = session.write().await;
+    let _ = session.text(msg).await.map_err(|e| {
         log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
         Error::Message(e.to_string())
-    })
+    });
+    drop(session);
+    Ok(())
 }
 
 async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
@@ -452,7 +481,7 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
         close_reason
     );
 
-    if let Some(mut session) = sessions_cache_utils::get_mut_session(req_id) {
+    if let Some(session) = sessions_cache_utils::get_session(req_id).await {
         if let Some(reason) = close_reason.as_ref() {
             log::info!(
                 "[WS_HANDLER]: req_id: {} Closing session with reason: {:?}",
@@ -461,6 +490,7 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
             );
         }
 
+        let mut session = session.write().await;
         // Attempt to close the session
         if let Err(e) = session.close(close_reason).await {
             log::error!(
@@ -469,14 +499,15 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
                 e
             );
         }
+        drop(session);
     }
 
     // Remove the session from the cache
-    sessions_cache_utils::remove_session(req_id);
+    sessions_cache_utils::remove_session(req_id).await;
     log::info!(
         "[WS_HANDLER]: req_id: {} Session cleanup completed. Remaining sessions: {}",
         req_id,
-        sessions_cache_utils::len_sessions()
+        sessions_cache_utils::len_sessions().await
     );
 }
 
@@ -505,13 +536,15 @@ async fn handle_search_event(
     let client_msg = WsClientEvents::Search(Box::new(search_req.clone()));
 
     // Register running search BEFORE spawning the search task
-    WS_SEARCH_REGISTRY.insert(
+    let mut w = WS_SEARCH_REGISTRY.write().await;
+    w.insert(
         trace_id.clone(),
         SearchState::Running {
             cancel_tx,
             req_id: req_id.to_string(),
         },
     );
+    drop(w);
 
     // Spawn the search task
     tokio::spawn(async move {
@@ -531,11 +564,13 @@ async fn handle_search_event(
             ) => {
                 match search_result {
                     Ok(_) => {
-                        if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
+                        let mut w = WS_SEARCH_REGISTRY.write().await;
+                        if let Some(state) = w.get_mut(&trace_id_for_task) {
                             *state = SearchState::Completed {
                                 req_id: req_id.to_string(),
                             };
                         }
+                        drop(w);
 
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
@@ -594,18 +629,19 @@ async fn handle_search_event(
 // Cancel handler
 #[cfg(feature = "enterprise")]
 async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
-    if let Some(mut entry) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
-        let state = entry.value_mut();
+    let mut w = WS_SEARCH_REGISTRY.write().await;
+    if let Some(state) = w.get_mut(trace_id) {
         let cancel_tx = match state {
             SearchState::Running { cancel_tx, .. } => cancel_tx.clone(),
             state => {
                 let err_msg = format!("Cannot cancel search in state: {:?}", state);
                 log::warn!("[WS_HANDLER]: {}", err_msg);
+                drop(w);
                 return Err(anyhow::anyhow!(err_msg));
             }
         };
 
-        *entry.value_mut() = SearchState::Cancelled {
+        *state = SearchState::Cancelled {
             req_id: trace_id.to_string(),
         };
 
@@ -615,6 +651,8 @@ async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
 
         log::info!("[WS_HANDLER]: Search cancelled for trace_id: {}", trace_id);
     }
+    drop(w);
+
     Ok(())
 }
 
@@ -627,11 +665,13 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
             trace_id
         );
         // Update state to cancelled before returning
-        if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
+        let mut w = WS_SEARCH_REGISTRY.write().await;
+        if let Some(state) = w.get_mut(trace_id) {
             *state = SearchState::Cancelled {
-                req_id: trace_id.to_string(),
+                req_id: req_id.to_string(),
             };
         }
+        drop(w);
         return None;
     }
 
@@ -652,17 +692,25 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
     };
 
     // Update registry state
-    if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
-        *state = SearchState::Completed {
+    let mut w = WS_SEARCH_REGISTRY.write().await;
+    w.entry(trace_id.to_string())
+        .and_modify(|state| {
+            *state = SearchState::Completed {
+                req_id: trace_id.to_string(),
+            }
+        })
+        .or_insert(SearchState::Completed {
             req_id: trace_id.to_string(),
-        };
-    }
+        });
+    drop(w);
 
     Some(close_reason)
 }
 
 // Add cleanup function
 async fn cleanup_search_resources(trace_id: &str) {
-    WS_SEARCH_REGISTRY.remove(trace_id);
+    let mut w = WS_SEARCH_REGISTRY.write().await;
+    w.remove(trace_id);
+    drop(w);
     log::debug!("[WS_HANDLER]: trace_id: {}, Resources cleaned up", trace_id);
 }

@@ -87,9 +87,12 @@ pub mod enterprise_utils {
 }
 
 pub mod sessions_cache_utils {
+    use std::sync::Arc;
+
     use actix_ws::{CloseCode, CloseReason};
     use config::get_config;
     use futures::FutureExt;
+    use tokio::sync::RwLock;
 
     use super::search_registry_utils::SearchState;
     use crate::{
@@ -122,28 +125,42 @@ pub mod sessions_cache_utils {
                 }
 
                 // Add delay between runs if too many sessions
-                if WS_SESSIONS.len() > 1000 {
+                let r = WS_SESSIONS.read().await;
+                if r.len() > 1000 {
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 }
+                drop(r);
             }
         });
     }
 
     async fn cleanup_expired_sessions() {
-        let expired: Vec<String> = WS_SESSIONS
-            .iter()
-            .filter(|entry| entry.value().is_expired())
-            .map(|entry| entry.key().clone())
-            .collect();
+        // get expired sessions
+        let r = WS_SESSIONS.read().await;
+        let session_ids: Vec<String> = r.keys().cloned().collect();
+        let mut expired = Vec::new();
 
+        for session_id in session_ids {
+            if let Some(session) = r.get(&session_id) {
+                let session_lock = session.read().await;
+                if session_lock.is_expired() {
+                    expired.push(session_id);
+                }
+                drop(session_lock);
+            }
+        }
+        drop(r);
+
+        // close and remove expired sessions
         for session_id in expired {
             // Clean up associated searches first
-            cleanup_searches_for_session(&session_id);
+            cleanup_searches_for_session(&session_id).await;
 
             // Close and remove session
-            if let Some(mut session) = get_mut_session(&session_id) {
+            if let Some(session) = get_session(&session_id).await {
                 log::info!("[WS_GC] Closing expired session: {}", session_id);
 
+                let mut session = session.write().await;
                 if let Err(e) = session
                     .close(Some(CloseReason {
                         code: CloseCode::Normal,
@@ -153,29 +170,36 @@ pub mod sessions_cache_utils {
                 {
                     log::warn!("[WS_GC] Error closing session {}: {}", session_id, e);
                 }
+                drop(session);
             }
 
-            remove_session(&session_id);
+            remove_session(&session_id).await;
             log::info!("[WS_GC] Removed expired session: {}", session_id);
         }
 
-        log::info!("[WS_GC] Remaining active sessions: {}", len_sessions());
+        log::info!(
+            "[WS_GC] Remaining active sessions: {}",
+            len_sessions().await
+        );
     }
 
-    fn cleanup_searches_for_session(session_id: &str) {
-        let searches_to_remove: Vec<String> = WS_SEARCH_REGISTRY
+    async fn cleanup_searches_for_session(session_id: &str) {
+        let r = WS_SEARCH_REGISTRY.read().await;
+        let searches_to_remove: Vec<String> = r
             .iter()
-            .filter_map(|entry| {
-                if entry.value().get_req_id() == session_id {
-                    Some(entry.key().clone())
+            .filter_map(|(key, state)| {
+                if state.get_req_id() == session_id {
+                    Some(key.clone())
                 } else {
                     None
                 }
             })
             .collect();
+        drop(r);
 
         for trace_id in searches_to_remove {
-            if let Some((_, state)) = WS_SEARCH_REGISTRY.remove(&trace_id) {
+            let mut w = WS_SEARCH_REGISTRY.write().await;
+            if let Some(state) = w.remove(&trace_id) {
                 match state {
                     SearchState::Running { cancel_tx, req_id } => {
                         let _ = cancel_tx.try_send(());
@@ -194,34 +218,42 @@ pub mod sessions_cache_utils {
                     }
                 }
             }
+            drop(w);
         }
     }
 
     /// Insert a new session into the cache
-    pub fn insert_session(session_id: &str, session: WsSession) {
-        WS_SESSIONS.insert(session_id.to_string(), session);
+    pub async fn insert_session(session_id: &str, session: Arc<RwLock<WsSession>>) {
+        let mut w = WS_SESSIONS.write().await;
+        w.insert(session_id.to_string(), session);
+        drop(w);
     }
 
     /// Remove a session from the cache
-    pub fn remove_session(session_id: &str) {
-        WS_SESSIONS.remove(session_id);
+    pub async fn remove_session(session_id: &str) {
+        let mut w = WS_SESSIONS.write().await;
+        w.remove(session_id);
+        drop(w);
     }
 
     // Return a mutable reference to the session
-    pub fn get_mut_session(
-        session_id: &str,
-    ) -> Option<dashmap::mapref::one::RefMut<'_, String, WsSession>> {
-        WS_SESSIONS.get_mut(session_id)
+    pub async fn get_session(session_id: &str) -> Option<Arc<RwLock<WsSession>>> {
+        let r = WS_SESSIONS.read().await;
+        let session = r.get(session_id).cloned();
+        drop(r);
+        session
     }
 
     /// Check if a session exists in the cache
-    pub fn contains_session(session_id: &str) -> bool {
-        WS_SESSIONS.contains_key(session_id)
+    pub async fn contains_session(session_id: &str) -> bool {
+        let r = WS_SESSIONS.read().await;
+        r.contains_key(session_id)
     }
 
     /// Get the number of sessions in the cache
-    pub fn len_sessions() -> usize {
-        WS_SESSIONS.len()
+    pub async fn len_sessions() -> usize {
+        let r = WS_SESSIONS.read().await;
+        r.len()
     }
 }
 
@@ -255,10 +287,13 @@ pub mod search_registry_utils {
     }
 
     // Add this function to check if a search is cancelled
-    pub fn is_cancelled(trace_id: &str) -> Option<bool> {
-        WS_SEARCH_REGISTRY
+    pub async fn is_cancelled(trace_id: &str) -> Option<bool> {
+        let r = WS_SEARCH_REGISTRY.read().await;
+        let is_cancelled = r
             .get(trace_id)
-            .map(|state| matches!(*state, SearchState::Cancelled { .. }))
+            .map(|state| matches!(*state, SearchState::Cancelled { .. }));
+        drop(r);
+        is_cancelled
     }
 }
 

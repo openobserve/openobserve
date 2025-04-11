@@ -141,14 +141,14 @@ async fn search_in_cluster(
         (start, vec![])
     } else {
         config::metrics::QUERY_METRICS_CACHE_REQUESTS
-            .with_label_values(&[])
+            .with_label_values(&[&req.org_id])
             .inc();
         let start_time = std::time::Instant::now();
         match cache::get(query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
                 config::metrics::QUERY_METRICS_CACHE_HITS
-                    .with_label_values(&[])
+                    .with_label_values(&[&req.org_id])
                     .inc();
                 log::info!(
                     "[trace_id {trace_id}] promql->search->cache: hit cache, took: {} ms",
@@ -361,8 +361,16 @@ async fn search_in_cluster(
     // cache the result
     if !cache_disabled {
         if let Some(matrix) = values.get_ref_matrix_values() {
-            if let Err(err) =
-                cache::set(trace_id, query, original_start, end, step, matrix.to_vec()).await
+            if let Err(err) = cache::set(
+                trace_id,
+                &req.org_id,
+                query,
+                original_start,
+                end,
+                step,
+                matrix.to_vec(),
+            )
+            .await
             {
                 log::error!(
                     "[trace_id {trace_id}] promql->search->cache: set cache err: {:?}",

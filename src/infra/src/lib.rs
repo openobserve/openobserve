@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#![feature(btree_extract_if)]
+
 pub mod cache;
 pub mod cluster_coordinator;
 pub mod db;
