@@ -21,9 +21,10 @@ import TemplateList from "@/components/alerts/TemplateList.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
 // @ts-ignore
-import { rest } from "msw";
+import { http, HttpResponse } from "msw";
 import templateService from "@/services/alert_templates";
 import router from "../../helpers/router";
+import { rest } from "cypress/types/lodash";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -66,6 +67,10 @@ describe("Alert List", async () => {
 
   it("Should display table column headers", async () => {
     await flushPromises();
+    console.log("Should display table column headers=======", wrapper
+      .find('[data-test="alert-templates-list-table"]')
+      .find("thead")
+      .find("tr").html());
     const tableData = wrapper
       .find('[data-test="alert-templates-list-table"]')
       .find("thead")
@@ -103,7 +108,7 @@ describe("Alert List", async () => {
       name: "alertTemplates",
       query: {
         action: "add",
-        org_identifier: "default_organization_01",
+        org_identifier: store.state.selectedOrganization.identifier,
       },
     });
   });
@@ -113,29 +118,26 @@ describe("Alert List", async () => {
     const deleteAlert = vi.spyOn(templateService, "delete");
     beforeEach(async () => {
       global.server.use(
-        rest.delete(
+        http.delete(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates/${template_name}`,
-          (req: any, res: any, ctx: any) => {
-            return res(ctx.status(200), ctx.json({ code: 200 }));
+          () => {
+            return HttpResponse.json({ code: 200 });
           }
         )
       );
       global.server.use(
-        rest.get(
+        http.get(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/templates`,
-          (req: any, res: any, ctx: any) => {
-            return res(
-              ctx.status(200),
-              ctx.json({
-                list: [
-                  {
+          () => {
+            return HttpResponse.json({
+              list: [
+                {
                     name: "Template3",
                     body: '\r\n[\r\n  {\r\n    "labels": {\r\n        "alertname": "{alert_name}",\r\n        "stream": "{stream_name}",\r\n        "organization": "{org_name}",\r\n        "alerttype": "{alert_type}",\r\n        "severity": "critical"\r\n    },\r\n    "annotations": {\r\n        "timestamp": "{timestamp}"\r\n    }\r\n  }\r\n]',
                     isDefault: true,
                   },
                 ],
-              })
-            );
+            });
           }
         )
       );

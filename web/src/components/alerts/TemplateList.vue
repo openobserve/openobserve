@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <div v-if=" !showImportTemplate  && !showTemplateEditor">
+    <div v-if="!showImportTemplate && !showTemplateEditor">
       <q-table
         data-test="alert-templates-list-table"
         ref="q-table"
@@ -118,13 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div v-else>
-      <ImportTemplate
-      :templates="templates"
-      @update:templates="getTemplates"
-       />
+      <ImportTemplate :templates="templates" @update:templates="getTemplates" />
     </div>
-
-
 
     <ConfirmDialog
       title="Delete Template"
@@ -150,7 +145,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportTemplate from "./ImportTemplate.vue";
 
 const AddTemplate = defineAsyncComponent(
-  () => import("@/components/alerts/AddTemplate.vue")
+  () => import("@/components/alerts/AddTemplate.vue"),
 );
 
 const store = useStore();
@@ -203,11 +198,11 @@ onMounted(() => {
 watch(
   () => router.currentRoute.value.query.action,
   (action) => {
-    if (!action){ 
+    if (!action) {
       showTemplateEditor.value = false;
       showImportTemplate.value = false;
-    };
-  }
+    }
+  },
 );
 
 const getTemplates = () => {
@@ -215,6 +210,27 @@ const getTemplates = () => {
     spinner: true,
     message: "Please wait while loading templates...",
   });
+  // fetch(
+  //   `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`,
+  //   {
+  //     method: "GET",
+  //   },
+  // )
+  //   .then((response) => {
+  //     console.log(
+  //       "getTemplates response ----------------------------------",
+  //       response,
+  //     );
+  //     return response.json();
+  //   })
+  //   .then((data) =>
+  //     console.log("getTemplates data ----------------------------------", data),
+  //   )
+  //   .catch((error) => console.error("Error:", error));
+
+  // console.log(
+  //   "getTemplates from TemplateList.vue ----------------------------------",
+  // );
   templateService
     .list({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -228,7 +244,7 @@ const getTemplates = () => {
     })
     .catch((err) => {
       dismiss();
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
           type: "negative",
           message: "Error while pulling templates.",
@@ -244,10 +260,10 @@ const updateRoute = () => {
   if (router.currentRoute.value.query.action === "add") editTemplate();
   if (router.currentRoute.value.query.action === "update")
     editTemplate(
-      getTemplateByName(router.currentRoute.value.query.name as string)
+      getTemplateByName(router.currentRoute.value.query.name as string),
     );
-  if(router.currentRoute.value.query.action === "import") {
-    showImportTemplate.value = true
+  if (router.currentRoute.value.query.action === "import") {
+    showImportTemplate.value = true;
   }
 };
 const getTemplateByName = (name: string) => {
@@ -317,13 +333,13 @@ const deleteTemplate = () => {
 const importTemplate = () => {
   showImportTemplate.value = true;
   router.push({
-        name: "alertTemplates",
-        query: {
-          action: "import",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-}
+    name: "alertTemplates",
+    query: {
+      action: "import",
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
 const conformDeleteDestination = (destination: any) => {
   confirmDelete.value.visible = true;
   confirmDelete.value.data = destination;
@@ -354,24 +370,23 @@ const filterData = (rows: any, terms: any) => {
 };
 const exportTemplate = (row: any) => {
   const findTemplate: any = getTemplateByName(row.name);
-      const templateByName = {...findTemplate}
-      if(templateByName.hasOwnProperty("#")) delete templateByName["#"];
-      const templateJson = JSON.stringify(templateByName,null,2);
-      const blob = new Blob([templateJson], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        // Create an anchor element to trigger the download
-        const link = document.createElement('a');
-        link.href = url;
+  const templateByName = { ...findTemplate };
+  if (templateByName.hasOwnProperty("#")) delete templateByName["#"];
+  const templateJson = JSON.stringify(templateByName, null, 2);
+  const blob = new Blob([templateJson], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  // Create an anchor element to trigger the download
+  const link = document.createElement("a");
+  link.href = url;
 
-        // Set the filename of the download
-        link.download = `${templateByName.name}.json`;
+  // Set the filename of the download
+  link.download = `${templateByName.name}.json`;
 
-        // Trigger the download by simulating a click
-        link.click();
+  // Trigger the download by simulating a click
+  link.click();
 
-        // Clean up the URL object after download
-        URL.revokeObjectURL(url);
-
-}
+  // Clean up the URL object after download
+  URL.revokeObjectURL(url);
+};
 </script>
 <style lang=""></style>
