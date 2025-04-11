@@ -1787,6 +1787,7 @@ pub struct RateLimit {
     )]
     pub ratelimit_rule_refresh_interval: usize,
 }
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
