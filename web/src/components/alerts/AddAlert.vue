@@ -1551,7 +1551,7 @@ export default defineComponent({
           callAlert
             .then((res: { data: any }) => {
               this.formData = { ...defaultValue };
-              this.$emit("update:list");
+              this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
               this.q.notify({
