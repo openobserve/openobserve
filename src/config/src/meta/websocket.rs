@@ -15,7 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::meta::search::{Response, SearchEventContext};
+use crate::meta::search::{Response, SearchEventContext, ValuesEventContext};
 
 pub const MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE: &str = "Reached Max query range limit.";
 
@@ -40,6 +40,31 @@ pub struct SearchEventReq {
     pub org_id: String,
     // TODO: is it PII safe?
     pub user_id: Option<String>,
+    /// Top K is used only in values search
+    #[serde(default)]
+    pub values_event_context: Option<ValuesEventContext>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ValuesEventReq {
+    pub trace_id: String,
+    pub payload: crate::meta::search::ValuesRequest,
+    pub stream_type: crate::meta::stream::StreamType,
+    pub use_cache: bool,
+    pub org_id: String,
+    pub user_id: Option<String>,
+}
+
+impl ValuesEventReq {
+    pub fn is_valid(&self) -> bool {
+        if self.trace_id.is_empty() {
+            return false;
+        }
+        if self.org_id.is_empty() {
+            return false;
+        }
+        true
+    }
 }
 
 impl SearchEventReq {

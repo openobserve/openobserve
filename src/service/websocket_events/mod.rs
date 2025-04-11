@@ -16,6 +16,8 @@
 pub mod search;
 pub mod sort;
 pub mod utils;
+pub mod values;
 
 pub use search::*;
 pub use utils::*;
+pub use values::*;
