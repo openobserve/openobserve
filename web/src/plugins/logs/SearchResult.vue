@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="q-pb-lg"
           style=" left: 45%; margin: 30px 0px"
-          v-if="  (searchObj.meta.showHistogram) && (searchObj.loadingHistogram == true ||  searchObj.loading == true) && ( plotChart && Object.keys(plotChart)?.length == 0) "
+          v-if="histogramLoader"
           
         >
           <q-spinner-hourglass
@@ -616,6 +616,10 @@ export default defineComponent({
         return [];
       }
     });
+    //this is used to show the histogram loader when the histogram is loading
+    const histogramLoader = computed(()=>{
+      return (searchObj.meta.showHistogram) && (searchObj.loadingHistogram == true ||  searchObj.loading == true) && ( plotChart.value && Object.keys(plotChart.value)?.length == 0) 
+    })
 
     return {
       t,
@@ -655,6 +659,7 @@ export default defineComponent({
       getPaginations,
       refreshPagination,
       refreshJobPagination,
+      histogramLoader
     };
   },
   computed: {
