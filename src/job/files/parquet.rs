@@ -537,7 +537,7 @@ async fn move_files(
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
                 new_file_name,
-                e.to_string()
+                e
             );
             // need release all the files
             for file in files_with_size.iter() {
@@ -558,7 +558,7 @@ async fn move_files(
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
                         file.key,
-                        e.to_string()
+                        e
                     );
                 }
             } else {
@@ -567,7 +567,7 @@ async fn move_files(
                         log::warn!(
                             "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {}, {}",
                             file.key,
-                            e.to_string()
+                            e
                         );
                         // add to pending delete list
                         if let Err(e) =
@@ -576,7 +576,7 @@ async fn move_files(
                             log::error!(
                                 "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
                                 file.key,
-                                e.to_string()
+                                e
                             );
                         }
                     }
@@ -1455,11 +1455,7 @@ pub(crate) async fn create_tantivy_index(
             );
         }
         Err(e) => {
-            log::error!(
-                "{} generated tantivy index file error: {}",
-                caller,
-                e.to_string()
-            );
+            log::error!("{} generated tantivy index file error: {}", caller, e);
             return Err(e.into());
         }
     }

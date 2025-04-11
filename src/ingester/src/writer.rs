@@ -201,7 +201,7 @@ impl Writer {
             .join(idx.to_string());
         log::info!(
             "[INGESTER:MEM:{idx}] create file: {}/{}/{}/{}.wal",
-            wal_dir.display().to_string(),
+            wal_dir.display(),
             &key.org_id,
             &key.stream_type,
             wal_id
@@ -410,7 +410,7 @@ impl Writer {
             .join(self.idx.to_string());
         log::info!(
             "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
-            wal_dir.display().to_string(),
+            wal_dir.display(),
             &self.key.org_id,
             &self.key.stream_type,
             wal_id

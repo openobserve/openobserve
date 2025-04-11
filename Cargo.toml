@@ -24,6 +24,7 @@ publish = false
 [features]
 default = []
 enterprise = []
+marketplace = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pprof"]

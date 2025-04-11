@@ -400,7 +400,7 @@ fn get_empty_record_batch_stream(
             trace_id,
             node_addr,
             is_querier,
-            e.to_string(),
+            e,
             start.elapsed().as_millis(),
         );
         process_partial_err(partial_err, e);
@@ -478,7 +478,7 @@ impl Stream for FlightStream {
                 self.node_addr,
                 self.is_querier,
                 self.start.elapsed().as_millis(),
-                e.to_string()
+                e
             );
             process_partial_err(self.partial_err.clone(), e);
             return Poll::Ready(None);
@@ -503,7 +503,7 @@ impl Stream for FlightStream {
                     self.trace_id,
                     self.node_addr,
                     self.is_querier,
-                    e.to_string(),
+                    e,
                     self.start.elapsed().as_millis(),
                 );
                 process_partial_err(self.partial_err.clone(), e);
