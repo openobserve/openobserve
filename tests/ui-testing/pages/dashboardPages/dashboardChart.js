@@ -6,7 +6,7 @@ export default class ChartTypeSelector {
     this.page = page;
   }
 
-  // Dynamically select a chart type by its type name
+  // Chart Type select
   async selectChartType(chartType) {
     const chartOption = this.page.locator(
       `[data-test="selected-chart-${chartType}-item"]`
@@ -46,5 +46,33 @@ export default class ChartTypeSelector {
 
     await streamOption.waitFor({ state: "visible", timeout: 5000 });
     await streamOption.click();
+  }
+
+  // Search field and added for X, Y,Breakdown etc.
+  async searchAndAddField(fieldName, target) {
+    const searchInput = this.page.locator(
+      '[data-test="index-field-search-input"]'
+    );
+    await searchInput.click();
+    await searchInput.fill(fieldName);
+
+    // await this.page.waitForSelector(
+    //   `[data-test="index-field-item"]:has-text("${fieldName}")`
+    // );
+
+    const buttonSelectors = {
+      x: '[data-test="dashboard-add-x-data"]',
+      y: '[data-test="dashboard-add-y-data"]',
+      b: '[data-test="dashboard-add-b-data"]',
+      filter: '[data-test="dashboard-add-filter-data"]',
+    };
+
+    const buttonSelector = buttonSelectors[target];
+
+    if (!buttonSelector) {
+      throw new Error(`Invalid target type: ${target}`);
+    }
+
+    await this.page.locator(buttonSelector).click();
   }
 }
