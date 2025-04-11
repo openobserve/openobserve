@@ -2169,7 +2169,7 @@ export const usePanelDataLoader = (
     }
 
     // for websocket
-    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+    if (isWebSocketEnabled(store.state) && state.searchRequestTraceIds) {
       try {
         // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {
