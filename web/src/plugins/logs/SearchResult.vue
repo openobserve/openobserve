@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="q-pb-lg"
           style=" left: 45%; margin: 30px 0px"
-          v-if="(searchObj.loadingHistogram == true && searchObj.meta.showHistogram) || (searchObj.loading == true && searchObj.meta.showHistogram) && ( plotChart && Object.keys(plotChart)?.length == 0) "
+          v-if="  (searchObj.meta.showHistogram) && (searchObj.loadingHistogram == true ||  searchObj.loading == true) && ( plotChart && Object.keys(plotChart)?.length == 0) "
           
         >
           <q-spinner-hourglass
