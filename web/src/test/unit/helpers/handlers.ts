@@ -33,9 +33,8 @@ export const restHandlers = [
   ),
 
   http.get(
-    `http://localhost:5080/api/default_organization_01/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`,
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`,
     ({ request }) => {
-      console.log("mocked request");
       return HttpResponse.json({
         list: [
           {
@@ -58,7 +57,7 @@ export const restHandlers = [
   ),
 
   http.post(
-    `http://localhost:5080/api/default/k8s_json/alerts/?type=logs`,
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/k8s_json/alerts/?type=logs`,
     () => {
       return HttpResponse.json({});
     },

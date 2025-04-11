@@ -175,7 +175,6 @@ describe("Streams", async () => {
 
     let logPartition, timeStampCheckbox, updateSettingsButton: any;
     beforeEach(async () => {
-      console.log(wrapper.vm.indexData, "index data");
     });
     it("Should make api call when user updates the form and click update settings ", async () => {
       // Find the q-toggle component wrapper
@@ -316,7 +315,6 @@ describe("Streams", async () => {
         .findAll("tbody tr")
         .at(1) // Assuming you want to select the first row for this test
         .find('[data-test="schema-stream-index-select"]');
-      console.log(indexTypeSelectWrapper.html(), "indexTypeSelectWrapper");
       const indexTypeSelector = indexTypeSelectWrapper.findComponent({
         name: "QSelect",
       });
@@ -362,7 +360,6 @@ describe("Streams", async () => {
         .findAll("tbody tr")
         .at(1) // Assuming you want to select the first row for this test
         .find('[data-test="schema-stream-index-select"]');
-      console.log(indexTypeSelectWrapper.html(), "indexTypeSelectWrapper");
       const indexTypeSelector = indexTypeSelectWrapper.findComponent({
         name: "QSelect",
       });
@@ -405,7 +402,6 @@ describe("Streams", async () => {
         .findAll("tbody tr")
         .at(2) // Assuming you want to select the first row for this test
         .find('[data-test="schema-stream-index-select"]');
-      console.log(indexTypeSelectWrapper.html(), "indexTypeSelectWrapper");
       const indexTypeSelector = indexTypeSelectWrapper.findComponent({
         name: "QSelect",
       });
@@ -434,7 +430,6 @@ describe("Streams", async () => {
       );
 
       parsedRequest.partition_keys.add.forEach((index: any) => {
-        console.log(index, "index");
         if (index.field == "log") {
           expect(index.types).toEqual("value");
         }
@@ -450,7 +445,6 @@ describe("Streams", async () => {
         .findAll("tbody tr")
         .at(3) // Assuming you want to select the first row for this test
         .find('[data-test="schema-stream-index-select"]');
-      console.log(indexTypeSelectWrapper.html(), "indexTypeSelectWrapper");
       const indexTypeSelector = indexTypeSelectWrapper.findComponent({
         name: "QSelect",
       });
@@ -494,18 +488,15 @@ describe("Streams", async () => {
       const indexTypeSelectWrapper = wrapper.find(
         '[data-test="schema-stream-delete-log-field-fts-key-checkbox"]',
       );
-      console.log(indexTypeSelectWrapper.html(), "indexTypeSelectWrapper");
       const indexTypeSelector = await indexTypeSelectWrapper.find(
         'input[type="checkbox"]',
       );
 
-      console.log(indexTypeSelector.html(), "indexTypeSelector");
       await indexTypeSelector.setValue(true);
       await indexTypeSelector.trigger("click");
 
       await wrapper.vm.$nextTick();
 
-      console.log(wrapper.html(), "wrapper");
 
       const updateSchemaBtn = await wrapper.find(
         '[data-test="schema-add-field-button"]',
@@ -526,7 +517,6 @@ describe("Streams", async () => {
       const parsedRequest = JSON.parse(
         updateStream.mock.settledResults[0].value.config.data,
       );
-      console.log(parsedRequest, "parsedRequest");
 
       parsedRequest.partition_keys.add.forEach((index: any) => {
         expect(index).toEqual("log");
@@ -536,7 +526,7 @@ describe("Streams", async () => {
     });
 
     describe("disable options test cases", () => {
-      it("disable Options: hould disable options correctly based on row data", async () => {
+      it("disable Options: should disable options correctly based on row data", async () => {
         const wrapper = mount(LogStream, {
           props: {
             modelValue: {

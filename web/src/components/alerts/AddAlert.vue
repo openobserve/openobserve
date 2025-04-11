@@ -1460,7 +1460,6 @@ export default defineComponent({
     },
 
     async onSubmit() {
-      console.log("here it is");
       // Delaying submission by 500ms to allow the form to validate, as query is validated in validateSqlQuery method
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
