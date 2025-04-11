@@ -25,7 +25,6 @@ use parquet::file::metadata::ParquetMetaDataReader;
 
 pub mod local;
 pub mod remote;
-pub mod s3_test;
 
 pub const CONCURRENT_REQUESTS: usize = 1000;
 

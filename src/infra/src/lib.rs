@@ -35,6 +35,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     file_list::create_table().await?;
     file_list::LOCAL_CACHE.create_table().await?;
     file_list::local_cache_gc().await?;
+    if !config::is_local_disk_storage() {
+        storage::remote::test_config().await?;
+    }
     pipeline::init().await?;
     queue::init().await?;
     scheduler::init().await?;

@@ -367,3 +367,21 @@ fn init_client() -> Box<dyn object_store::ObjectStore> {
         },
     }
 }
+
+pub async fn test_config() -> Result<(), anyhow::Error> {
+    let test_file = "o2_test/check.txt";
+    // Test download
+    if let Err(e) = super::get(test_file).await {
+        if matches!(e, object_store::Error::NotFound { .. }) {
+            let test_content = Bytes::from("Hello, S3!");
+            // Test upload
+            if let Err(e) = super::put(test_file, test_content).await {
+                return Err(anyhow::anyhow!("S3 upload test failed: {:?}", e));
+            }
+        } else {
+            return Err(anyhow::anyhow!("S3 download test failed: {:?}", e));
+        }
+    }
+
+    Ok(())
+}
