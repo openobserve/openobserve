@@ -113,6 +113,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // check s3 config
     if let Err(e) = infra::storage::s3_test::test_s3_config().await {
+        log::error!("S3 test failed: {}", e);
         panic!("s3 test failed. please check your s3 config, err: {e}")
     }
 
