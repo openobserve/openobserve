@@ -24,7 +24,6 @@ import { Dialog, Notify } from "quasar";
 import store from "../../helpers/store";
 import { createI18n } from "vue-i18n";
 import axios, { AxiosResponse } from "axios";
-// import MockAdapter from "axios-mock-adapter";
 import { installQuasar } from "../../helpers";
 import router from "../../helpers/router";
 
