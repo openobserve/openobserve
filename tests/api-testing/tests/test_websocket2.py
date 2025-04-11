@@ -562,28 +562,117 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total
 
 
 
-# # Define test data with different queries and expected response details for websocket enable
-# def test_enable_websocket(create_session, base_url):
-#     """Fixture to enable WebSocket"""
-#     session = create_session
-#     url = base_url
-#     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
-#     payload_websocket = {
-#         "scrape_interval": 15,
-#         "span_id_field_name": "span_id",
-#         "trace_id_field_name": "trace_id",
-#         "toggle_ingestion_logs": True,
-#         "enable_websocket_search": True
-#     }
+# Define test data with different queries and expected response details for websocket enable
+def test_enable_websocket(create_session, base_url):
+    """Fixture to enable WebSocket"""
+    session = create_session
+    url = base_url
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    payload_websocket = {
+        "scrape_interval": 15,
+        "span_id_field_name": "span_id",
+        "trace_id_field_name": "trace_id",
+        "toggle_ingestion_logs": True,
+        "enable_websocket_search": True
+    }
 
-#     print("Session Websocket Enabled headers:", session.headers)
+    print("Session Websocket Enabled headers:", session.headers)
 
-#     resp_websocket = session.post(f"{url}api/{org_id}/settings", json=payload_websocket)
+    resp_websocket = session.post(f"{url}api/{org_id}/settings", json=payload_websocket)
 
-#     print("Enable Websocket", resp_websocket.content)
-#     assert (
-#         resp_websocket.status_code == 200
-#     ), f"Websocket enable 200, but got {resp_websocket.status_code} {resp_websocket.content}"
+    print("Enable Websocket", resp_websocket.content)
+    assert (
+        resp_websocket.status_code == 200
+    ), f"Websocket enable 200, but got {resp_websocket.status_code} {resp_websocket.content}"
+
+
+def handle_websocket_connection(message):
+    """Simple WebSocket handler - just get results and return"""
+  
+    ws = None
+    cookie_header = f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}"
+    
+    # Generate a dynamic UUID
+    connection_uuid = str(uuid.uuid4())  # Renamed from uuid to connection_uuid
+    
+    # Construct the WebSocket URL
+    WS_URL = f"{WS_ZO_BASE_URL}api/{org_id}/ws/v2/{connection_uuid}"
+
+    try:
+        ws = websocket.create_connection(WS_URL, header={"Cookie": cookie_header})
+        
+        # Send query
+        ws.send(json.dumps(message))
+        
+        # Get results
+        response = ws.recv()
+        res_json = json.loads(response)
+        return res_json
+        
+    except websocket.WebSocketConnectionClosedException as e:
+        print(f"WebSocket connection closed by server: {e}")
+        raise
+    except websocket.WebSocketTimeoutException as e:
+        print(f"WebSocket timeout: {e}")
+        raise
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse response as JSON: {e}")
+        raise
+    except Exception as e:
+        print(f"Unexpected WebSocket error: {e}")
+        raise
+    finally:
+        if ws:
+            try:
+                ws.close()
+            except:
+                pass  # Ignore errors during close
+
+
+def test_websocket_histogram():
+    """Test WebSocket cancel ."""
+    # Prepare headers with cookies
+
+    # cookie_header_histogram = f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}"
+    
+    # # Generate a dynamic UUID
+    # uuid_histogram = str(uuid.uuid4())  # Generates a new UUID
+
+    # # Construct the WebSocket URL
+    # WS_URL_histogram = f"{WS_ZO_BASE_URL}api/{org_id}/ws/v2/{uuid_histogram}"
+    # # Generate a dynamic trace_id
+    trace_id_histogram = str(uuid.uuid4())
+
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    message_histogram = {
+    "type": "search",
+    "content": {
+        "trace_id": trace_id_histogram,
+        "payload": {
+            "query": {
+                "sql": f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+                "start_time": ten_min_ago,
+                "end_time": end_time,
+                "size": -1,
+                "sql_mode": "full"
+            }
+        },
+        "stream_type": "logs",
+        "search_type": "ui",
+        "use_cache": True,
+        "org_id": org_id
+    }
+}
+    response_data_histogram = handle_websocket_connection(message_histogram)
+
+    print("WebSocket histogram response:", response_data_histogram)
+
+    # # Assert that is_success is True
+    # assert response_data_histogram["content"]["is_success"] is True, "Expected is_success to be True"
+
+
 
 # @pytest.mark.parametrize("test_name, hist_query, expected_total_hits_results_histg, expected_zo_sql_num_histg", test_data_histog)
 # def test_websocket_histogram(test_name, hist_query, expected_total_hits_results_histg, expected_zo_sql_num_histg):
