@@ -59,6 +59,7 @@ use crate::service::{
             table_provider::uniontable::NewUnionTable,
         },
         index::IndexCondition,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         match_file,
         request::FlightSearchRequest,
     },
@@ -212,10 +213,26 @@ pub async fn search(
         )
         .await?;
         log::info!(
-            "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, files: {}, took: {} ms",
-            req.query_identifier.partition,
-            file_list.len(),
-            file_list_took,
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, files: {}, took: {} ms",
+                    req.query_identifier.partition,
+                    file_list.len(),
+                    file_list_took,
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .node_role(LOCAL_NODE.role.clone())
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component(
+                        "service:search:grpc:flight:do_get::search get file_list by ids"
+                            .to_string()
+                    )
+                    .step(5)
+                    .duration(file_list_took)
+                    .search_get_file_id_list(file_list_took)
+                    .build()
+            )
         );
 
         if physical_plan.name() == "AggregateExec"
@@ -351,8 +368,23 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
-        start.elapsed().as_millis()
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
+                .component(
+                    "service:search:grpc:flight:do_get::search generated physical plan".to_string()
+                )
+                .step(12)
+                .duration(start.elapsed().as_millis() as usize)
+                .search_generated_physical_plan_took(start.elapsed().as_millis() as usize)
+                .build()
+        )
     );
 
     Ok((ctx, physical_plan, scan_stats))
