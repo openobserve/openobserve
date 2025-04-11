@@ -210,27 +210,7 @@ const getTemplates = () => {
     spinner: true,
     message: "Please wait while loading templates...",
   });
-  // fetch(
-  //   `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`,
-  //   {
-  //     method: "GET",
-  //   },
-  // )
-  //   .then((response) => {
-  //     console.log(
-  //       "getTemplates response ----------------------------------",
-  //       response,
-  //     );
-  //     return response.json();
-  //   })
-  //   .then((data) =>
-  //     console.log("getTemplates data ----------------------------------", data),
-  //   )
-  //   .catch((error) => console.error("Error:", error));
 
-  // console.log(
-  //   "getTemplates from TemplateList.vue ----------------------------------",
-  // );
   templateService
     .list({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -244,7 +224,7 @@ const getTemplates = () => {
     })
     .catch((err) => {
       dismiss();
-      if (err.response.status != 403) {
+      if (err.response.status !== 403) {
         q.notify({
           type: "negative",
           message: "Error while pulling templates.",

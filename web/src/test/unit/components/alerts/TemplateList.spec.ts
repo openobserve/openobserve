@@ -24,7 +24,6 @@ import store from "../../helpers/store";
 import { http, HttpResponse } from "msw";
 import templateService from "@/services/alert_templates";
 import router from "../../helpers/router";
-import { rest } from "cypress/types/lodash";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -67,10 +66,6 @@ describe("Alert List", async () => {
 
   it("Should display table column headers", async () => {
     await flushPromises();
-    console.log("Should display table column headers=======", wrapper
-      .find('[data-test="alert-templates-list-table"]')
-      .find("thead")
-      .find("tr").html());
     const tableData = wrapper
       .find('[data-test="alert-templates-list-table"]')
       .find("thead")
