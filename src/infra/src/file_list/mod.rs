@@ -69,6 +69,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
+    async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()>;
     async fn list(&self) -> Result<Vec<(String, FileMeta)>>;
     async fn query(
         &self,
@@ -236,6 +237,11 @@ pub async fn contains(file: &str) -> Result<bool> {
 #[inline]
 pub async fn update_flattened(file: &str, flattened: bool) -> Result<()> {
     CLIENT.update_flattened(file, flattened).await
+}
+
+#[inline]
+pub async fn update_compressed_size(file: &str, size: i64) -> Result<()> {
+    CLIENT.update_compressed_size(file, size).await
 }
 
 #[inline]

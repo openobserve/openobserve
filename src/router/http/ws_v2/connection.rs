@@ -225,7 +225,7 @@ impl QuerierConnection {
         }
 
         // reaches here when connection is closed/error from the querier side
-        self.clean_up().await;
+        self.clean_up(false).await;
     }
 
     async fn health_check(&self) {
@@ -242,13 +242,17 @@ impl QuerierConnection {
                 }
                 Some(w) => {
                     if w.send(WsMessage::Ping(vec![])).await.is_err() {
+                        log::error!(
+                            "[WS::QuerierConnection] failed to send ping message to querier {}",
+                            self.querier_name
+                        );
                         break;
                     }
                 }
             }
         }
 
-        self.clean_up().await;
+        self.clean_up(true).await;
     }
 
     pub async fn is_active_trace_id(&self, trace_id: &TraceId) -> bool {
@@ -269,9 +273,15 @@ impl QuerierConnection {
         Ok(())
     }
 
-    async fn clean_up(&self) {
+    async fn clean_up(&self, force_remove: bool) {
         // flush in case of any remaining trace_ids
         self.response_router.flush().await;
+
+        log::info!(
+            "[WS::QuerierConnection] cleaning up connection to querier {}: force_remove: {}",
+            self.querier_name,
+            force_remove
+        );
 
         // Send close message to the querier for graceful shutdown
         let mut write_guard = self.write.lock().await;
@@ -284,6 +294,12 @@ impl QuerierConnection {
             }
             *write_guard = None;
         }
+
+        log::info!(
+            "[WS::QuerierConnection] removing connection from the pool: {}, force_remove: {}",
+            self.querier_name,
+            force_remove
+        );
 
         // remove the connection from the pool
         QuerierConnectionPool::clean_up(&self.querier_name).await;

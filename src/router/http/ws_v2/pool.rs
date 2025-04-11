@@ -41,6 +41,9 @@ impl QuerierConnectionPool {
         querier_name: &QuerierName,
     ) -> WsResult<Arc<QuerierConnection>> {
         if let Some(conn) = self.connections.read().await.get(querier_name) {
+            log::info!(
+                "[WS::ConnectionPool] returning existing connection to querier {querier_name}"
+            );
             return Ok(conn.clone());
         }
 
@@ -50,6 +53,11 @@ impl QuerierConnectionPool {
             .write()
             .await
             .insert(querier_name.to_string(), conn.clone());
+        log::info!("[WS::ConnectionPool] created new connection to querier {querier_name}");
+        QuerierConnectionPool::print_all_connections(
+            format!("after create new {}", querier_name).as_str(),
+        )
+        .await;
         Ok(conn)
     }
 
@@ -80,9 +88,32 @@ impl QuerierConnectionPool {
 
     pub async fn clean_up(querier_name: &QuerierName) {
         let ws_handler = get_ws_handler().await;
+        QuerierConnectionPool::print_all_connections(
+            format!("before cleanup {}", querier_name).as_str(),
+        )
+        .await;
         ws_handler
             .connection_pool
             .remove_querier_connection(querier_name)
             .await;
+
+        QuerierConnectionPool::print_all_connections(
+            format!("after cleanup {}", querier_name).as_str(),
+        )
+        .await;
+    }
+
+    pub async fn print_all_connections(helper_txt: &str) {
+        let ws_handler = get_ws_handler().await;
+        let ws_handler_clone = ws_handler.clone();
+        for (querier_name, _) in ws_handler_clone
+            .connection_pool
+            .connections
+            .read()
+            .await
+            .iter()
+        {
+            log::info!("[WS::ConnectionPool]   {helper_txt}: {querier_name}");
+        }
     }
 }
