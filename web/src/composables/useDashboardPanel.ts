@@ -1461,7 +1461,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     ].fields.value = null;
   };
 
-  const addFilteredItem = async (name: string) => {
+  const addFilteredItem = async (filterItem: {
+    streamAlias: string;
+    name: string;
+  }) => {
     const currentQuery =
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1480,7 +1483,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentQuery.fields.filter.conditions.push({
       type: "list",
       values: [],
-      column: name,
+      column: {
+        field: filterItem.name,
+        streamAlias: filterItem.streamAlias,
+      },
       operator: null,
       value: null,
       logicalOperator: "AND",
@@ -1502,14 +1508,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         end_time: new Date(
           dashboardPanelData.meta.dateTime["end_time"].toISOString(),
         ).getTime(),
-        fields: [name],
+        fields: [filterItem.name],
         size: 100,
         type: currentQuery.fields.stream_type,
         no_count: true,
       });
 
       dashboardPanelData.meta.filterValue.push({
-        column: name,
+        column: {
+          field: filterItem.name,
+          streamAlias: filterItem.streamAlias,
+        },
         value: res?.data?.hits?.[0]?.values
           .map((it: any) => it.zo_sql_key)
           .filter((it: any) => it),
@@ -1528,11 +1537,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
-  const loadFilterItem = ({ streamAlias, field: name }: any) => {
+  const loadFilterItem = (filterItem: {
+    streamAlias: string;
+    field: string;
+  }) => {
     // get stream name from streamAlias
     const streamName =
-      getAllSelectedStreams().find((it: any) => it.streamAlias == streamAlias)
-        ?.stream ??
+      getAllSelectedStreams().find(
+        (it: any) => it.streamAlias == filterItem.streamAlias,
+      )?.stream ??
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream;
@@ -1546,7 +1559,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       end_time: new Date(
         dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
       ).getTime(),
-      fields: [name],
+      fields: [filterItem.field],
       size: 100,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1555,13 +1568,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     })
       .then((res: any) => {
         const find = dashboardPanelData.meta.filterValue.findIndex(
-          (it: any) => it.column == name,
+          (it: any) =>
+            it.column.field === filterItem.field &&
+            it.column.streamAlias === filterItem.streamAlias,
         );
         if (find >= 0) {
           dashboardPanelData.meta.filterValue.splice(find, 1);
         }
         dashboardPanelData.meta.filterValue.push({
-          column: name,
+          column: filterItem,
           streamName: streamName,
           value: res?.data?.hits?.[0]?.values
             .map((it: any) => it.zo_sql_key)
@@ -2174,10 +2189,25 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
    * @returns the formatted value
    */
 
-  const formatValue = (value: any, column: string): string | null => {
-    const columnType = dashboardPanelData.meta.stream.selectedStreamFields.find(
-      (it: any) => it.name == column,
+  const formatValue = (
+    value: any,
+    column: { field: string; streamAlias: string },
+  ): string | null => {
+    // streamAlias can be undefined or null, also, groupedfield will have one entry with streamAlias as null
+    // so we need to handle both cases
+    const streamFields = column.streamAlias
+      ? dashboardPanelData?.meta?.streamFields?.groupedFields.find(
+          (it: any) => it.stream_alias === column.streamAlias,
+        )
+      : dashboardPanelData?.meta?.streamFields?.groupedFields.find(
+          (it: any) =>
+            it.stream_alias === null || it.stream_alias === undefined,
+        );
+
+    const columnType = streamFields?.schema?.find(
+      (it: any) => it.name == column.field,
     )?.type;
+
     if (value == null) {
       // if value is null or undefined, return it as is
       return value;
@@ -2226,143 +2256,154 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   /**
+   * Build a single condition from the given condition object.
+   * @param {object} condition - a filter object with properties for column,
+   *   operator, value, and logicalOperator.
+   * @returns {string} - the condition as a string.
+   */
+  const buildCondition = (condition: any) => {
+    if (condition.filterType === "group") {
+      const groupConditions = condition.conditions
+        .map(buildCondition)
+        .filter(Boolean);
+      const logicalOperators = condition.conditions
+        .map((c: any) => c.logicalOperator)
+        .filter(Boolean);
+
+      let groupQuery = "";
+      groupConditions.forEach((cond: any, index: any) => {
+        if (index > 0) {
+          groupQuery += ` ${logicalOperators[index]} `;
+        }
+        groupQuery += cond;
+      });
+
+      return groupConditions.length ? `(${groupQuery})` : "";
+    } else if (condition.type === "list" && condition.values?.length > 0) {
+      return `${condition.column.field} IN (${condition.values
+        .map((value: any) => formatValue(value, condition.column))
+        .join(", ")})`;
+    } else if (condition.type === "condition" && condition.operator != null) {
+      let selectFilter = "";
+      if (["Is Null", "Is Not Null"].includes(condition.operator)) {
+        selectFilter += `${condition.column.field} `;
+        switch (condition.operator) {
+          case "Is Null":
+            selectFilter += `IS NULL`;
+            break;
+          case "Is Not Null":
+            selectFilter += `IS NOT NULL`;
+            break;
+        }
+      } else if (condition.operator === "IN") {
+        selectFilter += `${condition.column.field} IN (${formatINValue(
+          condition.value,
+        )})`;
+      } else if (condition.operator === "NOT IN") {
+        selectFilter += `${condition.column.field} NOT IN (${formatINValue(
+          condition.value,
+        )})`;
+      } else if (condition.operator === "match_all") {
+        selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
+      } else if (condition.operator === "match_all_raw") {
+        selectFilter += `match_all_raw(${formatValue(condition.value, condition.column)})`;
+      } else if (condition.operator === "match_all_raw_ignore_case") {
+        selectFilter += `match_all_raw_ignore_case(${formatValue(
+          condition.value,
+          condition.column,
+        )})`;
+      } else if (condition.operator === "str_match") {
+        selectFilter += `str_match(${condition.column.field}, ${formatValue(
+          condition.value,
+          condition.column,
+        )})`;
+      } else if (condition.operator === "str_match_ignore_case") {
+        selectFilter += `str_match_ignore_case(${
+          condition.column.field
+        }, ${formatValue(condition.value, condition.column)})`;
+      } else if (condition.operator === "re_match") {
+        selectFilter += `re_match(${condition.column.field}, ${formatValue(
+          condition.value,
+          condition.column,
+        )})`;
+      } else if (condition.operator === "re_not_match") {
+        selectFilter += `re_not_match(${condition.column.field}, ${formatValue(
+          condition.value,
+          condition.column,
+        )})`;
+      } else if (condition.value != null && condition.value !== "") {
+        // streamAlias can be undefined or null, also, groupedfield will have one entry with streamAlias as null
+        // so we need to handle both cases
+        const streamFields = condition.column.streamAlias
+          ? dashboardPanelData?.meta?.streamFields?.groupedFields.find(
+              (it: any) => it.stream_alias === condition.column.streamAlias,
+            )
+          : dashboardPanelData?.meta?.streamFields?.groupedFields.find(
+              (it: any) =>
+                it.stream_alias === null || it.stream_alias === undefined,
+            );
+
+        const columnType = streamFields?.schema?.find(
+          (it: any) => it.name == condition.column.field,
+        )?.type;
+
+        selectFilter += `${condition.column.field} `;
+        switch (condition.operator) {
+          case "=":
+          case "<>":
+          case "<":
+          case ">":
+          case "<=":
+          case ">=":
+            selectFilter += `${condition.operator} ${formatValue(
+              condition.value,
+              condition.column,
+            )}`;
+            break;
+          case "Contains":
+            selectFilter +=
+              columnType === "Utf8"
+                ? `LIKE '%${condition.value}%'`
+                : `LIKE %${condition.value}%`;
+            break;
+          case "Not Contains":
+            selectFilter +=
+              columnType === "Utf8"
+                ? `NOT LIKE '%${condition.value}%'`
+                : `NOT LIKE %${condition.value}%`;
+            break;
+          case "Starts With":
+            selectFilter +=
+              columnType === "Utf8"
+                ? `LIKE '${condition.value}%'`
+                : `LIKE ${condition.value}%`;
+            break;
+          case "Ends With":
+            selectFilter +=
+              columnType === "Utf8"
+                ? `LIKE '%${condition.value}'`
+                : `LIKE %${condition.value}`;
+            break;
+          default:
+            selectFilter += `${condition.operator} ${formatValue(
+              condition.value,
+              condition.column,
+            )}`;
+            break;
+        }
+      }
+      return selectFilter;
+    }
+    return "";
+  };
+
+  /**
    * Build a WHERE clause from the given filter data.
    * @param {array} filterData - an array of filter objects, each with properties
    *   for column, operator, value, and logicalOperator.
    * @returns {string} - the WHERE clause as a string.
    */
   const buildWhereClause = (filterData: any) => {
-    /**
-     * Build a single condition from the given condition object.
-     * @param {object} condition - a filter object with properties for column,
-     *   operator, value, and logicalOperator.
-     * @returns {string} - the condition as a string.
-     */
-    const buildCondition = (condition: any) => {
-      const columnType =
-        dashboardPanelData.meta.stream.selectedStreamFields.find(
-          (it: any) => it.name == condition.column,
-        )?.type;
-      if (condition.filterType === "group") {
-        const groupConditions = condition.conditions
-          .map(buildCondition)
-          .filter(Boolean);
-        const logicalOperators = condition.conditions
-          .map((c: any) => c.logicalOperator)
-          .filter(Boolean);
-
-        let groupQuery = "";
-        groupConditions.forEach((cond: any, index: any) => {
-          if (index > 0) {
-            groupQuery += ` ${logicalOperators[index]} `;
-          }
-          groupQuery += cond;
-        });
-
-        return groupConditions.length ? `(${groupQuery})` : "";
-      } else if (condition.type === "list" && condition.values?.length > 0) {
-        return `${condition.column} IN (${condition.values
-          .map((value: any) => formatValue(value, condition.column))
-          .join(", ")})`;
-      } else if (condition.type === "condition" && condition.operator != null) {
-        let selectFilter = "";
-        if (["Is Null", "Is Not Null"].includes(condition.operator)) {
-          selectFilter += `${condition.column} `;
-          switch (condition.operator) {
-            case "Is Null":
-              selectFilter += `IS NULL`;
-              break;
-            case "Is Not Null":
-              selectFilter += `IS NOT NULL`;
-              break;
-          }
-        } else if (condition.operator === "IN") {
-          selectFilter += `${condition.column} IN (${formatINValue(
-            condition.value,
-          )})`;
-        } else if (condition.operator === "NOT IN") {
-          selectFilter += `${condition.column} NOT IN (${formatINValue(
-            condition.value,
-          )})`;
-        } else if (condition.operator === "match_all") {
-          selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
-        } else if (condition.operator === "match_all_raw") {
-          selectFilter += `match_all_raw(${formatValue(condition.value, condition.column)})`;
-        } else if (condition.operator === "match_all_raw_ignore_case") {
-          selectFilter += `match_all_raw_ignore_case(${formatValue(
-            condition.value,
-            condition.column,
-          )})`;
-        } else if (condition.operator === "str_match") {
-          selectFilter += `str_match(${condition.column}, ${formatValue(
-            condition.value,
-            condition.column,
-          )})`;
-        } else if (condition.operator === "str_match_ignore_case") {
-          selectFilter += `str_match_ignore_case(${
-            condition.column
-          }, ${formatValue(condition.value, condition.column)})`;
-        } else if (condition.operator === "re_match") {
-          selectFilter += `re_match(${condition.column}, ${formatValue(
-            condition.value,
-            condition.column,
-          )})`;
-        } else if (condition.operator === "re_not_match") {
-          selectFilter += `re_not_match(${condition.column}, ${formatValue(
-            condition.value,
-            condition.column,
-          )})`;
-        } else if (condition.value != null && condition.value !== "") {
-          selectFilter += `${condition.column} `;
-          switch (condition.operator) {
-            case "=":
-            case "<>":
-            case "<":
-            case ">":
-            case "<=":
-            case ">=":
-              selectFilter += `${condition.operator} ${formatValue(
-                condition.value,
-                condition.column,
-              )}`;
-              break;
-            case "Contains":
-              selectFilter +=
-                columnType === "Utf8"
-                  ? `LIKE '%${condition.value}%'`
-                  : `LIKE %${condition.value}%`;
-              break;
-            case "Not Contains":
-              selectFilter +=
-                columnType === "Utf8"
-                  ? `NOT LIKE '%${condition.value}%'`
-                  : `NOT LIKE %${condition.value}%`;
-              break;
-            case "Starts With":
-              selectFilter +=
-                columnType === "Utf8"
-                  ? `LIKE '${condition.value}%'`
-                  : `LIKE ${condition.value}%`;
-              break;
-            case "Ends With":
-              selectFilter +=
-                columnType === "Utf8"
-                  ? `LIKE '%${condition.value}'`
-                  : `LIKE %${condition.value}`;
-              break;
-            default:
-              selectFilter += `${condition.operator} ${formatValue(
-                condition.value,
-                condition.column,
-              )}`;
-              break;
-          }
-        }
-        return selectFilter;
-      }
-      return "";
-    };
-
     const whereConditions = filterData.map(buildCondition).filter(Boolean);
 
     const logicalOperators = filterData.map((it: any) => it.logicalOperator);
@@ -3364,6 +3405,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     selectedStreamFieldsBasedOnUserDefinedSchema,
     updateGroupedFields,
     getAllSelectedStreams,
+    buildCondition,
   };
 };
 export default useDashboardPanelData;
