@@ -219,8 +219,8 @@ export default defineComponent({
         type: Boolean,
         default: false,
       },
-      emits: ['update:folders', 'update:activeFolderId'],
     },
+    emits: ['update:folders', 'update:activeFolderId'],
     setup(props, { emit }) {
       const store = useStore();
       const { showPositiveNotification, showErrorNotification } =
