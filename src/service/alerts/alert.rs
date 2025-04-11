@@ -1610,10 +1610,14 @@ pub fn get_alert_start_end_time(
     }
     (alert_start_time, alert_end_time)
 }
-
 fn format_variable_value(val: String) -> String {
     val.chars()
-        .flat_map(|c| c.escape_default())
+        .map(|c| match c {
+            '\'' => "\\'".to_string(),
+            '"' => "\\\"".to_string(),
+            '\\' => "\\\\".to_string(),
+            _ => c.to_string(),
+        })
         .collect::<String>()
 }
 
