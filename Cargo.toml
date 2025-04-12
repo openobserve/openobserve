@@ -57,7 +57,7 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
     "support-rust-embed-for-web",
     "base64",
 ] }
-actix-ws = "0.2.5"
+actix-ws = "0.3.0"
 actix = "0.13.5"
 actix-web-actors = "4.3.0"
 actix-tls.workspace = true
