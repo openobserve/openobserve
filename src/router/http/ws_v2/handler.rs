@@ -82,7 +82,7 @@ impl WsHandler {
         let mut msg_stream = msg_stream
             .max_frame_size(cfg.websocket.max_frame_size * 1024 * 1024)
             .aggregate_continuations()
-            .max_continuation_size(cfg.websocket.max_continuation_size * 1024 * 1024ß);
+            .max_continuation_size(cfg.websocket.max_continuation_size * 1024 * 1024);
 
         log::info!("[WS::Router::Handler] new client connected: {}", client_id);
 
