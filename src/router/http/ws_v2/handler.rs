@@ -80,7 +80,7 @@ impl WsHandler {
         let (response, mut ws_session, msg_stream) = actix_ws::handle(&req, stream)?;
         // increase the maximum allowed frame size to 128KiB and aggregate continuation frames
         let mut msg_stream = msg_stream
-            .max_frame_size(128 * 1024)
+            .max_frame_size(1024 * 1024)
             .aggregate_continuations();
 
         log::info!("[WS::Router::Handler] new client connected: {}", client_id);
