@@ -77,7 +77,13 @@ impl WsHandler {
         log::info!("[WS::Router::Handler] new client incoming: {}", client_id);
 
         // Client -> Router connection
-        let (response, mut ws_session, mut msg_stream) = actix_ws::handle(&req, stream)?;
+        let (response, mut ws_session, msg_stream) = actix_ws::handle(&req, stream)?;
+        // increase the maximum allowed frame size to 128KiB and aggregate continuation frames
+        let mut msg_stream = msg_stream
+            .max_frame_size(cfg.websocket.max_frame_size * 1024 * 1024)
+            .aggregate_continuations()
+            .max_continuation_size(cfg.websocket.max_continuation_size * 1024 * 1024);
+
         log::info!("[WS::Router::Handler] new client connected: {}", client_id);
 
         // Create session by registering the client & extract the user_id from the auth
@@ -156,7 +162,7 @@ impl WsHandler {
                                         break;
                                     }
                                 }
-                                Ok(actix_ws::Message::Text(text)) => {
+                                Ok(actix_ws::AggregatedMessage::Text(text)) => {
                                     match json::from_str::<WsClientEvents>(&text) {
                                         Err(e) => {
                                             log::error!(
@@ -275,7 +281,7 @@ impl WsHandler {
                                         }
                                     }
                                 }
-                                Ok(actix_ws::Message::Close(close_reason)) => {
+                                Ok(actix_ws::AggregatedMessage::Close(close_reason)) => {
                                     log::info!(
                                         "[WS::Router::Handler] disconnect signal received from client_id: {}, close_reason: {:?}", client_id, close_reason
                                     );
@@ -287,10 +293,10 @@ impl WsHandler {
                                     log::debug!("[WS::Router::Handler] Stop handle_incoming for client_id: {}", client_id);
                                     break;
                                 }
-                                Ok(actix_ws::Message::Ping(ping)) => {
+                                Ok(actix_ws::AggregatedMessage::Ping(ping)) => {
                                     let _ = response_tx.send(WsServerEvents::Ping(ping.to_vec())).await;
                                 }
-                                Ok(actix_ws::Message::Pong(pong)) => {
+                                Ok(actix_ws::AggregatedMessage::Pong(pong)) => {
                                     log::debug!("[WS::Router::Handler] Pong received from client_id: {}, pong: {:?}", client_id, pong);
                                 }
                                 Ok(_) => {}

@@ -877,16 +877,17 @@ export default defineComponent({
       try {
         const res = await alertsService.listByFolderId(1,1000,"name",false,"",store?.state?.selectedOrganization?.identifier,folderId,query);
           var counter = 1;
+          let localAllAlerts = [];
           //this is the alerts that we use to store
-          allAlerts.value = res.data.list.map((alert: any) => {
+          localAllAlerts = res.data.list.map((alert: any) => {
             return {
               ...alert,
               uuid: getUUID(),
             };
           });
           //general alerts that we use to display (formatting the alerts into the table format)
-          //allAlerts is the alerts that we use to store
-          allAlerts.value = allAlerts.value.map((data: any) => {
+          //localAllAlerts is the alerts that we use to store
+          localAllAlerts = localAllAlerts.map((data: any) => {
             let conditions = "--";
             if (data.condition.conditions?.length) {
               conditions = data.condition.conditions
@@ -937,14 +938,24 @@ export default defineComponent({
             };
           });
           //this is the condition where we are setting the alertStateLoadingMap
-          allAlerts.value.forEach((alert: any) => {
+          localAllAlerts.forEach((alert: any) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
           });    
           //this is the condition where we are setting the allAlertsListByFolderId in the store
           store?.dispatch("setAllAlertsListByFolderId", {
             ...store.state.organizationData.allAlertsListByFolderId,
-            [folderId]: allAlerts.value,
+            [folderId]: localAllAlerts,
           });
+          //RACE CONDITION handling
+          //this is the condition where we are checking the if the folderId is not equal to the activeFolderId
+          //if it is not equal then we are returning  and if is not search across folders then we are returning as well as in previous step we are anyways storing in the store for future use
+          //this will prevent the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
+          if(folderId != activeFolderId.value && !query){
+            dismiss();
+            return;
+          }
+          //here we are actually assigning the localAllAlerts to the allAlerts to avoid the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
+          allAlerts.value = localAllAlerts;
           //this is the condition where we are setting the filteredResults 
           //1. If it is search across folders then also we are setting the filteredResults(which contains the filtered alerts)
           //2. If it is not search across folders then we are setting the filteredResults to the alerts(which contains all the alerts)
@@ -971,7 +982,6 @@ export default defineComponent({
             });
           }
           dismiss();
-        
       } catch (error) {
           console.error(error);
           dismiss();
