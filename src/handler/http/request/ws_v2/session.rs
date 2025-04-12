@@ -16,7 +16,7 @@
 use std::time::Duration;
 
 use actix_http::ws::{CloseCode, CloseReason};
-use actix_ws::{MessageStream, Session};
+use actix_ws::{AggregatedMessageStream, Session};
 use config::{
     get_config,
     meta::websocket::{SearchEventReq, SearchResultType},
@@ -133,7 +133,12 @@ impl WsSession {
     }
 }
 
-pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String, path: String) {
+pub async fn run(
+    mut msg_stream: AggregatedMessageStream,
+    user_id: String,
+    req_id: String,
+    path: String,
+) {
     log::info!(
         "[WS_HANDLER]: Starting WebSocket session for req_id: {}, path: {}",
         req_id,
@@ -161,7 +166,7 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                 }
 
                 match msg {
-                    Ok(actix_ws::Message::Ping(bytes)) => {
+                    Ok(actix_ws::AggregatedMessage::Ping(bytes)) => {
                         log::debug!(
                             "[WS_HANDLER]: Received ping from client for req_id: {}",
                             req_id
@@ -183,13 +188,13 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                             break;
                         }
                     }
-                    Ok(actix_ws::Message::Pong(_)) => {
+                    Ok(actix_ws::AggregatedMessage::Pong(_)) => {
                         log::debug!(
                             "[WS_HANDLER]: Received pong from client for req_id: {}",
                             req_id
                         );
                     }
-                    Ok(actix_ws::Message::Text(msg)) => {
+                    Ok(actix_ws::AggregatedMessage::Text(msg)) => {
                         log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received message: {}",
                             req_id,
                             get_config().common.node_role,
@@ -197,7 +202,7 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                         );
                         handle_text_message(&user_id, &req_id, msg.to_string(), path.clone()).await;
                     }
-                    Ok(actix_ws::Message::Close(reason)) => {
+                    Ok(actix_ws::AggregatedMessage::Close(reason)) => {
                         if let Some(reason) = reason.as_ref() {
                             match reason.code {
                                 CloseCode::Normal | CloseCode::Error => {

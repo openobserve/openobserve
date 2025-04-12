@@ -70,6 +70,11 @@ pub async fn websocket(
 
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
+    // increase the maximum allowed frame size to 128KiB and aggregate continuation frames
+    let msg_stream = msg_stream
+        .max_frame_size(128 * 1024)
+        .aggregate_continuations();
+
     let ws_session = WsSession::new(session, cookie_expiry);
     sessions_cache_utils::insert_session(&router_id, Arc::new(RwLock::new(ws_session))).await;
     log::info!(
