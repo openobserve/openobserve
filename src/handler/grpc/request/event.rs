@@ -23,6 +23,7 @@ use config::{
     metrics,
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
+use infra::cache::file_data::TRACE_ID_FOR_CACHE_LATEST_FILE;
 use opentelemetry::global;
 use proto::cluster_rpc::{EmptyResponse, FileList, event_server::Event};
 use tonic::{Request, Response, Status};
@@ -50,6 +51,12 @@ impl Event for Eventer {
             .filter(|v| !v.deleted)
             .map(FileKey::from)
             .collect::<Vec<_>>();
+        let del_items = req
+            .items
+            .iter()
+            .filter(|v| v.deleted)
+            .map(|v| v.key.clone())
+            .collect::<Vec<_>>();
         let cfg = get_config();
 
         // cache latest files for querier
@@ -70,7 +77,8 @@ impl Event for Eventer {
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
                     if let Err(e) =
-                        infra::cache::file_data::download("cache_latest_file", &item.key).await
+                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &item.key)
+                            .await
                     {
                         log::error!("Failed to cache file data: {}", e);
                     }
@@ -79,13 +87,21 @@ impl Event for Eventer {
                 if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
                     if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
                     {
-                        if let Err(e) =
-                            infra::cache::file_data::download("cache_latest_file", &ttv_file).await
+                        if let Err(e) = infra::cache::file_data::download(
+                            TRACE_ID_FOR_CACHE_LATEST_FILE,
+                            &ttv_file,
+                        )
+                        .await
                         {
                             log::error!("Failed to cache file data: {}", e);
                         }
                     }
                 }
+            }
+
+            // delete merge files
+            if cfg.cache_latest_files.delete_merge_files {
+                infra::cache::file_data::delete::add(del_items);
             }
         }
 
