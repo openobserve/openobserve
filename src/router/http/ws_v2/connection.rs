@@ -174,7 +174,10 @@ impl QuerierConnection {
                                 }
                                 tungstenite::protocol::Message::Text(text) => {
                                     let svr_event = match json::from_str::<WsServerEvents>(&text) {
-                                        Ok(event) => event,
+                                        Ok(event) => {
+                                            log::info!("[WS::Router::QuerierConnection] router received message from querier for trace_id: {}", event.get_trace_id());
+                                            event
+                                        },
                                         Err(e) => {
                                             log::error!(
                                                 "[WS::Router::QuerierConnection] Error parsing message received from querier: {}. Trying to get trace_id",
@@ -206,7 +209,8 @@ impl QuerierConnection {
                                     if let Err(e) = self.response_router.route_response(svr_event.clone()).await {
                                         // scenario 2 where the trace_id & sender are not cleaned up -> left for clean job
                                         log::error!(
-                                            "[WS::Router::QuerierConnection] Error routing response from querier back to client socket: {}, message: {}",
+                                            "[WS::Router::QuerierConnection] Error routing response from querier back to client, trace_id: {}, socket: {}, message: {}",
+                                            svr_event.get_trace_id(),
                                             e,
                                             svr_event.to_json()
                                         );
@@ -367,6 +371,10 @@ impl ResponseRouter {
                     .send(message)
                     .await
                     .map_err(|_| WsError::ResponseChannelClosed(trace_id.clone()))?;
+                log::info!(
+                    "[WS::Router::QuerierConnection] router sent message to router-client task for trace_id: {}",
+                    trace_id
+                );
                 Ok(())
             }
         }
