@@ -431,6 +431,18 @@ pub struct WebSocket {
     pub session_gc_interval_secs: i64,
     #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 30)]
     pub ping_interval_secs: i64,
+    #[env_config(
+        name = "ZO_WEBSOCKET_MAX_FRAME_SIZE",
+        default = 1,
+        help = "Maximum allowed frame size in MB"
+    )]
+    pub max_frame_size: usize,
+    #[env_config(
+        name = "ZO_WEBSOCKET_MAX_CONTINUATION_SIZE",
+        default = 256,
+        help = "Maximum allowed continuation size in MB"
+    )]
+    pub max_continuation_size: usize,
 }
 
 #[derive(EnvConfig)]
@@ -1448,7 +1460,7 @@ pub struct Compact {
 pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = true)]
     pub enabled: bool,
-    // Memory data cache strategy, default is lru, other value is fifo
+    // Memory data cache strategy, default is lru, other value is fifo, time_lru
     #[env_config(name = "ZO_MEMORY_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
     // Memory data cache bucket num, multiple bucket means multiple locker, default is 0
@@ -1483,7 +1495,7 @@ pub struct MemoryCache {
 pub struct DiskCache {
     #[env_config(name = "ZO_DISK_CACHE_ENABLED", default = true)]
     pub enabled: bool,
-    // Disk data cache strategy, default is lru, other value is fifo
+    // Disk data cache strategy, default is lru, other value is fifo, time_lru
     #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
     // Disk data cache bucket num, multiple bucket means multiple locker, default is 0
@@ -1787,6 +1799,7 @@ pub struct RateLimit {
     )]
     pub ratelimit_rule_refresh_interval: usize,
 }
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
