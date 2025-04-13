@@ -101,7 +101,17 @@ impl Event for Eventer {
 
             // delete merge files
             if cfg.cache_latest_files.delete_merge_files {
-                infra::cache::file_data::delete::add(del_items);
+                if cfg.cache_latest_files.cache_parquet {
+                    infra::cache::file_data::delete::add(del_items.clone());
+                }
+                if cfg.cache_latest_files.cache_index {
+                    infra::cache::file_data::delete::add(
+                        del_items
+                            .into_iter()
+                            .filter_map(|v| convert_parquet_idx_file_name_to_tantivy_file(&v))
+                            .collect(),
+                    );
+                }
             }
         }
 
