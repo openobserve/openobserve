@@ -53,7 +53,7 @@ impl Event for Eventer {
         let cfg = get_config();
 
         // cache latest files for querier
-        if cfg.memory_cache.cache_latest_files && LOCAL_NODE.is_querier() {
+        if cfg.cache_latest_files.enabled && LOCAL_NODE.is_querier() {
             for item in put_items.iter() {
                 let Some(node_name) = get_node_from_consistent_hash(
                     &item.key,
@@ -68,13 +68,15 @@ impl Event for Eventer {
                     continue; // not this node
                 }
                 // cache parquet
-                if let Err(e) =
-                    infra::cache::file_data::download("cache_latest_file", &item.key).await
-                {
-                    log::error!("Failed to cache file data: {}", e);
+                if cfg.cache_latest_files.cache_parquet {
+                    if let Err(e) =
+                        infra::cache::file_data::download("cache_latest_file", &item.key).await
+                    {
+                        log::error!("Failed to cache file data: {}", e);
+                    }
                 }
                 // cache index for the parquet
-                if item.meta.index_size > 0 {
+                if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
                     if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
                     {
                         if let Err(e) =
