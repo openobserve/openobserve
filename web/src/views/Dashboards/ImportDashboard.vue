@@ -558,12 +558,18 @@ export default defineComponent({
               }
             }
 
-            const hasFailure = results.some(r => r.error);
-            if (hasFailure) {
-              reject({ file: fileName, results });
-            } else {
-              resolve({ file: fileName, results });
-            }
+            const failedMessages = results
+                .filter(r => r.error)
+                .map(r => `${r.error?.message || r.error}`);
+
+              if (failedMessages.length) {
+                reject({
+                  file: `JSON ${fileIndex + 1}`,         
+                  error: failedMessages.join("; "),
+                });
+              } else {
+                resolve({ file: fileName, results });
+              }
           } catch (e) {
             reject({ file: fileName, error: "Error processing file" });
           }
