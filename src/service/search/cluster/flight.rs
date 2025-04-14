@@ -128,6 +128,11 @@ pub async fn search(
                 .duration(file_id_list_took)
                 .search_get_file_id_list(file_id_list_vec.len())
                 .search_file_id_list_took(file_id_list_took)
+                .desc(format!(
+                    "search flight get files {} ids took {} ms ",
+                    file_id_list_vec.len(),
+                    file_id_list_took
+                ))
                 .build()
         )
     );
@@ -186,8 +191,9 @@ pub async fn search(
                 .component("service:search:flight:leader get nodes".to_string())
                 .step(3)
                 .duration(start.elapsed().as_millis() as usize)
-                .search_get_node_list_took(idx_scan_size)
+                .search_get_node_list_took(idx_took)
                 .search_get_node_list_num((nodes.len(), querier_num))
+                .desc(format!("search flight get inverted index file lists idx_took {}, get nodes num: {}, querier num: {}", idx_took, nodes.len(), querier_num))
                 .build()
         )
     );
@@ -507,6 +513,7 @@ pub async fn run_datafusion(
                     .step(0)
                     .duration(took as usize)
                     .search_run_datafution_took(took as usize)
+                    .desc(format!("datafusion search took {} ms", took))
                     .build()
             )
         );
@@ -677,6 +684,10 @@ pub async fn check_work_group(
                 .step(4)
                 .duration(took_wait)
                 .search_check_work_group_wait_in_queue(took_wait)
+                .desc(format!(
+                    "search cluster flight check_work_group took: {} ms",
+                    took_wait
+                ))
                 .build()
         )
     );

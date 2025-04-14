@@ -237,6 +237,12 @@ pub async fn search(
 
         c_resp.deltas.sort();
         c_resp.deltas.dedup();
+        let total = (req.query.end_time - req.query.start_time) as usize;
+        let deltas_total = c_resp
+            .deltas
+            .iter()
+            .map(|d| (d.delta_end_time - d.delta_start_time) as usize)
+            .sum();
         log::info!(
             "{}",
             search_inspector_fields(
@@ -248,13 +254,12 @@ pub async fn search(
                     .step(1)
                     .duration(start.elapsed().as_millis() as usize)
                     .search_cache_spend_time(start.elapsed().as_millis() as usize)
-                    .search_cache_reduce_time((
-                        (req.query.end_time - req.query.start_time) as usize,
-                        c_resp
-                            .deltas
-                            .iter()
-                            .map(|d| (d.delta_end_time - d.delta_start_time) as usize)
-                            .sum()
+                    .search_cache_reduce_time((total, deltas_total))
+                    .desc(format!(
+                        "search cacher took: {} ms, search from {} ms reduce to {} ms",
+                        start.elapsed().as_millis() as usize,
+                        total,
+                        deltas_total
                     ))
                     .build()
             )

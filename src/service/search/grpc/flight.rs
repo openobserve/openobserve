@@ -231,6 +231,10 @@ pub async fn search(
                     .step(5)
                     .duration(file_list_took)
                     .search_get_file_id_list(file_list_took)
+                    .desc(format!(
+                        "grpc flight search get file_list by ids took : {} ms",
+                        file_list_took
+                    ))
                     .build()
             )
         );
@@ -383,6 +387,10 @@ pub async fn search(
                 .step(12)
                 .duration(start.elapsed().as_millis() as usize)
                 .search_generated_physical_plan_took(start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "grpc flight search generated physical plan, took: {} ms",
+                    start.elapsed().as_millis()
+                ))
                 .build()
         )
     );

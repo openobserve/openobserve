@@ -200,6 +200,10 @@ pub async fn search(
                 .step(0)
                 .duration(start.elapsed().as_millis() as usize)
                 .search_leader_spend_time(start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "service:search leader finish took: {} ms",
+                    start.elapsed().as_millis()
+                ))
                 .build()
         )
     );

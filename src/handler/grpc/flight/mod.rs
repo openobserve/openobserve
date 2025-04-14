@@ -126,6 +126,10 @@ impl FlightService for FlightServiceImpl {
                     .step(0)
                     .duration(_start.elapsed().as_millis() as usize)
                     .search_get_ctx_and_physical_plan_took(_start.elapsed().as_millis() as usize)
+                    .desc(format!(
+                        "get ctx and physical plan took: {} ms",
+                        _start.elapsed().as_millis()
+                    ))
                     .build()
             )
         );

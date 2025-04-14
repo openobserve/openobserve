@@ -136,6 +136,12 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
                     .duration(start.elapsed().as_millis() as usize)
                     .search_cached_ids(cached_ids.len())
                     .search_remote_db_left_ids(ids.len() - cached_ids.len())
+                    .desc(format!(
+                        "file list get cached_ids: {}, left ids: {}, took: {} ms",
+                        cached_ids.len(),
+                        ids.len() - cached_ids.len(),
+                        start.elapsed().as_millis()
+                    ))
                     .build()
             )
         );
@@ -194,6 +200,11 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
                 .duration(start.elapsed().as_millis() as usize)
                 .search_remote_db_files(db_files.len())
                 .search_remote_db_query_took(start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "file list query from db: {}, took: {} ms",
+                    db_files.len(),
+                    start.elapsed().as_millis()
+                ))
                 .build()
         )
     );
@@ -224,6 +235,11 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
                     .duration(start.elapsed().as_millis() as usize)
                     .search_cached_ids(db_files.len())
                     .search_set_cached_ids_took(start.elapsed().as_millis() as usize)
+                    .desc(format!(
+                        "file list set cached_ids: {}, took: {} ms",
+                        db_files.len(),
+                        start.elapsed().as_millis()
+                    ))
                     .build()
             )
         );

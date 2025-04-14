@@ -33,6 +33,8 @@ pub struct SearchInspectorFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub component: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub desc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub search_cache_spend_time: Option<usize>, // unit ms
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_cache_reduced_time_range: Option<Vec<String>>,
@@ -164,6 +166,11 @@ impl SearchInspectorFieldsBuilder {
 
     pub fn component(mut self, component: String) -> Self {
         self.fields.component = Some(component);
+        self
+    }
+
+    pub fn desc(mut self, value: String) -> Self {
+        self.fields.desc = Some(value);
         self
     }
 

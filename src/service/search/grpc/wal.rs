@@ -244,6 +244,10 @@ pub async fn search_parquet(
                 .search_wal_parquet_files(scan_stats.files as usize)
                 .search_wal_parquet_files_original_size(scan_stats.original_size as usize)
                 .search_wal_parquet_compressed_size(scan_stats.compressed_size as usize)
+                .desc(format!("wal parquest search load groups {}, files {}, scan_size {}, compressed_size {}, took: {} ms", files_group.len(),
+                scan_stats.files,
+                scan_stats.original_size,
+                scan_stats.compressed_size, start.elapsed().as_millis() as usize))
                 .build()
         )
     );
@@ -327,6 +331,10 @@ pub async fn search_parquet(
                 .component("service:search:wal:parquet create tables took".to_string())
                 .step(11)
                 .duration(start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "wal parquest search load tables took {} ms",
+                    start.elapsed().as_millis() as usize
+                ))
                 .build()
         )
     );
@@ -420,6 +428,10 @@ pub async fn search_memtable(
                 .search_mem_files(scan_stats.files as usize)
                 .search_mem_files_original_size(scan_stats.original_size as usize)
                 .search_mem_compressed_size(scan_stats.compressed_size as usize)
+                .desc(format!("wal mem search load groups {}, files {}, scan_size {}, compressed_size {}, took {} ms", batch_groups.len(),
+                scan_stats.files,
+                scan_stats.original_size,
+                scan_stats.compressed_size, start.elapsed().as_millis()))
                 .build()
         )
     );
@@ -511,6 +523,10 @@ pub async fn search_memtable(
                 .component("service:search:wal:memtable create tables took".to_string())
                 .step(12)
                 .duration(start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "wal mem search create tables took {} ms",
+                    start.elapsed().as_millis()
+                ))
                 .build()
         )
     );

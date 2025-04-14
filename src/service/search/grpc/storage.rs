@@ -175,6 +175,12 @@ pub async fn search(
                     .duration(idx_took)
                     .search_inverted_index_reduced_file_list_num(ori_files_len - files.len())
                     .search_inverted_index_idx_took(idx_took)
+                    .desc(format!(
+                        "search storage inverted index reduced file_list {} num to {} in {} ms",
+                        ori_files_len - files.len(),
+                        files.len(),
+                        idx_took
+                    ))
                     .build()
             )
         );
@@ -298,6 +304,10 @@ pub async fn search(
                 .search_querier_files(scan_stats.querier_files as usize)
                 .search_querier_memory_cached_files(scan_stats.querier_memory_cached_files as usize)
                 .search_querier_disk_cached_files(scan_stats.querier_disk_cached_files as usize)
+                .desc(format!("search storage load files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms", scan_stats.querier_files,
+                scan_stats.querier_memory_cached_files,
+                scan_stats.querier_disk_cached_files,
+                cache_start.elapsed().as_millis()))
                 .build()
         )
     );
@@ -375,6 +385,10 @@ pub async fn search(
                 .component("service:search:grpc:storage create tables took".to_string())
                 .step(9)
                 .duration(start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "search storage create tables took: {} ms",
+                    start.elapsed().as_millis()
+                ))
                 .build()
         )
     );
@@ -547,6 +561,10 @@ pub async fn filter_file_list_by_tantivy_index(
                 .search_tantivy_querier_disk_cached_files(
                     scan_stats.querier_disk_cached_files as usize
                 )
+                .desc(format!("search storage load tantivy index files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms ", scan_stats.querier_files,
+                scan_stats.querier_memory_cached_files,
+                scan_stats.querier_disk_cached_files,
+                start.elapsed().as_millis()))
                 .build()
         )
     );
@@ -748,10 +766,14 @@ pub async fn filter_file_list_by_tantivy_index(
                 )
                 .step(8)
                 .duration(search_start.elapsed().as_millis() as usize)
-                .search_tantivy_index_condition(index_condition)
+                .search_tantivy_index_condition(index_condition.clone())
                 .search_tantivy_total_hits(total_hits)
                 .search_tantivy_is_add_filter_back(is_add_filter_back)
                 .search_tantivy_file_num(file_list_map.len())
+                .desc(format!("total hits for index_condition: {:?} found {} rows, is_add_filter_back: {}, file_num: {}, took: {} ms", index_condition,
+                total_hits,
+                is_add_filter_back,
+                file_list_map.len(), search_start.elapsed().as_millis()))
                 .build()
         )
     );

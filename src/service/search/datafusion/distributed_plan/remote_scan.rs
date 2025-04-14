@@ -544,6 +544,13 @@ impl Drop for FlightStream {
                 .search_flighstream_files(self.files as usize)
                 .search_flighstream_num_rows(self.num_rows)
                 .search_flighstream_scan_size(self.scan_size as usize)
+                .desc(format!(
+                    "remote sacn search files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+                    self.files,
+                    self.scan_size / 1024 / 1024,
+                    self.num_rows,
+                    self.start.elapsed().as_millis()
+                ))
                 .build(),
         );
     }
