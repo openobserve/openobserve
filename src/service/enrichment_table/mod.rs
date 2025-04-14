@@ -141,8 +141,8 @@ pub async fn save_enrichment_data(
     // if it does, we need to return an error
     if total_expected_size_in_mb > enrichment_table_max_size {
         return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+            HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
                 format!(
                     "enrichment table [{stream_name}] total expected storage size {} exceeds max storage size {}",
                     total_expected_size_in_mb, enrichment_table_max_size
