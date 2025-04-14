@@ -373,8 +373,8 @@ test_data_sql = [
     (
         "FULL Join",
         f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a FULL JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
-        45,
-        41,
+        50,
+        50,
     ),
 
     (
