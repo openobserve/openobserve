@@ -45,7 +45,7 @@ use crate::{
         format_stream_name,
         ingestion::{check_ingestion_allowed, get_val_for_attr},
         logs::bulk::TRANSFORM_FAILED,
-        schema::get_upto_discard_error,
+        schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 
@@ -105,6 +105,8 @@ pub async fn logs_json_handler(
     check_ingestion_allowed(org_id, Some(&stream_name))?;
 
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
         .timestamp_micros();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
@@ -305,9 +307,13 @@ pub async fn logs_json_handler(
                 }
 
                 // check ingestion time
-                if timestamp < min_ts {
+                if timestamp < min_ts || timestamp > max_ts {
                     stream_status.status.failed += 1; // to old data, just discard
-                    stream_status.status.error = get_upto_discard_error().to_string();
+                    stream_status.status.error = if timestamp < min_ts {
+                        get_upto_discard_error().to_string()
+                    } else {
+                        get_future_discard_error().to_string()
+                    };
                     metrics::INGEST_ERRORS
                         .with_label_values(&[
                             org_id,

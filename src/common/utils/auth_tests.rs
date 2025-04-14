@@ -3177,6 +3177,7 @@ mod tests {
                 circuit_breaker_reset_window_num: i64::default(),
                 circuit_breaker_slow_request_threshold: u64::default(),
                 ingest_allowed_upto: i64::default(),
+                ingest_allowed_in_future: i64::default(),
                 ingest_flatten_level: u32::default(),
                 ignore_file_retention_by_stream: bool::default(),
                 logs_file_retention: String::default(),

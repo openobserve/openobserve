@@ -49,6 +49,11 @@ pub fn generate_trace_id() -> String {
     opentelemetry::trace::TraceId::from(trace_id).to_string()
 }
 
+/// Convert a snowflake id to a timestamp in milliseconds.
+pub fn to_timestamp_millis(id: i64) -> i64 {
+    id >> 22
+}
+
 /// The `SnowflakeIdGenerator` type is snowflake algorithm wrapper.
 #[derive(Copy, Clone, Debug)]
 pub struct SnowflakeIdGenerator {
@@ -217,6 +222,9 @@ fn biding_time_conditions(last_time_millis: i64, epoch: SystemTime) -> i64 {
 
 #[cfg(test)]
 mod tests {
+
+    use chrono::TimeZone;
+
     use super::*;
 
     #[test]
@@ -235,5 +243,19 @@ mod tests {
         let new_id1 = format!("{}-{}", new_id, "0");
         let new_id2 = format!("{}-{}", new_id1, "abcd");
         assert_eq!(new_id2, trace_id2);
+    }
+
+    #[test]
+    fn test_ider_to_timestamp_millis() {
+        let data = [
+            (7232450184620358447, "2024-08-22"),
+            (7317509042887196698, "2025-04-14"),
+        ];
+        for (id, ts) in data {
+            let id_ts = to_timestamp_millis(id);
+            let t = chrono::Utc.timestamp_nanos(id_ts * 1000_000);
+            let td = t.format("%Y-%m-%d").to_string();
+            assert_eq!(td, ts.to_string());
+        }
     }
 }
