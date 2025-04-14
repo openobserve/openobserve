@@ -51,7 +51,7 @@ use crate::{
         format_stream_name, get_formatted_stream_name,
         ingestion::check_ingestion_allowed,
         logs::bulk::TRANSFORM_FAILED,
-        schema::{get_overlap_discard_error, get_upto_discard_error},
+        schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 
@@ -80,7 +80,7 @@ pub async fn ingest(
 
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
-    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_overlap).unwrap())
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_future).unwrap())
         .timestamp_micros();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
@@ -432,7 +432,7 @@ pub fn handle_timestamp(
         return Err(get_upto_discard_error());
     }
     if timestamp > max_ts {
-        return Err(get_overlap_discard_error());
+        return Err(get_future_discard_error());
     }
     local_val.insert(
         cfg.common.column_timestamp.clone(),

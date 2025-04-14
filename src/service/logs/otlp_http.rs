@@ -46,7 +46,7 @@ use crate::{
         format_stream_name,
         ingestion::{check_ingestion_allowed, get_val_for_attr},
         logs::bulk::TRANSFORM_FAILED,
-        schema::{get_overlap_discard_error, get_upto_discard_error},
+        schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 
@@ -107,7 +107,7 @@ pub async fn logs_json_handler(
 
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
-    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_overlap).unwrap())
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_future).unwrap())
         .timestamp_micros();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
@@ -310,7 +310,7 @@ pub async fn logs_json_handler(
                     stream_status.status.error = if timestamp < min_ts {
                         get_upto_discard_error().to_string()
                     } else {
-                        get_overlap_discard_error().to_string()
+                        get_future_discard_error().to_string()
                     };
                     metrics::INGEST_ERRORS
                         .with_label_values(&[

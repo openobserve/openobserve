@@ -192,7 +192,7 @@ pub async fn handle_otlp_request(
     };
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
-    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_overlap).unwrap())
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_future).unwrap())
         .timestamp_micros();
 
     // Start retrieving associated pipeline and construct pipeline params
@@ -601,7 +601,7 @@ pub async fn ingest_json(
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
-    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_overlap).unwrap())
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_future).unwrap())
         .timestamp_micros();
 
     let json_values: Vec<json::Value> = json::from_slice(&body)?;

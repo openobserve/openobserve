@@ -49,10 +49,10 @@ pub(crate) fn get_upto_discard_error() -> anyhow::Error {
     )
 }
 
-pub(crate) fn get_overlap_discard_error() -> anyhow::Error {
+pub(crate) fn get_future_discard_error() -> anyhow::Error {
     anyhow::anyhow!(
-        "Too far future data, only last {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_OVERLAP=<max_hours>",
-        get_config().limit.ingest_allowed_overlap
+        "Too far future data, only future {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_IN_FUTURE=<max_hours>",
+        get_config().limit.ingest_allowed_future
     )
 }
 

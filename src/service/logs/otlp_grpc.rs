@@ -46,7 +46,7 @@ use crate::{
             grpc::{get_val, get_val_with_type_retained},
         },
         logs::bulk::TRANSFORM_FAILED,
-        schema::{get_overlap_discard_error, get_upto_discard_error},
+        schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 
@@ -71,7 +71,7 @@ pub async fn handle_grpc_request(
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
-    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_overlap).unwrap())
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_future).unwrap())
         .timestamp_micros();
 
     let log_ingestion_errors = ingestion_log_enabled().await;
@@ -148,7 +148,7 @@ pub async fn handle_grpc_request(
                     stream_status.status.error = if timestamp < min_ts {
                         get_upto_discard_error().to_string()
                     } else {
-                        get_overlap_discard_error().to_string()
+                        get_future_discard_error().to_string()
                     };
                     metrics::INGEST_ERRORS
                         .with_label_values(&[
