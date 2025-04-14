@@ -745,7 +745,7 @@ pub async fn build_search_request_per_field(
                         .iter()
                         .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
 
-                            // pick up where clause from sql
+                    // pick up where clause from sql
                     let sql_where_from_query = match SearchService::sql::pickup_where(&sql, None) {
                         Ok(v) => v.unwrap_or_default(),
                         Err(e) => {
@@ -843,16 +843,16 @@ pub async fn build_search_request_per_field(
     for field in fields {
         let sql = match (no_count, use_result_cache) {
             (true, true) => format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" WHERE {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
             ),
             (true, false) => format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key" 
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" WHERE {sql_where} GROUP BY zo_sql_key" 
             ),
             (false, true) => format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" WHERE {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC"
             ),
             (false, false) => format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
+                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" WHERE {sql_where} GROUP BY zo_sql_key"
             ),
         };
 
@@ -1177,10 +1177,10 @@ async fn values_v1(
                 })
                 .collect::<Vec<_>>();
 
-            let mut field_value: json::Map<String, json::Value> = json::Map::new();
-            field_value.insert("field".to_string(), json::Value::String(key));
-            field_value.insert("values".to_string(), json::Value::Array(top_hits));
-            hit_values.push(json::Value::Object(field_value));
+                let mut field_value: json::Map<String, json::Value> = json::Map::new();
+                field_value.insert("field".to_string(), json::Value::String(key));
+                field_value.insert("values".to_string(), json::Value::Array(top_hits));
+                hit_values.push(json::Value::Object(field_value));
         }
 
         resp.scan_size = std::cmp::max(resp.scan_size, ret.scan_size);

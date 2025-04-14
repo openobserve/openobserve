@@ -261,6 +261,41 @@ pub async fn run(
     cleanup_and_close_session(&req_id, close_reason).await;
 }
 
+/// Resolves user ID based on the execution mode and request data
+/// 
+/// # Parameters
+/// * `default_user_id` - Default user ID from the HTTP request
+/// * `user_id_from_event` - Optional user ID from the event
+/// 
+/// # Returns
+/// * `Option<String>` - Resolved user ID if successful, None otherwise
+#[cfg(feature = "enterprise")]
+async fn resolve_enterprise_user_id(
+    default_user_id: &str,
+    user_id_from_event: Option<&String>,
+) -> Option<String> {
+    if get_config().common.local_mode {
+        // Single node mode, use user_id from the HTTP request header
+        Some(default_user_id.to_string())
+    } else {
+        // Cluster mode, try to determine user ID
+        // First check if we're running without router nodes
+        let router_nodes = get_cached_online_router_nodes().await;
+        if let Some(nodes) = router_nodes {
+            if nodes.is_empty() {
+                // Single node enterprise deployment
+                return Some(default_user_id.to_string());
+            }
+        }
+        
+        // Next, try to use user_id from the event
+        if let Some(id) = user_id_from_event {
+            return Some(id.clone());
+        }
+        None
+    }
+}
+
 /// Handle the incoming text message
 /// Text message is parsed into `WsClientEvents` and processed accordingly
 /// Depending on each event type, audit must be done
@@ -284,38 +319,21 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
             match client_msg {
                 WsClientEvents::Search(ref search_req) => {
                     #[allow(unused_mut)]
-                    let mut user_id = user_id;
+                    let mut user_id = user_id.to_string();
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
-                        user_id = if get_config().common.local_mode {
-                            // single node mode, use user_id from the http request header
-                            user_id
-                        } else {
-                            // cluster mode, use user_id from the ws event added by the router
-                            let router_nodes = get_cached_online_router_nodes().await;
-                            let user_id = router_nodes.and_then(|nodes| {
-                                if nodes.is_empty() {
-                                    // if router nodes are not found, use the user_id from the
-                                    // search request
-                                    // since its a single node, running enterprise
-                                    Some(user_id)
-                                } else {
-                                    None
-                                }
-                            });
-                            if let Some(user_id) = user_id {
-                                user_id
-                            } else if let Some(user_id) = &search_req.user_id {
-                                user_id
-                            } else {
+                        user_id = match resolve_enterprise_user_id(
+                            &user_id,
+                            search_req.user_id.as_ref(),
+                        ).await {
+                            Some(id) => id,
+                            None => {
                                 log::error!("[WS_HANDLER]: User id not found in search request");
                                 let err_res = WsServerEvents::error_response(
-                                    errors::Error::Message(
-                                        "User id not found in search request".to_string(),
-                                    ),
+                                    errors::Error::Message("User id not found in search request".to_string()),
                                     Some(req_id.to_string()),
-                                    Some(search_req.trace_id.clone()),
+                                    Some(search_req.trace_id.to_string()),
                                     Default::default(),
                                 );
                                 let _ = send_message(req_id, err_res.to_json()).await;
@@ -326,7 +344,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     handle_search_event(
                         search_req,
                         &search_req.org_id,
-                        user_id,
+                        &user_id,
                         req_id,
                         path.clone(),
                     )
@@ -334,25 +352,21 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 }
                 WsClientEvents::Values(ref values_req) => {
                     #[allow(unused_mut)]
-                    let mut user_id = user_id;
+                    let mut user_id = user_id.to_string();
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
-                        user_id = if get_config().common.local_mode {
-                            // single node mode, use user_id from the http request header
-                            user_id
-                        } else {
-                            // cluster mode, use user_id from the ws event added by the router
-                            if let Some(user_id) = &values_req.user_id {
-                                user_id
-                            } else {
+                        user_id = match resolve_enterprise_user_id(
+                            &user_id,
+                            values_req.user_id.as_ref(),
+                        ).await {
+                            Some(id) => id,
+                            None => {
                                 log::error!("[WS_HANDLER]: User id not found in values request");
                                 let err_res = WsServerEvents::error_response(
-                                    errors::Error::Message(
-                                        "User id not found in values request".to_string(),
-                                    ),
+                                    errors::Error::Message("User id not found in values request".to_string()),
                                     Some(req_id.to_string()),
-                                    Some(values_req.trace_id.clone()),
+                                    Some(values_req.trace_id.to_string()),
                                     Default::default(),
                                 );
                                 let _ = send_message(req_id, err_res.to_json()).await;
@@ -363,7 +377,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     handle_values_event(
                         values_req,
                         &values_req.org_id,
-                        user_id,
+                        &user_id,
                         req_id,
                         path.clone(),
                     )

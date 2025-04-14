@@ -51,7 +51,7 @@ pub async fn handle_values_request(
     let no_count = payload.no_count;
 
     log::info!(
-        "[WS_SEARCH] trace_id: {} Received values request, start_time: {}, end_time: {}",
+        "[WS_VALUES] trace_id: {} Received values request, start_time: {}, end_time: {}",
         trace_id,
         DateTime::from_timestamp_micros(start_time.unwrap_or(0) / 1_000).map_or("None".to_string(), |dt| dt.to_string()),
         DateTime::from_timestamp_micros(end_time.unwrap_or(0) / 1_000).map_or("None".to_string(), |dt| dt.to_string())
@@ -114,7 +114,7 @@ pub async fn handle_values_request(
                 .unwrap_or_default();
 
             log::info!(
-                "[WS_SEARCH] trace_id: {}, found cache responses len:{}, with hits: {}, cache_start_time: {:#?}, cache_end_time: {:#?}",
+                "[WS_VALUES] trace_id: {}, found cache responses len:{}, with hits: {}, cache_start_time: {:#?}, cache_end_time: {:#?}",
                 trace_id,
                 cached_resp.len(),
                 cached_hits,
@@ -173,7 +173,7 @@ pub async fn handle_values_request(
                 // Step 2: Search without cache
                 // no caches found process req directly
                 log::info!(
-                    "[WS_SEARCH] trace_id: {} No cache found, processing search request",
+                    "[WS_VALUES] trace_id: {} No cache found, processing search request",
                     trace_id
                 );
                 let max_query_range =
@@ -220,7 +220,7 @@ pub async fn handle_values_request(
                     .await
                     .map_err(|e| {
                         log::error!(
-                            "[WS_SEARCH] trace_id: {}, Error writing results to cache: {:?}",
+                            "[WS_VALUES] trace_id: {}, Error writing results to cache: {:?}",
                             trace_id,
                             e
                         );
@@ -265,7 +265,7 @@ pub async fn handle_values_request(
     }
 
     // Once all searches are complete, write the accumulated results to a file
-    log::info!("[WS_SEARCH] trace_id {} all searches completed", trace_id);
+    log::info!("[WS_VALUES] trace_id {} all searches completed", trace_id);
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
