@@ -28,6 +28,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let instance_id = match instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {
+            log::info!("Generating new instance id");
             let id = ider::generate();
             let _ = instance::set(&id).await;
             id
