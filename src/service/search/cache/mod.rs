@@ -27,12 +27,14 @@ use config::{
         stream::StreamType,
     },
     metrics,
-    utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
+    utils::{base64, hash::Sum64, json, sql::is_aggregate_query, time::format_duration},
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
@@ -243,6 +245,15 @@ pub async fn search(
             .iter()
             .map(|d| (d.delta_end_time - d.delta_start_time) as usize)
             .sum();
+        let search_role = "leader".to_string();
+
+        #[cfg(feature = "enterprise")]
+        let search_role = if get_o2_config().super_cluster.enabled {
+            "super".to_string()
+        } else {
+            search_role
+        };
+
         log::info!(
             "{}",
             search_inspector_fields(
@@ -250,16 +261,16 @@ pub async fn search(
                 SearchInspectorFieldsBuilder::new()
                     .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
-                    .component("service:search:cacher:search deltas".to_string())
-                    .step(1)
+                    .component("cacher:search deltas".to_string())
+                    .search_role(search_role)
                     .duration(start.elapsed().as_millis() as usize)
                     .search_cache_spend_time(start.elapsed().as_millis() as usize)
                     .search_cache_reduce_time((total, deltas_total))
                     .desc(format!(
                         "search cacher took: {} ms, search from {} ms reduce to {} ms",
-                        start.elapsed().as_millis() as usize,
-                        total,
-                        deltas_total
+                        start.elapsed().as_millis(),
+                        format_duration(total as u64),
+                        format_duration(deltas_total as u64)
                     ))
                     .build()
             )

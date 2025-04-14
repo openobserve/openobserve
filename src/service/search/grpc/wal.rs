@@ -238,8 +238,8 @@ pub async fn search_parquet(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("service:search:wal:parquet load took".to_string())
-                .step(10)
+                .component("wal:parquet load took".to_string())
+                .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .search_wal_parquet_files(scan_stats.files as usize)
                 .search_wal_parquet_files_original_size(scan_stats.original_size as usize)
@@ -328,8 +328,8 @@ pub async fn search_parquet(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("service:search:wal:parquet create tables took".to_string())
-                .step(11)
+                .component("wal:parquet create tables took".to_string())
+                .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .desc(format!(
                     "wal parquest search load tables took {} ms",
@@ -422,8 +422,8 @@ pub async fn search_memtable(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("service:search:wal:memtable load took".to_string())
-                .step(12)
+                .component("wal:memtable load took".to_string())
+                .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .search_mem_files(scan_stats.files as usize)
                 .search_mem_files_original_size(scan_stats.original_size as usize)
@@ -520,8 +520,8 @@ pub async fn search_memtable(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("service:search:wal:memtable create tables took".to_string())
-                .step(12)
+                .component("wal:memtable create tables took".to_string())
+                .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .desc(format!(
                     "wal mem search create tables took {} ms",

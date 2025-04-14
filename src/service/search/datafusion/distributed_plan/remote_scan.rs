@@ -536,10 +536,8 @@ impl Drop for FlightStream {
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(self.node_addr.clone())
-                .component(
-                    "service:search:datafution:distributed_plan FlightStream drop".to_string(),
-                )
-                .step(12)
+                .component("datafution:distributed_plan FlightStream drop".to_string())
+                .search_role("follower".to_string())
                 .duration(self.start.elapsed().as_millis() as usize)
                 .search_flighstream_files(self.files as usize)
                 .search_flighstream_num_rows(self.num_rows)

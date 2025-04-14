@@ -254,6 +254,34 @@ pub fn end_of_the_day(timestamp: i64) -> i64 {
     t_next_day_zero - 1
 }
 
+pub fn format_duration(ms: u64) -> String {
+    let seconds = ms / 1000;
+    let minutes = seconds / 60;
+    let hours = minutes / 60;
+    let days = hours / 24;
+
+    let remaining_seconds = seconds % 60;
+    let remaining_minutes = minutes % 60;
+    let remaining_hours = hours % 24;
+
+    let mut parts = Vec::new();
+
+    if days > 0 {
+        parts.push(format!("{} days", days));
+    }
+    if remaining_hours > 0 {
+        parts.push(format!("{} hours", remaining_hours));
+    }
+    if remaining_minutes > 0 {
+        parts.push(format!("{} minutes", remaining_minutes));
+    }
+    if remaining_seconds > 0 {
+        parts.push(format!("{} seconds", remaining_seconds));
+    }
+
+    parts.join(", ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

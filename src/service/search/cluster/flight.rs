@@ -123,13 +123,13 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("service:search:flight:leader get file id".to_string())
-                .step(2)
+                .component("flight:leader get file id".to_string())
+                .search_role("leader".to_string())
                 .duration(file_id_list_took)
                 .search_get_file_id_list(file_id_list_vec.len())
                 .search_file_id_list_took(file_id_list_took)
                 .desc(format!(
-                    "search flight get files {} ids took {} ms ",
+                    "get files {} ids took {} ms ",
                     file_id_list_vec.len(),
                     file_id_list_took
                 ))
@@ -188,12 +188,16 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("service:search:flight:leader get nodes".to_string())
-                .step(3)
+                .component("flight:leader get nodes".to_string())
+                .search_role("leader".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .search_get_node_list_took(idx_took)
+                .search_get_node_list_took(start.elapsed().as_millis() as usize)
                 .search_get_node_list_num((nodes.len(), querier_num))
-                .desc(format!("search flight get inverted index file lists idx_took {}, get nodes num: {}, querier num: {}", idx_took, nodes.len(), querier_num))
+                .desc(format!(
+                    "get nodes num: {}, querier num: {}",
+                    nodes.len(),
+                    querier_num
+                ))
                 .build()
         )
     );
@@ -507,13 +511,10 @@ pub async fn run_datafusion(
                 SearchInspectorFieldsBuilder::new()
                     .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
-                    .component(
-                        "service:search:cluster:flight:run_datafusion collect done".to_string()
-                    )
-                    .step(0)
+                    .component("flight:run_datafusion collect done".to_string())
+                    .search_role("follower".to_string())
                     .duration(took as usize)
                     .search_run_datafution_took(took as usize)
-                    .desc(format!("datafusion search took {} ms", took))
                     .build()
             )
         );
@@ -680,14 +681,10 @@ pub async fn check_work_group(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("service:search:cluster:flight:check_work_group".to_string())
-                .step(4)
+                .component("flight:check_work_group".to_string())
+                .search_role("leader".to_string())
                 .duration(took_wait)
                 .search_check_work_group_wait_in_queue(took_wait)
-                .desc(format!(
-                    "search cluster flight check_work_group took: {} ms",
-                    took_wait
-                ))
                 .build()
         )
     );

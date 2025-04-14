@@ -27,7 +27,7 @@ pub struct SearchInspectorFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub step: Option<i64>,
+    pub search_role: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -154,8 +154,8 @@ impl SearchInspectorFieldsBuilder {
         self
     }
 
-    pub fn step(mut self, step: i64) -> Self {
-        self.fields.step = Some(step);
+    pub fn search_role(mut self, search_role: String) -> Self {
+        self.fields.search_role = Some(search_role);
         self
     }
 

@@ -224,17 +224,10 @@ pub async fn search(
                 SearchInspectorFieldsBuilder::new()
                     .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
-                    .component(
-                        "service:search:grpc:flight:do_get::search get file_list by ids"
-                            .to_string()
-                    )
-                    .step(5)
+                    .component("flight:do_get::search get file_list by ids".to_string())
+                    .search_role("follower".to_string())
                     .duration(file_list_took)
                     .search_get_file_id_list(file_list_took)
-                    .desc(format!(
-                        "grpc flight search get file_list by ids took : {} ms",
-                        file_list_took
-                    ))
                     .build()
             )
         );
@@ -381,16 +374,10 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component(
-                    "service:search:grpc:flight:do_get::search generated physical plan".to_string()
-                )
-                .step(12)
+                .component("flight:do_get::search generated physical plan".to_string())
+                .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .search_generated_physical_plan_took(start.elapsed().as_millis() as usize)
-                .desc(format!(
-                    "grpc flight search generated physical plan, took: {} ms",
-                    start.elapsed().as_millis()
-                ))
                 .build()
         )
     );

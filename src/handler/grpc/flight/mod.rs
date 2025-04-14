@@ -120,16 +120,10 @@ impl FlightService for FlightServiceImpl {
                 SearchInspectorFieldsBuilder::new()
                     .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
-                    .component(
-                        "service:search:flight::do_get get_ctx_and_physical_plan".to_string()
-                    )
-                    .step(0)
+                    .component("flight::do_get get_ctx_and_physical_plan".to_string())
+                    .search_role("follower".to_string())
                     .duration(_start.elapsed().as_millis() as usize)
                     .search_get_ctx_and_physical_plan_took(_start.elapsed().as_millis() as usize)
-                    .desc(format!(
-                        "get ctx and physical plan took: {} ms",
-                        _start.elapsed().as_millis()
-                    ))
                     .build()
             )
         );

@@ -55,8 +55,10 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::make_grpc_search_client, o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, tracing::info_span,
+    crate::service::grpc::make_grpc_search_client,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
+    std::collections::HashSet, tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
@@ -189,6 +191,16 @@ pub async fn search(
         Ok(Err(e)) => Err(e),
         Err(e) => Err(Error::Message(e.to_string())),
     };
+
+    let search_role = "leader".to_string();
+
+    #[cfg(feature = "enterprise")]
+    let search_role = if get_o2_config().super_cluster.enabled {
+        "super".to_string()
+    } else {
+        search_role
+    };
+
     log::info!(
         "{}",
         search_inspector_fields(
@@ -196,14 +208,10 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("service:search leader".to_string())
-                .step(0)
+                .component("service:search leader finish".to_string())
+                .search_role(search_role)
                 .duration(start.elapsed().as_millis() as usize)
                 .search_leader_spend_time(start.elapsed().as_millis() as usize)
-                .desc(format!(
-                    "service:search leader finish took: {} ms",
-                    start.elapsed().as_millis()
-                ))
                 .build()
         )
     );
