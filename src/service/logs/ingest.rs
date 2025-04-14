@@ -48,7 +48,7 @@ use crate::{
     },
     service::{
         format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
-        logs::bulk::TRANSFORM_FAILED, schema::get_upto_discard_error,
+        logs::bulk::TRANSFORM_FAILED, schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 
@@ -76,6 +76,8 @@ pub async fn ingest(
     check_ingestion_allowed(org_id, Some(&stream_name))?;
 
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
         .timestamp_micros();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
@@ -204,7 +206,7 @@ pub async fn ingest(
             let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
 
             // handle timestamp
-            let timestamp = match handle_timestamp(&mut res, min_ts) {
+            let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
                 Ok(ts) => ts,
                 Err(e) => {
                     stream_status.status.failed += 1;
@@ -307,7 +309,7 @@ pub async fn ingest(
 
                     for (idx, mut res) in stream_pl_results {
                         // handle timestamp
-                        let timestamp = match handle_timestamp(&mut res, min_ts) {
+                        let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
                             Ok(ts) => ts,
                             Err(e) => {
                                 stream_status.status.failed += 1;
@@ -438,7 +440,11 @@ pub async fn ingest(
     ))
 }
 
-pub fn handle_timestamp(value: &mut json::Value, min_ts: i64) -> Result<i64, anyhow::Error> {
+pub fn handle_timestamp(
+    value: &mut json::Value,
+    min_ts: i64,
+    max_ts: i64,
+) -> Result<i64, anyhow::Error> {
     let local_val = value
         .as_object_mut()
         .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
@@ -452,6 +458,9 @@ pub fn handle_timestamp(value: &mut json::Value, min_ts: i64) -> Result<i64, any
     // check ingestion time
     if timestamp < min_ts {
         return Err(get_upto_discard_error());
+    }
+    if timestamp > max_ts {
+        return Err(get_future_discard_error());
     }
     local_val.insert(
         TIMESTAMP_COL_NAME.to_string(),
