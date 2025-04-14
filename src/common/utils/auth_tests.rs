@@ -3006,7 +3006,6 @@ mod tests {
                 session_max_lifetime_secs: i64::default(),
                 session_gc_interval_secs: i64::default(),
                 ping_interval_secs: i64::default(),
-                health_check_interval: i64::default(),
             },
             route: config::Route {
                 timeout: u64::default(),
@@ -3269,11 +3268,15 @@ mod tests {
                 pending_jobs_metric_interval: u64::default(),
                 max_group_files: usize::default(),
             },
+            cache_latest_files: config::CacheLatestFiles {
+                enabled: bool::default(),
+                cache_parquet: bool::default(),
+                cache_index: bool::default(),
+            },
             memory_cache: config::MemoryCache {
                 enabled: bool::default(),
                 cache_strategy: String::default(),
                 bucket_num: 1,
-                cache_latest_files: bool::default(),
                 max_size: usize::default(),
                 skip_size: usize::default(),
                 release_size: usize::default(),

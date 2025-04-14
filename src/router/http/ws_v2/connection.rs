@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use std::sync::Arc;
 
 use actix_http::StatusCode;
 use async_trait::async_trait;
@@ -29,7 +26,7 @@ use reqwest::header::{HeaderName, HeaderValue};
 use tokio::{
     net::TcpStream,
     sync::{
-        Mutex,
+        RwLock,
         mpsc::{Sender, channel},
     },
 };
@@ -38,8 +35,9 @@ use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, protocol::Message as WsMessage},
 };
 
+use super::pool::QuerierConnectionPool;
 use crate::{
-    common::infra::cluster,
+    common::{infra::cluster, utils::websocket::get_ping_interval_secs_with_jitter},
     router::http::ws_v2::{
         error::*,
         handler::{QuerierName, TraceId},
@@ -54,16 +52,14 @@ pub trait Connection: Send + Sync {
     async fn connect(node_name: &str, http_url: &str) -> WsResult<Arc<Self>>;
     async fn disconnect(&self);
     async fn send_message(&self, message: WsClientEvents) -> WsResult<()>;
-    async fn is_connected(&self) -> bool;
 }
 
 #[derive(Debug)]
 pub struct QuerierConnection {
     querier_name: QuerierName,
-    write: Arc<Mutex<Option<SplitSink<WsStreamType, WsMessage>>>>,
+    write: Arc<RwLock<Option<SplitSink<WsStreamType, WsMessage>>>>,
     shutdown_tx: Sender<()>,
     response_router: Arc<ResponseRouter>,
-    is_connected: Arc<AtomicBool>,
 }
 
 impl Drop for QuerierConnection {
@@ -89,7 +85,8 @@ impl Drop for ResponseRouter {
 impl ResponseRouter {
     pub async fn flush(&self) {
         let mut count = 0;
-        for (trace_id, sender) in self.routes.write().await.drain() {
+        let mut write_guard = self.routes.write().await;
+        for (trace_id, sender) in write_guard.drain() {
             // Send error response to client
             let _ = sender
                 .send(WsServerEvents::Error {
@@ -104,7 +101,7 @@ impl ResponseRouter {
                 .await;
             count += 1;
         }
-
+        drop(write_guard);
         log::info!("[WS::QuerierConnection::ResponseRouter] flushed {count} routes",);
     }
 }
@@ -120,19 +117,25 @@ pub async fn create_connection(querier_name: &QuerierName) -> WsResult<Arc<Queri
 }
 
 impl QuerierConnection {
+    pub fn get_name(&self) -> &QuerierName {
+        &self.querier_name
+    }
+
     pub async fn register_request(&self, trace_id: TraceId, response_tx: Sender<WsServerEvents>) {
-        self.response_router
-            .routes
-            .write()
-            .await
-            .insert(trace_id, response_tx);
+        let mut write_guard = self.response_router.routes.write().await;
+        write_guard.insert(trace_id.clone(), response_tx);
+        drop(write_guard);
+        log::info!(
+            "[WS::QuerierConnection] registered trace_id {trace_id} in response_router-routes"
+        );
     }
 
     pub async fn unregister_request(&self, trace_id: &TraceId) {
         let mut write_guard = self.response_router.routes.write().await;
         write_guard.remove(trace_id);
         write_guard.shrink_to_fit();
-        log::debug!("[WS::Connection] removed trace_id {trace_id} from response_router-routes");
+        drop(write_guard);
+        log::info!("[WS::Connection] removed trace_id {trace_id} from response_router-routes");
     }
 
     async fn listen_to_querier_response(
@@ -155,7 +158,7 @@ impl QuerierConnection {
                                     log::debug!("[WS::Router::QuerierConnection] received ping message: {:?}", ping);
                                     let pong = tungstenite::protocol::Message::Pong(ping);
                                     let write_clone = self.write.clone();
-                                    let mut write_guard = write_clone.lock().await;
+                                    let mut write_guard = write_clone.write().await;
                                     if let Some(write) = write_guard.as_mut() {
                                         let _ = write.send(pong).await;
                                     }
@@ -171,7 +174,10 @@ impl QuerierConnection {
                                 }
                                 tungstenite::protocol::Message::Text(text) => {
                                     let svr_event = match json::from_str::<WsServerEvents>(&text) {
-                                        Ok(event) => event,
+                                        Ok(event) => {
+                                            log::info!("[WS::Router::QuerierConnection] router received message from querier for trace_id: {}", event.get_trace_id());
+                                            event
+                                        },
                                         Err(e) => {
                                             log::error!(
                                                 "[WS::Router::QuerierConnection] Error parsing message received from querier: {}. Trying to get trace_id",
@@ -203,7 +209,8 @@ impl QuerierConnection {
                                     if let Err(e) = self.response_router.route_response(svr_event.clone()).await {
                                         // scenario 2 where the trace_id & sender are not cleaned up -> left for clean job
                                         log::error!(
-                                            "[WS::Router::QuerierConnection] Error routing response from querier back to client socket: {}, message: {}",
+                                            "[WS::Router::QuerierConnection] Error routing response from querier back to client, trace_id: {}, socket: {}, message: {}",
+                                            svr_event.get_trace_id(),
                                             e,
                                             svr_event.to_json()
                                         );
@@ -229,45 +236,89 @@ impl QuerierConnection {
         }
 
         // reaches here when connection is closed/error from the querier side
-        // mark the connection disconnected and exist
-        self.is_connected.store(false, Ordering::SeqCst);
-        // flush in case of any remaining trace_ids
-        self.response_router.flush().await;
+        self.clean_up(false).await;
     }
 
     async fn health_check(&self) {
-        let cfg = get_config();
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            cfg.websocket.health_check_interval as _,
+            get_ping_interval_secs_with_jitter() as _,
         ));
 
         loop {
             interval.tick().await;
-            let mut write_guard = self.write.lock().await;
+            let mut write_guard = self.write.write().await;
             match write_guard.as_mut() {
                 None => {
+                    drop(write_guard);
                     break;
                 }
                 Some(w) => {
                     if w.send(WsMessage::Ping(vec![])).await.is_err() {
+                        log::error!(
+                            "[WS::QuerierConnection] failed to send ping message to querier {}",
+                            self.querier_name
+                        );
+                        drop(write_guard);
                         break;
                     }
                 }
             }
+            drop(write_guard);
         }
 
-        // mark the connection disconnected and exist
-        self.is_connected.store(false, Ordering::SeqCst);
-        // flush in case of any remaining trace_ids
-        self.response_router.flush().await;
+        self.clean_up(true).await;
     }
 
     pub async fn is_active_trace_id(&self, trace_id: &TraceId) -> bool {
-        self.response_router
-            .routes
-            .read()
-            .await
-            .contains_key(trace_id)
+        let r = self.response_router.routes.read().await;
+        let is_active = r.contains_key(trace_id);
+        drop(r);
+        is_active
+    }
+
+    pub async fn _send_ping(&self) -> WsResult<()> {
+        let mut write_guard = self.write.write().await;
+        if let Some(write) = write_guard.as_mut() {
+            if let Err(e) = write.send(WsMessage::Ping(vec![])).await {
+                drop(write_guard);
+                return Err(WsError::ConnectionError(e.to_string()));
+            }
+        }
+        drop(write_guard);
+        Ok(())
+    }
+
+    async fn clean_up(&self, force_remove: bool) {
+        // flush in case of any remaining trace_ids
+        self.response_router.flush().await;
+
+        log::info!(
+            "[WS::QuerierConnection] cleaning up connection to querier {}: force_remove: {}",
+            self.querier_name,
+            force_remove
+        );
+
+        // Send close message to the querier for graceful shutdown
+        let mut write_guard = self.write.write().await;
+        if let Some(write) = write_guard.as_mut() {
+            if let Err(e) = write.close().await {
+                log::warn!(
+                    "[WS::QuerierConnection] failed to send close frame to querier during cleanup: {}",
+                    e
+                );
+            }
+            *write_guard = None;
+        }
+        drop(write_guard);
+
+        log::info!(
+            "[WS::QuerierConnection] removing connection from the pool: {}, force_remove: {}",
+            self.querier_name,
+            force_remove
+        );
+
+        // remove the connection from the pool
+        QuerierConnectionPool::clean_up(&self.querier_name).await;
     }
 }
 
@@ -302,19 +353,28 @@ impl ResponseRouter {
                 }
             });
             write_guard.shrink_to_fit();
+            drop(write_guard);
         }
     }
 
     pub async fn route_response(&self, message: WsServerEvents) -> WsResult<()> {
         let trace_id = message.get_trace_id();
+        let sender = {
+            let r = self.routes.read().await;
+            r.get(&trace_id).cloned()
+        };
 
-        match self.routes.read().await.get(&trace_id) {
+        match sender {
             None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
             Some(resp_sender) => {
                 resp_sender
                     .send(message)
                     .await
                     .map_err(|_| WsError::ResponseChannelClosed(trace_id.clone()))?;
+                log::info!(
+                    "[WS::Router::QuerierConnection] router sent message to router-client task for trace_id: {}",
+                    trace_id
+                );
                 Ok(())
             }
         }
@@ -336,63 +396,50 @@ impl Connection for QuerierConnection {
             WsError::ConnectionError(e.to_string())
         })?;
         let (write, read) = ws_stream.split();
-        let write = Arc::new(Mutex::new(Some(write)));
+        let write = Arc::new(RwLock::new(Some(write)));
 
         // Signal to shutdown
         let (shutdown_tx, shutdown_rx) = channel::<()>(1);
 
         // Setting up components needed for the two tasks
         let response_router = ResponseRouter::new();
-        let is_connected = Arc::new(AtomicBool::new(true));
 
         let conn: Arc<QuerierConnection> = Arc::new(Self {
             querier_name: node_name.to_string(),
             write,
             shutdown_tx,
             response_router,
-            is_connected,
         });
 
         // Spawn task to listen to querier responses
         let conn_t1 = conn.clone();
         tokio::spawn(async move {
             let _ = conn_t1.listen_to_querier_response(read, shutdown_rx).await;
-            if !conn_t1.is_connected().await {
-                log::info!(
-                    "[WS::QuerierConnection] connection to querier {} closed",
-                    conn_t1.querier_name
-                );
-            }
         });
 
         // Spawn health check task
         let conn_t2 = conn.clone();
         tokio::spawn(async move {
             let _ = conn_t2.health_check().await;
-            if !conn_t2.is_connected().await {
-                log::info!(
-                    "[WS::QuerierConnection] connection to querier {} closed",
-                    conn_t2.querier_name
-                );
-            }
         });
 
         Ok(conn)
     }
 
     async fn disconnect(&self) {
-        let mut write_guard = self.write.lock().await;
+        let mut write_guard = self.write.write().await;
         if let Some(write) = write_guard.as_mut() {
             let close_frame = tungstenite::protocol::Message::Close(None);
             let _ = write.send(close_frame).await;
             _ = write.close().await;
             *write_guard = None;
         }
+        drop(write_guard);
         _ = self.shutdown_tx.send(()).await;
     }
 
     async fn send_message(&self, message: WsClientEvents) -> WsResult<()> {
-        let mut write_guard = self.write.lock().await;
+        let mut write_guard = self.write.write().await;
         if let Some(write) = write_guard.as_mut() {
             let trace_id = message.get_trace_id();
             // Convert `WsClientEvents` to `tungstenite::protocol::Message`
@@ -404,28 +451,25 @@ impl Connection for QuerierConnection {
                         trace_id,
                         self.querier_name
                     );
+                    drop(write_guard);
                     Ok(())
                 }
                 Err(e) => {
                     log::error!(
-                        "[WS::QuerierConnection] error sending messages via connection {e}. Mark the connection disconnected"
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via connection {}. Mark the connection disconnected",
+                        trace_id,
+                        e
                     );
-                    self.is_connected.store(false, Ordering::SeqCst);
+                    drop(write_guard);
                     Err(WsError::ConnectionError(format!(
-                        "[WS::QuerierConnection] error sending messages via connection {e}"
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via connection {}. Mark the connection disconnected",
+                        trace_id, e
                     )))
                 }
             }
         } else {
+            drop(write_guard);
             Err(WsError::ConnectionError("Not connected".into()))
-        }
-    }
-
-    async fn is_connected(&self) -> bool {
-        if self.write.lock().await.is_some() {
-            self.is_connected.load(Ordering::SeqCst)
-        } else {
-            false
         }
     }
 }
@@ -457,8 +501,8 @@ fn get_default_querier_request(http_url: &str) -> WsResult<tungstenite::http::Re
         }
     }
 
-    // TODO: v2 ws endpoint should be agnostic from `org` and `12345678`
-    let parsed_url = parsed_url.to_string() + "api/default/ws/v2/12345678";
+    let instance_name = get_config().common.instance_name.clone();
+    let parsed_url = parsed_url.to_string() + "api/default/ws/v2/" + &instance_name;
 
     let mut ws_req = parsed_url
         .into_client_request()

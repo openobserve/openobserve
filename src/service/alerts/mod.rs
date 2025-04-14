@@ -336,7 +336,16 @@ impl QueryConditionExt for QueryCondition {
                 "evaluate_scheduled begin to call SearchService::search_multi, {:?}",
                 req
             );
-            SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
+            SearchService::grpc_search::grpc_search_multi(
+                &trace_id,
+                org_id,
+                stream_type,
+                None,
+                &req,
+                Some(RoleGroup::Background),
+            )
+            .await
+            // SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
         } else {
             // fire the query
             let req = config::meta::search::Request {

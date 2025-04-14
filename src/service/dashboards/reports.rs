@@ -91,7 +91,9 @@ pub async fn save(
         report.frequency.cron =
             super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
         // Check if the cron expression is valid
-        Schedule::from_str(&report.frequency.cron)?;
+        if let Err(e) = Schedule::from_str(&report.frequency.cron) {
+            return Err(anyhow::anyhow!("Invalid cron expression: {e}"));
+        }
     } else if report.frequency.interval == 0 {
         report.frequency.interval = 1;
     }

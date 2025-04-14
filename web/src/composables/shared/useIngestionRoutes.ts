@@ -58,6 +58,7 @@ import Zookeeper from '@/components/ingestion/databases/Zookeeper.vue';
 import Cassandra from '@/components/ingestion/databases/Cassandra.vue';
 import Aerospike from '@/components/ingestion/databases/Aerospike.vue';
 import DynamoDB from '@/components/ingestion/databases/DynamoDB.vue';
+import Databricks from '@/components/ingestion/databases/Databricks.vue';
 
 import Security from "@/components/ingestion/Security.vue";
 import Falco from "@/components/ingestion/security/Falco.vue";
@@ -101,6 +102,8 @@ import Others from "@/components/ingestion/Others.vue";
 import Airflow from "@/components/ingestion/others/Airflow.vue";
 import Airbyte from "@/components/ingestion/others/Airbyte.vue";
 import Cribl from "@/components/ingestion/others/Cribl.vue";
+import Vercel from "@/components/ingestion/others/Vercel.vue";
+import Heroku from "@/components/ingestion/others/Heroku.vue";
 
 const useIngestionRoutes = () => {
   const ingestionRoutes: any = [
@@ -442,6 +445,14 @@ const useIngestionRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
+            {
+              path: "databricks",
+              name: "databricks",
+              component: Databricks,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
           ]
         },
         {
@@ -740,6 +751,22 @@ const useIngestionRoutes = () => {
               path: "cribl",
               name: "cribl",
               component: Cribl,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "vercel",
+              name: "vercel",
+              component: Vercel,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "heroku",
+              name: "heroku",
+              component: Heroku,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },

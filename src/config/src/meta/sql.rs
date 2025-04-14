@@ -149,6 +149,7 @@ pub struct Limit<'a>(pub &'a SqlExpr);
 pub struct Where<'a>(pub &'a Option<SqlExpr>);
 
 impl Sql {
+    #[deprecated(since = "0.14.5", note = "use service::search::Sql::new instead")]
     pub fn new(sql: &str) -> Result<Sql, anyhow::Error> {
         if sql.is_empty() {
             return Err(anyhow::anyhow!("SQL is empty"));
@@ -1070,6 +1071,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_sql_new() {
         let table = "index.1.2022";
         let sql = format!(
@@ -1085,6 +1087,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_sql_parse() {
         let sqls = [
             ("select * from table1", true),
@@ -1124,6 +1127,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_sql_parse_timerange() {
         let samples = [
             ("select * from tbl where ts in (1, 2, 3)", (0,0)),
@@ -1152,6 +1156,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_sql_parse_fields() {
         let samples = [
             ("select * FROM tbl", vec![]),
