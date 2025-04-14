@@ -334,7 +334,7 @@ mod test {
     #[test]
     fn test_deserialize_not_condition_list() {
         let and_condition_list = r#"{
-            "not: {
+            "not": {
                 "and": [
                     {
                         "column": "level",

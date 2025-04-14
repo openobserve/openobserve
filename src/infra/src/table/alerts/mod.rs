@@ -74,7 +74,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .context_attributes
             .map(serde_json::from_value)
             .transpose()?;
-        let query_conditions: Option<Vec<intermediate::QueryCondition>> = value
+        let query_conditions: Option<MetaConditionList> = value
             .query_conditions
             .map(serde_json::from_value)
             .transpose()?;
@@ -116,10 +116,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.updated_at = updated_at_utc;
         alert.query_condition = MetaQueryCondition {
             query_type: query_type.into(),
-            conditions: query_conditions
-            .map(|cs| MetaConditionList::LegacyConditions(cs.into_iter()
-            .map(|c| MetaConditionList::EndCondition(Into::<config::meta::alerts::Condition>::into(c)))
-            .collect::<Vec<MetaConditionList>>())),
+            conditions: query_conditions,
             sql: value.query_sql,
             promql: value.query_promql,
             promql_condition: query_promql_condition.map(|c| c.into()),
