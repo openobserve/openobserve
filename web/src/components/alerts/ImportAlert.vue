@@ -703,10 +703,6 @@ export default defineComponent({
         }
       }
       if (allAlertsCreated) {
-        //if the alerts are created successfully, then make the isAlertImporting to false
-        //and also notify the user
-        //and also redirect to the alert list page
-        isAlertImporting.value = false;
         q.notify({
           message: "Alert(s) imported successfully",
           color: "positive",
@@ -721,7 +717,7 @@ export default defineComponent({
           },
         });
       }
-      //if the alerts are not created successfully, then make the isAlertImporting to false
+      //if the alerts created successfully or not make the isAlertImporting to false
       isAlertImporting.value = false;
     };
 

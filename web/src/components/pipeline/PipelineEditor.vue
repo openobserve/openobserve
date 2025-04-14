@@ -702,10 +702,8 @@ const onSubmitPipeline = async () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-      isPipelineSaving.value = false;
     })
     .catch((error) => {
-      isPipelineSaving.value = false;
       if (pipelineObj.isEditPipeline) {
         pipelineObj.isEditPipeline = true;
       }
