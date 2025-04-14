@@ -57,7 +57,7 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
         };
 
         let job = cluster_rpc::Job {
-            trace_id: ider::uuid(),
+            trace_id: ider::generate_trace_id(),
             job: "".to_string(),
             stage: 0,
             partition: 0,

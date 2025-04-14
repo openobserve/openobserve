@@ -529,7 +529,7 @@ mod tests {
         let expected_value = range_values.first().unwrap().clone();
 
         // Test setting cache
-        let set_result = set(trace_id, org_id, query, start, end, step, range_values).await;
+        let set_result = set(trace_id, org, query, start, end, step, range_values).await;
         assert!(set_result.is_ok());
 
         // Test getting cache
@@ -571,16 +571,8 @@ mod tests {
                 time_window: None,
             }];
 
-            let set_result = set(
-                trace_id,
-                org_id,
-                query,
-                start,
-                end,
-                step,
-                range_values.clone(),
-            )
-            .await;
+            let set_result =
+                set(trace_id, org, query, start, end, step, range_values.clone()).await;
             assert!(set_result.is_ok());
         }
 

@@ -247,7 +247,7 @@ impl QueryConditionExt for QueryCondition {
         } else {
             std::cmp::max(100, trigger_condition.threshold)
         };
-        let trace_id = ider::uuid();
+        let trace_id = ider::generate_trace_id();
 
         let resp = if self.multi_time_range.is_some()
             && !self.multi_time_range.as_ref().unwrap().is_empty()

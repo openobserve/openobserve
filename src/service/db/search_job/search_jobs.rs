@@ -340,7 +340,7 @@ pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn retry_search_job(job_id: &str) -> Result<(), errors::Error> {
-    let trace_id = ider::uuid();
+    let trace_id = ider::generate_trace_id();
     let updated_at = chrono::Utc::now().timestamp_micros();
     infra::table::search_job::search_jobs::retry_search_job(job_id, &trace_id, updated_at).await?;
 
