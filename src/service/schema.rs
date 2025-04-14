@@ -17,7 +17,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use config::{
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
+    ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
+    TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
@@ -109,18 +110,23 @@ pub async fn check_for_schema(
         if !is_schema_changed {
             // check defined_schema_fields
             let stream_setting = unwrap_stream_settings(schema.schema());
-            let (defined_schema_fields, need_original) = match stream_setting {
-                Some(s) => (
-                    s.defined_schema_fields.unwrap_or_default(),
-                    s.store_original_data,
-                ),
-                None => (Vec::new(), false),
-            };
+            let (defined_schema_fields, need_original, index_original_data, index_all_values) =
+                match stream_setting {
+                    Some(s) => (
+                        s.defined_schema_fields.unwrap_or_default(),
+                        s.store_original_data,
+                        s.index_original_data,
+                        s.index_all_values,
+                    ),
+                    None => (Vec::new(), false, false, false),
+                };
             if !defined_schema_fields.is_empty() {
                 let schema = generate_schema_for_defined_schema_fields(
                     schema,
                     &defined_schema_fields,
                     need_original,
+                    index_original_data,
+                    index_all_values,
                 );
                 stream_schema_map.insert(stream_name.to_string(), schema);
             }
@@ -411,7 +417,9 @@ async fn handle_diff_schema(
     w.insert(cache_key.clone(), final_schema.clone());
     drop(w);
     let need_original = stream_setting.store_original_data;
-    if need_original {
+    let index_original_data = stream_setting.index_original_data;
+    let index_all_values = stream_setting.index_all_values;
+    if need_original || index_original_data {
         if let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone()) {
             entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
         }
@@ -426,6 +434,8 @@ async fn handle_diff_schema(
         &final_schema,
         &defined_schema_fields,
         need_original,
+        index_original_data,
+        index_all_values,
     );
     stream_schema_map.insert(stream_name.to_string(), final_schema);
 
@@ -450,6 +460,8 @@ pub fn generate_schema_for_defined_schema_fields(
     schema: &SchemaCache,
     fields: &[String],
     need_original: bool,
+    index_original_data: bool,
+    index_all_values: bool,
 ) -> SchemaCache {
     if fields.is_empty() || schema.fields_map().len() < fields.len() + 10 {
         return schema.clone();
@@ -459,6 +471,7 @@ pub fn generate_schema_for_defined_schema_fields(
     let timestamp_col = TIMESTAMP_COL_NAME.to_string();
     let o2_id_col = ID_COL_NAME.to_string();
     let original_col = ORIGINAL_DATA_COL_NAME.to_string();
+    let all_values_col = ALL_VALUES_COL_NAME.to_string();
 
     let mut fields: HashSet<&String> = fields.iter().collect();
     if !fields.contains(&timestamp_col) {
@@ -467,12 +480,17 @@ pub fn generate_schema_for_defined_schema_fields(
     if !fields.contains(&cfg.common.column_all) {
         fields.insert(&cfg.common.column_all);
     }
-    if need_original {
+    if need_original || index_original_data {
         if !fields.contains(&o2_id_col) {
             fields.insert(&o2_id_col);
         }
         if !fields.contains(&original_col) {
             fields.insert(&original_col);
+        }
+    }
+    if index_all_values {
+        if !fields.contains(&all_values_col) {
+            fields.insert(&all_values_col);
         }
     }
 

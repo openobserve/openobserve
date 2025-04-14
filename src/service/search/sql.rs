@@ -1624,7 +1624,8 @@ fn o2_id_is_needed(
     !matches!(search_event_type, Some(SearchEventType::DerivedStream))
         && schemas.values().any(|schema| {
             let stream_setting = unwrap_stream_settings(schema.schema());
-            stream_setting.is_some_and(|setting| setting.store_original_data)
+            stream_setting
+                .is_some_and(|setting| setting.store_original_data || setting.index_original_data)
         })
 }
 

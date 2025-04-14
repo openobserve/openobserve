@@ -83,6 +83,7 @@ pub async fn ingest(
 
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
     let mut store_original_when_pipeline_exists = false;
 
     let mut json_data_by_stream = HashMap::new();
@@ -170,6 +171,7 @@ pub async fn ingest(
                 &streams,
                 &mut user_defined_schema_map,
                 &mut streams_need_original_map,
+                &mut streams_need_all_values_map,
             )
             .await;
 
@@ -380,6 +382,7 @@ pub async fn ingest(
                                 &[stream_params],
                                 &mut user_defined_schema_map,
                                 &mut streams_need_original_map,
+                                &mut streams_need_all_values_map,
                             )
                             .await;
                         }

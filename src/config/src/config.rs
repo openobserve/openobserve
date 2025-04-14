@@ -81,10 +81,11 @@ pub const MINIMUM_DB_CONNECTIONS: u32 = 2;
 pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
 
 // Columns added to ingested records for _INTERNAL_ use only.
-// Used for storing and querying unflattened original data
-pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
-pub const ID_COL_NAME: &str = "_o2_id";
 pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
+// Used for storing and querying unflattened original data
+pub const ID_COL_NAME: &str = "_o2_id";
+pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
+pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];

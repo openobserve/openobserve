@@ -129,10 +129,12 @@ pub async fn logs_json_handler(
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
     crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
         &mut streams_need_original_map,
+        &mut streams_need_all_values_map,
     )
     .await;
     // with pipeline, we need to store original if any of the destinations requires original
@@ -442,6 +444,7 @@ pub async fn logs_json_handler(
                             &[stream_params],
                             &mut user_defined_schema_map,
                             &mut streams_need_original_map,
+                            &mut streams_need_all_values_map,
                         )
                         .await;
                     }
