@@ -111,6 +111,7 @@ impl QueryConditionExt for QueryCondition {
             end_time,
             ..Default::default()
         };
+        let trace_id = ider::generate_trace_id();
         let sql = match self.query_type {
             QueryType::Custom => {
                 let (Some(stream_name), Some(v)) = (stream_name, self.conditions.as_ref()) else {
@@ -167,7 +168,7 @@ impl QueryConditionExt for QueryCondition {
                     query_exemplars: false,
                     no_cache: None,
                 };
-                let resp = match promql::search::search("", org_id, &req, "", 0).await {
+                let resp = match promql::search::search(&trace_id, org_id, &req, "", 0).await {
                     Ok(v) => v,
                     Err(_) => {
                         return Ok(eval_results);
@@ -247,7 +248,6 @@ impl QueryConditionExt for QueryCondition {
         } else {
             std::cmp::max(100, trigger_condition.threshold)
         };
-        let trace_id = ider::generate_trace_id();
 
         let resp = if self.multi_time_range.is_some()
             && !self.multi_time_range.as_ref().unwrap().is_empty()
