@@ -199,7 +199,7 @@
                     round
                     class="q-mr-sm pointer"
                   ></q-btn
-                  >{{ t("common.addFieldToTable") }}</q-item-label
+                  >{{addOrRemoveLabel(key)}}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -482,6 +482,12 @@ export default {
         return true;
       });
     });
+    const addOrRemoveLabel = (key: string) => {
+      if(searchObj.data.stream.selectedFields.includes(key)) {
+        return t("common.removeFieldFromTable");
+      }
+      return t("common.addFieldToTable");
+    };
 
     return {
       t,
@@ -510,6 +516,7 @@ export default {
       tracesStreams,
       setViewTraceBtn,
       getOriginalData,
+      addOrRemoveLabel,
     };
   },
 };

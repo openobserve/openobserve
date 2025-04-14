@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.14.5"
+version = "0.14.6"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -57,7 +57,7 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
     "support-rust-embed-for-web",
     "base64",
 ] }
-actix-ws = "0.2.5"
+actix-ws = "0.3.0"
 actix = "0.13.5"
 actix-web-actors = "4.3.0"
 actix-tls.workspace = true
@@ -296,12 +296,12 @@ rustls = { version = "0.23.20", default-features = false, features = [
     "std",
     "tls12",
 ] }
-sea-orm = { version = "1.1.0", features = [
+sea-orm = { version = "1.1.8", features = [
     "sqlx-all",
     "runtime-tokio-rustls",
     "macros",
 ] }
-sea-orm-migration = { version = "1.1.0", features = [
+sea-orm-migration = { version = "1.1.8", features = [
     "sqlx-mysql",
     "sqlx-postgres",
     "sqlx-sqlite",
@@ -314,7 +314,7 @@ sha1 = "0.10.6"
 sha256 = "1.4.0"
 snafu = "0.7.5"
 snap = "1"
-sqlx = { version = "0.8.2", features = [
+sqlx = { version = "0.8.3", features = [
     "runtime-tokio-rustls",
     "postgres",
     "mysql",

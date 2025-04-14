@@ -399,6 +399,7 @@ pub struct Config {
     pub common: Common,
     pub limit: Limit,
     pub compact: Compact,
+    pub cache_latest_files: CacheLatestFiles,
     pub memory_cache: MemoryCache,
     pub disk_cache: DiskCache,
     pub log: Log,
@@ -429,10 +430,20 @@ pub struct WebSocket {
     pub session_max_lifetime_secs: i64,
     #[env_config(name = "ZO_WEBSOCKET_SESSION_GC_INTERVAL_SECS", default = 60)]
     pub session_gc_interval_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 15)]
+    #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 30)]
     pub ping_interval_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_HEALTH_CHECK_INTERVAL_SECS", default = 60)]
-    pub health_check_interval: i64,
+    #[env_config(
+        name = "ZO_WEBSOCKET_MAX_FRAME_SIZE",
+        default = 1,
+        help = "Maximum allowed frame size in MB"
+    )]
+    pub max_frame_size: usize,
+    #[env_config(
+        name = "ZO_WEBSOCKET_MAX_CONTINUATION_SIZE",
+        default = 256,
+        help = "Maximum allowed continuation size in MB"
+    )]
+    pub max_continuation_size: usize,
 }
 
 #[derive(EnvConfig)]
@@ -1447,17 +1458,29 @@ pub struct Compact {
 }
 
 #[derive(EnvConfig)]
+pub struct CacheLatestFiles {
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_ENABLED", default = false)]
+    pub enabled: bool,
+    // cache parquet files
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_PARQUET", default = true)]
+    pub cache_parquet: bool,
+    // cache index(tantivy) files
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_INDEX", default = true)]
+    pub cache_index: bool,
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_DELETE_MERGE_FILES", default = false)]
+    pub delete_merge_files: bool,
+}
+
+#[derive(EnvConfig)]
 pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = true)]
     pub enabled: bool,
-    // Memory data cache strategy, default is lru, other value is fifo
+    // Memory data cache strategy, default is lru, other value is fifo, time_lru
     #[env_config(name = "ZO_MEMORY_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
     // Memory data cache bucket num, multiple bucket means multiple locker, default is 0
     #[env_config(name = "ZO_MEMORY_CACHE_BUCKET_NUM", default = 0)]
     pub bucket_num: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_CACHE_LATEST_FILES", default = false)]
-    pub cache_latest_files: bool,
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
@@ -1485,7 +1508,7 @@ pub struct MemoryCache {
 pub struct DiskCache {
     #[env_config(name = "ZO_DISK_CACHE_ENABLED", default = true)]
     pub enabled: bool,
-    // Disk data cache strategy, default is lru, other value is fifo
+    // Disk data cache strategy, default is lru, other value is fifo, time_lru
     #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
     // Disk data cache bucket num, multiple bucket means multiple locker, default is 0
@@ -1789,6 +1812,7 @@ pub struct RateLimit {
     )]
     pub ratelimit_rule_refresh_interval: usize,
 }
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -2354,6 +2378,8 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
+        cfg.cache_latest_files.enabled = false;
+        cfg.cache_latest_files.delete_merge_files = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();

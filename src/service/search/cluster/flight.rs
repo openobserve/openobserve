@@ -641,7 +641,7 @@ pub async fn partition_filt_list(
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     let mut partition_strategy =
         QueryPartitionStrategy::from(&cfg.common.feature_query_partition_strategy);
-    if cfg.memory_cache.cache_latest_files {
+    if cfg.cache_latest_files.enabled {
         partition_strategy = QueryPartitionStrategy::FileHash;
     }
     let partitions = match partition_strategy {

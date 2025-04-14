@@ -111,6 +111,7 @@ use tracing_subscriber::{
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let cfg = get_config();
+
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(
@@ -306,7 +307,7 @@ async fn main() -> Result<(), anyhow::Error> {
             // init websocket gc
             if cfg.websocket.enabled {
                 log::info!("Initializing WebSocket session garbage collector");
-                if let Err(e) = handler::http::request::websocket::init().await {
+                if let Err(e) = handler::http::request::ws_v2::init().await {
                     job_init_tx.send(false).ok();
                     panic!("websocket gc init failed: {}", e);
                 }
