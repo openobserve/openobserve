@@ -269,8 +269,8 @@ pub async fn search(
                     .desc(format!(
                         "search cacher took: {} ms, search from {} ms reduce to {} ms",
                         start.elapsed().as_millis(),
-                        format_duration(total as u64),
-                        format_duration(deltas_total as u64)
+                        format_duration(total as u64 / 1000),
+                        format_duration(deltas_total as u64 / 1000)
                     ))
                     .build()
             )
