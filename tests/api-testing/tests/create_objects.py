@@ -18,6 +18,7 @@ from pages.report_page import ReportPage
 from pages.savedview_page import SavedViewPage
 from pages.serviceaccount_page import ServiceAccountPage
 from pages.search_page import SearchPage
+from pages.alertV2_page import AlertV2Page
 
 
 # Use environment variable
@@ -38,6 +39,7 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
     savedview_page = SavedViewPage(session, base_url, org_id)
     serviceaccount_page = ServiceAccountPage(session, base_url, org_id)
     search_page = SearchPage(session, base_url, org_id) 
+    alertV2_page = AlertV2Page(session, base_url, org_id)
 
     for i in range(num_objects):
 
@@ -187,4 +189,32 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
         search_page.search_partition_logs_query_2_hours_stream(session, base_url, email_address_admin, "12345678", org_id, stream_name)   
         search_page.search_cache_logs_query_2_hours_stream(session, base_url, email_address_admin, "12345678", org_id, stream_name)
         search_page.search_histogram_logs_query_2_hours_stream(session, base_url, email_address_admin, "12345678", org_id, stream_name)
+
+
+        # Test cases for Version 2 API
+
+         # Create templates
+        template_v2_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}v2"
+        template_page.create_template_webhook(session, base_url, user_email, user_password, org_id, template_v2_webhook)
+
+        # Create destinations
         
+        destination_v2_webhook = f"destination_webhook_{destination_page.Unique_value_destination}_{i}v2"
+        destination_page.create_destination_webhook(session, base_url, org_id, user_email, user_password, template_v2_webhook, destination_v2_webhook)
+
+
+
+        # Create folder
+        folder_v2_name = f"folder_{folder_page.Unique_value_folder}_{i}v2"
+        folder_id = folder_page.create_folder_alert_v2(session, base_url, user_email, user_password, org_id, folder_v2_name)
+
+        # Create alert
+
+        alert_v2_name = f"alert_{alertV2_page.Unique_value_alert}_{i}v2"
+        alertV2_page.create_scheduled_sql_alert(session, base_url, user_email, user_password, org_id, stream_name, destination_v2_webhook, folder_id, alert_v2_name)
+
+        alert_v2_name_no_trigger = f"alert_{alertV2_page.Unique_value_alert}_{i}v2_no_trigger"
+        alertV2_page.create_scheduled_sql_alert_vrl_no_trigger(session, base_url, user_email, user_password, org_id, stream_name, destination_v2_webhook, folder_id, alert_v2_name_no_trigger)
+
+        alert_v2_name_trigger = f"alert_{alertV2_page.Unique_value_alert}_{i}v2_trigger"
+        alertV2_page.create_scheduled_sql_alert_vrl_trigger(session, base_url, user_email, user_password, org_id, stream_name, destination_v2_webhook, folder_id, alert_v2_name_trigger)
