@@ -310,10 +310,6 @@ impl FileData {
             return Ok(());
         };
         self.cur_size -= data_size;
-        log::debug!(
-            "[trace_id {trace_id}] File disk cache remove file done, released {} bytes",
-            data_size
-        );
 
         // delete file from local disk
         let file_path = format!(
@@ -324,7 +320,7 @@ impl FileData {
         );
         if let Err(e) = fs::remove_file(&file_path) {
             log::error!(
-                "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                "[trace_id {trace_id}] File disk cache remove file: {}, error: {}",
                 file_path,
                 e
             );
@@ -703,11 +699,12 @@ pub async fn get_dir() -> String {
     FILES[0].read().await.root_dir.clone()
 }
 
-pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+pub async fn download(trace_id: &str, file: &str) -> Result<usize, anyhow::Error> {
     let data = storage::get(file).await?;
     if data.is_empty() {
         return Err(anyhow::anyhow!("file {} data size is zero", file));
     }
+    let data_len = data.len();
     if let Err(e) = set(trace_id, file, data).await {
         return Err(anyhow::anyhow!(
             "set file {} to disk cache failed: {}",
@@ -715,7 +712,7 @@ pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
             e
         ));
     };
-    Ok(())
+    Ok(data_len)
 }
 
 fn get_bucket_idx(file: &str) -> usize {

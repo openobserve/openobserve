@@ -91,8 +91,12 @@ const useSearchWebSocket = () => {
       setTimeout(() => {
         Object.keys(traces).forEach((traceId) => {
           if(((traces[traceId].socketId === _socketId) && traces[traceId].isInitiated) || !traces[traceId].socketId) {
-            response.code = 1000;
-            traces[traceId]?.close.forEach((handler: any) => handler(response));
+            // Don't send error event when retry is happening
+            traces[traceId]?.close.forEach((handler: any) => handler({
+              ...response,
+              type: "close",
+              code: 1000,
+            }));
             traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data));
             cleanUpListeners(traceId);        
           }

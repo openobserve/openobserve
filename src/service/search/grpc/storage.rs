@@ -256,7 +256,10 @@ pub async fn search(
     let cache_start = std::time::Instant::now();
     let cache_type = cache_files(
         &query.trace_id,
-        &files.iter().map(|f| f.key.as_ref()).collect_vec(),
+        &files
+            .iter()
+            .map(|f| (f.key.as_ref(), f.meta.compressed_size))
+            .collect_vec(),
         &mut scan_stats,
         "parquet",
     )
@@ -382,13 +385,13 @@ pub async fn search(
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 async fn cache_files(
     trace_id: &str,
-    files: &[&str],
+    files: &[(&str, i64)],
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> Result<file_data::CacheType, Error> {
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
-    for file in files.iter() {
+    for (file, _) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
@@ -424,19 +427,19 @@ async fn cache_files(
     let trace_id = trace_id.to_string();
     let files = files
         .iter()
-        .filter_map(|f| {
+        .filter_map(|(f, size)| {
             if cached_files.contains(f) {
                 None
             } else {
-                Some(f.to_string())
+                Some((f.to_string(), *size))
             }
         })
         .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
-        let files = files.iter().map(|f| f.as_str()).collect_vec();
-        for file in &files {
-            match job::queue_background_download(&trace_id, file, cache_type).await {
+        let files_num = files.len();
+        for (file, size) in files {
+            match job::queue_background_download(&trace_id, &file, size, cache_type).await {
                 Ok(_) => {
                     log::debug!(
                         "[trace_id {trace_id}] file {file} successfully queued for download"
@@ -452,7 +455,7 @@ async fn cache_files(
         log::info!(
             "[trace_id {}] search->storage: successfully enqueued {} files of {} for background download into {:?} ",
             trace_id,
-            files.len(),
+            files_num,
             file_type,
             cache_type,
         );
@@ -505,7 +508,7 @@ pub async fn filter_file_list_by_tantivy_index(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, _)| ttv_file.as_str())
+            .map(|(ttv_file, meta)| (ttv_file.as_str(), meta.meta.index_size))
             .collect_vec(),
         &mut scan_stats,
         "index",

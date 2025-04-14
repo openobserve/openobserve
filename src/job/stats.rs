@@ -62,9 +62,9 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // should run it at least every 5 minutes
+    // should run it at least every minute
     let mut interval = time::interval(time::Duration::from_secs(std::cmp::max(
-        300,
+        60,
         get_config().limit.calculate_stats_interval,
     )));
 

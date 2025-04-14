@@ -141,15 +141,18 @@ async fn search_in_cluster(
         (start, vec![])
     } else {
         config::metrics::QUERY_METRICS_CACHE_REQUESTS
-            .with_label_values(&[])
+            .with_label_values(&[&req.org_id])
             .inc();
         let start_time = std::time::Instant::now();
         match cache::get(query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
-                config::metrics::QUERY_METRICS_CACHE_HITS
-                    .with_label_values(&[])
-                    .inc();
+                config::metrics::QUERY_METRICS_CACHE_RATIO
+                    .with_label_values(&[&req.org_id])
+                    .inc_by(min(
+                        100,
+                        (new_start - start) as u64 * 100 / (end - start) as u64,
+                    ));
                 log::info!(
                     "[trace_id {trace_id}] promql->search->cache: hit cache, took: {} ms",
                     took

@@ -295,6 +295,23 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(())
     }
 
+    async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+        sqlx::query(
+            r#"UPDATE file_list SET compressed_size = $1 WHERE stream = $2 AND date = $3 AND file = $4;"#,
+        )
+        .bind(size)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .execute(&*client)
+        .await?;
+        Ok(())
+    }
+
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(

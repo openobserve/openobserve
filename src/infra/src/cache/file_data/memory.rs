@@ -184,10 +184,6 @@ impl FileData {
             return Ok(());
         };
         self.cur_size -= data_size;
-        log::debug!(
-            "[trace_id {trace_id}] File memory cache remove file done, released {} bytes",
-            data_size
-        );
 
         // remove file from data cache
         let idx = get_bucket_idx(&key);
@@ -352,11 +348,12 @@ pub async fn is_empty() -> bool {
     true
 }
 
-pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+pub async fn download(trace_id: &str, file: &str) -> Result<usize, anyhow::Error> {
     let data = storage::get(file).await?;
     if data.is_empty() {
         return Err(anyhow::anyhow!("file {} data size is zero", file));
     }
+    let data_len = data.len();
     if let Err(e) = set(trace_id, file, data).await {
         return Err(anyhow::anyhow!(
             "set file {} to memory cache failed: {}",
@@ -364,7 +361,7 @@ pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
             e
         ));
     };
-    Ok(())
+    Ok(data_len)
 }
 
 fn get_bucket_idx(file: &str) -> usize {

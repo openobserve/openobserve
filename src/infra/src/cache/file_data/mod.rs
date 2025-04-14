@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod delete;
 pub mod disk;
 pub mod memory;
 
@@ -26,6 +27,7 @@ use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 
 const INITIAL_CACHE_SIZE: usize = 128;
+pub const TRACE_ID_FOR_CACHE_LATEST_FILE: &str = "cache_latest_file";
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CacheType {
@@ -175,14 +177,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+pub async fn download(trace_id: &str, file: &str) -> Result<usize, anyhow::Error> {
     let cfg = config::get_config();
     if cfg.memory_cache.enabled {
         memory::download(trace_id, file).await
     } else if cfg.disk_cache.enabled {
         disk::download(trace_id, file).await
     } else {
-        Ok(())
+        Ok(0)
     }
 }
 
