@@ -235,11 +235,11 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
         return Ok(());
     }
 
-    if let None = lock_stream(org, stream).await {
+    if lock_stream(org, stream).await.is_none() {
         // someone else is processing this.
         return Ok(());
     }
-    let files = infra::file_list::get_entries_in_range(&org, &stream, start, end).await?;
+    let files = infra::file_list::get_entries_in_range(org, stream, start, end).await?;
     if files.is_empty() {
         if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
             log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
@@ -248,7 +248,7 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
     }
     let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
     let count = files.len();
-    if let Err(e) = generate_cache_file(&org, &stream, (start, end), files).await {
+    if let Err(e) = generate_cache_file(org, stream, (start, end), files).await {
         log::error!("[COMPACTOR:JOB] file_list dump file generation error : {e}");
     } else {
         log::info!("successfully dumped file list {org}/{stream} offset {offset} count {count}");
@@ -314,7 +314,7 @@ fn get_writer(schema: Arc<Schema>, buf: &mut Vec<u8>) -> AsyncArrowWriter<&mut V
 }
 
 async fn remove_files_from_file_list(ids: &[i64]) -> Result<(), anyhow::Error> {
-    infra::file_list::batch_remove_by_ids(&ids).await?;
+    infra::file_list::batch_remove_by_ids(ids).await?;
     Ok(())
 }
 

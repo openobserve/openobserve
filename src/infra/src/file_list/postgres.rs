@@ -1453,8 +1453,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         DB_QUERY_NUMS
             .with_label_values(&["update", "file_list_jobs"])
             .inc();
-        let sql = format!("UPDATE file_list_jobs SET dumped = $1 WHERE id = $2;",);
-        sqlx::query(&sql)
+        sqlx::query("UPDATE file_list_jobs SET dumped = $1 WHERE id = $2;")
             .bind(dumped)
             .bind(id)
             .execute(&pool)

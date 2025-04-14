@@ -136,7 +136,7 @@ pub async fn merge_parquet_files(
         )
     } else if stream_type == StreamType::Filelist {
         // for file list we do not have timestamp, so we instead stor by min ts of entries
-        format!("SELECT * FROM tbl ORDER BY min_ts DESC")
+        "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
     } else {
         format!("SELECT * FROM tbl ORDER BY {} DESC", TIMESTAMP_COL_NAME)
     };

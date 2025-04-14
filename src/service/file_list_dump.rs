@@ -192,7 +192,7 @@ pub async fn get_file_list_entries_in_range(
     let t = df.collect().await.unwrap();
     let ret = t
         .into_iter()
-        .flat_map(|rb| record_batch_to_file_record(rb))
+        .flat_map(record_batch_to_file_record)
         .collect();
 
     Ok(ret)

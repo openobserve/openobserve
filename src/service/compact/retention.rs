@@ -277,7 +277,7 @@ pub async fn delete_all(
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
-    super::super::file_list_dump::delete_all_for_stream(org_id, stream_type, &stream_name).await?;
+    super::super::file_list_dump::delete_all_for_stream(org_id, stream_type, stream_name).await?;
     log::info!(
         "deleted file list for: {}/{}/{}/all",
         org_id,
