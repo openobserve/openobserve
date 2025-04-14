@@ -4899,7 +4899,7 @@ const useLogs = () => {
   const buildWebSocketPayload = (
     queryReq: SearchRequestPayload,
     isPagination: boolean,
-    type: "search" | "histogram" | "pageCount",
+    type: "search" | "histogram" | "pageCount" | "values",
     meta?: any,
   ) => {
     const { traceId } = generateTraceContext();
@@ -4907,7 +4907,7 @@ const useLogs = () => {
 
     const payload: {
       queryReq: SearchRequestPayload;
-      type: "search" | "histogram" | "pageCount";
+      type: "search" | "histogram" | "pageCount" | "values";
       isPagination: boolean;
       traceId: string;
       org_id: string;

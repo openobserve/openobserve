@@ -657,6 +657,8 @@ import {
   convertTimeFromMicroToMilli,
   formatLargeNumber,
   useLocalInterestingFields,
+  generateTraceContext,
+  isWebSocketEnabled,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import {
@@ -668,6 +670,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
+import useSearchWebSocket from "@/composables/useSearchWebSocket";
 
 interface Filter {
   fieldName: string;
@@ -707,6 +710,10 @@ export default defineComponent({
       getFilterExpressionByFieldType,
       extractValueQuery,
     } = useLogs();
+
+    const { fetchQueryDataWithWebSocket, sendSearchMessageBasedOnRequestId } =
+      useSearchWebSocket();
+
     const userDefinedSchemaBtnGroupOption = [
       {
         label: "",
@@ -965,6 +972,28 @@ export default defineComponent({
           }
           if (query_context !== "") {
             query_context = query_context == undefined ? "" : query_context;
+
+            // Implement websocket based field values, check getQueryData in useLogs for websocket enabled
+            if (isWebSocketEnabled()) {
+              fetchValuesWithWebsocket({
+                fields: [name],
+                size: 10,
+                no_count: true,
+                regions: searchObj.meta.regions,
+                clusters: searchObj.meta.clusters,
+                vrl_fn: query_fn,
+                start_time: startISOTimestamp,
+                end_time: endISOTimestamp,
+                timeout: 30000,
+                stream_name: selectedStream,
+                stream_type: searchObj.data.stream.streamType,
+                query_context: query_context,
+                use_cache: query_fn,
+                sql: query_context,
+              });
+              return;
+            }
+
             await streamService
               .fieldValues({
                 org_identifier: store.state.selectedOrganization.identifier,
@@ -1201,6 +1230,144 @@ export default defineComponent({
         ? "Select Stream"
         : "";
     });
+
+    // ----- WebSocket Implementation -----
+
+    const fetchValuesWithWebsocket = (payload: any) => {
+      const wsPayload = {
+        queryReq: payload,
+        type: "values",
+        isPagination: false,
+        traceId: generateTraceContext().traceId,
+        org_id: searchObj.organizationIdentifier,
+      };
+      initializeWebSocketConnection(wsPayload);
+    };
+
+    const initializeWebSocketConnection = (payload: any): string => {
+      return fetchQueryDataWithWebSocket(payload, {
+        open: sendSearchMessage,
+        close: handleSearchClose,
+        error: handleSearchError,
+        message: handleSearchResponse,
+        reset: handleSearchReset,
+      }) as string;
+    };
+
+    const sendSearchMessage = (queryReq: any) => {
+      console.log("sendSearchMessage");
+      const payload = {
+        type: "values",
+        content: {
+          trace_id: queryReq.traceId,
+          payload: queryReq.queryReq,
+          stream_type: searchObj.data.stream.streamType,
+          search_type: "ui",
+          use_cache: (window as any).use_cache ?? true,
+          org_id: searchObj.organizationIdentifier,
+        },
+      };
+
+      if (
+        Object.hasOwn(queryReq.queryReq, "regions") &&
+        Object.hasOwn(queryReq.queryReq, "clusters")
+      ) {
+        payload.content.payload["regions"] = queryReq.queryReq.regions;
+        payload.content.payload["clusters"] = queryReq.queryReq.clusters;
+      }
+
+      sendSearchMessageBasedOnRequestId(payload);
+      console.log(payload);
+    };
+
+    const handleSearchClose = (payload: any, response: any) => {
+      // Disable the loading indicator
+      if (fieldValues.value[payload.queryReq.fields[0]]) {
+        fieldValues.value[payload.queryReq.fields[0]].isLoading = false;
+      }
+
+      //TODO Omkar: Remove the duplicate error codes, are present same in useSearchWebSocket.ts
+      const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
+
+      if (errorCodes.includes(response.code)) {
+        handleSearchError(payload, {
+          content: {
+            message:
+              "WebSocket connection terminated unexpectedly. Please check your network and try again",
+            trace_id: payload.traceId,
+            code: response.code,
+            error_detail: "",
+          },
+          type: "error",
+        });
+      }
+    };
+
+    const handleSearchError = (request: any, err: any) => {
+      if (fieldValues.value[request.queryReq.fields[0]]) {
+        fieldValues.value[request.queryReq.fields[0]].isLoading = false;
+        fieldValues.value[request.queryReq.fields[0]].errMsg =
+          "Failed to fetch field values";
+      }
+    };
+
+    const handleSearchResponse = (payload: any, response: any) => {
+      console.log("handleSearchResponse");
+      fieldValues.value[payload.queryReq.fields[0]] = {
+        values: [],
+        isLoading: false,
+        errMsg: "",
+      };
+      handleValuesData(
+        response.content.results.hits,
+        payload.queryReq.fields[0],
+      );
+    };
+
+    const handleSearchReset = (data: any) => {
+      fieldValues.value[data.payload.queryReq.fields[0]] = {
+        values: [],
+        isLoading: true,
+        errMsg: "",
+      };
+
+      fetchValuesWithWebsocket(data.payload.queryReq);
+    };
+
+    const handleValuesData = (data: any, name: string) => {
+      if (data.length) {
+        data.forEach((item: any) => {
+          item.values.forEach((subItem: any) => {
+            if (fieldValues.value[name]["values"].length) {
+              let index = fieldValues.value[name]["values"].findIndex(
+                (value: any) => value.key == subItem.zo_sql_key,
+              );
+              if (index != -1) {
+                fieldValues.value[name]["values"][index].count =
+                  parseInt(subItem.zo_sql_num) +
+                  fieldValues.value[name]["values"][index].count;
+              } else {
+                fieldValues.value[name]["values"].push({
+                  key: subItem.zo_sql_key,
+                  count: subItem.zo_sql_num,
+                });
+              }
+            } else {
+              fieldValues.value[name]["values"].push({
+                key: subItem.zo_sql_key,
+                count: subItem.zo_sql_num,
+              });
+            }
+          });
+        });
+        if (fieldValues.value[name]["values"].length > 10) {
+          fieldValues.value[name]["values"].sort((a, b) => b.count - a.count); // Sort the array based on count in descending order
+          fieldValues.value[name]["values"] = fieldValues.value[name][
+            "values"
+          ].slice(0, 10); // Return the first 10 elements
+        }
+      }
+    };
 
     return {
       t,
