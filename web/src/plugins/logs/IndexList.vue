@@ -994,7 +994,7 @@ export default defineComponent({
                     query_context.replace("[INDEX_NAME]", selectedStream),
                   ) || "",
               });
-              return;
+              continue;
             }
 
             await streamService
