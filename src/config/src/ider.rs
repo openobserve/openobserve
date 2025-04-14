@@ -42,7 +42,6 @@ pub fn uuid() -> String {
     Ksuid::new(None, None).to_string()
 }
 
-  
 /// Generate a new trace_id.
 pub fn generate_trace_id() -> String {
     let trace_id = crate::utils::rand::get_rand_u128()
@@ -223,12 +222,10 @@ fn biding_time_conditions(last_time_millis: i64, epoch: SystemTime) -> i64 {
 
 #[cfg(test)]
 mod tests {
- 
+
     use chrono::TimeZone;
 
     use super::*;
-
-
 
     #[test]
     fn test_generate_trace_id() {
@@ -260,5 +257,5 @@ mod tests {
             let td = t.format("%Y-%m-%d").to_string();
             assert_eq!(td, ts.to_string());
         }
- 
+    }
 }
