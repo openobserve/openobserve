@@ -1082,6 +1082,8 @@ mod tests {
             "select a, b, c from \"{}\" where a=1 and b=1 or c=1 order by c desc limit 5 offset 10",
             table
         );
+
+        #[allow(deprecated)]
         let local_sql: Sql = Sql::new(sql.as_str()).unwrap();
         assert_eq!(local_sql.source, table);
         assert_eq!(local_sql.limit, 5);
@@ -1112,6 +1114,8 @@ mod tests {
                 false,
             ),
         ];
+
+        #[allow(deprecated)]
         for (sql, ok) in sqls {
             let ret = Sql::new(sql);
             assert_eq!(ret.is_ok(), ok);
@@ -1148,6 +1152,7 @@ mod tests {
             ("select * from tbl where _timestamp BETWEEN 1666093521151350 AND 1666093521151351", (1666093521151350,1666093521151351)),
             (r#"select * from tbl where time_range("_timestamp", '2022-10-19T15:19:24.587Z','2022-10-19T15:34:24.587Z')"#,(1666192764587000,1666193664587000))].to_vec();
 
+        #[allow(deprecated)]
         for (sql, (expected_t1, expected_t2)) in samples {
             let (actual_t1, actual_t2) = Sql::new(sql).unwrap().time_range.unwrap();
             assert_eq!(actual_t1, expected_t1);
@@ -1218,6 +1223,8 @@ mod tests {
                 vec!["a", "k8s_namespace_name"],
             ),
         ];
+
+        #[allow(deprecated)]
         for (sql, fields) in samples {
             let actual = Sql::new(sql).unwrap().fields;
             assert_eq!(actual, fields);
