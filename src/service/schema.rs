@@ -488,10 +488,8 @@ pub fn generate_schema_for_defined_schema_fields(
             fields.insert(&original_col);
         }
     }
-    if index_all_values {
-        if !fields.contains(&all_values_col) {
-            fields.insert(&all_values_col);
-        }
+    if index_all_values && !fields.contains(&all_values_col) {
+        fields.insert(&all_values_col);
     }
 
     let mut new_fields = Vec::with_capacity(fields.len());
