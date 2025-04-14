@@ -46,13 +46,9 @@ impl PartitionGenerator {
     /// Vector of [start, end] time ranges in microseconds, in DESC order
     pub fn generate_partitions(&self, start_time: i64, end_time: i64, step: i64) -> Vec<[i64; 2]> {
         if self.is_histogram {
-            // Use the old partition logic for histogram queries
-            return self
-                .generate_partitions_aligned_with_histogram_interval(start_time, end_time, step);
+            self.generate_partitions_aligned_with_histogram_interval(start_time, end_time, step)
         } else {
-            // For non-histogram queries, generate partitions with mini partition for faster initial
-            // results
-            return self.generate_partitions_with_mini_partition(start_time, end_time, step);
+            self.generate_partitions_with_mini_partition(start_time, end_time, step)
         }
     }
 
