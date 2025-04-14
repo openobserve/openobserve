@@ -49,6 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="sm xl"
           no-caps
           @click="importJson"
+          :loading="isAlertImporting"
+          :disable="isAlertImporting"
           data-test="alert-import-json-btn"
         />
       </div>
@@ -522,6 +524,7 @@ export default defineComponent({
     const selectedFolderId = ref<any>(router.currentRoute.value.query.folder || "default");
     const activeFolderId = ref(router.currentRoute.value.query.folder || router.currentRoute.value.query?.folderId);
     const activeFolderAlerts = ref<any>([]);
+    const isAlertImporting = ref(false);
     const getFormattedDestinations: any = computed(() => {
       return props.destinations.map((destination: any) => {
         return destination.name;
@@ -688,14 +691,22 @@ export default defineComponent({
       }
 
       let allAlertsCreated = true;
+      // made the isAlertImporting to true to disable the import button
+      // and also added a spinner to the import button
+      isAlertImporting.value = true;
       // Now we can always process as an array
       for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
         const success = await processJsonObject(jsonObj, index + 1);
         if (!success) {
           allAlertsCreated = false;
+          isAlertImporting.value = false;
         }
       }
       if (allAlertsCreated) {
+        //if the alerts are created successfully, then make the isAlertImporting to false
+        //and also notify the user
+        //and also redirect to the alert list page
+        isAlertImporting.value = false;
         q.notify({
           message: "Alert(s) imported successfully",
           color: "positive",
@@ -710,6 +721,8 @@ export default defineComponent({
           },
         });
       }
+      //if the alerts are not created successfully, then make the isAlertImporting to false
+      isAlertImporting.value = false;
     };
 
     const processJsonObject = async (jsonObj: any, index: number) => {
@@ -1211,7 +1224,8 @@ export default defineComponent({
       selectedFolderId,
       getActiveFolderAlerts,
       activeFolderAlerts,
-      store
+      store,
+      isAlertImporting,
     };
   },
   components: {
