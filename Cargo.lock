@@ -2475,6 +2475,7 @@ dependencies = [
  "memchr",
  "murmur3",
  "once_cell",
+ "opentelemetry 0.26.0",
  "ordered-float 4.6.0",
  "parking_lot",
  "parquet",
