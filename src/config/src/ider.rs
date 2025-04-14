@@ -44,7 +44,8 @@ pub fn uuid() -> String {
 
 /// Generate a new trace_id.
 pub fn generate_trace_id() -> String {
-    let trace_id = crate::utils::rand::get_rand_u128();
+    let trace_id = crate::utils::rand::get_rand_u128()
+        .unwrap_or_else(|| chrono::Utc::now().timestamp_micros() as u128);
     opentelemetry::trace::TraceId::from(trace_id).to_string()
 }
 
