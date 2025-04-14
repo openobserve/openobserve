@@ -47,8 +47,10 @@ use crate::{
         StreamStatus,
     },
     service::{
-        format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
-        logs::bulk::TRANSFORM_FAILED, schema::{get_future_discard_error, get_upto_discard_error},
+        format_stream_name, get_formatted_stream_name,
+        ingestion::check_ingestion_allowed,
+        logs::bulk::TRANSFORM_FAILED,
+        schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 
