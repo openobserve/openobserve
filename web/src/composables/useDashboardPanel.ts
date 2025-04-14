@@ -2262,6 +2262,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
    * @returns {string} - the condition as a string.
    */
   const buildCondition = (condition: any) => {
+    const streamAlias =
+      condition.column.streamAlias ??
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.stream;
+
     if (condition.filterType === "group") {
       const groupConditions = condition.conditions
         .map(buildCondition)
@@ -2280,13 +2286,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       return groupConditions.length ? `(${groupQuery})` : "";
     } else if (condition.type === "list" && condition.values?.length > 0) {
-      return `${condition.column.field} IN (${condition.values
+      return `${streamAlias}.${condition.column.field} IN (${condition.values
         .map((value: any) => formatValue(value, condition.column))
         .join(", ")})`;
     } else if (condition.type === "condition" && condition.operator != null) {
       let selectFilter = "";
       if (["Is Null", "Is Not Null"].includes(condition.operator)) {
-        selectFilter += `${condition.column.field} `;
+        selectFilter += `${streamAlias}.${condition.column.field} `;
         switch (condition.operator) {
           case "Is Null":
             selectFilter += `IS NULL`;
@@ -2296,31 +2302,29 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             break;
         }
       } else if (condition.operator === "IN") {
-        selectFilter += `${condition.column.field} IN (${formatINValue(
+        selectFilter += `${streamAlias}.${condition.column.field} IN (${formatINValue(
           condition.value,
         )})`;
       } else if (condition.operator === "NOT IN") {
-        selectFilter += `${condition.column.field} NOT IN (${formatINValue(
+        selectFilter += `${streamAlias}.${condition.column.field} NOT IN (${formatINValue(
           condition.value,
         )})`;
       } else if (condition.operator === "match_all") {
         selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
       } else if (condition.operator === "str_match") {
-        selectFilter += `str_match(${condition.column.field}, ${formatValue(
+        selectFilter += `str_match(${streamAlias}.${condition.column.field}, ${formatValue(
           condition.value,
           condition.column,
         )})`;
       } else if (condition.operator === "str_match_ignore_case") {
-        selectFilter += `str_match_ignore_case(${
-          condition.column.field
-        }, ${formatValue(condition.value, condition.column)})`;
+        selectFilter += `str_match_ignore_case(${streamAlias}.${condition.column.field}, ${formatValue(condition.value, condition.column)})`;
       } else if (condition.operator === "re_match") {
-        selectFilter += `re_match(${condition.column.field}, ${formatValue(
+        selectFilter += `re_match(${streamAlias}.${condition.column.field}, ${formatValue(
           condition.value,
           condition.column,
         )})`;
       } else if (condition.operator === "re_not_match") {
-        selectFilter += `re_not_match(${condition.column.field}, ${formatValue(
+        selectFilter += `re_not_match(${streamAlias}.${condition.column.field}, ${formatValue(
           condition.value,
           condition.column,
         )})`;
@@ -2340,7 +2344,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           (it: any) => it.name == condition.column.field,
         )?.type;
 
-        selectFilter += `${condition.column.field} `;
+        selectFilter += `${streamAlias}.${condition.column.field} `;
         switch (condition.operator) {
           case "=":
           case "<>":
