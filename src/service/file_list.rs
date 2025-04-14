@@ -89,6 +89,8 @@ pub async fn query(
             segment_ids: None,
         })
     }
+    file_keys.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
+    file_keys.dedup_by(|a, b| a.key == b.key);
     Ok(file_keys)
 }
 
@@ -271,7 +273,8 @@ pub async fn query_by_ids(
     // 4. merge the results
     files.extend(db_files.into_iter().map(|(_, f)| f));
     files.extend(dumped_files.into_iter().map(|(_, f)| f));
-
+    files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
     Ok(files)
 }
 
