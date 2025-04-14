@@ -184,10 +184,6 @@ impl FileData {
             return Ok(());
         };
         self.cur_size -= data_size;
-        log::debug!(
-            "[trace_id {trace_id}] File memory cache remove file done, released {} bytes",
-            data_size
-        );
 
         // remove file from data cache
         let idx = get_bucket_idx(&key);
