@@ -331,10 +331,6 @@ pub async fn search_parquet(
                 .component("wal:parquet create tables took".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .desc(format!(
-                    "wal parquest search load tables took {} ms",
-                    start.elapsed().as_millis() as usize
-                ))
                 .build()
         )
     );
@@ -523,10 +519,6 @@ pub async fn search_memtable(
                 .component("wal:memtable create tables took".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .desc(format!(
-                    "wal mem search create tables took {} ms",
-                    start.elapsed().as_millis()
-                ))
                 .build()
         )
     );
