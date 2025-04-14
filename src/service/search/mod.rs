@@ -69,6 +69,7 @@ pub(crate) mod datafusion;
 pub(crate) mod grpc;
 pub(crate) mod grpc_search;
 pub(crate) mod index;
+pub(crate) mod partition;
 pub(crate) mod request;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
@@ -744,7 +745,12 @@ pub async fn search_partition(
     if step < min_step {
         step = min_step;
     }
+    // Align step with min_step to ensure partition boundaries match histogram intervals
     if min_step > 0 && step % min_step > 0 {
+        // If step is not perfectly divisible by min_step, round it down to the nearest multiple
+        // Example: If min_step = 5 minutes  and step = 17 minutes
+        //   step % min_step = 17 % 5 = 2 (2 minutes)
+        //   step = 17 - 2 = 15 (15 minutes, which is divisible by 5)
         step = step - step % min_step;
     }
     // this is to ensure we create partitions less than max_query_range
@@ -756,45 +762,17 @@ pub async fn search_partition(
         };
     }
 
-    // Mini partition configuration
-    let mini_partition_duration_secs = cfg.limit.mini_search_partition_duration_secs;
-    let mini_partition_count = cfg.limit.mini_search_partition_count;
-    let mini_partition_size_microseconds = mini_partition_duration_secs * 1_000_000;
+    let is_histogram = query.from == -1;
 
-    // Generate partitions by DESC order
-    let mut partitions = Vec::with_capacity(part_num + mini_partition_count);
-    let mut end = req.end_time;
+    // Create a partition generator
+    let generator = partition::PartitionGenerator::new(
+        min_step,
+        cfg.limit.mini_search_partition_duration_secs,
+        is_histogram,
+    );
 
-    // Create mini partitions first for faster initial results
-    for _ in 0..mini_partition_count {
-        if end <= req.start_time {
-            break;
-        }
-
-        let start = max(
-            end - mini_partition_size_microseconds as i64,
-            req.start_time,
-        );
-        if start < end {
-            partitions.push([start, end]);
-        }
-        end = start;
-    }
-
-    // Calculate remaining time range
-    let remaining_time = end - req.start_time;
-    if remaining_time > 0 {
-        while end > req.start_time {
-            let start = max(end - step, req.start_time);
-            partitions.push([start, end]);
-            end = start;
-        }
-    }
-
-    // Handle edge case of empty partitions
-    if partitions.is_empty() {
-        partitions.push([req.start_time, req.end_time]);
-    }
+    // Generate partitions
+    let mut partitions = generator.generate_partitions(req.start_time, req.end_time, step);
 
     // We need to reverse partitions if query is ASC order
     if let Some((field, order_by)) = sql.order_by.first() {
