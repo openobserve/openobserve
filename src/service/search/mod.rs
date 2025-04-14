@@ -116,7 +116,7 @@ pub async fn search(
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
-            ider::uuid()
+            ider::generate_trace_id()
         }
     } else {
         trace_id.to_string()
@@ -304,7 +304,7 @@ pub async fn search_multi(
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
-            ider::uuid()
+            ider::generate_trace_id()
         }
     } else {
         trace_id.to_string()
