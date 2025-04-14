@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ use config::{
     metrics,
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
-use infra::file_list as infra_file_list;
+use infra::{cache::file_data::TRACE_ID_FOR_CACHE_LATEST_FILE, file_list as infra_file_list};
 use opentelemetry::global;
 use proto::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
 use tonic::{Request, Response, Status};
@@ -89,7 +89,7 @@ impl Event for Eventer {
         }
 
         // cache latest files for querier
-        if cfg.memory_cache.cache_latest_files && LOCAL_NODE.is_querier() {
+        if cfg.cache_latest_files.enabled && LOCAL_NODE.is_querier() {
             for item in put_items.iter() {
                 let Some(node_name) = get_node_from_consistent_hash(
                     &item.key,
@@ -104,21 +104,58 @@ impl Event for Eventer {
                     continue; // not this node
                 }
                 // cache parquet
-                if let Err(e) =
-                    infra::cache::file_data::download("cache_latest_file", &item.key).await
-                {
-                    log::error!("Failed to cache file data: {}", e);
+                if cfg.cache_latest_files.cache_parquet {
+                    if let Err(e) =
+                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &item.key)
+                            .await
+                    {
+                        log::error!("Failed to cache file data: {}", e);
+                    }
                 }
                 // cache index for the parquet
-                if item.meta.index_size > 0 {
+                if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
                     if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
                     {
-                        if let Err(e) =
-                            infra::cache::file_data::download("cache_latest_file", &ttv_file).await
+                        if let Err(e) = infra::cache::file_data::download(
+                            TRACE_ID_FOR_CACHE_LATEST_FILE,
+                            &ttv_file,
+                        )
+                        .await
                         {
                             log::error!("Failed to cache file data: {}", e);
                         }
                     }
+                }
+            }
+
+            // delete merge files
+            if cfg.cache_latest_files.delete_merge_files {
+                if cfg.cache_latest_files.cache_parquet {
+                    let del_items = req
+                        .items
+                        .iter()
+                        .filter_map(|v| if v.deleted { Some(v.key.clone()) } else { None })
+                        .collect::<Vec<_>>();
+                    infra::cache::file_data::delete::add(del_items);
+                }
+                if cfg.cache_latest_files.cache_index {
+                    let del_items = req
+                        .items
+                        .iter()
+                        .filter_map(|v| {
+                            if v.deleted {
+                                match v.meta.as_ref() {
+                                    Some(m) if m.index_size > 0 => {
+                                        convert_parquet_idx_file_name_to_tantivy_file(&v.key)
+                                    }
+                                    _ => None,
+                                }
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    infra::cache::file_data::delete::add(del_items);
                 }
             }
         }

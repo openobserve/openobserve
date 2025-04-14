@@ -315,7 +315,33 @@ pub static QUERY_DISK_METRICS_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(||
     .expect("Metric created")
 });
 
-// query metrics cache stats
+// query cache ratio for parquet files
+pub static QUERY_PARQUET_CACHE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_parquet_cache_requests",
+            "Querier parquet cache requests.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_PARQUET_CACHE_RATIO: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_parquet_cache_ratio",
+            "Querier parquet cache ratio.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+// query cache ratio for metrics
 pub static QUERY_METRICS_CACHE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -328,11 +354,11 @@ pub static QUERY_METRICS_CACHE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-pub static QUERY_METRICS_CACHE_HITS: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static QUERY_METRICS_CACHE_RATIO: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
-            "query_metrics_cache_hits",
-            "Querier metrics cache hits.".to_owned() + HELP_SUFFIX,
+            "query_metrics_cache_ratio",
+            "Querier metrics cache ratio.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -770,10 +796,16 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(QUERY_DISK_METRICS_CACHE_USED_BYTES.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(QUERY_PARQUET_CACHE_REQUESTS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_PARQUET_CACHE_RATIO.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(QUERY_METRICS_CACHE_REQUESTS.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(QUERY_METRICS_CACHE_HITS.clone()))
+        .register(Box::new(QUERY_METRICS_CACHE_RATIO.clone()))
         .expect("Metric registered");
 
     // query manager

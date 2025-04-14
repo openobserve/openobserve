@@ -365,6 +365,7 @@ pub struct Config {
     pub common: Common,
     pub limit: Limit,
     pub compact: Compact,
+    pub cache_latest_files: CacheLatestFiles,
     pub memory_cache: MemoryCache,
     pub disk_cache: DiskCache,
     pub log: Log,
@@ -1377,6 +1378,20 @@ pub struct Compact {
 }
 
 #[derive(EnvConfig)]
+pub struct CacheLatestFiles {
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_ENABLED", default = false)]
+    pub enabled: bool,
+    // cache parquet files
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_PARQUET", default = true)]
+    pub cache_parquet: bool,
+    // cache index(tantivy) files
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_INDEX", default = true)]
+    pub cache_index: bool,
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_DELETE_MERGE_FILES", default = false)]
+    pub delete_merge_files: bool,
+}
+
+#[derive(EnvConfig)]
 pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = true)]
     pub enabled: bool,
@@ -1386,8 +1401,6 @@ pub struct MemoryCache {
     // Memory data cache bucket num, multiple bucket means multiple locker, default is 0
     #[env_config(name = "ZO_MEMORY_CACHE_BUCKET_NUM", default = 0)]
     pub bucket_num: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_CACHE_LATEST_FILES", default = false)]
-    pub cache_latest_files: bool,
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,

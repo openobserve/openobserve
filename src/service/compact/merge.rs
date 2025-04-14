@@ -984,7 +984,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
             }
         }
         // send broadcast to other nodes
-        if get_config().memory_cache.cache_latest_files {
+        if get_config().cache_latest_files.enabled {
             if let Err(e) = db::file_list::broadcast::send(events, None).await {
                 log::error!("[COMPACTOR] send broadcast for file_list failed: {}", e);
             }

@@ -18,6 +18,7 @@ use std::sync::Arc;
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
     meta::{function::VRLResultResolver, search, sql::TableReferenceExt},
+    metrics::{QUERY_PARQUET_CACHE_RATIO, QUERY_PARQUET_CACHE_REQUESTS},
     utils::{
         arrow::record_batches_to_json_rows,
         flatten,
@@ -226,18 +227,26 @@ pub async fn search(
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
     result.set_scan_records(scan_stats.records as usize);
-    result.set_cached_ratio(
-        (((scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files) * 100)
-            as f64
-            / scan_stats.querier_files as f64) as usize,
-    );
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
-
     result.set_idx_took(if idx_took > 0 {
         idx_took
     } else {
         scan_stats.idx_took as usize
     });
+
+    if scan_stats.querier_files > 0 {
+        let parquet_cached_ratio = (((scan_stats.querier_memory_cached_files
+            + scan_stats.querier_disk_cached_files)
+            * 100) as f64
+            / scan_stats.querier_files as f64) as usize;
+        result.set_cached_ratio(parquet_cached_ratio);
+        QUERY_PARQUET_CACHE_RATIO
+            .with_label_values(&[&sql.org_id, &sql.stream_type.to_string()])
+            .inc_by(parquet_cached_ratio as u64);
+        QUERY_PARQUET_CACHE_REQUESTS
+            .with_label_values(&[&sql.org_id, &sql.stream_type.to_string()])
+            .inc();
+    }
 
     if query_type == "table" {
         result.response_type = "table".to_string();

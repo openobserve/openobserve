@@ -311,10 +311,6 @@ impl FileData {
             return Ok(());
         };
         self.cur_size -= data_size;
-        log::debug!(
-            "[trace_id {trace_id}] File disk cache remove file done, released {} bytes",
-            data_size
-        );
 
         // delete file from local disk
         let file_path = format!(
@@ -325,7 +321,7 @@ impl FileData {
         );
         if let Err(e) = fs::remove_file(&file_path) {
             log::error!(
-                "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                "[trace_id {trace_id}] File disk cache remove file: {}, error: {}",
                 file_path,
                 e
             );
