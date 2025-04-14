@@ -152,9 +152,13 @@ export default defineComponent({
           emit("updated");
           moveFolderForm.value.resetValidation();
         } catch (err: any) {
-          showErrorNotification(err?.message ?? "Dashboard move failed.", {
+          //this condition is kept to handle if 403 error is thrown we are showing unautorized message and we dont need this error explicitly
+          if(err.status !== 403){
+            showErrorNotification(err?.message ?? "Dashboard move failed.", {
             timeout: 2000,
-          });
+            });
+          }
+
         }
       });
     });
