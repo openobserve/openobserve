@@ -1164,6 +1164,8 @@ pub struct Limit {
     pub query_group_base_speed: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
+    #[env_config(name = "ZO_INGEST_ALLOWED_IN_FUTURE", default = 24)] // in hours - in future
+    pub ingest_allowed_in_future: i64,
     #[env_config(name = "ZO_INGEST_FLATTEN_LEVEL", default = 3)] // default flatten level
     pub ingest_flatten_level: u32,
     #[env_config(name = "ZO_IGNORE_FILE_RETENTION_BY_STREAM", default = false)]
