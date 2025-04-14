@@ -626,34 +626,52 @@ export default defineComponent({
     const importFromUrl = async () => {
       isLoading.value = ImportType.URL;
       try {
-        // get the dashboard
-        const urlData = url.value.trim() ? url.value.trim() : "";
+        const urlData = url.value.trim();
 
         if (!urlData && !jsonStr.value) {
           showErrorNotification("Please Enter a URL for import");
           return;
         }
 
-        const oldImportedSchema = JSON.parse(jsonStr.value);
-        const convertedSchema =
-          convertDashboardSchemaVersion(oldImportedSchema);
+        //this is used to convert the json string to an array of objects
+        //so that we can use the same logic to import the dashboard
+        //Example: if user uploads a single object file it will be converted to an array and if user uploads a array of objects it is already an array so we dont do anything
+        const rawJson = JSON.parse(jsonStr.value);
+        const dashboards = Array.isArray(rawJson) ? rawJson : [rawJson];
+        
 
-        await importDashboardFromJSON(
-          convertedSchema,
-          selectedFolder.value,
-        ).then((res) => {
-          resetAndRefresh(ImportType.URL, selectedFolder.value);
-          filesImportResults.value = [];
-          jsonStr.value = "";
-
-          showPositiveNotification(`Dashboard Imported Successfully`);
+        const importPromises = dashboards.map((dashboard, index) => {
+          try {
+            const converted = convertDashboardSchemaVersion(dashboard);
+            return importDashboardFromJSON(converted, selectedFolder.value);
+          } catch (e) {
+            return Promise.reject({ index, error: e });
+          }
         });
+
+        const results = await Promise.allSettled(importPromises);
+
+        const successCount = results.filter(r => r.status === 'fulfilled').length;
+        const failedCount = results.length - successCount;
+
+        if (successCount > 0) {
+          await resetAndRefresh(ImportType.URL, selectedFolder.value);
+          showPositiveNotification(`${successCount} Dashboard(s) Imported Successfully`);
+        }
+
+        if (failedCount > 0) {
+          showErrorNotification(`${failedCount} Dashboard(s) Failed to Import`);
+        }
+
+        filesImportResults.value = results;
+        jsonStr.value = "";
       } catch (error) {
         showErrorNotification("Failed to Import Dashboard");
       } finally {
         isLoading.value = false;
       }
-    };
+  };
+
 
     // import dashboard from json string
     const importFromJsonStr = async () => {
