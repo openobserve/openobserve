@@ -403,7 +403,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let id = id.parse::<i64>().unwrap();
             let ts = config::ider::to_timestamp_millis(id);
             println!("timestamp: {}", ts);
-            let t = chrono::Utc.timestamp_nanos(ts * 1000_000);
+            let t = chrono::Utc.timestamp_nanos(ts * 1_000_000);
             let td = t.format("%Y-%m-%dT%H:%M:%SZ").to_string();
             println!("datetimes: {}", td);
         }
