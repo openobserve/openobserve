@@ -429,7 +429,9 @@ async fn delete_from_file_list(
     stream_name: &str,
     time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
-    let task_id = tokio::task::id();
+    let task_id = tokio::task::try_id()
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| rand::random::<u64>().to_string());
     let fake_trace_id = format!(
         "delete_from_file_list-{}-{}-{}",
         task_id, time_range.0, time_range.1
