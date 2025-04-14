@@ -699,7 +699,6 @@ export default defineComponent({
         const success = await processJsonObject(jsonObj, index + 1);
         if (!success) {
           allAlertsCreated = false;
-          isAlertImporting.value = false;
         }
       }
       if (allAlertsCreated) {
