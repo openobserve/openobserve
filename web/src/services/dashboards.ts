@@ -88,9 +88,9 @@ const dashboards = {
   delete_Folder: (organization: string, folderId: any) => {
     return http().delete(`/api/${organization}/folders/${folderId}`);
   },
-  move_Dashboard: (organization: string, dashboardIds: string[], dstFolderId: string) => {
+  move_Dashboard: (organization: string, dashboardIds: string[], from: string, dstFolderId: string) => {
     return http().patch(
-      `/api/${organization}/dashboards/move`,
+      `/api/${organization}/dashboards/move?folder=${from}`,
       {
         "dashboard_ids": dashboardIds,
         "dst_folder_id": dstFolderId

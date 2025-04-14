@@ -946,6 +946,7 @@ export const moveDashboardToAnotherFolder = async (
     await dashboardService.move_Dashboard(
       store.state.selectedOrganization.identifier,
       dashboardIds,
+      from,
       to
     );
 
