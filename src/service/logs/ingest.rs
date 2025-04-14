@@ -48,8 +48,10 @@ use crate::{
         StreamStatus,
     },
     service::{
-        format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
-        logs::bulk::TRANSFORM_FAILED, schema::get_upto_discard_error,
+        format_stream_name, get_formatted_stream_name,
+        ingestion::check_ingestion_allowed,
+        logs::bulk::TRANSFORM_FAILED,
+        schema::{get_overlap_discard_error, get_upto_discard_error},
     },
 };
 
@@ -77,6 +79,8 @@ pub async fn ingest(
     check_ingestion_allowed(org_id, Some(&stream_name))?;
 
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_overlap).unwrap())
         .timestamp_micros();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
@@ -227,7 +231,7 @@ pub async fn ingest(
             }
 
             // handle timestamp
-            let timestamp = match handle_timestamp(&mut local_val, min_ts) {
+            let timestamp = match handle_timestamp(&mut local_val, min_ts, max_ts) {
                 Ok(ts) => ts,
                 Err(e) => {
                     stream_status.status.failed += 1;
@@ -315,7 +319,7 @@ pub async fn ingest(
                         }
 
                         // handle timestamp
-                        let timestamp = match handle_timestamp(&mut local_val, min_ts) {
+                        let timestamp = match handle_timestamp(&mut local_val, min_ts, max_ts) {
                             Ok(ts) => ts,
                             Err(e) => {
                                 stream_status.status.failed += 1;
@@ -412,6 +416,7 @@ pub async fn ingest(
 pub fn handle_timestamp(
     local_val: &mut json::Map<String, json::Value>,
     min_ts: i64,
+    max_ts: i64,
 ) -> Result<i64, anyhow::Error> {
     let cfg = get_config();
     // handle timestamp
@@ -425,6 +430,9 @@ pub fn handle_timestamp(
     // check ingestion time
     if timestamp < min_ts {
         return Err(get_upto_discard_error());
+    }
+    if timestamp > max_ts {
+        return Err(get_overlap_discard_error());
     }
     local_val.insert(
         cfg.common.column_timestamp.clone(),

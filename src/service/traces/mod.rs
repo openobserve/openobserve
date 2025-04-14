@@ -190,10 +190,10 @@ pub async fn handle_otlp_request(
         Some(name) => format_stream_name(name),
         None => "default".to_owned(),
     };
-    let min_ts = (Utc::now()
-        - Duration::try_hours(cfg.limit.ingest_allowed_upto)
-            .expect("configuration error: too large ingest_allowed_upto"))
-    .timestamp_micros();
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_overlap).unwrap())
+        .timestamp_micros();
 
     // Start retrieving associated pipeline and construct pipeline params
     let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
@@ -338,7 +338,14 @@ pub async fn handle_otlp_request(
                     partial_success.rejected_spans += 1;
                     continue;
                 }
-
+                if timestamp > max_ts {
+                    log::error!(
+                        "[TRACES:OTLP] skipping span with timestamp newer than allowed retention period, trace_id: {}",
+                        trace_id
+                    );
+                    partial_success.rejected_spans += 1;
+                    continue;
+                }
                 let local_val = Span {
                     trace_id: trace_id.clone(),
                     span_id,
@@ -592,10 +599,10 @@ pub async fn ingest_json(
     }
 
     let cfg = get_config();
-    let min_ts = (Utc::now()
-        - Duration::try_hours(cfg.limit.ingest_allowed_upto)
-            .expect("configuration error: too large ingest_allowed_upto"))
-    .timestamp_micros();
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_overlap).unwrap())
+        .timestamp_micros();
 
     let json_values: Vec<json::Value> = json::from_slice(&body)?;
     let mut json_data_by_stream = HashMap::new();
@@ -616,7 +623,14 @@ pub async fn ingest_json(
             partial_success.rejected_spans += 1;
             continue;
         }
-
+        if timestamp > max_ts {
+            log::error!(
+                "[TRACES:JSON] skipping span with timestamp newer than allowed retention period, trace_id: {}",
+                &trace_id
+            );
+            partial_success.rejected_spans += 1;
+            continue;
+        }
         // JSON Flattening
         value = flatten::flatten(value)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;

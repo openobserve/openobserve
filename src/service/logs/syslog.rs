@@ -87,6 +87,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_overlap).unwrap())
+        .timestamp_micros();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
 
@@ -178,7 +180,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         }
 
         // handle timestamp
-        let timestamp = match handle_timestamp(&mut local_val, min_ts) {
+        let timestamp = match handle_timestamp(&mut local_val, min_ts, max_ts) {
             Ok(ts) => ts,
             Err(e) => {
                 stream_status.status.failed += 1;
@@ -272,7 +274,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                         }
 
                         // handle timestamp
-                        let timestamp = match handle_timestamp(&mut local_val, min_ts) {
+                        let timestamp = match handle_timestamp(&mut local_val, min_ts, max_ts) {
                             Ok(ts) => ts,
                             Err(e) => {
                                 stream_status.status.failed += 1;
