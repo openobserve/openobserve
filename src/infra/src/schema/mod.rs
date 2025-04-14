@@ -18,8 +18,8 @@ use std::{collections::HashMap, sync::Arc};
 use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
-    BLOOM_FILTER_DEFAULT_FIELDS, RwAHashMap, RwHashMap, SQL_FULL_TEXT_SEARCH_FIELDS,
-    SQL_SECONDARY_INDEX_SEARCH_FIELDS, get_config,
+    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ORIGINAL_DATA_COL_NAME, RwAHashMap,
+    RwHashMap, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS, get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
@@ -280,6 +280,11 @@ pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<S
         Some(settings) => {
             let mut fields = settings.full_text_search_keys.clone();
             fields.extend(default_fields);
+            if settings.index_original_data {
+                fields.push(ORIGINAL_DATA_COL_NAME.to_string());
+            } else if settings.index_all_values {
+                fields.push(ALL_VALUES_COL_NAME.to_string());
+            }
             fields.sort();
             fields.dedup();
             fields
