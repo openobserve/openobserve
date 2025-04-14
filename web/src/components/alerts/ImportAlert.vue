@@ -49,6 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="sm xl"
           no-caps
           @click="importJson"
+          :loading="isAlertImporting"
+          :disable="isAlertImporting"
           data-test="alert-import-json-btn"
         />
       </div>
@@ -522,6 +524,7 @@ export default defineComponent({
     const selectedFolderId = ref<any>(router.currentRoute.value.query.folder || "default");
     const activeFolderId = ref(router.currentRoute.value.query.folder || router.currentRoute.value.query?.folderId);
     const activeFolderAlerts = ref<any>([]);
+    const isAlertImporting = ref(false);
     const getFormattedDestinations: any = computed(() => {
       return props.destinations.map((destination: any) => {
         return destination.name;
@@ -688,6 +691,9 @@ export default defineComponent({
       }
 
       let allAlertsCreated = true;
+      // made the isAlertImporting to true to disable the import button
+      // and also added a spinner to the import button
+      isAlertImporting.value = true;
       // Now we can always process as an array
       for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
         const success = await processJsonObject(jsonObj, index + 1);
@@ -710,6 +716,9 @@ export default defineComponent({
           },
         });
       }
+      //if the alerts created successfully or not make the isAlertImporting to false
+      //it will only enable the import button after the alerts are created successfully
+      isAlertImporting.value = false;
     };
 
     const processJsonObject = async (jsonObj: any, index: number) => {
@@ -748,17 +757,10 @@ export default defineComponent({
           field: "alert_name",
         });
       }
-      if (checkAlertsInList(activeFolderAlerts.value, input.name)) {
-        alertErrors.push({
-          message: `Alert - ${index}: "${input.name}" already exists`,
-          field: "alert_name",
-        });
-      }
       const organizationData = store.state.organizations;
       const orgList = organizationData.map((org: any) => org.identifier);
 
       // 2. Validate 'org_id' field
-      console.log(input.org_id,'org id')
       if (
         !input.org_id ||
         typeof input.org_id !== "string" ||
@@ -909,7 +911,6 @@ export default defineComponent({
           `Alert - ${index}: Operator should be one of: '=', '!=', '>=', '<=', '>', '<', 'Contains', 'NotContains'.`,
         );
       }
-      console.log(input,'input')
 
 
       if (
@@ -1219,7 +1220,8 @@ export default defineComponent({
       selectedFolderId,
       getActiveFolderAlerts,
       activeFolderAlerts,
-      store
+      store,
+      isAlertImporting,
     };
   },
   components: {
