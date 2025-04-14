@@ -19,6 +19,8 @@ use infra::errors;
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::tungstenite;
 
+use crate::handler::http::request::search::error_utils::map_error_to_http_response;
+
 pub mod enterprise_utils {
     #[allow(unused_imports)]
     use config::meta::stream::StreamType;
@@ -442,14 +444,20 @@ impl WsServerEvents {
         should_client_retry: bool,
     ) -> Self {
         match err {
-            errors::Error::ErrorCode(code) => WsServerEvents::Error {
-                code: code.get_code(),
-                message: code.get_message(),
-                error_detail: Some(code.get_error_detail()),
-                trace_id: trace_id.clone(),
-                request_id: request_id.clone(),
-                should_client_retry,
-            },
+            errors::Error::ErrorCode(ref code) => {
+                let message = code.get_message();
+                let error_detail = code.get_error_detail();
+                let http_response =
+                    map_error_to_http_response(err, trace_id.clone().unwrap_or_default());
+                WsServerEvents::Error {
+                    code: http_response.status().into(),
+                    message,
+                    error_detail: Some(error_detail),
+                    trace_id: trace_id.clone(),
+                    request_id: request_id.clone(),
+                    should_client_retry,
+                }
+            }
             _ => WsServerEvents::Error {
                 code: StatusCode::INTERNAL_SERVER_ERROR.into(),
                 message: err.to_string(),

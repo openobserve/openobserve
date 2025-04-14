@@ -77,7 +77,13 @@ impl WsHandler {
         log::info!("[WS::Router::Handler] new client incoming: {}", client_id);
 
         // Client -> Router connection
-        let (response, mut ws_session, mut msg_stream) = actix_ws::handle(&req, stream)?;
+        let (response, mut ws_session, msg_stream) = actix_ws::handle(&req, stream)?;
+        // increase the maximum allowed frame size to 128KiB and aggregate continuation frames
+        let mut msg_stream = msg_stream
+            .max_frame_size(cfg.websocket.max_frame_size * 1024 * 1024)
+            .aggregate_continuations()
+            .max_continuation_size(cfg.websocket.max_continuation_size * 1024 * 1024);
+
         log::info!("[WS::Router::Handler] new client connected: {}", client_id);
 
         // Create session by registering the client & extract the user_id from the auth
@@ -156,7 +162,7 @@ impl WsHandler {
                                         break;
                                     }
                                 }
-                                Ok(actix_ws::Message::Text(text)) => {
+                                Ok(actix_ws::AggregatedMessage::Text(text)) => {
                                     match json::from_str::<WsClientEvents>(&text) {
                                         Err(e) => {
                                             log::error!(
@@ -224,15 +230,15 @@ impl WsHandler {
                                             {
                                                 Err(e) => {
                                                     log::error!(
-                                                        "[WS::Router::Handler] error getting querier_conn for client_id: {}, error: {}", client_id, e
+                                                        "[WS::Router::Handler] error getting querier_conn for client_id: {}, trace_id: {}, error: {}", client_id, trace_id.clone(), e
                                                     );
-                                                    let err_msg = ErrorMessage::new(e, Some(trace_id), None);
+                                                    let err_msg = ErrorMessage::new(e, Some(trace_id.clone()), None);
                                                     let should_disconnect =
                                                         err_msg.should_disconnect;
                                                     if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Error(err_msg))).await
                                                     {
                                                         log::error!(
-                                                            "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, error: {}", client_id, e
+                                                            "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, trace_id: {}, error: {}", client_id, trace_id.clone(), e
                                                         );
                                                     }
                                                     if should_disconnect {
@@ -241,7 +247,10 @@ impl WsHandler {
                                                         continue;
                                                     }
                                                 }
-                                                Ok(querier_conn) => querier_conn,
+                                                Ok(querier_conn) => {
+                                                    log::info!("[WS::Router::Handler] got querier connection for client_id: {}, trace_id: {}, querier_name: {}", client_id, trace_id, querier_conn.get_name());
+                                                    querier_conn
+                                                }
                                             };
                                             querier_conn
                                                 .register_request(
@@ -258,24 +267,26 @@ impl WsHandler {
                                             if let Err(e) = querier_conn.send_message(message).await
                                             {
                                                 log::error!(
-                                                    "[WS::Router::Handler] error forwarding client message via selected querier connection for client_id: {}, error: {}", client_id, e
+                                                    "[WS::Router::Handler] error forwarding client message via selected querier connection for client_id: {}, trace_id: {}, error: {}", client_id, trace_id, e
                                                 );
-                                                let err_msg = ErrorMessage::new(e, Some(trace_id), None);
+                                                let err_msg = ErrorMessage::new(e, Some(trace_id.clone()), None);
                                                 let should_disconnect = err_msg.should_disconnect;
                                                 if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Error(err_msg))).await {
                                                     log::error!(
-                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, error: {}", client_id, e
+                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, trace_id: {}, error: {}", client_id, trace_id.clone(), e
                                                     );
                                                 }
                                                 if should_disconnect {
                                                     break;
                                                 }
                                             }
+
+                                            log::info!("[WS::Router::Handler] processed message for client_id: {}, trace_id: {}", client_id, trace_id);
                                             count += 1;
                                         }
                                     }
                                 }
-                                Ok(actix_ws::Message::Close(close_reason)) => {
+                                Ok(actix_ws::AggregatedMessage::Close(close_reason)) => {
                                     log::info!(
                                         "[WS::Router::Handler] disconnect signal received from client_id: {}, close_reason: {:?}", client_id, close_reason
                                     );
@@ -287,11 +298,12 @@ impl WsHandler {
                                     log::debug!("[WS::Router::Handler] Stop handle_incoming for client_id: {}", client_id);
                                     break;
                                 }
-                                Ok(actix_ws::Message::Ping(ping)) => {
+                                Ok(actix_ws::AggregatedMessage::Ping(ping)) => {
+                                    log::info!("[WS::Router::Handler] Ping received from client_id: {}, ping: {:?}", client_id, ping);
                                     let _ = response_tx.send(WsServerEvents::Ping(ping.to_vec())).await;
                                 }
-                                Ok(actix_ws::Message::Pong(pong)) => {
-                                    log::debug!("[WS::Router::Handler] Pong received from client_id: {}, pong: {:?}", client_id, pong);
+                                Ok(actix_ws::AggregatedMessage::Pong(pong)) => {
+                                    log::info!("[WS::Router::Handler] Pong received from client_id: {}, pong: {:?}", client_id, pong);
                                 }
                                 Ok(_) => {}
                             }
@@ -570,7 +582,15 @@ pub async fn get_querier_connection(
             .get_or_create_connection(&querier_name)
             .await
         {
-            Ok(conn) => return Ok(conn),
+            Ok(conn) => {
+                log::info!(
+                    "[WS::Router::Handler] get_or_create_connection: querier connection for client_id: {}, trace_id: {}, querier_name: {}",
+                    client_id,
+                    trace_id,
+                    querier_name
+                );
+                return Ok(conn);
+            }
             Err(e) => {
                 log::error!(
                     "[WS::Router::Handler] error getting or creating querier connection for client_id: {}, error: {}, try number: {}, router_node: {}, querier_name: {}",

@@ -1252,7 +1252,7 @@ export default defineComponent({
           // check is required for union query where both streams interesting fields goes into single array
           // but it should be added if field exist in the strem schema
           searchObj.data.streamResults.list.forEach((stream) => {
-            if (stream.name === parsedSQL.from[0].table) {
+            if (stream.name === parsedSQL?.from?.[0]?.table) {
               stream.schema.forEach((stream_field) => {
                 if (field.name === stream_field.name) {
                   parsedSQL.columns.push({

@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           activeTab === tab.value ? 'active text-primary' : '',
           tab.disabled && 'disabled',
+          tab.hide && 'hidden',
         ]"
         @click="changeTab(tab)"
       >
@@ -47,6 +48,7 @@ interface Tab {
   style?: Record<string, string>;
   disabled?: boolean;
   title?: string;
+  hide?: boolean;
 }
 
 const emit = defineEmits(["update:activeTab"]);
@@ -66,7 +68,7 @@ const props = defineProps({
 });
 
 const changeTab = (tab: Tab) => {
-  if (tab.disabled) return;
+  if (tab.disabled || tab.hide) return;
   emit("update:activeTab", tab.value);
 };
 </script>
