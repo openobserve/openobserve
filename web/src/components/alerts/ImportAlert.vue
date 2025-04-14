@@ -717,6 +717,7 @@ export default defineComponent({
         });
       }
       //if the alerts created successfully or not make the isAlertImporting to false
+      //it will only enable the import button after the alerts are created successfully
       isAlertImporting.value = false;
     };
 
