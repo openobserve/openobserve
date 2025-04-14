@@ -392,6 +392,7 @@ mod tests {
         let next_run_at = dt.timestamp_micros();
         let aligned_time = TriggerCondition::align_time(next_run_at, 0, 300); // 5 minutes in seconds
         let aligned_dt = DateTime::from_timestamp_micros(aligned_time).unwrap();
+        assert_eq!(aligned_dt.hour(), 11);
         assert_eq!(aligned_dt.minute(), 0);
         assert_eq!(aligned_dt.second(), 0);
 
@@ -409,6 +410,7 @@ mod tests {
         let next_run_at = dt.timestamp_micros();
         let aligned_time = TriggerCondition::align_time(next_run_at, 0, 60); // 1 minute in seconds
         let aligned_dt = DateTime::from_timestamp_micros(aligned_time).unwrap();
+        assert_eq!(aligned_dt.hour(), 17);
         assert_eq!(aligned_dt.minute(), 19);
         assert_eq!(aligned_dt.second(), 0);
 
@@ -425,6 +427,7 @@ mod tests {
         let timezone = FixedOffset::east_opt(8 * 60 * 60).unwrap(); // UTC+8
         let dt = timezone.with_ymd_and_hms(2025, 1, 1, 17, 19, 30).unwrap();
         let next_run_at = dt.timestamp_micros();
+        // `align_time` expects frequency in minutes, so convert 8 hours to minutes
         let aligned_time = TriggerCondition::align_time(next_run_at, 8 * 60, 3600); // 1 hour in seconds
         let aligned_dt = DateTime::from_timestamp_micros(aligned_time)
             .unwrap()
@@ -447,7 +450,6 @@ mod tests {
         let after_5_minutes = Utc::now() + Duration::minutes(5);
         assert_eq!(dt.minute(), after_5_minutes.minute());
 
-        // Test case 2: Cron expression
         // Test case 2: Cron expression
         let condition = TriggerCondition {
             frequency: 300,
@@ -505,7 +507,7 @@ mod tests {
         let dt = DateTime::from_timestamp_micros(result).unwrap();
 
         // The next trigger should be aligned to the previous 5-minute boundary
-        // If current time is 11:03:00, the next trigger should be at 11:00:00
+        // If current time is 11:03:00, the next trigger should be at 11:05:00
         assert_eq!(dt.minute() % 5, 0);
         assert_eq!(dt.second(), 0);
 
