@@ -8,7 +8,6 @@ pub mod cipher_keys;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_value_fields;
-pub mod file_list_dump;
 pub mod folders;
 pub mod rate_limit_rules;
 pub mod search_job_partitions;
