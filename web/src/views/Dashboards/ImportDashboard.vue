@@ -670,13 +670,15 @@ export default defineComponent({
         }
 
         filesImportResults.value = results;
-        jsonStr.value = "";
       } catch (error) {
         showErrorNotification("Failed to Import Dashboard");
       } finally {
+        if (jsonStr.value && typeof jsonStr.value !== "string") {
+            jsonStr.value = "";
+          }
         isLoading.value = false;
       }
-  };
+    };
 
 
     // import dashboard from json string
