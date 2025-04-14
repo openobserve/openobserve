@@ -293,7 +293,8 @@ pub async fn query_ids(
         org_id,
         stream_name,
         stream_type,
-        time_range.unwrap(),
+        time_range
+            .ok_or_else(|| infra::errors::Error::Message("time_range is required".to_string()))?,
     )
     .await
     .unwrap();

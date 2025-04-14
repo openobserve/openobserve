@@ -302,7 +302,10 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
     Ok(())
 }
 
-fn get_writer(schema: Arc<Schema>, buf: &mut Vec<u8>) -> AsyncArrowWriter<&mut Vec<u8>> {
+fn get_writer(
+    schema: Arc<Schema>,
+    buf: &mut Vec<u8>,
+) -> Result<AsyncArrowWriter<&mut Vec<u8>>, anyhow::Error> {
     let cfg = get_config();
     let writer_props = WriterProperties::builder()
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
@@ -310,7 +313,8 @@ fn get_writer(schema: Arc<Schema>, buf: &mut Vec<u8>) -> AsyncArrowWriter<&mut V
         .set_compression(get_parquet_compression(&cfg.common.parquet_compression));
 
     let writer_props = writer_props.build();
-    AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
+    let writer = AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props))?;
+    Ok(writer)
 }
 
 async fn remove_files_from_file_list(ids: &[i64]) -> Result<(), anyhow::Error> {
@@ -382,7 +386,7 @@ async fn generate_cache_file(
     )?;
 
     let mut buf = Vec::new();
-    let mut writer = get_writer(schema, &mut buf);
+    let mut writer = get_writer(schema, &mut buf)?;
     writer.write(&batch).await?;
     writer.close().await?;
 
