@@ -192,29 +192,20 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
 
 
         # Test cases for Version 2 API
-
-         # Create templates
+        # Create templates
         template_v2_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}v2"
         template_page.create_template_webhook(session, base_url, user_email, user_password, org_id, template_v2_webhook)
-
         # Create destinations
-        
         destination_v2_webhook = f"destination_webhook_{destination_page.Unique_value_destination}_{i}v2"
         destination_page.create_destination_webhook(session, base_url, org_id, user_email, user_password, template_v2_webhook, destination_v2_webhook)
-
-
-
         # Create folder
         folder_v2_name = f"folder_{folder_page.Unique_value_folder}_{i}v2"
         folder_id = folder_page.create_folder_alert_v2(session, base_url, user_email, user_password, org_id, folder_v2_name)
-
         # Create alert
-
         alert_v2_name = f"alert_{alertV2_page.Unique_value_alert}_{i}v2"
         alertV2_page.create_scheduled_sql_alert(session, base_url, user_email, user_password, org_id, stream_name, destination_v2_webhook, folder_id, alert_v2_name)
-
         alert_v2_name_no_trigger = f"alert_{alertV2_page.Unique_value_alert}_{i}v2_no_trigger"
         alertV2_page.create_scheduled_sql_alert_vrl_no_trigger(session, base_url, user_email, user_password, org_id, stream_name, destination_v2_webhook, folder_id, alert_v2_name_no_trigger)
-
         alert_v2_name_trigger = f"alert_{alertV2_page.Unique_value_alert}_{i}v2_trigger"
         alertV2_page.create_scheduled_sql_alert_vrl_trigger(session, base_url, user_email, user_password, org_id, stream_name, destination_v2_webhook, folder_id, alert_v2_name_trigger)
+        

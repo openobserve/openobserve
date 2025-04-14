@@ -1,7 +1,5 @@
 import random
-import uuid
 from requests.auth import HTTPBasicAuth
-import time
 
 class AlertV2Page:
     # Make Unique_value_alert a class variable
@@ -51,7 +49,7 @@ class AlertV2Page:
                     "lastEditedBy": user_email,
                     "folder_id": folder_id
                 }
-        response = session.post(f"{base_url}api/v2/{org_id}/alerts?folder={folder_id}", json=payload)
+        response = session.post(f"{base_url}api/v2/{org_id}/alerts?folder={folder_id}", json=payload, headers=headers)
         if response.status_code == 409:
             # Handle alert already exists scenario
             print(f"Alert already exists: {payload['name']}.")
@@ -98,7 +96,7 @@ class AlertV2Page:
                     "lastEditedBy": user_email,
                     "folder_id": folder_id
                 }
-        response = session.post(f"{base_url}api/v2/{org_id}/alerts?folder={folder_id}", json=payload)
+        response = session.post(f"{base_url}api/v2/{org_id}/alerts?folder={folder_id}", json=payload, headers=headers)
         if response.status_code == 409:
             # Handle alert already exists scenario
             print(f"Alert already exists: {payload['name']}.")
@@ -145,7 +143,7 @@ class AlertV2Page:
                     "lastEditedBy": user_email,
                     "folder_id": folder_id
                 }
-        response = session.post(f"{base_url}api/v2/{org_id}/alerts?folder={folder_id}", json=payload)
+        response = session.post(f"{base_url}api/v2/{org_id}/alerts?folder={folder_id}", json=payload, headers=headers)
         if response.status_code == 409:
             # Handle alert already exists scenario
             print(f"Alert already exists: {payload['name']}.")
