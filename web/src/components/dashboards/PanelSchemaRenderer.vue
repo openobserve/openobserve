@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="chartPanelClass"
     >
       <div
-        v-if="!errorDetail"
+        v-if="!errorDetail?.message"
         :style="{ height: chartPanelHeight, width: '100%' }"
       >
         <MapsRenderer
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="
-          !errorDetail &&
+          !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps'
         "
@@ -115,15 +115,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ noData }}
       </div>
       <div
-        v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling"
+        v-if="
+          errorDetail?.message &&
+          !panelSchema?.error_config?.custom_error_handeling
+        "
         class="errorMessage"
       >
         <q-icon size="md" name="warning" />
-        <div style="height: 80%; width: 100%">Error Loading Data</div>
+        <div style="height: 80%; width: 100%">
+          {{
+            errorDetail?.code?.toString().startsWith("4")
+              ? errorDetail.message
+              : "Error Loading Data"
+          }}
+        </div>
       </div>
       <div
         v-if="
-          errorDetail &&
+          errorDetail?.message &&
           panelSchema?.error_config?.custom_error_handeling &&
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
@@ -585,10 +594,17 @@ export default defineComponent({
 
           emit("updated:vrlFunctionFieldList", responseFields);
         }
-        if (panelData.value.chartType == "custom_chart") errorDetail.value = "";
+        if (panelData.value.chartType == "custom_chart")
+          errorDetail.value = {
+            message: "",
+            code: "",
+          };
 
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-        if (!errorDetail.value && validatePanelData?.value?.length === 0) {
+        if (
+          !errorDetail?.value?.message &&
+          validatePanelData?.value?.length === 0
+        ) {
           try {
             // passing chartpanelref to get width and height of DOM element
             panelData.value = await convertPanelData(
@@ -607,11 +623,17 @@ export default defineComponent({
             limitNumberOfSeriesWarningMessage.value =
               panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
 
-            errorDetail.value = "";
+            errorDetail.value = {
+              message: "",
+              code: "",
+            };
           } catch (error: any) {
             console.error("error", error);
 
-            errorDetail.value = error.message;
+            errorDetail.value = {
+              message: error.message,
+              code: error.code || "",
+            };
           }
         } else {
           // if no data is available, then show the default data
@@ -624,7 +646,10 @@ export default defineComponent({
             data.value = JSON.parse(
               panelSchema.value?.error_config?.default_data_on_error,
             );
-            errorDetail.value = "";
+            errorDetail.value = {
+              message: "",
+              code: "",
+            };
           }
         }
       },
@@ -784,7 +809,7 @@ export default defineComponent({
     watch(errorDetail, () => {
       //check if there is an error message or not
       // if (!errorDetail.value) return; // emmit is required to reset the error on parent component
-      emit("error", errorDetail.value);
+      emit("error", errorDetail.value.message);
     });
 
     const hidePopupsAndOverlays = () => {

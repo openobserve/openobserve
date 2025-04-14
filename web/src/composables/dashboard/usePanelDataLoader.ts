@@ -126,7 +126,10 @@ export const usePanelDataLoader = (
   const state = reactive({
     data: [] as any,
     loading: false,
-    errorDetail: "",
+    errorDetail: {
+      message: "",
+      code: "",
+    },
     metadata: {
       queries: [] as any,
     },
@@ -450,7 +453,10 @@ export const usePanelDataLoader = (
             abortControllerRef.signal,
           );
           // remove past error detail
-          state.errorDetail = "";
+          state.errorDetail = {
+            message: "",
+            code: "",
+          };
 
           // Removing below part to allow rendering chart if the error is a function error
           // if there is an function error and which not related to stream range, throw error
@@ -565,7 +571,10 @@ export const usePanelDataLoader = (
 
   const handleHistogramResponse = async (payload: any, searchRes: any) => {
     // remove past error detail
-    state.errorDetail = "";
+    state.errorDetail = {
+      message: "",
+      code: "",
+    };
 
     // is streaming aggs
     const streaming_aggs = searchRes?.content?.streaming_aggs ?? false;
@@ -619,7 +628,10 @@ export const usePanelDataLoader = (
       // set loading to false
       state.loading = false;
       state.isOperationCancelled = false;
-      state.errorDetail = error?.message || "Unknown error in search response";
+      state.errorDetail = {
+        message: error?.message || "Unknown error in search response",
+        code: error?.code ?? "",
+      };
     }
   };
 
@@ -633,7 +645,6 @@ export const usePanelDataLoader = (
 
       return;
     }
-
 
     sendSearchMessageBasedOnRequestId({
       type: "search",
@@ -746,7 +757,10 @@ export const usePanelDataLoader = (
 
       addTraceId(traceId);
     } catch (e: any) {
-      state.errorDetail = e?.message || e;
+      state.errorDetail = {
+        message: e?.message || e,
+        code: e?.code ?? "",
+      };
       state.loading = false;
       state.isOperationCancelled = false;
     }
@@ -838,7 +852,10 @@ export const usePanelDataLoader = (
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
       // remove past error detail
-      state.errorDetail = "";
+      state.errorDetail = {
+        message: "",
+        code: "",
+      };
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
@@ -879,7 +896,10 @@ export const usePanelDataLoader = (
                 abortController.signal,
               );
 
-              state.errorDetail = "";
+              state.errorDetail = {
+                message: "",
+                code: "",
+              };
               return { result: res.data.data, metadata: metadata };
             } catch (error) {
               processApiError(error, "promql");
@@ -1047,7 +1067,10 @@ export const usePanelDataLoader = (
                     abortControllerRef.signal,
                   );
                   // remove past error detail
-                  state.errorDetail = "";
+                  state.errorDetail = {
+                    message: "",
+                    code: "",
+                  };
 
                   // if there is an function error and which not related to stream range, throw error
                   if (
@@ -1428,7 +1451,13 @@ export const usePanelDataLoader = (
           errorDetailValue?.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
-        state.errorDetail = trimmedErrorMessage;
+
+        const errorCode = error?.response?.data?.code || error?.code || "";
+
+        state.errorDetail = {
+          message: trimmedErrorMessage,
+          code: errorCode,
+        };
         break;
       }
       case "sql": {
@@ -1443,7 +1472,13 @@ export const usePanelDataLoader = (
           errorDetailValue?.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
-        state.errorDetail = trimmedErrorMessage;
+
+        const errorCode = error?.response?.data?.code || error?.code || "";
+
+        state.errorDetail = {
+          message: trimmedErrorMessage,
+          code: errorCode,
+        };
         break;
       }
       default:
