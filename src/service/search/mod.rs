@@ -767,7 +767,7 @@ pub async fn search_partition(
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
         min_step,
-        cfg.limit.mini_search_partition_duration_secs,
+        cfg.limit.search_mini_partition_duration_secs,
         is_histogram,
     );
 

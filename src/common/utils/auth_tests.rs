@@ -3248,7 +3248,7 @@ mod tests {
                 inverted_index_skip_threshold: usize::default(),
                 max_query_range_for_sa: i64::default(),
                 db_text_data_type: String::default(),
-                mini_search_partition_duration_secs: u64::default(),
+                search_mini_partition_duration_secs: u64::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),

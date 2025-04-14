@@ -1401,11 +1401,11 @@ pub struct Limit {
     )]
     pub max_dashboard_series: usize,
     #[env_config(
-        name = "ZO_MINI_SEARCH_PARTITION_DURATION_SECS",
+        name = "ZO_SEARCH_MINI_PARTITION_DURATION_SECS",
         default = 60,
         help = "Duration of each mini search partition in seconds"
     )]
-    pub mini_search_partition_duration_secs: u64,
+    pub search_mini_partition_duration_secs: u64,
 }
 
 #[derive(EnvConfig)]
