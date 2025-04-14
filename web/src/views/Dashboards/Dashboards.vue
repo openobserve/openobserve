@@ -996,42 +996,38 @@ export default defineComponent({
       filterQuery.value = "";
       searchQuery.value = "";
     }
-    const downloadDashboard = async (dashboardId: any,index: number) => {
-      // get the dashboard
-      const dashboard = await getDashboard(
-        store,
-        dashboardId,
-        route.query.folder
-      );
-      dashboard.owner = "";
-
-      // prepare json and download via a click
-      const data =
-        "data:text/json;charset=utf-8," +
-        encodeURIComponent(JSON.stringify(dashboard, null, 2));
-      const htmlA = document.createElement("a");
-      htmlA.setAttribute("href", data);
-      const fileName = dashboard.title || `dashboard-${index+1}`;
-      htmlA.setAttribute("download", fileName + ".dashboard.json");
-      htmlA.click();
-    };
     const multipleExportDashboard = async () => {
-      //using Promise.all to download all dashboards in parallel
-      //this will make sure that the success message is shown after all the dashboards are downloaded
       try {
-        await Promise.all(selectedDashboardIds.value.map(async (dashboardId, index) => {
-        await downloadDashboard(dashboardId, index);
-      }));
+        //this is used to get the dashbaords from the selected dashboard ids
+        const dashboards = await Promise.all(
+          selectedDashboardIds.value.map((dashboardId) =>
+            getDashboard(store, dashboardId, route.query.folder)
+          )
+        );
+        //this is used to clean up the owner field and set the default title if missing
+        const cleanedDashboards = dashboards.map((dashboard, index) => {
+          dashboard.owner = "";
+          dashboard.title = dashboard.title || `dashboard-${index + 1}`;
+          return dashboard;
+        });
 
-      showPositiveNotification(`${selectedDashboardIds.value.length} Dashboards exported successfully.`);
-      //resetting the selected dashboards
-      //to avoid further export of same dashboards
-      selected.value = [];
+        const dataStr = "data:text/json;charset=utf-8," +
+          encodeURIComponent(JSON.stringify(cleanedDashboards, null, 2));
+
+        // Create and trigger the download
+        const htmlA = document.createElement("a");
+        htmlA.setAttribute("href", dataStr);
+        //the file name is exported_dashboards.json
+        htmlA.setAttribute("download", "exported_dashboards.json");
+        htmlA.click();
+
+        showPositiveNotification(`${cleanedDashboards.length} Dashboards exported successfully.`);
+        selected.value = [];
       } catch (error) {
         showErrorNotification(error?.message ?? "Error exporting dashboards");
       }
+    };
 
-    }
     const moveMultipleDashboards = () => {
       //here we are showing the move dashboard dialog for multiple dashboards
       //we are assigning the selected dashboard ids to the props of move dashboard dialog
