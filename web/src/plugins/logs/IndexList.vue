@@ -659,6 +659,7 @@ import {
   useLocalInterestingFields,
   generateTraceContext,
   isWebSocketEnabled,
+  b64EncodeStandard,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import {
@@ -978,7 +979,7 @@ export default defineComponent({
               fetchValuesWithWebsocket({
                 fields: [name],
                 size: 10,
-                no_count: true,
+                no_count: false,
                 regions: searchObj.meta.regions,
                 clusters: searchObj.meta.clusters,
                 vrl_fn: query_fn,
@@ -987,9 +988,11 @@ export default defineComponent({
                 timeout: 30000,
                 stream_name: selectedStream,
                 stream_type: searchObj.data.stream.streamType,
-                query_context: query_context,
-                use_cache: query_fn,
-                sql: query_context,
+                use_cache: (window as any).use_cache ?? true,
+                sql:
+                  b64EncodeUnicode(
+                    query_context.replace("[INDEX_NAME]", selectedStream),
+                  ) || "",
               });
               return;
             }
