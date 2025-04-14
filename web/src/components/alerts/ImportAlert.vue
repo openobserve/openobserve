@@ -748,17 +748,10 @@ export default defineComponent({
           field: "alert_name",
         });
       }
-      if (checkAlertsInList(activeFolderAlerts.value, input.name)) {
-        alertErrors.push({
-          message: `Alert - ${index}: "${input.name}" already exists`,
-          field: "alert_name",
-        });
-      }
       const organizationData = store.state.organizations;
       const orgList = organizationData.map((org: any) => org.identifier);
 
       // 2. Validate 'org_id' field
-      console.log(input.org_id,'org id')
       if (
         !input.org_id ||
         typeof input.org_id !== "string" ||
@@ -909,7 +902,6 @@ export default defineComponent({
           `Alert - ${index}: Operator should be one of: '=', '!=', '>=', '<=', '>', '<', 'Contains', 'NotContains'.`,
         );
       }
-      console.log(input,'input')
 
 
       if (
