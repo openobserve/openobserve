@@ -64,6 +64,12 @@ pub async fn save_enrichment_table(
         }
     };
     let cfg = config::get_config();
+    log::debug!(
+        "Enrichment table {} content length in mb: {}, max size in mb: {}",
+        table_name,
+        content_length,
+        cfg.limit.enrichment_table_max_size
+    );
     if content_length > cfg.limit.enrichment_table_max_size as f64 {
         return Ok(MetaHttpResponse::bad_request(format!(
             "exceeds allowed limit of {} mb",
