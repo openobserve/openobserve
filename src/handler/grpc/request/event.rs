@@ -51,12 +51,6 @@ impl Event for Eventer {
             .filter(|v| !v.deleted)
             .map(FileKey::from)
             .collect::<Vec<_>>();
-        let del_items = req
-            .items
-            .iter()
-            .filter(|v| v.deleted)
-            .map(|v| v.key.clone())
-            .collect::<Vec<_>>();
         let cfg = get_config();
 
         // cache latest files for querier
@@ -102,15 +96,31 @@ impl Event for Eventer {
             // delete merge files
             if cfg.cache_latest_files.delete_merge_files {
                 if cfg.cache_latest_files.cache_parquet {
-                    infra::cache::file_data::delete::add(del_items.clone());
+                    let del_items = req
+                        .items
+                        .iter()
+                        .filter_map(|v| if v.deleted { Some(v.key.clone()) } else { None })
+                        .collect::<Vec<_>>();
+                    infra::cache::file_data::delete::add(del_items);
                 }
                 if cfg.cache_latest_files.cache_index {
-                    infra::cache::file_data::delete::add(
-                        del_items
-                            .into_iter()
-                            .filter_map(|v| convert_parquet_idx_file_name_to_tantivy_file(&v))
-                            .collect(),
-                    );
+                    let del_items = req
+                        .items
+                        .iter()
+                        .filter_map(|v| {
+                            if v.deleted {
+                                match v.meta.as_ref() {
+                                    Some(m) if m.index_size > 0 => {
+                                        convert_parquet_idx_file_name_to_tantivy_file(&v.key)
+                                    }
+                                    _ => None,
+                                }
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    infra::cache::file_data::delete::add(del_items);
                 }
             }
         }

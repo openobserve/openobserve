@@ -51,5 +51,7 @@ impl Queue {
 }
 
 pub fn add(files: Vec<String>) {
-    PENDING_CHANNEL.add(files)
+    if !files.is_empty() {
+        PENDING_CHANNEL.add(files)
+    }
 }
