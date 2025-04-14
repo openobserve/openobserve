@@ -63,7 +63,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()>
     let cfg = config::get_config();
 
     // notify other nodes
-    if cfg.memory_cache.cache_latest_files {
+    if cfg.cache_latest_files.enabled {
         let mut q = broadcast::BROADCAST_QUEUE.write().await;
         q.push(file_data);
     }

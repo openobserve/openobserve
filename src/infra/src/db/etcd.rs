@@ -258,7 +258,7 @@ impl super::Db for Etcd {
                 let item_key = item_key.strip_prefix(&self.prefix).unwrap();
                 result.insert(item_key.to_string(), Bytes::from(kv.value().to_vec()));
             }
-            tokio::task::yield_now().await; // yield to other tasks
+            tokio::task::coop::consume_budget().await;
 
             if !have_next {
                 break;
@@ -303,7 +303,7 @@ impl super::Db for Etcd {
                 let item_key = item_key.strip_prefix(&self.prefix).unwrap();
                 result.push(item_key.to_string());
             }
-            tokio::task::yield_now().await; // yield to other tasks
+            tokio::task::coop::consume_budget().await;
 
             if !have_next {
                 break;
@@ -347,7 +347,7 @@ impl super::Db for Etcd {
                 }
                 result.push(Bytes::from(kv.value().to_vec()));
             }
-            tokio::task::yield_now().await; // yield to other tasks
+            tokio::task::coop::consume_budget().await;
 
             if !have_next {
                 break;
@@ -409,7 +409,7 @@ impl super::Db for Etcd {
                     result.push((start_dt, Bytes::from(kv.value().to_vec())));
                 }
             }
-            tokio::task::yield_now().await; // yield to other tasks
+            tokio::task::coop::consume_budget().await;
 
             if !have_next {
                 break;

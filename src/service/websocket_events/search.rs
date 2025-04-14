@@ -40,7 +40,7 @@ use crate::{
             },
         },
     },
-    handler::http::request::websocket::session::send_message,
+    handler::http::request::ws_v2::session::send_message,
     service::{
         search::{
             self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
@@ -554,7 +554,7 @@ async fn process_delta(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
-        if let Some(is_cancelled) = search_registry_utils::is_cancelled(&trace_id) {
+        if let Some(is_cancelled) = search_registry_utils::is_cancelled(&trace_id).await {
             if is_cancelled {
                 // Search is cancelled, stop processing
                 return Ok(());
@@ -725,7 +725,7 @@ async fn send_cached_responses(
     curr_res_size: &mut i64,
     fallback_order_by_col: Option<String>,
 ) -> Result<(), Error> {
-    if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id) {
+    if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id).await {
         if is_cancelled {
             log::info!(
                 "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping cached response",
@@ -860,7 +860,7 @@ async fn do_partitioned_search(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
-        if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id) {
+        if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id).await {
             if is_cancelled {
                 log::info!(
                     "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping partitioned search",

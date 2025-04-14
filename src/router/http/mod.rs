@@ -19,7 +19,7 @@ use ::config::{
         cluster::{Role, RoleGroup},
         promql::RequestRangeQuery,
     },
-    router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
+    router::{INGESTER_ROUTES, is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
     utils::rand::get_rand_element,
 };
 use actix_web::{
@@ -32,7 +32,6 @@ pub use ws_v2::remove_querier_from_handler;
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
-mod ws;
 pub(crate) mod ws_v2;
 
 struct URLDetails {
@@ -156,8 +155,12 @@ async fn dispatch(
 
     // check if the request is a websocket request
     let path_columns: Vec<&str> = path.split('/').collect();
-    if path_columns.get(3).unwrap_or(&"").starts_with("ws") {
-        return proxy_ws(req, payload, new_url, start).await;
+    if *path_columns.get(3).unwrap_or(&"") == "ws"
+        && INGESTER_ROUTES
+            .iter()
+            .all(|ingest_route| !path.ends_with(ingest_route))
+    {
+        return proxy_ws(req, payload, start).await;
     }
 
     // check if the request need to be proxied by body
@@ -383,7 +386,6 @@ async fn proxy_querier_by_body(
 async fn proxy_ws(
     req: HttpRequest,
     payload: web::Payload,
-    new_url: URLDetails,
     start: std::time::Instant,
 ) -> actix_web::Result<HttpResponse, Error> {
     let cfg = get_config();
@@ -413,34 +415,11 @@ async fn proxy_ws(
                 }
             }
         } else {
-            // Use the legacy WebSocket proxy implementation
-            // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
-            let ws_url = match ws::convert_to_websocket_url(&new_url.full_url) {
-                Ok(url) => url,
-                Err(e) => {
-                    log::error!("Error converting URL to WebSocket: {:?}", e);
-                    return Ok(HttpResponse::BadRequest()
-                        .force_close()
-                        .body("Invalid WebSocket URL"));
-                }
-            };
-
-            match ws::ws_proxy(req, payload, &ws_url).await {
-                Ok(res) => {
-                    log::info!(
-                        "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
-                        ws_url,
-                        start.elapsed().as_millis()
-                    );
-                    Ok(res)
-                }
-                Err(e) => {
-                    log::error!("[WS_ROUTER] failed: {:?}", e);
-                    Ok(HttpResponse::InternalServerError()
-                        .force_close()
-                        .body("WebSocket proxy error"))
-                }
-            }
+            log::info!(
+                "[WS_ROUTER]: Node Role: {} Websocket is disabled",
+                cfg.common.node_role
+            );
+            Ok(HttpResponse::NotFound().body("WebSocket is disabled"))
         }
     } else {
         log::info!(

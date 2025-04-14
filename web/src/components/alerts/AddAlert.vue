@@ -1231,9 +1231,10 @@ export default defineComponent({
 
             if (res.data?.function_error) {
               vrlFunctionError.value = res.data.function_error;
+              let msg = vrlFunctionError.value || "Invalid VRL Function";
               q.notify({
                 type: "negative",
-                message: "Invalid VRL Function",
+                message: msg,
                 timeout: 3000,
               });
               reject("function_error");
@@ -1550,7 +1551,7 @@ export default defineComponent({
           callAlert
             .then((res: { data: any }) => {
               this.formData = { ...defaultValue };
-              this.$emit("update:list");
+              this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
               this.q.notify({

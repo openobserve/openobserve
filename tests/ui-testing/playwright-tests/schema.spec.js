@@ -199,6 +199,7 @@ test.describe("Schema testcases", () => {
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
+    await page.locator('[data-test="tab-allFields"]').click();
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-add-field-button"]').click();
