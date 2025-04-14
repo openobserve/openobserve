@@ -134,9 +134,9 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
         alertV2_page.create_scheduled_sql_alert_vrl_trigger(session, base_url, user_email, user_password, org_id, stream_name, destination_v2_webhook, folder_id, alert_v2_name_trigger)
 
 
-    # Created all objects successfully by admin user
+        # Created all objects successfully by admin user
 
-    # Create templates
+        # Create templates
 
         template_admin_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}admin"
         template_page.create_template_webhook(session, base_url, email_address_admin, "12345678", org_id, template_admin_webhook)
