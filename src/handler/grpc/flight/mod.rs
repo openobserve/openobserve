@@ -324,7 +324,7 @@ impl FlightSenderStream {
                 Ok(span_context)
             }
             None => Err(infra::errors::Error::Message(format!(
-                "Invalid trace id:{}",
+                "Invalid trace id: {}",
                 self.trace_id
             ))),
         }

@@ -74,7 +74,8 @@ pub(crate) mod datafusion;
 pub(crate) mod grpc;
 pub(crate) mod grpc_search;
 pub(crate) mod index;
-pub mod inspector;
+pub(crate) mod inspector;
+pub(crate) mod partition;
 pub(crate) mod request;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
@@ -122,7 +123,7 @@ pub async fn search(
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
-            ider::uuid()
+            ider::generate_trace_id()
         }
     } else {
         trace_id.to_string()
@@ -333,7 +334,7 @@ pub async fn search_multi(
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
-            ider::uuid()
+            ider::generate_trace_id()
         }
     } else {
         trace_id.to_string()
@@ -753,6 +754,7 @@ pub async fn search_partition(
         }
     }
 
+    // Calculate original step with all factors considered
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
     if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
@@ -765,12 +767,19 @@ pub async fn search_partition(
     if part_num > 1000 {
         part_num = 1000;
     }
+
+    // Calculate step with all constraints
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
     if step < min_step {
         step = min_step;
     }
+    // Align step with min_step to ensure partition boundaries match histogram intervals
     if min_step > 0 && step % min_step > 0 {
+        // If step is not perfectly divisible by min_step, round it down to the nearest multiple
+        // Example: If min_step = 5 minutes  and step = 17 minutes
+        //   step % min_step = 17 % 5 = 2 (2 minutes)
+        //   step = 17 - 2 = 15 (15 minutes, which is divisible by 5)
         step = step - step % min_step;
     }
     // this is to ensure we create partitions less than max_query_range
@@ -782,27 +791,17 @@ pub async fn search_partition(
         };
     }
 
-    // Generate partitions by DESC order
-    let mut partitions = Vec::with_capacity(part_num);
-    let mut end = req.end_time;
-    let mut last_partition_step = end % min_step;
-    let duration = req.end_time - req.start_time;
-    while end > req.start_time {
-        let mut start = max(end - step, req.start_time);
-        if last_partition_step > 0 && duration > min_step && part_num > 1 {
-            partitions.push([end - last_partition_step, end]);
-            start -= last_partition_step;
-            end -= last_partition_step;
-        } else {
-            start = max(start - last_partition_step, req.start_time);
-        }
-        partitions.push([start, end]);
-        end = start;
-        last_partition_step = 0;
-    }
-    if partitions.is_empty() {
-        partitions.push([req.start_time, req.end_time]);
-    }
+    let is_histogram = sql.histogram_interval.is_some();
+
+    // Create a partition generator
+    let generator = partition::PartitionGenerator::new(
+        min_step,
+        cfg.limit.search_mini_partition_duration_secs,
+        is_histogram,
+    );
+
+    // Generate partitions
+    let mut partitions = generator.generate_partitions(req.start_time, req.end_time, step);
 
     // We need to reverse partitions if query is ASC order
     if let Some((field, order_by)) = sql.order_by.first() {

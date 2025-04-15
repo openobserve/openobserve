@@ -717,6 +717,9 @@ async fn process_node(
             let min_ts = (Utc::now()
                 - chrono::Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
             .timestamp_micros();
+            let max_ts = (Utc::now()
+                + chrono::Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
+            .timestamp_micros();
             while let Some((_, mut record, flattened)) = receiver.recv().await {
                 // handle timestamp before sending to remote_write service
                 if !flattened {
@@ -741,7 +744,8 @@ async fn process_node(
                         }
                     };
                 }
-                if let Err(e) = crate::service::logs::ingest::handle_timestamp(&mut record, min_ts)
+                if let Err(e) =
+                    crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
                 {
                     let err_msg = format!("DestinationNode error handling timestamp: {}", e);
                     if let Err(send_err) = error_sender
