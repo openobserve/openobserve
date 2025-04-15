@@ -308,7 +308,7 @@ export default defineComponent({
             org_identifier: this.store.state.selectedOrganization.identifier,
           },
         });
-    } catch (e) {
+    } catch (e: any) {
       this.loading = false;
       this.freeLoading = false;
       this.proLoading = false;
