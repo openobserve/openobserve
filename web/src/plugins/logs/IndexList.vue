@@ -735,6 +735,16 @@ export default defineComponent({
         errMsg?: string;
       };
     }> = ref({});
+
+    // New state to store field values with stream context
+    const streamFieldValues: Ref<{
+      [key: string]: {
+        [stream: string]: {
+          values: { key: string; count: number }[];
+        };
+      };
+    }> = ref({});
+
     let parser: any;
 
     const streamTypes = [
@@ -1316,60 +1326,91 @@ export default defineComponent({
 
     const handleSearchResponse = (payload: any, response: any) => {
       console.log("handleSearchResponse");
-      fieldValues.value[payload.queryReq.fields[0]] = {
+      const fieldName = payload.queryReq.fields[0];
+      const streamName = payload.queryReq.stream_name;
+
+      // Initialize if not exists
+      if (!fieldValues.value[fieldName]) {
+        fieldValues.value[fieldName] = {
+          values: [],
+          isLoading: false,
+          errMsg: "",
+        };
+      }
+
+      // Initialize stream-specific values if not exists
+      if (!streamFieldValues.value[fieldName]) {
+        streamFieldValues.value[fieldName] = {};
+      }
+
+      streamFieldValues.value[fieldName][streamName] = {
         values: [],
-        isLoading: false,
-        errMsg: "",
       };
-      handleValuesData(
-        response.content.results.hits,
-        payload.queryReq.fields[0],
-      );
+
+      // Process the results
+      if (response.content.results.hits.length) {
+        // Store stream-specific values
+        const streamValues: { key: string; count: number }[] = [];
+
+        response.content.results.hits.forEach((item: any) => {
+          item.values.forEach((subItem: any) => {
+            streamValues.push({
+              key: subItem.zo_sql_key,
+              count: parseInt(subItem.zo_sql_num),
+            });
+          });
+        });
+
+        // Update stream-specific values
+        streamFieldValues.value[fieldName][streamName].values = streamValues;
+
+        // Aggregate values across all streams
+        const aggregatedValues: { [key: string]: number } = {};
+
+        // Collect all values from all streams
+        Object.keys(streamFieldValues.value[fieldName]).forEach((stream) => {
+          streamFieldValues.value[fieldName][stream].values.forEach((value) => {
+            if (aggregatedValues[value.key]) {
+              aggregatedValues[value.key] += value.count;
+            } else {
+              aggregatedValues[value.key] = value.count;
+            }
+          });
+        });
+
+        // Convert aggregated values to array and sort
+        const aggregatedArray = Object.keys(aggregatedValues).map((key) => ({
+          key,
+          count: aggregatedValues[key],
+        }));
+
+        // Sort by count in descending order
+        aggregatedArray.sort((a, b) => b.count - a.count);
+
+        // Take top 10
+        fieldValues.value[fieldName].values = aggregatedArray.slice(0, 10);
+      }
+
+      // Mark as not loading
+      fieldValues.value[fieldName].isLoading = false;
     };
 
     const handleSearchReset = (data: any) => {
-      fieldValues.value[data.payload.queryReq.fields[0]] = {
+      const fieldName = data.payload.queryReq.fields[0];
+
+      // Reset the main fieldValues state
+      fieldValues.value[fieldName] = {
         values: [],
         isLoading: true,
         errMsg: "",
       };
 
-      fetchValuesWithWebsocket(data.payload.queryReq);
-    };
-
-    const handleValuesData = (data: any, name: string) => {
-      if (data.length) {
-        data.forEach((item: any) => {
-          item.values.forEach((subItem: any) => {
-            if (fieldValues.value[name]["values"].length) {
-              let index = fieldValues.value[name]["values"].findIndex(
-                (value: any) => value.key == subItem.zo_sql_key,
-              );
-              if (index != -1) {
-                fieldValues.value[name]["values"][index].count =
-                  parseInt(subItem.zo_sql_num) +
-                  fieldValues.value[name]["values"][index].count;
-              } else {
-                fieldValues.value[name]["values"].push({
-                  key: subItem.zo_sql_key,
-                  count: subItem.zo_sql_num,
-                });
-              }
-            } else {
-              fieldValues.value[name]["values"].push({
-                key: subItem.zo_sql_key,
-                count: subItem.zo_sql_num,
-              });
-            }
-          });
-        });
-        if (fieldValues.value[name]["values"].length > 10) {
-          fieldValues.value[name]["values"].sort((a, b) => b.count - a.count); // Sort the array based on count in descending order
-          fieldValues.value[name]["values"] = fieldValues.value[name][
-            "values"
-          ].slice(0, 10); // Return the first 10 elements
-        }
+      // Reset the streamFieldValues state for this field
+      if (streamFieldValues.value[fieldName]) {
+        streamFieldValues.value[fieldName] = {};
       }
+
+      fetchValuesWithWebsocket(data.payload.queryReq);
     };
 
     return {
