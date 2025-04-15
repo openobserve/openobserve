@@ -62,6 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         color="secondary"
         padding="sm xl"
         no-caps
+        :loading="isPipelineSaving"
+        :disable="isPipelineSaving"
         @click="savePipeline"
       />
     </div>
@@ -384,6 +386,8 @@ const isFetchingFunctions = ref(false);
 
 const chartContainerRef = ref(null);
 
+const isPipelineSaving = ref(false);
+
 const nodeRows = ref<(string | null)[]>([]);
 
 const q = useQuasar();
@@ -660,7 +664,9 @@ const validatePipeline = () => {
 };
 
 const onSubmitPipeline = async () => {
+  isPipelineSaving.value = true;
   if(!validatePipeline()){
+    isPipelineSaving.value = false;
     return;
   }
   const dismiss = q.notify({
@@ -724,6 +730,7 @@ const onSubmitPipeline = async () => {
       }
     })
     .finally(() => {
+      isPipelineSaving.value = false;
       dismiss();
     });
 };

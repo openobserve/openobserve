@@ -101,7 +101,7 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
         id += 1;
         #[cfg(feature = "cloud")]
         let org_subscription: i32 =
-            cloud_billings::get_org_subscription_type(&org.identifier.as_str(), user_id)
+            cloud_billings::get_org_subscription_type(org.identifier.as_str(), user_id)
                 .await
                 .map(|sub_type| sub_type as i32)
                 .unwrap_or_default();

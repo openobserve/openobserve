@@ -111,6 +111,7 @@ impl QueryConditionExt for QueryCondition {
             end_time,
             ..Default::default()
         };
+        let trace_id = ider::generate_trace_id();
         let sql = match self.query_type {
             QueryType::Custom => {
                 let (Some(stream_name), Some(v)) = (stream_name, self.conditions.as_ref()) else {
@@ -167,7 +168,7 @@ impl QueryConditionExt for QueryCondition {
                     query_exemplars: false,
                     no_cache: None,
                 };
-                let resp = match promql::search::search("", org_id, &req, "", 0).await {
+                let resp = match promql::search::search(&trace_id, org_id, &req, "", 0).await {
                     Ok(v) => v,
                     Err(_) => {
                         return Ok(eval_results);
@@ -247,7 +248,6 @@ impl QueryConditionExt for QueryCondition {
         } else {
             std::cmp::max(100, trigger_condition.threshold)
         };
-        let trace_id = ider::uuid();
 
         let req_start = std::time::Instant::now();
         let resp = if self.multi_time_range.is_some()
@@ -340,7 +340,16 @@ impl QueryConditionExt for QueryCondition {
                 "evaluate_scheduled begin to call SearchService::search_multi, {:?}",
                 req
             );
-            SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
+            SearchService::grpc_search::grpc_search_multi(
+                &trace_id,
+                org_id,
+                stream_type,
+                None,
+                &req,
+                Some(RoleGroup::Background),
+            )
+            .await
+            // SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
         } else {
             // fire the query
             let req = config::meta::search::Request {

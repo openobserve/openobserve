@@ -26,6 +26,9 @@ use object_store::{
 
 use crate::storage::{CONCURRENT_REQUESTS, format_key};
 
+// test only
+const TEST_FILE: &str = "o2_test/check.txt";
+
 pub struct Remote {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
 }
@@ -124,7 +127,9 @@ impl ObjectStore for Remote {
             .get(&(format_key(&file, true).into()))
             .await
             .map_err(|e| {
-                log::error!("[STORAGE] get remote file: {}, error: {:?}", file, e);
+                if file.ne(TEST_FILE) {
+                    log::error!("[STORAGE] get remote file: {}, error: {:?}", file, e);
+                }
                 e
             })?;
 
@@ -366,4 +371,21 @@ fn init_client() -> Box<dyn object_store::ObjectStore> {
             }
         },
     }
+}
+
+pub async fn test_config() -> Result<(), anyhow::Error> {
+    // Test download
+    if let Err(e) = super::get(TEST_FILE).await {
+        if matches!(e, object_store::Error::NotFound { .. }) {
+            let test_content = Bytes::from("Hello, S3!");
+            // Test upload
+            if let Err(e) = super::put(TEST_FILE, test_content).await {
+                return Err(anyhow::anyhow!("S3 upload test failed: {:?}", e));
+            }
+        } else {
+            return Err(anyhow::anyhow!("S3 download test failed: {:?}", e));
+        }
+    }
+
+    Ok(())
 }

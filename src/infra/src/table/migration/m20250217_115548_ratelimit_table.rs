@@ -13,6 +13,20 @@ impl MigrationTrait for Migration {
             .create_table(create_ratelimit_table_statement())
             .await?;
 
+        let index_exists = manager
+            .has_index(RateLimitRules::Table.to_string().as_str(), RESOURCE_KEY)
+            .await?;
+        if index_exists {
+            manager
+                .drop_index(
+                    Index::drop()
+                        .name(RESOURCE_KEY)
+                        .table(RateLimitRules::Table)
+                        .to_owned(),
+                )
+                .await?;
+        }
+
         match manager.get_database_backend() {
             DbBackend::MySql => {
                 manager

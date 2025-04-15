@@ -1624,10 +1624,25 @@ pub fn get_alert_start_end_time(
     }
     (alert_start_time, alert_end_time)
 }
-
 fn format_variable_value(val: String) -> String {
     val.chars()
-        .flat_map(|c| c.escape_default())
+        .map(|c| match c {
+            '\'' => "\\\\'".to_string(),
+            '"' => "\\\"".to_string(),
+            '\\' => "\\\\".to_string(),
+            '\n' => "\\n".to_string(),
+            '\r' => "\\r".to_string(),
+            '\t' => "\\t".to_string(),
+            '\0' => "\\u{0}".to_string(),
+            '\x1b' => "\\u{1b}".to_string(),
+            '\x08' => "\\u{8}".to_string(),
+            '\x0c' => "\\u{c}".to_string(),
+            '\x0b' => "\\u{b}".to_string(),
+            '\x01' => "\\u{1}".to_string(),
+            '\x02' => "\\u{2}".to_string(),
+            '\x1f' => "\\u{1f}".to_string(),
+            _ => c.to_string(),
+        })
         .collect::<String>()
 }
 
@@ -1798,6 +1813,12 @@ mod tests {
         assert_eq!(
             format_variable_value("Hello World".to_string()),
             "Hello World"
+        );
+
+        // Test emoji
+        assert_eq!(
+            format_variable_value("你好世界セメント한국어atīna👍".to_string()),
+            "你好世界セメント한국어atīna👍"
         );
     }
 

@@ -13,6 +13,7 @@ service Search {
     rpc CancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
     rpc ClusterCancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
     rpc Search(SearchRequest) returns (SearchResponse) {}
+    rpc SearchMulti(SearchRequest) returns (SearchResponse) {}
     rpc SearchPartition(SearchPartitionRequest) returns (SearchPartitionResponse) {}
     rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
     rpc DeleteResult(DeleteResultRequest) returns (DeleteResultResponse) {}
