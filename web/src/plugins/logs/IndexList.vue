@@ -254,6 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @before-show="
                   (event: any) => openFilterCreator(event, props.row)
                 "
+                @before-hide="(event: any) => cancelTraceId(props.row.name)"
               >
                 <template v-slot:header>
                   <div
@@ -712,8 +713,13 @@ export default defineComponent({
       extractValueQuery,
     } = useLogs();
 
-    const { fetchQueryDataWithWebSocket, sendSearchMessageBasedOnRequestId } =
-      useSearchWebSocket();
+    const {
+      fetchQueryDataWithWebSocket,
+      sendSearchMessageBasedOnRequestId,
+      cancelSearchQueryBasedOnRequestId,
+    } = useSearchWebSocket();
+
+    const traceIdMapper = ref({});
 
     const userDefinedSchemaBtnGroupOption = [
       {
@@ -1255,6 +1261,8 @@ export default defineComponent({
         org_id: searchObj.organizationIdentifier,
       };
       initializeWebSocketConnection(wsPayload);
+
+      addTraceId(payload.fields[0], wsPayload.traceId);
     };
 
     const initializeWebSocketConnection = (payload: any): string => {
@@ -1268,7 +1276,6 @@ export default defineComponent({
     };
 
     const sendSearchMessage = (queryReq: any) => {
-      console.log("sendSearchMessage");
       const payload = {
         type: "values",
         content: {
@@ -1290,7 +1297,6 @@ export default defineComponent({
       }
 
       sendSearchMessageBasedOnRequestId(payload);
-      console.log(payload);
     };
 
     const handleSearchClose = (payload: any, response: any) => {
@@ -1314,6 +1320,8 @@ export default defineComponent({
           type: "error",
         });
       }
+
+      removeTraceId(payload.queryReq.fields[0], payload.traceId);
     };
 
     const handleSearchError = (request: any, err: any) => {
@@ -1322,10 +1330,16 @@ export default defineComponent({
         fieldValues.value[request.queryReq.fields[0]].errMsg =
           "Failed to fetch field values";
       }
+
+      removeTraceId(request.queryReq.fields[0], request.content.trace_id);
     };
 
     const handleSearchResponse = (payload: any, response: any) => {
-      console.log("handleSearchResponse");
+      if (response.type === "cancel_response") {
+        removeTraceId(payload.queryReq.fields[0], response.content.trace_id);
+        return;
+      }
+
       const fieldName = payload.queryReq.fields[0];
       const streamName = payload.queryReq.stream_name;
 
@@ -1413,6 +1427,34 @@ export default defineComponent({
       fetchValuesWithWebsocket(data.payload.queryReq);
     };
 
+    const addTraceId = (field: string, traceId: string) => {
+      if (!traceIdMapper.value[field]) {
+        traceIdMapper.value[field] = [];
+      }
+
+      traceIdMapper.value[field].push(traceId);
+    };
+
+    const removeTraceId = (field: string, traceId: string) => {
+      if (traceIdMapper.value[field]) {
+        traceIdMapper.value[field] = traceIdMapper.value[field].filter(
+          (id) => id !== traceId,
+        );
+      }
+    };
+
+    const cancelTraceId = (field: string) => {
+      const traceIds = traceIdMapper.value[field];
+      if (traceIds) {
+        traceIds.forEach((traceId) => {
+          cancelSearchQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
+        });
+      }
+    };
+
     return {
       t,
       store,
@@ -1483,6 +1525,7 @@ export default defineComponent({
       formatLargeNumber,
       sortedStreamFields,
       placeHolderText,
+      cancelTraceId,
     };
   },
 });
