@@ -357,6 +357,14 @@ pub async fn update_stream_settings(
                 settings.data_retention = data_retention;
             }
 
+            if let Some(index_original_data) = new_settings.index_original_data {
+                settings.index_original_data = index_original_data;
+            }
+
+            if let Some(index_all_values) = new_settings.index_all_values {
+                settings.index_all_values = index_all_values;
+            }
+
             // check for user defined schema
             if !new_settings.defined_schema_fields.add.is_empty() {
                 if !cfg.common.allow_user_defined_schemas {
