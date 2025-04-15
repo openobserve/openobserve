@@ -296,7 +296,7 @@ pub async fn search(
                 .search_role("follower".to_string())
                 .duration(cache_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "load files {}, memory cached {}, disk cached {}, {download_msg}, scan_size {}, compressed_size {}",
+                    "load files {}, memory cached {}, disk cached {}, scan_size {}, compressed_size {}",
                     scan_stats.querier_files,
                     scan_stats.querier_memory_cached_files,
                     scan_stats.querier_disk_cached_files,
@@ -545,7 +545,7 @@ pub async fn filter_file_list_by_tantivy_index(
                 .component("tantivy load files".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .desc(format!("load tantivy index files {}, memory cached {}, disk cached {}, {download_msg}", scan_stats.querier_files,
+                .desc(format!("load tantivy index files {}, memory cached {}, disk cached {}", scan_stats.querier_files,
                 scan_stats.querier_memory_cached_files,
                 scan_stats.querier_disk_cached_files,
                 ))
