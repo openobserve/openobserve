@@ -59,7 +59,6 @@ use crate::{
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
         ("trace_id" = Option<String>, Query, description = "trace_id, eg: trace_id=684a4e5dac43429a86a0a2ef9adf62c2"),
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
@@ -85,15 +84,15 @@ use crate::{
         (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/{stream_name}/search/profile")]
+#[get("/{org_id}/search/profile")]
 pub async fn get_search_profile(
-    path: web::Path<(String, String)>,
+    path: web::Path<String>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, stream_name) = (path.into_inner(), "default".to_string());
     let mut range_error = String::new();
     let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
         tracing::info_span!(
