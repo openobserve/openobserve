@@ -1134,6 +1134,10 @@ const useLogs = () => {
     return parsedSQL?.distinct?.type === "DISTINCT";
   };
 
+  const isWithQuery = (parsedSQL: any = null) => {
+    return parsedSQL?.with && parsedSQL?.with?.length > 0;
+  };
+
   const getQueryPartitions = async (queryReq: any) => {
     try {
       // const queryReq = buildSearch();
@@ -1410,7 +1414,7 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
-              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL) && !isDistinctQuery(parsedSQL)))) ||
+              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL) && !isDistinctQuery(parsedSQL) && !isWithQuery(parsedSQL)))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
@@ -1812,7 +1816,7 @@ const useLogs = () => {
           resetHistogramWithError(
             "Histogram is not available for limit queries.",
           );
-        } else if (searchObj.meta.sqlMode && isDistinctQuery(parsedSQL)) {
+        } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
           let aggFlag = false;
           if (parsedSQL) {
             aggFlag = hasAggregation(parsedSQL?.columns);
@@ -1829,10 +1833,19 @@ const useLogs = () => {
               searchObjDebug["pagecountEndTime"] = performance.now();
             }, 0);
           }
-          resetHistogramWithError(
-            "Histogram is not available for DISTINCT queries.",
-          );
-        } else {
+          if(isWithQuery(parsedSQL)){
+            resetHistogramWithError(
+              "Histogram is not available for WITH queries.",
+            );
+          }
+          else{
+            console.log('here it is')
+            resetHistogramWithError(
+              "Histogram is not available for DISTINCT queries.",
+            );
+          }
+        } 
+        else {
           let aggFlag = false;
           if (parsedSQL) {
             aggFlag = hasAggregation(parsedSQL?.columns);
@@ -2295,7 +2308,7 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        if (isDistinctQuery(parsedSQL)) {
+        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
           delete queryReq.query.track_total_hits;
         }
       }
@@ -4905,7 +4918,7 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        if (isDistinctQuery(parsedSQL)) {
+        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
           delete queryReq.query.track_total_hits;
         }
       }
@@ -5470,7 +5483,7 @@ const useLogs = () => {
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
-    } else if (searchObj.meta.sqlMode && isDistinctQuery(parsedSQL)) {
+    } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
       let aggFlag = false;
       if (parsedSQL) {
         aggFlag = hasAggregation(parsedSQL?.columns);
@@ -5486,9 +5499,17 @@ const useLogs = () => {
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
       }
-      resetHistogramWithError(
-        "Histogram is not available for DISTINCT queries.",
-      );
+      if(isWithQuery(parsedSQL)){
+        resetHistogramWithError(
+          "Histogram is not available for WITH queries.",
+        );
+      }
+      else{
+        console.log('here it is 2')
+        resetHistogramWithError(
+          "Histogram is not available for DISTINCT queries.",
+        );
+      }
     } else {
       let aggFlag = false;
       if (parsedSQL) {
@@ -5523,7 +5544,7 @@ const useLogs = () => {
   function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
     return !(
       searchObj.meta.sqlMode &&
-      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL))
+      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))
     );
   }
 
