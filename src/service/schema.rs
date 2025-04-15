@@ -345,6 +345,7 @@ async fn handle_diff_schema(
             field_name == TIMESTAMP_COL_NAME
                 || field_name == ID_COL_NAME
                 || field_name == ORIGINAL_DATA_COL_NAME
+                || field_name == ALL_VALUES_COL_NAME
                 || field_name == cfg.common.column_all
         };
 
