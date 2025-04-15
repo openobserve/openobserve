@@ -57,11 +57,6 @@ impl SearchInspectorFieldsBuilder {
         }
     }
 
-    pub fn timestamp(mut self, value: String) -> Self {
-        self.fields.timestamp = Some(value);
-        self
-    }
-
     pub fn node_role(mut self, role: Vec<Role>) -> Self {
         self.fields.node_role = Some(role);
         self
