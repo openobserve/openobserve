@@ -86,7 +86,9 @@ impl ResponseRouter {
     pub async fn flush(&self, querier_name: &QuerierName, force_remove: bool) {
         let mut count = 0;
         let mut write_guard = self.routes.write().await;
-        for (trace_id, sender) in write_guard.drain() {
+        let removed = write_guard.drain().collect::<Vec<_>>();
+        drop(write_guard);
+        for (trace_id, sender) in removed.into_iter() {
             // Send error response to client
             let _ = sender
                 .send(WsServerEvents::Error {
@@ -107,7 +109,6 @@ impl ResponseRouter {
             );
             count += 1;
         }
-        drop(write_guard);
         log::info!(
             "[WS::QuerierConnection::ResponseRouter] flushed {count} routes for querier: {}, force_remove: {}",
             querier_name,
@@ -371,7 +372,7 @@ impl ResponseRouter {
             let mut write_guard = self.routes.write().await;
             write_guard.retain(|trace_id, response_tx| {
                 if response_tx.is_closed() {
-                    log::debug!("[WS::QuerierConnection] channel closed for trace_id {trace_id}. Removed from routes");
+                    log::info!("[WS::QuerierConnection] channel closed for trace_id {trace_id}. Removed from routes");
                     false
                 } else {
                     true
@@ -402,6 +403,7 @@ impl ResponseRouter {
                     );
                     let mut write_guard = self.routes.write().await;
                     write_guard.remove(&trace_id);
+                    write_guard.shrink_to_fit();
                     drop(write_guard);
                     return Err(WsError::ResponseChannelClosed(trace_id.clone()));
                 }

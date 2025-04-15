@@ -327,11 +327,15 @@ impl WsHandler {
                                     if let Err(e) = ws_session.pong(&ping).await {
                                         log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
                                          // cleanup
-                                         if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Close(Some(CloseReason::from(CloseCode::Normal))))).await {
-                                             log::error!(
-                                                 "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, error: {}", client_id, e
-                                             );
-                                         }
+                                        //  if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Close(Some(CloseReason::from(CloseCode::Normal))))).await {
+                                        //      log::error!(
+                                        //          "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, error: {}", client_id, e
+                                        //      );
+                                        //  }
+                                        if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Normal))).await {
+                                            log::error!("[WS::Router::Handler]: Error closing websocket session client_id: {}, error: {}", client_id, e);
+                                        };
+                                        return Ok(());
                                     }
                                 }
                                 WsServerEvents::Pong(pong) => {
@@ -509,7 +513,7 @@ impl WsHandler {
                                 }
                                 Some(DisconnectMessage::Close(close_reason)) => {
                                     if let Err(e) = ws_session.close(close_reason).await {
-                                        log::error!("[WS::Router::Handler]: Error closing websocket session session_id: {}, error: {}", client_id, e);
+                                        log::error!("[WS::Router::Handler]: Error closing websocket session client_id: {}, error: {}", client_id, e);
                                     };
                                     return Ok(());
                                 }
