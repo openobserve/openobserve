@@ -20,6 +20,7 @@ use config::{
     meta::stream::{FileKey, FileMeta},
 };
 use dashmap::{DashMap, DashSet};
+use hashbrown::HashMap;
 use infra::errors::Result;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
@@ -27,6 +28,8 @@ use o2_enterprise::enterprise::{
     super_cluster::stream::client::super_cluster_cache_stats,
 };
 use once_cell::sync::Lazy;
+
+use crate::service;
 
 pub mod broadcast;
 pub mod local;
@@ -134,10 +137,27 @@ async fn single_cache_stats() -> Result<()> {
     for org_id in orgs {
         let ret = infra::file_list::get_stream_stats(&org_id, None, None).await;
         if ret.is_err() {
-            log::error!("Load stream stats error: {}", ret.err().unwrap());
+            log::error!("Load stream stats from db  error: {}", ret.err().unwrap());
             continue;
         }
+        let dumped_stats = service::file_list_dump::stats(&org_id, None, None, None, false).await;
+
+        if dumped_stats.is_err() {
+            log::error!(
+                "Load stream stats from file_list dump error: {}",
+                ret.err().unwrap()
+            );
+            continue;
+        }
+        let mut stream_stats = HashMap::new();
         for (stream, stats) in ret.unwrap() {
+            stream_stats.insert(stream, stats);
+        }
+        for (stream, stats) in dumped_stats.unwrap() {
+            let entry = stream_stats.entry(stream).or_insert(Default::default());
+            *entry = &*entry + &stats;
+        }
+        for (stream, stats) in stream_stats {
             let columns = stream.split('/').collect::<Vec<&str>>();
             let org_id = columns[0];
             let stream_type = columns[1];
