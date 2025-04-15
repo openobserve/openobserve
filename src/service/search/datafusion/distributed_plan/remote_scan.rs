@@ -53,7 +53,7 @@ use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
 };
-
+use config::utils::size::bytes_to_human_readable;
 use super::{
     codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
     node::RemoteScanNode,
@@ -537,7 +537,7 @@ impl FlightStream {
                         .desc(format!(
                             "remote scan search files: {}, scan_size: {} mb, num_rows: {}",
                             self.files,
-                            self.scan_size / 1024 / 1024,
+                            bytes_to_human_readable(self.scan_size as f64),
                             self.num_rows
                         ))
                         .build(),
