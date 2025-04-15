@@ -418,10 +418,10 @@ pub async fn search_memtable(
                 .component("wal:memtable load took".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .desc(format!("wal mem search load groups {}, files {}, scan_size {}, compressed_size {}, took {} ms", batch_groups.len(),
+                .desc(format!("wal mem search load groups {}, files {}, scan_size {}, compressed_size {}", batch_groups.len(),
                 scan_stats.files,
                 scan_stats.original_size,
-                scan_stats.compressed_size, start.elapsed().as_millis()))
+                scan_stats.compressed_size))
                 .build()
         )
     );

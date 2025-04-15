@@ -543,10 +543,10 @@ pub async fn filter_file_list_by_tantivy_index(
                 .component("tantivy load files".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .desc(format!("load tantivy index files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms ", scan_stats.querier_files,
+                .desc(format!("load tantivy index files {}, memory cached {}, disk cached {}, {download_msg}", scan_stats.querier_files,
                 scan_stats.querier_memory_cached_files,
                 scan_stats.querier_disk_cached_files,
-                start.elapsed().as_millis()))
+                ))
                 .build()
         )
     );
@@ -747,11 +747,10 @@ pub async fn filter_file_list_by_tantivy_index(
                 .search_role("follower".to_string())
                 .duration(search_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "found {} rows, is_add_filter_back: {}, file_num: {}, took: {} ms",
+                    "found {} rows, is_add_filter_back: {}, file_num: {}",
                     total_hits,
                     is_add_filter_back,
                     file_list_map.len(),
-                    search_start.elapsed().as_millis()
                 ))
                 .build()
         )
