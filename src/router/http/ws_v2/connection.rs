@@ -394,23 +394,19 @@ impl ResponseRouter {
         match sender {
             None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
             Some(resp_sender) => {
-                if !resp_sender.is_closed() {
-                    resp_sender
-                        .send(message)
-                        .await
-                        .map_err(|_| WsError::ResponseChannelClosed(trace_id.clone()))?;
-                    log::info!(
-                        "[WS::Router::QuerierConnection] router sent message to router-client task for trace_id: {}",
-                        trace_id
-                    );
-                } else {
+                if let Err(e) = resp_sender.send(message).await {
                     log::error!(
-                        "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {} is closed",
-                        trace_id
+                        "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {} error: {}",
+                        trace_id,
+                        e
                     );
+                    let mut write_guard = self.routes.write().await;
+                    write_guard.remove(&trace_id);
+                    drop(write_guard);
+                    // TODO: notify `Router-Client` task to ask the client to retry for that
+                    // trace_id
                     return Err(WsError::ResponseChannelClosed(trace_id.clone()));
                 }
-
                 Ok(())
             }
         }
