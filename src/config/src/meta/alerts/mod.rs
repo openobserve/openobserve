@@ -508,6 +508,9 @@ mod tests {
 
         // The next trigger should be aligned to the previous 5-minute boundary
         // If current time is 11:03:00, the next trigger should be at 11:05:00
+        let now = Utc::now();
+        let expected = now + Duration::minutes(6);
+        assert!(dt < expected);
         assert_eq!(dt.minute() % 5, 0);
         assert_eq!(dt.second(), 0);
 
