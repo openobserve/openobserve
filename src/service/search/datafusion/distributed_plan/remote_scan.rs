@@ -520,7 +520,7 @@ impl FlightStream {
                     SearchInspectorFieldsBuilder::new()
                         .node_role(LOCAL_NODE.role.clone())
                         .node_name(self.node_name.clone())
-                        .component("remote scan drop".to_string())
+                        .component("remote scan end".to_string())
                         .search_role("follower".to_string())
                         .duration(self.start.elapsed().as_millis() as usize)
                         .desc(format!(
