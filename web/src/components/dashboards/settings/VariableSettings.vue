@@ -236,7 +236,6 @@ export default defineComponent({
     const { t } = useI18n();
     const route = useRoute();
     const isAddVariable = ref(false);
-
     const dashboardVariableData: any = reactive({
       data: {},
     });
@@ -457,7 +456,7 @@ export default defineComponent({
 
 .variables-list-header {
   display: grid;
-  grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 120px;
+  grid-template-columns: 48px 80px minmax(150px, 1fr) 150px 120px 120px;
   padding: 8px 0;
   font-weight: 900;
   border-bottom: 1px solid #cccccc70;
