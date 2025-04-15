@@ -405,7 +405,7 @@ impl ResponseRouter {
                     );
                 } else {
                     log::error!(
-                        "[WS::Router::QuerierConnection] router-client task for trace_id: {} is closed",
+                        "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {} is closed",
                         trace_id
                     );
                     return Err(WsError::ResponseChannelClosed(trace_id.clone()));
