@@ -421,8 +421,8 @@ pub async fn search_memtable(
                 .duration(start.elapsed().as_millis() as usize)
                 .desc(format!("wal mem search load groups {}, files {}, scan_size {}, compressed_size {}", batch_groups.len(),
                 scan_stats.files,
-                scan_stats.original_size,
-                scan_stats.compressed_size))
+                bytes_to_human_readable(scan_stats.original_size as f64),
+                bytes_to_human_readable(scan_stats.compressed_size as f64)))
                 .build()
         )
     );
