@@ -403,8 +403,6 @@ impl ResponseRouter {
                     let mut write_guard = self.routes.write().await;
                     write_guard.remove(&trace_id);
                     drop(write_guard);
-                    // TODO: notify `Router-Client` task to ask the client to retry for that
-                    // trace_id
                     return Err(WsError::ResponseChannelClosed(trace_id.clone()));
                 }
                 Ok(())
