@@ -140,10 +140,12 @@ pub async fn run(
     req_id: String,
     path: String,
 ) {
+    let cfg = get_config();
     log::info!(
-        "[WS_HANDLER]: Starting WebSocket session for req_id: {}, path: {}",
+        "[WS_HANDLER]: Starting WebSocket session for req_id: {}, path: {}, querier: {}",
         req_id,
-        path
+        path,
+        cfg.common.instance_name
     );
 
     let mut ping_interval = tokio::time::interval(Duration::from_secs(
@@ -159,7 +161,7 @@ pub async fn run(
                     let mut session = session.write().await;
                     session.update_activity();
                     if !session.is_client_cookie_valid() {
-                        log::error!("[WS_HANDLER]: Session cookie expired for req_id: {}", req_id);
+                        log::error!("[WS_HANDLER]: Session cookie expired for req_id: {}, querier: {}", req_id, cfg.common.instance_name);
                         drop(session);
                         break;
                     }
@@ -169,15 +171,17 @@ pub async fn run(
                 match msg {
                     Ok(actix_ws::AggregatedMessage::Ping(bytes)) => {
                         log::debug!(
-                            "[WS_HANDLER]: Received ping from client for req_id: {}",
-                            req_id
+                            "[WS_HANDLER]: Received ping from client for req_id: {}, querier: {}",
+                            req_id,
+                            cfg.common.instance_name
                         );
                         if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
                             let mut session = session.write().await;
                             if let Err(e) = session.pong(&bytes).await {
                                 log::error!(
-                                    "[WS_HANDLER]: Failed to send pong to client for req_id: {}, error: {}",
+                                    "[WS_HANDLER]: Failed to send pong to client for req_id: {}, querier: {}, error: {}",
                                     req_id,
+                                    cfg.common.instance_name,
                                     e
                                 );
                                 drop(session);
@@ -185,20 +189,22 @@ pub async fn run(
                             }
                             drop(session);
                         } else {
-                            log::error!("[WS_HANDLER]: Session not found for ping response");
+                            log::error!("[WS_HANDLER]: Session not found for ping response, req_id: {}, querier: {}", req_id, cfg.common.instance_name);
                             break;
                         }
                     }
                     Ok(actix_ws::AggregatedMessage::Pong(_)) => {
                         log::debug!(
-                            "[WS_HANDLER]: Received pong from client for req_id: {}",
-                            req_id
+                            "[WS_HANDLER]: Received pong from client for req_id: {}, querier: {}",
+                            req_id,
+                            cfg.common.instance_name
                         );
                     }
                     Ok(actix_ws::AggregatedMessage::Text(msg)) => {
-                        log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received message: {}",
+                        log::info!("[WS_HANDLER]: Request Id: {} Node Role: {}, querier: {}, Received message: {}",
                             req_id,
-                            get_config().common.node_role,
+                            cfg.common.node_role,
+                            cfg.common.instance_name,
                             msg
                         );
                         handle_text_message(&user_id, &req_id, msg.to_string(), path.clone()).await;
@@ -235,14 +241,16 @@ pub async fn run(
             _ = ping_interval.tick() => {
                 if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
                     log::debug!(
-                        "[WS_HANDLER]: Sending heartbeat ping to client for req_id: {}",
-                        req_id
+                        "[WS_HANDLER]: Sending heartbeat ping to client for req_id: {}, querier: {}",
+                        req_id,
+                        cfg.common.instance_name
                     );
                     let mut session = session.write().await;
                     if let Err(e) = session.ping(&[]).await {
                         log::error!(
-                            "[WS_HANDLER]: Failed to send ping to client for req_id: {}, error: {}. Connection will be closed.",
+                            "[WS_HANDLER]: Failed to send ping to client for req_id: {}, querier: {}, error: {}. Connection will be closed.",
                             req_id,
+                            cfg.common.instance_name,
                             e
                         );
                         drop(session);
@@ -251,8 +259,9 @@ pub async fn run(
                     drop(session);
                 } else {
                     log::warn!(
-                        "[WS_HANDLER]: Session not found for req_id: {} during heartbeat. Connection will be closed.",
-                        req_id
+                        "[WS_HANDLER]: Session not found for req_id: {}, querier: {} during heartbeat. Connection will be closed.",
+                        req_id,
+                        cfg.common.instance_name
                     );
                     break;
                 }
@@ -532,17 +541,20 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
 }
 
 async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
+    let cfg = get_config();
     log::info!(
-        "[WS_HANDLER]: Beginning cleanup for req_id: {}, close_reason: {:?}",
+        "[WS_HANDLER]: Beginning cleanup for req_id: {}, close_reason: {:?}, querier: {}",
         req_id,
-        close_reason
+        close_reason,
+        cfg.common.instance_name
     );
 
     if let Some(session) = sessions_cache_utils::get_session(req_id).await {
         if let Some(reason) = close_reason.as_ref() {
             log::info!(
-                "[WS_HANDLER]: req_id: {} Closing session with reason: {:?}",
+                "[WS_HANDLER]: req_id: {}, querier: {}, Closing session with reason: {:?}",
                 req_id,
+                cfg.common.instance_name,
                 reason
             );
         }
@@ -551,8 +563,9 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
         // Attempt to close the session
         if let Err(e) = session.close(close_reason).await {
             log::error!(
-                "[WS_HANDLER]: req_id: {} Failed to close session gracefully: {:?}",
+                "[WS_HANDLER]: req_id: {}, querier: {}, Failed to close session gracefully: {:?}",
                 req_id,
+                cfg.common.instance_name,
                 e
             );
         }
@@ -562,8 +575,9 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
     // Remove the session from the cache
     sessions_cache_utils::remove_session(req_id).await;
     log::info!(
-        "[WS_HANDLER]: req_id: {} Session cleanup completed. Remaining sessions: {}",
+        "[WS_HANDLER]: req_id: {}, querier: {}, Session cleanup completed. Remaining sessions: {}",
         req_id,
+        cfg.common.instance_name,
         sessions_cache_utils::len_sessions().await
     );
 }

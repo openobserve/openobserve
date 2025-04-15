@@ -229,6 +229,11 @@ pub mod sessions_cache_utils {
         let mut w = WS_SESSIONS.write().await;
         w.insert(session_id.to_string(), session);
         drop(w);
+        log::info!(
+            "[WS::SessionCache] inserted session: {}, querier: {}",
+            session_id,
+            get_config().common.instance_name
+        );
     }
 
     /// Remove a session from the cache
@@ -236,6 +241,11 @@ pub mod sessions_cache_utils {
         let mut w = WS_SESSIONS.write().await;
         w.remove(session_id);
         drop(w);
+        log::info!(
+            "[WS::SessionCache] removed session: {}, querier: {}",
+            session_id,
+            get_config().common.instance_name
+        );
     }
 
     // Return a mutable reference to the session
