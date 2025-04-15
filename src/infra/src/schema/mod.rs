@@ -282,7 +282,8 @@ pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<S
             fields.extend(default_fields);
             if settings.index_original_data {
                 fields.push(ORIGINAL_DATA_COL_NAME.to_string());
-            } else if settings.index_all_values {
+            }
+            if settings.index_all_values {
                 fields.push(ALL_VALUES_COL_NAME.to_string());
             }
             fields.sort();
