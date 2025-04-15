@@ -89,13 +89,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           :data="
             panelSchema.queryType === 'promql' ||
-            (data.length &&
-              data[0]?.length &&
-              panelData.chartType != 'geomap' &&
+            (panelData.chartType != 'geomap' &&
               panelData.chartType != 'table' &&
-              panelData.chartType != 'maps')
+              panelData.chartType != 'maps' &&
+              loading)
               ? panelData
-              : { options: { backgroundColor: 'transparent' } }
+              : noData == 'No Data'
+                ? {
+                    options: {
+                      backgroundColor: 'transparent',
+                    },
+                  }
+                : panelData
           "
           :height="chartPanelHeight"
           @updated:data-zoom="onDataZoom"
@@ -107,7 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
-          panelSchema.type != 'maps'
+          panelSchema.type != 'maps' &&
+          !loading
         "
         class="noData"
         data-test="no-data"
@@ -146,9 +152,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
-        <q-spinner-dots
-          color="primary"
-          size="40px"
+        <q-linear-progress
+          dark
+          indeterminate
+          class="loadingProgress"
+          size="xs"
           style="margin: 0 auto; z-index: 999"
         />
       </div>
@@ -1918,5 +1926,8 @@ export default defineComponent({
   top: 20%;
   width: 100%;
   text-align: center;
+}
+.loadingProgress {
+  color: #c5c8e6;
 }
 </style>
