@@ -31,3 +31,9 @@ pub fn get_rand_num_within(min: u64, max: u64) -> u64 {
     getrandom::getrandom(&mut buf).unwrap();
     min + buf[0] as u64 % (max - min)
 }
+
+pub fn get_rand_u128() -> Option<u128> {
+    let mut buf = [0u8; 16];
+    getrandom::getrandom(&mut buf).ok()?;
+    Some(u128::from_le_bytes(buf))
+}
