@@ -361,20 +361,31 @@ impl ResponseRouter {
         let trace_id = message.get_trace_id();
         let sender = {
             let r = self.routes.read().await;
-            r.get(&trace_id).cloned()
+            let sender = r.get(&trace_id).cloned();
+            drop(r);
+            sender
         };
 
         match sender {
             None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
             Some(resp_sender) => {
-                resp_sender
-                    .send(message)
-                    .await
-                    .map_err(|_| WsError::ResponseChannelClosed(trace_id.clone()))?;
-                log::info!(
-                    "[WS::Router::QuerierConnection] router sent message to router-client task for trace_id: {}",
-                    trace_id
-                );
+                if !resp_sender.is_closed() {
+                    resp_sender
+                        .send(message)
+                        .await
+                        .map_err(|_| WsError::ResponseChannelClosed(trace_id.clone()))?;
+                    log::info!(
+                        "[WS::Router::QuerierConnection] router sent message to router-client task for trace_id: {}",
+                        trace_id
+                    );
+                } else {
+                    log::error!(
+                        "[WS::Router::QuerierConnection] router-client task for trace_id: {} is closed",
+                        trace_id
+                    );
+                    return Err(WsError::ResponseChannelClosed(trace_id.clone()));
+                }
+
                 Ok(())
             }
         }
