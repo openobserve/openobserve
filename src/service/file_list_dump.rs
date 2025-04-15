@@ -30,6 +30,17 @@ use crate::service::search::datafusion::exec::create_parquet_table;
 
 const HOUR_IN_MILI: i64 = 3600 * 1000;
 
+macro_rules! get_col {
+    ($var:ident, $name:literal, $typ:ty, $rbatch:ident) => {
+        let $var = $rbatch
+            .column_by_name($name)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<$typ>()
+            .unwrap();
+    };
+}
+
 #[inline]
 fn round_down_to_hour(v: i64) -> i64 {
     v - (v % HOUR_IN_MILI * 1000)
@@ -49,85 +60,19 @@ async fn get_dump_files_in_range(
 }
 
 fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
-    // TODO: clean this up using macro
-    let id_col = rb
-        .column_by_name("id")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let org_col = rb
-        .column_by_name("org")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .unwrap();
-    let stream_col = rb
-        .column_by_name("stream")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .unwrap();
-    let date_col = rb
-        .column_by_name("date")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .unwrap();
-    let file_col = rb
-        .column_by_name("file")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .unwrap();
-    let deleted_col = rb
-        .column_by_name("deleted")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<BooleanArray>()
-        .unwrap();
-    let flattened_col = rb
-        .column_by_name("flattened")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<BooleanArray>()
-        .unwrap();
-    let min_ts_col = rb
-        .column_by_name("min_ts")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let max_ts_col = rb
-        .column_by_name("max_ts")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let records_col = rb
-        .column_by_name("records")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let original_size_col = rb
-        .column_by_name("original_size")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let compressed_size_col = rb
-        .column_by_name("compressed_size")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let index_size_col = rb
-        .column_by_name("index_size")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
+    get_col!(id_col, "id", Int64Array, rb);
+    get_col!(org_col, "org", StringArray, rb);
+    get_col!(stream_col, "stream", StringArray, rb);
+    get_col!(date_col, "date", StringArray, rb);
+    get_col!(file_col, "file", StringArray, rb);
+    get_col!(deleted_col, "deleted", BooleanArray, rb);
+    get_col!(flattened_col, "flattened", BooleanArray, rb);
+    get_col!(min_ts_col, "min_ts", Int64Array, rb);
+    get_col!(max_ts_col, "max_ts", Int64Array, rb);
+    get_col!(records_col, "records", Int64Array, rb);
+    get_col!(original_size_col, "original_size", Int64Array, rb);
+    get_col!(compressed_size_col, "compressed_size", Int64Array, rb);
+    get_col!(index_size_col, "index_size", Int64Array, rb);
     let mut ret = Vec::with_capacity(rb.num_rows());
     for idx in 0..rb.num_rows() {
         let t = FileRecord {
@@ -151,54 +96,14 @@ fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
 }
 
 fn record_batch_to_stats(rb: RecordBatch) -> Vec<(String, StreamStats)> {
-    let stream_col = rb
-        .column_by_name("stream")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .unwrap();
-    let min_ts_col = rb
-        .column_by_name("min_ts")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let max_ts_col = rb
-        .column_by_name("max_ts")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let file_num_col = rb
-        .column_by_name("file_num")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let records_col = rb
-        .column_by_name("records")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let original_size_col = rb
-        .column_by_name("original_size")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let compressed_size_col = rb
-        .column_by_name("compressed_size")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
-    let index_size_col = rb
-        .column_by_name("index_size")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
+    get_col!(stream_col, "stream", StringArray, rb);
+    get_col!(min_ts_col, "min_ts", Int64Array, rb);
+    get_col!(max_ts_col, "max_ts", Int64Array, rb);
+    get_col!(file_num_col, "file_num", Int64Array, rb);
+    get_col!(records_col, "records", Int64Array, rb);
+    get_col!(original_size_col, "original_size", Int64Array, rb);
+    get_col!(compressed_size_col, "compressed_size", Int64Array, rb);
+    get_col!(index_size_col, "index_size", Int64Array, rb);
 
     let mut ret = Vec::with_capacity(rb.num_rows());
     for idx in 0..rb.num_rows() {
