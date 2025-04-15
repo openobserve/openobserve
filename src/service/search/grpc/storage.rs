@@ -292,7 +292,7 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("storage cache took".to_string())
+                .component("storage load files".to_string())
                 .search_role("follower".to_string())
                 .duration(cache_start.elapsed().as_millis() as usize)
                 .desc(format!(
@@ -375,7 +375,7 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("storage create tables took".to_string())
+                .component("storage create tables".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .build()

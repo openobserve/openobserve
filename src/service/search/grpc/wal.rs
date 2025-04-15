@@ -35,6 +35,7 @@ use datafusion::{
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
+use config::utils::size::bytes_to_human_readable;
 use infra::errors::{Error, ErrorCodes};
 use ingester::WAL_PARQUET_METADATA;
 
@@ -238,13 +239,13 @@ pub async fn search_parquet(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("wal:parquet load took".to_string())
+                .component("wal:parquet load".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .desc(format!("wal parquest search load groups {}, files {}, scan_size {}, compressed_size {}", files_group.len(),
                 scan_stats.files,
-                scan_stats.original_size,
-                scan_stats.compressed_size))
+                bytes_to_human_readable(scan_stats.original_size as f64),
+                bytes_to_human_readable(scan_stats.compressed_size as f64)))
                 .build()
         )
     );
@@ -325,7 +326,7 @@ pub async fn search_parquet(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("wal:parquet create tables took".to_string())
+                .component("wal:parquet create tables".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .build()

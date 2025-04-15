@@ -265,8 +265,7 @@ pub async fn search(
                     .search_role(search_role)
                     .duration(start.elapsed().as_millis() as usize)
                     .desc(format!(
-                        "search cacher took: {}, search from {} reduce to {}",
-                        start.elapsed().as_millis(),
+                        "search cacher search from {} reduce to {}",
                         format_duration(total as u64 / 1000),
                         format_duration(deltas_total as u64 / 1000)
                     ))
