@@ -121,7 +121,7 @@ impl TriggerCondition {
     }
 
     // Next trigger time should align with the pipeline timezone time
-    // if the frquency is 5 mins., and it is 11:03:00 now, the next trigger time should be 11:05:00
+    // if the frequency is 5 mins., and it is 11:03:00 now, the next trigger time should be 11:05:00
     fn align_time(next_run_at: i64, timezone_offset: i32, frequency: i64) -> i64 {
         // Convert the timestamp to a DateTime with the specified timezone offset
         let timezone = FixedOffset::east_opt(timezone_offset * 60).unwrap();
