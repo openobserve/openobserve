@@ -762,7 +762,7 @@ pub async fn search_partition(
         };
     }
 
-    let is_histogram = query.from == -1;
+    let is_histogram = sql.histogram_interval.is_some();
 
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
