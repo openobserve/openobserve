@@ -631,8 +631,8 @@ export default defineComponent({
             console.error("error", error);
 
             errorDetail.value = {
-              message: error.message,
-              code: error.code || "",
+              message: error?.message,
+              code: error?.code || "",
             };
           }
         } else {
@@ -809,7 +809,7 @@ export default defineComponent({
     watch(errorDetail, () => {
       //check if there is an error message or not
       // if (!errorDetail.value) return; // emmit is required to reset the error on parent component
-      emit("error", errorDetail.value.message);
+      emit("error", errorDetail.value);
     });
 
     const hidePopupsAndOverlays = () => {
