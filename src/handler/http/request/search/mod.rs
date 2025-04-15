@@ -747,7 +747,7 @@ pub async fn build_search_request_per_field(
 
                     // pick up where clause from sql
                     let sql_where_from_query = match SearchService::sql::pickup_where(&sql, None) {
-                        Ok(v) => v.unwrap_or_default(),
+                        Ok(v) => format!("WHERE {}", v.unwrap_or_default()),
                         Err(e) => {
                             return Err(Error::other(e));
                         }
@@ -843,16 +843,16 @@ pub async fn build_search_request_per_field(
     for field in fields {
         let sql = match (no_count, use_result_cache) {
             (true, true) => format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" WHERE {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
             ),
             (true, false) => format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" WHERE {sql_where} GROUP BY zo_sql_key" 
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key" 
             ),
             (false, true) => format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" WHERE {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC"
             ),
             (false, false) => format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" WHERE {sql_where} GROUP BY zo_sql_key"
+                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
             ),
         };
 
