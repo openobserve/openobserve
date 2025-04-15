@@ -38,7 +38,7 @@ use crate::{
         format_stream_name,
         ingestion::check_ingestion_allowed,
         pipeline::batch_execution::{ExecutablePipeline, ExecutablePipelineBulkInputs},
-        schema::get_upto_discard_error,
+        schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 
@@ -68,6 +68,8 @@ pub async fn ingest(
 
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
         .timestamp_micros();
 
     let log_ingestion_errors = ingestion_log_enabled().await;
@@ -286,9 +288,13 @@ pub async fn ingest(
                 };
 
                 // check ingestion time
-                if timestamp < min_ts {
+                if timestamp < min_ts || timestamp > max_ts {
                     bulk_res.errors = true;
-                    let failure_reason = Some(get_upto_discard_error().to_string());
+                    let failure_reason = if timestamp < min_ts {
+                        Some(get_upto_discard_error().to_string())
+                    } else {
+                        Some(get_future_discard_error().to_string())
+                    };
                     metrics::INGEST_ERRORS
                         .with_label_values(&[
                             org_id,
@@ -461,9 +467,13 @@ pub async fn ingest(
                             };
 
                             // check ingestion time
-                            if timestamp < min_ts {
+                            if timestamp < min_ts || timestamp > max_ts {
                                 bulk_res.errors = true;
-                                let failure_reason = Some(get_upto_discard_error().to_string());
+                                let failure_reason = if timestamp < min_ts {
+                                    Some(get_upto_discard_error().to_string())
+                                } else {
+                                    Some(get_future_discard_error().to_string())
+                                };
                                 metrics::INGEST_ERRORS
                                     .with_label_values(&[
                                         org_id,

@@ -430,22 +430,32 @@ function parseCondition(condition: any) {
           filterType: "condition",
         };
       } else if (condition?.operator == "LIKE") {
+        // right value may have % at the beginning or end or both
+        // so we need to remove it
+        const value = condition?.right?.value
+          ?.replace(/^%/, "")
+          .replace(/%$/, "");
         return {
           type: "condition",
           values: [],
           column: condition?.left?.column?.expr?.value,
           operator: "Contains",
-          value: `'${condition?.right?.value}'`,
+          value: `${value}`,
           logicalOperator: "AND",
           filterType: "condition",
         };
       } else if (condition?.operator == "NOT LIKE") {
+        // right value may have % at the beginning or end or both
+        // so we need to remove it
+        const value = condition?.right?.value
+          ?.replace(/^%/, "")
+          .replace(/%$/, "");
         return {
           type: "condition",
           values: [],
           column: condition?.left?.column?.expr?.value,
           operator: "Not Contains",
-          value: `'${condition?.right?.value}'`,
+          value: `${value}`,
           logicalOperator: "AND",
           filterType: "condition",
         };

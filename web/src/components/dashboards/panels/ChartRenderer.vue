@@ -485,8 +485,11 @@ export default defineComponent({
         try {
           chart?.setOption(options, true);
           chart?.setOption({ animation: true });
-        } catch (e) {
-          emit("error", e);
+        } catch (e: any) {
+          emit("error", {
+            message: e,
+            code: "",
+          });
         }
 
         chartInitialSetUp();
@@ -510,8 +513,11 @@ export default defineComponent({
         }
         chart?.setOption(props?.data?.options || {}, true);
         chartInitialSetUp();
-      } catch (e) {
-        emit("error", e);
+      } catch (e: any) {
+        emit("error", {
+          message: e,
+          code: "",
+        });
       }
     });
     onUnmounted(() => {
@@ -597,8 +603,11 @@ export default defineComponent({
             dataZoomSelectActive: true,
           });
           windowResizeEventCallback();
-        } catch (e) {
-          emit("error", e);
+        } catch (e: any) {
+          emit("error", {
+            message: e,
+            code: "",
+          });
         }
       },
       { deep: true },
