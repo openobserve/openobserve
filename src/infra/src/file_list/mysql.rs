@@ -1451,8 +1451,8 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         for (time_start, time_end) in day_partitions {
             let o = org.to_string();
             let query = match stream{
-                Some(stream)=> format!("SELECT * FROM file_list WHERE max_ts >= $1 AND min_ts <= $2 AND org = $3 AND stream = '{stream}' AND deleted = $5;"),
-                None=>"SELECT * FROM file_list WHERE max_ts >= $1 AND min_ts <= $2 AND org = $3 AND deleted = $5;".to_string()
+                Some(stream)=> format!("SELECT * FROM file_list WHERE max_ts >= ? AND min_ts <= ? AND org = ? AND stream = '{stream}' AND deleted = ?;"),
+                None=>"SELECT * FROM file_list WHERE max_ts >= ? AND min_ts <= ? AND org =? AND deleted = ?;".to_string()
             };
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT.clone();

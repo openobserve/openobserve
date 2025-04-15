@@ -401,14 +401,12 @@ pub async fn stats(
 
     let dump_files: Vec<_> = dump_files
         .into_iter()
+        .filter(|f| {
+            f.stream
+                .contains(&format!("{org_id}/{}", StreamType::Filelist))
+        })
         .map(|f| FileKey {
-            key: format!(
-                "files/{org_id}/{}/{}/{}/{}",
-                StreamType::Filelist,
-                f.stream,
-                f.date,
-                f.file
-            ),
+            key: format!("files/{}/{}/{}", f.stream, f.date, f.file),
             meta: (&f).into(),
             deleted: false,
             segment_ids: None,

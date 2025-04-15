@@ -20,7 +20,7 @@ use proto::cluster_rpc::{
 };
 use tonic::{Request, Response, Status};
 
-use crate::service::{db, file_list_dump};
+use crate::service::db;
 
 const BATCH_DELAY_MS: u64 = 100;
 const MAX_CONCURRENT_ORGS: usize = 10;
@@ -48,12 +48,9 @@ impl StreamServiceImpl {
         stream_name: Option<&str>,
     ) -> infra::errors::Result<Vec<StreamStatsEntry>> {
         let stats = infra::file_list::get_stream_stats(org_id, stream_type, stream_name).await?;
-        let dumped_stats =
-            file_list_dump::stats(org_id, stream_type, stream_name, None, false).await?;
 
         Ok(stats
             .into_iter()
-            .chain(dumped_stats.into_iter())
             .map(|(stream, stats)| StreamStatsEntry {
                 stream: stream.to_string(),
                 stats: Some(Self::convert_to_stream_stats(&stats)),
