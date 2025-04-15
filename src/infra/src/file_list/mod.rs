@@ -174,7 +174,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn get_entries_in_range(
         &self,
         org: &str,
-        stream: &str,
+        stream: Option<&str>,
         start_time: i64,
         end_time: i64,
     ) -> Result<Vec<FileRecord>>;
@@ -482,7 +482,7 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
 #[inline]
 pub async fn get_entries_in_range(
     org: &str,
-    stream: &str,
+    stream: Option<&str>,
     start_time: i64,
     end_time: i64,
 ) -> Result<Vec<FileRecord>> {

@@ -239,7 +239,7 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
         // someone else is processing this.
         return Ok(());
     }
-    let files = infra::file_list::get_entries_in_range(org, stream, start, end).await?;
+    let files = infra::file_list::get_entries_in_range(org, Some(stream), start, end).await?;
     if files.is_empty() {
         if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
             log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");

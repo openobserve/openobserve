@@ -1422,7 +1422,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     async fn get_entries_in_range(
         &self,
         org: &str,
-        stream: &str,
+        stream: Option<&str>,
         time_start: i64,
         time_end: i64,
     ) -> Result<Vec<super::FileRecord>> {
@@ -1450,15 +1450,16 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
 
         for (time_start, time_end) in day_partitions {
             let o = org.to_string();
-            let s = stream.to_string();
+            let query = match stream{
+                Some(stream)=> format!("SELECT * FROM file_list WHERE max_ts >= $1 AND min_ts <= $2 AND org = $3 AND stream = '{stream}' AND deleted = $5;"),
+                None=>"SELECT * FROM file_list WHERE max_ts >= $1 AND min_ts <= $2 AND org = $3 AND deleted = $5;".to_string()
+            };
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT.clone();
-                let query = "SELECT * FROM file_list WHERE  max_ts >= ? AND min_ts <= ? AND org = ? AND stream = ? AND deleted = ?;";
-                sqlx::query_as::<_, super::FileRecord>(query)
+                sqlx::query_as::<_, super::FileRecord>(&query)
                     .bind(time_start)
                     .bind(time_end)
                     .bind(o)
-                    .bind(s)
                     .bind(false)
                     .fetch_all(&pool)
                     .await

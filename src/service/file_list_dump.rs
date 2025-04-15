@@ -17,7 +17,7 @@ use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
 use chrono::Utc;
 use config::{
     get_config,
-    meta::stream::{FileKey, FileListDeleted, StreamType},
+    meta::stream::{FileKey, FileListDeleted, StreamStats, StreamType},
 };
 use hashbrown::HashMap;
 use infra::{
@@ -37,7 +37,7 @@ fn round_down_to_hour(v: i64) -> i64 {
 
 async fn get_dump_files_in_range(
     org: &str,
-    stream: &str,
+    stream: Option<&str>,
     range: (i64, i64),
 ) -> Result<Vec<FileRecord>, errors::Error> {
     let start = round_down_to_hour(range.0);
@@ -49,6 +49,7 @@ async fn get_dump_files_in_range(
 }
 
 fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
+    // TODO: clean this up using macro
     let id_col = rb
         .column_by_name("id")
         .unwrap()
@@ -149,6 +150,109 @@ fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     ret
 }
 
+fn record_batch_to_stats(rb: RecordBatch) -> Vec<(String, StreamStats)> {
+    let stream_col = rb
+        .column_by_name("stream")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+    let min_ts_col = rb
+        .column_by_name("min_ts")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
+    let max_ts_col = rb
+        .column_by_name("max_ts")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
+    let file_num_col = rb
+        .column_by_name("file_num")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
+    let records_col = rb
+        .column_by_name("records")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
+    let original_size_col = rb
+        .column_by_name("original_size")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
+    let compressed_size_col = rb
+        .column_by_name("compressed_size")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
+    let index_size_col = rb
+        .column_by_name("index_size")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
+
+    let mut ret = Vec::with_capacity(rb.num_rows());
+    for idx in 0..rb.num_rows() {
+        let t = StreamStats {
+            created_at: 0,
+            doc_time_min: min_ts_col.value(idx),
+            doc_time_max: max_ts_col.value(idx),
+            doc_num: records_col.value(idx),
+            file_num: file_num_col.value(idx),
+            storage_size: original_size_col.value(idx) as f64,
+            compressed_size: compressed_size_col.value(idx) as f64,
+            index_size: index_size_col.value(idx) as f64,
+        };
+        let stream = stream_col.value(idx).to_string();
+        ret.push((stream, t));
+    }
+    ret
+}
+
+async fn exec(
+    trace_id: &str,
+    partitions: usize,
+    dump_files: &[FileKey],
+    query: &str,
+) -> Result<Vec<RecordBatch>, errors::Error> {
+    let schema = super::super::job::FILE_LIST_SCHEMA.clone();
+
+    let session = config::meta::search::Session {
+        id: trace_id.to_string(),
+        storage_type: config::meta::search::StorageType::Memory,
+        work_group: None,
+        target_partitions: partitions,
+    };
+    let tbl = create_parquet_table(
+        &session,
+        schema.clone(),
+        dump_files,
+        HashMap::new(),
+        false,
+        None,
+        None,
+        vec![],
+        false,
+    )
+    .await?;
+
+    let ctx = prepare_datafusion_context(None, vec![], false, 16).await?;
+    ctx.register_table("file_list", tbl).unwrap();
+    let df = ctx.sql(query).await.unwrap();
+    let ret = df.collect().await.unwrap();
+
+    Ok(ret)
+}
+
 pub async fn get_file_list_entries_in_range(
     trace_id: &str,
     org: &str,
@@ -161,7 +265,7 @@ pub async fn get_file_list_entries_in_range(
         "{org}/{}/{org}_{stream_type}_{stream}",
         StreamType::Filelist
     );
-    let dump_files = get_dump_files_in_range(org, &stream_key, range).await?;
+    let dump_files = get_dump_files_in_range(org, Some(&stream_key), range).await?;
     let dump_files: Vec<_> = dump_files
         .into_iter()
         .map(|f| FileKey {
@@ -171,28 +275,6 @@ pub async fn get_file_list_entries_in_range(
             segment_ids: None,
         })
         .collect();
-
-    let schema = super::super::job::FILE_LIST_SCHEMA.clone();
-
-    let session = config::meta::search::Session {
-        id: trace_id.to_string(),
-        storage_type: config::meta::search::StorageType::Memory,
-        work_group: None,
-        target_partitions: cfg.limit.cpu_num,
-    };
-    let tbl = create_parquet_table(
-        &session,
-        schema.clone(),
-        &dump_files,
-        HashMap::new(),
-        false,
-        None,
-        None,
-        vec![],
-        false,
-    )
-    .await?;
-
     let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
 
     let stream_key = format!("{org}/{stream_type}/{stream}");
@@ -201,10 +283,8 @@ pub async fn get_file_list_entries_in_range(
         range.0, max_ts_upper_bound, range.1
     );
 
-    let ctx = prepare_datafusion_context(None, vec![], false, 16).await?;
-    ctx.register_table("file_list", tbl).unwrap();
-    let df = ctx.sql(&query).await.unwrap();
-    let t = df.collect().await.unwrap();
+    let t = exec(trace_id, cfg.limit.cpu_num, &dump_files, &query).await?;
+
     let ret = t
         .into_iter()
         .flat_map(record_batch_to_file_record)
@@ -223,7 +303,8 @@ async fn move_and_delete(
         "{org}/{}/{org}_{stream_type}_{stream}",
         StreamType::Filelist
     );
-    let list = infra::file_list::get_entries_in_range(org, &stream_key, range.0, range.1).await?;
+    let list =
+        infra::file_list::get_entries_in_range(org, Some(&stream_key), range.0, range.1).await?;
     let del_items: Vec<_> = list
         .into_iter()
         .map(|f| FileListDeleted {
@@ -280,4 +361,90 @@ pub async fn delete_in_time_range(
     range: (i64, i64),
 ) -> Result<(), errors::Error> {
     move_and_delete(org, stream_type, stream, range).await
+}
+
+pub async fn stats(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+    pk_value: Option<(i64, i64)>,
+    deleted: bool,
+) -> Result<Vec<(String, StreamStats)>, errors::Error> {
+    let cfg = get_config();
+
+    let (field, value, dump_files) = match (stream_type, stream_name) {
+        (Some(stype), Some(sname)) => {
+            let stream_key = format!("{org_id}/{}/{org_id}_{stype}_{sname}", StreamType::Filelist);
+            let dump_files = get_dump_files_in_range(
+                org_id,
+                Some(&stream_key),
+                (0, Utc::now().timestamp_micros()),
+            )
+            .await?;
+            (
+                "stream",
+                format!(
+                    "{}/{}/{}",
+                    org_id,
+                    stream_type.unwrap(),
+                    stream_name.unwrap()
+                ),
+                dump_files,
+            )
+        }
+        _ => {
+            let dump_files =
+                get_dump_files_in_range(org_id, None, (0, Utc::now().timestamp_micros())).await?;
+            ("org", org_id.to_string(), dump_files)
+        }
+    };
+
+    let dump_files: Vec<_> = dump_files
+        .into_iter()
+        .map(|f| FileKey {
+            key: format!(
+                "files/{org_id}/{}/{}/{}/{}",
+                StreamType::Filelist,
+                f.stream,
+                f.date,
+                f.file
+            ),
+            meta: (&f).into(),
+            deleted: false,
+            segment_ids: None,
+        })
+        .collect();
+
+    let mut sql = format!(
+        r#"
+SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num, 
+SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size
+FROM file_list 
+WHERE {field} = '{value}'
+        "#
+    );
+    if deleted {
+        sql = format!("{} AND deleted IS TRUE", sql);
+    }
+    let sql = match pk_value {
+        None => format!("{} GROUP BY stream", sql),
+        Some((0, 0)) => format!("{} GROUP BY stream", sql),
+        Some((min, max)) => {
+            if deleted {
+                format!("{} AND id <= {} GROUP BY stream", sql, max)
+            } else {
+                format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+            }
+        }
+    };
+
+    let task_id = tokio::task::try_id()
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| rand::random::<u64>().to_string());
+    let fake_trace_id = format!("stats_on_dump-{}", task_id);
+    let t = exec(&fake_trace_id, cfg.limit.cpu_num, &dump_files, &sql).await?;
+    // we have to do this manually here, otherwise it will not get cleared.
+    super::search::datafusion::storage::file_list::clear(&fake_trace_id);
+    let ret = t.into_iter().flat_map(record_batch_to_stats).collect();
+    Ok(ret)
 }
