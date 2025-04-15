@@ -603,14 +603,16 @@ impl Drop for FlightStream {
                 log::error!("error creating stream span: {}", e);
             }
         }
-        log::info!("[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
-                self.trace_id,
-                self.node_addr,
-                self.is_querier,
-                self.files,
-                self.scan_size / 1024 / 1024,
-                self.num_rows,
-                self.start.elapsed().as_millis());
+        log::info!(
+            "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+            self.trace_id,
+            self.node_addr,
+            self.is_querier,
+            self.files,
+            self.scan_size / 1024 / 1024,
+            self.num_rows,
+            self.start.elapsed().as_millis()
+        );
     }
 }
 
