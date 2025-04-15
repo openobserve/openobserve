@@ -241,9 +241,6 @@ pub async fn search_parquet(
                 .component("wal:parquet load took".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .search_wal_parquet_files(scan_stats.files as usize)
-                .search_wal_parquet_files_original_size(scan_stats.original_size as usize)
-                .search_wal_parquet_compressed_size(scan_stats.compressed_size as usize)
                 .desc(format!("wal parquest search load groups {}, files {}, scan_size {}, compressed_size {}, took: {} ms", files_group.len(),
                 scan_stats.files,
                 scan_stats.original_size,
@@ -421,9 +418,6 @@ pub async fn search_memtable(
                 .component("wal:memtable load took".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .search_mem_files(scan_stats.files as usize)
-                .search_mem_files_original_size(scan_stats.original_size as usize)
-                .search_mem_compressed_size(scan_stats.compressed_size as usize)
                 .desc(format!("wal mem search load groups {}, files {}, scan_size {}, compressed_size {}, took {} ms", batch_groups.len(),
                 scan_stats.files,
                 scan_stats.original_size,

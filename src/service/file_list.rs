@@ -129,16 +129,13 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
                 SearchInspectorFieldsBuilder::new()
                     .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
-                    .component("query_by_ids file_list get cached_ids".to_string())
+                    .component("file_list get cached_ids".to_string())
                     .search_role("follower".to_string())
                     .duration(start.elapsed().as_millis() as usize)
-                    .search_cached_ids(cached_ids.len())
-                    .search_remote_db_left_ids(ids.len() - cached_ids.len())
                     .desc(format!(
-                        "get cached_ids: {}, left ids: {}, took: {} ms",
+                        "get cached_ids: {}, left ids: {}",
                         cached_ids.len(),
                         ids.len() - cached_ids.len(),
-                        start.elapsed().as_millis()
                     ))
                     .build()
             )
@@ -196,12 +193,9 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
                 .component("query_by_ids file_list query from db".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .search_remote_db_files(db_files.len())
-                .search_remote_db_query_took(start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "query from db: {}, took: {} ms",
+                    "query from db: {}",
                     db_files.len(),
-                    start.elapsed().as_millis()
                 ))
                 .build()
         )
@@ -229,12 +223,9 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
                     .component("query_by_ids file_list set cached_ids".to_string())
                     .search_role("follower".to_string())
                     .duration(start.elapsed().as_millis() as usize)
-                    .search_cached_ids(db_files.len())
-                    .search_set_cached_ids_took(start.elapsed().as_millis() as usize)
                     .desc(format!(
-                        "set cached_ids: {}, took: {} ms",
+                        "set cached_ids: {}",
                         db_files.len(),
-                        start.elapsed().as_millis()
                     ))
                     .build()
             )

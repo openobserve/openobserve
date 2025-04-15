@@ -123,7 +123,6 @@ impl FlightService for FlightServiceImpl {
                     .component("flight::do_get get_ctx_and_physical_plan".to_string())
                     .search_role("follower".to_string())
                     .duration(_start.elapsed().as_millis() as usize)
-                    .search_get_ctx_and_physical_plan_took(_start.elapsed().as_millis() as usize)
                     .build()
             )
         );

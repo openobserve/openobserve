@@ -126,12 +126,9 @@ pub async fn search(
                 .component("flight:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .search_get_file_id_list(file_id_list_vec.len())
-                .search_file_id_list_took(file_id_list_took)
                 .desc(format!(
-                    "get files {} ids took {} ms ",
+                    "get files {} ids",
                     file_id_list_vec.len(),
-                    file_id_list_took
                 ))
                 .build()
         )
@@ -191,8 +188,6 @@ pub async fn search(
                 .component("flight:leader get nodes".to_string())
                 .search_role("leader".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .search_get_node_list_took(start.elapsed().as_millis() as usize)
-                .search_get_node_list_num((nodes.len(), querier_num))
                 .desc(format!(
                     "get nodes num: {}, querier num: {}",
                     nodes.len(),
@@ -514,7 +509,6 @@ pub async fn run_datafusion(
                     .component("flight:run_datafusion collect done".to_string())
                     .search_role("follower".to_string())
                     .duration(took as usize)
-                    .search_run_datafution_took(took as usize)
                     .build()
             )
         );
@@ -684,7 +678,6 @@ pub async fn check_work_group(
                 .component("flight:check_work_group".to_string())
                 .search_role("leader".to_string())
                 .duration(took_wait)
-                .search_check_work_group_wait_in_queue(took_wait)
                 .build()
         )
     );

@@ -212,7 +212,6 @@ pub async fn search(
                 .component("service:search leader finish".to_string())
                 .search_role(search_role)
                 .duration(start.elapsed().as_millis() as usize)
-                .search_leader_spend_time(start.elapsed().as_millis() as usize)
                 .build()
         )
     );

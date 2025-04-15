@@ -539,9 +539,6 @@ impl Drop for FlightStream {
                 .component("datafution:distributed_plan FlightStream drop".to_string())
                 .search_role("follower".to_string())
                 .duration(self.start.elapsed().as_millis() as usize)
-                .search_flighstream_files(self.files as usize)
-                .search_flighstream_num_rows(self.num_rows)
-                .search_flighstream_scan_size(self.scan_size as usize)
                 .desc(format!(
                     "remote sacn search files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
                     self.files,

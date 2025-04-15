@@ -227,7 +227,6 @@ pub async fn search(
                     .component("flight:do_get::search get file_list by ids".to_string())
                     .search_role("follower".to_string())
                     .duration(file_list_took)
-                    .search_get_file_id_list(file_list_took)
                     .build()
             )
         );
@@ -377,7 +376,6 @@ pub async fn search(
                 .component("flight:do_get::search generated physical plan".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .search_generated_physical_plan_took(start.elapsed().as_millis() as usize)
                 .build()
         )
     );

@@ -240,7 +240,7 @@ pub async fn search(
         c_resp.deltas.sort();
         c_resp.deltas.dedup();
         let total = (req.query.end_time - req.query.start_time) as usize;
-        let deltas_total = c_resp
+        let deltas_total: usize = c_resp
             .deltas
             .iter()
             .map(|d| (d.delta_end_time - d.delta_start_time) as usize)
@@ -264,8 +264,6 @@ pub async fn search(
                     .component("cacher:search deltas".to_string())
                     .search_role(search_role)
                     .duration(start.elapsed().as_millis() as usize)
-                    .search_cache_spend_time(start.elapsed().as_millis() as usize)
-                    .search_cache_reduce_time((total, deltas_total))
                     .desc(format!(
                         "search cacher took: {}, search from {} reduce to {}",
                         start.elapsed().as_millis(),
