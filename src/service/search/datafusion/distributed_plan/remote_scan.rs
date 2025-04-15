@@ -535,11 +535,10 @@ impl FlightStream {
                         .search_role("follower".to_string())
                         .duration(self.start.elapsed().as_millis() as usize)
                         .desc(format!(
-                            "remote scan search files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+                            "remote scan search files: {}, scan_size: {} mb, num_rows: {}",
                             self.files,
                             self.scan_size / 1024 / 1024,
-                            self.num_rows,
-                            self.start.elapsed().as_millis()
+                            self.num_rows
                         ))
                         .build(),
                 );
