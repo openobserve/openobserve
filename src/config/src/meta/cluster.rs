@@ -35,6 +35,7 @@ pub trait NodeInfo: Debug + Send + Sync {
     fn get_cluster_name(&self) -> String {
         crate::config::get_cluster_name()
     }
+    fn get_node_name(&self) -> String;
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -154,6 +155,10 @@ impl NodeInfo for Node {
 
     fn get_grpc_addr(&self) -> String {
         self.grpc_addr.clone()
+    }
+
+    fn get_node_name(&self) -> String {
+        self.name.clone()
     }
 }
 

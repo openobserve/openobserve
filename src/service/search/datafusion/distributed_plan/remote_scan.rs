@@ -386,6 +386,7 @@ async fn get_remote_batch(
         schema,
         stream,
         node.get_grpc_addr(),
+        node.get_node_name(),
         is_querier,
         files,
         scan_size,
@@ -435,6 +436,7 @@ struct FlightStream {
     schema: SchemaRef,
     stream: Streaming<FlightData>,
     node_addr: String,
+    node_name: String,
     is_querier: bool,
     files: i64,
     scan_size: i64,
@@ -452,6 +454,7 @@ impl FlightStream {
         schema: SchemaRef,
         stream: Streaming<FlightData>,
         node_addr: String,
+        node_name: String,
         is_querier: bool,
         files: i64,
         scan_size: i64,
@@ -465,6 +468,7 @@ impl FlightStream {
             schema,
             stream,
             node_addr,
+            node_name,
             is_querier,
             files,
             scan_size,
@@ -515,7 +519,7 @@ impl FlightStream {
                     ),
                     SearchInspectorFieldsBuilder::new()
                         .node_role(LOCAL_NODE.role.clone())
-                        .node_name(self.node_addr.clone())
+                        .node_name(self.node_name.clone())
                         .component("remote scan drop".to_string())
                         .search_role("follower".to_string())
                         .duration(self.start.elapsed().as_millis() as usize)
