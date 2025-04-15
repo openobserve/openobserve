@@ -58,11 +58,14 @@ use super::{
     codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
     node::RemoteScanNode,
 };
-use crate::service::{
-    grpc::get_cached_channel,
-    search::{
-        MetadataMap,
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+use crate::{
+    common::infra::cluster,
+    service::{
+        grpc::get_cached_channel,
+        search::{
+            MetadataMap,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        },
     },
 };
 
@@ -380,13 +383,21 @@ async fn get_remote_batch(
         scan_stats.lock().add(&stats);
     }
 
+    let nodes = cluster::get_cached_nodes(|_| true)
+        .await
+        .unwrap_or_default();
+    let node_name = nodes
+        .iter()
+        .find(|n| n.grpc_addr == node.get_grpc_addr())
+        .map(|n| n.name.clone())
+        .unwrap_or_default();
     Ok(Box::pin(FlightStream::new(
         trace_id,
         context,
         schema,
         stream,
         node.get_grpc_addr(),
-        node.get_node_name(),
+        node_name,
         is_querier,
         files,
         scan_size,
