@@ -19,7 +19,7 @@ use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
 #[cfg(feature = "enterprise")]
 use cipher::{RewriteCipherCall, RewriteCipherKey};
-use config::{ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME};
+use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
 use datafusion::optimizer::{
     AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
     decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
@@ -56,9 +56,9 @@ pub mod utils;
 
 pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
     vec![Arc::new(RemoveIndexFieldsRule::new(
-        sql.columns.iter().any(|(_, columns)| {
-            columns.contains(ORIGINAL_DATA_COL_NAME) || columns.contains(ID_COL_NAME)
-        }),
+        sql.columns
+            .iter()
+            .any(|(_, columns)| columns.contains(ORIGINAL_DATA_COL_NAME)),
         sql.columns
             .iter()
             .any(|(_, columns)| columns.contains(ALL_VALUES_COL_NAME)),

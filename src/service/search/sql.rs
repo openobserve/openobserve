@@ -386,8 +386,10 @@ fn generate_select_star_schema(
                     // skip selecting "_original" column if `SELECT * ...`
                     let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
                     if !need_fst_fields {
-                        fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
-                        fields.retain(|field| field.name() != ALL_VALUES_COL_NAME);
+                        fields.retain(|field| {
+                            field.name() != ORIGINAL_DATA_COL_NAME
+                                && field.name() != ALL_VALUES_COL_NAME
+                        });
                     }
                     fields
                 };
