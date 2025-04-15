@@ -67,14 +67,19 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!([
           {
-            "timestamp": "1744263671510048000",
+            "timestamp": "1744642342595319615",
             "node_role": [
               "Querier"
             ],
-            "step": 3,
+            "node_name": "usertest-openobserve-querier-0",
+            "search_role": "follower",
             "duration": 0,
-            "component": "service:search:cacher:search wait in queue",
-            "search_wait_in_queue": 0
+            "component": "storage cache took",
+            "desc": "load files 5, memory cached 0, disk cached 5,  took: 0 ms",
+            "search_storage_cache_took": 0,
+            "search_querier_files": 5,
+            "search_querier_memory_cached_files": 0,
+            "search_querier_disk_cached_files": 5
           }])),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
