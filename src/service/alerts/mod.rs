@@ -477,6 +477,7 @@ impl QueryConditionExt for QueryCondition {
 pub trait ConditionListExt: Sync + Send + 'static {
     async fn len(&self) -> u32;
     async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error>;
+    async fn is_empty(&self) -> bool;
 }
 
 #[async_trait]
@@ -531,6 +532,37 @@ impl ConditionListExt for ConditionList {
                 };
                 build_expr(node, "", data_type)
             }
+        }
+    }
+
+    async fn is_empty(&self) -> bool {
+        match self {
+            ConditionList::OrNode{or:conditions} => {
+                for condition in conditions.iter() {
+                    if condition.is_empty().await {
+                        return true;
+                    }
+                }
+                false
+            },
+            ConditionList::AndNode{and:conditions} => {
+                for condition in conditions.iter() {
+                    if !condition.is_empty().await {
+                        return false;
+                    }
+                }
+                true
+            },
+            ConditionList::NotNode{not:inner} => inner.is_empty().await,
+            ConditionList::LegacyConditions(conditions) => {
+                for condition in conditions.iter() {
+                    if !condition.is_empty().await {
+                        return false;
+                    }
+                }
+                true
+            },
+            ConditionList::EndCondition(_) => false
         }
     }
 }
