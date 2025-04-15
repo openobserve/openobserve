@@ -207,11 +207,13 @@ impl WsHandler {
                                                 message.append_user_id(user_id.clone());
                                             }
 
-                                            log::debug!(
-                                                "[WS::Router::Handler] received message for client_id: {}, message: {:?}",
+                                            log::info!(
+                                                "[WS::Router::Handler] received message for client_id: {}, trace_id: {}, router: {}",
                                                 client_id,
-                                                message
+                                                message.get_trace_id(),
+                                                cfg.common.instance_name,
                                             );
+
                                             let trace_id = message.get_trace_id();
                                             let role_group =
                                                 if let WsClientEvents::Search(req) = &message {
