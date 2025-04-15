@@ -130,13 +130,19 @@ pub async fn save_enrichment_data(
     );
     let total_expected_size_in_bytes = current_size_in_bytes + bytes_in_payload as f64;
     let total_expected_size_in_mb = total_expected_size_in_bytes / SIZE_IN_MB;
-    // if appending data, we need to check if the storage size exceeds the max size
+    log::debug!(
+        "enrichment table [{stream_name}] total expected storage size in mb: {} and max storage size in mb: {}",
+        total_expected_size_in_mb,
+        enrichment_table_max_size
+    );
+
+    // we need to check if the storage size exceeds the max size
     // if not, we can append the data
     // if it does, we need to return an error
-    if append_data && total_expected_size_in_mb > enrichment_table_max_size {
+    if total_expected_size_in_mb > enrichment_table_max_size {
         return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+            HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
                 format!(
                     "enrichment table [{stream_name}] total expected storage size {} exceeds max storage size {}",
                     total_expected_size_in_mb, enrichment_table_max_size
@@ -220,12 +226,13 @@ pub async fn save_enrichment_data(
         .as_ref()
         .clone()
         .with_metadata(HashMap::new());
+    let schema = Arc::new(schema);
     let schema_key = schema.hash_key();
     buf.insert(
         hour_key,
         SchemaRecords {
             schema_key,
-            schema: Arc::new(schema),
+            schema: schema.clone(),
             records,
             records_size,
         },
@@ -253,7 +260,7 @@ pub async fn save_enrichment_data(
         };
 
     // notify update
-    if stream_schema.has_fields {
+    if !schema.fields().is_empty() {
         if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
             log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
         };

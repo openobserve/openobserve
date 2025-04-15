@@ -15,8 +15,11 @@
 
 pub mod session;
 
+use std::sync::Arc;
+
 use actix_web::{Error, HttpRequest, HttpResponse, get, web};
 use config::{cluster::LOCAL_NODE, get_config};
+use tokio::sync::RwLock;
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::extract_auth_expiry_and_user_id;
@@ -67,8 +70,15 @@ pub async fn websocket(
 
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
+    // increase the maximum allowed frame size to 1MB actix-ws and
+    // aggregate continuation frames
+    let msg_stream = msg_stream
+        .max_frame_size(cfg.websocket.max_frame_size * 1024 * 1024)
+        .aggregate_continuations()
+        .max_continuation_size(cfg.websocket.max_continuation_size * 1024 * 1024);
+
     let ws_session = WsSession::new(session, cookie_expiry);
-    sessions_cache_utils::insert_session(&router_id, ws_session);
+    sessions_cache_utils::insert_session(&router_id, Arc::new(RwLock::new(ws_session))).await;
     log::info!(
         "[WS_HANDLER]: Node Role: {} Got websocket request for router_id: {}",
         cfg.common.node_role,

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#![feature(btree_extract_if)]
+
 pub mod cache;
 pub mod cluster_coordinator;
 pub mod db;
@@ -33,6 +35,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     file_list::create_table().await?;
     file_list::LOCAL_CACHE.create_table().await?;
     file_list::local_cache_gc().await?;
+    if !config::is_local_disk_storage() {
+        storage::remote::test_config().await?;
+    }
     pipeline::init().await?;
     queue::init().await?;
     scheduler::init().await?;

@@ -622,6 +622,12 @@ const validateChartFieldsConfiguration = (
     default:
       break;
   }
+
+  // Check filter conditions validity
+  if (fields?.filter?.conditions?.length) {
+    // Validate the conditions
+    validateConditions(fields?.filter?.conditions ?? [], errors);
+  }
 };
 
 /**
@@ -748,17 +754,6 @@ const validatePanelFields = (panel: any, errors: string[] = []) => {
       panel?.queries?.[currentQueryIndex]?.fields ?? {},
       errors,
     );
-
-    // Check filter conditions validity
-    if (
-      panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions?.length
-    ) {
-      // Validate the conditions
-      validateConditions(
-        panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions ?? [],
-        errors,
-      );
-    }
   }
 
   return errors;

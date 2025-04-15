@@ -52,6 +52,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_action_scripts_migration = false;
     let mut need_alert_folders_migration = false;
     let mut need_ratelimit_migration = false;
+    let mut need_service_accounts_migration = false;
     let mut existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
             Ok(Some(model)) => Some(model),
@@ -160,6 +161,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if meta_version > v0_0_15 && existing_model_version < v0_0_16 {
             log::info!("[OFGA:Local] Ratelimit migration needed");
             need_ratelimit_migration = true;
+            need_service_accounts_migration = true;
         }
     }
 
@@ -266,6 +268,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_ratelimit_migration {
                         get_ownership_all_org_tuple(org_name, "ratelimit", &mut tuples);
+                    }
+                    if need_service_accounts_migration {
+                        get_ownership_all_org_tuple(org_name, "service_accounts", &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {

@@ -277,11 +277,16 @@ impl std::fmt::Display for RoleGroup {
 #[inline]
 pub fn get_internal_grpc_token() -> String {
     let cfg = get_config();
-    if cfg.grpc.internal_grpc_token.is_empty() {
+    let token = if cfg.grpc.internal_grpc_token.is_empty() {
         get_instance_id()
     } else {
         cfg.grpc.internal_grpc_token.clone()
+    };
+
+    if token.is_empty() {
+        panic!("grpc token is empty");
     }
+    token
 }
 
 // CompactionJobType is used to distinguish between current and historical compaction jobs.
