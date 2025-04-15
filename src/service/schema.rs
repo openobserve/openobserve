@@ -47,6 +47,13 @@ pub(crate) fn get_upto_discard_error() -> anyhow::Error {
     )
 }
 
+pub(crate) fn get_future_discard_error() -> anyhow::Error {
+    anyhow::anyhow!(
+        "Too far data, only future {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_IN_FUTURE=<max_hours>",
+        get_config().limit.ingest_allowed_in_future
+    )
+}
+
 pub(crate) fn get_request_columns_limit_error(
     stream_name: &str,
     num_fields: usize,

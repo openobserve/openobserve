@@ -439,6 +439,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="add-alert-submit-btn"
                 :label="t('alerts.save')"
+                :loading="isAlertSaving"
+                :disable="isAlertSaving"
                 class="q-mb-md text-bold no-border q-ml-md"
                 color="secondary"
                 padding="sm xl"
@@ -655,6 +657,8 @@ export default defineComponent({
     const showTimezoneWarning = ref(false);
     
     const activeFolderId = ref(router.currentRoute.value.query.folder || "default");
+
+    const isAlertSaving = ref(false);
 
     const updateActiveFolderId = (folderId: any) => {
       activeFolderId.value = folderId.value;
@@ -1213,6 +1217,10 @@ export default defineComponent({
       query.query.start_time = query.query.start_time + 780000000;
 
       query.query.sql = formData.value.query_condition.sql;
+      //removed the encoding as it is not required for the alert queries 
+      if(store.state.zoConfig.sql_base64_enabled && query?.encoding){
+        delete query.encoding;
+      }
 
       if (formData.value.query_condition.vrl_function)
         query.query.query_fn = b64EncodeUnicode(
@@ -1366,6 +1374,7 @@ export default defineComponent({
       activeFolderId,
       updateActiveFolderId,
       alertType,
+      isAlertSaving,
     };
   },
 
@@ -1456,6 +1465,9 @@ export default defineComponent({
     async onSubmit() {
       // Delaying submission by 500ms to allow the form to validate, as query is validated in validateSqlQuery method
       // When user updated query and click on save
+      // made the isAlertSaving to true to disable the save button
+      // and also added a spinner to the save button
+      this.isAlertSaving = true;
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       if (
@@ -1468,6 +1480,7 @@ export default defineComponent({
           message: "Selecting all Columns in SQL query is not allowed.",
           timeout: 1500,
         });
+        this.isAlertSaving = false;
         return false;
       }
 
@@ -1477,6 +1490,7 @@ export default defineComponent({
           message: "Please select stream name.",
           timeout: 1500,
         });
+        this.isAlertSaving = false;
         return false;
       }
 
@@ -1512,11 +1526,15 @@ export default defineComponent({
 
       this.addAlertForm.validate().then(async (valid: any) => {
         if (!valid) {
+          this.isAlertSaving = false;
           return false;
         }
 
         const payload = this.getAlertPayload();
-        if (!this.validateInputs(payload)) return;
+        if (!this.validateInputs(payload)) {
+          this.isAlertSaving = false;
+          return;
+        }
 
         const dismiss = this.q.notify({
           spinner: true,
@@ -1537,6 +1555,7 @@ export default defineComponent({
           } catch (error) {
             dismiss();
             console.log("Error while validating sql query");
+            this.isAlertSaving = false;
             return false;
           }
         }
@@ -1554,12 +1573,14 @@ export default defineComponent({
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
+              this.isAlertSaving = false;
               this.q.notify({
                 type: "positive",
                 message: `Alert updated successfully.`,
               });
             })
             .catch((err: any) => {
+              this.isAlertSaving = false;
               dismiss();
               this.handleAlertError(err);
             });
@@ -1586,12 +1607,14 @@ export default defineComponent({
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
+              this.isAlertSaving = false;
               this.q.notify({
                 type: "positive",
                 message: `Alert saved successfully.`,
               });
             })
             .catch((err: any) => {
+              this.isAlertSaving = false;
               dismiss();
               this.handleAlertError(err);
             });

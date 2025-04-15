@@ -3006,6 +3006,8 @@ mod tests {
                 session_max_lifetime_secs: i64::default(),
                 session_gc_interval_secs: i64::default(),
                 ping_interval_secs: i64::default(),
+                max_frame_size: usize::default(),
+                max_continuation_size: usize::default(),
             },
             route: config::Route {
                 timeout: u64::default(),
@@ -3177,6 +3179,7 @@ mod tests {
                 circuit_breaker_reset_window_num: i64::default(),
                 circuit_breaker_slow_request_threshold: u64::default(),
                 ingest_allowed_upto: i64::default(),
+                ingest_allowed_in_future: i64::default(),
                 ingest_flatten_level: u32::default(),
                 ignore_file_retention_by_stream: bool::default(),
                 logs_file_retention: String::default(),
@@ -3245,6 +3248,7 @@ mod tests {
                 inverted_index_skip_threshold: usize::default(),
                 max_query_range_for_sa: i64::default(),
                 db_text_data_type: String::default(),
+                search_mini_partition_duration_secs: u64::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
@@ -3272,6 +3276,7 @@ mod tests {
                 enabled: bool::default(),
                 cache_parquet: bool::default(),
                 cache_index: bool::default(),
+                delete_merge_files: bool::default(),
             },
             memory_cache: config::MemoryCache {
                 enabled: bool::default(),
