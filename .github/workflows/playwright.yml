@@ -122,6 +122,7 @@ jobs:
             "reportsUpdated2.spec.js",
             "dashboards/dashboard-filter.spec.js",
             "dashboards/dashboard-folder.spec.js",
+            "dashboards/dashboard-multiYaxis.spec.js",
             "join.spec.js",
             "changeOrg.spec.js",
             "serviceAccount.spec.js",

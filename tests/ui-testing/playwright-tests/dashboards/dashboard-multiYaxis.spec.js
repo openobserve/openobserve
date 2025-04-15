@@ -10,6 +10,7 @@ import {
 } from "../utils/dashCreation.js";
 
 import ChartTypeSelector from "../../pages/dashboardPages/dashboardChart.js";
+import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -34,9 +35,11 @@ test.describe("dashboard filter testcases", () => {
     page,
   }) => {
     const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
 
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
     await page.locator('[data-test="dashboard-add"]').click();
     await page.locator('[data-test="add-dashboard-name"]').click();
     await page
@@ -67,6 +70,20 @@ test.describe("dashboard filter testcases", () => {
     await page.waitForTimeout(2000);
 
     await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
+    await page.waitForTimeout(2000);
+
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_namespace_name",
+      "filter"
+    );
+
+    await chartTypeSelector.addFilterCondition1(
+      "kubernetes_namespace_name",
+      "kubernetes.container_image",
+      ">=",
+      "test-namespace"
+    );
+
     await page.waitForTimeout(2000);
   });
 });

@@ -65,6 +65,10 @@ export default class ChartTypeSelector {
       y: '[data-test="dashboard-add-y-data"]',
       b: '[data-test="dashboard-add-b-data"]',
       filter: '[data-test="dashboard-add-filter-data"]',
+      latitude: '[data-test="dashboard-add-latitude-data"]',
+      longitude: '[data-test="dashboard-add-longitude-data"]',
+      weight: '[data-test="dashboard-add-weight-data"]',
+      z: '[data-test="dashboard-add-z-data"]',
     };
 
     const buttonSelector = buttonSelectors[target];
@@ -74,5 +78,76 @@ export default class ChartTypeSelector {
     }
 
     await this.page.locator(buttonSelector).click();
+  }
+
+  // async addFilterCondition(fieldName, operator, value) {
+  //   // Step 1: Click to add condition on existing filter field
+  //   await this.page
+  //     .locator(`[data-test="dashboard-add-condition-label-0-${fieldName}"]`)
+  //     .click();
+
+  //   // Step 2: Click on 'Filters on Field' dropdown
+  //   await this.page.getByText("Filters on Fieldarrow_drop_down").click();
+
+  //   // Step 3: Select the field from dropdown
+  //   await this.page.getByRole("option", { name: fieldName }).click();
+
+  //   // Step 4: Switch to 'Condition' tab
+  //   await this.page
+  //     .locator('[data-test="dashboard-add-condition-list-0"]')
+  //     .click();
+  //   await this.page
+  //     .locator('[data-test="dashboard-add-condition-condition-0"]')
+  //     .click();
+
+  //   // Step 5: Select operator
+  //   await this.page
+  //     .locator('[data-test="dashboard-add-condition-operator"]')
+  //     .click();
+  //   await this.page.getByRole("option", { name: operator }).click();
+
+  //   // Step 6: Enter value
+  //   const valueInput = this.page.locator('[data-test="common-auto-complete"]');
+  //   await valueInput.click();
+  //   await valueInput.fill(value);
+  // }
+
+  //Add filter conditions
+
+  async addFilterCondition1(initialFieldName, newFieldName, operator, value) {
+    // Step 1: Click to open condition config for the initially added field
+    await this.page
+      .locator(
+        `[data-test="dashboard-add-condition-label-0-${initialFieldName}"]`
+      )
+      .click();
+
+    // Step 2: Change field from dropdown
+    await this.page.getByText("Filters on Fieldarrow_drop_down").click();
+    await this.page
+      .getByText("Filters on Fieldarrow_drop_down")
+      .fill(newFieldName);
+
+    // await this.page;
+    // await this.page.getByRole("option", { name: newFieldName }).click();
+
+    // Step 3: Switch to 'Condition' tab
+    await this.page
+      .locator('[data-test="dashboard-add-condition-list-0"]')
+      .click();
+    await this.page
+      .locator('[data-test="dashboard-add-condition-condition-0"]')
+      .click();
+
+    // Step 4: Select operator
+    await this.page
+      .locator('[data-test="dashboard-add-condition-operator"]')
+      .click();
+    await this.page.getByRole("option", { name: operator }).click();
+
+    // Step 5: Enter value
+    const valueInput = this.page.locator('[data-test="common-auto-complete"]');
+    await valueInput.click();
+    await valueInput.fill(value);
   }
 }
