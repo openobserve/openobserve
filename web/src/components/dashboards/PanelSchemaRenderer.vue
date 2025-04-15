@@ -152,11 +152,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
-        <q-linear-progress
-          dark
-          indeterminate
-          class="loadingProgress"
-          size="xs"
+        <q-spinner-dots
+          color="primary"
+          size="40px"
           style="margin: 0 auto; z-index: 999"
         />
       </div>
@@ -1926,8 +1924,5 @@ export default defineComponent({
   top: 20%;
   width: 100%;
   text-align: center;
-}
-.loadingProgress {
-  color: #c5c8e6;
 }
 </style>
