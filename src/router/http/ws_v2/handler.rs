@@ -342,6 +342,7 @@ impl WsHandler {
                                         );
                                         continue;
                                     };
+                                    log::info!("[WS::Router::Handler] received message from router-querier task for client_id: {}, trace_id: {}", client_id, message.get_trace_id());
                                     if let Err(e) = ws_session.text(message_str).await {
                                         log::error!("[WS::Router::Handler] Error sending message to client_id: {}, error: {}", client_id, e);
                                         break;
@@ -506,7 +507,7 @@ impl WsHandler {
                                 }
                                 Some(DisconnectMessage::Close(close_reason)) => {
                                     if let Err(e) = ws_session.close(close_reason).await {
-                                        log::error!("[WS::Router::Handler]: Error closing websocket session: {}", e);
+                                        log::error!("[WS::Router::Handler]: Error closing websocket session session_id: {}, error: {}", client_id, e);
                                     };
                                     return Ok(());
                                 }
