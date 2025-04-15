@@ -416,7 +416,7 @@ pub async fn search_memtable(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("wal:memtable load took".to_string())
+                .component("wal:memtable load".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .desc(format!("wal mem search load groups {}, files {}, scan_size {}, compressed_size {}", batch_groups.len(),
@@ -511,7 +511,7 @@ pub async fn search_memtable(
             SearchInspectorFieldsBuilder::new()
                 .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
-                .component("wal:memtable create tables took".to_string())
+                .component("wal:memtable create tables".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .build()
