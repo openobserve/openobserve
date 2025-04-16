@@ -20,6 +20,7 @@ use config::{
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         stream::{DistinctField, StreamType},
     },
+    utils::time::now_micros,
 };
 use futures::future::join_all;
 use hashbrown::HashMap;
@@ -201,7 +202,7 @@ async fn update_distinct_variables(
                 add_distinct_field_entry(dashboard_id, org_id, &name, typ.to_string(), f).await?;
                 let _temp = DistinctField {
                     name: f.to_owned(),
-                    added_ts: chrono::Utc::now().timestamp_micros(),
+                    added_ts: now_micros(),
                 };
                 if !stream_settings.distinct_value_fields.contains(&_temp) {
                     stream_settings.distinct_value_fields.push(_temp);

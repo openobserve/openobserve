@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
-use config::utils::time::{parse_milliseconds, parse_str_to_timestamp_micros};
+use config::utils::time::{now_micros, parse_milliseconds, parse_str_to_timestamp_micros};
 use infra::errors;
 use promql_parser::parser;
 #[cfg(feature = "enterprise")]
@@ -201,7 +201,7 @@ async fn query(
     }
 
     let start = match req.time {
-        None => chrono::Utc::now().timestamp_micros(),
+        None => now_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
@@ -471,7 +471,7 @@ async fn query_range(
     }
 
     let start = match req.start {
-        None => chrono::Utc::now().timestamp_micros(),
+        None => now_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
@@ -483,7 +483,7 @@ async fn query_range(
         },
     };
     let end = match req.end {
-        None => chrono::Utc::now().timestamp_micros(),
+        None => now_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
@@ -940,7 +940,7 @@ fn validate_metadata_params(
         parse_str_to_timestamp_micros(&start.unwrap()).map_err(|e| e.to_string())?
     };
     let end = if end.is_none() || end.as_ref().unwrap().is_empty() {
-        chrono::Utc::now().timestamp_micros()
+        now_micros()
     } else {
         parse_str_to_timestamp_micros(&end.unwrap()).map_err(|e| e.to_string())?
     };

@@ -769,7 +769,11 @@ export default defineComponent({
 
     const errorData = ref("");
     const onError = (error: any) => {
-      errorData.value = typeof error === "string" ? error : error?.value;
+      if (typeof error === "string") {
+        errorData.value = error;
+      } else {
+        errorData.value = error?.message ?? "";
+      }
     };
 
     return {

@@ -254,6 +254,33 @@ pub fn end_of_the_day(timestamp: i64) -> i64 {
     t_next_day_zero - 1
 }
 
+pub fn format_duration(ms: u64) -> String {
+    if ms == 0 {
+        return "0s".to_string();
+    }
+    let seconds = ms / 1000;
+    let minutes = seconds / 60;
+    let hours = minutes / 60;
+    let days = hours / 24;
+    let remaining_seconds = seconds % 60;
+    let remaining_minutes = minutes % 60;
+    let remaining_hours = hours % 24;
+    let mut parts = Vec::new();
+    if days > 0 {
+        parts.push(format!("{}d", days));
+    }
+    if remaining_hours > 0 {
+        parts.push(format!("{}h", remaining_hours));
+    }
+    if remaining_minutes > 0 {
+        parts.push(format!("{}m", remaining_minutes));
+    }
+    if remaining_seconds > 0 {
+        parts.push(format!("{}s", remaining_seconds));
+    }
+    parts.join("")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -435,5 +462,37 @@ mod tests {
         let n = 1744077663427000;
         let s = get_ymdh_from_micros(n);
         assert_eq!(s, "2025/04/08/02");
+    }
+
+    #[test]
+    fn test_format_duration() {
+        // Test zero milliseconds
+        assert_eq!(format_duration(0), "0s");
+
+        // Test seconds only
+        assert_eq!(format_duration(1000), "1s");
+        assert_eq!(format_duration(5000), "5s");
+        assert_eq!(format_duration(59000), "59s");
+
+        // Test minutes only
+        assert_eq!(format_duration(60000), "1m");
+        assert_eq!(format_duration(300000), "5m");
+        assert_eq!(format_duration(3540000), "59m");
+
+        // Test hours only
+        assert_eq!(format_duration(3600000), "1h");
+        assert_eq!(format_duration(7200000), "2h");
+        assert_eq!(format_duration(82800000), "23h");
+
+        // Test days only
+        assert_eq!(format_duration(86400000), "1d");
+        assert_eq!(format_duration(172800000), "2d");
+        assert_eq!(format_duration(2592000000), "30d");
+
+        // Test combinations
+        assert_eq!(format_duration(90061000), "1d1h1m1s");
+        assert_eq!(format_duration(93784000), "1d2h3m4s");
+        assert_eq!(format_duration(3661000), "1h1m1s");
+        assert_eq!(format_duration(61000), "1m1s");
     }
 }

@@ -84,7 +84,7 @@ async fn search_in_cluster(
     user_email: &str,
 ) -> Result<Value> {
     let op_start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
+    let started_at = now_micros();
     let cfg = get_config();
 
     let &cluster_rpc::MetricsQueryStmt {

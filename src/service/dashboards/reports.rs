@@ -28,6 +28,7 @@ use config::{
             ReportFrequencyType, ReportListFilters, ReportTimerangeType,
         },
     },
+    utils::time::now_micros,
 };
 use cron::Schedule;
 use futures::{StreamExt, future::try_join_all};
@@ -514,7 +515,7 @@ async fn generate_report(
             );
 
             let time_duration: i64 = time_duration.parse()?;
-            let end_time = chrono::Utc::now().timestamp_micros();
+            let end_time = now_micros();
             let start_time = match time_unit {
                 "m" => {
                     end_time

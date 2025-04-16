@@ -1099,8 +1099,8 @@ const useLogs = () => {
       if (store.state.zoConfig.sql_base64_enabled) {
         req["encoding"] = "base64";
         req.query.sql = b64EncodeUnicode(req.query.sql);
+        //encode the histogram only if the current page is 1 
         if (
-          !searchObj.meta.sqlMode &&
           searchObj.data.resultGrid.currentPage == 1
         ) {
           req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
@@ -4899,7 +4899,7 @@ const useLogs = () => {
   const buildWebSocketPayload = (
     queryReq: SearchRequestPayload,
     isPagination: boolean,
-    type: "search" | "histogram" | "pageCount",
+    type: "search" | "histogram" | "pageCount" | "values",
     meta?: any,
   ) => {
     const { traceId } = generateTraceContext();
@@ -4907,7 +4907,7 @@ const useLogs = () => {
 
     const payload: {
       queryReq: SearchRequestPayload;
-      type: "search" | "histogram" | "pageCount";
+      type: "search" | "histogram" | "pageCount" | "values";
       isPagination: boolean;
       traceId: string;
       org_id: string;

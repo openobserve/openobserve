@@ -25,7 +25,7 @@ use arrow_schema::{DataType, Field, Schema};
 use config::{
     FxIndexMap, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
-    utils::{json, schema::infer_json_schema_from_map},
+    utils::{json, schema::infer_json_schema_from_map, time::now_micros},
 };
 use infra::{
     errors::{Error, Result},
@@ -184,7 +184,7 @@ impl Metadata for DistinctValues {
         drop(mem_table);
 
         // write to wal
-        let timestamp = chrono::Utc::now().timestamp_micros();
+        let timestamp = now_micros();
         let default_schema = self.generate_schema();
 
         // transpose the table

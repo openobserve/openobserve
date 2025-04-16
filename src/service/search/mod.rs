@@ -19,7 +19,9 @@ use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
-    TIMESTAMP_COL_NAME, get_config, ider,
+    TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config, ider,
     meta::{
         cluster::RoleGroup,
         search,
@@ -32,6 +34,7 @@ use config::{
         base64, json,
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_aggregate_query},
+        time::now_micros,
     },
 };
 use datafusion::distributed_plan::streaming_aggs_exec;
@@ -53,14 +56,17 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::make_grpc_search_client, o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, tracing::info_span,
+    crate::service::grpc::make_grpc_search_client,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
+    std::collections::HashSet, tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
     handler::grpc::request::search::Searcher,
+    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
 pub(crate) mod cache;
@@ -69,6 +75,8 @@ pub(crate) mod datafusion;
 pub(crate) mod grpc;
 pub(crate) mod grpc_search;
 pub(crate) mod index;
+pub(crate) mod inspector;
+pub(crate) mod partition;
 pub(crate) mod request;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
@@ -108,7 +116,7 @@ pub async fn search(
     in_req: &search::Request,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
+    let started_at = now_micros();
     let cfg = get_config();
 
     let trace_id = if trace_id.is_empty() {
@@ -185,7 +193,28 @@ pub async fn search(
         Ok(Err(e)) => Err(e),
         Err(e) => Err(Error::Message(e.to_string())),
     };
-    log::info!("[trace_id {trace_id}] in leader task finish");
+
+    let search_role = "leader".to_string();
+
+    #[cfg(feature = "enterprise")]
+    let search_role = if get_o2_config().super_cluster.enabled {
+        "super".to_string()
+    } else {
+        search_role
+    };
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] in leader task finish"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("service:search leader finish".to_string())
+                .search_role(search_role)
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     // remove task because task if finished
     let mut _work_group = None;
@@ -667,6 +696,7 @@ pub async fn search_partition(
             });
         }
     }
+    log::info!("[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}", max_query_range, max_query_range_in_hour);
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
@@ -681,9 +711,11 @@ pub async fn search_partition(
         response.partitions.push([req.start_time, req.end_time]);
         response.max_query_range = max_query_range_in_hour;
         response.histogram_interval = sql.histogram_interval;
+        log::info!("[trace_id {trace_id}] search_partition: returning single partition");
         return Ok(response);
     };
 
+    log::info!("[trace_id {trace_id}] search_partition: getting nodes");
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
@@ -696,6 +728,7 @@ pub async fn search_partition(
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
     });
+
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -724,6 +757,7 @@ pub async fn search_partition(
         }
     }
 
+    // Calculate original step with all factors considered
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
     if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
@@ -736,12 +770,19 @@ pub async fn search_partition(
     if part_num > 1000 {
         part_num = 1000;
     }
+
+    // Calculate step with all constraints
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
     if step < min_step {
         step = min_step;
     }
+    // Align step with min_step to ensure partition boundaries match histogram intervals
     if min_step > 0 && step % min_step > 0 {
+        // If step is not perfectly divisible by min_step, round it down to the nearest multiple
+        // Example: If min_step = 5 minutes  and step = 17 minutes
+        //   step % min_step = 17 % 5 = 2 (2 minutes)
+        //   step = 17 - 2 = 15 (15 minutes, which is divisible by 5)
         step = step - step % min_step;
     }
     // this is to ensure we create partitions less than max_query_range
@@ -753,35 +794,30 @@ pub async fn search_partition(
         };
     }
 
-    // Generate partitions by DESC order
-    let mut partitions = Vec::with_capacity(part_num);
-    let mut end = req.end_time;
-    let mut last_partition_step = end % min_step;
-    let duration = req.end_time - req.start_time;
-    while end > req.start_time {
-        let mut start = max(end - step, req.start_time);
-        if last_partition_step > 0 && duration > min_step && part_num > 1 {
-            partitions.push([end - last_partition_step, end]);
-            start -= last_partition_step;
-            end -= last_partition_step;
-        } else {
-            start = max(start - last_partition_step, req.start_time);
-        }
-        partitions.push([start, end]);
-        end = start;
-        last_partition_step = 0;
-    }
-    if partitions.is_empty() {
-        partitions.push([req.start_time, req.end_time]);
-    }
+    let is_histogram = sql.histogram_interval.is_some();
+    let sql_order_by = sql
+        .order_by
+        .first()
+        .map(|(field, order_by)| {
+            if field == &ts_column.clone().unwrap_or_default() && order_by == &OrderBy::Asc {
+                OrderBy::Asc
+            } else {
+                OrderBy::Desc
+            }
+        })
+        .unwrap_or(OrderBy::Desc);
 
-    // We need to reverse partitions if query is ASC order
-    if let Some((field, order_by)) = sql.order_by.first() {
-        if field == &ts_column.unwrap_or_default() && order_by == &OrderBy::Asc {
-            resp.order_by = OrderBy::Asc;
-            partitions.reverse();
-        }
-    }
+    log::debug!("[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}", total_secs, part_num, step, min_step, is_histogram);
+    // Create a partition generator
+    let generator = partition::PartitionGenerator::new(
+        min_step,
+        cfg.limit.search_mini_partition_duration_secs,
+        is_histogram,
+    );
+
+    // Generate partitions
+    let partitions =
+        generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
 
     resp.partitions = partitions;
     Ok(resp)

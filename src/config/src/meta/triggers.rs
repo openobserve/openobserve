@@ -52,6 +52,7 @@ pub struct TriggerId {
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Trigger {
+    pub id: i64,
     pub org: String,
     pub module: TriggerModule,
     pub module_key: String,

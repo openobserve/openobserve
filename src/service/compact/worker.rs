@@ -56,7 +56,7 @@ pub struct JobScheduler {
 
 impl JobScheduler {
     pub fn new(num: usize, worker_tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Self {
-        let (tx, rx) = mpsc::channel::<MergeJob>(num);
+        let (tx, rx) = mpsc::channel::<MergeJob>(1);
         let rx = Arc::new(Mutex::new(rx));
         Self {
             num,
@@ -147,7 +147,7 @@ pub struct MergeWorker {
 
 impl MergeWorker {
     pub fn new(num: usize) -> Self {
-        let (tx, rx) = mpsc::channel::<(MergeSender, MergeBatch)>(num * 2);
+        let (tx, rx) = mpsc::channel::<(MergeSender, MergeBatch)>(1);
         let rx = Arc::new(Mutex::new(rx));
         Self { num, rx, tx }
     }

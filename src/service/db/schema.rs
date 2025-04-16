@@ -23,7 +23,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     is_local_disk_storage,
     meta::{cluster::RoleGroup, stream::StreamType},
-    utils::json,
+    utils::{json, time::now_micros},
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -307,9 +307,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let ts_range = if ev_start_dt == 0 && prev_start_dt == 0 {
                     None
                 } else if ev_start_dt == 0 || (prev_start_dt > 0 && ev_start_dt > prev_start_dt) {
-                    Some((prev_start_dt, chrono::Utc::now().timestamp_micros()))
+                    Some((prev_start_dt, now_micros()))
                 } else {
-                    Some((ev_start_dt, chrono::Utc::now().timestamp_micros()))
+                    Some((ev_start_dt, now_micros()))
                 };
 
                 let mut schema_versions =

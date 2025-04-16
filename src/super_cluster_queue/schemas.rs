@@ -15,7 +15,10 @@
 
 use arrow::datatypes::Schema;
 use async_recursion::async_recursion;
-use config::{meta::stream::StreamType, utils::json};
+use config::{
+    meta::stream::StreamType,
+    utils::{json, time::now_micros},
+};
 use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
@@ -71,7 +74,7 @@ async fn merge(msg: Message) -> Result<()> {
             let msg = Message {
                 key: msg.key,
                 value: msg.value,
-                start_dt: Some(chrono::Utc::now().timestamp_micros()),
+                start_dt: Some(now_micros()),
                 need_watch: msg.need_watch,
                 message_type: msg.message_type,
                 source_cluster: msg.source_cluster,

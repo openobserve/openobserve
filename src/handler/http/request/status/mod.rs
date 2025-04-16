@@ -46,7 +46,10 @@ use {
         validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
     crate::service::self_reporting::audit,
-    config::{ider, utils::base64},
+    config::{
+        ider,
+        utils::{base64, time::now_micros},
+    },
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
@@ -410,7 +413,7 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         // Since this is not a protected route, there is no way to get the user email
         user_email: "".to_string(),
         org_id: "".to_string(),
-        _timestamp: chrono::Utc::now().timestamp_micros(),
+        _timestamp: now_micros(),
         protocol: Protocol::Http(HttpMeta {
             method: "GET".to_string(),
             path: "/config/reload".to_string(),
@@ -465,7 +468,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        _timestamp: chrono::Utc::now().timestamp_micros(),
+        _timestamp: now_micros(),
         protocol: Protocol::Http(HttpMeta {
             method: "GET".to_string(),
             path: "/config/redirect".to_string(),
@@ -552,7 +555,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
                         http_meta.response_code = 400;
                     }
-                    audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+                    audit_message._timestamp = now_micros();
                     audit(audit_message).await;
                     return Ok(HttpResponse::Unauthorized().json(e.to_string()));
                 }
@@ -587,7 +590,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             }
             log::info!("Redirecting user after processing token");
 
-            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit_message._timestamp = now_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_url))
@@ -598,7 +601,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
                 http_meta.response_code = 400;
             }
-            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit_message._timestamp = now_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Unauthorized().json(e.to_string()))
         }
@@ -744,7 +747,7 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
         audit(AuditMessage {
             user_email,
             org_id: "".to_string(),
-            _timestamp: chrono::Utc::now().timestamp_micros(),
+            _timestamp: now_micros(),
             protocol: Protocol::Http(HttpMeta {
                 method: "GET".to_string(),
                 path: "/config/logout".to_string(),

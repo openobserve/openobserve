@@ -479,6 +479,11 @@ const validateSqlQuery = () => {
 
   query.query.sql = streamRoute.value.query_condition.sql;
 
+  //removed the encoding as it is not required for the pipeline queries 
+  if(store.state.zoConfig.sql_base64_enabled && query?.encoding){
+    delete query.encoding;
+  }
+
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
     searchService
       .search({

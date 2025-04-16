@@ -1475,6 +1475,13 @@ const validateFrequency = () => {
         frequency.value.cron,
       );
 
+      // parse cron expression
+      if (frequency.value.cron.trim().split(" ").length !== 6) {
+        cronError.value =
+          "Cron expression must have exactly 6 fields: [Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]";
+        return;
+      }
+
       if (
         typeof intervalInSecs === "number" &&
         !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)

@@ -1217,6 +1217,10 @@ export default defineComponent({
       query.query.start_time = query.query.start_time + 780000000;
 
       query.query.sql = formData.value.query_condition.sql;
+      //removed the encoding as it is not required for the alert queries 
+      if(store.state.zoConfig.sql_base64_enabled && query?.encoding){
+        delete query.encoding;
+      }
 
       if (formData.value.query_condition.vrl_function)
         query.query.query_fn = b64EncodeUnicode(

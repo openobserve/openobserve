@@ -67,6 +67,14 @@ export interface WebSocketSearchPayload {
   meta?: any;
 }
 
+export interface WebSocketValuesPayload {
+  queryReq: SearchRequestPayload;
+  type: "values";
+  traceId: string;
+  org_id: string;
+  meta?: any;
+}
+
 export interface ErrorContent {
   message: string;
   trace_id?: string;

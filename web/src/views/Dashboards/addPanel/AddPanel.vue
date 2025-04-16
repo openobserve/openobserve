@@ -1252,11 +1252,14 @@ export default defineComponent({
       }
     };
 
-    const handleChartApiError = (errorMessage: any) => {
-      const errorList = errorData.errors ?? [];
-      errorList.splice(0);
-      if (errorMessage) {
-        errorList.push(errorMessage);
+    const handleChartApiError = (errorMessage: {
+      message: string;
+      code: string;
+    }) => {
+      if (errorMessage?.message) {
+        const errorList = errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMessage.message);
       }
     };
 

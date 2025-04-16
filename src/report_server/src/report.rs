@@ -6,7 +6,7 @@ use chromiumoxide::{
     fetcher::{BrowserFetcher, BrowserFetcherOptions},
     handler::viewport::Viewport,
 };
-use config::get_config;
+use config::{get_config, utils::time::now_micros};
 use futures::StreamExt;
 use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
@@ -237,7 +237,7 @@ pub async fn generate_report(
             log::debug!("dashb_url for dashboard {folder_id}/{dashboard_id}: {dashb_url}");
 
             let time_duration: i64 = time_duration.parse()?;
-            let end_time = chrono::Utc::now().timestamp_micros();
+            let end_time = now_micros();
             let start_time = match time_unit {
                 "m" => {
                     end_time

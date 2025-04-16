@@ -15,14 +15,13 @@
 
 use actix_web::{Error, HttpRequest, HttpResponse, post, web};
 #[cfg(feature = "enterprise")]
-use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol};
-
-#[cfg(feature = "enterprise")]
-use crate::service::self_reporting::audit;
-#[cfg(feature = "enterprise")]
-use crate::{common::utils::jwt::verify_decode_token, handler::http::auth::jwt::process_token};
+use {
+    crate::service::self_reporting::audit,
+    crate::{common::utils::jwt::verify_decode_token, handler::http::auth::jwt::process_token},
+    config::utils::time::now_micros,
+    o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks},
+    o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol},
+};
 
 #[cfg(feature = "enterprise")]
 #[post("/token")]
@@ -35,7 +34,7 @@ pub async fn exchange_token(
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        _timestamp: chrono::Utc::now().timestamp_micros(),
+        _timestamp: now_micros(),
         protocol: Protocol::Http(HttpMeta {
             method: req.method().to_string(),
             path: req.path().to_string(),
@@ -65,12 +64,12 @@ pub async fn exchange_token(
                     if let Protocol::Http(http_meta) = &mut audit_message.protocol {
                         http_meta.response_code = 401;
                     }
-                    audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+                    audit_message._timestamp = now_micros();
                     audit(audit_message).await;
                     return Ok(HttpResponse::Unauthorized().json(e.to_string()));
                 }
             }
-            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit_message._timestamp = now_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Ok().json(response))
         }
@@ -79,7 +78,7 @@ pub async fn exchange_token(
             if let Protocol::Http(http_meta) = &mut audit_message.protocol {
                 http_meta.response_code = 401;
             }
-            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit_message._timestamp = now_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Unauthorized().json(e.to_string()))
         }

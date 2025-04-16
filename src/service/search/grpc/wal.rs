@@ -17,6 +17,7 @@ use std::{path::Path, sync::Arc};
 
 use arrow::array::{ArrayRef, new_null_array};
 use config::{
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         search::{ScanStats, StorageType},
@@ -26,6 +27,7 @@ use config::{
         file::{is_exists, scan_files},
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
+        size::bytes_to_human_readable,
     },
 };
 use datafusion::{
@@ -45,6 +47,7 @@ use crate::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
             generate_filter_from_equal_items, generate_search_schema_diff,
             index::IndexCondition,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             match_source,
         },
     },
@@ -61,6 +64,7 @@ pub async fn search_parquet(
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
 ) -> super::SearchTable {
+    let load_start = std::time::Instant::now();
     // get file list
     let stream_settings =
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
@@ -222,12 +226,30 @@ pub async fn search_parquet(
     }
 
     log::info!(
-        "[trace_id {}] wal->parquet->search: load groups {}, files {}, scan_size {}, compressed_size {}",
-        query.trace_id,
-        files_group.len(),
-        scan_stats.files,
-        scan_stats.original_size,
-        scan_stats.compressed_size
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] wal->parquet->search: load groups {}, files {}, scan_size {}, compressed_size {}",
+                query.trace_id,
+                files_group.len(),
+                scan_stats.files,
+                scan_stats.original_size,
+                scan_stats.compressed_size
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("wal:parquet load".to_string())
+                .search_role("follower".to_string())
+                .duration(load_start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "wal parquet search load groups {}, files {}, scan_size {}, compressed_size {}",
+                    files_group.len(),
+                    scan_stats.files,
+                    bytes_to_human_readable(scan_stats.original_size as f64),
+                    bytes_to_human_readable(scan_stats.compressed_size as f64)
+                ))
+                .build()
+        )
     );
 
     if cfg.common.memory_circuit_breaker_enable {
@@ -251,6 +273,7 @@ pub async fn search_parquet(
     }
 
     let mut tables = Vec::new();
+    let start = std::time::Instant::now();
     for (ver, files) in files_group {
         if files.is_empty() {
             continue;
@@ -294,6 +317,23 @@ pub async fn search_parquet(
     // lock these files for this request
     wal::lock_request(&query.trace_id, &lock_files);
 
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] wal->parquet->search: create tables took {} ms",
+                query.trace_id,
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("wal:parquet create tables".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
+
     Ok((tables, scan_stats))
 }
 
@@ -307,6 +347,7 @@ pub async fn search_memtable(
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
 ) -> super::SearchTable {
+    let load_start = std::time::Instant::now();
     let mut scan_stats = ScanStats::new();
 
     // format partition keys
@@ -363,12 +404,30 @@ pub async fn search_memtable(
     }
 
     log::info!(
-        "[trace_id {}] wal->mem->search: load groups {}, files {}, scan_size {}, compressed_size {}",
-        query.trace_id,
-        batch_groups.len(),
-        scan_stats.files,
-        scan_stats.original_size,
-        scan_stats.compressed_size,
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] wal->mem->search: load groups {}, files {}, scan_size {}, compressed_size {}",
+                query.trace_id,
+                batch_groups.len(),
+                scan_stats.files,
+                scan_stats.original_size,
+                scan_stats.compressed_size,
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("wal:memtable load".to_string())
+                .search_role("follower".to_string())
+                .duration(load_start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "wal mem search load groups {}, files {}, scan_size {}, compressed_size {}",
+                    batch_groups.len(),
+                    scan_stats.files,
+                    bytes_to_human_readable(scan_stats.original_size as f64),
+                    bytes_to_human_readable(scan_stats.compressed_size as f64)
+                ))
+                .build()
+        )
     );
 
     let cfg = get_config();
@@ -389,6 +448,7 @@ pub async fn search_memtable(
     }
 
     let mut tables = Vec::new();
+    let start = std::time::Instant::now();
     for (schema, mut record_batches) in batch_groups {
         if record_batches.is_empty() {
             continue;
@@ -443,6 +503,22 @@ pub async fn search_memtable(
         tables.push(table as _);
     }
 
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] wal->mem->search: create tables took {} ms",
+                query.trace_id,
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("wal:memtable create tables".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
     Ok((tables, scan_stats))
 }
 

@@ -738,7 +738,7 @@ pub struct Common {
     pub feature_query_without_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = false)]
+    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
     pub feature_query_streaming_aggs: bool,
     #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
     pub feature_join_match_one_enabled: bool,
@@ -1400,6 +1400,12 @@ pub struct Limit {
         help = "maximum series to display in charts"
     )]
     pub max_dashboard_series: usize,
+    #[env_config(
+        name = "ZO_SEARCH_MINI_PARTITION_DURATION_SECS",
+        default = 60,
+        help = "Duration of each mini search partition in seconds"
+    )]
+    pub search_mini_partition_duration_secs: u64,
 }
 
 #[derive(EnvConfig)]

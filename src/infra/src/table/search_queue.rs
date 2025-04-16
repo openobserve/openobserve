@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::time::now_micros;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 
 use super::{entity::search_queue::*, get_lock};
@@ -26,7 +27,7 @@ pub async fn add(work_group: &str, user_id: &str, trace_id: &str) -> Result<(), 
         work_group: Set(work_group.to_string()),
         user_id: Set(user_id.to_string()),
         trace_id: Set(trace_id.to_string()),
-        created_at: Set(chrono::Utc::now().timestamp_micros()),
+        created_at: Set(now_micros()),
         ..Default::default()
     };
 
