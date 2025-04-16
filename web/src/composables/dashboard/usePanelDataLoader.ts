@@ -745,7 +745,6 @@ export const usePanelDataLoader = (
         traceId: string;
         org_id: string;
         pageType: string;
-        encoding: string | null;
       } = {
         queryReq: {
           query: store.state.zoConfig.sql_base64_enabled
