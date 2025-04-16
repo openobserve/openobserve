@@ -919,7 +919,7 @@ async fn write_traces(
                         continue;
                     }
                     match alert
-                        .evaluate(Some(&record_val), (None, alert_end_time))
+                        .evaluate(Some(&record_val), (None, alert_end_time), None)
                         .await
                     {
                         Ok(res) if res.data.is_some() => {
