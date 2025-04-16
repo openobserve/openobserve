@@ -865,7 +865,7 @@ pub async fn do_partitioned_search(
     let mut curr_res_size = 0;
 
     log::info!(
-        "[WS_SEARCH] Found {} partitions for trace_id: {}, partitions: {:#?}",
+        "[WS_SEARCH] Found {} partitions for trace_id: {}, partitions: {:?}",
         partitions.len(),
         trace_id,
         &partitions
