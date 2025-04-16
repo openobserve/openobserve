@@ -1031,7 +1031,7 @@ async fn write_results_to_cache(
         }
     }
 
-    let mut merged_response = cache::merge_response(
+    let merged_response = cache::merge_response(
         &c_resp.trace_id,
         &mut cached_responses,
         &mut search_responses,
@@ -1051,15 +1051,19 @@ async fn write_results_to_cache(
     //     || (!merged_response.function_error.is_empty()
     //         && merged_response.function_error.contains("vrl"));
 
-    let mut should_cache_results = merged_response.new_start_time.is_some()
-        || merged_response.new_end_time.is_some()
-        || merged_response.function_error.is_empty();
+    // let mut should_cache_results = merged_response.new_start_time.is_some()
+    //     || merged_response.new_end_time.is_some()
+    //     || merged_response.function_error.is_empty();
 
-    merged_response.function_error.retain(|err| {
-        !err.contains("Query duration is modified due to query range restriction of")
-    });
+    // merged_response.function_error.retain(|err| {
+    //     !err.contains("Query duration is modified due to query range restriction of")
+    // });
 
-    should_cache_results = should_cache_results && merged_response.function_error.is_empty();
+    // should_cache_results = should_cache_results && merged_response.function_error.is_empty();
+
+    // Update: Don't cache any partial results
+    let should_cache_results =
+        merged_response.function_error.is_empty() && !merged_response.hits.is_empty();
 
     if cfg.common.result_cache_enabled && should_cache_results {
         cache::write_results_v2(

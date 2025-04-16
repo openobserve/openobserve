@@ -455,15 +455,19 @@ pub async fn search(
     // 1. VRL error
     // 2. Super cluster error
     // 3. Range error (max_query_limit)
+
+    // let should_cache_results =
+    //     res.new_start_time.is_some() || res.new_end_time.is_some() ||
+    // res.function_error.is_empty();
+
     // Cache partial results only if there is a range error
+    // if !res.function_error.is_empty() && !range_error.is_empty() {
+    //     res.function_error.retain(|err| !err.contains(&range_error));
+    //     should_cache_results = should_cache_results && res.function_error.is_empty();
+    // }
 
-    let mut should_cache_results =
-        res.new_start_time.is_some() || res.new_end_time.is_some() || res.function_error.is_empty();
-
-    if !res.function_error.is_empty() && !range_error.is_empty() {
-        res.function_error.retain(|err| !err.contains(&range_error));
-        should_cache_results = should_cache_results && res.function_error.is_empty();
-    }
+    // Update: Don't cache any partial results
+    let should_cache_results = res.function_error.is_empty() && !res.hits.is_empty();
 
     // result cache save changes start
     if cfg.common.result_cache_enabled
