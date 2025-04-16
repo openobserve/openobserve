@@ -2,15 +2,13 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { login } from "../utils/dashLogin.js";
-import { ingestion, removeUTFCharacters } from "../utils/dashIngestion.js";
-import {
-  waitForDashboardPage,
-  applyQueryButton,
-  deleteDashboard,
-} from "../utils/dashCreation.js";
+import { ingestion } from "../utils/dashIngestion.js";
+import { waitForDashboardPage } from "../utils/dashCreation.js";
 
 import ChartTypeSelector from "../../pages/dashboardPages/dashboardChart.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
+import DashboardCreate from "../../pages/dashboardPages/dashboard-Create.js";
+import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -36,53 +34,44 @@ test.describe("dashboard filter testcases", () => {
   }) => {
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
 
     await dashboardPage.menuItem("dashboards-item");
+
     await waitForDashboardPage(page);
 
-    await page.locator('[data-test="dashboard-add"]').click();
-    await page.locator('[data-test="add-dashboard-name"]').click();
-    await page
-      .locator('[data-test="add-dashboard-name"]')
-      .fill(randomDashboardName);
+    await dashboardCreate.createDashboard(randomDashboardName);
 
-    await page.locator('[data-test="dashboard-add-submit"]').click();
-    await page.waitForTimeout(500);
-
-    const button = page.locator(
-      '[data-test="dashboard-if-no-panel-add-panel-btn"]'
-    );
-    await expect(button).toBeVisible();
-
-    await page.waitForTimeout(2000);
-    await button.click();
-
-    // select the chart
+    await dashboardCreate.AddPanel();
 
     await chartTypeSelector.selectChartType("line");
-
-    await page.waitForTimeout(2000);
 
     await chartTypeSelector.selectStreamType("logs");
 
     await chartTypeSelector.selectStream("e2e_automate");
 
-    await page.waitForTimeout(2000);
-
     await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
-    await page.waitForTimeout(2000);
 
-    await chartTypeSelector.searchAndAddField(
-      "kubernetes_namespace_name",
-      "filter"
-    );
+    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
-    await chartTypeSelector.addFilterCondition1(
-      "kubernetes_namespace_name",
-      "kubernetes.container_image",
-      ">=",
-      "test-namespace"
-    );
+    await chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
+
+    await dateTimeHelper.setRelativeTimeRange("5-M");
+
+    // await dashboardCreate.applyButton();
+
+    // await chartTypeSelector.searchAndAddField(
+    //   "kubernetes_namespace_name",
+    //   "filter"
+    // );
+
+    // await chartTypeSelector.addFilterCondition1(
+    //   "kubernetes_namespace_name",
+    //   "",
+    //   ">=",
+    //   "test-namespace"
+    // );
 
     await page.waitForTimeout(2000);
   });

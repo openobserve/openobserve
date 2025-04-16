@@ -36,7 +36,7 @@ export default class ChartTypeSelector {
       '[data-test="index-dropdown-stream"]'
     );
     await streamInput.click();
-    await streamInput.press("Control+a"); // Use 'Meta+a' for Mac
+    await streamInput.press("Control+a");
     await streamInput.fill(streamName);
 
     const streamOption = this.page
@@ -114,40 +114,103 @@ export default class ChartTypeSelector {
 
   //Add filter conditions
 
+  // async addFilterCondition1(initialFieldName, newFieldName, operator, value) {
+  //   // Step 1: Click to open condition config for the initially added field
+  //   await this.page
+  //     .locator(
+  //       `[data-test="dashboard-add-condition-label-0-${initialFieldName}"]`
+  //     )
+  //     .click();
+
+  //   // Step 2: Change field from dropdown
+  //   await this.page.getByText("Filters on Fieldarrow_drop_down").click();
+  //   await this.page
+  //     .getByText("Filters on Fieldarrow_drop_down")
+  //     .fill(newFieldName);
+
+  //   // await this.page;
+  //   // await this.page.getByRole("option", { name: newFieldName }).click();
+
+  //   // Step 3: Switch to 'Condition' tab
+  //   await this.page
+  //     .locator('[data-test="dashboard-add-condition-list-0"]')
+  //     .click();
+  //   await this.page
+  //     .locator('[data-test="dashboard-add-condition-condition-0"]')
+  //     .click();
+
+  //   // Step 4: Select operator
+  //   await this.page
+  //     .locator('[data-test="dashboard-add-condition-operator"]')
+  //     .click();
+  //   await this.page.getByRole("option", { name: operator }).click();
+
+  //   // Step 5: Enter value
+  //   const valueInput = this.page.locator('[data-test="common-auto-complete"]');
+  //   await valueInput.click();
+  //   await valueInput.fill(value);
+  // }
+
   async addFilterCondition1(initialFieldName, newFieldName, operator, value) {
-    // Step 1: Click to open condition config for the initially added field
-    await this.page
-      .locator(
-        `[data-test="dashboard-add-condition-label-0-${initialFieldName}"]`
-      )
-      .click();
+    // Step 1: Click the existing field if provided
+    if (initialFieldName) {
+      await this.page
+        .locator(
+          `[data-test="dashboard-add-condition-label-0-${initialFieldName}"]`
+        )
+        .click();
+    }
 
-    // Step 2: Change field from dropdown
-    await this.page.getByText("Filters on Fieldarrow_drop_down").click();
-    await this.page
-      .getByText("Filters on Fieldarrow_drop_down")
-      .fill(newFieldName);
+    // Step 2: Change field if newFieldName is provided
+    if (newFieldName) {
+      const fieldDropdown = this.page.locator(
+        '[data-test="dashboard-add-condition-column-0\\}"]'
+      );
 
-    // await this.page;
-    // await this.page.getByRole("option", { name: newFieldName }).click();
+      await fieldDropdown.click();
+      await fieldDropdown.fill(newFieldName);
 
-    // Step 3: Switch to 'Condition' tab
-    await this.page
-      .locator('[data-test="dashboard-add-condition-list-0"]')
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-add-condition-condition-0"]')
-      .click();
+      await this.page
+        .getByRole("option", { name: newFieldName, exact: true })
+        .first()
+        .click();
+    }
 
-    // Step 4: Select operator
-    await this.page
-      .locator('[data-test="dashboard-add-condition-operator"]')
-      .click();
-    await this.page.getByRole("option", { name: operator }).click();
+    const selectedField = newFieldName || initialFieldName;
 
-    // Step 5: Enter value
-    const valueInput = this.page.locator('[data-test="common-auto-complete"]');
-    await valueInput.click();
-    await valueInput.fill(value);
+    // Step 3: Open the condition configuration if operator or value is being handled
+    if (operator || value) {
+      await this.page
+        .locator('[data-test="dashboard-add-condition-list-0"]')
+        .click();
+      await this.page
+        .locator('[data-test="dashboard-add-condition-condition-0"]')
+        .click();
+    }
+
+    // Step 4: Select operator if provided
+    if (operator) {
+      await this.page
+        .locator('[data-test="dashboard-add-condition-operator"]')
+        .click();
+      await this.page.getByRole("option", { name: operator }).click();
+    }
+
+    // Step 5: Enter value if provided
+    if (value) {
+      const valueInput = this.page.locator(
+        '[data-test="common-auto-complete"]'
+      );
+      await valueInput.click();
+      await valueInput.fill(value);
+    } else if (operator && selectedField) {
+      // Step 6: Assert dynamic error message for missing value
+      const expectedError = `Filter: ${selectedField}: Condition value required`;
+      const errorMessageLocator = this.page
+        .locator("div")
+        .filter({ hasText: expectedError })
+        .first();
+      await expect(errorMessageLocator).toBeVisible();
+    }
   }
 }
