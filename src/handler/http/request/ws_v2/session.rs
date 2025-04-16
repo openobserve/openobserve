@@ -20,6 +20,7 @@ use actix_ws::{AggregatedMessageStream, Session};
 use config::{
     get_config,
     meta::websocket::{SearchEventReq, SearchResultType},
+    utils::time::now_micros,
 };
 use futures::StreamExt;
 use infra::errors::{self, Error};
@@ -62,7 +63,7 @@ pub struct WsSession {
 
 impl WsSession {
     pub fn new(inner: Session, cookie_expiry: Option<i64>) -> Self {
-        let now = chrono::Utc::now().timestamp_micros();
+        let now = now_micros();
         Self {
             inner: Some(inner),
             last_activity_ts: now,
@@ -72,12 +73,12 @@ impl WsSession {
     }
 
     pub fn update_activity(&mut self) {
-        self.last_activity_ts = chrono::Utc::now().timestamp_micros();
+        self.last_activity_ts = now_micros();
     }
 
     pub fn is_expired(&self) -> bool {
         let cfg = get_config();
-        let now = chrono::Utc::now().timestamp_micros();
+        let now = now_micros();
         let idle_timeout_micros = cfg.websocket.session_idle_timeout_secs * 1_000_000;
         let max_lifetime_micros = cfg.websocket.session_max_lifetime_secs * 1_000_000;
 
@@ -88,7 +89,7 @@ impl WsSession {
     }
 
     pub fn is_client_cookie_valid(&self) -> bool {
-        let now = chrono::Utc::now().timestamp_micros();
+        let now = now_micros();
         self.cookie_expiry.is_none_or(|expiry| expiry > now)
     }
 

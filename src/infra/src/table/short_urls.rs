@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::time::now_micros;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, FromQueryResult, Order,
     PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
@@ -128,7 +129,7 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
     let record = ActiveModel {
         short_id: Set(short_id.to_string()),
         original_url: Set(original_url.to_string()),
-        created_ts: Set(chrono::Utc::now().timestamp_micros()),
+        created_ts: Set(now_micros()),
         ..Default::default()
     };
 

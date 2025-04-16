@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         search::ScanStats,
@@ -25,6 +26,8 @@ use config::{
 use hashbrown::HashSet;
 use infra::{errors::Result, file_list, storage};
 use rayon::slice::ParallelSliceMut;
+
+use crate::service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields};
 
 #[tracing::instrument(
     name = "service::file_list::query",
@@ -116,9 +119,25 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
             .map(|(id, ..)| *id)
             .collect::<HashSet<_>>();
         log::info!(
-            "[trace_id {trace_id}] file_list get cached_ids: {}, took: {} ms",
-            cached_ids.len(),
-            start.elapsed().as_millis()
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] file_list get cached_ids: {}, took: {} ms",
+                    cached_ids.len(),
+                    start.elapsed().as_millis()
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("file_list get cached_ids".to_string())
+                    .search_role("follower".to_string())
+                    .duration(start.elapsed().as_millis() as usize)
+                    .desc(format!(
+                        "get cached_ids: {}, left ids: {}",
+                        cached_ids.len(),
+                        ids.len() - cached_ids.len(),
+                    ))
+                    .build()
+            )
         );
 
         FILE_LIST_CACHE_HIT_COUNT
@@ -160,9 +179,21 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         })
         .collect::<Vec<_>>();
     log::info!(
-        "[trace_id {trace_id}] file_list query from db: {}, took: {} ms",
-        db_files.len(),
-        start.elapsed().as_millis()
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] file_list query from db: {}, took: {} ms",
+                db_files.len(),
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("file_list query from db".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .desc(format!("query from db: {}", db_files.len(),))
+                .build()
+        )
     );
 
     // 3. set the local cache
@@ -172,10 +203,23 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
             log::error!("[trace_id {trace_id}] file_list set cache failed: {:?}", e);
         }
+
         log::info!(
-            "[trace_id {trace_id}] file_list set cached_ids: {}, took: {} ms",
-            db_files.len(),
-            start.elapsed().as_millis()
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] file_list set cached_ids: {}, took: {} ms",
+                    db_files.len(),
+                    start.elapsed().as_millis()
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("file_list set cached_ids".to_string())
+                    .search_role("follower".to_string())
+                    .duration(start.elapsed().as_millis() as usize)
+                    .desc(format!("set cached_ids: {}", db_files.len(),))
+                    .build()
+            )
         );
     }
 

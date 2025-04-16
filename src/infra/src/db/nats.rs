@@ -682,7 +682,7 @@ impl Locker {
         let mut last_err = None;
 
         let expiration = now + second_micros(timeout);
-        while expiration > chrono::Utc::now().timestamp_micros() {
+        while expiration > now_micros() {
             match bucket.create(&key, value.clone()).await {
                 Ok(_) => {
                     self.state.store(1, Ordering::SeqCst);
@@ -813,7 +813,7 @@ async fn check_exist_lock(
             let ret_parts = ret.split(':').collect::<Vec<_>>();
             let expiration = ret_parts.last().unwrap();
             let expiration = expiration.parse::<i64>().unwrap();
-            if expiration < chrono::Utc::now().timestamp_micros() {
+            if expiration < now_micros() {
                 if let Err(err) = bucket.purge(&key).await {
                     log::error!("nats purge lock for key: {}, error: {}", orig_key, err);
                     return Err(Error::Message("nats purge lock error".to_string()));

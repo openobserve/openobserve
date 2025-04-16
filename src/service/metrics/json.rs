@@ -27,7 +27,12 @@ use config::{
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
+    utils::{
+        flatten, json,
+        schema::infer_json_schema,
+        schema_ext::SchemaExt,
+        time::{self, now_micros},
+    },
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
@@ -51,7 +56,7 @@ use crate::{
 
 pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
+    let started_at = now_micros();
 
     if !LOCAL_NODE.is_ingester() {
         return Err(anyhow::anyhow!("not an ingester"));
@@ -147,7 +152,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                         &stream_name,
                         StreamType::Metrics,
                         &schema,
-                        Some(chrono::Utc::now().timestamp_micros()),
+                        Some(now_micros()),
                     )
                     .await?;
                 }
@@ -158,7 +163,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
 
         // check timestamp
         let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
-            None => chrono::Utc::now().timestamp_micros(),
+            None => now_micros(),
             Some(json::Value::Number(s)) => {
                 time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
             }
@@ -420,9 +425,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                 let key = format!("{}/{}/{}", org_id, StreamType::Metrics, stream_name);
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = chrono::Utc::now().timestamp_micros();
+                    let alert_end_time = now_micros();
                     for alert in alerts {
-                        match alert.evaluate(Some(record), (None, alert_end_time)).await {
+                        match alert
+                            .evaluate(Some(record), (None, alert_end_time), None)
+                            .await
+                        {
                             Ok(res) if res.data.is_some() => {
                                 trigger_alerts.push((alert.clone(), res.data.unwrap()))
                             }

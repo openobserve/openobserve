@@ -28,7 +28,11 @@ use config::{
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
     metrics,
-    utils::{json, schema_ext::SchemaExt, time::parse_i64_to_timestamp_micros},
+    utils::{
+        json,
+        schema_ext::SchemaExt,
+        time::{now_micros, parse_i64_to_timestamp_micros},
+    },
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashSet;
@@ -508,9 +512,12 @@ pub async fn remote_write(
                 );
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = chrono::Utc::now().timestamp_micros();
+                    let alert_end_time = now_micros();
                     for alert in alerts {
-                        match alert.evaluate(Some(val_map), (None, alert_end_time)).await {
+                        match alert
+                            .evaluate(Some(val_map), (None, alert_end_time), None)
+                            .await
+                        {
                             Ok(res) if res.data.is_some() => {
                                 trigger_alerts.push((alert.clone(), res.data.unwrap()))
                             }
