@@ -42,7 +42,8 @@ use tokio::sync::{
 
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
-const HOUR_IN_MS: i64 = 3600 * 1000;
+const HOUR_IN_MICRO: i64 = 3600 * 1000 * 1000;
+
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
     Arc::new(Schema::new(vec![
         Field::new("id", arrow_schema::DataType::Int64, false),
@@ -62,6 +63,8 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
 });
 pub const FILE_LIST_CACHE_DIR_NAME: &str = "_oo_file_list_dump";
 
+// these correspond to job_id, org_id, stream and offset
+// job id is the id from db for that job row
 type JobInfo = (i64, String, String, i64);
 
 struct DownloadQueue {
@@ -82,6 +85,14 @@ static FILE_LIST_DUMP_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
     DownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
 });
 
+// This stores the job ids that are currently in the queue for dumping
+// normally the queue should be big enough and dumping should be fast enough
+// that before the dump job runs again, everyhting from queue is dumped. But in extream cases
+// it is possible that there are still jobs in the queue witing to be dumped, and the
+// dump job (enqueing new jobs) runs again. In this case, it will again pick up the jobs which are
+// currently in queue, because they are not marked as done in the db. In such case, it is possible
+// that files in that time range get dumped before they are compacted. So instead we maintain this
+// and before enqueing, check if the job_id is already waiting in queue or not.
 static ONGOING_JOB_IDS: Lazy<RwLock<HashSet<i64>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 async fn lock_stream(org: &str, stream: &str) -> Option<()> {
@@ -151,9 +162,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     }
                     Some((job_id, org, stream, offset)) => {
                         if let Err(e) = dump(job_id, &org, &stream, offset).await {
-                            log::error!(
-                                "error in dumping files {org}/{stream} offset {offset} : {e}"
-                            );
+                            log::error!("error in dumping files {stream} offset {offset} : {e}");
                         }
                         let mut ongoing = ONGOING_JOB_IDS.write().await;
                         ongoing.remove(&job_id);
@@ -172,13 +181,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
         let pending = infra::file_list::get_pending_dump_jobs().await?;
         let threshold_hour = Utc::now().timestamp_micros()
-            - (config.common.file_list_dump_min_hour as i64 * HOUR_IN_MS * 1000);
+            - (config.common.file_list_dump_min_hour as i64 * HOUR_IN_MICRO);
 
         let ongoing = ONGOING_JOB_IDS.read().await;
         let pending = pending
             .into_iter()
             .filter(|(id, _, _, offset)| {
-                let end = offset + HOUR_IN_MS * 1000;
+                let end = offset + HOUR_IN_MICRO;
                 if end >= threshold_hour {
                     return false;
                 }
@@ -227,7 +236,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), anyhow::Error> {
     let config = get_config();
     let start = offset;
-    let end = offset + HOUR_IN_MS * 1000;
+    let end = offset + HOUR_IN_MICRO;
 
     if stream.contains(StreamType::Filelist.as_str()) {
         // we do not want to dump the dumped files
@@ -248,10 +257,10 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
     }
     let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
     let count = files.len();
-    if let Err(e) = generate_cache_file(org, stream, (start, end), files).await {
+    if let Err(e) = generate_dump_file(org, stream, (start, end), files).await {
         log::error!("[COMPACTOR:JOB] file_list dump file generation error : {e}");
     } else {
-        log::info!("successfully dumped file list {org}/{stream} offset {offset} count {count}");
+        log::info!("successfully dumped file list {stream} offset {offset} count {count}");
         // we remove files only if not dual writing
         if !config.common.file_list_dump_dual_write {
             if let Err(e) = remove_files_from_file_list(&ids).await {
@@ -262,7 +271,7 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
                 )
             } else {
                 log::info!(
-                    "successfully removed dumped files from file_list for {org}/{stream} offset {offset}"
+                    "successfully removed dumped files from file_list for {stream} offset {offset}"
                 );
             }
         }
@@ -322,7 +331,7 @@ async fn remove_files_from_file_list(ids: &[i64]) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn generate_cache_file(
+async fn generate_dump_file(
     org: &str,
     stream: &str,
     range: (i64, i64),

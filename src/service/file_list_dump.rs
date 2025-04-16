@@ -24,11 +24,12 @@ use infra::{
     errors,
     file_list::{FileRecord, calculate_max_ts_upper_bound},
 };
+use rayon::slice::ParallelSliceMut;
 
 use super::search::datafusion::exec::prepare_datafusion_context;
 use crate::service::search::datafusion::exec::create_parquet_table;
 
-const HOUR_IN_MILI: i64 = 3600 * 1000;
+const HOUR_IN_MICRO: i64 = 3600 * 1000 * 1000;
 
 macro_rules! get_col {
     ($var:ident, $name:literal, $typ:ty, $rbatch:ident) => {
@@ -43,7 +44,7 @@ macro_rules! get_col {
 
 #[inline]
 fn round_down_to_hour(v: i64) -> i64 {
-    v - (v % HOUR_IN_MILI * 1000)
+    v - (v % HOUR_IN_MICRO)
 }
 
 async fn get_dump_files_in_range(
@@ -52,7 +53,7 @@ async fn get_dump_files_in_range(
     range: (i64, i64),
 ) -> Result<Vec<FileRecord>, errors::Error> {
     let start = round_down_to_hour(range.0);
-    let end = round_down_to_hour(range.1) + HOUR_IN_MILI * 1000;
+    let end = round_down_to_hour(range.1) + HOUR_IN_MICRO;
 
     let list = infra::file_list::get_entries_in_range(org, stream, start, end).await?;
 
@@ -92,6 +93,8 @@ fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
         };
         ret.push(t);
     }
+    ret.par_sort_unstable_by_key(|f| f.id);
+    ret.dedup_by_key(|f| f.id);
     ret
 }
 
