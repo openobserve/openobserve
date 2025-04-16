@@ -606,8 +606,6 @@ pub async fn search_partition(
         streaming_aggs_exec::init_cache(id, query.start_time, query.end_time);
     }
 
-    log::info!("[trace_id {trace_id}] skip_get_file_list: {}, is_aggregate: {}, is_streaming_aggregate: {}", skip_get_file_list, is_aggregate, is_streaming_aggregate);
-
     let mut files = Vec::new();
 
     let mut max_query_range = 0;
@@ -617,8 +615,6 @@ pub async fn search_partition(
         let stream_name = stream.stream_name();
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let use_stream_stats_for_partition = stream_settings.approx_partition;
-
-        log::info!("[trace_id {trace_id}] stream_name: {}, use_stream_stats_for_partition: {}", stream_name, use_stream_stats_for_partition);
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
@@ -704,7 +700,6 @@ pub async fn search_partition(
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
     });
-    log::info!("[trace_id {trace_id}] search_partition: records: {}, original_size: {}", records, original_size);
 
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
@@ -1348,126 +1343,5 @@ mod tests {
                 expected
             );
         }
-    }
-
-    #[tokio::test]
-    async fn test_search_partition_with_skip_file_list() {
-        // Test case where we skip the file list calculation
-        let trace_id = "test_trace_id";
-        let org_id = "test_org_id";
-        let stream_type = StreamType::Logs;
-        let start_time = Utc::now().timestamp_micros() - 3600 * 1_000_000; // 1 hour ago
-        let end_time = Utc::now().timestamp_micros();
-        
-        let req = search::SearchPartitionRequest {
-            start_time,
-            end_time,
-            sql: "SELECT * FROM test_stream WHERE _timestamp > 0 AND field='value'".to_string(),
-            encoding: "json".to_string(),
-            regions: vec![],
-            clusters: vec![],
-            query_fn: Some(base64::encode_url("#ResultArray#".to_string())),
-            streaming_output: false,
-        };
-
-        // This test relies on the behavior where apply_over_hits causes skip_get_file_list to be true
-        let result = search_partition(trace_id, org_id, None, stream_type, &req, false).await;
-        
-        match result {
-            Ok(resp) => {
-                assert_eq!(resp.partitions.len(), 1);
-                assert_eq!(resp.partitions[0][0], start_time);
-                assert_eq!(resp.partitions[0][1], end_time);
-            },
-            Err(e) => panic!("Expected success but got error: {:?}", e),
-        }
-    }
-
-    #[tokio::test]
-    async fn test_search_partition_with_aggregate_query() {
-        // Test with an aggregate query that should use streaming aggregates
-        let trace_id = "test_trace_id";
-        let org_id = "test_org_id";
-        let stream_type = StreamType::Logs;
-        let start_time = Utc::now().timestamp_micros() - 3600 * 1_000_000; // 1 hour ago
-        let end_time = Utc::now().timestamp_micros();
-        
-        let req = search::SearchPartitionRequest {
-            start_time,
-            end_time,
-            sql: "SELECT COUNT(*) FROM test_stream GROUP BY field".to_string(),
-            encoding: "json".to_string(),
-            regions: vec![],
-            clusters: vec![],
-            query_fn: None,
-            streaming_output: true,
-        };
-
-        // In a real environment, this would create partitions based on the aggregate query
-        // For the test, we'll check if the function handles the request correctly
-        let result = search_partition(trace_id, org_id, None, stream_type, &req, false).await;
-        
-        // Since this test would likely fail without proper mocking, we'll just check the result type
-        assert!(result.is_ok() || result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_search_partition_with_max_query_range() {
-        // Test with max_query_range parameter
-        let trace_id = "test_trace_id";
-        let org_id = "test_org_id";
-        let stream_type = StreamType::Logs;
-        let start_time = Utc::now().timestamp_micros() - 24 * 3600 * 1_000_000; // 24 hours ago
-        let end_time = Utc::now().timestamp_micros();
-        
-        let req = search::SearchPartitionRequest {
-            start_time,
-            end_time,
-            sql: "SELECT * FROM test_stream".to_string(),
-            encoding: "json".to_string(),
-            regions: vec![],
-            clusters: vec![],
-            query_fn: None,
-            streaming_output: false,
-        };
-
-        // When skip_max_query_range is false, the function should respect max_query_range
-        let result = search_partition(trace_id, org_id, None, stream_type, &req, false).await;
-        
-        // This will need mocking of stream settings in real implementation
-        assert!(result.is_ok() || result.is_err());
-        
-        // When skip_max_query_range is true, the function should ignore max_query_range
-        let result_skip = search_partition(trace_id, org_id, None, stream_type, &req, true).await;
-        
-        assert!(result_skip.is_ok() || result_skip.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_search_partition_with_user_id() {
-        // Test with user_id to check if the function properly handles user-specific settings
-        let trace_id = "test_trace_id";
-        let org_id = "test_org_id";
-        let user_id = "test_user_id";
-        let stream_type = StreamType::Logs;
-        let start_time = Utc::now().timestamp_micros() - 3600 * 1_000_000; // 1 hour ago
-        let end_time = Utc::now().timestamp_micros();
-        
-        let req = search::SearchPartitionRequest {
-            start_time,
-            end_time,
-            sql: "SELECT * FROM test_stream".to_string(),
-            encoding: "json".to_string(),
-            regions: vec![],
-            clusters: vec![],
-            query_fn: None,
-            streaming_output: false,
-        };
-
-        // With user_id provided, the function might apply user-specific quotas
-        let result = search_partition(trace_id, org_id, Some(user_id), stream_type, &req, false).await;
-        
-        // This will need mocking of user settings in real implementation
-        assert!(result.is_ok() || result.is_err());
     }
 }

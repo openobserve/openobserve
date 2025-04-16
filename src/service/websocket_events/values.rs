@@ -79,7 +79,7 @@ pub async fn handle_values_request(
     let top_k = payload.size.or(Some(cfg.limit.query_default_limit));
 
     // get values req query
-    let reqs = build_search_request_per_field(&payload, org_id, stream_type, &stream_name, false).await?;
+    let reqs = build_search_request_per_field(&payload, org_id, stream_type, &stream_name).await?;
 
     for (search_req, stream_type, field) in reqs {
         // Convert the request query to SearchQuery type if needed

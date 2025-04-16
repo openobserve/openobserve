@@ -681,7 +681,6 @@ pub async fn build_search_request_per_field(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    use_result_cache: bool,
 ) -> Result<Vec<(config::meta::search::Request, StreamType, FieldName)>, Error> {
     let query_fn = req.vrl_fn
         .as_ref()
@@ -842,19 +841,14 @@ pub async fn build_search_request_per_field(
 
     let mut requests = Vec::new();
     for field in fields {
-        let sql = match (no_count, use_result_cache) {
-            (true, true) => format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
-            ),
-            (true, false) => format!(
+        let sql = if no_count {
+            format!(
                 "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key" 
-            ),
-            (false, true) => format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC"
-            ),
-            (false, false) => format!(
+            )
+        } else {
+            format!(
                 "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
-            ),
+            )
         };
 
         let mut req = req.clone();
