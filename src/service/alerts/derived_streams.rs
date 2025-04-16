@@ -49,7 +49,7 @@ pub async fn save(
                 }
 
                 // check if _timestamp is a selected field, or _timestamp as an alias
-                if !is_timestamp_selected(sql)? {
+                if !is_timestamp_selected(sql).map_err(|e| anyhow::anyhow!("Invalid SQL: {}", e))? {
                     return Err(anyhow::anyhow!(
                         "SQL for scheduled pipeline must include _timestamp, or aliased as _timestamp.\n\
                         e.g. SELECT app_name, MAX(_timestamp) AS _timestamp FROM ..."
@@ -95,7 +95,7 @@ pub async fn save(
                 || derived_stream.query_condition.promql_condition.is_none()
             {
                 return Err(anyhow::anyhow!(
-                    "Scheduled pipeline with SQL mode should have a query"
+                    "Scheduled pipeline with PromQL mode should have a query and condition"
                 ));
             }
         }

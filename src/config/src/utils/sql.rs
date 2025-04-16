@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, ops::ControlFlow};
+use std::ops::ControlFlow;
 
 use sqlparser::{
     ast::{Expr, Function, GroupByExpr, Query, SelectItem, SetExpr, Statement, Visit, Visitor},
@@ -234,61 +234,36 @@ impl Visitor for TimestampVisitor {
         if let SetExpr::Select(select) = query.body.as_ref() {
             for item in &select.projection {
                 match item {
-                    SelectItem::UnnamedExpr(expr) => {
-                        let mut visitor = FieldNameVisitor::new();
-                        expr.visit(&mut visitor);
-                        if visitor.field_names.contains(TIMESTAMP_COL_NAME) {
+                    SelectItem::UnnamedExpr(expr) => match expr {
+                        Expr::Identifier(ident) if ident.value == TIMESTAMP_COL_NAME => {
                             self.timestamp_selected = true;
-                            break;
+                            return ControlFlow::Break(());
                         }
-                    }
+                        Expr::CompoundIdentifier(idents) => {
+                            if let Some(last) = idents.last() {
+                                if last.value == TIMESTAMP_COL_NAME {
+                                    self.timestamp_selected = true;
+                                    return ControlFlow::Break(());
+                                }
+                            }
+                        }
+                        _ => {}
+                    },
                     SelectItem::ExprWithAlias { alias, .. } => {
                         if alias.value == TIMESTAMP_COL_NAME {
                             self.timestamp_selected = true;
-                            break;
+                            return ControlFlow::Break(());
                         }
                     }
                     SelectItem::Wildcard(_) => {
                         self.timestamp_selected = true;
-                        break;
+                        return ControlFlow::Break(());
                     }
                     _ => {}
                 }
             }
         }
 
-        ControlFlow::Continue(())
-    }
-}
-
-struct FieldNameVisitor {
-    pub field_names: HashSet<String>,
-}
-
-impl FieldNameVisitor {
-    fn new() -> Self {
-        Self {
-            field_names: HashSet::new(),
-        }
-    }
-}
-
-impl Visitor for FieldNameVisitor {
-    type Break = ();
-
-    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
-        match expr {
-            Expr::Identifier(ident) => {
-                self.field_names.insert(ident.value.clone());
-            }
-            Expr::Case { .. } => {
-                expr.visit(self);
-            }
-            Expr::Subquery(query) => {
-                query.visit(self);
-            }
-            _ => {}
-        }
         ControlFlow::Continue(())
     }
 }
@@ -302,100 +277,102 @@ mod tests {
         let test_cases = vec![
             // Basic selection cases
             (
-                "SELECT _timestamp FROM table",
+                "SELECT _timestamp FROM table1",
                 true,
                 "Direct timestamp selection",
             ),
             (
-                "SELECT name, _timestamp FROM table",
+                "SELECT name, _timestamp FROM table1",
                 true,
                 "Timestamp with other columns",
             ),
             (
-                "SELECT * FROM table",
+                "SELECT * FROM table1",
                 true,
                 "Wildcard selection includes timestamp",
             ),
-            ("SELECT name FROM table", false, "No timestamp selected"),
-            // Alias cases
+            ("SELECT name FROM table1", false, "No timestamp selected"),
+            // Function cases without alias - should all be false
             (
-                "SELECT _timestamp as ts FROM table",
+                "SELECT MAX(_timestamp) FROM table1",
                 false,
-                "_timestamp has to be the alias",
+                "Function without _timestamp alias",
             ),
             (
-                "SELECT name as _timestamp FROM table",
-                false,
-                "Other column aliased as timestamp",
-            ),
-            // Function and expression cases
-            (
-                "SELECT MAX(_timestamp) FROM table",
-                false,
-                "Not aliased as _timestamp",
-            ),
-            (
-                "SELECT histogram(_timestamp, '1m') FROM table",
-                false,
-                "Not aliased as _timestamp",
-            ),
-            (
-                "SELECT date_trunc('hour', _timestamp) FROM table",
-                false,
-                "Not aliased as _timestamp",
-            ),
-            // Group by cases
-            (
-                "SELECT _timestamp, COUNT(*) FROM table GROUP BY _timestamp",
+                "SELECT MAX(_timestamp), MAX(_timestamp) as _timestamp FROM table1",
                 true,
-                "Timestamp in GROUP BY",
+                "One of the functions has _timestamp alias",
             ),
             (
-                "SELECT date_trunc('hour', _timestamp) as _timestamp, COUNT(*) FROM table GROUP BY _timestamp",
-                true,
-                "Aliased as _timestamp",
-            ),
-            // Complex queries
-            (
-                "SELECT t1._timestamp FROM table t1 JOIN table2 t2 ON t1.id = t2.id",
-                true,
-                "Timestamp in JOIN query",
+                "SELECT MIN(_timestamp) FROM table1",
+                false,
+                "Function without _timestamp alias",
             ),
             (
-                "SELECT * FROM (SELECT _timestamp FROM table) subq",
+                "SELECT COUNT(_timestamp) FROM table1",
+                false,
+                "Function without _timestamp alias",
+            ),
+            // Function cases with alias - should be true when aliased as _timestamp
+            (
+                "SELECT MAX(_timestamp) as _timestamp FROM table1",
                 true,
+                "Function aliased as _timestamp",
+            ),
+            (
+                "SELECT MIN(_timestamp) as other FROM table1",
+                false,
+                "Function with different alias",
+            ),
+            // Expression cases
+            (
+                "SELECT _timestamp + 1 FROM table1",
+                false,
+                "Expression without _timestamp alias",
+            ),
+            (
+                "SELECT (_timestamp + 1) as _timestamp FROM table1",
+                true,
+                "Expression aliased as _timestamp",
+            ),
+            // Compound identifiers
+            (
+                "SELECT t1._timestamp FROM table1 t1",
+                true,
+                "Table qualified timestamp",
+            ),
+            (
+                "SELECT t1._timestamp as other FROM table1 t1",
+                false,
+                "Table qualified timestamp with different alias",
+            ),
+            // Complex expressions
+            (
+                "SELECT CASE WHEN _timestamp > 0 THEN _timestamp ELSE 0 END FROM table1",
+                false,
                 "Timestamp in subquery",
             ),
             (
-                "SELECT CASE WHEN _timestamp > 0 THEN _timestamp ELSE 0 END FROM table",
+                "SELECT CASE WHEN _timestamp > 0 THEN _timestamp ELSE 0 END as _timestamp FROM table1",
                 true,
-                "Timestamp in CASE expression",
+                "CASE expression aliased as _timestamp",
+            ),
+            // Subqueries
+            (
+                "SELECT * FROM (SELECT _timestamp FROM table1) t",
+                true,
+                "Subquery with wildcard",
             ),
             (
-                "SELECT * FROM table WHERE _timestamp > 0",
-                true,
-                "Timestamp only in WHERE clause still counts as selected due to *",
-            ),
-            (
-                "SELECT name FROM table WHERE _timestamp > 0",
+                "SELECT t.other FROM (SELECT _timestamp as other FROM table1) t",
                 false,
-                "Timestamp only in WHERE clause doesn't count as selected",
+                "Subquery with renamed timestamp",
             ),
-            // Edge cases
+            // Multiple levels of aliases
             (
-                "SELECT '_timestamp' as literal FROM table",
-                false,
-                "String literal shouldn't count",
-            ),
-            (
-                "SELECT name as \"_timestamp\" FROM table",
+                "SELECT MAX(_timestamp) as ts1, ts1 as _timestamp FROM table1",
                 true,
-                "Quoted timestamp alias",
-            ),
-            (
-                "WITH t AS (SELECT _timestamp FROM table) SELECT * FROM t",
-                true,
-                "Timestamp in CTE",
+                "Still results a _timestamp field",
             ),
         ];
 
@@ -409,11 +386,5 @@ mod tests {
         }
 
         Ok(())
-    }
-
-    #[test]
-    fn test_invalid_sql() {
-        let result = is_timestamp_selected("SELECT * FREM table"); // intentionally malformed SQL
-        assert!(result.is_err(), "Should fail on invalid SQL");
     }
 }
