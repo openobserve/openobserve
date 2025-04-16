@@ -278,7 +278,7 @@ pub fn format_duration(ms: u64) -> String {
     if remaining_seconds > 0 {
         parts.push(format!("{}s", remaining_seconds));
     }
-    parts.join(", ")
+    parts.join("")
 }
 
 #[cfg(test)]
@@ -490,9 +490,9 @@ mod tests {
         assert_eq!(format_duration(2592000000), "30d");
 
         // Test combinations
-        assert_eq!(format_duration(90061000), "1d, 1h, 1m, 1s");
-        assert_eq!(format_duration(93784000), "1d, 2h, 3m, 4s");
-        assert_eq!(format_duration(3661000), "1h, 1m, 1s");
-        assert_eq!(format_duration(61000), "1m, 1s");
+        assert_eq!(format_duration(90061000), "1d1h1m1s");
+        assert_eq!(format_duration(93784000), "1d2h3m4s");
+        assert_eq!(format_duration(3661000), "1h1m1s");
+        assert_eq!(format_duration(61000), "1m1s");
     }
 }
