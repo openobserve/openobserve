@@ -32,6 +32,10 @@ pub struct SearchInspectorFields {
     pub component: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub desc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sql: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time_range: Option<(String, String)>,
 }
 
 impl SearchInspectorFields {
@@ -84,6 +88,16 @@ impl SearchInspectorFieldsBuilder {
 
     pub fn desc(mut self, value: String) -> Self {
         self.fields.desc = Some(value);
+        self
+    }
+
+    pub fn sql(mut self, sql: String) -> Self {
+        self.fields.sql = Some(sql);
+        self
+    }
+
+    pub fn time_range(mut self, value: (String, String)) -> Self {
+        self.fields.time_range = Some(value);
         self
     }
 

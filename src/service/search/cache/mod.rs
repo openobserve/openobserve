@@ -176,6 +176,15 @@ pub async fn search(
         );
     }
 
+    let search_role = "leader".to_string();
+
+    #[cfg(feature = "enterprise")]
+    let search_role = if get_o2_config().super_cluster.enabled {
+        "super".to_string()
+    } else {
+        search_role
+    };
+
     // Result caching check ends, start search
     let mut results = Vec::new();
     let mut work_group_set = Vec::new();
@@ -245,14 +254,6 @@ pub async fn search(
             .iter()
             .map(|d| (d.delta_end_time - d.delta_start_time) as usize)
             .sum();
-        let search_role = "leader".to_string();
-
-        #[cfg(feature = "enterprise")]
-        let search_role = if get_o2_config().super_cluster.enabled {
-            "super".to_string()
-        } else {
-            search_role
-        };
 
         log::info!(
             "{}",
@@ -262,7 +263,7 @@ pub async fn search(
                     .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("cacher:search deltas".to_string())
-                    .search_role(search_role)
+                    .search_role(search_role.clone())
                     .duration(start.elapsed().as_millis() as usize)
                     .desc(format!(
                         "search cacher search from {} reduce to {}",
@@ -339,6 +340,25 @@ pub async fn search(
 
     // do search
     let time = start.elapsed().as_secs_f64();
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] cache done"),
+            SearchInspectorFieldsBuilder::new()
+                .node_role(LOCAL_NODE.role.clone())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("summary".to_string())
+                .search_role(search_role)
+                .sql(req.query.sql.clone())
+                .time_range((
+                    req.query.start_time.to_string(),
+                    req.query.end_time.to_string()
+                ))
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
+
     let work_group = get_work_group(work_group_set);
 
     let search_type = req

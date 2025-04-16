@@ -30,7 +30,7 @@ use arrow_schema::{Schema, SchemaRef};
 use config::{
     cluster::LOCAL_NODE,
     meta::search::{ScanStats, SearchEventType},
-    utils::rand::generate_random_string,
+    utils::{rand::generate_random_string, size::bytes_to_human_readable},
 };
 use datafusion::{
     common::{DataFusionError, Result, Statistics},
@@ -53,7 +53,7 @@ use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
 };
-use config::utils::size::bytes_to_human_readable;
+
 use super::{
     codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
     node::RemoteScanNode,

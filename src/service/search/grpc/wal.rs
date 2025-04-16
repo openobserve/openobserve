@@ -27,6 +27,7 @@ use config::{
         file::{is_exists, scan_files},
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
+        size::bytes_to_human_readable,
     },
 };
 use datafusion::{
@@ -35,7 +36,6 @@ use datafusion::{
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
-use config::utils::size::bytes_to_human_readable;
 use infra::errors::{Error, ErrorCodes};
 use ingester::WAL_PARQUET_METADATA;
 
@@ -419,10 +419,13 @@ pub async fn search_memtable(
                 .component("wal:memtable load".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .desc(format!("wal mem search load groups {}, files {}, scan_size {}, compressed_size {}", batch_groups.len(),
-                scan_stats.files,
-                bytes_to_human_readable(scan_stats.original_size as f64),
-                bytes_to_human_readable(scan_stats.compressed_size as f64)))
+                .desc(format!(
+                    "wal mem search load groups {}, files {}, scan_size {}, compressed_size {}",
+                    batch_groups.len(),
+                    scan_stats.files,
+                    bytes_to_human_readable(scan_stats.original_size as f64),
+                    bytes_to_human_readable(scan_stats.compressed_size as f64)
+                ))
                 .build()
         )
     );

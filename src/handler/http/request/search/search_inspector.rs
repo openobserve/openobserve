@@ -260,6 +260,14 @@ pub async fn get_search_profile(
     match res {
         Ok(res) => {
             let mut events = Vec::new();
+            let mut si = SearchInspector {
+                sql: "".to_string(),
+                start_time: "".to_string(),
+                end_time: "".to_string(),
+                total_duration: 0,
+                events: vec![],
+            };
+
             for hit in res.hits {
                 if let Some(events_str) = hit.get("events") {
                     if let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
@@ -272,8 +280,16 @@ pub async fn get_search_profile(
                                 if let Some(mut fields) =
                                     extract_search_inspector_fields(event.name.as_str())
                                 {
-                                    fields.timestamp = Some(event._timestamp.to_string());
-                                    inspectors.push(fields);
+                                    if fields.component == Some("summary".to_string()) {
+                                        si.sql = fields.sql.unwrap();
+                                        let time_range = fields.time_range.unwrap();
+                                        si.start_time = time_range.0;
+                                        si.end_time = time_range.1;
+                                        si.total_duration = fields.duration.unwrap();
+                                    } else {
+                                        fields.timestamp = Some(event._timestamp.to_string());
+                                        inspectors.push(fields);
+                                    }
                                 }
                             })
                             .collect();
@@ -283,7 +299,9 @@ pub async fn get_search_profile(
                 }
             }
 
-            Ok(HttpResponse::Ok().json(events))
+            si.events = events;
+
+            Ok(HttpResponse::Ok().json(si))
         }
         Err(err) => {
             let search_type = req
@@ -316,4 +334,13 @@ pub struct SearchInspectorEvent {
     pub code_filepath: Option<String>,
     pub code_lineno: Option<String>,
     pub level: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchInspector {
+    pub sql: String,
+    pub start_time: String,
+    pub end_time: String,
+    pub total_duration: usize,
+    pub events: Vec<SearchInspectorFields>,
 }

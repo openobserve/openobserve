@@ -30,6 +30,7 @@ use config::{
     utils::{
         file::is_exists,
         inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+        size::bytes_to_human_readable,
         tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
         time::BASE_TIME,
     },
@@ -45,7 +46,7 @@ use itertools::Itertools;
 use tantivy::Directory;
 use tokio::sync::Semaphore;
 use tracing::Instrument;
-use config::utils::size::bytes_to_human_readable;
+
 use crate::{
     job,
     service::{
@@ -545,9 +546,11 @@ pub async fn filter_file_list_by_tantivy_index(
                 .component("tantivy load files".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .desc(format!("load tantivy index files {}, memory cached {}, disk cached {}", scan_stats.querier_files,
-                scan_stats.querier_memory_cached_files,
-                scan_stats.querier_disk_cached_files,
+                .desc(format!(
+                    "load tantivy index files {}, memory cached {}, disk cached {}",
+                    scan_stats.querier_files,
+                    scan_stats.querier_memory_cached_files,
+                    scan_stats.querier_disk_cached_files,
                 ))
                 .build()
         )
