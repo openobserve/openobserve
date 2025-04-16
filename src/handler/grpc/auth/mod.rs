@@ -53,7 +53,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     if token.eq(get_internal_grpc_token().as_str()) || token.eq(super_cluster_token.as_str()) {
         Ok(req)
     } else {
-        log::info!("Auth token is not internal grpc token");
+        log::debug!("Auth token is not internal grpc token");
         let org_id = metadata.get(&cfg.grpc.org_header_key);
         if org_id.is_none() {
             return Err(Status::invalid_argument(format!(

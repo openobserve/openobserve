@@ -29,7 +29,11 @@ use config::{
         stream::{FileKey, QueryPartitionStrategy, StreamType},
     },
     metrics,
-    utils::{inverted_index::split_token, json, time::BASE_TIME},
+    utils::{
+        inverted_index::split_token,
+        json,
+        time::{BASE_TIME, now_micros},
+    },
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
@@ -878,7 +882,7 @@ pub async fn get_file_id_lists(
         if let Some(schema) = stream.schema() {
             if schema == "enrich" || schema == "enrichment_tables" {
                 let start = BASE_TIME.timestamp_micros();
-                let end = chrono::Utc::now().timestamp_micros();
+                let end = now_micros();
                 time_range = Some((start, end));
             }
         }

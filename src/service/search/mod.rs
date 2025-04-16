@@ -34,6 +34,7 @@ use config::{
         base64, json,
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_aggregate_query},
+        time::now_micros,
     },
 };
 use datafusion::distributed_plan::streaming_aggs_exec;
@@ -115,7 +116,7 @@ pub async fn search(
     in_req: &search::Request,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
+    let started_at = now_micros();
     let cfg = get_config();
 
     let trace_id = if trace_id.is_empty() {
