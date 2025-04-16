@@ -1310,6 +1310,58 @@ const validatePanelContentByType = (panel: any, errors: string[]) => {
   }
 };
 
+const validateJoinField = (join: any, errors: string[], joinIndex: number) => {
+  // validate stream
+  if (!join?.stream) {
+    errors.push(`Join #${joinIndex + 1}: Stream is required`);
+  }
+
+  // validate join type
+  if (!join?.joinType) {
+    errors.push(`Join #${joinIndex + 1}: Join type is required`);
+  }
+
+  // validate conditions
+  // at least one condition is required
+  // and each condition should have leftField, rightField, operation
+  if (!join?.conditions || join?.conditions?.length === 0) {
+    errors.push(`Join #${joinIndex + 1}: Conditions are required`);
+  }
+
+  // validate each condition
+  join?.conditions?.forEach((condition: any, conditionIndex: number) => {
+    // validate leftField
+    if (!condition?.leftField?.field) {
+      errors.push(
+        `Join #${joinIndex + 1}: Condition #${conditionIndex + 1}: Left field is required`,
+      );
+    }
+
+    // validate rightField
+    if (!condition?.rightField?.field) {
+      errors.push(
+        `Join #${joinIndex + 1}: Condition #${conditionIndex + 1}: Right field is required`,
+      );
+    }
+
+    // validate operation
+    if (!condition?.operation) {
+      errors.push(
+        `Join #${joinIndex + 1}: Condition #${conditionIndex + 1}: Operation is required`,
+      );
+    }
+  });
+};
+
+const validateJoinFields = (joins: any, errors: string[]) => {
+  // validate join fields
+  if (joins) {
+    joins.forEach((join: any, index: number) =>
+      validateJoinField(join, errors, index),
+    );
+  }
+};
+
 /**
  * Validates panel fields without validating stream field existence
  *
@@ -1500,6 +1552,12 @@ export const validatePanel = (
       currentYLabel,
       errors,
       isFieldsValidationRequired,
+    );
+
+    // validate join fields
+    validateJoinFields(
+      panelData?.data?.queries?.[currentQueryIndex]?.joins,
+      errors,
     );
 
     // Validate fields against streams if field validation is required
