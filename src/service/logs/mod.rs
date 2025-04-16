@@ -432,7 +432,10 @@ async fn write_logs(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    match alert.evaluate(Some(&record_val), (None, end_time)).await {
+                    match alert
+                        .evaluate(Some(&record_val), (None, end_time), None)
+                        .await
+                    {
                         Ok(trigger_results) if trigger_results.data.is_some() => {
                             triggers.push((alert.clone(), trigger_results.data.unwrap()));
                             evaluated_alerts.insert(key);
