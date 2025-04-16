@@ -1062,8 +1062,10 @@ async fn write_results_to_cache(
     // should_cache_results = should_cache_results && merged_response.function_error.is_empty();
 
     // Update: Don't cache any partial results
-    let should_cache_results =
-        merged_response.function_error.is_empty() && !merged_response.hits.is_empty();
+    let should_cache_results = merged_response.new_start_time.is_none()
+        && merged_response.new_end_time.is_none()
+        && merged_response.function_error.is_empty()
+        && !merged_response.hits.is_empty();
 
     if cfg.common.result_cache_enabled && should_cache_results {
         cache::write_results_v2(

@@ -467,7 +467,10 @@ pub async fn search(
     // }
 
     // Update: Don't cache any partial results
-    let should_cache_results = res.function_error.is_empty() && !res.hits.is_empty();
+    let should_cache_results = res.new_start_time.is_none()
+        && res.new_end_time.is_none()
+        && res.function_error.is_empty()
+        && !res.hits.is_empty();
 
     // result cache save changes start
     if cfg.common.result_cache_enabled
