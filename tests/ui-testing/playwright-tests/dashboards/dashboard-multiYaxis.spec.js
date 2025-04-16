@@ -3,12 +3,16 @@ import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { login } from "../utils/dashLogin.js";
 import { ingestion } from "../utils/dashIngestion.js";
-import { waitForDashboardPage } from "../utils/dashCreation.js";
+import {
+  waitForDashboardPage,
+  deleteDashboard,
+} from "../utils/dashCreation.js";
 
 import ChartTypeSelector from "../../pages/dashboardPages/dashboardChart.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-Create.js";
 import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
+import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -29,13 +33,14 @@ test.describe("dashboard filter testcases", () => {
     await orgNavigation;
   });
 
-  test("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
+  test("Should correctly add multiple Y-axes to the stacked chart type.", async ({
     page,
   }) => {
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
     const dashboardCreate = new DashboardCreate(page);
     const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
 
     await dashboardPage.menuItem("dashboards-item");
 
@@ -45,7 +50,7 @@ test.describe("dashboard filter testcases", () => {
 
     await dashboardCreate.AddPanel();
 
-    await chartTypeSelector.selectChartType("line");
+    await chartTypeSelector.selectChartType("stacked");
 
     await chartTypeSelector.selectStreamType("logs");
 
@@ -57,22 +62,30 @@ test.describe("dashboard filter testcases", () => {
 
     await chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
 
-    await dateTimeHelper.setRelativeTimeRange("5-M");
+    await dateTimeHelper.setRelativeTimeRange("6-w");
 
-    // await dashboardCreate.applyButton();
+    dashboardPageActions.waitForChartToRender();
 
-    // await chartTypeSelector.searchAndAddField(
-    //   "kubernetes_namespace_name",
-    //   "filter"
-    // );
+    await page
+      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+      .click();
 
-    // await chartTypeSelector.addFilterCondition1(
-    //   "kubernetes_namespace_name",
-    //   "",
-    //   ">=",
-    //   "test-namespace"
-    // );
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", kubernetes_labels_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
+        })
+        .first()
+    ).toBeVisible();
 
-    await page.waitForTimeout(2000);
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    dashboardPageActions.AddPanelName(randomDashboardName);
+
+    dashboardPageActions.SavePanel();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+
+    await deleteDashboard(page, randomDashboardName);
   });
 });

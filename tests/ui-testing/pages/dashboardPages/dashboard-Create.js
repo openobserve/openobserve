@@ -1,6 +1,8 @@
 import { expect } from "@playwright/test";
 
 // pages/chartTypeSelector.js
+// methods: createDashboard, searchDashboard, AddPanel, applyButton
+
 export default class DashboardCreate {
   constructor(page) {
     this.page = page;

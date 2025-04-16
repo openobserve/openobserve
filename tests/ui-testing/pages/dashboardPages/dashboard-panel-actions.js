@@ -8,17 +8,16 @@ export default class DashboardactionPage {
     this.panelNameInput = page.locator('[data-test="dashboard-panel-name"]');
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applydashbaord = page.locator('[data-test="dashboard-apply"]');
+    this.applydashbaord = page.locator('[data-test="dashboard-apply"]');
   }
 
   // Add panel name
   async AddPanelName(panelName) {
     await this.panelNameInput.click();
     await this.panelNameInput.fill(panelName);
-    await this.panelSaveBtn.click();
   }
 
   // Save panel button
-
   async SavePanel() {
     await this.panelSaveBtn.click();
   }
@@ -26,5 +25,15 @@ export default class DashboardactionPage {
   //Apply dashboard button
   async ApplyDashboardBtn() {
     await this.applydashbaord.click();
+  }
+
+  // Wait for chart to render
+
+  async waitForChartToRender() {
+    // Wait for it to go back to bg-secondary (render complete)
+    await this.page.waitForFunction(() => {
+      const btn = document.querySelector('[data-test="dashboard-apply"]');
+      return btn && btn.classList.contains("bg-secondary");
+    });
   }
 }
