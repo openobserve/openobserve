@@ -52,7 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
 
           </span>
-          <span v-else-if="searchObj.data.histogram.errorCode == -1 && !searchObj.loadingCounter && searchObj.meta.showHistogram" class="q-ml-md text-warning">
+          <span v-else-if="searchObj.data.histogram.errorCode == -1 && !searchObj.loadingCounter && searchObj.meta.showHistogram" class="q-ml-md " 
+          :class="store.state.theme == 'dark' ? 'histogram-unavailable-text' : 'histogram-unavailable-text-light'"
+          >
             {{ searchObj.data.histogram.errorMsg }}
           </span>
         </div>
@@ -953,5 +955,11 @@ export default defineComponent({
     position: relative;
     height: 30px;
   }
+}
+.histogram-unavailable-text{
+  color: #F5A623;
+}
+.histogram-unavailable-text-light{
+  color: #ff8800;
 }
 </style>
