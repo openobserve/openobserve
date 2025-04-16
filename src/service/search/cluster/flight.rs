@@ -63,6 +63,7 @@ use crate::{
             table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
         },
         generate_filter_from_equal_items,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         request::Request,
         sql::Sql,
         utils::{AsyncDefer, ScanStatsVisitor},
@@ -111,10 +112,22 @@ pub async fn search(
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, took: {} ms",
-        sql.time_range,
-        file_id_list_vec.len(),
-        file_id_list_took,
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, took: {} ms",
+                sql.time_range,
+                file_id_list_vec.len(),
+                file_id_list_took,
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:leader get file id".to_string())
+                .search_role("leader".to_string())
+                .duration(file_id_list_took)
+                .desc(format!("get files {} ids", file_id_list_vec.len(),))
+                .build()
+        )
     );
     let mut scan_stats = ScanStats {
         files: file_id_list_vec.len() as i64,
@@ -127,8 +140,14 @@ pub async fn search(
         get_inverted_index_file_lists(trace_id, &req, &sql, &query).await?;
     scan_stats.idx_scan_size = idx_scan_size as i64;
     req.set_use_inverted_index(use_ttv_inverted_index);
+    log::info!(
+        "[trace_id {trace_id}] flight->search: get get_inverted_index_file_lists idx_scan_size: {:?}, idx_took: {} ms",
+        idx_scan_size,
+        idx_took,
+    );
 
     // 3. get nodes
+    let get_node_start = std::time::Instant::now();
     let node_group = req
         .search_event_type
         .as_ref()
@@ -152,9 +171,25 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: get nodes num: {}, querier num: {}",
-        nodes.len(),
-        querier_num,
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: get nodes num: {}, querier num: {}",
+                nodes.len(),
+                querier_num,
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:leader get nodes".to_string())
+                .search_role("leader".to_string())
+                .duration(get_node_start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "get nodes num: {}, querier num: {}",
+                    nodes.len(),
+                    querier_num
+                ))
+                .build()
+        )
     );
 
     // waiting in work group queue
@@ -450,6 +485,7 @@ pub async fn run_datafusion(
     }
 
     // run datafusion
+    let datafusion_start = std::time::Instant::now();
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
@@ -457,7 +493,18 @@ pub async fn run_datafusion(
         log::error!("[trace_id {trace_id}] flight->search: datafusion collect error: {e}");
         Err(e.into())
     } else {
-        log::info!("[trace_id {trace_id}] flight->search: datafusion collect done");
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] flight->search: datafusion collect done"),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("flight:run_datafusion collect done".to_string())
+                    .search_role("follower".to_string())
+                    .duration(datafusion_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }
@@ -612,8 +659,19 @@ pub async fn check_work_group(
     // done in the queue
     let took_wait = start.elapsed().as_millis() as usize - file_list_took;
     log::info!(
-        "[trace_id {trace_id}] search: wait in queue took: {} ms",
-        took_wait,
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] search: wait in queue took: {} ms",
+                took_wait
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:check_work_group".to_string())
+                .search_role("leader".to_string())
+                .duration(took_wait)
+                .build()
+        )
     );
     Ok((took_wait, work_group_str, work_group))
 }
