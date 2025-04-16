@@ -521,14 +521,9 @@ pub async fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
     )
 }
 
-pub async fn get_node_by_addr(addr: &str) -> Node {
+pub async fn get_node_by_addr(addr: &str) -> Option<Node> {
     let nodes = get_cached_nodes(|_| true).await.unwrap_or_default();
-    let node = nodes
-        .iter()
-        .find(|n| n.grpc_addr == addr)
-        .cloned()
-        .unwrap_or(Node::default());
-    node
+    nodes.iter().find(|n| n.grpc_addr == addr).cloned()
 }
 
 #[inline(always)]
