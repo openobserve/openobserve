@@ -201,7 +201,7 @@ pub async fn run(
                         );
                     }
                     Ok(actix_ws::AggregatedMessage::Text(msg)) => {
-                        log::info!("[WS_HANDLER]: Request Id: {} Node Role: {}, querier: {}, Received message: {}",
+                        log::debug!("[WS_HANDLER]: Request Id: {} Node Role: {}, querier: {}, Received message: {}",
                             req_id,
                             cfg.common.node_role,
                             cfg.common.instance_name,
@@ -551,7 +551,7 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
 
     if let Some(session) = sessions_cache_utils::get_session(req_id).await {
         if let Some(reason) = close_reason.as_ref() {
-            log::info!(
+            log::debug!(
                 "[WS_HANDLER]: req_id: {}, querier: {}, Closing session with reason: {:?}",
                 req_id,
                 cfg.common.instance_name,

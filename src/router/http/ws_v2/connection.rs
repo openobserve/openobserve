@@ -101,7 +101,7 @@ impl ResponseRouter {
                                                 * connection is closed */
                 })
                 .await;
-            log::info!(
+            log::debug!(
                 "[WS::QuerierConnection::ResponseRouter] flushed for trace_id: {}, querier_name: {}, force_remove: {}",
                 trace_id,
                 querier_name,
@@ -109,7 +109,7 @@ impl ResponseRouter {
             );
             count += 1;
         }
-        log::info!(
+        log::debug!(
             "[WS::QuerierConnection::ResponseRouter] flushed {count} routes for querier: {}, force_remove: {}",
             querier_name,
             force_remove
@@ -146,7 +146,7 @@ impl QuerierConnection {
         write_guard.remove(trace_id);
         write_guard.shrink_to_fit();
         drop(write_guard);
-        log::info!(
+        log::debug!(
             "[WS::Connection] removed trace_id {trace_id} from response_router-routes, router: {}, querier: {}",
             get_config().common.instance_name,
             self.querier_name
@@ -337,7 +337,7 @@ impl QuerierConnection {
         }
         drop(write_guard);
 
-        log::info!(
+        log::debug!(
             "[WS::QuerierConnection] removing connection from the pool: {}, force_remove: {}",
             self.querier_name,
             force_remove
@@ -372,7 +372,7 @@ impl ResponseRouter {
             let mut write_guard = self.routes.write().await;
             write_guard.retain(|trace_id, response_tx| {
                 if response_tx.is_closed() {
-                    log::info!("[WS::QuerierConnection] channel closed for trace_id {trace_id}. Removed from routes");
+                    log::debug!("[WS::QuerierConnection] channel closed for trace_id {trace_id}. Removed from routes");
                     false
                 } else {
                     true
