@@ -64,22 +64,23 @@ use crate::{
         ("end_time" = i64, Query, description = "end time"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!([
-          {
-            "timestamp": "1744642342595319615",
-            "node_role": [
-              "Querier"
-            ],
-            "node_name": "usertest-openobserve-querier-0",
-            "search_role": "follower",
-            "duration": 0,
-            "component": "storage load files",
-            "desc": "load files 5, memory cached 0, disk cached 5",
-            "search_storage_cache_took": 0,
-            "search_querier_files": 5,
-            "search_querier_memory_cached_files": 0,
-            "search_querier_disk_cached_files": 5
-          }])),
+        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+          "sql": "SELECT count(*) FROM \"default\" WHERE match_all('m')",
+          "start_time": "1744168877746000",
+          "end_time": "1744773677746000",
+          "total_duration": 2407,
+          "events": [
+            {
+              "timestamp": "1744773679038683087",
+              "node_role": [
+                "Ingester"
+              ],
+              "node_name": "usertest-openobserve-ingester-0",
+              "search_role": "follower",
+              "duration": 0,
+              "component": "wal:memtable load",
+              "desc": "wal mem search load groups 1, files 6, scan_size 16.01 MB, compressed_size 16.85 MB"
+            }]})),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
