@@ -43,6 +43,7 @@ use tokio::sync::{
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
 const HOUR_IN_MICRO: i64 = 3600 * 1000 * 1000;
+const FILE_DUMP_RECORD_BATCH_SIZE: usize = 10000;
 
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
     Arc::new(Schema::new(vec![
@@ -238,7 +239,14 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
     let start = offset;
     let end = offset + HOUR_IN_MICRO;
 
-    if stream.contains(StreamType::Filelist.as_str()) {
+    let columns = stream.split('/').collect::<Vec<&str>>();
+    if columns.len() != 3 {
+        log::warn!("invalid stream name format for {job_id} : {stream}");
+        infra::file_list::set_job_dumped_status(job_id, true).await?;
+        return Ok(());
+    }
+    let stream_type = StreamType::from(columns[1]);
+    if stream_type == StreamType::Filelist {
         // we do not want to dump the dumped files
         infra::file_list::set_job_dumped_status(job_id, true).await?;
         return Ok(());
@@ -331,15 +339,10 @@ async fn remove_files_from_file_list(ids: &[i64]) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn generate_dump_file(
-    org: &str,
-    stream: &str,
-    range: (i64, i64),
-    files: Vec<FileRecord>,
-) -> Result<(), anyhow::Error> {
-    // if there are no files to dump, no point in making a dump file
+fn create_record_batch(files: &[FileRecord]) -> Result<RecordBatch, anyhow::Error> {
+    let schema = FILE_LIST_SCHEMA.clone();
     if files.is_empty() {
-        return Ok(());
+        return Ok(RecordBatch::new_empty(schema));
     }
     let batch_size = files.len();
 
@@ -359,10 +362,10 @@ async fn generate_dump_file(
 
     for file in files {
         field_id.append_value(file.id);
-        field_org.append_value(file.org);
-        field_stream.append_value(file.stream);
-        field_date.append_value(file.date);
-        field_file.append_value(file.file);
+        field_org.append_value(file.org.clone());
+        field_stream.append_value(file.stream.clone());
+        field_date.append_value(file.date.clone());
+        field_file.append_value(file.file.clone());
         field_deleted.append_value(file.deleted);
         field_min_ts.append_value(file.min_ts);
         field_max_ts.append_value(file.max_ts);
@@ -372,8 +375,6 @@ async fn generate_dump_file(
         field_index_size.append_value(file.index_size);
         field_flattened.append_value(file.flattened);
     }
-
-    let schema = FILE_LIST_SCHEMA.clone();
 
     let batch = RecordBatch::try_new(
         schema.clone(),
@@ -393,10 +394,26 @@ async fn generate_dump_file(
             Arc::new(field_index_size.finish()),
         ],
     )?;
+    Ok(batch)
+}
 
+async fn generate_dump_file(
+    org: &str,
+    stream: &str,
+    range: (i64, i64),
+    files: Vec<FileRecord>,
+) -> Result<(), anyhow::Error> {
+    // if there are no files to dump, no point in making a dump file
+    if files.is_empty() {
+        return Ok(());
+    }
+    let batch_size = files.len();
     let mut buf = Vec::new();
-    let mut writer = get_writer(schema, &mut buf)?;
-    writer.write(&batch).await?;
+    let mut writer = get_writer(FILE_LIST_SCHEMA.clone(), &mut buf)?;
+    for chunk in files.chunks(FILE_DUMP_RECORD_BATCH_SIZE) {
+        let batch = create_record_batch(chunk)?;
+        writer.write(&batch).await?;
+    }
     writer.close().await?;
 
     let ts = chrono::DateTime::from_timestamp_micros(range.0).unwrap();

@@ -56,6 +56,17 @@ async fn get_dump_files_in_range(
     let end = round_down_to_hour(range.1) + HOUR_IN_MICRO;
 
     let list = infra::file_list::get_entries_in_range(org, stream, start, end).await?;
+    let list = list
+        .into_iter()
+        .filter(|f| {
+            let columns = f.stream.split('/').collect::<Vec<&str>>();
+            if columns.len() != 3 {
+                return false;
+            }
+            let stream_type = StreamType::from(columns[1]);
+            stream_type == StreamType::Filelist
+        })
+        .collect();
 
     Ok(list)
 }
@@ -309,10 +320,6 @@ pub async fn stats(
 
     let dump_files: Vec<_> = dump_files
         .into_iter()
-        .filter(|f| {
-            f.stream
-                .contains(&format!("{org_id}/{}", StreamType::Filelist))
-        })
         .map(|f| FileKey {
             key: format!("files/{}/{}/{}", f.stream, f.date, f.file),
             meta: (&f).into(),
