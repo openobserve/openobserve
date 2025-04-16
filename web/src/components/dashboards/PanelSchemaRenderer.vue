@@ -89,13 +89,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           :data="
             panelSchema.queryType === 'promql' ||
-            (data.length &&
-              data[0]?.length &&
-              panelData.chartType != 'geomap' &&
+            (panelData.chartType != 'geomap' &&
               panelData.chartType != 'table' &&
-              panelData.chartType != 'maps')
+              panelData.chartType != 'maps' &&
+              loading)
               ? panelData
-              : { options: { backgroundColor: 'transparent' } }
+              : noData == 'No Data'
+                ? {
+                    options: {
+                      backgroundColor: 'transparent',
+                    },
+                  }
+                : panelData
           "
           :height="chartPanelHeight"
           @updated:data-zoom="onDataZoom"
@@ -107,7 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
-          panelSchema.type != 'maps'
+          panelSchema.type != 'maps' &&
+          !loading
         "
         class="noData"
         data-test="no-data"
