@@ -294,7 +294,7 @@ pub async fn authentication(
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        _timestamp: chrono::Utc::now().timestamp_micros(),
+        _timestamp: now_micros(),
         protocol: Protocol::Http(HttpMeta {
             method: "POST".to_string(),
             path: "/auth/login".to_string(),
@@ -443,7 +443,7 @@ pub async fn get_presigned_url(
         let audit_message = AuditMessage {
             user_email: basic_auth.user_id().to_string(),
             org_id: "".to_string(),
-            _timestamp: chrono::Utc::now().timestamp_micros(),
+            _timestamp: now_micros(),
             protocol: Protocol::Http(HttpMeta {
                 method: "GET".to_string(),
                 path: "/auth/presigned-url".to_string(),
@@ -483,7 +483,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         let mut audit_message = AuditMessage {
             user_email: "".to_string(),
             org_id: "".to_string(),
-            _timestamp: chrono::Utc::now().timestamp_micros(),
+            _timestamp: now_micros(),
             protocol: Protocol::Http(HttpMeta {
                 method: "GET".to_string(),
                 path: "/auth/login".to_string(),

@@ -1971,6 +1971,7 @@ mod tests {
                 .num_microseconds()
                 .unwrap();
         let trigger = Trigger {
+            id: 1,
             org: "e2e".to_string(),
             module: config::meta::triggers::TriggerModule::Alert,
             module_key: id.to_string(),
@@ -2022,6 +2023,7 @@ mod tests {
         assert!(id.is_some());
         let id = id.unwrap();
         let trigger = Trigger {
+            id: 1,
             org: "e2e".to_string(),
             module: config::meta::triggers::TriggerModule::Alert,
             module_key: id.to_string(),
@@ -2088,6 +2090,7 @@ mod tests {
                 .num_microseconds()
                 .unwrap();
         let trigger = Trigger {
+            id: 1,
             org: "e2e".to_string(),
             module: config::meta::triggers::TriggerModule::Alert,
             module_key: id.to_string(),

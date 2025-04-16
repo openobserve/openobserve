@@ -133,7 +133,7 @@ async fn audit_middleware(
             audit(AuditMessage {
                 user_email,
                 org_id,
-                _timestamp: chrono::Utc::now().timestamp_micros(),
+                _timestamp: now_micros(),
                 protocol: Protocol::Http(HttpMeta {
                     method,
                     path,

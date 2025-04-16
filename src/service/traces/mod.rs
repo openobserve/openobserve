@@ -29,7 +29,7 @@ use config::{
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema_ext::SchemaExt},
+    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
 };
 use hashbrown::HashSet;
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
@@ -905,7 +905,7 @@ async fn write_traces(
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts {
             if triggers.len() < alerts.len() {
-                let alert_end_time = chrono::Utc::now().timestamp_micros();
+                let alert_end_time = now_micros();
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",

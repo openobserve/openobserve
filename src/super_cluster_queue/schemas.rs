@@ -71,7 +71,7 @@ async fn merge(msg: Message) -> Result<()> {
             let msg = Message {
                 key: msg.key,
                 value: msg.value,
-                start_dt: Some(chrono::Utc::now().timestamp_micros()),
+                start_dt: Some(now_micros()),
                 need_watch: msg.need_watch,
                 message_type: msg.message_type,
                 source_cluster: msg.source_cluster,

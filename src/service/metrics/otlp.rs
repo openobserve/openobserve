@@ -33,7 +33,7 @@ use config::{
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema_ext::SchemaExt},
+    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
 };
 use hashbrown::HashSet;
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
@@ -515,7 +515,7 @@ pub async fn handle_otlp_request(
                 );
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = chrono::Utc::now().timestamp_micros();
+                    let alert_end_time = now_micros();
                     for alert in alerts {
                         match alert.evaluate(Some(val_map), (None, alert_end_time)).await {
                             Ok(res) if res.data.is_some() => {
