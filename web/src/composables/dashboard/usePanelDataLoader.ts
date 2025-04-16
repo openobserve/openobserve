@@ -342,8 +342,13 @@ export const usePanelDataLoader = (
     endISOTimestamp: string,
     histogramInterval: string | null,
   ) => {
+    const sql = store.state.zoConfig.sql_base64_enabled
+      ? b64EncodeUnicode(
+          await changeHistogramInterval(query, histogramInterval ?? null),
+        )
+      : await changeHistogramInterval(query, histogramInterval ?? null);
     return {
-      sql: await changeHistogramInterval(query, histogramInterval ?? null),
+      sql,
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
@@ -378,7 +383,12 @@ export const usePanelDataLoader = (
           queryService.partition({
             org_identifier: store.state.selectedOrganization.identifier,
             query: {
-              sql: query,
+              sql: store.state.zoConfig.sql_base64_enabled
+                ? b64EncodeUnicode(query)
+                : query,
+              encoding: store.state.zoConfig.sql_base64_enabled
+                ? "base64"
+                : null,
               query_fn: it.vrlFunctionQuery
                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                 : null,
@@ -458,6 +468,9 @@ export const usePanelDataLoader = (
                       partition[1],
                       histogramInterval,
                     ),
+                    encoding: store.state.zoConfig.sql_base64_enabled
+                      ? "base64"
+                      : null,
                   },
                   page_type: pageType,
                   traceparent,
@@ -772,13 +785,17 @@ export const usePanelDataLoader = (
         traceId: string;
         org_id: string;
         pageType: string;
+        encoding: string | null;
       } = {
         queryReq: {
-          query,
+          query: store.state.zoConfig.sql_base64_enabled
+            ? b64EncodeUnicode(query)
+            : query,
           it,
           startISOTimestamp,
           endISOTimestamp,
           currentQueryIndex,
+          encoding: store.state.zoConfig.sql_base64_enabled ? "base64" : null,
         },
         type: "histogram",
         isPagination: false,
