@@ -19,7 +19,9 @@ use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
-    TIMESTAMP_COL_NAME, get_config, ider,
+    TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config, ider,
     meta::{
         cluster::RoleGroup,
         search,
@@ -32,6 +34,7 @@ use config::{
         base64, json,
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_aggregate_query},
+        time::now_micros,
     },
 };
 use datafusion::distributed_plan::streaming_aggs_exec;
@@ -53,14 +56,17 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::make_grpc_search_client, o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, tracing::info_span,
+    crate::service::grpc::make_grpc_search_client,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
+    std::collections::HashSet, tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
     handler::grpc::request::search::Searcher,
+    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
 pub(crate) mod cache;
@@ -69,6 +75,7 @@ pub(crate) mod datafusion;
 pub(crate) mod grpc;
 pub(crate) mod grpc_search;
 pub(crate) mod index;
+pub(crate) mod inspector;
 pub(crate) mod partition;
 pub(crate) mod request;
 pub(crate) mod sql;
@@ -109,7 +116,7 @@ pub async fn search(
     in_req: &search::Request,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
+    let started_at = now_micros();
     let cfg = get_config();
 
     let trace_id = if trace_id.is_empty() {
@@ -186,7 +193,28 @@ pub async fn search(
         Ok(Err(e)) => Err(e),
         Err(e) => Err(Error::Message(e.to_string())),
     };
-    log::info!("[trace_id {trace_id}] in leader task finish");
+
+    let search_role = "leader".to_string();
+
+    #[cfg(feature = "enterprise")]
+    let search_role = if get_o2_config().super_cluster.enabled {
+        "super".to_string()
+    } else {
+        search_role
+    };
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] in leader task finish"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("service:search leader finish".to_string())
+                .search_role(search_role)
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     // remove task because task if finished
     let mut _work_group = None;

@@ -15,10 +15,13 @@
 
 use std::{collections::HashSet, str::FromStr};
 
-use config::meta::{
-    alerts::alert::{Alert, ListAlertsParams},
-    folder::{DEFAULT_FOLDER, Folder},
-    stream::StreamType,
+use config::{
+    meta::{
+        alerts::alert::{Alert, ListAlertsParams},
+        folder::{DEFAULT_FOLDER, Folder},
+        stream::StreamType,
+    },
+    utils::time::now_micros,
 };
 use infra::{
     cluster_coordinator::alerts as cluster,
@@ -80,7 +83,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
             let mut trigger = db::scheduler::Trigger {
                 org: org_id.to_string(),
                 module_key: schedule_key.clone(),
-                next_run_at: chrono::Utc::now().timestamp_micros(),
+                next_run_at: now_micros(),
                 is_realtime: alert.is_real_time,
                 is_silenced: false,
                 ..Default::default()
@@ -159,7 +162,7 @@ pub async fn create<C: TransactionTrait>(
     let trigger = db::scheduler::Trigger {
         org: org_id.to_string(),
         module_key: schedule_key.clone(),
-        next_run_at: chrono::Utc::now().timestamp_micros(),
+        next_run_at: now_micros(),
         is_realtime: alert.is_real_time,
         is_silenced: false,
         ..Default::default()
@@ -189,7 +192,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     let mut trigger = db::scheduler::Trigger {
         org: org_id.to_string(),
         module_key: schedule_key.clone(),
-        next_run_at: chrono::Utc::now().timestamp_micros(),
+        next_run_at: now_micros(),
         is_realtime: alert.is_real_time,
         is_silenced: false,
         ..Default::default()

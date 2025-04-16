@@ -84,7 +84,8 @@ async fn handle_alert_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    let scheduler_trace_id = format!("{}/{}", trace_id, ider::uuid());
+    let query_trace_id = ider::generate_trace_id();
+    let scheduler_trace_id = format!("{}/{}", trace_id, query_trace_id);
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_alert_triggers: processing trigger: {}",
@@ -293,7 +294,9 @@ async fn handle_alert_triggers(
 
     let evaluation_took = Instant::now();
     // evaluate alert
-    let result = alert.evaluate(None, (start_time, now)).await;
+    let result = alert
+        .evaluate(None, (start_time, now), Some(query_trace_id))
+        .await;
     let evaluation_took = evaluation_took.elapsed().as_secs_f64();
     trigger_data_stream.evaluation_took_in_secs = Some(evaluation_took);
     if result.is_err() {
@@ -537,7 +540,7 @@ async fn handle_report_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    let scheduler_trace_id = format!("{}/{}", trace_id, ider::uuid());
+    let scheduler_trace_id = format!("{}/{}", trace_id, ider::generate_trace_id());
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_report_trigger,org: {}, module_key: {}",
@@ -734,7 +737,8 @@ async fn handle_derived_stream_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    let scheduler_trace_id = format!("{}/{}", trace_id, ider::uuid());
+    let query_trace_id = ider::generate_trace_id();
+    let scheduler_trace_id = format!("{}/{}", trace_id, query_trace_id);
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_derived_stream_triggers processing trigger: {}",
         trigger.module_key
@@ -993,7 +997,11 @@ async fn handle_derived_stream_triggers(
 
         // evaluate trigger and configure trigger next run time
         match derived_stream
-            .evaluate((start, end), &trigger.module_key)
+            .evaluate(
+                (start, end),
+                &trigger.module_key,
+                Some(query_trace_id.clone()),
+            )
             .await
         {
             Err(e) => {

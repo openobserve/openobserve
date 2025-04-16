@@ -16,7 +16,7 @@
 use config::{
     get_config,
     meta::stream::{ALL_STREAM_TYPES, FileKey, PartitionTimeLevel},
-    utils::time::BASE_TIME,
+    utils::time::{BASE_TIME, now_micros},
 };
 use infra::file_list as infra_file_list;
 
@@ -45,7 +45,7 @@ pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
 
     // load stream list
     let start_time = BASE_TIME.timestamp_micros();
-    let end_time = chrono::Utc::now().timestamp_micros();
+    let end_time = now_micros();
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs.iter() {
         for stream_type in ALL_STREAM_TYPES {

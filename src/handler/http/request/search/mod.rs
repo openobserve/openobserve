@@ -64,6 +64,7 @@ pub(crate) mod error_utils;
 pub mod multi_streams;
 pub mod query_manager;
 pub mod saved_view;
+pub mod search_inspector;
 pub mod search_job;
 pub(crate) mod utils;
 
