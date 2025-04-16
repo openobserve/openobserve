@@ -30,6 +30,7 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::{
+    dist_lock,
     file_list::FileRecord,
     schema::{STREAM_SCHEMAS_LATEST, SchemaCache},
 };
@@ -96,45 +97,41 @@ static FILE_LIST_DUMP_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
 // and before enqueing, check if the job_id is already waiting in queue or not.
 static ONGOING_JOB_IDS: Lazy<RwLock<HashSet<i64>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
-async fn lock_stream(org: &str, stream: &str) -> Option<()> {
-    // we make this dummy stream name, because the actual file_list stream will also
-    // be used by compactor to compact the dump files
-    let stream_name = format!("file_list_dump/{stream}");
-    let (_, node) = db::compact::files::get_offset(org, StreamType::Filelist, &stream_name).await;
+async fn lock_stream(org_id: &str, stream_type: StreamType, stream_name: &str) -> Option<()> {
+    let (_, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return None; // other node is processing
     }
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let lock_key = format!(
-            "/file_list_dump/{}/{}/{}",
-            org,
-            StreamType::Filelist,
-            stream,
-        );
-        let locker = match infra::dist_lock::lock(&lock_key, 10).await {
-            Ok(l) => l,
+        let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let locker = match dist_lock::lock(&lock_key, 0).await {
+            Ok(v) => v,
             Err(_) => return None,
         };
         // check the working node again, maybe other node locked it first
-        let (_, node) =
-            db::compact::files::get_offset(org, StreamType::Filelist, &stream_name).await;
+        let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
         if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
-            let _ = infra::dist_lock::unlock(&locker).await;
+            // we cannot do anything even if unlock fails, so ignore
+            let _ = dist_lock::unlock(&locker).await;
             return None; // other node is processing
         }
         // set to current node
-        let _ = db::compact::files::set_offset(
-            org,
-            StreamType::Filelist,
-            &stream_name,
-            0, // we don't care about the actual offset
+        let ret = db::compact::files::set_offset(
+            org_id,
+            stream_type,
+            stream_name,
+            offset,
             Some(&LOCAL_NODE.uuid.clone()),
         )
         .await;
-        let _ = infra::dist_lock::unlock(&locker).await;
+        let _ = dist_lock::unlock(&locker).await;
         drop(locker);
+        match ret {
+            Ok(_) => {}
+            Err(_) => return None,
+        }
     }
     Some(())
 }
@@ -252,7 +249,7 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
         return Ok(());
     }
 
-    if lock_stream(org, stream).await.is_none() {
+    if lock_stream(org, stream_type, stream).await.is_none() {
         // someone else is processing this.
         return Ok(());
     }
