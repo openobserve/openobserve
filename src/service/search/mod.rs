@@ -791,6 +791,17 @@ pub async fn search_partition(
     }
 
     let is_histogram = sql.histogram_interval.is_some();
+    let sql_order_by = sql
+        .order_by
+        .first()
+        .map(|(field, order_by)| {
+            if field == &ts_column.clone().unwrap_or_default() && order_by == &OrderBy::Asc {
+                OrderBy::Asc
+            } else {
+                OrderBy::Desc
+            }
+        })
+        .unwrap_or(OrderBy::Desc);
 
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
@@ -800,15 +811,8 @@ pub async fn search_partition(
     );
 
     // Generate partitions
-    let mut partitions = generator.generate_partitions(req.start_time, req.end_time, step);
-
-    // We need to reverse partitions if query is ASC order
-    if let Some((field, order_by)) = sql.order_by.first() {
-        if field == &ts_column.unwrap_or_default() && order_by == &OrderBy::Asc {
-            resp.order_by = OrderBy::Asc;
-            partitions.reverse();
-        }
-    }
+    let partitions =
+        generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
 
     resp.partitions = partitions;
     Ok(resp)
