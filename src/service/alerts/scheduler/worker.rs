@@ -216,6 +216,7 @@ impl SchedulerJobPuller {
             let mut jobs = Vec::with_capacity(triggers.len());
             for trigger in triggers {
                 let job_id = trigger.id;
+                let job_key = trigger.module_key.clone();
                 let (tx, mut rx) = mpsc::channel::<()>(1);
                 let scheduled_job = ScheduledJob {
                     trace_id: trace_id.clone(),
@@ -234,9 +235,10 @@ impl SchedulerJobPuller {
                             _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
                             _ = rx.recv() => {
                                 log::debug!(
-                                    "[SCHEDULER][JobPuller-{}] keep_alive for job[{}] done",
+                                    "[SCHEDULER][JobPuller-{}] keep_alive for job[{}] trigger[{}] done",
                                     trace_id_keep_alive,
-                                    job_id
+                                    job_id,
+                                    job_key
                                 );
                                 return;
                             }
@@ -246,9 +248,10 @@ impl SchedulerJobPuller {
                                 .await
                         {
                             log::error!(
-                                "[SCHEDULER][JobPuller-{}] keep_alive for job[{}] failed: {}",
+                                "[SCHEDULER][JobPuller-{}] keep_alive for job[{}] trigger[{}] failed: {}",
                                 trace_id_keep_alive,
                                 job_id,
+                                job_key,
                                 e
                             );
                         }
