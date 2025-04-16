@@ -25,6 +25,7 @@ use config::{
         search::{SearchEventContext, SearchEventType},
         sql::resolve_stream_names,
     },
+    utils::sql::is_timestamp_selected,
 };
 use cron::Schedule;
 
@@ -43,7 +44,15 @@ pub async fn save(
             if let Some(sql) = &derived_stream.query_condition.sql {
                 if sql.is_empty() {
                     return Err(anyhow::anyhow!(
-                        "DerivedStreams with SQL mode should have a query"
+                        "Scheduled pipeline with SQL mode should have a query"
+                    ));
+                }
+
+                // check if _timestamp is a selected field, or _timestamp as an alias
+                if !is_timestamp_selected(sql)? {
+                    return Err(anyhow::anyhow!(
+                        "SQL for scheduled pipeline must include _timestamp, or aliased as _timestamp.\n\
+                        e.g. SELECT app_name, MAX(_timestamp) AS _timestamp FROM ..."
                     ));
                 }
 
@@ -73,7 +82,7 @@ pub async fn save(
                 }
             } else {
                 return Err(anyhow::anyhow!(
-                    "DerivedStreams with SQL mode should have a query"
+                    "Scheduled pipeline with SQL mode should have a query"
                 ));
             }
         }
@@ -86,7 +95,7 @@ pub async fn save(
                 || derived_stream.query_condition.promql_condition.is_none()
             {
                 return Err(anyhow::anyhow!(
-                    "DerivedStreams with SQL mode should have a query"
+                    "Scheduled pipeline with SQL mode should have a query"
                 ));
             }
         }
