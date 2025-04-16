@@ -2456,6 +2456,7 @@ dependencies = [
  "chromiumoxide",
  "chrono",
  "cityhasher",
+ "cron",
  "dashmap",
  "datafusion",
  "dotenv_config",

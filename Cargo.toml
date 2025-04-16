@@ -85,7 +85,7 @@ clap = { version = "4.1", default-features = false, features = [
     "cargo",
 ] }
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
-cron = "0.15"
+cron.workspace = true
 csv = "1.3"
 dashmap.workspace = true
 datafusion.workspace = true
@@ -238,6 +238,7 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
+cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
 datafusion = "45.0.0"
 datafusion-proto = "45.0.0"
