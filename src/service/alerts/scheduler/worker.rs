@@ -27,6 +27,7 @@ use crate::service::db::scheduler::{Trigger, TriggerModule, pull as scheduler_pu
 pub struct ScheduledJob {
     pub trace_id: String,
     pub trigger: Trigger,
+    pub stop_keep_alive_tx: mpsc::Sender<()>,
 }
 
 /// Configuration for the scheduler
@@ -83,56 +84,36 @@ impl SchedulerWorker {
 
             match job {
                 Some(job) => {
+                    let job_id = job.trigger.id;
+                    let job_key = job.trigger.module_key.to_string();
                     log::debug!(
-                        "[SCHEDULER][Worker-{}] trace_id: {} Processing trigger: {}",
+                        "[SCHEDULER][Worker-{}] trace_id: {} Processing job[{}], trigger: {}",
                         self.id,
                         job.trace_id,
-                        job.trigger.module_key
+                        job_id,
+                        job_key
                     );
 
-                    // keep alive the job while processing it
-                    let trace_id_keep_alive = job.trace_id.clone();
-                    let job_ids = vec![job.trigger.id];
-                    let ttl = self.config.keep_alive_interval_secs;
-                    let alert_timeout = self.config.alert_schedule_timeout;
-                    let report_timeout = self.config.report_schedule_timeout;
-                    let (_tx, mut rx) = mpsc::channel::<()>(1);
-                    tokio::task::spawn(async move {
-                        loop {
-                            tokio::select! {
-                                _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
-                                _ = rx.recv() => {
-                                    log::debug!(
-                                        "[SCHEDULER][Worker-{}] keep_alive for job {:?} done",
-                                        trace_id_keep_alive,
-                                        job_ids,
-                                    );
-                                    return;
-                                }
-                            }
-                            if let Err(e) = infra::scheduler::keep_alive(
-                                &job_ids,
-                                alert_timeout,
-                                report_timeout,
-                            )
-                            .await
-                            {
-                                log::error!(
-                                    "[SCHEDULER][Worker-{}] keep_alive for job {:?} failed: {}",
-                                    trace_id_keep_alive,
-                                    job_ids,
-                                    e
-                                );
-                            }
-                        }
-                    });
-
                     // Process the trigger
-                    if let Err(e) = self.handle_trigger(&job.trace_id, job.trigger).await {
+                    let ret = self.handle_trigger(&job.trace_id, job.trigger).await;
+                    // Stop the keep alive for the job
+                    if let Err(e) = job.stop_keep_alive_tx.send(()).await {
                         log::error!(
-                            "[SCHEDULER][Worker-{}] trace_id: {} Error handling trigger: {}",
+                            "[SCHEDULER][Worker-{}] trace_id: {} Error stopping keep alive for job[{}], trigger: {}, error: {}",
                             self.id,
                             job.trace_id,
+                            job_id,
+                            job_key,
+                            e
+                        );
+                    }
+                    if let Err(e) = ret {
+                        log::error!(
+                            "[SCHEDULER][Worker-{}] trace_id: {} Error handling job[{}], trigger: {}, error: {}",
+                            self.id,
+                            job.trace_id,
+                            job_id,
+                            job_key,
                             e
                         );
                     }
@@ -232,46 +213,52 @@ impl SchedulerJobPuller {
 
             // keep alive the jobs before sending them to the workers
             // but need to release the thread after the job is sent to the worker
-            let trace_id_keep_alive = trace_id.clone();
-            let job_ids = triggers.iter().map(|t| t.id).collect::<Vec<_>>();
-            let ttl = self.config.keep_alive_interval_secs;
-            let alert_timeout = self.config.alert_schedule_timeout;
-            let report_timeout = self.config.report_schedule_timeout;
-            let (_tx, mut rx) = mpsc::channel::<()>(1);
-            tokio::task::spawn(async move {
-                loop {
-                    tokio::select! {
-                        _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
-                        _ = rx.recv() => {
-                            log::debug!(
-                                "[SCHEDULER][JobPuller-{}] keep_alive for jobs {:?} done",
-                                trace_id_keep_alive,
-                                job_ids
-                            );
-                            return;
-                        }
-                    }
-                    if let Err(e) =
-                        infra::scheduler::keep_alive(&job_ids, alert_timeout, report_timeout).await
-                    {
-                        log::error!(
-                            "[SCHEDULER][JobPuller-{}] keep_alive for jobs {:?} failed: {}",
-                            trace_id_keep_alive,
-                            job_ids,
-                            e
-                        );
-                    }
-                }
-            });
-
-            // Send all triggers to be processed
+            let mut jobs = Vec::with_capacity(triggers.len());
             for trigger in triggers {
+                let job_id = trigger.id;
+                let (tx, mut rx) = mpsc::channel::<()>(1);
                 let scheduled_job = ScheduledJob {
                     trace_id: trace_id.clone(),
                     trigger,
+                    stop_keep_alive_tx: tx,
                 };
+                jobs.push(scheduled_job);
 
-                if self.tx.send(scheduled_job).await.is_err() {
+                let trace_id_keep_alive = trace_id.clone();
+                let ttl = self.config.keep_alive_interval_secs;
+                let alert_timeout = self.config.alert_schedule_timeout;
+                let report_timeout = self.config.report_schedule_timeout;
+                tokio::task::spawn(async move {
+                    loop {
+                        tokio::select! {
+                            _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
+                            _ = rx.recv() => {
+                                log::debug!(
+                                    "[SCHEDULER][JobPuller-{}] keep_alive for job[{}] done",
+                                    trace_id_keep_alive,
+                                    job_id
+                                );
+                                return;
+                            }
+                        }
+                        if let Err(e) =
+                            infra::scheduler::keep_alive(&[job_id], alert_timeout, report_timeout)
+                                .await
+                        {
+                            log::error!(
+                                "[SCHEDULER][JobPuller-{}] keep_alive for job[{}] failed: {}",
+                                trace_id_keep_alive,
+                                job_id,
+                                e
+                            );
+                        }
+                    }
+                });
+            }
+
+            // Send all jobs to be processed
+            for job in jobs {
+                if self.tx.send(job).await.is_err() {
                     log::error!(
                         "[SCHEDULER][JobPuller-{}] Channel closed, exiting job puller",
                         trace_id
