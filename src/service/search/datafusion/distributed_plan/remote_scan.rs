@@ -382,14 +382,14 @@ async fn get_remote_batch(
         scan_stats.lock().add(&stats);
     }
 
-    let node_name = get_node_by_addr(&node.get_grpc_addr()).await;
+    let node_finded = get_node_by_addr(&node.get_grpc_addr()).await;
     Ok(Box::pin(FlightStream::new(
         trace_id,
         context,
         schema,
         stream,
         node.get_grpc_addr(),
-        node_name,
+        node_finded.name,
         is_querier,
         files,
         scan_size,
