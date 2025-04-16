@@ -17,7 +17,7 @@ export default class ChartTypeSelector {
     await chartOption.click();
   }
 
-  // Strem Type select
+  //  Stream Type select
   async selectStreamType(type) {
     // Click the dropdown
     await this.page.locator('[data-test="index-dropdown-stream_type"]').click();
@@ -55,10 +55,6 @@ export default class ChartTypeSelector {
     await searchInput.click();
     await searchInput.fill(fieldName);
 
-    // await this.page.waitForSelector(
-    //   `[data-test="index-field-item"]:has-text("${fieldName}")`
-    // );
-
     const buttonSelectors = {
       x: '[data-test="dashboard-add-x-data"]',
       y: '[data-test="dashboard-add-y-data"]',
@@ -79,7 +75,7 @@ export default class ChartTypeSelector {
     await this.page.locator(buttonSelector).click();
   }
 
-  async addFilterCondition1(initialFieldName, newFieldName, operator, value) {
+  async addFilterCondition(initialFieldName, newFieldName, operator, value) {
     // Step 1: Click the existing field if provided
     if (initialFieldName) {
       await this.page

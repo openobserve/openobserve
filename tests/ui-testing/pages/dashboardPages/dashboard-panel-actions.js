@@ -7,12 +7,11 @@ export default class DashboardactionPage {
 
     this.panelNameInput = page.locator('[data-test="dashboard-panel-name"]');
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
-    this.applydashbaord = page.locator('[data-test="dashboard-apply"]');
-    this.applydashbaord = page.locator('[data-test="dashboard-apply"]');
+    this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
   }
 
   // Add panel name
-  async AddPanelName(panelName) {
+  async addPanelName(panelName) {
     await this.panelNameInput.click();
     await this.panelNameInput.fill(panelName);
   }
@@ -24,7 +23,7 @@ export default class DashboardactionPage {
 
   //Apply dashboard button
   async ApplyDashboardBtn() {
-    await this.applydashbaord.click();
+    await this.applyDashboard.click();
   }
 
   // Wait for chart to render

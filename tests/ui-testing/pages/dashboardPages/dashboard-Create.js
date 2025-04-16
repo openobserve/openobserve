@@ -35,7 +35,7 @@ export default class DashboardCreate {
   }
 
   //Add Panel to dashboard
-  async AddPanel() {
+  async addPanel() {
     await expect(this.addPanelIfEmptyBtn).toBeVisible({ timeout: 5000 });
     await this.addPanelIfEmptyBtn.click();
   }

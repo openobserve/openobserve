@@ -48,7 +48,7 @@ test.describe("dashboard filter testcases", () => {
 
     await dashboardCreate.createDashboard(randomDashboardName);
 
-    await dashboardCreate.AddPanel();
+    await dashboardCreate.addPanel();
 
     await chartTypeSelector.selectChartType("stacked");
 
@@ -64,7 +64,7 @@ test.describe("dashboard filter testcases", () => {
 
     await dateTimeHelper.setRelativeTimeRange("6-w");
 
-    dashboardPageActions.waitForChartToRender();
+    await dashboardPageActions.waitForChartToRender();
 
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
@@ -80,9 +80,9 @@ test.describe("dashboard filter testcases", () => {
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
-    dashboardPageActions.AddPanelName(randomDashboardName);
+    await dashboardPageActions.addPanelName(randomDashboardName);
 
-    dashboardPageActions.SavePanel();
+    await dashboardPageActions.SavePanel();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
 
