@@ -36,6 +36,7 @@ use {
     actix_http::h1::Payload,
     actix_web::{HttpMessage, web::BytesMut},
     base64::{Engine as _, engine::general_purpose},
+    config::utils::time::now_micros,
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, HttpMeta, Protocol},

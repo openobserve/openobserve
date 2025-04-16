@@ -15,7 +15,10 @@
 
 use arrow::datatypes::Schema;
 use async_recursion::async_recursion;
-use config::{meta::stream::StreamType, utils::json};
+use config::{
+    meta::stream::StreamType,
+    utils::{json, time::now_micros},
+};
 use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 

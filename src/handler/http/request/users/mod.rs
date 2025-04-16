@@ -31,6 +31,7 @@ use strum::IntoEnumIterator;
 use {
     crate::common::utils::auth::check_permissions,
     crate::service::self_reporting::audit,
+    config::utils::time::now_micros,
     o2_dex::config::get_config as get_dex_config,
     o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol},
     o2_openfga::config::get_config as get_openfga_config,

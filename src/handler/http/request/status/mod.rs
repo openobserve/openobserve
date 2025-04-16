@@ -46,7 +46,10 @@ use {
         validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
     crate::service::self_reporting::audit,
-    config::{ider, utils::base64},
+    config::{
+        ider,
+        utils::{base64, time::now_micros},
+    },
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
