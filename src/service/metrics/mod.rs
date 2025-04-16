@@ -75,5 +75,8 @@ fn get_exclude_labels() -> Vec<&'static str> {
 
 // format stream name
 pub fn format_label_name(label: &str) -> String {
-    RE_CORRECT_LABEL_NAME.replace_all(label, "_").to_string()
+    RE_CORRECT_LABEL_NAME
+        .replace_all(label, "_")
+        .to_string()
+        .to_lowercase()
 }

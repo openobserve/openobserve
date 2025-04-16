@@ -16,7 +16,10 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Duration;
-use config::{metrics::DB_QUERY_NUMS, utils::hash::Sum64};
+use config::{
+    metrics::DB_QUERY_NUMS,
+    utils::{hash::Sum64, time::now_micros},
+};
 use sqlx::Row;
 
 use super::{
@@ -322,6 +325,38 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         Ok(())
     }
 
+    /// Keeps the trigger alive
+    async fn keep_alive(&self, ids: &[i64], alert_timeout: i64, report_timeout: i64) -> Result<()> {
+        let now = now_micros();
+        let report_max_time = now
+            + Duration::try_seconds(report_timeout)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        let alert_max_time = now
+            + Duration::try_seconds(alert_timeout)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+
+        let sql = format!(
+            "UPDATE scheduled_jobs SET end_time = CASE WHEN module = ? THEN ? ELSE ? END WHERE id IN ({});",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        let pool = CLIENT.clone();
+        sqlx::query(&sql)
+            .bind(TriggerModule::Alert)
+            .bind(alert_max_time)
+            .bind(report_max_time)
+            .execute(&pool)
+            .await?;
+
+        Ok(())
+    }
+
     /// Returns the Trigger jobs with "Waiting" status.
     /// Steps:
     /// - Read the records with status "Waiting", oldest createdAt, next_run_at <= now and limit =
@@ -337,7 +372,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         report_timeout: i64,
     ) -> Result<Vec<Trigger>> {
         log::debug!("Start pulling scheduled_job");
-        let now = chrono::Utc::now().timestamp_micros();
+        let now = now_micros();
         let report_max_time = now
             + Duration::try_seconds(report_timeout)
                 .unwrap()
@@ -416,8 +451,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
 FROM scheduled_jobs
 WHERE status = ? AND next_run_at <= ? AND NOT (is_realtime = ? AND is_silenced = ?)
 ORDER BY next_run_at
-LIMIT ?
-FOR UPDATE;
+LIMIT ?;
             "#,
         )
         .bind(TriggerStatus::Waiting)
@@ -656,7 +690,7 @@ WHERE id IN ({});",
     /// - Update their status back to "Waiting" and increase their "retries" by 1
     async fn watch_timeout(&self) -> Result<()> {
         let pool = CLIENT.clone();
-        let now = chrono::Utc::now().timestamp_micros();
+        let now = now_micros();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs", ""])
             .inc();

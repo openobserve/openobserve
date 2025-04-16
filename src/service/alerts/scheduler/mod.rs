@@ -24,11 +24,19 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();
 
     // Create scheduler config
+    let keep_alive_interval_secs = std::cmp::max(
+        60,
+        std::cmp::min(
+            cfg.limit.alert_schedule_timeout,
+            cfg.limit.report_schedule_timeout,
+        ) / 4,
+    ) as u64;
     let scheduler_config = worker::SchedulerConfig {
         alert_schedule_concurrency: cfg.limit.alert_schedule_concurrency,
         alert_schedule_timeout: cfg.limit.alert_schedule_timeout,
         report_schedule_timeout: cfg.limit.report_schedule_timeout,
         poll_interval_secs: cfg.limit.alert_schedule_interval as u64, // Can be configurable
+        keep_alive_interval_secs,
     };
 
     // Create and run scheduler

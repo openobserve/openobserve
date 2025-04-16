@@ -36,6 +36,7 @@ use {
     actix_http::h1::Payload,
     actix_web::{HttpMessage, web::BytesMut},
     base64::{Engine as _, engine::general_purpose},
+    config::utils::time::now_micros,
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, HttpMeta, Protocol},
@@ -136,7 +137,7 @@ async fn audit_middleware(
             audit(AuditMessage {
                 user_email,
                 org_id,
-                _timestamp: chrono::Utc::now().timestamp_micros(),
+                _timestamp: now_micros(),
                 protocol: Protocol::Http(HttpMeta {
                     method,
                     path,

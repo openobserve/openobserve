@@ -34,6 +34,7 @@ use config::{
     utils::{
         json::{Map, Value, estimate_json_bytes, get_string_value, pickup_string_value},
         schema_ext::SchemaExt,
+        time::now_micros,
     },
 };
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
@@ -417,7 +418,7 @@ async fn write_logs(
         // start check for alert trigger
         if let Some(alerts) = cur_stream_alerts {
             if triggers.len() < alerts.len() {
-                let end_time = chrono::Utc::now().timestamp_micros();
+                let end_time = now_micros();
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
