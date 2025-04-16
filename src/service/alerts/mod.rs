@@ -181,7 +181,7 @@ impl QueryConditionExt for QueryCondition {
                 };
                 let promql::value::Value::Matrix(value) = resp else {
                     log::warn!(
-                        "Alert evaluate: PromQL query {} returned unexpected response: {:?}",
+                        "Alert evaluate: trace_id: {trace_id}, PromQL query {} returned unexpected response: {:?}",
                         v,
                         resp
                     );
@@ -342,7 +342,7 @@ impl QueryConditionExt for QueryCondition {
                 per_query_response: false, // Will return results in single array
             };
             log::debug!(
-                "evaluate_scheduled begin to call SearchService::search_multi, {:?}",
+                "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search_multi, {:?}",
                 req
             );
             SearchService::grpc_search::grpc_search_multi(
@@ -396,7 +396,7 @@ impl QueryConditionExt for QueryCondition {
                 local_mode: None,
             };
             log::debug!(
-                "evaluate_scheduled begin to call SearchService::search, {:?}",
+                "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search, {:?}",
                 req
             );
             // SearchService::search(&trace_id, org_id, stream_type, None, &req).await
@@ -460,7 +460,10 @@ impl QueryConditionExt for QueryCondition {
                 _ => {}
             }
         });
-        log::debug!("alert resp hits len:{:#?}", records.len());
+        log::debug!(
+            "alert trace_id: {trace_id}, resp hits len:{:#?}",
+            records.len()
+        );
         eval_results.query_took = Some(resp.took as i64);
         eval_results.data = if self.search_event_type.is_none() {
             let threshold = trigger_condition.threshold as usize;

@@ -84,7 +84,7 @@ async fn handle_alert_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    let query_trace_id = ider::uuid();
+    let query_trace_id = ider::generate_trace_id();
     let scheduler_trace_id = format!("{}/{}", trace_id, query_trace_id);
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
@@ -540,7 +540,7 @@ async fn handle_report_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    let scheduler_trace_id = format!("{}/{}", trace_id, ider::uuid());
+    let scheduler_trace_id = format!("{}/{}", trace_id, ider::generate_trace_id());
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_report_trigger,org: {}, module_key: {}",
@@ -737,7 +737,7 @@ async fn handle_derived_stream_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    let query_trace_id = ider::uuid();
+    let query_trace_id = ider::generate_trace_id();
     let scheduler_trace_id = format!("{}/{}", trace_id, query_trace_id);
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_derived_stream_triggers processing trigger: {}",
@@ -997,7 +997,11 @@ async fn handle_derived_stream_triggers(
 
         // evaluate trigger and configure trigger next run time
         match derived_stream
-            .evaluate((start, end), &trigger.module_key, Some(query_trace_id))
+            .evaluate(
+                (start, end),
+                &trigger.module_key,
+                Some(query_trace_id.clone()),
+            )
             .await
         {
             Err(e) => {
