@@ -26,13 +26,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     </span>
     <VariablesValueSelector
+      v-if="hasGlobalVariables"
       :variablesConfig="dashboardData?.variables"
+      :scope="'global'"
+      :currentTabId="selectedTabId"
+      :currentPanelId="null"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
       :selectedTimeDate="currentTimeObj['__global']"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
-      ref="variablesValueSelectorRef"
+      @variable-dependency-update="handleDependencyUpdate"
+      ref="globalVariablesRef"
+      class="global-variables-selector"
     />
+
     <TabList
       v-if="showTabs && selectedTabId !== null"
       class="q-mt-sm"
@@ -40,6 +47,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :viewOnly="viewOnly"
       @refresh="refreshDashboard"
     />
+
+    <!-- Tab level variables -->
+    <VariablesValueSelector
+      v-if="hasTabLevelVariables"
+      :variablesConfig="dashboardData?.variables"
+      :scope="'tabs'"
+      :currentTabId="selectedTabId"
+      :currentPanelId="null"
+      :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
+      :selectedTimeDate="currentTimeObj['__global']"
+      :initialVariableValues="initialVariableValues"
+      @variablesData="tabVariablesDataUpdated"
+      @variable-dependency-update="handleDependencyUpdate"
+      ref="tabVariablesRef"
+      class="tab-variables-selector q-mt-sm"
+    />
+
     <slot name="before_panels" />
     <div class="displayDiv">
       <div
@@ -50,6 +74,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         style="height: 100%; width: 100%"
       >
+        <!-- Panel-specific variables for single panel print mode -->
+        <div
+          v-if="hasPanelVariablesForPanel(panels[0].id)"
+          class="panel-variables-container"
+        >
+          <VariablesValueSelector
+            v-if="hasPanelVariablesForPanel(panels[0].id)"
+            :variablesConfig="dashboardData?.variables"
+            :scope="'panels'"
+            :currentTabId="selectedTabId"
+            :currentPanelId="panels[0].id"
+            :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
+            :selectedTimeDate="
+              currentTimeObj[panels[0].id] || currentTimeObj['__global']
+            "
+            :initialVariableValues="initialVariableValues"
+            @variablesData="
+              (data) => panelVariablesDataUpdated(data, panels[0].id)
+            "
+            @variable-dependency-update="handleDependencyUpdate"
+            ref="panelVariablesRef"
+            class="panel-variables-selector"
+          />
+        </div>
+
         <PanelContainer
           @onDeletePanel="onDeletePanel"
           @onViewPanel="onViewPanel"
@@ -63,10 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             currentTimeObj['__global'] ||
             {}
           "
-          :variablesData="
-            currentVariablesDataRef[panels[0].id] ||
-            currentVariablesDataRef['__global']
-          "
+          :variablesData="getPanelVariables(panels[0].id)"
           :forceLoad="forceLoad"
           :searchType="searchType"
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
@@ -110,6 +156,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           drag-allow-from=".drag-allow"
         >
           <div style="height: 100%">
+            <!-- Panel-specific variables before the panel -->
+            <div
+              v-if="hasPanelVariablesForPanel(item.id)"
+              class="panel-variables-container"
+            >
+              <VariablesValueSelector
+                v-if="hasPanelVariablesForPanel(item.id)"
+                :variablesConfig="dashboardData?.variables"
+                :scope="'panels'"
+                :currentTabId="selectedTabId"
+                :currentPanelId="item.id"
+                :showDynamicFilters="
+                  dashboardData.variables?.showDynamicFilters
+                "
+                :selectedTimeDate="
+                  currentTimeObj[item.id] || currentTimeObj['__global']
+                "
+                :initialVariableValues="initialVariableValues"
+                @variablesData="
+                  (data) => panelVariablesDataUpdated(data, item.id)
+                "
+                @variable-dependency-update="handleDependencyUpdate"
+                ref="panelVariablesRef"
+                class="panel-variables-selector"
+              />
+            </div>
+
             <PanelContainer
               @onDeletePanel="onDeletePanel"
               @onViewPanel="onViewPanel"
@@ -121,10 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedTimeDate="
                 currentTimeObj[item.id] || currentTimeObj['__global'] || {}
               "
-              :variablesData="
-                currentVariablesDataRef[item.id] ||
-                currentVariablesDataRef['__global']
-              "
+              :variablesData="getPanelVariables(item.id)"
               :currentVariablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
@@ -136,8 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @refresh="refreshDashboard"
               @update:initial-variable-values="updateInitialVariableValues"
               @onEditLayout="openEditLayout"
-            >
-            </PanelContainer>
+            />
           </div>
         </grid-item>
       </grid-layout>
@@ -181,6 +250,8 @@ import {
   provide,
   ref,
   watch,
+  onMounted,
+  nextTick,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -200,6 +271,7 @@ import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { useLoading } from "@/composables/useLoading";
+import { get } from "http";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -265,6 +337,7 @@ export default defineComponent({
 
     // inject selected tab, default will be default tab
     const selectedTabId = inject("selectedTabId", ref("default"));
+    const currentPanelId = ref(null);
 
     const panels: any = computed(() => {
       return selectedTabId.value !== null
@@ -577,17 +650,418 @@ export default defineComponent({
       };
     };
 
+    // Update refreshPanelRequest to be more efficient
     const refreshPanelRequest = (panelId) => {
       emit("refreshPanelRequest", panelId);
-
       currentVariablesDataRef.value = {
         ...currentVariablesDataRef.value,
-        [panelId]: variablesData.value,
+        [panelId]: getPanelVariables(panelId),
       };
     };
 
     const openEditLayout = (id: string) => {
       emit("openEditLayout", id);
+    };
+
+    // Add new function to initialize panel variables
+    const initializePanelVariables = () => {
+      console.debug("Initializing panel variables");
+      if (panels.value.length > 0) {
+        console.debug(`Initializing ${panels.value.length} panels`);
+
+        // Find the first panel that has variables
+        const panelWithVariables = panels.value.find((panel: any) => {
+          if (!panel.id) return false;
+
+          const variables = variablesData.value?.values || [];
+          return variables.some((variable: any) => {
+            if (!variable.scope || variable.scope === "global") return true;
+            if (variable.scope === "tabs")
+              return variable.tabs?.includes(selectedTabId.value);
+            if (variable.scope === "panels") {
+              return (
+                variable.tabs?.includes(selectedTabId.value) &&
+                variable.panels?.includes(panel.id)
+              );
+            }
+            return false;
+          });
+        });
+
+        // Set currentPanelId to the first panel that has variables
+        if (panelWithVariables) {
+          currentPanelId.value = panelWithVariables.id;
+        }
+
+        // Initialize variables for all panels
+        panels.value.forEach((panel: any) => {
+          if (panel.id) {
+            console.debug(`Initializing panel ${panel.id}`);
+            currentVariablesDataRef.value[panel.id] = getPanelVariables(
+              panel.id,
+            );
+          }
+        });
+      }
+    };
+
+    // Update the watch for panels to initialize variables
+    // watch(
+    //   panels,
+    //   (newPanels) => {
+    //     initializePanelVariables();
+    //   },
+    //   { immediate: true },
+    // );
+
+    // // Add initialization in onMounted
+    // onMounted(() => {
+    //   initializePanelVariables();
+    // });
+
+    const getVariablesByScope = (scope, panelId = null) => {
+      if (!props.dashboardData.variables?.list) {
+        return { list: [] };
+      }
+
+      let filteredVariables = [];
+
+      switch (scope) {
+        case "global":
+          // Get variables with global scope or no scope defined
+          filteredVariables = props.dashboardData.variables.list.filter(
+            (variable) => !variable.scope || variable.scope === "global",
+          );
+          break;
+
+        case "tabs":
+          // Get variables with tabs scope for the current selected tab
+          filteredVariables = props.dashboardData.variables.list.filter(
+            (variable) =>
+              variable.scope === "tabs" &&
+              variable.tabs?.includes(selectedTabId.value),
+          );
+          break;
+
+        case "panels":
+          // Get variables with panels scope for the specific panel
+          if (panelId) {
+            filteredVariables = props.dashboardData.variables.list.filter(
+              (variable) =>
+                variable.scope === "panels" &&
+                variable.tabs?.includes(selectedTabId.value) &&
+                variable.panels?.includes(panelId),
+            );
+          }
+          break;
+      }
+
+      return {
+        ...props.dashboardData.variables,
+        list: filteredVariables,
+      };
+    };
+
+    // Update the has* methods to be more precise
+    const hasGlobalVariables = computed(() => {
+      return (
+        props.dashboardData?.variables?.list?.some(
+          (variable) => !variable.scope || variable.scope === "global",
+        ) ?? false
+      );
+    });
+
+    const hasTabLevelVariables = computed(() => {
+      return (
+        props.dashboardData?.variables?.list?.some(
+          (variable) =>
+            variable.scope === "tabs" &&
+            variable.tabs?.includes(selectedTabId.value),
+        ) ?? false
+      );
+    });
+
+    const hasPanelVariablesForPanel = (panelId) => {
+      return (
+        props.dashboardData?.variables?.list?.some(
+          (variable) =>
+            variable.scope === "panels" &&
+            variable.tabs?.includes(selectedTabId.value) &&
+            variable.panels?.includes(panelId),
+        ) ?? false
+      );
+    };
+
+    // Handle updates from different variable levels
+    const tabVariablesDataUpdated = (data) => {
+      if (!data || JSON.stringify(variablesData.value) === JSON.stringify(data))
+        return;
+
+      const updatedVars = { ...variablesData.value };
+      let hasChanges = false;
+
+      // Only update tab-scoped variables
+      props.dashboardData?.variables?.list?.forEach((variable) => {
+        if (
+          variable.scope === "tabs" &&
+          variable.tabs?.includes(selectedTabId.value)
+        ) {
+          if (data[variable.name] !== updatedVars[variable.name]) {
+            updatedVars[variable.name] = data[variable.name];
+            hasChanges = true;
+          }
+        }
+      });
+
+      if (hasChanges) {
+        variablesData.value = updatedVars;
+        // Update affected panels
+        panels.value.forEach((panel) => {
+          if (panel.id) {
+            refreshPanelRequest(panel.id);
+          }
+        });
+      }
+    };
+
+    const panelVariablesDataUpdated = (data, panelId) => {
+      if (!panelId || !data) return;
+
+      const currentPanelVars = currentVariablesDataRef.value[panelId] || {};
+      if (JSON.stringify(currentPanelVars) === JSON.stringify(data)) return;
+
+      const updatedVars = {
+        ...getPanelVariables(panelId),
+        ...data,
+      };
+
+      // Only update if there are actual changes
+      if (JSON.stringify(updatedVars) !== JSON.stringify(currentPanelVars)) {
+        currentVariablesDataRef.value = {
+          ...currentVariablesDataRef.value,
+          [panelId]: updatedVars,
+        };
+        refreshPanelRequest(panelId);
+      }
+    };
+
+    // Modify getPanelVariables to be more efficient
+    const getPanelVariables = (panelId) => {
+      const result = { ...variablesData.value }; // Start with global variables
+
+      if (!props.dashboardData?.variables?.list) {
+        return result;
+      }
+
+      // Get panel-specific values from currentVariablesDataRef if they exist
+      if (currentVariablesDataRef.value[panelId]) {
+        const panelVars = currentVariablesDataRef.value[panelId];
+        Object.keys(panelVars).forEach((key) => {
+          if (panelVars[key] !== undefined) {
+            result[key] = panelVars[key];
+          }
+        });
+      }
+
+      return result;
+    };
+
+    // Replace computed properties with optimized methods
+    const getGlobalOnlyVariables = () => {
+      if (!props.dashboardData?.variables?.list) return null;
+
+      // Cache the result since global variables don't change frequently
+      if (!getGlobalOnlyVariables.cache) {
+        getGlobalOnlyVariables.cache = {
+          ...props.dashboardData.variables,
+          list: props.dashboardData.variables.list.filter(
+            (variable) => !variable.scope || variable.scope === "global",
+          ),
+        };
+      }
+      return getGlobalOnlyVariables.cache;
+    };
+
+    const getTabOnlyVariables = () => {
+      if (!props.dashboardData?.variables?.list) return null;
+
+      const cacheKey = selectedTabId.value;
+      if (!getTabOnlyVariables.cache?.[cacheKey]) {
+        getTabOnlyVariables.cache = {
+          [cacheKey]: {
+            ...props.dashboardData.variables,
+            list: props.dashboardData.variables.list.filter(
+              (variable) =>
+                variable.scope === "tabs" &&
+                variable.tabs?.includes(selectedTabId.value),
+            ),
+          },
+        };
+      }
+      return getTabOnlyVariables.cache[cacheKey];
+    };
+
+    // Initialize cache objects
+    getGlobalOnlyVariables.cache = null;
+    getTabOnlyVariables.cache = {};
+    const panelVariablesCache = new Map();
+
+    const getPanelOnlyVariablesConfig = (panelId) => {
+      if (!props.dashboardData?.variables?.list || !panelId) return null;
+
+      const cacheKey = `${selectedTabId.value}-${panelId}`;
+      if (!panelVariablesCache.has(cacheKey)) {
+        const config = {
+          ...props.dashboardData.variables,
+          list: props.dashboardData.variables.list.filter(
+            (variable) =>
+              variable.scope === "panels" &&
+              variable.tabs?.includes(selectedTabId.value) &&
+              variable.panels?.includes(panelId),
+          ),
+        };
+        panelVariablesCache.set(cacheKey, config);
+      }
+      return panelVariablesCache.get(cacheKey);
+    };
+
+    // Clear caches when dashboard data changes
+    watch(
+      () => props.dashboardData?.variables,
+      () => {
+        getGlobalOnlyVariables.cache = null;
+        getTabOnlyVariables.cache = {};
+        panelVariablesCache.clear();
+      },
+      { deep: true },
+    );
+
+    // Clear tab-specific and panel-specific caches when selected tab changes
+    watch(selectedTabId, () => {
+      getTabOnlyVariables.cache = {};
+      panelVariablesCache.clear();
+    });
+
+    // References to the variable selectors
+    const globalVariablesRef = ref(null);
+    const tabVariablesRef = ref(null);
+    const panelVariablesRef = ref(null);
+
+    const handleDependencyUpdate = ({
+      source,
+      affected,
+      updatedCompleteData,
+      scope,
+    }) => {
+      // Get only the variables that belong to this scope
+      const getPanelScopedAffectedVars = (panelId) => {
+        return affected.filter((name) => {
+          const variable = props.dashboardData.variables.list.find(
+            (v) => v.name === name,
+          );
+          return (
+            variable &&
+            variable.scope === "panels" &&
+            variable.tabs?.includes(selectedTabId.value) &&
+            variable.panels?.includes(panelId)
+          );
+        });
+      };
+
+      const getTabScopedAffectedVars = () => {
+        return affected.filter((name) => {
+          const variable = props.dashboardData.variables.list.find(
+            (v) => v.name === name,
+          );
+          return (
+            variable &&
+            variable.scope === "tabs" &&
+            variable.tabs?.includes(selectedTabId.value)
+          );
+        });
+      };
+
+      if (scope === "global" && globalVariablesRef.value) {
+        // Handle tab variables affected by global changes
+        if (tabVariablesRef.value) {
+          const tabScopedAffected = getTabScopedAffectedVars();
+          if (tabScopedAffected.length > 0) {
+            nextTick(() => {
+              tabVariablesRef.value.refreshFromDependencyUpdate(
+                updatedCompleteData,
+                tabScopedAffected,
+              );
+            });
+          }
+        }
+
+        // Handle panel variables affected by global changes
+        if (Array.isArray(panelVariablesRef.value)) {
+          panelVariablesRef.value.forEach((panelRef, index) => {
+            const panelId = panels.value[index]?.id;
+            if (panelRef && panelId) {
+              const panelScopedAffected = getPanelScopedAffectedVars(panelId);
+              if (panelScopedAffected.length > 0) {
+                panelRef.refreshFromDependencyUpdate(
+                  updatedCompleteData,
+                  panelScopedAffected,
+                );
+              }
+            }
+          });
+        } else if (panelVariablesRef.value && panels.value[0]?.id) {
+          const panelScopedAffected = getPanelScopedAffectedVars(
+            panels.value[0].id,
+          );
+          if (panelScopedAffected.length > 0) {
+            panelVariablesRef.value.refreshFromDependencyUpdate(
+              updatedCompleteData,
+              panelScopedAffected,
+            );
+          }
+        }
+      } else if (scope === "tabs" && tabVariablesRef.value) {
+        // Handle panel variables affected by tab changes
+        if (Array.isArray(panelVariablesRef.value)) {
+          panelVariablesRef.value.forEach((panelRef, index) => {
+            const panelId = panels.value[index]?.id;
+            if (panelRef && panelId) {
+              const panelScopedAffected = getPanelScopedAffectedVars(panelId);
+              if (panelScopedAffected.length > 0) {
+                nextTick(() => {
+                  panelRef.refreshFromDependencyUpdate(
+                    updatedCompleteData,
+                    panelScopedAffected,
+                  );
+                });
+              }
+            }
+          });
+        } else if (panelVariablesRef.value && panels.value[0]?.id) {
+          const panelScopedAffected = getPanelScopedAffectedVars(
+            panels.value[0].id,
+          );
+          if (panelScopedAffected.length > 0) {
+            panelVariablesRef.value.refreshFromDependencyUpdate(
+              updatedCompleteData,
+              panelScopedAffected,
+            );
+          }
+        }
+      } else if (scope === "panels" && panelVariablesRef.value) {
+        // Check if any tab variables are affected by panel changes (less common case)
+        if (tabVariablesRef.value) {
+          const tabScopedAffected = getTabScopedAffectedVars();
+          if (tabScopedAffected.length > 0) {
+            nextTick(() => {
+              tabVariablesRef.value.refreshFromDependencyUpdate(
+                updatedCompleteData,
+                tabScopedAffected,
+              );
+            });
+          }
+        }
+      }
     };
 
     return {
@@ -618,6 +1092,21 @@ export default defineComponent({
       openEditLayout,
       saveDashboardData,
       currentVariablesDataRef,
+      currentPanelId,
+      getPanelVariables,
+      hasPanelVariablesForPanel,
+      getVariablesByScope,
+      hasGlobalVariables,
+      hasTabLevelVariables,
+      tabVariablesDataUpdated,
+      panelVariablesDataUpdated,
+      getGlobalOnlyVariables,
+      getTabOnlyVariables,
+      getPanelOnlyVariablesConfig,
+      handleDependencyUpdate,
+      globalVariablesRef,
+      tabVariablesRef,
+      panelVariablesRef,
     };
   },
   methods: {
@@ -737,5 +1226,30 @@ export default defineComponent({
 
 .gridBackground.dark {
   border-color: rgba(204, 204, 220, 0.12) !important;
+}
+
+/* Global level variables - at the top of the dashboard */
+.global-variables-selector {
+  margin-bottom: 12px;
+}
+
+/* Tab level variables - below the tabs */
+.tab-variables-selector {
+  margin-bottom: 12px;
+  border-top: 1px solid var(--q-border-color, #e0e0e0);
+  padding-top: 8px;
+}
+
+/* Container for panel variables */
+.panel-variables-container {
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Panel level variables - above each panel */
+.panel-variables-selector {
+  padding: 8px;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
 }
 </style>
