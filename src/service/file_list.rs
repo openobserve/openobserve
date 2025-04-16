@@ -127,7 +127,6 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
                     start.elapsed().as_millis()
                 ),
                 SearchInspectorFieldsBuilder::new()
-                    .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("file_list get cached_ids".to_string())
                     .search_role("follower".to_string())
@@ -188,7 +187,6 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("file_list query from db".to_string())
                 .search_role("follower".to_string())
@@ -215,7 +213,6 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
                     start.elapsed().as_millis()
                 ),
                 SearchInspectorFieldsBuilder::new()
-                    .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("file_list set cached_ids".to_string())
                     .search_role("follower".to_string())

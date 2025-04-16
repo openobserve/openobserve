@@ -47,6 +47,8 @@ mod scheduler;
 
 pub use scheduler::select_best_node;
 
+use crate::common::infra::cluster;
+
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
@@ -519,6 +521,18 @@ pub async fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
             .map(|(_uuid, node)| node.clone())
             .collect(),
     )
+}
+
+pub async fn get_node_by_addr(addr: &str) -> String {
+    let nodes = cluster::get_cached_nodes(|_| true)
+        .await
+        .unwrap_or_default();
+    let node_name = nodes
+        .iter()
+        .find(|n| n.grpc_addr == addr)
+        .map(|n| n.name.clone())
+        .unwrap_or_default();
+    node_name
 }
 
 #[inline(always)]

@@ -121,7 +121,6 @@ pub async fn search(
                 file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:leader get file id".to_string())
                 .search_role("leader".to_string())
@@ -148,7 +147,7 @@ pub async fn search(
     );
 
     // 3. get nodes
-    let start = std::time::Instant::now();
+    let get_node_start = std::time::Instant::now();
     let node_group = req
         .search_event_type
         .as_ref()
@@ -180,11 +179,10 @@ pub async fn search(
                 querier_num,
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:leader get nodes".to_string())
                 .search_role("leader".to_string())
-                .duration(start.elapsed().as_millis() as usize)
+                .duration(get_node_start.elapsed().as_millis() as usize)
                 .desc(format!(
                     "get nodes num: {}, querier num: {}",
                     nodes.len(),
@@ -487,7 +485,7 @@ pub async fn run_datafusion(
     }
 
     // run datafusion
-    let start = std::time::Instant::now();
+    let datafusion_start = std::time::Instant::now();
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
@@ -495,17 +493,15 @@ pub async fn run_datafusion(
         log::error!("[trace_id {trace_id}] flight->search: datafusion collect error: {e}");
         Err(e.into())
     } else {
-        let took = start.elapsed().as_millis();
         log::info!(
             "{}",
             search_inspector_fields(
                 format!("[trace_id {trace_id}] flight->search: datafusion collect done"),
                 SearchInspectorFieldsBuilder::new()
-                    .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:run_datafusion collect done".to_string())
                     .search_role("follower".to_string())
-                    .duration(took as usize)
+                    .duration(datafusion_start.elapsed().as_millis() as usize)
                     .build()
             )
         );
@@ -670,7 +666,6 @@ pub async fn check_work_group(
                 took_wait
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:check_work_group".to_string())
                 .search_role("leader".to_string())

@@ -118,7 +118,7 @@ pub async fn search(
     if files.is_empty() {
         return Ok((vec![], ScanStats::default()));
     }
-    let ori_files_len = files.len();
+    let original_files_len = files.len();
     log::info!(
         "[trace_id {}] search->storage: stream {}/{}/{}, load file_list num {}",
         query.trace_id,
@@ -166,14 +166,13 @@ pub async fn search(
                     idx_took
                 ),
                 SearchInspectorFieldsBuilder::new()
-                    .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("storage inverted index reduced file_list num".to_string())
                     .search_role("follower".to_string())
                     .duration(idx_took)
                     .desc(format!(
                         "inverted index reduced file_list from {} to {} in {} ms",
-                        ori_files_len,
+                        original_files_len,
                         files.len(),
                         idx_took
                     ))
@@ -291,7 +290,6 @@ pub async fn search(
                 cache_start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("storage load files".to_string())
                 .search_role("follower".to_string())
@@ -376,7 +374,6 @@ pub async fn search(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("storage create tables".to_string())
                 .search_role("follower".to_string())
@@ -541,7 +538,6 @@ pub async fn filter_file_list_by_tantivy_index(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("tantivy load files".to_string())
                 .search_role("follower".to_string())
@@ -746,7 +742,6 @@ pub async fn filter_file_list_by_tantivy_index(
                 search_start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("tantivy search".to_string())
                 .search_role("follower".to_string())

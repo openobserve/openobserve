@@ -64,7 +64,7 @@ pub async fn search_parquet(
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
 ) -> super::SearchTable {
-    let start = std::time::Instant::now();
+    let load_start = std::time::Instant::now();
     // get file list
     let stream_settings =
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
@@ -237,11 +237,10 @@ pub async fn search_parquet(
                 scan_stats.compressed_size
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:parquet load".to_string())
                 .search_role("follower".to_string())
-                .duration(start.elapsed().as_millis() as usize)
+                .duration(load_start.elapsed().as_millis() as usize)
                 .desc(format!(
                     "wal parquet search load groups {}, files {}, scan_size {}, compressed_size {}",
                     files_group.len(),
@@ -327,7 +326,6 @@ pub async fn search_parquet(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:parquet create tables".to_string())
                 .search_role("follower".to_string())
@@ -349,7 +347,7 @@ pub async fn search_memtable(
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
 ) -> super::SearchTable {
-    let start = std::time::Instant::now();
+    let load_start = std::time::Instant::now();
     let mut scan_stats = ScanStats::new();
 
     // format partition keys
@@ -417,11 +415,10 @@ pub async fn search_memtable(
                 scan_stats.compressed_size,
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:memtable load".to_string())
                 .search_role("follower".to_string())
-                .duration(start.elapsed().as_millis() as usize)
+                .duration(load_start.elapsed().as_millis() as usize)
                 .desc(format!(
                     "wal mem search load groups {}, files {}, scan_size {}, compressed_size {}",
                     batch_groups.len(),
@@ -515,7 +512,6 @@ pub async fn search_memtable(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:memtable create tables".to_string())
                 .search_role("follower".to_string())

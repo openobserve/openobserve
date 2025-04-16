@@ -116,7 +116,6 @@ impl FlightService for FlightServiceImpl {
                     _start.elapsed().as_millis(),
                 ),
                 SearchInspectorFieldsBuilder::new()
-                    .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight::do_get get_ctx_and_physical_plan".to_string())
                     .search_role("follower".to_string())

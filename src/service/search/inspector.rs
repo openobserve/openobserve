@@ -13,15 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::cluster::Role;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SearchInspectorFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub node_role: Option<Vec<Role>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -59,11 +56,6 @@ impl SearchInspectorFieldsBuilder {
         Self {
             fields: Default::default(),
         }
-    }
-
-    pub fn node_role(mut self, role: Vec<Role>) -> Self {
-        self.fields.node_role = Some(role);
-        self
     }
 
     pub fn node_name(mut self, value: String) -> Self {

@@ -259,7 +259,6 @@ pub async fn search(
             search_inspector_fields(
                 format!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas),
                 SearchInspectorFieldsBuilder::new()
-                    .node_role(LOCAL_NODE.role.clone())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("cacher:search deltas".to_string())
                     .search_role(search_role.clone())
@@ -344,7 +343,6 @@ pub async fn search(
         search_inspector_fields(
             format!("[trace_id {trace_id}] cache done"),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("summary".to_string())
                 .search_role(search_role)

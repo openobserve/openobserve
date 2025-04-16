@@ -207,7 +207,6 @@ pub async fn search(
         search_inspector_fields(
             format!("[trace_id {trace_id}] in leader task finish"),
             SearchInspectorFieldsBuilder::new()
-                .node_role(LOCAL_NODE.role.clone())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("service:search leader finish".to_string())
                 .search_role(search_role)

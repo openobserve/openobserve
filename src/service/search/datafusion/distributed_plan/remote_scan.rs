@@ -28,7 +28,6 @@ use arrow_flight::{
 };
 use arrow_schema::{Schema, SchemaRef};
 use config::{
-    cluster::LOCAL_NODE,
     meta::search::{ScanStats, SearchEventType},
     utils::{rand::generate_random_string, size::bytes_to_human_readable},
 };
@@ -59,7 +58,7 @@ use super::{
     node::RemoteScanNode,
 };
 use crate::{
-    common::infra::cluster,
+    common::infra::cluster::get_node_by_addr,
     service::{
         grpc::get_cached_channel,
         search::{
@@ -383,14 +382,7 @@ async fn get_remote_batch(
         scan_stats.lock().add(&stats);
     }
 
-    let nodes = cluster::get_cached_nodes(|_| true)
-        .await
-        .unwrap_or_default();
-    let node_name = nodes
-        .iter()
-        .find(|n| n.grpc_addr == node.get_grpc_addr())
-        .map(|n| n.name.clone())
-        .unwrap_or_default();
+    let node_name = get_node_by_addr(&node.get_grpc_addr()).await;
     Ok(Box::pin(FlightStream::new(
         trace_id,
         context,
@@ -517,6 +509,12 @@ impl FlightStream {
                     .start_with_context(&tracer, &self.parent_cx);
 
                 let span_context = span.span_context().clone();
+                let role = match self.node_name.as_str() {
+                    name if name.contains("querier") => "Querier",
+                    name if name.contains("ingester") => "Ingester",
+                    _ => "Unknown",
+                };
+
                 let event = search_inspector_fields(
                     format!(
                         "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
@@ -529,10 +527,9 @@ impl FlightStream {
                         self.start.elapsed().as_millis(),
                     ),
                     SearchInspectorFieldsBuilder::new()
-                        .node_role(LOCAL_NODE.role.clone())
                         .node_name(self.node_name.clone())
                         .component("remote scan streaming".to_string())
-                        .search_role("follower".to_string())
+                        .search_role(role.to_string())
                         .duration(self.start.elapsed().as_millis() as usize)
                         .desc(format!(
                             "remote scan search files: {}, scan_size: {}, num_rows: {}",
