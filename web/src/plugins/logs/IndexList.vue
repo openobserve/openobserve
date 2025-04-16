@@ -719,7 +719,7 @@ export default defineComponent({
       cancelSearchQueryBasedOnRequestId,
     } = useSearchWebSocket();
 
-    const traceIdMapper = ref({});
+    const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
     const userDefinedSchemaBtnGroupOption = [
       {
