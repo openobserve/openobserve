@@ -25,6 +25,7 @@ use config::{
     },
 };
 use infra::errors::{Error, ErrorCodes};
+use std::time::Instant;
 use tracing::Instrument;
 
 use super::sort::order_search_results;
@@ -925,10 +926,13 @@ pub async fn do_partitioned_search(
 
             if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
                 log::debug!("Getting top k values for partition {idx}");
+                let instant = Instant::now();
                 let top_k_values = tokio::task::spawn_blocking(move || {
                     get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
                 }).await.unwrap();
                 search_res.hits = top_k_values?;
+                let duration = instant.elapsed();
+                log::info!("Top k values for partition {idx} took {:?}", duration);
             }
 
             // Send the cached response
