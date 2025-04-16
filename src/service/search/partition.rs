@@ -15,6 +15,8 @@
 
 use std::cmp::max;
 
+use config::meta::sql::OrderBy;
+
 /// Generates partitions for search queries
 pub struct PartitionGenerator {
     /// Minimum step size in microseconds (usually based on histogram interval)
@@ -44,11 +46,19 @@ impl PartitionGenerator {
     ///
     /// # Returns
     /// Vector of [start, end] time ranges in microseconds, in DESC order
-    pub fn generate_partitions(&self, start_time: i64, end_time: i64, step: i64) -> Vec<[i64; 2]> {
+    pub fn generate_partitions(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        step: i64,
+        order_by: OrderBy,
+    ) -> Vec<[i64; 2]> {
         if self.is_histogram {
-            self.generate_partitions_aligned_with_histogram_interval(start_time, end_time, step)
+            self.generate_partitions_aligned_with_histogram_interval(
+                start_time, end_time, step, order_by,
+            )
         } else {
-            self.generate_partitions_with_mini_partition(start_time, end_time, step)
+            self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
         }
     }
 
@@ -66,27 +76,49 @@ impl PartitionGenerator {
         start_time: i64,
         end_time: i64,
         step: i64,
+        order_by: OrderBy,
     ) -> Vec<[i64; 2]> {
-        // Generate partitions by DESC order
         let mut partitions = Vec::new();
-        let mut end = end_time;
 
         // Create a single mini partition for faster initial results
         let mini_partition_size_microseconds =
             std::cmp::min(self.mini_partition_duration_secs * 1_000_000, step as u64) as i64;
 
-        // Handle mini partition if it's smaller than the total range
-        if mini_partition_size_microseconds < (end_time - start_time) {
-            let start = std::cmp::max(end - mini_partition_size_microseconds, start_time);
-            partitions.push([start, end]);
-            end = start;
-        }
+        // Different behavior based on order
+        if order_by == OrderBy::Desc {
+            // For DESC order, mini partition at the end time
+            let mut end = end_time;
 
-        // Calculate remaining time range
-        while end > start_time {
-            let start = std::cmp::max(end - step, start_time);
-            partitions.push([start, end]);
-            end = start;
+            // Handle mini partition if it's smaller than the total range
+            if mini_partition_size_microseconds < (end_time - start_time) {
+                let start = std::cmp::max(end - mini_partition_size_microseconds, start_time);
+                partitions.push([start, end]);
+                end = start;
+            }
+
+            // Calculate remaining time range
+            while end > start_time {
+                let start = std::cmp::max(end - step, start_time);
+                partitions.push([start, end]);
+                end = start;
+            }
+        } else {
+            // For ASC order, mini partition at the start time
+            let mut start = start_time;
+
+            // Handle mini partition if it's smaller than the total range
+            if mini_partition_size_microseconds < (end_time - start_time) {
+                let end = std::cmp::min(start + mini_partition_size_microseconds, end_time);
+                partitions.push([start, end]);
+                start = end;
+            }
+
+            // Calculate remaining time range
+            while start < end_time {
+                let end = std::cmp::min(start + step, end_time);
+                partitions.push([start, end]);
+                start = end;
+            }
         }
 
         // Handle edge case of empty partitions
@@ -104,6 +136,7 @@ impl PartitionGenerator {
         start_time: i64,
         end_time: i64,
         step: i64,
+        order_by: OrderBy,
     ) -> Vec<[i64; 2]> {
         // Generate partitions by DESC order
         let mut partitions = Vec::new();
@@ -131,6 +164,11 @@ impl PartitionGenerator {
             partitions.push([start_time, end_time]);
         }
 
+        // We need to reverse partitions if query is ASC order
+        if order_by == OrderBy::Asc {
+            partitions.reverse();
+        }
+
         partitions
     }
 }
@@ -140,7 +178,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_partition_generator_with_histogram_alignment_without_mini_partition() {
+    fn test_partition_generator_with_histogram_alignment_desc_order() {
         // Test case: 10:02 - 10:17 with 5-minute histogram interval
         let start_time = 1617267720000000; // 10:02
         let end_time = 1617268620000000; // 10:17
@@ -154,7 +192,7 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step);
+        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Desc);
 
         // Expected partitions:
         // Partition 1: 10:15 - 10:17
@@ -163,7 +201,7 @@ mod tests {
         // Partition 4: 10:02 - 10:05
 
         // Print the actual partitions for debugging
-        println!("HISTOGRAM PARTITIONS:");
+        println!("HISTOGRAM PARTITIONS (DESC):");
         println!("Number of partitions: {}", partitions.len());
         for (i, [start, end]) in partitions.iter().enumerate() {
             // Convert to human-readable time for debugging
@@ -192,6 +230,78 @@ mod tests {
     }
 
     #[test]
+    fn test_partition_generator_with_histogram_alignment_asc_order() {
+        // Test case: 10:02 - 10:17 with 5-minute histogram interval
+        let start_time = 1617267720000000; // 10:02
+        let end_time = 1617268620000000; // 10:17
+        let min_step = 300000000; // 5 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = 300000000; // 5 minutes
+
+        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Asc);
+
+        // Expected partitions for ASC order:
+        // Partition 1: 10:02 - 10:05
+        // Partition 2: 10:05 - 10:10
+        // Partition 3: 10:10 - 10:15
+        // Partition 4: 10:15 - 10:17
+
+        // Print the actual partitions for debugging
+        println!("HISTOGRAM PARTITIONS (ASC):");
+        println!("Number of partitions: {}", partitions.len());
+        for (i, [start, end]) in partitions.iter().enumerate() {
+            // Convert to human-readable time for debugging
+            let start_mins = (start - 1617267600000000) / 60000000; // Minutes since 10:00
+            let end_mins = (end - 1617267600000000) / 60000000;
+            println!(
+                "Partition {}: 10:{:02} - 10:{:02} ({} - {})",
+                i + 1,
+                start_mins,
+                end_mins,
+                start,
+                end
+            );
+        }
+
+        // Verify histogram alignment and ASC order
+        assert_eq!(
+            partitions.first().unwrap()[0],
+            start_time,
+            "First partition should start at start_time"
+        );
+        assert_eq!(
+            partitions.last().unwrap()[1],
+            end_time,
+            "Last partition should end at end_time"
+        );
+
+        // Verify histogram alignment
+        for [start, end] in &partitions {
+            if *start != start_time && *end != end_time {
+                assert_eq!(
+                    *start % min_step,
+                    0,
+                    "Partition start should align with histogram interval"
+                );
+            }
+        }
+
+        // Verify the partitions are in ascending order
+        let mut prev_end = start_time;
+        for [start, end] in &partitions {
+            assert_eq!(*start, prev_end, "Partitions should be contiguous");
+            assert!(*end > *start, "End time should be greater than start time");
+            prev_end = *end;
+        }
+    }
+
+    #[test]
     fn test_partition_generator_without_histogram_alignment_mini_partition() {
         // Test case: 10:02 - 10:17 with the same parameters as the histogram test
         let start_time = 1617267720000000; // 10:02
@@ -206,7 +316,7 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step);
+        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Desc);
 
         // Expected partitions:
         // 1. 10:16 - 10:17 (mini partition)
@@ -215,7 +325,7 @@ mod tests {
         // 4. 10:02 - 10:06
 
         // Print the actual partitions for debugging
-        println!("NON-HISTOGRAM PARTITIONS:");
+        println!("NON-HISTOGRAM PARTITIONS (DESC):");
         println!("Number of partitions: {}", partitions.len());
         for (i, [start, end]) in partitions.iter().enumerate() {
             // Convert to human-readable time for debugging
@@ -234,5 +344,74 @@ mod tests {
         // Verify full coverage of time range
         assert_eq!(partitions.last().unwrap()[0], start_time);
         assert_eq!(partitions.first().unwrap()[1], end_time);
+
+        // Verify mini partition is at the end (DESC order)
+        let mini_partition = &partitions[0];
+        let mini_partition_duration = mini_partition[1] - mini_partition[0];
+        assert!(
+            mini_partition_duration <= (mini_partition_duration_secs * 1_000_000) as i64,
+            "Mini partition size should not exceed the configured duration"
+        );
+        assert_eq!(
+            mini_partition[1], end_time,
+            "Mini partition should end at end_time"
+        );
+    }
+
+    #[test]
+    fn test_partition_generator_asc_order_with_mini_partition() {
+        // Test case: 10:02 - 10:17 with 5-minute intervals
+        let start_time = 1617267720000000; // 10:02
+        let end_time = 1617268620000000; // 10:17
+        let min_step = 300000000; // 5 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            false, // is_histogram = false
+        );
+        let step = 300000000; // 5 minutes
+
+        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Asc);
+
+        // Expected partitions with ASC order:
+        // 1. 10:02 - 10:03 (mini partition)
+        // 2. 10:03 - 10:08
+        // 3. 10:08 - 10:13
+        // 4. 10:13 - 10:17
+
+        // Print the actual partitions for debugging
+        println!("NON-HISTOGRAM PARTITIONS (ASC):");
+        println!("Number of partitions: {}", partitions.len());
+        for (i, [start, end]) in partitions.iter().enumerate() {
+            // Convert to human-readable time for debugging
+            let start_mins = (start - 1617267600000000) / 60000000; // Minutes since 10:00
+            let end_mins = (end - 1617267600000000) / 60000000;
+            println!(
+                "Partition {}: 10:{:02} - 10:{:02} ({} - {})",
+                i + 1,
+                start_mins,
+                end_mins,
+                start,
+                end
+            );
+        }
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
+
+        // Verify mini partition is at the start (ASC order)
+        let mini_partition = &partitions[0];
+        let mini_partition_duration = mini_partition[1] - mini_partition[0];
+        assert!(
+            mini_partition_duration <= (mini_partition_duration_secs * 1_000_000) as i64,
+            "Mini partition size should not exceed the configured duration"
+        );
+        assert_eq!(
+            mini_partition[0], start_time,
+            "Mini partition should start at start_time"
+        );
     }
 }
