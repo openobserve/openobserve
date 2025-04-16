@@ -349,7 +349,7 @@ export const convertPromQLData = async (
     xAxis: {
       type: "time",
       axisLine: {
-        show: searchQueryData.every((it: any) => it.length == 0)
+        show: searchQueryData?.every((it: any) => it.result.length == 0)
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
@@ -381,7 +381,7 @@ export const convertPromQLData = async (
         },
       },
       axisLine: {
-        show: searchQueryData.every((it: any) => it.length == 0)
+        show: searchQueryData?.every((it: any) => it.result.length == 0)
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },

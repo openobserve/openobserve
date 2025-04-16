@@ -1111,7 +1111,7 @@ export const convertSQLData = async (
           show: true,
         },
         axisLine: {
-          show: searchQueryData.every((it: any) => it.length == 0)
+          show: searchQueryData?.every((it: any) => it.length == 0)
             ? true
             : (panelSchema.config?.axis_border_show ?? false),
         },
@@ -1172,7 +1172,7 @@ export const convertSQLData = async (
         show: true,
       },
       axisLine: {
-        show: searchQueryData.every((it: any) => it.length == 0)
+        show: searchQueryData?.every((it: any) => it.length == 0)
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
