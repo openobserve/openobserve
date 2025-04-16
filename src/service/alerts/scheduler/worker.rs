@@ -43,6 +43,7 @@ pub struct SchedulerConfig {
 #[derive(Clone)]
 pub struct SchedulerWorker {
     pub id: usize,
+    pub config: SchedulerConfig,
     pub rx: Arc<Mutex<mpsc::Receiver<ScheduledJob>>>,
 }
 
@@ -63,8 +64,12 @@ pub struct Scheduler {
 }
 
 impl SchedulerWorker {
-    pub fn new(id: usize, rx: Arc<Mutex<mpsc::Receiver<ScheduledJob>>>) -> Self {
-        Self { id, rx }
+    pub fn new(
+        id: usize,
+        config: SchedulerConfig,
+        rx: Arc<Mutex<mpsc::Receiver<ScheduledJob>>>,
+    ) -> Self {
+        Self { id, config, rx }
     }
 
     pub async fn run(&self) -> Result<()> {
@@ -84,6 +89,43 @@ impl SchedulerWorker {
                         job.trace_id,
                         job.trigger.module_key
                     );
+
+                    // keep alive the job while processing it
+                    let trace_id_keep_alive = job.trace_id.clone();
+                    let job_ids = vec![job.trigger.id];
+                    let ttl = self.config.keep_alive_interval_secs;
+                    let alert_timeout = self.config.alert_schedule_timeout;
+                    let report_timeout = self.config.report_schedule_timeout;
+                    let (_tx, mut rx) = mpsc::channel::<()>(1);
+                    tokio::task::spawn(async move {
+                        loop {
+                            tokio::select! {
+                                _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
+                                _ = rx.recv() => {
+                                    log::debug!(
+                                        "[SCHEDULER][Worker-{}] keep_alive for job {:?} done",
+                                        trace_id_keep_alive,
+                                        job_ids,
+                                    );
+                                    return;
+                                }
+                            }
+                            if let Err(e) = infra::scheduler::keep_alive(
+                                &job_ids,
+                                alert_timeout,
+                                report_timeout,
+                            )
+                            .await
+                            {
+                                log::error!(
+                                    "[SCHEDULER][Worker-{}] keep_alive for job {:?} failed: {}",
+                                    trace_id_keep_alive,
+                                    job_ids,
+                                    e
+                                );
+                            }
+                        }
+                    });
 
                     // Process the trigger
                     if let Err(e) = self.handle_trigger(&job.trace_id, job.trigger).await {
@@ -202,8 +244,9 @@ impl SchedulerJobPuller {
                         _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
                         _ = rx.recv() => {
                             log::debug!(
-                                "[SCHEDULER][JobPuller-{}] keep_alive done",
-                                trace_id_keep_alive
+                                "[SCHEDULER][JobPuller-{}] keep_alive for jobs {:?} done",
+                                trace_id_keep_alive,
+                                job_ids
                             );
                             return;
                         }
@@ -212,8 +255,9 @@ impl SchedulerJobPuller {
                         infra::scheduler::keep_alive(&job_ids, alert_timeout, report_timeout).await
                     {
                         log::error!(
-                            "[SCHEDULER][JobPuller-{}] keep_alive failed: {}",
+                            "[SCHEDULER][JobPuller-{}] keep_alive for jobs {:?} failed: {}",
                             trace_id_keep_alive,
+                            job_ids,
                             e
                         );
                     }
@@ -275,7 +319,7 @@ impl Scheduler {
 
         // Create workers
         let workers = (0..max_workers)
-            .map(|id| SchedulerWorker::new(id, rx.clone()))
+            .map(|id| SchedulerWorker::new(id, config.clone(), rx.clone()))
             .collect();
 
         // Create job puller
