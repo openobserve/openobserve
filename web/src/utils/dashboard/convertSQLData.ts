@@ -1111,7 +1111,9 @@ export const convertSQLData = async (
           show: true,
         },
         axisLine: {
-          show: panelSchema.config?.axis_border_show || false,
+          show: searchQueryData?.every((it: any) => it.length == 0)
+            ? true
+            : (panelSchema.config?.axis_border_show ?? false),
         },
         axisTick: {
           show: xAxisKeys.length + breakDownKeys.length == 1 ? false : true,
@@ -1170,7 +1172,9 @@ export const convertSQLData = async (
         show: true,
       },
       axisLine: {
-        show: panelSchema.config?.axis_border_show || false,
+        show: searchQueryData?.every((it: any) => it.length == 0)
+          ? true
+          : (panelSchema.config?.axis_border_show ?? false),
       },
     },
     toolbox: {
@@ -2643,9 +2647,9 @@ export const convertSQLData = async (
   if (!["metric", "gauge"].includes(panelSchema.type)) {
     options.series = options.series.filter((it: any) => it.data?.length);
     if (panelSchema.type == "h-bar" || panelSchema.type == "h-stacked") {
-      options.xAxis = options.series.length ? options.xAxis : {};
+      options.xAxis = options.xAxis;
     } else if (!["pie", "donut"].includes(panelSchema.type)) {
-      options.yAxis = options.series.length ? options.yAxis : {};
+      options.yAxis = options.yAxis;
     }
   }
 
