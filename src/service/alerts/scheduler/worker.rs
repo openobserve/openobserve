@@ -36,6 +36,7 @@ pub struct SchedulerConfig {
     pub alert_schedule_timeout: i64,
     pub report_schedule_timeout: i64,
     pub poll_interval_secs: u64,
+    pub keep_alive_interval_secs: u64,
 }
 
 /// Scheduler worker for processing triggers
@@ -186,6 +187,38 @@ impl SchedulerJobPuller {
                     );
                 }
             }
+
+            // keep alive the jobs before sending them to the workers
+            // but need to release the thread after the job is sent to the worker
+            let trace_id_keep_alive = trace_id.clone();
+            let job_ids = triggers.iter().map(|t| t.id).collect::<Vec<_>>();
+            let ttl = self.config.keep_alive_interval_secs;
+            let alert_timeout = self.config.alert_schedule_timeout;
+            let report_timeout = self.config.report_schedule_timeout;
+            let (_tx, mut rx) = mpsc::channel::<()>(1);
+            tokio::task::spawn(async move {
+                loop {
+                    tokio::select! {
+                        _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
+                        _ = rx.recv() => {
+                            log::debug!(
+                                "[SCHEDULER][JobPuller-{}] keep_alive done",
+                                trace_id_keep_alive
+                            );
+                            return;
+                        }
+                    }
+                    if let Err(e) =
+                        infra::scheduler::keep_alive(&job_ids, alert_timeout, report_timeout).await
+                    {
+                        log::error!(
+                            "[SCHEDULER][JobPuller-{}] keep_alive failed: {}",
+                            trace_id_keep_alive,
+                            e
+                        );
+                    }
+                }
+            });
 
             // Send all triggers to be processed
             for trigger in triggers {

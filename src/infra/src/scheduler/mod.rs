@@ -53,7 +53,7 @@ pub trait Scheduler: Sync + Send + 'static {
         data: Option<&str>,
     ) -> Result<()>;
     async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()>;
-    async fn keep_alive(&self, id: i64, alert_timeout: i64, report_timeout: i64) -> Result<()>;
+    async fn keep_alive(&self, ids: &[i64], alert_timeout: i64, report_timeout: i64) -> Result<()>;
     async fn pull(
         &self,
         concurrency: i64,
@@ -117,8 +117,8 @@ pub async fn update_trigger(trigger: Trigger, clone: bool) -> Result<()> {
 
 /// Keeps the trigger alive
 #[inline]
-pub async fn keep_alive(id: i64, alert_timeout: i64, report_timeout: i64) -> Result<()> {
-    CLIENT.keep_alive(id, alert_timeout, report_timeout).await
+pub async fn keep_alive(ids: &[i64], alert_timeout: i64, report_timeout: i64) -> Result<()> {
+    CLIENT.keep_alive(ids, alert_timeout, report_timeout).await
 }
 
 /// Scheduler pulls only those triggers that match the conditions-

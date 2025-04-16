@@ -313,7 +313,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     }
 
     /// Keeps the trigger alive
-    async fn keep_alive(&self, id: i64, alert_timeout: i64, report_timeout: i64) -> Result<()> {
+    async fn keep_alive(&self, ids: &[i64], alert_timeout: i64, report_timeout: i64) -> Result<()> {
         let now = now_micros();
         let report_max_time = now
             + Duration::try_seconds(report_timeout)
@@ -326,15 +326,19 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .num_microseconds()
                 .unwrap();
 
+        let sql = format!(
+            "UPDATE scheduled_jobs SET end_time = CASE WHEN module = $1 THEN $2 ELSE $3 END WHERE id IN ({});",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(
-                "UPDATE scheduled_jobs SET end_time = CASE WHEN module = $1 THEN $2 ELSE $3 END WHERE id = $4",
-            )
+        sqlx::query(&sql)
             .bind(TriggerModule::Alert)
             .bind(alert_max_time)
             .bind(report_max_time)
-            .bind(id)
             .execute(&*client)
             .await?;
 
