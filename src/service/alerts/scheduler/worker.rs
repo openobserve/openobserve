@@ -299,7 +299,7 @@ impl Scheduler {
         let max_workers = config.alert_schedule_concurrency as usize;
 
         // Create a channel for work distribution with capacity for max workers
-        let (tx, rx) = mpsc::channel(max_workers);
+        let (tx, rx) = mpsc::channel(1);
 
         // Share receiver between workers
         let rx = Arc::new(Mutex::new(rx));
