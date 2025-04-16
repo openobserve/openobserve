@@ -930,10 +930,14 @@ export const updateFolderByType = async (store: any, folderId: any, data: any, t
     throw error;
   }
 };
+//from dashboard id is the folder id from where the dashboard will be moved
+//to dashboard id is the folder id to where the dashboard will be moved
+//dashboardIds is the array of dashboard ids that will be moved
+//we require from to get the latest dashboards list after moving
 
 export const moveDashboardToAnotherFolder = async (
   store: any,
-  dashboardId: any,
+  dashboardIds: any,
   from: any,
   to: any,
 ) => {
@@ -941,11 +945,9 @@ export const moveDashboardToAnotherFolder = async (
     //move dashboard
     await dashboardService.move_Dashboard(
       store.state.selectedOrganization.identifier,
-      dashboardId,
-      {
-        from: from,
-        to: to,
-      },
+      dashboardIds,
+      from,
+      to
     );
 
     //update both folders dashboard

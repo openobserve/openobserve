@@ -209,6 +209,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :pagination="pagination"
           :filter="filterQuery"
           :filter-method="filterData"
+          v-model:selected="selected"
+          selection="multiple"
           :loading="loading"
           @row-click="onRowClick"
           data-test="dashboard-table"
@@ -216,6 +218,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- if data not available show nodata component -->
           <template #no-data>
             <NoData />
+          </template>
+          <!-- header selection which on click selects all the dashboards -->
+          <template #header-selection="scope">
+            <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+          </template>
+          <!-- body selection which on click selects the dashboard -->
+          <template #body-selection="scope">
+            <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
           </template>
           <template #body-cell-description="props">
             <q-td :props="props">
@@ -302,6 +312,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:changeRecordPerPage="changePagination"
               @update:maxRecordToReturn="changeMaxRecordToReturn"
             />
+            <div class="bottom-btn-dashboard-list">
+                <q-btn
+                  v-if="selected.length > 0"
+                  data-test="dashboard-list-move-across-folders-btn"
+                  class="flex items-center move-btn-dashboard-list q-mr-md no-border"
+                  color="secondary"
+                  :icon="outlinedDriveFileMove"
+                  :label="'Move'"
+                  @click="moveMultipleDashboards"
+                />
+                <q-btn
+                  v-if="selected.length > 0"
+                  data-test="dashboard-list-export-dashboards-btn"
+                  class="flex items-center export-btn-dashboard-list no-border"
+                  color="secondary"
+                  icon="download"
+                  :label="'Export'"
+                  @click="multipleExportDashboard"
+                />
+              </div>
           </template>
         </q-table>
 
@@ -344,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <MoveDashboardToAnotherFolder
             @updated="handleDashboardMoved"
-            :dashboard-id="selectedDashboardIdToMove"
+            :dashboard-ids="selectedDashboardIdToMove"
             :activeFolderId="activeFolderToMove"
           />
         </q-dialog>
@@ -402,6 +432,7 @@ import {
   getAllDashboardsByFolderId,
   getDashboard,
   getFoldersList,
+  moveModuleToAnotherFolder,
 } from "../../utils/commons.ts";
 import {
   outlinedDelete,
@@ -459,6 +490,8 @@ export default defineComponent({
     const searchAcrossFolders = ref(false);
     const filterQuery = ref("");
     const folderSearchQuery = ref("");
+    const selected = ref([]);
+
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
       const columns = computed(() => {
@@ -525,7 +558,9 @@ export default defineComponent({
           }
 
         return baseColumns;
-  });
+      });
+      const selectedDashboardIds = computed(() =>  selected.value.length > 0 ? selected.value.map(row => row.id) : []);
+
 
     const perPageOptions = [
       { label: "5", value: 5 },
@@ -569,6 +604,9 @@ export default defineComponent({
           spinner: true,
           message: "Please wait while loading dashboards...",
         });
+        //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder 
+        //the selected dashboards are not shown
+        selected.value = [];
         try {
           const response = await getAllDashboardsByFolderId(
             store,
@@ -772,6 +810,7 @@ export default defineComponent({
     });
 
     const dashboards = computed(function () {
+      selected.value = [];
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         const dashboardList = toRaw(
           store.state.organizationData?.allDashboardList[
@@ -844,7 +883,7 @@ export default defineComponent({
     };
 
     const showMoveDashboardPanel = (dashboard: any) => {
-      selectedDashboardIdToMove.value = dashboard.id;
+      selectedDashboardIdToMove.value = [dashboard.id];
       selectedDashboardToMove.value = dashboard;
       showMoveDashboardDialog.value = true;
     };
@@ -941,7 +980,7 @@ export default defineComponent({
     }, 600);
 
     const activeFolderToMove = computed(()=>{
-      return selectedDashboardToMove.value.folder_id ? selectedDashboardToMove.value.folder_id : activeFolderId.value;
+      return selectedDashboardToMove.value?.folder_id ? selectedDashboardToMove.value?.folder_id : activeFolderId.value;
     })
     const clearSearchHistory = () => {
       searchQuery.value = "";
@@ -957,6 +996,46 @@ export default defineComponent({
       filterQuery.value = "";
       searchQuery.value = "";
     }
+    const multipleExportDashboard = async () => {
+      try {
+        //this is used to get the dashbaords from the selected dashboard ids
+        const dashboards = await Promise.all(
+          selectedDashboardIds.value.map((dashboardId) =>
+            getDashboard(store, dashboardId, route.query.folder)
+          )
+        );
+        //this is used to clean up the owner field and set the default title if missing
+        const cleanedDashboards = dashboards.map((dashboard, index) => {
+          dashboard.owner = "";
+          dashboard.title = dashboard.title || `dashboard-${index + 1}`;
+          return dashboard;
+        });
+
+        const dataStr = "data:text/json;charset=utf-8," +
+          encodeURIComponent(JSON.stringify(cleanedDashboards, null, 2));
+
+        // Create and trigger the download
+        const htmlA = document.createElement("a");
+        htmlA.setAttribute("href", dataStr);
+        //the file name is exported_dashboards.json
+        htmlA.setAttribute("download", "exported_dashboards.json");
+        htmlA.click();
+
+        showPositiveNotification(`${cleanedDashboards.length} Dashboards exported successfully.`);
+        selected.value = [];
+      } catch (error) {
+        showErrorNotification(error?.message ?? "Error exporting dashboards");
+      }
+    };
+
+    const moveMultipleDashboards = () => {
+      //here we are showing the move dashboard dialog for multiple dashboards
+      //we are assigning the selected dashboard ids to the props of move dashboard dialog
+      showMoveDashboardDialog.value = true;
+      selectedDashboardIdToMove.value = selectedDashboardIds.value;
+
+    }
+
 
 
     return {
@@ -1027,7 +1106,10 @@ export default defineComponent({
       dynamicQueryModel,
       folderSearchQuery,
       filteredFolders,
-      updateActiveFolderId
+      updateActiveFolderId,
+      selected,
+      multipleExportDashboard,
+      moveMultipleDashboards,
     };
   },
   methods: {
@@ -1132,5 +1214,18 @@ export default defineComponent({
   overflow: hidden;
   text-overflow: ellipsis;
   text-transform: none !important;
+}
+.bottom-btn-dashboard-list {
+  display: flex;
+  width: 100%;
+  align-items: center;
+}
+
+.move-btn-dashboard-list {
+  width: calc(10vw);
+}
+
+.export-btn-dashboard-list {
+  width: calc(10vw);
 }
 </style>
