@@ -112,8 +112,15 @@ pub async fn get_search_profile(
         .unwrap_or("")
         .to_string();
 
-    let query = web::Query::<hashbrown::HashMap<String, String>>::from_query(in_req.query_string())
-        .unwrap();
+    let query =
+        match web::Query::<hashbrown::HashMap<String, String>>::from_query(in_req.query_string()) {
+            Ok(q) => q,
+            Err(_) => {
+                return Ok(meta::http::HttpResponse::bad_request(
+                    "Invalid query parameters",
+                ));
+            }
+        };
     let stream_type = StreamType::Traces;
 
     // Validate required parameters
@@ -194,9 +201,12 @@ pub async fn get_search_profile(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error(StatusCode::BAD_REQUEST.into(), e.to_string()),
-                ));
+                return Ok(
+                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                        StatusCode::BAD_REQUEST.into(),
+                        e.to_string(),
+                    )),
+                );
             }
         };
         if !keys_used.is_empty() {
@@ -213,8 +223,10 @@ pub async fn get_search_profile(
                 };
 
                 if !is_root_user(&user_id) {
-                    let user: meta::user::User =
-                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+                    let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
+                        Some(u) => u.clone(),
+                        None => return Ok(meta::http::HttpResponse::forbidden("User not found")),
+                    };
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         &user_id,
@@ -283,10 +295,10 @@ pub async fn get_search_profile(
                                 {
                                     if fields.component == Some("summary".to_string()) {
                                         si.sql = fields.sql.unwrap();
-                                        let time_range = fields.time_range.unwrap();
+                                        let time_range = fields.time_range.unwrap_or_default();
                                         si.start_time = time_range.0;
                                         si.end_time = time_range.1;
-                                        si.total_duration = fields.duration.unwrap();
+                                        si.total_duration = fields.duration.unwrap_or_default();
                                     } else {
                                         fields.timestamp = Some(event._timestamp.to_string());
                                         inspectors.push(fields);

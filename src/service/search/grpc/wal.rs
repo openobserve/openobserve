@@ -242,10 +242,13 @@ pub async fn search_parquet(
                 .component("wal:parquet load".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .desc(format!("wal parquest search load groups {}, files {}, scan_size {}, compressed_size {}", files_group.len(),
-                scan_stats.files,
-                bytes_to_human_readable(scan_stats.original_size as f64),
-                bytes_to_human_readable(scan_stats.compressed_size as f64)))
+                .desc(format!(
+                    "wal parquet search load groups {}, files {}, scan_size {}, compressed_size {}",
+                    files_group.len(),
+                    scan_stats.files,
+                    bytes_to_human_readable(scan_stats.original_size as f64),
+                    bytes_to_human_readable(scan_stats.compressed_size as f64)
+                ))
                 .build()
         )
     );
