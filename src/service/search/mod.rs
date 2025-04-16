@@ -782,7 +782,7 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    log::info!("[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, sql_order_by: {}", total_secs, part_num, step, min_step, sql_order_by);
+    log::debug!("[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}", total_secs, part_num, step, min_step);
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
         min_step,
