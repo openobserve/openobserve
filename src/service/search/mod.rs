@@ -696,6 +696,7 @@ pub async fn search_partition(
             });
         }
     }
+    log::info!("[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}", max_query_range, max_query_range_in_hour);
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
@@ -710,9 +711,11 @@ pub async fn search_partition(
         response.partitions.push([req.start_time, req.end_time]);
         response.max_query_range = max_query_range_in_hour;
         response.histogram_interval = sql.histogram_interval;
+        log::info!("[trace_id {trace_id}] search_partition: returning single partition");
         return Ok(response);
     };
 
+    log::info!("[trace_id {trace_id}] search_partition: getting nodes");
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
@@ -725,6 +728,7 @@ pub async fn search_partition(
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
     });
+
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -803,6 +807,7 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
+    log::debug!("[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}", total_secs, part_num, step, min_step, is_histogram);
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
         min_step,
