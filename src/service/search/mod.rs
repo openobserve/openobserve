@@ -606,6 +606,8 @@ pub async fn search_partition(
         streaming_aggs_exec::init_cache(id, query.start_time, query.end_time);
     }
 
+    log::info!("[trace_id {trace_id}] skip_get_file_list: {}, is_aggregate: {}, is_streaming_aggregate: {}", skip_get_file_list, is_aggregate, is_streaming_aggregate);
+
     let mut files = Vec::new();
 
     let mut max_query_range = 0;
@@ -615,6 +617,8 @@ pub async fn search_partition(
         let stream_name = stream.stream_name();
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let use_stream_stats_for_partition = stream_settings.approx_partition;
+
+        log::info!("[trace_id {trace_id}] stream_name: {}, use_stream_stats_for_partition: {}", stream_name, use_stream_stats_for_partition);
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
@@ -668,6 +672,7 @@ pub async fn search_partition(
             });
         }
     }
+    log::info!("[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}", max_query_range, max_query_range_in_hour);
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
@@ -682,9 +687,11 @@ pub async fn search_partition(
         response.partitions.push([req.start_time, req.end_time]);
         response.max_query_range = max_query_range_in_hour;
         response.histogram_interval = sql.histogram_interval;
+        log::info!("[trace_id {trace_id}] search_partition: returning single partition");
         return Ok(response);
     };
 
+    log::info!("[trace_id {trace_id}] search_partition: getting nodes");
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
@@ -775,6 +782,7 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
+    log::info!("[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, sql_order_by: {}", total_secs, part_num, step, min_step, sql_order_by);
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
         min_step,
