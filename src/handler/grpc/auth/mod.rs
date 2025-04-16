@@ -51,14 +51,6 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     #[cfg(not(feature = "enterprise"))]
     let super_cluster_token = get_internal_grpc_token();
 
-    // TODO(taiming): remove_me
-    log::warn!(
-        "[check_auth]: token: {}, internal_grpc_token: {}, super_cluster_token: {}",
-        token,
-        get_internal_grpc_token(),
-        super_cluster_token
-    );
-
     if token.eq(get_internal_grpc_token().as_str()) || token.eq(super_cluster_token.as_str()) {
         Ok(req)
     } else {
