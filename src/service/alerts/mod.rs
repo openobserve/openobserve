@@ -584,7 +584,7 @@ impl ConditionExt for ConditionList {
                 eval
             }
             ConditionList::AndNode{ and: conditions } | ConditionList::LegacyConditions(conditions) => {
-                let mut eval = false;
+                let mut eval = true;
                 for condition in conditions {
                     eval = eval && condition.evaluate(row).await
                 }
