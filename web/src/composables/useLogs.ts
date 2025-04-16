@@ -1814,8 +1814,10 @@ const useLogs = () => {
           refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
-            "Histogram is not available for limit queries.",
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1
           );
+          searchObj.meta.histogramDirtyFlag = false;
         } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
           let aggFlag = false;
           if (parsedSQL) {
@@ -1835,15 +1837,19 @@ const useLogs = () => {
           }
           if(isWithQuery(parsedSQL)){
             resetHistogramWithError(
-              "Histogram is not available for WITH queries.",
+              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+              -1
             );
           }
           else{
             console.log('here it is')
             resetHistogramWithError(
-              "Histogram is not available for DISTINCT queries.",
+              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries",
+              -1
             );
+
           }
+          searchObj.meta.histogramDirtyFlag = false;
         } 
         else {
           let aggFlag = false;
@@ -5482,7 +5488,8 @@ const useLogs = () => {
         addRequestId(payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
-      resetHistogramWithError("Histogram is not available for limit queries.");
+      resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT and LIMIT queries.", -1);
+      searchObj.meta.histogramDirtyFlag = false;
     } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
       let aggFlag = false;
       if (parsedSQL) {
@@ -5501,15 +5508,18 @@ const useLogs = () => {
       }
       if(isWithQuery(parsedSQL)){
         resetHistogramWithError(
-          "Histogram is not available for WITH queries.",
+          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+          -1
         );
+        searchObj.meta.histogramDirtyFlag = false;
       }
       else{
-        console.log('here it is 2')
         resetHistogramWithError(
-          "Histogram is not available for DISTINCT queries.",
+          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+          -1
         );
       }
+      searchObj.meta.histogramDirtyFlag = false;
     } else {
       let aggFlag = false;
       if (parsedSQL) {
@@ -5910,6 +5920,8 @@ const useLogs = () => {
     routeToSearchSchedule,
     isActionsEnabled,
     sendCancelSearchMessage,
+    isDistinctQuery,
+    isWithQuery,
   };
 };
 

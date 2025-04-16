@@ -568,6 +568,8 @@ export default defineComponent({
       initializeWebSocketConnection,
       addRequestId,
       sendCancelSearchMessage,
+      isDistinctQuery,
+      isWithQuery,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1593,6 +1595,8 @@ export default defineComponent({
       showJobScheduler,
       showSearchScheduler,
       closeSearchSchedulerFn,
+      isDistinctQuery,
+      isWithQuery,
     };
   },
   computed: {
@@ -1671,8 +1675,16 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram is not available for limit queries.",
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",-1
           );
+          this.searchObj.meta.histogramDirtyFlag = false;
+        } 
+        else if (this.searchObj.meta.sqlMode && (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))) {
+          this.resetHistogramWithError(
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1
+          );
+          this.searchObj.meta.histogramDirtyFlag = false;
         } else if (this.searchObj.data.stream.selectedStream.length > 1) {
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",
