@@ -88,7 +88,7 @@ fn get_data(
         .iter()
         .filter(|v| {
             if let vrl::value::Value::Object(map) = v {
-                // Default to true for empty conditions array
+                // Default to false for empty conditions array
                 if condition.is_empty() {
                     return false;
                 }
