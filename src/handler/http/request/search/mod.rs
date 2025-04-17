@@ -666,7 +666,7 @@ pub type FieldName = String;
 /// This flag will toggle the resultant requests between streaming aggregations and result cache.
 /// By default, this function will produce an SQL which utilizes `Streaming Aggregations` to send
 /// the results to the client. The SQL will be a simple aggregation query in case streaming
-/// aggregations are used. If `use_result_cache` is set to true, the SQL projectoin will include a
+/// aggregations are used. If `use_result_cache` is set to true, the SQL projection will include a
 /// histogram which will allow the use of result cache.
 ///
 /// Another parameter is `no_count` which is used to determine if the count is needed or not.
