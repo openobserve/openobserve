@@ -468,9 +468,6 @@ export const usePanelDataLoader = (
                       partition[1],
                       histogramInterval,
                     ),
-                    encoding: store.state.zoConfig.sql_base64_enabled
-                      ? "base64"
-                      : null,
                   },
                   page_type: pageType,
                   traceparent,
@@ -708,6 +705,7 @@ export const usePanelDataLoader = (
             payload.queryReq.endISOTimestamp,
             null,
           ),
+          encoding: store.state.zoConfig.sql_base64_enabled ? "base64" : null,
         },
         stream_type: payload.pageType,
         search_type: searchType.value ?? "dashboards",
