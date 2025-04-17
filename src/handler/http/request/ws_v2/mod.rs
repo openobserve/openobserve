@@ -80,9 +80,10 @@ pub async fn websocket(
     let ws_session = WsSession::new(session, cookie_expiry);
     sessions_cache_utils::insert_session(&router_id, Arc::new(RwLock::new(ws_session))).await;
     log::info!(
-        "[WS_HANDLER]: Node Role: {} Got websocket request for router_id: {}",
+        "[WS_HANDLER]: Node Role: {} Got websocket request for router_id: {}, querier: {}",
         cfg.common.node_role,
         router_id,
+        cfg.common.instance_name
     );
 
     // Spawn the handler

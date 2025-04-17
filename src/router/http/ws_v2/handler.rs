@@ -207,11 +207,13 @@ impl WsHandler {
                                                 message.append_user_id(user_id.clone());
                                             }
 
-                                            log::debug!(
-                                                "[WS::Router::Handler] received message for client_id: {}, message: {:?}",
+                                            log::info!(
+                                                "[WS::Router::Handler] received message for client_id: {}, trace_id: {}, router: {}",
                                                 client_id,
-                                                message
+                                                message.get_trace_id(),
+                                                cfg.common.instance_name,
                                             );
+
                                             let trace_id = message.get_trace_id();
                                             let role_group =
                                                 if let WsClientEvents::Search(req) = &message {
@@ -325,11 +327,15 @@ impl WsHandler {
                                     if let Err(e) = ws_session.pong(&ping).await {
                                         log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
                                          // cleanup
-                                         if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Close(Some(CloseReason::from(CloseCode::Normal))))).await {
-                                             log::error!(
-                                                 "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, error: {}", client_id, e
-                                             );
-                                         }
+                                        //  if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Close(Some(CloseReason::from(CloseCode::Normal))))).await {
+                                        //      log::error!(
+                                        //          "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, error: {}", client_id, e
+                                        //      );
+                                        //  }
+                                        if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Normal))).await {
+                                            log::error!("[WS::Router::Handler]: Error closing websocket session client_id: {}, error: {}", client_id, e);
+                                        };
+                                        return Ok(());
                                     }
                                 }
                                 WsServerEvents::Pong(pong) => {
@@ -342,6 +348,7 @@ impl WsHandler {
                                         );
                                         continue;
                                     };
+                                    log::info!("[WS::Router::Handler] received message from router-querier task for client_id: {}, trace_id: {}", client_id, message.get_trace_id());
                                     if let Err(e) = ws_session.text(message_str).await {
                                         log::error!("[WS::Router::Handler] Error sending message to client_id: {}, error: {}", client_id, e);
                                         break;
@@ -506,7 +513,7 @@ impl WsHandler {
                                 }
                                 Some(DisconnectMessage::Close(close_reason)) => {
                                     if let Err(e) = ws_session.close(close_reason).await {
-                                        log::error!("[WS::Router::Handler]: Error closing websocket session: {}", e);
+                                        log::error!("[WS::Router::Handler]: Error closing websocket session client_id: {}, error: {}", client_id, e);
                                     };
                                     return Ok(());
                                 }
