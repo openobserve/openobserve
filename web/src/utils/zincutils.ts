@@ -826,7 +826,7 @@ export const durationFormatter = (durationInSeconds: number): string => {
   return formattedDuration;
 };
 
-export const getTimezoneOffset = () => {
+export const getTimezoneOffset = (timezone: string |null = null) => {
   const now = new Date();
 
   // Get the day, month, and year from the date object
@@ -844,7 +844,7 @@ export const getTimezoneOffset = () => {
   // Combine them in the HH:MM format
   const scheduleTime = `${hours}:${minutes}`;
 
-  const ScheduleTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const ScheduleTimezone = timezone ? timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const convertedDateTime = convertDateToTimestamp(
     scheduleDate,
