@@ -44,10 +44,7 @@ pub async fn grpc_search(
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     if nodes.is_empty() {
-        log::error!(
-            "[trace_id: {}] search->grpc: no querier node online",
-            trace_id
-        );
+        log::error!("[trace_id: {trace_id}] search->grpc: no querier node online",);
         return Err(server_internal_error("no querier node online"));
     }
 
@@ -82,8 +79,7 @@ pub async fn grpc_search(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "[trace_id: {}] search->grpc: node: {}, search err: {:?}",
-                        trace_id,
+                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
                         node.get_grpc_addr(),
                         err
                     );
@@ -120,10 +116,7 @@ pub async fn grpc_search_multi(
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     if nodes.is_empty() {
-        log::error!(
-            "[trace_id: {}] search->grpc: no querier node online",
-            trace_id
-        );
+        log::error!("[trace_id: {trace_id}] search->grpc: no querier node online",);
         return Err(server_internal_error("no querier node online"));
     }
 
@@ -158,8 +151,7 @@ pub async fn grpc_search_multi(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "[trace_id: {}] search->grpc: node: {}, search err: {:?}",
-                        trace_id,
+                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
                         node.get_grpc_addr(),
                         err,
                     );
@@ -196,10 +188,7 @@ pub async fn grpc_search_partition(
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     if nodes.is_empty() {
-        log::error!(
-            "[trace_id: {}] search->grpc: no querier node online",
-            trace_id
-        );
+        log::error!("[trace_id: {trace_id}] search->grpc: no querier node online",);
         return Err(server_internal_error("no querier node online"));
     }
 
@@ -233,8 +222,7 @@ pub async fn grpc_search_partition(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "[trace_id: {}] search->grpc: node: {}, search err: {:?}",
-                        trace_id,
+                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
                         node.get_grpc_addr(),
                         err,
                     );
