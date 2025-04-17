@@ -377,6 +377,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </q-select>
                         </div>
                       </span>
+                      <span
+                        class="text-red"
+                        v-else-if="
+                          typeof errorMessage === 'object' &&
+                          errorMessage.field == 'org_id'
+                        "
+                      >
+                        {{ errorMessage.message }}
+                        <div style="width: 300px">
+                          <q-select
+                            data-test="pipeline-import-org-id-input"
+                            v-model="userSelectedOrgId[index]"
+                            :options="organizationData"
+                            :label="'Organization Id'"
+                            :popup-content-style="{
+                              textTransform: 'lowercase',
+                            }"
+                            color="input-border"
+                            bg-color="input-bg"
+                            class="q-py-sm showLabelOnTop no-case"
+                            filled
+                            stack-label
+                            dense
+                            use-input
+                            hide-selected
+                            fill-input
+                            :input-debounce="400"
+                            @update:model-value="updateOrgId(userSelectedOrgId[index].value, index)"
+                            behavior="menu"
+                          >
+                          </q-select>
+                        </div>
+                      </span>
                       <!-- source stream type should be one of the valid stream types -->
                       <span
                         class="text-red"
@@ -589,6 +622,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const userSelectedSqlQuery = ref<string[]>([]);
       const userSelectedFunctionName = ref<string[]>([]);
       const scheduledPipelines = ref<any>([]);
+      const userSelectedOrgId = ref<string[]>([]);
+      const organizationData = computed(() => {
+        return store.state.organizations.map((org: any) => {
+          return {
+            label: org.identifier,
+            value: org.identifier,
+            disable: !org.identifier || org.identifier !== store.state.selectedOrganization.identifier
+          };
+        });
+      });
+
       const getFormattedDestinations: any = computed(() => {
         return props.destinations.map((destination: any) => {
           return destination.name;
@@ -617,7 +661,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }
       const updateSqlQuery = (sqlQuery: string, index: number) => {
         
-        console.log(userSelectedSqlQuery.value[index], 'sqlQuery')
         jsonArrayOfObj.value[index].sql_query = sqlQuery;
         jsonArrayOfObj.value[index].source.query_condition.sql = sqlQuery;
         jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
@@ -849,7 +892,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
   
         if (allPipelinesCreated) {
-          emit("update:pipelines");
+          setTimeout(() => {
+            emit("update:pipelines");
           q.notify({
             message: "Pipelines(s) imported successfully",
             color: "positive",
@@ -862,6 +906,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               org_identifier: store.state.selectedOrganization.identifier,
             },
           });
+          }, 3000);
+
+
         }
       };
   
@@ -903,11 +950,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       const validateDestinationStream = async (streamType: string, streamName: string) => {
         try {
-          console.log(streamType, streamName, 'streamType, streamName');
           
           // Fetch streams
           const response: any = await getStreams(streamType, false);
-          console.log(response,'responss')
           
           // Ensure response contains the expected data
           if (response && Array.isArray(response.list)) {
@@ -951,19 +996,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           return true;
         }
       };
+      const validateNodesForOrg = (input: any) => {
+        return input.nodes.some((node: any) => {
+          return !node.data.org_id || (node.data.org_id != store.state.selectedOrganization.identifier)
+        }) ? false : true; // If condition is met (returns true), return false, otherwise return true
+      }
 
 
   
       const validatePipelineInputs = async (input: any, index: number) => {
-        console.log("input", input);
         let pipelineErrors: (string | { message: string; field: string })[] = [];
 
         // 1. validate name it should not be empty 
         if(!input.name.trim() || input.name.trim() === ""){
           pipelineErrors.push({ message: `Pipeline - ${index}: Name is required`, field: "pipeline_name" });
-        }
-        if(scheduledPipelines.value.includes(input.name)){
-          pipelineErrors.push({ message: `Pipeline - ${index}: Name is already taken for scheduled pipelines`, field: "pipeline_name" });
         }
         //2. validate source stream type it should be one of the valid stream types
         const validStreamTypes = ["logs", "metrics", "traces"];
@@ -980,7 +1026,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pipelineErrors.push({ message: `Pipeline - ${index}: Source stream name is required `, field: "source_stream_name" });
         }
 
-        //call getStreamsList to update the stream list //not neded as we are updating the stream list while selecting the stream type
+        //call getStreamsList to update the stream list 
+        // not neded as we are updating the stream list while selecting the stream type
         if(input.source.stream_type && validStreamTypes.includes(input.source.stream_type)){
           await getSourceStreamsList(input.source.stream_type, -1);
         }
@@ -1027,16 +1074,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           input.nodes.forEach((node: any) => {
             if(node.io_type == "input" && node.data.node_type == "query"){
               if(node.data.trigger_condition.frequency_type != 'cron'){
-                pipelineErrors.push(`Pipeline - ${index}: Frequency type should be cron and should match in source as well as in nodes`);
+                pipelineErrors.push(`Pipeline - ${index}: Frequency type should be cron and should match in source as well as in nodes so kindly check the frequency type in all nodes`);
               }
               if(node.data.trigger_condition.cron != input.source.trigger_condition.cron){
-                pipelineErrors.push(`Pipeline - ${index}: Cron should be same as in source and should match in all nodes`);
+                pipelineErrors.push(`Pipeline - ${index}: Cron should be same as in source and should match in all nodes so kindly check the cron in all nodes`);
               }
               if(node.data.trigger_condition.period != input.source.trigger_condition.period){
-                pipelineErrors.push(`Pipeline - ${index}: Period should be same as in source and should match in all nodes`);
+                pipelineErrors.push(`Pipeline - ${index}: Period should be same as in source and should match in all nodes so kindly check the period in all nodes`);
               }
               if(node.data.trigger_condition.timezone != input.source.trigger_condition.timezone){
-                pipelineErrors.push(`Pipeline - ${index}: Timezone should be same as in source and should match in all nodes`);
+                pipelineErrors.push(`Pipeline - ${index}: Timezone should be same as in source and should match in all nodes so kindly check the timezone in all nodes`);
               }
             }
           });
@@ -1045,12 +1092,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           input.nodes.forEach((node: any) => {
             if(node.io_type == "input" && node.data.node_type == "query"){
               if(node.data.trigger_condition.frequency_type != 'minutes'){
-                pipelineErrors.push(`Pipeline - ${index}: Frequency type should be minutes and should match in source as well as in nodes`);
+                pipelineErrors.push(`Pipeline - ${index}: Frequency type should be minutes and should match in source as well as in nodes so kindly check the frequency type in all nodes`);
               }
               if(node.data.trigger_condition.frequency != input.source.trigger_condition.frequency){
-                pipelineErrors.push(`Pipeline - ${index}: Frequency should be same as in source and should match in all nodes`);
+                pipelineErrors.push(`Pipeline - ${index}: Frequency should be same as in source and should match in all nodes so kindly check the frequency in all nodes`);
               }
             }
+          });
+        } 
+        if(!input.org || !input.source.org_id || !validateNodesForOrg(input) || input.org != store.state.selectedOrganization.identifier || input.source.org_id != store.state.selectedOrganization.identifier){
+          pipelineErrors.push( {
+            message: `Pipeline - ${index}: Organization Id is mandatory, should exist in organization list and should be equal to ${store.state.selectedOrganization.identifier} `,
+            field: "org_id",
           });
         }
 
@@ -1103,7 +1156,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pipelineErrors.push({ message: `Pipeline - ${index}: Condition is required`, field: "empty_condition" });
         }   
         const isValidRemoteDestination = validateRemoteDestination(input);
-        console.log(isValidRemoteDestination,'isValidRemoteDestination')
         if(!isValidRemoteDestination){
           pipelineErrors.push({ message: `Pipeline - ${index}: Remote destination is required`, field: "remote_destination" });
         }
@@ -1304,6 +1356,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         const list = response.data.list;
         scheduledPipelines.value = list.filter((pipeline: any) => pipeline.source.source_type == 'scheduled').map((pipeline: any) => pipeline.name);
       }
+      const updateOrgId = (orgId: string, index: number) => {
+        jsonArrayOfObj.value[index].org = orgId;
+        jsonArrayOfObj.value[index].source.org_id = orgId;
+        jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
+          if(node.data.node_type == "stream" || node.data.node_type == 'query'){
+            node.data.org_id = orgId;
+          }
+        });
+        jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      }
   
       return {
         t,
@@ -1363,7 +1425,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         destinationStreamTypes,
         timezoneOptions,
         handleDynamicStreamName,
-        scheduledPipelines
+        scheduledPipelines,
+        userSelectedOrgId,
+        organizationData,
+        updateOrgId,
       };
     },
     components: {
