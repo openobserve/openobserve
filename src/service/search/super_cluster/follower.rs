@@ -55,6 +55,7 @@ use crate::service::search::{
         exec::{prepare_datafusion_context, register_udf},
     },
     generate_filter_from_equal_items,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::{FlightSearchRequest, Request},
     utils::AsyncDefer,
 };
@@ -126,11 +127,24 @@ pub async fn search(
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
-        req.time_range,
-        file_id_list_vec.len(),
-        file_id_list_took,
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
+                req.time_range,
+                file_id_list_vec.len(),
+                file_id_list_took,
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("super:leader get file id".to_string())
+                .search_role("super".to_string())
+                .duration(file_id_list_took)
+                .desc(format!("get files {} ids", file_id_list_vec.len(),))
+                .build()
+        )
     );
+
     let mut scan_stats = ScanStats {
         files: file_id_list_vec.len() as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
@@ -151,6 +165,7 @@ pub async fn search(
     req.set_use_inverted_index(use_ttv_inverted_index);
 
     // get nodes
+    let get_node_start = std::time::Instant::now();
     let node_group = req
         .search_event_type
         .as_ref()
@@ -173,6 +188,28 @@ pub async fn search(
         return Err(Error::Message("no querier node online".to_string()));
     }
 
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] super->follower_leader: get nodes num: {}, querier num: {}",
+                nodes.len(),
+                querier_num,
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("super:leader get nodes".to_string())
+                .search_role("super".to_string())
+                .duration(get_node_start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "get nodes num: {}, querier num: {}",
+                    nodes.len(),
+                    querier_num
+                ))
+                .build()
+        )
+    );
+
     // check work group
     let (_took_wait, work_group_str, work_group) = check_work_group(
         &req,
@@ -181,6 +218,7 @@ pub async fn search(
         &file_id_list_vec,
         start,
         file_id_list_took,
+        "super".to_string(),
     )
     .await?;
     // add work_group

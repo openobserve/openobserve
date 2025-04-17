@@ -194,14 +194,13 @@ pub async fn search(
         Err(e) => Err(Error::Message(e.to_string())),
     };
 
-    let search_role = "leader".to_string();
+    #[allow(unused_mut)]
+    let mut search_role = "leader".to_string();
 
     #[cfg(feature = "enterprise")]
-    let search_role = if get_o2_config().super_cluster.enabled {
-        "super".to_string()
-    } else {
-        search_role
-    };
+    if get_o2_config().super_cluster.enabled {
+        search_role = "super".to_string();
+    }
 
     log::info!(
         "{}",
@@ -210,7 +209,7 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("service:search leader finish".to_string())
-                .search_role(search_role)
+                .search_role(search_role.to_string())
                 .duration(start.elapsed().as_millis() as usize)
                 .build()
         )
@@ -696,7 +695,11 @@ pub async fn search_partition(
             });
         }
     }
-    log::info!("[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}", max_query_range, max_query_range_in_hour);
+    log::info!(
+        "[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}",
+        max_query_range,
+        max_query_range_in_hour
+    );
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
@@ -807,7 +810,14 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    log::debug!("[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}", total_secs, part_num, step, min_step, is_histogram);
+    log::debug!(
+        "[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}",
+        total_secs,
+        part_num,
+        step,
+        min_step,
+        is_histogram
+    );
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
         min_step,

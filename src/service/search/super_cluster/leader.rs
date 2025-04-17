@@ -18,6 +18,7 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
+    cluster::LOCAL_NODE,
     get_config,
     meta::{cluster::NodeInfo, search::ScanStats, sql::TableReferenceExt},
     metrics,
@@ -42,6 +43,7 @@ use crate::service::search::{
         remote_scan::RemoteScanExec,
         rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
     },
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::Request,
     sql::Sql,
     utils::ScanStatsVisitor,
@@ -279,6 +281,7 @@ async fn run_datafusion(
         println!("{}", plan);
     }
 
+    let datafusion_start = std::time::Instant::now();
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
@@ -286,7 +289,18 @@ async fn run_datafusion(
         log::error!("[trace_id {trace_id}] super cluster leader: datafusion collect error: {e}");
         Err(e.into())
     } else {
-        log::info!("[trace_id {trace_id}] super cluster leader: datafusion collect done");
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] super cluster leader: datafusion collect done"),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("super:leader:run_datafusion collect done".to_string())
+                    .search_role("super".to_string())
+                    .duration(datafusion_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }
