@@ -138,7 +138,7 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("super:leader get file id".to_string())
-                .search_role("super".to_string())
+                .search_role("leader".to_string())
                 .duration(file_id_list_took)
                 .desc(format!("get files {} ids", file_id_list_vec.len(),))
                 .build()
@@ -199,7 +199,7 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("super:leader get nodes".to_string())
-                .search_role("super".to_string())
+                .search_role("leader".to_string())
                 .duration(get_node_start.elapsed().as_millis() as usize)
                 .desc(format!(
                     "get nodes num: {}, querier num: {}",
@@ -218,7 +218,7 @@ pub async fn search(
         &file_id_list_vec,
         start,
         file_id_list_took,
-        "super".to_string(),
+        "leader".to_string(),
     )
     .await?;
     // add work_group

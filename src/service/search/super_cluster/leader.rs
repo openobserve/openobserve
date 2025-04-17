@@ -86,7 +86,20 @@ pub async fn search(
     req.set_use_inverted_index(use_inverted_index);
 
     // 2. get nodes
+    let get_node_start = std::time::Instant::now();
     let nodes = get_cluster_nodes(trace_id, req_regions, req_clusters).await?;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] super get nodes: {}", nodes.len()),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("super get nodes".to_string())
+                .search_role("super".to_string())
+                .duration(get_node_start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     metrics::QUERY_RUNNING_NUMS
         .with_label_values(&[&sql.org_id])

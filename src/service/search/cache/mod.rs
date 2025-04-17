@@ -33,8 +33,6 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
@@ -176,13 +174,7 @@ pub async fn search(
         );
     }
 
-    #[allow(unused_mut)]
-    let mut search_role = "leader".to_string();
-
-    #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        search_role = "super".to_string();
-    }
+    let search_role = "cache".to_string();
 
     // Result caching check ends, start search
     let mut results = Vec::new();

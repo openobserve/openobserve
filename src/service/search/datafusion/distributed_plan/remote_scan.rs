@@ -383,7 +383,7 @@ async fn get_remote_batch(
     }
 
     let node_name = match get_node_by_addr(&node.get_grpc_addr()).await {
-        None => "".to_string(),
+        None => node.get_grpc_addr(),
         Some(node) => node.name,
     };
 
