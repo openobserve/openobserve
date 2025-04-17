@@ -111,7 +111,7 @@ pub async fn handle_search_request(
         Ok(v) => v.clone(),
         Err(e) => {
             let err_res = WsServerEvents::error_response(
-                Error::Message(e.to_string()),
+                &Error::Message(e.to_string()),
                 Some(req_id.to_string()),
                 Some(trace_id),
                 Default::default(),
@@ -128,7 +128,7 @@ pub async fn handle_search_request(
             enterprise_utils::check_permissions(stream_name, stream_type, user_id, org_id).await
         {
             let err_res = WsServerEvents::error_response(
-                Error::Message(e),
+                &Error::Message(e),
                 Some(req_id.to_string()),
                 Some(trace_id),
                 Default::default(),

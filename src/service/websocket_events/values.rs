@@ -72,7 +72,7 @@ pub async fn handle_values_request(
             enterprise_utils::check_permissions(&stream_name, stream_type, user_id, org_id).await
         {
             let err_res = WsServerEvents::error_response(
-                infra::errors::Error::Message(e),
+                &infra::errors::Error::Message(e),
                 Some(request_id.to_string()),
                 Some(trace_id),
                 Default::default(),
