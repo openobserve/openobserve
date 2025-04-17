@@ -4,12 +4,18 @@
       <q-select
         filled
         v-model="internalModel"
-        :options="options"
+        :options="filteredOptions"
         option-label="name"
         option-value="name"
         :display-value="internalModel?.field ?? 'Select a Field'"
         map-options
         dense
+        fill-input
+        use-input
+        input-debounce="0"
+        behavior="menu"
+        hide-selected
+        @filter="filterFields"
       >
         <template v-slot:option="scope">
           <q-expansion-item
@@ -76,8 +82,8 @@ export default defineComponent({
     );
 
     const internalModel = ref(props.modelValue);
-
     const options = ref<Option[]>([]);
+    const filteredOptions = ref<Option[]>([]);
 
     const { getStream } = useStreams();
     const { dashboardPanelData } = useDashboardPanelData(
@@ -107,6 +113,7 @@ export default defineComponent({
     async function fetchFieldsForStreams() {
       if (!props.streams || props.streams.length === 0) {
         options.value = [];
+        filteredOptions.value = [];
         return;
       }
 
@@ -126,6 +133,49 @@ export default defineComponent({
           };
         }),
       );
+
+      // Initialize filtered options with all options
+      filteredOptions.value = [...options?.value];
+    }
+
+    function filterFields(val: string, update: any) {
+      if (val === "") {
+        update(() => {
+          filteredOptions.value = [...options?.value];
+        });
+        return;
+      }
+
+      update(() => {
+        const needle = val?.toLowerCase();
+        // Filter options where either stream name (label) or field name contains the search term
+        filteredOptions.value = options?.value
+          ?.map((stream) => {
+            // First check if stream name matches
+            const streamMatches = stream?.label?.toLowerCase().includes(needle);
+
+            // Then filter child fields that match
+            const matchingFields = stream?.children?.filter(
+              (field: {
+                name: string;
+                stream: { streamAlias: string; stream: string };
+                type: string;
+              }) => field?.name?.toLowerCase()?.includes(needle),
+            );
+
+            // If stream name matches or has matching fields, include in results
+            if (streamMatches || matchingFields.length > 0) {
+              return {
+                ...stream,
+                // If stream matches directly, include all fields
+                // Otherwise only include matching fields
+                children: streamMatches ? stream?.children : matchingFields,
+              };
+            }
+            return null;
+          })
+          .filter(Boolean) as Option[];
+      });
     }
 
     function selectField(field: any) {
@@ -146,7 +196,9 @@ export default defineComponent({
     return {
       internalModel,
       options,
+      filteredOptions,
       selectField,
+      filterFields,
     };
   },
 });

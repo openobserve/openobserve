@@ -45,12 +45,18 @@
           filled
           dense
           v-model="modelValue.stream"
-          :options="streamOptions"
+          :options="filteredStreamOptions"
           emit-value
           map-options
           label="On Stream"
           class="q-py-md tw-w-1/3"
           data-test="dashboard-config-panel-join-to"
+          use-input
+          input-debounce="0"
+          behavior="menu"
+          hide-selected
+          fill-input
+          @filter="filterStreamOptions"
         />
       </div>
 
@@ -203,6 +209,7 @@ export default defineComponent({
     );
 
     const streamOptions = ref([]);
+    const filteredStreamOptions = ref([]);
     const joinOptions = ["inner", "left", "right"];
     const operationOptions = ["=", "!=", ">", "<", ">=", "<="];
 
@@ -259,6 +266,7 @@ export default defineComponent({
 
     onMounted(() => {
       loadStreamsListBasedOnType();
+      filteredStreamOptions.value = [...streamOptions?.value];
     });
 
     const removeCondition = (argIndex: number) => {
@@ -299,6 +307,22 @@ export default defineComponent({
       ];
     };
 
+    const filterStreamOptions = (val, update) => {
+      if (val === '') {
+        update(() => {
+          filteredStreamOptions.value = [...streamOptions?.value];
+        });
+        return;
+      }
+      
+      update(() => {
+        const needle = val.toLowerCase();
+        filteredStreamOptions.value = streamOptions?.value?.filter(
+          stream => stream?.label?.toLowerCase()?.includes(needle)
+        );
+      });
+    };
+
     return {
       t,
       streamOptions,
@@ -307,6 +331,8 @@ export default defineComponent({
       addCondition,
       operationOptions,
       getStreamsBasedJoinIndex,
+      filteredStreamOptions,
+      filterStreamOptions
     };
   },
 });
