@@ -354,6 +354,28 @@ pub async fn update_stream_settings(
                 settings.data_retention = data_retention;
             }
 
+            if let Some(index_original_data) = new_settings.index_original_data {
+                settings.index_original_data = index_original_data;
+            }
+
+            if let Some(index_all_values) = new_settings.index_all_values {
+                settings.index_all_values = index_all_values;
+            }
+
+            // if index_original_data is true, store_original_data must be true
+            if settings.index_original_data {
+                settings.store_original_data = true;
+            }
+
+            // index_original_data & index_all_values only can open one at a time
+            if settings.index_original_data && settings.index_all_values {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    "index_original_data & index_all_values cannot be true at the same time"
+                        .to_string(),
+                )));
+            }
+
             // check for user defined schema
             if !new_settings.defined_schema_fields.add.is_empty() {
                 if !cfg.common.allow_user_defined_schemas {

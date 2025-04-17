@@ -19,8 +19,9 @@ use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
 #[cfg(feature = "enterprise")]
 use cipher::{RewriteCipherCall, RewriteCipherKey};
+use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
 use datafusion::optimizer::{
-    OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
+    AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
     decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
     eliminate_cross_join::EliminateCrossJoin, eliminate_duplicated_expr::EliminateDuplicatedExpr,
     eliminate_filter::EliminateFilter, eliminate_group_by_constant::EliminateGroupByConstant,
@@ -36,6 +37,7 @@ use datafusion::optimizer::{
 };
 use infra::schema::get_stream_setting_fts_fields;
 use limit_join_right_side::LimitJoinRightSide;
+use remove_index_fields::RemoveIndexFieldsRule;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
 
@@ -47,9 +49,21 @@ pub mod add_timestamp;
 pub mod cipher;
 pub mod join_reorder;
 pub mod limit_join_right_side;
+pub mod remove_index_fields;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
 pub mod utils;
+
+pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
+    vec![Arc::new(RemoveIndexFieldsRule::new(
+        sql.columns
+            .iter()
+            .any(|(_, columns)| columns.contains(ORIGINAL_DATA_COL_NAME)),
+        sql.columns
+            .iter()
+            .any(|(_, columns)| columns.contains(ALL_VALUES_COL_NAME)),
+    ))]
+}
 
 pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
     let cfg = config::get_config();

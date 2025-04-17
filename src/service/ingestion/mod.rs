@@ -514,6 +514,7 @@ pub async fn get_uds_and_original_data_streams(
     streams: &[StreamParams],
     user_defined_schema_map: &mut HashMap<String, Option<HashSet<String>>>,
     streams_need_original: &mut HashMap<String, bool>,
+    streams_need_all_values: &mut HashMap<String, bool>,
 ) {
     for stream in streams {
         if user_defined_schema_map.contains_key(stream.stream_name.as_str()) {
@@ -525,7 +526,11 @@ pub async fn get_uds_and_original_data_streams(
                 .unwrap_or_default();
         streams_need_original.insert(
             stream.stream_name.to_string(),
-            stream_settings.store_original_data,
+            stream_settings.store_original_data || stream_settings.index_original_data,
+        );
+        streams_need_all_values.insert(
+            stream.stream_name.to_string(),
+            stream_settings.index_all_values,
         );
         if let Some(fields) = &stream_settings.defined_schema_fields {
             if !fields.is_empty() {

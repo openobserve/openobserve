@@ -348,7 +348,7 @@ const useStreams = () => {
   function removeSchemaFields(streamData: any) {
     if (streamData.schema) {
       streamData.schema = streamData.schema.filter((field: any) => {
-        return field.name != "_original" && field.name != "_o2_id";
+        return field.name != "_o2_id" && field.name != "_original" && field.name != "_all_values";
       });
     }
     return streamData;

@@ -82,7 +82,8 @@ pub async fn search(
 
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx =
-        prepare_datafusion_context(work_group.clone(), vec![], false, cfg.limit.cpu_num).await?;
+        prepare_datafusion_context(work_group.clone(), vec![], vec![], false, cfg.limit.cpu_num)
+            .await?;
 
     // register udf
     register_udf(&ctx, &org_id)?;

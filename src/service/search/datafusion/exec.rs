@@ -43,7 +43,7 @@ use datafusion::{
         session_state::SessionStateBuilder,
     },
     logical_expr::AggregateUDF,
-    optimizer::OptimizerRule,
+    optimizer::{AnalyzerRule, OptimizerRule},
     physical_plan::execute_stream,
     prelude::{Expr, SessionContext},
 };
@@ -143,8 +143,14 @@ pub async fn merge_parquet_files(
     let sort_by_timestamp_desc = true;
     // force use DATAFUSION_MIN_PARTITION for each merge task
     let target_partitions = DATAFUSION_MIN_PARTITION;
-    let ctx =
-        prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
+    let ctx = prepare_datafusion_context(
+        None,
+        vec![],
+        vec![],
+        sort_by_timestamp_desc,
+        target_partitions,
+    )
+    .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
     ctx.register_table("tbl", union_table)?;
@@ -245,8 +251,14 @@ pub async fn merge_parquet_files_with_downsampling(
     // create datafusion context
     let sort_by_timestamp_desc = true;
     let target_partitions = 2; // force use 2 cpu cores for one merge task
-    let ctx =
-        prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
+    let ctx = prepare_datafusion_context(
+        None,
+        vec![],
+        vec![],
+        sort_by_timestamp_desc,
+        target_partitions,
+    )
+    .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
     ctx.register_table("tbl", union_table)?;
@@ -467,6 +479,7 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
 
 pub async fn prepare_datafusion_context(
     _work_group: Option<String>,
+    analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     sorted_by_time: bool,
     target_partitions: usize,
@@ -486,6 +499,9 @@ pub async fn prepare_datafusion_context(
         .with_config(session_config)
         .with_runtime_env(runtime_env)
         .with_default_features();
+    for rule in analyzer_rules {
+        builder = builder.with_analyzer_rule(rule);
+    }
     if !optimizer_rules.is_empty() {
         builder = builder
             .with_optimizer_rules(optimizer_rules)
@@ -554,6 +570,7 @@ pub async fn register_table(
 
     let ctx = prepare_datafusion_context(
         session.work_group.clone(),
+        vec![],
         vec![],
         sorted_by_time,
         session.target_partitions,
