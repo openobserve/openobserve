@@ -17,12 +17,12 @@ export default class DashboardactionPage {
   }
 
   // Save panel button
-  async SavePanel() {
+  async savePanel() {
     await this.panelSaveBtn.click();
   }
 
   //Apply dashboard button
-  async ApplyDashboardBtn() {
+  async applyDashboardBtn() {
     await this.applyDashboard.click();
   }
 

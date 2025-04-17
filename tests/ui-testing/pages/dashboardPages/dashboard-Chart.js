@@ -75,6 +75,7 @@ export default class ChartTypeSelector {
     await this.page.locator(buttonSelector).click();
   }
 
+  // Add filter condition
   async addFilterCondition(initialFieldName, newFieldName, operator, value) {
     // Step 1: Click the existing field if provided
     if (initialFieldName) {

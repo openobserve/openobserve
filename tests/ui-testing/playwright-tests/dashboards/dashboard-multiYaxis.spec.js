@@ -8,7 +8,7 @@ import {
   deleteDashboard,
 } from "../utils/dashCreation.js";
 
-import ChartTypeSelector from "../../pages/dashboardPages/dashboardChart.js";
+import ChartTypeSelector from "../../pages/dashboardPages/dashboard-Chart.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-Create.js";
 import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
@@ -82,7 +82,7 @@ test.describe("dashboard filter testcases", () => {
 
     await dashboardPageActions.addPanelName(randomDashboardName);
 
-    await dashboardPageActions.SavePanel();
+    await dashboardPageActions.savePanel();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
 
