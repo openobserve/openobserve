@@ -8,9 +8,9 @@ import {
   deleteDashboard,
 } from "../utils/dashCreation.js";
 
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-Chart.js";
+import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-Create.js";
+import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
 import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
 
@@ -19,7 +19,7 @@ const randomDashboardName =
 
 test.describe.configure({ mode: "parallel" });
 
-test.describe("dashboard filter testcases", () => {
+test.describe("dashboard multi y axis testcases", () => {
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
     await login(page);
