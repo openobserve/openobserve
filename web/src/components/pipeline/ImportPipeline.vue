@@ -508,16 +508,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="index"
                     :data-test="`pipeline-import-creation-${index}`"
                   >
-                    <div
-                      :class="{
-                        'error-item text-bold': true,
-                        'text-green ': val.success,
-                        'text-red': !val.success,
-                      }"
-                      :data-test="`pipeline-import-creation-${index}-message`"
-                    >
-                      <pre>{{ val.message }}</pre>
-                    </div>
+                  <div
+                    :class="{
+                      'error-item text-bold': true,
+                      'text-green': val.success,
+                      'text-red': !val.success,
+                    }"
+                    style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word;"
+                    :data-test="`pipeline-import-creation-${index}-message`"
+                  >
+                    <pre style="white-space: pre-wrap; word-break: break-word;">{{ val.message }}</pre>
+                  </div>
                   </div>
                 </div>
               </div>
