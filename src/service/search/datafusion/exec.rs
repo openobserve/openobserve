@@ -251,8 +251,14 @@ pub async fn merge_parquet_files_with_downsampling(
     // create datafusion context
     let sort_by_timestamp_desc = true;
     let target_partitions = 2; // force use 2 cpu cores for one merge task
-    let ctx =
-        prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
+    let ctx = prepare_datafusion_context(
+        None,
+        vec![],
+        vec![],
+        sort_by_timestamp_desc,
+        target_partitions,
+    )
+    .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
     ctx.register_table("tbl", union_table)?;
