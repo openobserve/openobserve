@@ -13,29 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::{
-    search::{SearchEventType, ValuesEventContext},
-    websocket::{ValuesEventReq, SearchResultType},
-};
-use crate::handler::http::request::search::build_search_request_per_field;
-use config::get_config;
 use chrono::DateTime;
+use config::{
+    get_config,
+    meta::{
+        search::{SearchEventType, ValuesEventContext},
+        websocket::{SearchResultType, ValuesEventReq},
+    },
+};
 
 #[cfg(feature = "enterprise")]
 use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::utils::stream::get_max_query_range,
-    handler::http::request::ws_v2::session::send_message,
+    handler::http::request::{
+        search::build_search_request_per_field, ws_v2::session::send_message,
+    },
     service::{
         search::{cache, sql::Sql},
-        websocket_events::{WsServerEvents, search::{
-            do_partitioned_search, write_results_to_cache, handle_cache_responses_and_deltas
-        }},
+        websocket_events::{
+            WsServerEvents,
+            search::{
+                do_partitioned_search, handle_cache_responses_and_deltas, write_results_to_cache,
+            },
+        },
     },
 };
 
 pub async fn handle_values_request(
-    org_id: &str, 
+    org_id: &str,
     user_id: &str,
     request_id: &str,
     req: ValuesEventReq,
@@ -53,8 +59,10 @@ pub async fn handle_values_request(
     log::info!(
         "[WS_VALUES] trace_id: {} Received values request, start_time: {}, end_time: {}",
         trace_id,
-        DateTime::from_timestamp_micros(start_time.unwrap_or(0) / 1_000).map_or("None".to_string(), |dt| dt.to_string()),
-        DateTime::from_timestamp_micros(end_time.unwrap_or(0) / 1_000).map_or("None".to_string(), |dt| dt.to_string())
+        DateTime::from_timestamp_micros(start_time.unwrap_or(0) / 1_000)
+            .map_or("None".to_string(), |dt| dt.to_string()),
+        DateTime::from_timestamp_micros(end_time.unwrap_or(0) / 1_000)
+            .map_or("None".to_string(), |dt| dt.to_string())
     );
 
     // Check permissions for each stream
@@ -64,7 +72,7 @@ pub async fn handle_values_request(
             enterprise_utils::check_permissions(&stream_name, stream_type, user_id, org_id).await
         {
             let err_res = WsServerEvents::error_response(
-                infra::errors::Error::Message(e),
+                &infra::errors::Error::Message(e),
                 Some(request_id.to_string()),
                 Some(trace_id),
                 Default::default(),
@@ -85,14 +93,19 @@ pub async fn handle_values_request(
         // Convert the request query to SearchQuery type if needed
         // Here we're converting from the search_req.query to the expected type
         let search_query = search_req.query.clone().into();
-        
+
         let sql = Sql::new(&search_query, org_id, stream_type, search_req.search_type).await?;
         let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
-        
+
         if search_req.query.from == 0 {
-            let c_resp =
-                cache::check_cache_v2(&trace_id, org_id, stream_type, &search_req, search_req.use_cache.unwrap_or(false))
-                .await?;
+            let c_resp = cache::check_cache_v2(
+                &trace_id,
+                org_id,
+                stream_type,
+                &search_req,
+                search_req.use_cache.unwrap_or(false),
+            )
+            .await?;
             let local_c_resp = c_resp.clone();
             let cached_resp = local_c_resp.cached_response;
             let mut deltas = local_c_resp.deltas;
@@ -215,7 +228,7 @@ pub async fn handle_values_request(
                 // Safely unwrap Option<i64> values with defaults
                 let safe_start_time = start_time.unwrap_or(0);
                 let safe_end_time = end_time.unwrap_or(0);
-                
+
                 write_results_to_cache(c_resp, safe_start_time, safe_end_time, accumulated_results)
                     .await
                     .map_err(|e| {

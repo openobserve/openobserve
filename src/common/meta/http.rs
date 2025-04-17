@@ -71,7 +71,7 @@ impl HttpResponse {
         }
     }
 
-    pub fn error_code_with_trace_id(err: errors::ErrorCodes, trace_id: Option<String>) -> Self {
+    pub fn error_code_with_trace_id(err: &errors::ErrorCodes, trace_id: Option<String>) -> Self {
         HttpResponse {
             code: err.get_code(),
             message: err.get_message(),

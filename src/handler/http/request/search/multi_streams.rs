@@ -484,7 +484,7 @@ pub async fn search_multi(
                     if let errors::ErrorCodes::SearchCancelQuery(_) = code {
                         return Ok(HttpResponse::TooManyRequests().json(
                             meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
+                                &code,
                                 Some(trace_id),
                             ),
                         ));
@@ -778,7 +778,7 @@ pub async fn _search_partition_multi(
             log::error!("search error: {:?}", err);
             Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+                    meta::http::HttpResponse::error_code_with_trace_id(&code, Some(trace_id)),
                 ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -927,12 +927,12 @@ pub async fn around_multi(
                     errors::Error::ErrorCode(code) => match code {
                         errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
                             .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
+                                &code,
                                 Some(trace_id),
                             )),
                         _ => HttpResponse::InternalServerError().json(
                             meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
+                                &code,
                                 Some(trace_id),
                             ),
                         ),

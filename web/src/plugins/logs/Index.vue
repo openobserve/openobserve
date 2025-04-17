@@ -193,22 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else-if="
-                    (!searchObj.data.stream.selectedStreamFields ||
-                      searchObj.data.stream.selectedStreamFields.length == 0) &&
-                    searchObj.loading == false
-                  "
-                  class="row q-mt-lg"
-                >
-                  <h6
-                    data-test="logs-search-no-stream-selected-text"
-                    class="text-center col-10 q-mx-none"
-                  >
-                    <q-icon name="info" color="primary" size="md" /> No field
-                    found in selected stream.
-                  </h6>
-                </div>
-                <div
-                  v-else-if="
                     searchObj.data.queryResults.hasOwnProperty('hits') &&
                     searchObj.data.queryResults.hits.length == 0 &&
                     searchObj.loading == false &&
@@ -584,6 +568,8 @@ export default defineComponent({
       initializeWebSocketConnection,
       addRequestId,
       sendCancelSearchMessage,
+      isDistinctQuery,
+      isWithQuery,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1609,6 +1595,8 @@ export default defineComponent({
       showJobScheduler,
       showSearchScheduler,
       closeSearchSchedulerFn,
+      isDistinctQuery,
+      isWithQuery,
     };
   },
   computed: {
@@ -1687,8 +1675,16 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram is not available for limit queries.",
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",-1
           );
+          this.searchObj.meta.histogramDirtyFlag = false;
+        } 
+        else if (this.searchObj.meta.sqlMode && (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))) {
+          this.resetHistogramWithError(
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1
+          );
+          this.searchObj.meta.histogramDirtyFlag = false;
         } else if (this.searchObj.data.stream.selectedStream.length > 1) {
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",

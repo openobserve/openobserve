@@ -39,7 +39,7 @@ use {
     config::utils::time::now_micros,
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, HttpMeta, Protocol},
+        auditor::{AuditMessage, Protocol, ResponseMeta},
         infra::config::get_config as get_o2_config,
     },
 };
@@ -138,14 +138,16 @@ async fn audit_middleware(
                 user_email,
                 org_id,
                 _timestamp: now_micros(),
-                protocol: Protocol::Http(HttpMeta {
-                    method,
-                    path,
-                    body,
-                    query_params,
-                    response_code: res.response().status().as_u16(),
+                protocol: Protocol::Http,
+                response_meta: ResponseMeta {
+                    http_method: method,
+                    http_path: path,
+                    http_body: body,
+                    http_query_params: query_params,
+                    http_response_code: res.response().status().as_u16(),
                     error_msg,
-                }),
+                    trace_id: None,
+                },
             })
             .await;
         }

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-6 text-left q-pl-lg q-mt-xs warning flex">
+        <div v-else class="col-9 text-left q-pl-lg q-mt-xs warning flex items-center">
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
@@ -52,9 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
 
           </span>
+          <span v-else-if="searchObj.data.histogram.errorCode == -1 && !searchObj.loadingCounter && searchObj.meta.showHistogram" class="q-ml-md " 
+          :class="store.state.theme == 'dark' ? 'histogram-unavailable-text' : 'histogram-unavailable-text-light'"
+          >
+            {{ searchObj.data.histogram.errorMsg }}
+          </span>
         </div>
 
-        <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
+        <div class="col-3 text-right q-pr-md q-gutter-xs pagination-block">
           
           <q-pagination
             v-if="searchObj.meta.resultGrid.showPagination"
@@ -105,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
         </div>
       </div>
-      <div v-if="searchObj.data?.histogram?.errorMsg == ''">
+      <div v-if="searchObj.data?.histogram?.errorMsg == '' && searchObj.data.histogram.errorCode != -1">
         <ChartRenderer
           v-if="searchObj.meta.showHistogram && (searchObj.data?.queryResults?.aggs?.length > 0 || ( plotChart && Object.keys(plotChart)?.length > 0))"
           data-test="logs-search-result-bar-chart"
@@ -139,14 +144,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="
           searchObj.data.histogram?.errorMsg != '' &&
           searchObj.meta.showHistogram
+          && searchObj.data.histogram.errorCode != -1
         "
       >
         <h6
           class="text-center"
           style="margin: 30px 0px"
-          v-if="searchObj.data.histogram.errorCode != 0"
+          v-if="searchObj.data.histogram.errorCode != 0 && searchObj.data.histogram.errorCode != -1"
         >
-          <q-icon name="warning" color="warning" size="30px"></q-icon> Error
+          <q-icon name="warning" color="warning" size="xs"></q-icon> Error
           while fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
@@ -158,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ searchObj.data.histogram?.errorMsg }}
           </span>
         </h6>
-        <h6 class="text-center" v-else>
+        <h6 class="text-center" v-else-if="searchObj.data.histogram.errorCode != -1">
           {{ searchObj.data.histogram?.errorMsg }}
         </h6>
       </div>
@@ -176,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-columns="!searchObj.data.stream.selectedFields.length"
         class="col-12"
         :style="{
-          height: !searchObj.meta.showHistogram
+          height: !searchObj.meta.showHistogram || (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
             ? 'calc(100% - 40px)'
             : 'calc(100% - 140px)',
         }"
@@ -949,5 +955,11 @@ export default defineComponent({
     position: relative;
     height: 30px;
   }
+}
+.histogram-unavailable-text{
+  color: #F5A623;
+}
+.histogram-unavailable-text-light{
+  color: #ff8800;
 }
 </style>

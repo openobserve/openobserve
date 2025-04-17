@@ -696,7 +696,11 @@ pub async fn search_partition(
             });
         }
     }
-    log::info!("[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}", max_query_range, max_query_range_in_hour);
+    log::info!(
+        "[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}",
+        max_query_range,
+        max_query_range_in_hour
+    );
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
@@ -807,7 +811,14 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    log::debug!("[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}", total_secs, part_num, step, min_step, is_histogram);
+    log::debug!(
+        "[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}",
+        total_secs,
+        part_num,
+        step,
+        min_step,
+        is_histogram
+    );
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
         min_step,

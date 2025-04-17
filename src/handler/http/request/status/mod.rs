@@ -55,7 +55,7 @@ use {
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
     },
     o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, HttpMeta, Protocol},
+        auditor::{AuditMessage, Protocol, ResponseMeta},
         infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
         settings::{get_logo, get_logo_text},
     },
@@ -414,14 +414,16 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
-        protocol: Protocol::Http(HttpMeta {
-            method: "GET".to_string(),
-            path: "/config/reload".to_string(),
-            query_params: "".to_string(),
-            body: "".to_string(),
-            response_code: 200,
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: "GET".to_string(),
+            http_path: "/config/reload".to_string(),
+            http_query_params: "".to_string(),
+            http_body: "".to_string(),
+            http_response_code: 200,
             error_msg: None,
-        }),
+            trace_id: None,
+        },
     })
     .await;
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
@@ -469,14 +471,16 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
-        protocol: Protocol::Http(HttpMeta {
-            method: "GET".to_string(),
-            path: "/config/redirect".to_string(),
-            body: "".to_string(),
-            query_params: req.query_string().to_string(),
-            response_code: 302,
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: "GET".to_string(),
+            http_path: "/config/redirect".to_string(),
+            http_body: "".to_string(),
+            http_query_params: req.query_string().to_string(),
+            http_response_code: 302,
             error_msg: None,
-        }),
+            trace_id: None,
+        },
     };
 
     match query.get("state") {
@@ -486,9 +490,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             }
             Err(_) => {
                 // Bad Request
-                if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
-                    http_meta.response_code = 400;
-                }
+                audit_message.response_meta.http_response_code = 400;
                 audit(audit_message).await;
                 return Err(Error::new(ErrorKind::Other, "invalid state in request"));
             }
@@ -496,9 +498,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
 
         None => {
             // Bad Request
-            if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
-                http_meta.response_code = 400;
-            }
+            audit_message.response_meta.http_response_code = 400;
             audit(audit_message).await;
             return Err(Error::new(ErrorKind::Other, "no state in request"));
         }
@@ -552,9 +552,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     process_token(res).await
                 }
                 Err(e) => {
-                    if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
-                        http_meta.response_code = 400;
-                    }
+                    audit_message.response_meta.http_response_code = 400;
                     audit_message._timestamp = now_micros();
                     audit(audit_message).await;
                     return Ok(HttpResponse::Unauthorized().json(e.to_string()));
@@ -598,9 +596,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 .finish())
         }
         Err(e) => {
-            if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
-                http_meta.response_code = 400;
-            }
+            audit_message.response_meta.http_response_code = 400;
             audit_message._timestamp = now_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Unauthorized().json(e.to_string()))
@@ -748,14 +744,16 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
             user_email,
             org_id: "".to_string(),
             _timestamp: now_micros(),
-            protocol: Protocol::Http(HttpMeta {
-                method: "GET".to_string(),
-                path: "/config/logout".to_string(),
-                query_params: req.query_string().to_string(),
-                body: "".to_string(),
-                response_code: 200,
+            protocol: Protocol::Http,
+            response_meta: ResponseMeta {
+                http_method: "GET".to_string(),
+                http_path: "/config/logout".to_string(),
+                http_query_params: req.query_string().to_string(),
+                http_body: "".to_string(),
+                http_response_code: 200,
                 error_msg: None,
-            }),
+                trace_id: None,
+            },
         })
         .await;
     }

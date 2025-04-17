@@ -20,7 +20,7 @@ use {
     crate::{common::utils::jwt::verify_decode_token, handler::http::auth::jwt::process_token},
     config::utils::time::now_micros,
     o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks},
-    o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol},
+    o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
 };
 
 #[cfg(feature = "enterprise")]
@@ -35,14 +35,16 @@ pub async fn exchange_token(
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
-        protocol: Protocol::Http(HttpMeta {
-            method: req.method().to_string(),
-            path: req.path().to_string(),
-            body: "".to_string(),
-            query_params: req.query_string().to_string(),
-            response_code: 200,
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: req.method().to_string(),
+            http_path: req.path().to_string(),
+            http_body: "".to_string(),
+            http_query_params: req.query_string().to_string(),
+            http_response_code: 200,
             error_msg: None,
-        }),
+            trace_id: None,
+        },
     };
     match result {
         Ok(response) => {
@@ -61,9 +63,7 @@ pub async fn exchange_token(
                     process_token(res).await
                 }
                 Err(e) => {
-                    if let Protocol::Http(http_meta) = &mut audit_message.protocol {
-                        http_meta.response_code = 401;
-                    }
+                    audit_message.response_meta.http_response_code = 401;
                     audit_message._timestamp = now_micros();
                     audit(audit_message).await;
                     return Ok(HttpResponse::Unauthorized().json(e.to_string()));
@@ -75,9 +75,7 @@ pub async fn exchange_token(
         }
         Err(e) => {
             log::error!("Error: {}", e);
-            if let Protocol::Http(http_meta) = &mut audit_message.protocol {
-                http_meta.response_code = 401;
-            }
+            audit_message.response_meta.http_response_code = 401;
             audit_message._timestamp = now_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Unauthorized().json(e.to_string()))
