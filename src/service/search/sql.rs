@@ -477,7 +477,20 @@ fn generate_quick_mode_fields(
         .map(|f| f.name().to_string())
         .collect::<HashSet<_>>();
 
-    // check _timestamp
+    // check _all column
+    if cfg.common.feature_query_exclude_all {
+        if fields_name.contains(&cfg.common.column_all) {
+            fields.retain(|field| field.name().ne(&cfg.common.column_all));
+        }
+        if fields_name.contains(ORIGINAL_DATA_COL_NAME) {
+            fields.retain(|field| field.name().ne(ORIGINAL_DATA_COL_NAME));
+        }
+        if fields_name.contains(ALL_VALUES_COL_NAME) {
+            fields.retain(|field| field.name().ne(ALL_VALUES_COL_NAME));
+        }
+    }
+
+    // check _timestamp column
     if !fields_name.contains(TIMESTAMP_COL_NAME) {
         if let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME) {
             fields.push(Arc::new(field.clone()));
