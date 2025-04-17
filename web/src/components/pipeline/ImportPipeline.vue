@@ -623,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const userSelectedSqlQuery = ref<string[]>([]);
       const userSelectedFunctionName = ref<string[]>([]);
       const scheduledPipelines = ref<any>([]);
-      const userSelectedOrgId = ref<string[]>([]);
+      const userSelectedOrgId = ref<any[]>([]);
       const organizationData = computed(() => {
         return store.state.organizations.map((org: any) => {
           return {
