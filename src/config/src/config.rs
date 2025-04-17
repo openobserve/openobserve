@@ -1079,6 +1079,8 @@ pub struct Common {
     pub file_list_dump_dual_write: bool,
     #[env_config(name = "ZO_FILE_LIST_DUMP_MIN_HOUR", default = 12)]
     pub file_list_dump_min_hour: usize,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
+    pub file_list_dump_debug_check: bool,
 }
 
 #[derive(EnvConfig)]
@@ -2167,6 +2169,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     {
         cfg.common.feature_join_right_side_max_rows = 50_000;
     }
+
+    // debug check is useful only when dual write is enabled. Otherwise it will raise error
+    // incorrectly each time
+    cfg.common.file_list_dump_debug_check =
+        cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
 
     Ok(())
 }

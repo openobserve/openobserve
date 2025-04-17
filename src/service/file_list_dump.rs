@@ -184,7 +184,11 @@ pub async fn get_file_list_entries_in_range(
         "{org}/{}/{org}_{stream_type}_{stream}",
         StreamType::Filelist
     );
+    let db_start = std::time::Instant::now();
     let dump_files = get_dump_files_in_range(org, Some(&stream_key), range).await?;
+    let db_time = db_start.elapsed().as_millis();
+
+    let process_start = std::time::Instant::now();
     let dump_files: Vec<_> = dump_files
         .into_iter()
         .map(|f| FileKey {
@@ -208,6 +212,11 @@ pub async fn get_file_list_entries_in_range(
         .into_iter()
         .flat_map(record_batch_to_file_record)
         .collect();
+    let process_time = process_start.elapsed().as_millis();
+
+    log::info!(
+        "[FILE_LIST_DUMP] : getting dump files from db took {db_time} ms, searching for entries took {process_time} ms"
+    );
 
     Ok(ret)
 }
@@ -290,6 +299,12 @@ pub async fn stats(
     deleted: bool,
 ) -> Result<Vec<(String, StreamStats)>, errors::Error> {
     let cfg = get_config();
+
+    // in case of dual write, we have no way of de-duping with ids for stats.
+    // so we simply do not consider dumped files when dual-write is enabled.
+    if cfg.common.file_list_dump_dual_write {
+        return Ok(vec![]);
+    }
 
     let (field, value, dump_files) = match (stream_type, stream_name) {
         (Some(stype), Some(sname)) => {
