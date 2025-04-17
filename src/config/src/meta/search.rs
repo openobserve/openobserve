@@ -16,10 +16,9 @@
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
-use crate::meta::stream::StreamType;
 
 use crate::{
-    meta::sql::OrderBy,
+    meta::{sql::OrderBy, stream::StreamType},
     utils::{base64, json},
 };
 

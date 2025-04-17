@@ -448,13 +448,13 @@ impl WsServerEvents {
     }
 
     pub fn error_response(
-        err: errors::Error,
+        err: &errors::Error,
         request_id: Option<String>,
         trace_id: Option<String>,
         should_client_retry: bool,
     ) -> Self {
         match err {
-            errors::Error::ErrorCode(ref code) => {
+            errors::Error::ErrorCode(code) => {
                 let message = code.get_message();
                 let error_detail = code.get_error_detail();
                 let http_response =
