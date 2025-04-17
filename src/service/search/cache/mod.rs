@@ -17,7 +17,9 @@ use std::str::FromStr;
 
 use chrono::{TimeZone, Utc};
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
@@ -25,12 +27,14 @@ use config::{
         stream::StreamType,
     },
     metrics,
-    utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
+    utils::{base64, hash::Sum64, json, sql::is_aggregate_query, time::format_duration},
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
@@ -41,7 +45,11 @@ use crate::{
         utils::{functions, http::get_work_group},
     },
     service::{
-        search::{self as SearchService, cache::cacher::check_cache},
+        search::{
+            self as SearchService,
+            cache::cacher::check_cache,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -166,11 +174,14 @@ pub async fn search(
             "[trace_id {trace_id}] Query deltas are: {:?}",
             c_resp.deltas
         );
-        log::info!(
-            "[trace_id {trace_id}] Query original start time: {}, end time : {}",
-            req.query.start_time,
-            req.query.end_time
-        );
+    }
+
+    #[allow(unused_mut)]
+    let mut search_role = "leader".to_string();
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        search_role = "super".to_string();
     }
 
     // Result caching check ends, start search
@@ -234,9 +245,37 @@ pub async fn search(
 
         let mut tasks = Vec::new();
 
-        log::info!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas);
         c_resp.deltas.sort();
         c_resp.deltas.dedup();
+        let total = (req.query.end_time - req.query.start_time) as usize;
+        let deltas_total: usize = c_resp
+            .deltas
+            .iter()
+            .map(|d| (d.delta_end_time - d.delta_start_time) as usize)
+            .sum();
+
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("cacher:search deltas".to_string())
+                    .search_role(search_role.clone())
+                    .duration(start.elapsed().as_millis() as usize)
+                    .desc(format!(
+                        "search cacher search from {} reduce to {}",
+                        format_duration(total as u64 / 1000),
+                        format_duration(deltas_total as u64 / 1000)
+                    ))
+                    .build()
+            )
+        );
+        log::info!(
+            "[trace_id {trace_id}] Query original start time: {}, end time : {}",
+            req.query.start_time,
+            req.query.end_time
+        );
 
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let mut req = req.clone();
@@ -299,6 +338,24 @@ pub async fn search(
 
     // do search
     let time = start.elapsed().as_secs_f64();
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] cache done"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("summary".to_string())
+                .search_role(search_role)
+                .sql(req.query.sql.clone())
+                .time_range((
+                    req.query.start_time.to_string(),
+                    req.query.end_time.to_string()
+                ))
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
+
     let work_group = get_work_group(work_group_set);
 
     let search_type = req
@@ -398,15 +455,22 @@ pub async fn search(
     // 1. VRL error
     // 2. Super cluster error
     // 3. Range error (max_query_limit)
+
+    // let should_cache_results =
+    //     res.new_start_time.is_some() || res.new_end_time.is_some() ||
+    // res.function_error.is_empty();
+
     // Cache partial results only if there is a range error
+    // if !res.function_error.is_empty() && !range_error.is_empty() {
+    //     res.function_error.retain(|err| !err.contains(&range_error));
+    //     should_cache_results = should_cache_results && res.function_error.is_empty();
+    // }
 
-    let mut should_cache_results =
-        res.new_start_time.is_some() || res.new_end_time.is_some() || res.function_error.is_empty();
-
-    if !res.function_error.is_empty() && !range_error.is_empty() {
-        res.function_error.retain(|err| !err.contains(&range_error));
-        should_cache_results = should_cache_results && res.function_error.is_empty();
-    }
+    // Update: Don't cache any partial results
+    let should_cache_results = res.new_start_time.is_none()
+        && res.new_end_time.is_none()
+        && res.function_error.is_empty()
+        && !res.hits.is_empty();
 
     // result cache save changes start
     if cfg.common.result_cache_enabled

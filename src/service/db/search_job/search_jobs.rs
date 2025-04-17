@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::ider;
+use config::{ider, utils::time::now_micros};
 use infra::{
     errors, orm_err,
     table::{
@@ -43,7 +43,7 @@ pub async fn submit(
     end_time: i64,
 ) -> Result<String, errors::Error> {
     let job_id = ider::uuid();
-    let created_at = chrono::Utc::now().timestamp_micros();
+    let created_at = now_micros();
     let updated_at = created_at;
     let job = Model {
         id: job_id.to_string(),
@@ -84,7 +84,7 @@ pub async fn submit(
 
 // get a oldest job and lock it
 pub async fn get_job() -> Result<Option<Model>, errors::Error> {
-    let updated_at = chrono::Utc::now().timestamp_micros();
+    let updated_at = now_micros();
     let res = infra::table::search_job::search_jobs::get_job(updated_at).await?;
 
     // TODO: need other call to set the get job's status
@@ -105,7 +105,7 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
 }
 
 pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i64, errors::Error> {
-    let updated_at = chrono::Utc::now().timestamp_micros();
+    let updated_at = now_micros();
     let res = infra::table::search_job::search_jobs::cancel_job(job_id, updated_at).await?;
 
     // super cluster, cancel a job
@@ -128,7 +128,7 @@ pub async fn set_job_error_message(
     trace_id: &str,
     error_message: &str,
 ) -> Result<(), errors::Error> {
-    let updated_at = chrono::Utc::now().timestamp_micros();
+    let updated_at = now_micros();
     let operator = SetOperator {
         filter: vec![
             Filter::new(MetaColumn::Id, OperatorType::Equal, Value::string(job_id)),
@@ -161,7 +161,7 @@ pub async fn set_job_error_message(
 }
 
 pub async fn set_job_finish(job_id: &str, trace_id: &str, path: &str) -> Result<(), errors::Error> {
-    let updated_at = chrono::Utc::now().timestamp_micros();
+    let updated_at = now_micros();
     let operator = SetOperator {
         filter: vec![
             Filter::new(MetaColumn::Id, OperatorType::Equal, Value::string(job_id)),
@@ -256,7 +256,7 @@ pub async fn set_job_deleted(job_id: &str) -> Result<bool, errors::Error> {
 }
 
 pub async fn update_running_job(job_id: &str) -> Result<(), errors::Error> {
-    let updated_at = chrono::Utc::now().timestamp_micros();
+    let updated_at = now_micros();
     let operator = SetOperator {
         filter: vec![
             Filter::new(MetaColumn::Id, OperatorType::Equal, Value::string(job_id)),
@@ -354,7 +354,7 @@ pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
 
 pub async fn retry_search_job(job_id: &str) -> Result<(), errors::Error> {
     let trace_id = ider::generate_trace_id();
-    let updated_at = chrono::Utc::now().timestamp_micros();
+    let updated_at = now_micros();
     infra::table::search_job::search_jobs::retry_search_job(job_id, &trace_id, updated_at).await?;
 
     #[cfg(feature = "enterprise")]

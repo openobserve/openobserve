@@ -100,8 +100,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     // start worker threads
     let cfg = get_config();
-    let (tx, rx) =
-        tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(cfg.limit.file_move_thread_num);
+    let (tx, rx) = tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(1);
     let rx = Arc::new(Mutex::new(rx));
     for thread_id in 0..cfg.limit.file_move_thread_num {
         let rx = rx.clone();

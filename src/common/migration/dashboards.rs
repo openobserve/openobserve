@@ -19,6 +19,7 @@ use config::{
         dashboards::Dashboard,
         stream::{DistinctField, StreamSettings, StreamType},
     },
+    utils::time::now_micros,
 };
 use hashbrown::HashMap;
 use infra::{
@@ -78,7 +79,7 @@ async fn add_distinct_from_dashboard(
 
             let temp = DistinctField {
                 name: f,
-                added_ts: chrono::Utc::now().timestamp_micros(),
+                added_ts: now_micros(),
             };
 
             if !stream_settings.distinct_value_fields.contains(&temp) {

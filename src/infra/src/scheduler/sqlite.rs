@@ -15,7 +15,7 @@
 
 use async_trait::async_trait;
 use chrono::Duration;
-use config::utils::json;
+use config::utils::{json, time::now_micros};
 use sqlx::{Pool, Row, Sqlite};
 
 use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
@@ -312,6 +312,39 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
+    /// Keeps the trigger alive
+    async fn keep_alive(&self, ids: &[i64], alert_timeout: i64, report_timeout: i64) -> Result<()> {
+        let now = now_micros();
+        let report_max_time = now
+            + Duration::try_seconds(report_timeout)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        let alert_max_time = now
+            + Duration::try_seconds(alert_timeout)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+
+        let sql = format!(
+            "UPDATE scheduled_jobs SET end_time = CASE WHEN module = $1 THEN $2 ELSE $3 END WHERE id IN ({});",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        sqlx::query(&sql)
+            .bind(TriggerModule::Alert)
+            .bind(alert_max_time)
+            .bind(report_max_time)
+            .execute(&*client)
+            .await?;
+
+        Ok(())
+    }
+
     /// Returns the Trigger jobs with "Waiting" status.
     /// Steps:
     /// - Lock the Sqlite client for read-write
@@ -329,7 +362,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
 
-        let now = chrono::Utc::now().timestamp_micros();
+        let now = now_micros();
         let report_max_time = now
             + Duration::try_seconds(report_timeout)
                 .unwrap()
@@ -462,7 +495,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     async fn watch_timeout(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        let now = chrono::Utc::now().timestamp_micros();
+        let now = now_micros();
         sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = $1, retries = retries + 1

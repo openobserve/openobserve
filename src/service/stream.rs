@@ -314,10 +314,7 @@ pub async fn save_stream_settings(
     let mut metadata = schema.metadata.clone();
     metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
     if !metadata.contains_key("created_at") {
-        metadata.insert(
-            "created_at".to_string(),
-            chrono::Utc::now().timestamp_micros().to_string(),
-        );
+        metadata.insert("created_at".to_string(), now_micros().to_string());
     }
     db::schema::update_setting(org_id, stream_name, stream_type, metadata)
         .await
@@ -483,7 +480,7 @@ pub async fn update_stream_settings(
                     // we cannot allow duplicate entries here
                     let temp = DistinctField {
                         name: f.to_owned(),
-                        added_ts: chrono::Utc::now().timestamp_micros(),
+                        added_ts: now_micros(),
                     };
                     if !settings.distinct_value_fields.contains(&temp) {
                         settings.distinct_value_fields.push(temp);

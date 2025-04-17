@@ -84,6 +84,8 @@ impl PartitionGenerator {
         let mini_partition_size_microseconds =
             std::cmp::min(self.mini_partition_duration_secs * 1_000_000, step as u64) as i64;
 
+        log::info!("mini_partition_size_microseconds: {}, step: {}, end_time: {}, start_time: {}", mini_partition_size_microseconds, step, end_time, start_time);
+
         // Different behavior based on order
         if order_by == OrderBy::Desc {
             // For DESC order, mini partition at the end time
