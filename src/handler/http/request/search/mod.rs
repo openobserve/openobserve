@@ -654,24 +654,26 @@ pub async fn values(
 pub type FieldName = String;
 
 /// Builds a search request per field
-/// 
+///
 /// This function builds a search request per field based on the given request and parameters.
 /// Search request can basically be of two types:
 ///     1. Search on distinct values stream
 ///     2. Search on original data stream
 /// If the field is a distinct field, we will search of the distinct values stream.
 /// Otherwise, we will search on the original data stream.
-/// 
+///
 /// The `use_result_cache` parameter is used to determine the projection of the SQL query.
 /// This flag will toggle the resultant requests between streaming aggregations and result cache.
-/// By default, this function will produce an SQL which utilizes `Streaming Aggregations` to send the results to the client.
-/// The SQL will be a simple aggregation query in case streaming aggregations are used.
-/// If `use_result_cache` is set to true, the SQL projectoin will include a histogram which will allow the use of result cache.
-/// 
+/// By default, this function will produce an SQL which utilizes `Streaming Aggregations` to send
+/// the results to the client. The SQL will be a simple aggregation query in case streaming
+/// aggregations are used. If `use_result_cache` is set to true, the SQL projectoin will include a
+/// histogram which will allow the use of result cache.
+///
 /// Another parameter is `no_count` which is used to determine if the count is needed or not.
-/// `no_count` is used when only distinct values (sorted in alphabetical order) are needed but not the frequency of the values.
-/// For example, Dashboards, where we show the values listed in alphabetical order.
-/// 
+/// `no_count` is used when only distinct values (sorted in alphabetical order) are needed but not
+/// the frequency of the values. For example, Dashboards, where we show the values listed in
+/// alphabetical order.
+///
 /// Since values request can contain multiple fields, we return a vector of requests.
 /// Each request is a tuple of `Request`, `StreamType`, and `FieldName`.
 /// The `Request` contains the SQL query, from, size, start_time, end_time, etc.
@@ -683,7 +685,8 @@ pub async fn build_search_request_per_field(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<Vec<(config::meta::search::Request, StreamType, FieldName)>, Error> {
-    let query_fn = req.vrl_fn
+    let query_fn = req
+        .vrl_fn
         .as_ref()
         .and_then(|v| base64::decode_url(v.as_ref()).ok())
         .map(|vrl| {
@@ -700,12 +703,12 @@ pub async fn build_search_request_per_field(
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap_or(Schema::empty());
-    let fields = req.fields
+    let fields = req
+        .fields
         .iter()
         .filter(|field| schema.field_with_name(field).is_ok())
         .cloned()
         .collect::<Vec<_>>();
-
 
     let no_count = req.no_count;
 
@@ -844,7 +847,7 @@ pub async fn build_search_request_per_field(
     for field in fields {
         let sql = if no_count {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key" 
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
             )
         } else {
             format!(
@@ -1173,10 +1176,10 @@ async fn values_v1(
                 })
                 .collect::<Vec<_>>();
 
-                let mut field_value: json::Map<String, json::Value> = json::Map::new();
-                field_value.insert("field".to_string(), json::Value::String(key));
-                field_value.insert("values".to_string(), json::Value::Array(top_hits));
-                hit_values.push(json::Value::Object(field_value));
+            let mut field_value: json::Map<String, json::Value> = json::Map::new();
+            field_value.insert("field".to_string(), json::Value::String(key));
+            field_value.insert("values".to_string(), json::Value::Array(top_hits));
+            hit_values.push(json::Value::Object(field_value));
         }
 
         resp.scan_size = std::cmp::max(resp.scan_size, ret.scan_size);

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{cmp::Reverse, collections::BinaryHeap, time::Instant};
+
 use config::{
     get_config,
     meta::{
@@ -23,9 +25,9 @@ use config::{
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
     },
+    utils::json::{Map, Value},
 };
 use infra::errors::{Error, ErrorCodes};
-use std::time::Instant;
 use tracing::Instrument;
 
 use super::sort::order_search_results;
@@ -50,10 +52,6 @@ use crate::{
         websocket_events::{TimeOffset, WsServerEvents, search_registry_utils},
     },
 };
-
-use std::cmp::Reverse;
-use std::collections::BinaryHeap;
-use config::utils::json::{Map, Value};
 
 #[cfg(feature = "enterprise")]
 pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
@@ -625,7 +623,9 @@ async fn process_delta(
                 log::debug!("Getting top k values for partition {idx}");
                 let top_k_values = tokio::task::spawn_blocking(move || {
                     get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
-                }).await.unwrap();
+                })
+                .await
+                .unwrap();
                 search_res.hits = top_k_values?;
             }
 
@@ -928,7 +928,9 @@ pub async fn do_partitioned_search(
                 let instant = Instant::now();
                 let top_k_values = tokio::task::spawn_blocking(move || {
                     get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
-                }).await.unwrap();
+                })
+                .await
+                .unwrap();
                 search_res.hits = top_k_values?;
                 let duration = instant.elapsed();
                 log::debug!("Top k values for partition {idx} took {:?}", duration);
@@ -1116,7 +1118,7 @@ pub async fn write_results_to_cache(
 /// This is a com
 pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<Vec<Value>, Error> {
     let mut top_k_values: Vec<Value> = Vec::new();
-    
+
     if ctx.field.is_empty() {
         log::error!("Field is empty for values search");
         return Err(Error::Message("field is empty".to_string()));
@@ -1127,10 +1129,12 @@ pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<V
 
     let mut search_result_hits = Vec::new();
     for hit in hits {
-        let key = hit.get("zo_sql_key")
+        let key = hit
+            .get("zo_sql_key")
             .and_then(|v| v.as_str().map(|s| s.to_string()))
             .unwrap_or_default();
-        let num = hit.get("zo_sql_num")
+        let num = hit
+            .get("zo_sql_num")
             .and_then(|v| v.as_i64())
             .unwrap_or_default();
         search_result_hits.push((key, num));
@@ -1158,7 +1162,8 @@ pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<V
         top_k_values.push(Value::Object(field_value));
     } else {
         // For value-based sorting, use a min heap to get top k elements
-        let mut min_heap: BinaryHeap<Reverse<(i64, String)>> = BinaryHeap::with_capacity(k_limit as usize);
+        let mut min_heap: BinaryHeap<Reverse<(i64, String)>> =
+            BinaryHeap::with_capacity(k_limit as usize);
         for (k, v) in search_result_hits {
             if min_heap.len() < k_limit as usize {
                 // If heap not full, just add
@@ -1171,8 +1176,7 @@ pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<V
         }
 
         // Convert heap to vector and sort in descending order
-        let mut top_elements: Vec<_> =
-            min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
+        let mut top_elements: Vec<_> = min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
         top_elements.sort_by(|a, b| b.1.cmp(&a.1));
 
         let top_hits = top_elements

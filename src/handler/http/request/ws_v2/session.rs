@@ -45,8 +45,8 @@ use crate::{
     },
     // router::http::ws_v2::types::StreamMessage,
     service::websocket_events::{
-        WsClientEvents, WsServerEvents, handle_search_request, handle_values_request, search_registry_utils::SearchState,
-        sessions_cache_utils,
+        WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
+        search_registry_utils::SearchState, sessions_cache_utils,
     },
 };
 
@@ -272,11 +272,11 @@ pub async fn run(
 }
 
 /// Resolves user ID based on the execution mode and request data
-/// 
+///
 /// # Parameters
 /// * `default_user_id` - Default user ID from the HTTP request
 /// * `user_id_from_event` - Optional user ID from the event
-/// 
+///
 /// # Returns
 /// * `Option<String>` - Resolved user ID if successful, None otherwise
 #[cfg(feature = "enterprise")]
@@ -297,7 +297,7 @@ async fn resolve_enterprise_user_id(
                 return Some(default_user_id.to_string());
             }
         }
-        
+
         // Next, try to use user_id from the event
         if let Some(id) = user_id_from_event {
             return Some(id.clone());
@@ -333,23 +333,27 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
-                        user_id = match resolve_enterprise_user_id(
-                            &user_id,
-                            search_req.user_id.as_ref(),
-                        ).await {
-                            Some(id) => id,
-                            None => {
-                                log::error!("[WS_HANDLER]: User id not found in search request");
-                                let err_res = WsServerEvents::error_response(
-                                    errors::Error::Message("User id not found in search request".to_string()),
-                                    Some(req_id.to_string()),
-                                    Some(search_req.trace_id.to_string()),
-                                    Default::default(),
-                                );
-                                let _ = send_message(req_id, err_res.to_json()).await;
-                                return;
-                            }
-                        };
+                        user_id =
+                            match resolve_enterprise_user_id(&user_id, search_req.user_id.as_ref())
+                                .await
+                            {
+                                Some(id) => id,
+                                None => {
+                                    log::error!(
+                                        "[WS_HANDLER]: User id not found in search request"
+                                    );
+                                    let err_res = WsServerEvents::error_response(
+                                        errors::Error::Message(
+                                            "User id not found in search request".to_string(),
+                                        ),
+                                        Some(req_id.to_string()),
+                                        Some(search_req.trace_id.to_string()),
+                                        Default::default(),
+                                    );
+                                    let _ = send_message(req_id, err_res.to_json()).await;
+                                    return;
+                                }
+                            };
                     }
                     handle_search_event(
                         search_req,
@@ -366,23 +370,27 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
-                        user_id = match resolve_enterprise_user_id(
-                            &user_id,
-                            values_req.user_id.as_ref(),
-                        ).await {
-                            Some(id) => id,
-                            None => {
-                                log::error!("[WS_HANDLER]: User id not found in values request");
-                                let err_res = WsServerEvents::error_response(
-                                    errors::Error::Message("User id not found in values request".to_string()),
-                                    Some(req_id.to_string()),
-                                    Some(values_req.trace_id.to_string()),
-                                    Default::default(),
-                                );
-                                let _ = send_message(req_id, err_res.to_json()).await;
-                                return;
-                            }
-                        };
+                        user_id =
+                            match resolve_enterprise_user_id(&user_id, values_req.user_id.as_ref())
+                                .await
+                            {
+                                Some(id) => id,
+                                None => {
+                                    log::error!(
+                                        "[WS_HANDLER]: User id not found in values request"
+                                    );
+                                    let err_res = WsServerEvents::error_response(
+                                        errors::Error::Message(
+                                            "User id not found in values request".to_string(),
+                                        ),
+                                        Some(req_id.to_string()),
+                                        Some(values_req.trace_id.to_string()),
+                                        Default::default(),
+                                    );
+                                    let _ = send_message(req_id, err_res.to_json()).await;
+                                    return;
+                                }
+                            };
                     }
                     handle_values_event(
                         values_req,
@@ -871,7 +879,7 @@ async fn handle_values_event(
                         // Convert anyhow::Error to our Error type
                         let error = Error::Message(e.to_string());
                         let _ = handle_search_error(error, &req_id, &trace_id_for_task).await;
-                        
+
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
                         if is_audit_enabled {
