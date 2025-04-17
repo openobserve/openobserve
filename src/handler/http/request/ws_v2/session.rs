@@ -35,6 +35,8 @@ use tokio::sync::mpsc;
 #[cfg(feature = "enterprise")]
 use crate::common::infra::cluster::get_cached_online_router_nodes;
 #[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::error_utils::map_error_to_http_response;
+#[cfg(feature = "enterprise")]
 use crate::service::{
     self_reporting::audit,
     websocket_events::{handle_cancel, search_registry_utils},
@@ -43,7 +45,6 @@ use crate::{
     common::{
         infra::config::WS_SEARCH_REGISTRY, utils::websocket::get_ping_interval_secs_with_jitter,
     },
-    handler::http::request::search::error_utils::map_error_to_http_response,
     service::websocket_events::{
         WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
         search_registry_utils::SearchState, sessions_cache_utils,
@@ -679,9 +680,11 @@ async fn handle_search_event(
                         cleanup_search_resources(&trace_id_for_task).await;
                     }
                     Err(e) => {
-                        let error_msg = Some(e.to_string());
                         let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
+
+                        #[cfg(feature = "enterprise")]
                         let http_response_code: u16;
+                        #[cfg(feature = "enterprise")]
                         {
                             let http_response = map_error_to_http_response(&e, trace_id.to_string());
                             http_response_code = http_response.status().into();
@@ -700,7 +703,7 @@ async fn handle_search_event(
                                       http_query_params: "".to_string(),
                                       http_body: client_msg.to_json(),
                                       http_response_code,
-                                      error_msg,
+                                      error_msg: Some(e.to_string()),
                                       trace_id: Some(trace_id.to_string()),
                                   },
                               })
@@ -901,7 +904,10 @@ async fn handle_values_event(
                         // Convert anyhow::Error to our Error type
                         let error = Error::Message(e.to_string());
                         let _ = handle_search_error(&error, &req_id, &trace_id_for_task).await;
+
+                        #[cfg(feature = "enterprise")]
                         let http_response_code: u16;
+                        #[cfg(feature = "enterprise")]
                         {
                             let http_response = map_error_to_http_response(&error, trace_id.to_string());
                             http_response_code = http_response.status().into();
