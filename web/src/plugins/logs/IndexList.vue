@@ -1020,7 +1020,7 @@ export default defineComponent({
             query_context = query_context == undefined ? "" : query_context;
 
             // Implement websocket based field values, check getQueryData in useLogs for websocket enabled
-            if (isWebSocketEnabled() || isStreamingEnabled()) {
+            if (isWebSocketEnabled(store.state) || isStreamingEnabled()) {
               fetchValuesWithWebsocket({
                 fields: [name],
                 size: 10,
@@ -1042,19 +1042,25 @@ export default defineComponent({
               continue;
             }
 
-            //TODO : add comments for this in future 
+            //TODO : add comments for this in future
             //for future reference
             //values api using partition based api
-            let queryToBeSent = searchObj.meta.sqlMode ? searchObj.data.query : query_context.replace("[INDEX_NAME]", selectedStream);
-            const response = await getValuesPartition(startISOTimestamp,endISOTimestamp,name,queryToBeSent);
+            let queryToBeSent = searchObj.meta.sqlMode
+              ? searchObj.data.query
+              : query_context.replace("[INDEX_NAME]", selectedStream);
+            const response = await getValuesPartition(
+              startISOTimestamp,
+              endISOTimestamp,
+              name,
+              queryToBeSent,
+            );
             const partitions: any = response?.data.partitions || [];
-          
 
             for (const partition of partitions) {
               try {
-                //check if the field is opened because sometimes 
+                //check if the field is opened because sometimes
                 // user might close the field before all the subsequent requests are completed
-                if(!openedFilterFields.value.includes(name)){
+                if (!openedFilterFields.value.includes(name)) {
                   return;
                 }
                 const res: any = await streamService.fieldValues({
@@ -1085,7 +1091,8 @@ export default defineComponent({
                         (value: any) => value.key === subItem.zo_sql_key,
                       );
                       if (index !== -1) {
-                        fieldValues.value[name]["values"][index].count += parseInt(subItem.zo_sql_num);
+                        fieldValues.value[name]["values"][index].count +=
+                          parseInt(subItem.zo_sql_num);
                       } else {
                         fieldValues.value[name]["values"].push({
                           key: subItem.zo_sql_key,
@@ -1096,8 +1103,12 @@ export default defineComponent({
                   });
 
                   if (fieldValues.value[name]["values"].length > 10) {
-                    fieldValues.value[name]["values"].sort((a, b) => b.count - a.count);
-                    fieldValues.value[name]["values"] = fieldValues.value[name]["values"].slice(0, 10);
+                    fieldValues.value[name]["values"].sort(
+                      (a, b) => b.count - a.count,
+                    );
+                    fieldValues.value[name]["values"] = fieldValues.value[name][
+                      "values"
+                    ].slice(0, 10);
                   }
                 }
               } catch (err) {
@@ -1110,13 +1121,16 @@ export default defineComponent({
                 }
               }
             }
-            openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== name);
-
+            openedFilterFields.value = openedFilterFields.value.filter(
+              (field: string) => field !== name,
+            );
           }
         }
       } catch (err) {
         fieldValues.value[name]["isLoading"] = false;
-        openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== name);
+        openedFilterFields.value = openedFilterFields.value.filter(
+          (field: string) => field !== name,
+        );
         console.log(err);
         $q.notify({
           type: "negative",
@@ -1488,17 +1502,15 @@ export default defineComponent({
       }
     };
 
-
     const cancelFilterCreator = (row: any) => {
       //if it is websocker based then cancel the trace id
       //else cancel the further value api calls using the openedFilterFields
-      if(isWebSocketEnabled()){
+      if (isWebSocketEnabled()) {
         cancelTraceId(row.name);
-      }
-      else{
+      } else {
         cancelValueApi(row.name);
       }
-    }
+    };
 
     const cancelTraceId = (field: string) => {
       const traceIds = traceIdMapper.value[field];
@@ -1513,30 +1525,36 @@ export default defineComponent({
     };
     const cancelValueApi = (value: string) => {
       //remove the field from the openedFilterFields
-      openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== value);
-    }
-    const getValuesPartition = async (start: number, end: number,name:string,queryToBeSent:string) => {
-      try{
-          const queryReq = {
-            sql: queryToBeSent,
-            start_time: start,
-            end_time: end,
-            sql_mode: "context",
-            // streaming_output: true,
-          }
-          const res = await searchService.partition({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query: queryReq,
-            page_type: searchObj.data.stream.streamType,
-            traceparent: generateTraceContext().traceId,
-          });
-        
-          return res;
+      openedFilterFields.value = openedFilterFields.value.filter(
+        (field: string) => field !== value,
+      );
+    };
+    const getValuesPartition = async (
+      start: number,
+      end: number,
+      name: string,
+      queryToBeSent: string,
+    ) => {
+      try {
+        const queryReq = {
+          sql: queryToBeSent,
+          start_time: start,
+          end_time: end,
+          sql_mode: "context",
+          // streaming_output: true,
+        };
+        const res = await searchService.partition({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: queryReq,
+          page_type: searchObj.data.stream.streamType,
+          traceparent: generateTraceContext().traceId,
+        });
+
+        return res;
       } catch (err) {
         console.error("Failed to fetch field values:", err);
         fieldValues.value[name].errMsg = "Failed to fetch field values";
       }
-
     };
 
     return {
@@ -1610,7 +1628,7 @@ export default defineComponent({
       sortedStreamFields,
       placeHolderText,
       cancelTraceId,
-      cancelFilterCreator
+      cancelFilterCreator,
     };
   },
 });
