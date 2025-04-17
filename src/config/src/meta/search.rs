@@ -16,6 +16,7 @@
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
+use crate::meta::stream::StreamType;
 
 use crate::{
     meta::sql::OrderBy,
@@ -819,6 +820,14 @@ impl TryFrom<&str> for SearchEventType {
 
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+pub struct ValuesEventContext {
+    pub top_k: Option<i64>,
+    pub no_count: bool,
+    pub field: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub struct SearchEventContext {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1057,6 +1066,33 @@ impl MultiStreamRequest {
 pub struct PaginationQuery {
     pub from: Option<i64>,
     pub size: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ValuesRequest {
+    pub fields: Vec<String>,
+    #[serde(default)]
+    pub size: Option<i64>,
+    pub no_count: bool,
+    #[serde(default)]
+    pub regions: Vec<String>,
+    #[serde(default)]
+    pub clusters: Vec<String>,
+    #[serde(default)]
+    pub vrl_fn: Option<String>,
+    #[serde(default)]
+    pub start_time: Option<i64>,
+    #[serde(default)]
+    pub end_time: Option<i64>,
+    #[serde(default)]
+    pub filter: Option<String>,
+    #[serde(default)]
+    pub timeout: Option<i64>,
+    #[serde(default)]
+    pub use_cache: bool,
+    pub stream_name: String,
+    pub stream_type: StreamType,
+    pub sql: String,
 }
 
 #[cfg(test)]

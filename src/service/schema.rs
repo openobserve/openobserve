@@ -23,7 +23,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{promql::METADATA_LABEL, stream::StreamType},
     metrics,
-    utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
+    utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt, time::now_micros},
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
@@ -175,7 +175,7 @@ pub async fn check_for_schema(
             stream_type,
             is_new,
             &inferred_schema,
-            chrono::Utc::now().timestamp_micros(),
+            now_micros(),
             stream_schema_map,
         )
         .await?;

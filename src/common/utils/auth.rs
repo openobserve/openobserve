@@ -673,6 +673,19 @@ impl FromRequest for AuthExtractor {
                 } else {
                     object_type
                 };
+                // Currently, we have a patch api for dashboard move,
+                // which can not be handled by the middleware layer,
+                // so we need to bypass the check here
+                if method.eq("PATCH") {
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_str.to_owned(),
+                        method: "".to_string(),
+                        o2_type: "".to_string(),
+                        org_id: "".to_string(),
+                        bypass_check: true, // bypass check permissions
+                        parent_id: folder,
+                    }));
+                }
 
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),

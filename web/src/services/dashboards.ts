@@ -88,10 +88,13 @@ const dashboards = {
   delete_Folder: (organization: string, folderId: any) => {
     return http().delete(`/api/${organization}/folders/${folderId}`);
   },
-  move_Dashboard: (organization: string, dashboardId: string, data: any) => {
-    return http().put(
-      `/api/${organization}/folders/dashboards/${dashboardId}`,
-      data,
+  move_Dashboard: (organization: string, dashboardIds: string[], from: string, dstFolderId: string) => {
+    return http().patch(
+      `/api/${organization}/dashboards/move?folder=${from}`,
+      {
+        "dashboard_ids": dashboardIds,
+        "dst_folder_id": dstFolderId
+      },
       { headers: { "Content-Type": "application/json; charset=UTF-8" } }
     );
   },

@@ -101,11 +101,10 @@ impl Streams for StreamServiceImpl {
 
         let entries = Self::process_orgs_batch(&orgs, stream_type, stream_name).await;
         log::debug!(
-            "orgs:{:?}, stream_type:{:?}, stream_name:{:?}, stream stats: {:?}",
+            "orgs:{:?}, stream_type:{:?}, stream_name:{:?}",
             orgs,
             stream_type,
             stream_name,
-            entries
         );
         Ok(Response::new(StreamStatsResponse { entries }))
     }

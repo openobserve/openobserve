@@ -20,6 +20,7 @@ use config::{
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         stream::{DistinctField, StreamType},
     },
+    utils::time::now_micros,
 };
 use futures::future::join_all;
 use hashbrown::HashMap;
@@ -43,6 +44,9 @@ use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
     config::get_config as get_openfga_config,
 };
+
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::check_permissions;
 
 /// An error that occurs interacting with dashboards.
 #[derive(Debug, thiserror::Error)]
@@ -111,6 +115,9 @@ pub enum DashboardError {
     /// get.
     #[error(transparent)]
     ListPermittedDashboardsError(actix_web::Error),
+
+    #[error("Permission denied")]
+    PermissionDenied,
 }
 
 async fn add_distinct_field_entry(
@@ -201,7 +208,7 @@ async fn update_distinct_variables(
                 add_distinct_field_entry(dashboard_id, org_id, &name, typ.to_string(), f).await?;
                 let _temp = DistinctField {
                     name: f.to_owned(),
-                    added_ts: chrono::Utc::now().timestamp_micros(),
+                    added_ts: now_micros(),
                 };
                 if !stream_settings.distinct_value_fields.contains(&_temp) {
                     stream_settings.distinct_value_fields.push(_temp);
@@ -430,6 +437,8 @@ pub async fn move_dashboard(
     org_id: &str,
     dashboard_id: &str,
     to_folder: &str,
+    _user_id: &str,
+    _check_openfga: bool,
 ) -> Result<(), DashboardError> {
     if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
         return Err(DashboardError::MoveDestinationFolderNotFound);
@@ -438,6 +447,24 @@ pub async fn move_dashboard(
     let (curr_folder, dashboard) = table::dashboards::get_by_id(org_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)?;
+
+    #[cfg(feature = "enterprise")]
+    if _check_openfga && get_openfga_config().enabled {
+        // TODO: Try to make a single call for all alerts
+        if !check_permissions(
+            Some(dashboard_id.to_owned()),
+            org_id,
+            _user_id,
+            "dashboards",
+            "PUT",
+            &curr_folder.folder_id,
+        )
+        .await
+        {
+            return Err(DashboardError::PermissionDenied);
+        }
+    }
+
     let hash = dashboard.hash.clone();
     let _updated_dashboard = put(
         org_id,
@@ -486,6 +513,8 @@ pub async fn move_dashboards(
     org_id: &str,
     dashboard_ids: &[String],
     to_folder: &str,
+    user_id: &str,
+    check_openfga: bool,
 ) -> Result<(), DashboardError> {
     if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
         return Err(DashboardError::MoveDestinationFolderNotFound);
@@ -493,7 +522,7 @@ pub async fn move_dashboards(
 
     let futs = dashboard_ids
         .iter()
-        .map(|d_id| move_dashboard(org_id, d_id, to_folder));
+        .map(|d_id| move_dashboard(org_id, d_id, to_folder, user_id, check_openfga));
     let _ = join_all(futs)
         .await
         .into_iter()

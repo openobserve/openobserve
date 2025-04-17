@@ -201,10 +201,10 @@ test.describe("dashboard Import testcases", () => {
 
     await page.getByRole("button", { name: "Import" }).click();
 
-    await expect(page.getByText("Dashboard(s) Failed to Import")).toBeVisible();
+    await expect(page.getByText('warning1 File(s) Failed to Import')).toBeVisible();
     await expect(
       page.getByText(
-        " dashboard2-import.json : AxiosError: Request failed with status code 400"
+        " JSON 1 : Request failed with status code 400"
       )
     ).toBeVisible();
   });
