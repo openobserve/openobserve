@@ -159,7 +159,7 @@ import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
+import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
@@ -199,6 +199,35 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "doc_num",
+        field: (row: any) => row.doc_num.toLocaleString(),
+        label: t("logStream.docNum"),
+        align: "left",
+        sortable: true,
+        sort: (a, b, rowA, rowB) => {
+          return parseInt(rowA.doc_num) - parseInt(rowB.doc_num);
+        },
+      },
+      {
+        name: "storage_size",
+        label: t("logStream.storageSize"),
+        field: (row: any) => formatSizeFromMB(row.storage_size),
+        align: "left",
+        sortable: true,
+        sort: (a, b, rowA, rowB) => {
+          return rowA.original_storage_size- rowB.original_storage_size
+        },
+      },
+      {
+        name: "compressed_size",
+        field: (row: any) => formatSizeFromMB(row.compressed_size),
+        label: t("logStream.compressedSize"),
+        align: "left",
+        sortable: false,
+        sort: (a, b, rowA, rowB) =>
+          rowA.original_compressed_size- rowB.original_compressed_size,
+      },
+      {
         name: "actions",
         field: "actions",
         label: t("function.actions"),
@@ -220,13 +249,31 @@ export default defineComponent({
 
       getStreams("enrichment_tables", false)
         .then((res: any) => {
+          let doc_num = "";
+          let storage_size = "";
+          let compressed_size = "";
+          let original_storage_size = "";
+          let original_compressed_size = "";
           let counter = 1;
           resultTotal.value = res.list.length;
           jsTransforms.value = res.list.map((data: any) => {
+
+            if (data.stats) {
+              doc_num = data.stats.doc_num;
+              storage_size = data.stats.storage_size + " MB";
+              compressed_size = data.stats.compressed_size + " MB";
+              original_storage_size = data.stats.storage_size;
+              original_compressed_size = data.stats.compressed_size;
+            }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.name + counter,
               name: data.name,
+              doc_num: doc_num,
+              storage_size: storage_size,
+              compressed_size: compressed_size,
+              original_storage_size: original_storage_size,
+              original_compressed_size: original_compressed_size,
               actions: "action buttons",
               stream_type: data.stream_type,
             };
