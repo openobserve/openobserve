@@ -26,7 +26,7 @@ use futures::StreamExt;
 use infra::errors::{self, Error};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::{
-    auditor::{AuditMessage, Protocol, WsMeta},
+    auditor::{AuditMessage, Protocol, ResponseMeta},
     infra::config::get_config as get_o2_config,
 };
 use rand::prelude::SliceRandom;
@@ -43,10 +43,10 @@ use crate::{
     common::{
         infra::config::WS_SEARCH_REGISTRY, utils::websocket::get_ping_interval_secs_with_jitter,
     },
-    // router::http::ws_v2::types::StreamMessage,
+    handler::http::request::search::error_utils::map_error_to_http_response,
     service::websocket_events::{
-        WsClientEvents, WsServerEvents, handle_search_request, handle_values_request, search_registry_utils::SearchState,
-        sessions_cache_utils,
+        WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
+        search_registry_utils::SearchState, sessions_cache_utils,
     },
 };
 
@@ -272,11 +272,11 @@ pub async fn run(
 }
 
 /// Resolves user ID based on the execution mode and request data
-/// 
+///
 /// # Parameters
 /// * `default_user_id` - Default user ID from the HTTP request
 /// * `user_id_from_event` - Optional user ID from the event
-/// 
+///
 /// # Returns
 /// * `Option<String>` - Resolved user ID if successful, None otherwise
 #[cfg(feature = "enterprise")]
@@ -297,7 +297,7 @@ async fn resolve_enterprise_user_id(
                 return Some(default_user_id.to_string());
             }
         }
-        
+
         // Next, try to use user_id from the event
         if let Some(id) = user_id_from_event {
             return Some(id.clone());
@@ -317,7 +317,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
             if !client_msg.is_valid() {
                 log::error!("[WS_HANDLER]: Invalid event: {:?}", client_msg);
                 let err_res = WsServerEvents::error_response(
-                    errors::Error::Message("Invalid event".to_string()),
+                    &errors::Error::Message("Invalid event".to_string()),
                     Some(req_id.to_string()),
                     None,
                     Default::default(),
@@ -333,23 +333,27 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
-                        user_id = match resolve_enterprise_user_id(
-                            &user_id,
-                            search_req.user_id.as_ref(),
-                        ).await {
-                            Some(id) => id,
-                            None => {
-                                log::error!("[WS_HANDLER]: User id not found in search request");
-                                let err_res = WsServerEvents::error_response(
-                                    errors::Error::Message("User id not found in search request".to_string()),
-                                    Some(req_id.to_string()),
-                                    Some(search_req.trace_id.to_string()),
-                                    Default::default(),
-                                );
-                                let _ = send_message(req_id, err_res.to_json()).await;
-                                return;
-                            }
-                        };
+                        user_id =
+                            match resolve_enterprise_user_id(&user_id, search_req.user_id.as_ref())
+                                .await
+                            {
+                                Some(id) => id,
+                                None => {
+                                    log::error!(
+                                        "[WS_HANDLER]: User id not found in search request"
+                                    );
+                                    let err_res = WsServerEvents::error_response(
+                                        &errors::Error::Message(
+                                            "User id not found in search request".to_string(),
+                                        ),
+                                        Some(req_id.to_string()),
+                                        Some(search_req.trace_id.to_string()),
+                                        Default::default(),
+                                    );
+                                    let _ = send_message(req_id, err_res.to_json()).await;
+                                    return;
+                                }
+                            };
                     }
                     handle_search_event(
                         search_req,
@@ -366,23 +370,27 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
-                        user_id = match resolve_enterprise_user_id(
-                            &user_id,
-                            values_req.user_id.as_ref(),
-                        ).await {
-                            Some(id) => id,
-                            None => {
-                                log::error!("[WS_HANDLER]: User id not found in values request");
-                                let err_res = WsServerEvents::error_response(
-                                    errors::Error::Message("User id not found in values request".to_string()),
-                                    Some(req_id.to_string()),
-                                    Some(values_req.trace_id.to_string()),
-                                    Default::default(),
-                                );
-                                let _ = send_message(req_id, err_res.to_json()).await;
-                                return;
-                            }
-                        };
+                        user_id =
+                            match resolve_enterprise_user_id(&user_id, values_req.user_id.as_ref())
+                                .await
+                            {
+                                Some(id) => id,
+                                None => {
+                                    log::error!(
+                                        "[WS_HANDLER]: User id not found in values request"
+                                    );
+                                    let err_res = WsServerEvents::error_response(
+                                        &errors::Error::Message(
+                                            "User id not found in values request".to_string(),
+                                        ),
+                                        Some(req_id.to_string()),
+                                        Some(values_req.trace_id.to_string()),
+                                        Default::default(),
+                                    );
+                                    let _ = send_message(req_id, err_res.to_json()).await;
+                                    return;
+                                }
+                            };
                     }
                     handle_values_event(
                         values_req,
@@ -425,7 +433,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     // Only used for audit
                     #[cfg(feature = "enterprise")]
                     let client_msg = WsClientEvents::Cancel {
-                        trace_id,
+                        trace_id: trace_id.to_string(),
                         org_id: org_id.to_string(),
                         // setting user_id to None to handle PII
                         user_id: None,
@@ -441,12 +449,16 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                             user_email: user_id.to_string(),
                             org_id: org_id.to_string(),
                             _timestamp: chrono::Utc::now().timestamp(),
-                            protocol: Protocol::Ws(WsMeta {
-                                path: path.clone(),
-                                message_type: client_msg.get_type(),
-                                content: client_msg.to_json(),
-                                close_reason: "".to_string(),
-                            }),
+                            protocol: Protocol::Ws,
+                            response_meta: ResponseMeta {
+                                http_method: "".to_string(),
+                                http_path: path.clone(),
+                                http_query_params: "".to_string(),
+                                http_body: client_msg.to_json(),
+                                http_response_code: 200,
+                                error_msg: None,
+                                trace_id: Some(trace_id.to_string()),
+                            },
                         })
                         .await;
                     }
@@ -496,7 +508,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 e
             );
             let err_res = WsServerEvents::error_response(
-                e.into(),
+                &e.into(),
                 Some(req_id.to_string()),
                 None,
                 Default::default(),
@@ -650,12 +662,16 @@ async fn handle_search_event(
                                 user_email: user_id,
                                 org_id,
                                 _timestamp: chrono::Utc::now().timestamp(),
-                                protocol: Protocol::Ws(WsMeta {
-                                    path: path.clone(),
-                                    message_type: client_msg.get_type(),
-                                    content: client_msg.to_json(),
-                                    close_reason: "".to_string(),
-                                }),
+                                protocol: Protocol::Ws,
+                                response_meta: ResponseMeta {
+                                    http_method: "".to_string(),
+                                    http_path: path.clone(),
+                                    http_query_params: "".to_string(),
+                                    http_body: client_msg.to_json(),
+                                    http_response_code: 200,
+                                    error_msg: None,
+                                    trace_id: Some(trace_id.to_string()),
+                                },
                             })
                             .await;
                         }
@@ -663,7 +679,13 @@ async fn handle_search_event(
                         cleanup_search_resources(&trace_id_for_task).await;
                     }
                     Err(e) => {
-                        let _ = handle_search_error(e, &req_id, &trace_id_for_task).await;
+                        let error_msg = Some(e.to_string());
+                        let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
+                        let http_response_code: u16;
+                        {
+                            let http_response = map_error_to_http_response(&e, trace_id.to_string());
+                            http_response_code = http_response.status().into();
+                        }
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
                         if is_audit_enabled {
@@ -671,12 +693,16 @@ async fn handle_search_event(
                                   user_email: user_id,
                                   org_id,
                                   _timestamp: chrono::Utc::now().timestamp(),
-                                  protocol: Protocol::Ws(WsMeta {
-                                      path: path.clone(),
-                                      message_type: client_msg.get_type(),
-                                      content: client_msg.to_json(),
-                                      close_reason: "".to_string(),
-                                  }),
+                                  protocol: Protocol::Ws,
+                                  response_meta: ResponseMeta {
+                                      http_method: "".to_string(),
+                                      http_path: path.clone(),
+                                      http_query_params: "".to_string(),
+                                      http_body: client_msg.to_json(),
+                                      http_response_code,
+                                      error_msg,
+                                      trace_id: Some(trace_id.to_string()),
+                                  },
                               })
                               .await;
                         }
@@ -727,7 +753,7 @@ async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
+async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
     // if the error is due to search cancellation, return.
     // the cancel handler will close the session
     if let errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) = e {
@@ -749,7 +775,7 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
     log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
     // Send error response
     let err_res = WsServerEvents::error_response(
-        e,
+        &e,
         Some(req_id.to_string()),
         Some(trace_id.to_string()),
         Default::default(),
@@ -855,12 +881,16 @@ async fn handle_values_event(
                                 user_email: user_id,
                                 org_id,
                                 _timestamp: chrono::Utc::now().timestamp(),
-                                protocol: Protocol::Ws(WsMeta {
-                                    path: path.clone(),
-                                    message_type: client_msg.get_type(),
-                                    content: client_msg.to_json(),
-                                    close_reason: "".to_string(),
-                                }),
+                                protocol: Protocol::Ws,
+                                response_meta: ResponseMeta {
+                                    http_method: "".to_string(),
+                                    http_path: path.clone(),
+                                    http_query_params: "".to_string(),
+                                    http_body: client_msg.to_json(),
+                                    http_response_code: 200,
+                                    error_msg: None,
+                                    trace_id: Some(trace_id.to_string()),
+                                },
                             })
                             .await;
                         }
@@ -870,8 +900,12 @@ async fn handle_values_event(
                     Err(e) => {
                         // Convert anyhow::Error to our Error type
                         let error = Error::Message(e.to_string());
-                        let _ = handle_search_error(error, &req_id, &trace_id_for_task).await;
-                        
+                        let _ = handle_search_error(&error, &req_id, &trace_id_for_task).await;
+                        let http_response_code: u16;
+                        {
+                            let http_response = map_error_to_http_response(&error, trace_id.to_string());
+                            http_response_code = http_response.status().into();
+                        }
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
                         if is_audit_enabled {
@@ -879,12 +913,16 @@ async fn handle_values_event(
                                   user_email: user_id,
                                   org_id,
                                   _timestamp: chrono::Utc::now().timestamp(),
-                                  protocol: Protocol::Ws(WsMeta {
-                                      path: path.clone(),
-                                      message_type: client_msg.get_type(),
-                                      content: client_msg.to_json(),
-                                      close_reason: "".to_string(),
-                                  }),
+                                  protocol: Protocol::Ws,
+                                  response_meta: ResponseMeta {
+                                      http_method: "".to_string(),
+                                      http_path: path.clone(),
+                                      http_query_params: "".to_string(),
+                                      http_body: client_msg.to_json(),
+                                      http_response_code,
+                                      error_msg: Some(e.to_string()),
+                                      trace_id: Some(trace_id.to_string()),
+                                  },
                               })
                               .await;
                         }
