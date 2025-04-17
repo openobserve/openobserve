@@ -209,7 +209,7 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("service:search leader finish".to_string())
-                .search_role(search_role.to_string())
+                .search_role(search_role)
                 .duration(start.elapsed().as_millis() as usize)
                 .build()
         )
