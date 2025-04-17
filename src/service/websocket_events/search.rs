@@ -117,6 +117,11 @@ pub async fn handle_search_request(
         req.payload.search_type = Some(req.search_type);
     }
 
+    // if `ui_sql_base64_enabled` is true, decode the sql query before processing
+    if cfg.common.ui_sql_base64_enabled {
+        req.payload.decode()?;
+    }
+
     // get stream name
     let stream_names = match resolve_stream_names(&req.payload.query.sql) {
         Ok(v) => v.clone(),
