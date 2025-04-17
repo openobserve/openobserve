@@ -216,7 +216,7 @@ test.describe("Enrichment data testcases", () => {
     // Explore the file
     await page.locator(`[data-test="${fileName}-explore-btn"]`).click();
     await page.waitForSelector('[data-test="logs-vrl-function-editor"]');
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content")
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.inputarea')
       .fill(`
 abc, err = get_enrichment_table_record("${fileName}", {
   "protocol_number": to_string!(.protocol_number)
