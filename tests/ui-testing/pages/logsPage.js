@@ -234,7 +234,7 @@ export class LogsPage {
     await this.page.keyboard.press("Backspace");
     await this.page.waitForTimeout(3000);
     await this.page.locator(this.queryButton).click();
-    await this.page.getByText("No column found in selected stream.").click();
+    await this.page.getByText("SQL query is missing or invalid. Please submit a valid SQL statement.").click();
   }
 
 
