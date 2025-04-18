@@ -21,11 +21,11 @@ import vueJsx from "@vitejs/plugin-vue-jsx";
 import { quasar, transformAssetUrls } from "@quasar/vite-plugin";
 import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
-import path from "path";
-import dotenv from "dotenv";
-import fs from "fs-extra";
+import * as path from "path";
+import * as dotenv from "dotenv";
+import * as fs from "fs-extra";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
-import visualizer from "rollup-plugin-visualizer";
+import { visualizer } from "rollup-plugin-visualizer";
 import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
@@ -43,7 +43,7 @@ const isTesting = process.env.NODE_ENV === "test";
 
 const enterpriseResolverPlugin = {
   name: "enterprise-resolver",
-  async resolveId(source) {
+  async resolveId(source: string) {
     if (source.startsWith("@zo/")) {
       const fileName = source.replace("@zo/", "");
 
@@ -69,7 +69,7 @@ function monacoEditorTestResolver() {
   return {
     name: "monaco-editor-test-resolver",
     enforce: "post",
-    resolveId(id) {
+    resolveId(id: string) {
       if (id === "monaco-editor") {
         return {
           id: "monaco-editor/esm/vs/editor/editor.api",
@@ -123,7 +123,7 @@ export default defineConfig({
       }),
     enterpriseResolverPlugin,
     vueJsx(),
-    monacoEditorPlugin.default({
+    (monacoEditorPlugin as any).default({
       customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
     }),
     isTesting && monacoEditorTestResolver(),
@@ -148,8 +148,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 3000,
     rollupOptions: {
       plugins: [
-        nodePolyfills(),
-        visualizer.default({
+        nodePolyfills() as any,
+        visualizer({
           open: true,
           gzipSize: true,
           brotliSize: true,

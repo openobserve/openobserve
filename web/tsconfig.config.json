@@ -1,6 +1,6 @@
 {
   "references": [{ "path": "./tsconfig.node.json" }],
-  "include": ["vite.config.*", "vitest.config.*", "cypress.config.*"],
+  "include": ["src/**/*.ts", "vite.config.*", "vitest.config.*", "cypress.config.*"],
   "exclude": ["node_modules", "dist"],
   "compilerOptions": {
     "allowJs": true,
@@ -20,8 +20,5 @@
     "types": ["node"],
     "baseUrl": ".",
     "downlevelIteration": true,
-    "paths": {
-      "@/*": ["./src/*"]
-    }
   }
 }
