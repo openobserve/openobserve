@@ -44,7 +44,7 @@ pub async fn grpc_search(
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     if nodes.is_empty() {
-        log::error!("search->grpc: no querier node online");
+        log::error!("[trace_id: {trace_id}] search->grpc: no querier node online",);
         return Err(server_internal_error("no querier node online"));
     }
 
@@ -79,14 +79,12 @@ pub async fn grpc_search(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "search->grpc: node: {}, search err: {err:?}",
-                        &node.get_grpc_addr(),
+                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
+                        node.get_grpc_addr(),
+                        err
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(server_internal_error("search node error"));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)
@@ -118,7 +116,7 @@ pub async fn grpc_search_multi(
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     if nodes.is_empty() {
-        log::error!("search->grpc: no querier node online");
+        log::error!("[trace_id: {trace_id}] search->grpc: no querier node online",);
         return Err(server_internal_error("no querier node online"));
     }
 
@@ -153,14 +151,12 @@ pub async fn grpc_search_multi(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "search->grpc: node: {}, search err: {err:?}",
-                        &node.get_grpc_addr(),
+                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
+                        node.get_grpc_addr(),
+                        err,
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(server_internal_error("search node error"));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)
@@ -192,7 +188,7 @@ pub async fn grpc_search_partition(
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     if nodes.is_empty() {
-        log::error!("search->grpc: no querier node online");
+        log::error!("[trace_id: {trace_id}] search->grpc: no querier node online",);
         return Err(server_internal_error("no querier node online"));
     }
 
@@ -226,14 +222,12 @@ pub async fn grpc_search_partition(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "search->grpc: node: {}, search err: {err:?}",
-                        &node.get_grpc_addr(),
+                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
+                        node.get_grpc_addr(),
+                        err,
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(server_internal_error("search node error"));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)

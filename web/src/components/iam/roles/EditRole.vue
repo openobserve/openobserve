@@ -1574,7 +1574,7 @@ const getPipelines = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-  updateResourceEntities("pipeline", ["name"], [...pipelines.data.list]);
+  updateResourceEntities("pipeline", ["pipeline_id"], [...pipelines.data.list],false,"name");
 
   return new Promise((resolve) => {
     resolve(true);

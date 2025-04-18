@@ -164,7 +164,7 @@ async fn exec(
     )
     .await?;
 
-    let ctx = prepare_datafusion_context(None, vec![], false, 16).await?;
+    let ctx = prepare_datafusion_context(None, vec![], vec![], false, 16).await?;
     ctx.register_table("file_list", tbl).unwrap();
     let df = ctx.sql(query).await.unwrap();
     let ret = df.collect().await.unwrap();

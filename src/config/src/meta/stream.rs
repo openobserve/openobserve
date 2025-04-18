@@ -568,6 +568,10 @@ pub struct UpdateStreamSettings {
     pub approx_partition: Option<bool>,
     #[serde(default)]
     pub extended_retention_days: UpdateSettingsWrapper<TimeRange>,
+    #[serde(default)]
+    pub index_original_data: Option<bool>,
+    #[serde(default)]
+    pub index_all_values: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -695,6 +699,10 @@ pub struct StreamSettings {
     pub index_updated_at: i64,
     #[serde(default)]
     pub extended_retention_days: Vec<TimeRange>,
+    #[serde(default)]
+    pub index_original_data: bool,
+    #[serde(default)]
+    pub index_all_values: bool,
 }
 
 impl Serialize for StreamSettings {
@@ -722,6 +730,8 @@ impl Serialize for StreamSettings {
         state.serialize_field("approx_partition", &self.approx_partition)?;
         state.serialize_field("index_updated_at", &self.index_updated_at)?;
         state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
+        state.serialize_field("index_original_data", &self.index_original_data)?;
+        state.serialize_field("index_all_values", &self.index_all_values)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -871,6 +881,16 @@ impl From<&str> for StreamSettings {
             }
         }
 
+        let index_original_data = settings
+            .get("index_original_data")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        let index_all_values = settings
+            .get("index_all_values")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
         Self {
             partition_time_level,
             partition_keys,
@@ -886,6 +906,8 @@ impl From<&str> for StreamSettings {
             distinct_value_fields,
             index_updated_at,
             extended_retention_days,
+            index_original_data,
+            index_all_values,
         }
     }
 }

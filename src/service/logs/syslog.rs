@@ -22,7 +22,7 @@ use actix_web::{HttpResponse, http};
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
+    ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
@@ -110,10 +110,12 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
     crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
         &mut streams_need_original_map,
+        &mut streams_need_all_values_map,
     )
     .await;
     // with pipeline, we need to store original if any of the destinations requires original
@@ -208,6 +210,31 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             );
         }
 
+        // add `_all_values` if required by StreamSettings
+        if streams_need_all_values_map
+            .get(&stream_name)
+            .is_some_and(|v| *v)
+        {
+            let mut values = Vec::with_capacity(local_val.len());
+            for (k, value) in local_val.iter() {
+                if [
+                    TIMESTAMP_COL_NAME,
+                    ID_COL_NAME,
+                    ORIGINAL_DATA_COL_NAME,
+                    ALL_VALUES_COL_NAME,
+                ]
+                .contains(&k.as_str())
+                {
+                    continue;
+                }
+                values.push(value.to_string());
+            }
+            local_val.insert(
+                ALL_VALUES_COL_NAME.to_string(),
+                json::Value::String(values.join(" ")),
+            );
+        }
+
         let (ts_data, fn_num) = json_data_by_stream
             .entry(stream_name.clone())
             .or_insert((Vec::new(), None));
@@ -254,6 +281,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                             &[stream_params],
                             &mut user_defined_schema_map,
                             &mut streams_need_original_map,
+                            &mut streams_need_all_values_map,
                         )
                         .await;
                     }
@@ -311,6 +339,31 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                             local_val.insert(
                                 ID_COL_NAME.to_string(),
                                 json::Value::String(record_id.to_string()),
+                            );
+                        }
+
+                        // add `_all_values` if required by StreamSettings
+                        if streams_need_all_values_map
+                            .get(&destination_stream)
+                            .is_some_and(|v| *v)
+                        {
+                            let mut values = Vec::with_capacity(local_val.len());
+                            for (k, value) in local_val.iter() {
+                                if [
+                                    TIMESTAMP_COL_NAME,
+                                    ID_COL_NAME,
+                                    ORIGINAL_DATA_COL_NAME,
+                                    ALL_VALUES_COL_NAME,
+                                ]
+                                .contains(&k.as_str())
+                                {
+                                    continue;
+                                }
+                                values.push(value.to_string());
+                            }
+                            local_val.insert(
+                                ALL_VALUES_COL_NAME.to_string(),
+                                json::Value::String(values.join(" ")),
                             );
                         }
 
