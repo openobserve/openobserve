@@ -118,7 +118,16 @@ pub async fn handle_search_request(
     }
 
     // decode the sql query
-    req.payload.decode()?;
+    if let Err(e) = req.payload.decode() {
+        let err_res = WsServerEvents::error_response(
+            &Error::Message(e.to_string()),
+            Some(req_id.to_string()),
+            Some(trace_id),
+            Default::default(),
+        );
+        send_message(req_id, err_res.to_json()).await?;
+        return Ok(());
+    }
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.payload.query.sql) {
