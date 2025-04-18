@@ -156,7 +156,7 @@ mod tests {
     }
 
     #[test]
-    fn test_table_scan() -> Result<()> {
+    fn test_add_timestamp_table_scan() -> Result<()> {
         let table_scan = test_table()?;
         let plan = LogicalPlanBuilder::from(table_scan).build()?;
 
@@ -166,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    fn test_table_scan_with_projection() -> Result<()> {
+    fn test_add_timestamp_table_scan_with_projection() -> Result<()> {
         let table_scan = test_table()?;
         let plan = LogicalPlanBuilder::from(table_scan)
             .project(vec![col("id")])?
@@ -179,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn test_table_scan_with_filter() -> Result<()> {
+    fn test_add_timestamp_table_scan_with_filter() -> Result<()> {
         let table_scan = test_table()?;
         let plan = LogicalPlanBuilder::from(table_scan)
             .filter(col("id").gt(lit(1)))?
@@ -194,7 +194,7 @@ mod tests {
     }
 
     #[test]
-    fn test_table_scan_with_subquery() -> Result<()> {
+    fn test_add_timestamp_table_scan_with_subquery() -> Result<()> {
         let table_scan = test_table()?;
         let plan = LogicalPlanBuilder::from(table_scan)
             .filter(and(
@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn test_table_scan_with_join() -> Result<()> {
+    fn test_add_timestamp_table_scan_with_join() -> Result<()> {
         let left_table = create_table_with_name("left", None)?;
         let right_table = create_table_with_name("right", None)?;
         let plan = LogicalPlanBuilder::from(left_table)
@@ -249,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    fn test_table_scan_with_join_with_enrich() -> Result<()> {
+    fn test_add_timestamp_table_scan_with_join_with_enrich() -> Result<()> {
         let left_table = create_table_with_name("enrich.left", None)?;
         let right_table = create_table_with_name("right", None)?;
         let plan = LogicalPlanBuilder::from(left_table)

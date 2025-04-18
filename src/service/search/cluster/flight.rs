@@ -63,7 +63,7 @@ use crate::{
                 rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
             },
             exec::{prepare_datafusion_context, register_udf},
-            optimizer::generate_optimizer_rules,
+            optimizer::{generate_analyzer_rules, generate_optimizer_rules},
             table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
         },
         generate_filter_from_equal_items,
@@ -214,6 +214,7 @@ pub async fn search(
         &file_id_list_vec,
         start,
         file_list_took,
+        "leader".to_string(),
     )
     .await?;
     // add work_group
@@ -589,6 +590,7 @@ pub async fn check_work_group(
     file_id_list_vec: &[&FileId],
     start: std::time::Instant,
     file_list_took: usize, // the time took to get file list
+    search_role: String,
 ) -> Result<(
     usize,
     String,
@@ -672,7 +674,7 @@ pub async fn check_work_group(
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:check_work_group".to_string())
-                .search_role("leader".to_string())
+                .search_role(search_role)
                 .duration(took_wait)
                 .build()
         )
@@ -818,9 +820,11 @@ pub async fn generate_context(
     sql: &Arc<Sql>,
     target_partitions: usize,
 ) -> Result<SessionContext> {
+    let analyzer_rules = generate_analyzer_rules(sql);
     let optimizer_rules = generate_optimizer_rules(sql);
     let mut ctx = prepare_datafusion_context(
         req.work_group.clone(),
+        analyzer_rules,
         optimizer_rules,
         sql.sorted_by_time,
         target_partitions,
