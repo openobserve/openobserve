@@ -116,7 +116,7 @@ export default defineConfig({
     process.env.VITE_COVERAGE === "true" &&
       istanbul({
         include: "src/**/*",
-        exclude: ["node_modules", "test/"],
+        exclude: ["node_modules", "test/", "src/**/*.spec.{ts,js}"],
         extension: [".js", ".ts", ".vue"],
         requireEnv: false,
         forceBuildInstrument: true,
@@ -130,7 +130,7 @@ export default defineConfig({
   ].filter(Boolean),
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@": fileURLToPath(new URL('./src', import.meta.url)),
       "@enterprise": fileURLToPath(
         new URL("./src/enterprise", import.meta.url),
       ),

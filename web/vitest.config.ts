@@ -5,9 +5,15 @@ import viteConfig from './vite.config'
 export default mergeConfig(
   viteConfig,
   defineConfig({
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url))
+      }
+    },
     test: {
       environment: 'jsdom',
       exclude: [...configDefaults.exclude, 'e2e/**'],
+      include: ["src/**/*.{ts,js,vue}"],
       root: fileURLToPath(new URL('./src/test/unit', import.meta.url)),
       setupFiles: ['./helpers/setupTests.ts'],
       deps: {
