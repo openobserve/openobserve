@@ -47,6 +47,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="exploreEnrichmentTable(props)"
             />
             <q-btn
+              icon="list_alt"
+              :title="t('logStream.schemaHeader')"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click="listSchema(props)"
+            />
+            <q-btn
               icon="edit"
               class="q-ml-xs"
               padding="sm"
@@ -144,6 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
+    <q-dialog
+      v-model="showEnrichmentSchema"
+      position="right"
+      full-height
+      maximized
+    >
+      <EnrichmentSchema :selectedEnrichmentTable="selectedEnrichmentTable" />
+    </q-dialog>
   </q-page>
 </template>
 
@@ -163,10 +182,11 @@ import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../u
 import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
+import EnrichmentSchema from "./EnrichmentSchema.vue";
 
 export default defineComponent({
   name: "EnrichmentTableList",
-  components: { QTablePagination, AddEnrichmentTable, NoData, ConfirmDialog },
+  components: { QTablePagination, AddEnrichmentTable, NoData, ConfirmDialog, EnrichmentSchema },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -184,6 +204,7 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const showEnrichmentSchema = ref<boolean>(false);
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -307,6 +328,7 @@ export default defineComponent({
     const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
+    const selectedEnrichmentTable = ref<any>(null);
     const pagination: any = ref({
       rowsPerPage: 20,
     });
@@ -481,7 +503,10 @@ export default defineComponent({
         },
       });
     };
-
+    const listSchema = async (props: any) => {
+      selectedEnrichmentTable.value = props.row.name;
+      showEnrichmentSchema.value = true;
+    };
     return {
       t,
       qTable,
@@ -522,6 +547,9 @@ export default defineComponent({
       getImageURL,
       verifyOrganizationStatus,
       exploreEnrichmentTable,
+      showEnrichmentSchema,
+      listSchema,
+      selectedEnrichmentTable,
     };
   },
   computed: {
