@@ -5073,6 +5073,7 @@ const useLogs = () => {
           trace_id: queryReq.traceId,
           payload: {
             query: queryReq.queryReq.query,
+            encoding: store.state.zoConfig.sql_base64_enabled ? "base64" : null,
           } as SearchRequestPayload,
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
