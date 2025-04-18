@@ -149,7 +149,9 @@ pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
     pub query_type: QueryType,
-    pub conditions: Option<Vec<Condition>>,
+
+    #[serde(with = "condition_list_depth_validator")]
+    pub conditions: Option<meta_alerts::ConditionList>,
     pub sql: Option<String>,
     pub promql: Option<String>,
     pub promql_condition: Option<Condition>,
@@ -160,6 +162,42 @@ pub struct QueryCondition {
     pub search_event_type: Option<SearchEventType>,
     #[serde(default)]
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
+}
+
+/// Validator module to check that condition list doesn't exceed maximum depth
+mod condition_list_depth_validator {
+    use serde::{de, ser, Deserialize, Serialize};
+    use config::meta::alerts as meta_alerts;
+    
+    const MAX_DEPTH: usize = 3;
+    
+    /// Serialize implementation - simply pass through to the default serializer
+    pub fn serialize<S>(value: &Option<meta_alerts::ConditionList>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        value.serialize(serializer)
+    }
+    
+    /// Deserialize implementation with depth check
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<meta_alerts::ConditionList>, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        // First deserialize to the normal type
+        let condition_list: std::option::Option<meta_alerts::ConditionList> = Option::deserialize(deserializer)?;
+        
+        // Then check depth if Some
+        if let Some(ref list) = condition_list {
+            if list.depth() > MAX_DEPTH {
+                return Err(de::Error::custom(format!(
+                    "Condition list exceeds maximum allowed depth of {}", MAX_DEPTH
+                )));
+            }
+        }
+        
+        Ok(condition_list)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -340,9 +378,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
     fn from(value: meta_alerts::QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
-            conditions: value
-                .conditions
-                .map(|cs| cs.into_iter().map(|c| c.into()).collect()),
+            conditions: value.conditions,
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
@@ -513,9 +549,7 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
     fn from(value: QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
-            conditions: value
-                .conditions
-                .map(|cs| cs.into_iter().map(|c| c.into()).collect()),
+            conditions: value.conditions,
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
