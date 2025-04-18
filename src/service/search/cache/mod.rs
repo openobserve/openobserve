@@ -543,6 +543,8 @@ pub fn merge_response(
         res_took.wait_in_queue =
             std::cmp::max(res_took.wait_in_queue, res.took_detail.wait_in_queue);
         res_took.search_took = std::cmp::max(res_took.search_took, res.took_detail.search_took);
+        res_took.file_list_took =
+            std::cmp::max(res_took.file_list_took, res.took_detail.file_list_took);
         if !res.function_error.is_empty() {
             fn_error.extend(res.function_error.clone());
         }

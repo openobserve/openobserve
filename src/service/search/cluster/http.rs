@@ -101,7 +101,7 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     let ret = flight::search(&trace_id, sql.clone(), req, query).await;
 
-    let (merge_batches, scan_stats, took_wait, is_partial, idx_took, partial_err) = match ret {
+    let (merge_batches, scan_stats, took_wait, is_partial, partial_err) = match ret {
         Ok(v) => v,
         Err(e) => {
             log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
@@ -272,16 +272,15 @@ pub async fn search(
     result.set_partial(is_partial, partial_err);
     result.set_took(took_time);
     result.set_wait_in_queue(took_wait);
-    result.set_search_took(took_time - took_wait);
+    result.set_search_took(
+        took_time - took_wait,
+        scan_stats.file_list_took as usize,
+        scan_stats.idx_took as usize,
+    );
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
     result.set_scan_records(scan_stats.records as usize);
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
-    result.set_idx_took(if idx_took > 0 {
-        idx_took
-    } else {
-        scan_stats.idx_took as usize
-    });
 
     if scan_stats.querier_files > 0 {
         let cached_ratio = (scan_stats.querier_memory_cached_files

@@ -15,6 +15,7 @@
 
 use std::{cmp::max, sync::Arc};
 
+use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
@@ -85,6 +86,10 @@ pub(crate) mod utils;
 // Checks for #ResultArray#
 pub static RESULT_ARRAY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
+
+/// The result of search in cluster
+/// data, scan_stats, wait_in_queue, is_partial, partial_err
+type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
 
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
@@ -915,6 +920,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 querier_disk_cached_files: scan_stats.querier_disk_cached_files,
                 idx_scan_size: scan_stats.idx_scan_size / 1024 / 1024, // change to MB
                 idx_took: scan_stats.idx_took,
+                file_list_took: scan_stats.file_list_took,
             });
         let query_status = if result.is_queue {
             "waiting"
