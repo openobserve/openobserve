@@ -378,9 +378,11 @@ export const usePanelDataLoader = (
               sql: store.state.zoConfig.sql_base64_enabled
                 ? b64EncodeUnicode(query)
                 : query,
-              encoding: store.state.zoConfig.sql_base64_enabled
-                ? "base64"
-                : null,
+              // pass encodig if enabled,
+              // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+              ...(store.state.zoConfig.sql_base64_enabled
+                ? { encoding: "base64" }
+                : {}),
               query_fn: it.vrlFunctionQuery
                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                 : null,
@@ -668,7 +670,11 @@ export const usePanelDataLoader = (
             payload.queryReq.endISOTimestamp,
             null,
           ),
-          encoding: store.state.zoConfig.sql_base64_enabled ? "base64" : null,
+          // pass encodig if enabled,
+          // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
         },
         stream_type: payload.pageType,
         search_type: searchType.value ?? "dashboards",
@@ -750,7 +756,11 @@ export const usePanelDataLoader = (
           startISOTimestamp,
           endISOTimestamp,
           currentQueryIndex,
-          encoding: store.state.zoConfig.sql_base64_enabled ? "base64" : null,
+          // pass encodig if enabled,
+          // make sure that encoding: null is not being passed, that's why used object extraction logic
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
         },
         type: "histogram",
         isPagination: false,
