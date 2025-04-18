@@ -51,11 +51,12 @@ async fn get_dump_files_in_range(
     org: &str,
     stream: Option<&str>,
     range: (i64, i64),
+    min_id: Option<i64>,
 ) -> Result<Vec<FileRecord>, errors::Error> {
     let start = round_down_to_hour(range.0);
     let end = round_down_to_hour(range.1) + HOUR_IN_MICRO;
 
-    let list = infra::file_list::get_entries_in_range(org, stream, start, end).await?;
+    let list = infra::file_list::get_entries_in_range(org, stream, start, end, min_id).await?;
     let list = list
         .into_iter()
         .filter(|f| {
@@ -185,7 +186,7 @@ pub async fn get_file_list_entries_in_range(
         StreamType::Filelist
     );
     let db_start = std::time::Instant::now();
-    let dump_files = get_dump_files_in_range(org, Some(&stream_key), range).await?;
+    let dump_files = get_dump_files_in_range(org, Some(&stream_key), range, None).await?;
     let db_time = db_start.elapsed().as_millis();
 
     let process_start = std::time::Instant::now();
@@ -232,7 +233,8 @@ async fn move_and_delete(
         StreamType::Filelist
     );
     let list =
-        infra::file_list::get_entries_in_range(org, Some(&stream_key), range.0, range.1).await?;
+        infra::file_list::get_entries_in_range(org, Some(&stream_key), range.0, range.1, None)
+            .await?;
     let del_items: Vec<_> = list
         .into_iter()
         .map(|f| FileListDeleted {
@@ -306,6 +308,13 @@ pub async fn stats(
         return Ok(vec![]);
     }
 
+    // we can be sure that file with id x will always be dumped in a dump file with id > x
+    // because file dump is taken after original file entry, and id always increases
+    let min_id = match pk_value {
+        Some((min, _)) => Some(min),
+        _ => None,
+    };
+
     let (field, value, dump_files) = match (stream_type, stream_name) {
         (Some(stype), Some(sname)) => {
             let stream_key = format!("{org_id}/{}/{org_id}_{stype}_{sname}", StreamType::Filelist);
@@ -313,6 +322,7 @@ pub async fn stats(
                 org_id,
                 Some(&stream_key),
                 (0, Utc::now().timestamp_micros()),
+                min_id,
             )
             .await?;
             (
@@ -328,7 +338,8 @@ pub async fn stats(
         }
         _ => {
             let dump_files =
-                get_dump_files_in_range(org_id, None, (0, Utc::now().timestamp_micros())).await?;
+                get_dump_files_in_range(org_id, None, (0, Utc::now().timestamp_micros()), min_id)
+                    .await?;
             ("org", org_id.to_string(), dump_files)
         }
     };

@@ -1370,6 +1370,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         stream: Option<&str>,
         time_start: i64,
         time_end: i64,
+        min_id: Option<i64>,
     ) -> Result<Vec<super::FileRecord>> {
         if time_start == 0 && time_end == 0 {
             return Ok(Vec::new());
@@ -1395,13 +1396,18 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
 
         for (time_start, time_end) in day_partitions {
             let o = org.to_string();
-            let query = match stream{
-                Some(stream)=> format!("SELECT * FROM file_list WHERE max_ts >= $1 AND min_ts <= $2 AND org = $3 AND stream = '{stream}' AND deleted = $4;"),
-                None=>"SELECT * FROM file_list WHERE max_ts >= $1 AND min_ts <= $2 AND org = $3 AND deleted = $4;".to_string()
+            let sql = "SELECT * FROM file_list WHERE max_ts >= $1 AND min_ts <= $2 AND org = $3  AND deleted = $4";
+            let sql = match stream {
+                Some(stream) => format!("{sql} AND stream = '{stream}'"),
+                None => sql.to_string(),
+            };
+            let sql = match min_id {
+                Some(id) => format!("{sql} AND id >= {id}"),
+                None => sql,
             };
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT.clone();
-                sqlx::query_as::<_, super::FileRecord>(&query)
+                sqlx::query_as::<_, super::FileRecord>(&sql)
                     .bind(time_start)
                     .bind(time_end)
                     .bind(o)
