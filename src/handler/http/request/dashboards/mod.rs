@@ -63,6 +63,7 @@ impl From<DashboardError> for HttpResponse {
             }
             DashboardError::ListPermittedDashboardsError(err) => MetaHttpResponse::forbidden(err),
             DashboardError::UserNotFound => MetaHttpResponse::unauthorized("User not found"),
+            DashboardError::PermissionDenied => MetaHttpResponse::forbidden("Permission denied"),
         }
     }
 }
@@ -300,9 +301,19 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
 async fn move_dashboard(
     path: web::Path<(String, String)>,
     req_body: web::Json<MoveDashboardRequestBody>,
+    user_email: UserEmail,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    match dashboards::move_dashboard(&org_id, &dashboard_id, &req_body.to).await {
+    // For this endpoint, openfga check is already done in the middleware
+    match dashboards::move_dashboard(
+        &org_id,
+        &dashboard_id,
+        &req_body.to,
+        &user_email.user_id,
+        false,
+    )
+    .await
+    {
         Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "Dashboard moved".to_string(),
@@ -335,10 +346,19 @@ async fn move_dashboard(
 async fn move_dashboards(
     path: web::Path<String>,
     req_body: web::Json<MoveDashboardsRequestBody>,
+    user_email: UserEmail,
 ) -> HttpResponse {
     let org_id = path.into_inner();
-    match dashboards::move_dashboards(&org_id, &req_body.dashboard_ids, &req_body.dst_folder_id)
-        .await
+    // For this endpoint, openfga check is needed here, as we don't do openfga check in the
+    // middleware for this api endpoint, because it includes a batch of dashboards
+    match dashboards::move_dashboards(
+        &org_id,
+        &req_body.dashboard_ids,
+        &req_body.dst_folder_id,
+        &user_email.user_id,
+        true,
+    )
+    .await
     {
         Ok(_) => {
             let message = if req_body.dashboard_ids.len() == 1 {

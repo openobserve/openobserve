@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::meta::websocket::SearchEventReq;
+use config::meta::websocket::{SearchEventReq, ValuesEventReq};
 use infra::errors;
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::tungstenite;
@@ -226,6 +226,11 @@ pub mod sessions_cache_utils {
         let mut w = WS_SESSIONS.write().await;
         w.insert(session_id.to_string(), session);
         drop(w);
+        log::debug!(
+            "[WS::SessionCache] inserted session: {}, querier: {}",
+            session_id,
+            get_config().common.instance_name
+        );
     }
 
     /// Remove a session from the cache
@@ -233,6 +238,11 @@ pub mod sessions_cache_utils {
         let mut w = WS_SESSIONS.write().await;
         w.remove(session_id);
         drop(w);
+        log::debug!(
+            "[WS::SessionCache] removed session: {}, querier: {}",
+            session_id,
+            get_config().common.instance_name
+        );
     }
 
     // Return a mutable reference to the session
@@ -318,6 +328,7 @@ pub mod search_registry_utils {
 )]
 pub enum WsClientEvents {
     Search(Box<SearchEventReq>),
+    Values(Box<ValuesEventReq>),
     #[cfg(feature = "enterprise")]
     Cancel {
         trace_id: String,
@@ -338,6 +349,7 @@ impl WsClientEvents {
     pub fn get_type(&self) -> String {
         match self {
             WsClientEvents::Search(_) => "search",
+            WsClientEvents::Values(_) => "values",
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { .. } => "cancel",
             WsClientEvents::Benchmark { .. } => "benchmark",
@@ -353,6 +365,7 @@ impl WsClientEvents {
     pub fn get_trace_id(&self) -> String {
         match &self {
             Self::Search(req) => req.trace_id.clone(),
+            Self::Values(req) => req.trace_id.clone(),
             #[cfg(feature = "enterprise")]
             Self::Cancel { trace_id, .. } => trace_id.clone(),
             Self::Benchmark { id } => id.clone(),
@@ -363,6 +376,7 @@ impl WsClientEvents {
     pub fn is_valid(&self) -> bool {
         match self {
             Self::Search(req) => req.is_valid(),
+            Self::Values(req) => req.is_valid(),
             #[cfg(feature = "enterprise")]
             Self::Cancel {
                 trace_id, org_id, ..
@@ -378,6 +392,7 @@ impl WsClientEvents {
     pub fn append_user_id(&mut self, user_id: Option<String>) {
         match self {
             Self::Search(req) => req.user_id = user_id,
+            Self::Values(req) => req.user_id = user_id,
             Self::Cancel { user_id: uid, .. } => *uid = user_id,
             _ => {}
         }
@@ -430,13 +445,13 @@ impl WsServerEvents {
     }
 
     pub fn error_response(
-        err: errors::Error,
+        err: &errors::Error,
         request_id: Option<String>,
         trace_id: Option<String>,
         should_client_retry: bool,
     ) -> Self {
         match err {
-            errors::Error::ErrorCode(ref code) => {
+            errors::Error::ErrorCode(code) => {
                 let message = code.get_message();
                 let error_detail = code.get_error_detail();
                 let http_response =

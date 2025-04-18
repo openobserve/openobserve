@@ -15,11 +15,14 @@
 
 use std::{cmp::max, sync::Arc};
 
+use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
-    TIMESTAMP_COL_NAME, get_config, ider,
+    TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config, ider,
     meta::{
         cluster::RoleGroup,
         search,
@@ -32,6 +35,7 @@ use config::{
         base64, json,
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_aggregate_query},
+        time::now_micros,
     },
 };
 use datafusion::distributed_plan::streaming_aggs_exec;
@@ -47,20 +51,21 @@ use proto::cluster_rpc::{self, SearchQuery};
 use regex::Regex;
 use sql::Sql;
 use tokio::runtime::Runtime;
-#[cfg(not(feature = "enterprise"))]
-use tokio::sync::Mutex;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::make_grpc_search_client, o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, tracing::info_span,
+    crate::service::grpc::make_grpc_search_client,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
+    std::collections::HashSet, tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
     handler::grpc::request::search::Searcher,
+    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
 pub(crate) mod cache;
@@ -69,6 +74,7 @@ pub(crate) mod datafusion;
 pub(crate) mod grpc;
 pub(crate) mod grpc_search;
 pub(crate) mod index;
+pub(crate) mod inspector;
 pub(crate) mod partition;
 pub(crate) mod request;
 pub(crate) mod sql;
@@ -81,12 +87,12 @@ pub(crate) mod utils;
 pub static RESULT_ARRAY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
 
+/// The result of search in cluster
+/// data, scan_stats, wait_in_queue, is_partial, partial_err
+type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
+
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
-
-#[cfg(not(feature = "enterprise"))]
-pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
-    Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
 pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
@@ -109,7 +115,7 @@ pub async fn search(
     in_req: &search::Request,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
+    let started_at = now_micros();
     let cfg = get_config();
 
     let trace_id = if trace_id.is_empty() {
@@ -186,7 +192,27 @@ pub async fn search(
         Ok(Err(e)) => Err(e),
         Err(e) => Err(Error::Message(e.to_string())),
     };
-    log::info!("[trace_id {trace_id}] in leader task finish");
+
+    #[allow(unused_mut)]
+    let mut search_role = "leader".to_string();
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        search_role = "super".to_string();
+    }
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] in leader task finish"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("service:search leader finish".to_string())
+                .search_role(search_role)
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     // remove task because task if finished
     let mut _work_group = None;
@@ -258,13 +284,7 @@ pub async fn search(
                     search_type,
                     search_event_context,
                     trace_id: Some(trace_id),
-                    took_wait_in_queue: if res.took_detail.is_some() {
-                        let resp_took = res.took_detail.as_ref().unwrap();
-                        // Consider only the cluster wait queue duration
-                        Some(resp_took.cluster_wait_queue)
-                    } else {
-                        None
-                    },
+                    took_wait_in_queue: Some(res.took_detail.wait_in_queue),
                     work_group: _work_group,
                     result_cache_ratio: Some(res.result_cache_ratio),
                     ..Default::default()
@@ -668,6 +688,11 @@ pub async fn search_partition(
             });
         }
     }
+    log::info!(
+        "[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}",
+        max_query_range,
+        max_query_range_in_hour
+    );
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
@@ -682,9 +707,11 @@ pub async fn search_partition(
         response.partitions.push([req.start_time, req.end_time]);
         response.max_query_range = max_query_range_in_hour;
         response.histogram_interval = sql.histogram_interval;
+        log::info!("[trace_id {trace_id}] search_partition: returning single partition");
         return Ok(response);
     };
 
+    log::info!("[trace_id {trace_id}] search_partition: getting nodes");
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
@@ -697,6 +724,7 @@ pub async fn search_partition(
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
     });
+
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -775,6 +803,14 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
+    log::debug!(
+        "[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}",
+        total_secs,
+        part_num,
+        step,
+        min_step,
+        is_histogram
+    );
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
         min_step,
@@ -884,6 +920,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 querier_disk_cached_files: scan_stats.querier_disk_cached_files,
                 idx_scan_size: scan_stats.idx_scan_size / 1024 / 1024, // change to MB
                 idx_took: scan_stats.idx_took,
+                file_list_took: scan_stats.file_list_took,
             });
         let query_status = if result.is_queue {
             "waiting"

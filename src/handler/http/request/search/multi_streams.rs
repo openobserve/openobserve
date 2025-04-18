@@ -324,35 +324,15 @@ pub async fn search_multi(
         // add search type to request
         req.search_type = search_type;
 
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&org_id])
-            .inc();
-        // get a local search queue lock
-        #[cfg(not(feature = "enterprise"))]
-        let locker = SearchService::QUEUE_LOCKER.clone();
-        #[cfg(not(feature = "enterprise"))]
-        let locker = locker.lock().await;
-        #[cfg(not(feature = "enterprise"))]
-        if !cfg.common.feature_query_queue_enabled {
-            drop(locker);
-        }
-        #[cfg(not(feature = "enterprise"))]
-        let took_wait = start.elapsed().as_millis() as usize;
-        #[cfg(feature = "enterprise")]
-        let took_wait = 0;
-        log::info!("http search multi API wait in queue took: {}", took_wait);
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&org_id])
-            .dec();
-
         let trace_id = trace_id.clone();
         // do search
-        let search_res = SearchService::search(
+        let search_res = SearchService::cache::search(
             &trace_id,
             &org_id,
             stream_type,
             Some(user_id.to_string()),
             &req,
+            range_error.clone(),
         )
         .instrument(http_span.clone())
         .await;
@@ -381,7 +361,7 @@ pub async fn search_multi(
                     ])
                     .inc();
                 res.set_trace_id(trace_id);
-                res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
+                res.set_took(start.elapsed().as_millis() as usize);
 
                 let req_stats = RequestStats {
                     records: res.hits.len() as i64,
@@ -395,13 +375,7 @@ pub async fn search_multi(
                     search_type,
                     search_event_context: search_event_context.clone(),
                     trace_id: Some(res.trace_id.clone()),
-                    took_wait_in_queue: if res.took_detail.is_some() {
-                        let resp_took = res.took_detail.as_ref().unwrap();
-                        // Consider only the cluster wait queue duration
-                        Some(resp_took.cluster_wait_queue)
-                    } else {
-                        None
-                    },
+                    took_wait_in_queue: Some(res.took_detail.wait_in_queue),
                     work_group: res.work_group,
                     ..Default::default()
                 };
@@ -484,7 +458,7 @@ pub async fn search_multi(
                     if let errors::ErrorCodes::SearchCancelQuery(_) = code {
                         return Ok(HttpResponse::TooManyRequests().json(
                             meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
+                                &code,
                                 Some(trace_id),
                             ),
                         ));
@@ -618,7 +592,6 @@ pub async fn search_multi(
             max_ts: None,
             cached_ratio: None,
             trace_id: None,
-            // took_wait_in_queue: multi_res.t,
             search_type: multi_req.search_type,
             search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()
@@ -778,7 +751,7 @@ pub async fn _search_partition_multi(
             log::error!("search error: {:?}", err);
             Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+                    meta::http::HttpResponse::error_code_with_trace_id(&code, Some(trace_id)),
                 ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -927,12 +900,12 @@ pub async fn around_multi(
                     errors::Error::ErrorCode(code) => match code {
                         errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
                             .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
+                                &code,
                                 Some(trace_id),
                             )),
                         _ => HttpResponse::InternalServerError().json(
                             meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
+                                &code,
                                 Some(trace_id),
                             ),
                         ),

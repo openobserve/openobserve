@@ -314,10 +314,7 @@ pub async fn save_stream_settings(
     let mut metadata = schema.metadata.clone();
     metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
     if !metadata.contains_key("created_at") {
-        metadata.insert(
-            "created_at".to_string(),
-            chrono::Utc::now().timestamp_micros().to_string(),
-        );
+        metadata.insert("created_at".to_string(), now_micros().to_string());
     }
     db::schema::update_setting(org_id, stream_name, stream_type, metadata)
         .await
@@ -355,6 +352,28 @@ pub async fn update_stream_settings(
 
             if let Some(data_retention) = new_settings.data_retention {
                 settings.data_retention = data_retention;
+            }
+
+            if let Some(index_original_data) = new_settings.index_original_data {
+                settings.index_original_data = index_original_data;
+            }
+
+            if let Some(index_all_values) = new_settings.index_all_values {
+                settings.index_all_values = index_all_values;
+            }
+
+            // if index_original_data is true, store_original_data must be true
+            if settings.index_original_data {
+                settings.store_original_data = true;
+            }
+
+            // index_original_data & index_all_values only can open one at a time
+            if settings.index_original_data && settings.index_all_values {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    "index_original_data & index_all_values cannot be true at the same time"
+                        .to_string(),
+                )));
             }
 
             // check for user defined schema
@@ -461,7 +480,7 @@ pub async fn update_stream_settings(
                     // we cannot allow duplicate entries here
                     let temp = DistinctField {
                         name: f.to_owned(),
-                        added_ts: chrono::Utc::now().timestamp_micros(),
+                        added_ts: now_micros(),
                     };
                     if !settings.distinct_value_fields.contains(&temp) {
                         settings.distinct_value_fields.push(temp);

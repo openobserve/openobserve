@@ -26,7 +26,7 @@ use arrow_schema::{DataType, Field, Schema};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::stream::{StreamPartition, StreamSettings, StreamType},
-    utils::{json, schema_ext::SchemaExt},
+    utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use infra::schema::unwrap_partition_time_level;
 use once_cell::sync::Lazy;
@@ -77,7 +77,7 @@ impl Metadata for TraceListIndex {
         }
 
         // write to wal
-        let timestamp = chrono::Utc::now().timestamp_micros();
+        let timestamp = now_micros();
         let schema_key = self.schema.hash_key();
 
         let mut _is_new = false;
@@ -185,7 +185,7 @@ impl TraceListIndex {
         let mut is_new = false;
         if db_schema.fields().is_empty() {
             is_new = true;
-            let timestamp = chrono::Utc::now().timestamp_micros();
+            let timestamp = now_micros();
             let schema = self.schema.as_ref().clone();
             if let Err(e) = db::schema::merge(
                 org_id,
@@ -214,6 +214,8 @@ impl TraceListIndex {
                 distinct_value_fields: vec![],
                 index_updated_at: 0,
                 extended_retention_days: vec![],
+                index_all_values: false,
+                index_original_data: false,
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)
@@ -230,7 +232,10 @@ impl TraceListIndex {
 mod tests {
     use std::{collections::HashMap, sync::Arc};
 
-    use config::{meta::stream::StreamType, utils::json};
+    use config::{
+        meta::stream::StreamType,
+        utils::{json, time::now_micros},
+    };
     use infra::schema::unwrap_partition_time_level;
 
     use crate::{
@@ -264,7 +269,7 @@ mod tests {
             _timestamp: 1711267573271714542,
         };
         let schema_key = "9d384d5af30d1657";
-        let timestamp = chrono::Utc::now().timestamp_micros();
+        let timestamp = now_micros();
         let mut data = json::to_value(item).unwrap();
         let data = data.as_object_mut().unwrap();
         data.insert(

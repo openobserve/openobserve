@@ -36,15 +36,19 @@ use {
     actix_http::h1::Payload,
     actix_web::{HttpMessage, web::BytesMut},
     base64::{Engine as _, engine::general_purpose},
+    config::utils::time::now_micros,
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, HttpMeta, Protocol},
+        auditor::{AuditMessage, Protocol, ResponseMeta},
         infra::config::get_config as get_o2_config,
     },
 };
 
 use super::request::*;
-use crate::common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL};
+use crate::{
+    common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
+    handler::http::request::search::search_inspector,
+};
 
 pub mod middlewares;
 pub mod openapi;
@@ -133,15 +137,17 @@ async fn audit_middleware(
             audit(AuditMessage {
                 user_email,
                 org_id,
-                _timestamp: chrono::Utc::now().timestamp_micros(),
-                protocol: Protocol::Http(HttpMeta {
-                    method,
-                    path,
-                    body,
-                    query_params,
-                    response_code: res.response().status().as_u16(),
+                _timestamp: now_micros(),
+                protocol: Protocol::Http,
+                response_meta: ResponseMeta {
+                    http_method: method,
+                    http_path: path,
+                    http_body: body,
+                    http_query_params: query_params,
+                    http_response_code: res.response().status().as_u16(),
                     error_msg,
-                }),
+                    trace_id: None,
+                },
             })
             .await;
         }
@@ -430,6 +436,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(search::search_partition)
         .service(search::around_v1)
         .service(search::around_v2)
+        .service(search_inspector::get_search_profile)
         .service(search::values)
         .service(search::search_history)
         .service(search::saved_view::create_view)

@@ -16,6 +16,7 @@
 use std::{
     any::Any,
     collections::HashMap,
+    ops::Sub,
     sync::Arc,
     task::{Context, Poll},
 };
@@ -28,7 +29,7 @@ use arrow_flight::{
 use arrow_schema::{Schema, SchemaRef};
 use config::{
     meta::search::{ScanStats, SearchEventType},
-    utils::rand::generate_random_string,
+    utils::{rand::generate_random_string, size::bytes_to_human_readable},
 };
 use datafusion::{
     common::{DataFusionError, Result, Statistics},
@@ -42,6 +43,7 @@ use datafusion::{
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
 use futures::{Stream, StreamExt, TryStreamExt};
+use opentelemetry::trace::{Span, TraceId, Tracer};
 use parking_lot::Mutex;
 use prost::Message;
 use proto::cluster_rpc;
@@ -55,7 +57,16 @@ use super::{
     codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
     node::RemoteScanNode,
 };
-use crate::service::{grpc::get_cached_channel, search::MetadataMap};
+use crate::{
+    common::infra::cluster::get_node_by_addr,
+    service::{
+        grpc::get_cached_channel,
+        search::{
+            MetadataMap,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        },
+    },
+};
 
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
@@ -371,12 +382,20 @@ async fn get_remote_batch(
         scan_stats.lock().add(&stats);
     }
 
+    let node_name = match get_node_by_addr(&node.get_grpc_addr()).await {
+        None => node.get_grpc_addr(),
+        Some(node) => node.name,
+    };
+
     Ok(Box::pin(FlightStream::new(
         trace_id,
+        context,
         schema,
         stream,
         node.get_grpc_addr(),
+        node_name,
         is_querier,
+        remote_scan_node.super_cluster_info.is_super_cluster,
         files,
         scan_size,
         partial_err,
@@ -421,9 +440,12 @@ fn process_partial_err(partial_err: Arc<Mutex<String>>, e: tonic::Status) {
 
 struct FlightStream {
     trace_id: String,
+    parent_cx: opentelemetry::Context,
     schema: SchemaRef,
     stream: Streaming<FlightData>,
     node_addr: String,
+    node_name: String,
+    is_super: bool,
     is_querier: bool,
     files: i64,
     scan_size: i64,
@@ -437,9 +459,12 @@ impl FlightStream {
     #[allow(clippy::too_many_arguments)]
     fn new(
         trace_id: String,
+        parent_cx: opentelemetry::Context,
         schema: SchemaRef,
         stream: Streaming<FlightData>,
         node_addr: String,
+        node_name: String,
+        is_super: bool,
         is_querier: bool,
         files: i64,
         scan_size: i64,
@@ -449,9 +474,12 @@ impl FlightStream {
     ) -> Self {
         Self {
             trace_id,
+            parent_cx,
             schema,
             stream,
             node_addr,
+            node_name,
+            is_super,
             is_querier,
             files,
             scan_size,
@@ -459,6 +487,74 @@ impl FlightStream {
             partial_err,
             start,
             timeout,
+        }
+    }
+
+    fn create_stream_end_span(
+        &self,
+    ) -> Result<opentelemetry::trace::SpanContext, infra::errors::Error> {
+        let tracer = opentelemetry::global::tracer("FlightSenderStream");
+
+        let now = std::time::SystemTime::now();
+        let duration = self.start.elapsed();
+        let start_time = now.sub(duration);
+
+        let trace_id = self
+            .trace_id
+            .split('-')
+            .next()
+            .and_then(|id| TraceId::from_hex(id).ok());
+        match trace_id {
+            Some(trace_id) => {
+                let mut span = tracer
+                    .span_builder("service:search:flight::do_get_stream")
+                    .with_trace_id(trace_id)
+                    .with_start_time(start_time)
+                    .with_attributes(vec![opentelemetry::KeyValue::new(
+                        "duration",
+                        duration.as_nanos() as i64,
+                    )])
+                    .start_with_context(&tracer, &self.parent_cx);
+
+                let span_context = span.span_context().clone();
+                let search_role = if self.is_super {
+                    "leader".to_string()
+                } else {
+                    "follower".to_string()
+                };
+                let event = search_inspector_fields(
+                    format!(
+                        "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+                        self.trace_id,
+                        self.node_addr,
+                        self.is_querier,
+                        self.files,
+                        self.scan_size / 1024 / 1024,
+                        self.num_rows,
+                        self.start.elapsed().as_millis(),
+                    ),
+                    SearchInspectorFieldsBuilder::new()
+                        .node_name(self.node_name.clone())
+                        .component("remote scan streaming".to_string())
+                        .search_role(search_role)
+                        .duration(self.start.elapsed().as_millis() as usize)
+                        .desc(format!(
+                            "remote scan search files: {}, scan_size: {}, num_rows: {}",
+                            self.files,
+                            bytes_to_human_readable(self.scan_size as f64),
+                            self.num_rows
+                        ))
+                        .build(),
+                );
+
+                span.add_event_with_timestamp(event, now, vec![]);
+                span.end_with_timestamp(now);
+                Ok(span_context)
+            }
+            None => Err(infra::errors::Error::Message(format!(
+                "Invalid trace id: {}",
+                self.trace_id
+            ))),
         }
     }
 }
@@ -515,6 +611,12 @@ impl Stream for FlightStream {
 
 impl Drop for FlightStream {
     fn drop(&mut self) {
+        let cfg = config::get_config();
+        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+            if let Err(e) = self.create_stream_end_span() {
+                log::error!("error creating stream span: {}", e);
+            }
+        }
         log::info!(
             "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
             self.trace_id,
@@ -523,7 +625,7 @@ impl Drop for FlightStream {
             self.files,
             self.scan_size / 1024 / 1024,
             self.num_rows,
-            self.start.elapsed().as_millis(),
+            self.start.elapsed().as_millis()
         );
     }
 }

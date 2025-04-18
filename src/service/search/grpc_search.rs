@@ -37,15 +37,17 @@ pub async fn grpc_search(
     in_req: &search::Request,
     node_group: Option<RoleGroup>,
 ) -> Result<search::Response, Error> {
-    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(node_group).await {
-        Some(nodes) if !nodes.is_empty() => nodes,
-        _ => {
-            log::error!("search->grpc: no querier node online");
-            return Err(server_internal_error("no querier node online"));
-        }
-    };
+    let mut nodes = infra_cluster::get_cached_online_querier_nodes(node_group)
+        .await
+        .unwrap_or_default();
     // sort nodes by node_id this will improve hit cache ratio
+    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+    if nodes.is_empty() {
+        log::error!("[trace_id: {trace_id}] search->grpc: no querier node online",);
+        return Err(server_internal_error("no querier node online"));
+    }
+
     let mut rng = StdRng::from_entropy();
     let node = nodes.choose(&mut rng).unwrap().clone();
 
@@ -77,14 +79,12 @@ pub async fn grpc_search(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "search->grpc: node: {}, search err: {err:?}",
-                        &node.get_grpc_addr(),
+                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
+                        node.get_grpc_addr(),
+                        err
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(server_internal_error("search node error"));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)
@@ -109,15 +109,17 @@ pub async fn grpc_search_multi(
     in_req: &search::MultiStreamRequest,
     node_group: Option<RoleGroup>,
 ) -> Result<search::Response, Error> {
-    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(node_group).await {
-        Some(nodes) if !nodes.is_empty() => nodes,
-        _ => {
-            log::error!("search->grpc: no querier node online");
-            return Err(server_internal_error("no querier node online"));
-        }
-    };
+    let mut nodes = infra_cluster::get_cached_online_querier_nodes(node_group)
+        .await
+        .unwrap_or_default();
     // sort nodes by node_id this will improve hit cache ratio
+    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+    if nodes.is_empty() {
+        log::error!("[trace_id: {trace_id}] search->grpc: no querier node online",);
+        return Err(server_internal_error("no querier node online"));
+    }
+
     let mut rng = StdRng::from_entropy();
     let node = nodes.choose(&mut rng).unwrap().clone();
 
@@ -149,14 +151,12 @@ pub async fn grpc_search_multi(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "search->grpc: node: {}, search err: {err:?}",
-                        &node.get_grpc_addr(),
+                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
+                        node.get_grpc_addr(),
+                        err,
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(server_internal_error("search node error"));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)
@@ -181,15 +181,17 @@ pub async fn grpc_search_partition(
     node_group: Option<RoleGroup>,
     skip_max_query_range: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
-    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(node_group).await {
-        Some(nodes) => nodes,
-        None => {
-            log::error!("search->grpc: no querier node online");
-            return Err(server_internal_error("no querier node online"));
-        }
-    };
+    let mut nodes = infra_cluster::get_cached_online_querier_nodes(node_group)
+        .await
+        .unwrap_or_default();
     // sort nodes by node_id this will improve hit cache ratio
+    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+    if nodes.is_empty() {
+        log::error!("[trace_id: {trace_id}] search->grpc: no querier node online",);
+        return Err(server_internal_error("no querier node online"));
+    }
+
     let mut rng = StdRng::from_entropy();
     let node = nodes.choose(&mut rng).unwrap().clone();
 
@@ -220,14 +222,12 @@ pub async fn grpc_search_partition(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "search->grpc: node: {}, search err: {err:?}",
-                        &node.get_grpc_addr(),
+                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
+                        node.get_grpc_addr(),
+                        err,
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(server_internal_error("search node error"));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)

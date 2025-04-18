@@ -18,7 +18,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    meta::sql::OrderBy,
+    meta::{sql::OrderBy, stream::StreamType},
     utils::{base64, json},
 };
 
@@ -176,8 +176,7 @@ impl Request {
 pub struct Response {
     pub took: usize,
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub took_detail: Option<ResponseTook>,
+    pub took_detail: ResponseTook,
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub columns: Vec<String>,
@@ -222,38 +221,28 @@ pub struct Response {
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct ResponseTook {
     pub total: usize,
+    pub cache_took: usize,
+    pub file_list_took: usize,
+    pub wait_in_queue: usize,
     pub idx_took: usize,
-    pub wait_queue: usize,
-    pub cluster_total: usize,
-    pub cluster_wait_queue: usize,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub nodes: Vec<ResponseNodeTook>,
+    pub search_took: usize,
 }
 
 impl ResponseTook {
     pub fn add(&mut self, other: &ResponseTook) {
-        self.total += other.total;
+        self.cache_took += other.cache_took;
+        self.file_list_took += other.file_list_took;
+        self.wait_in_queue += other.wait_in_queue;
         self.idx_took += other.idx_took;
-        self.wait_queue += other.wait_queue;
-        self.cluster_total += other.cluster_total;
-        self.cluster_wait_queue += other.cluster_wait_queue;
-        self.nodes.extend(other.nodes.clone());
+        self.search_took += other.search_took;
     }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
-pub struct ResponseNodeTook {
-    pub node: String,
-    pub is_ingester: bool,
-    pub took: usize,
 }
 
 impl Response {
     pub fn new(from: i64, size: i64) -> Self {
         Response {
             took: 0,
-            took_detail: None,
+            took_detail: ResponseTook::default(),
             total: 0,
             from,
             size,
@@ -293,7 +282,6 @@ impl Response {
             .take(size as usize)
             .cloned()
             .collect();
-        // self.total = self.hits.len();
     }
 
     pub fn add_hit(&mut self, hit: &json::Value) {
@@ -301,31 +289,24 @@ impl Response {
         self.total += 1;
     }
 
-    pub fn set_cluster_took(&mut self, val: usize, wait: usize) {
-        self.took = val - wait;
-        self.took_detail = Some(ResponseTook {
-            total: 0,
-            idx_took: 0,
-            wait_queue: 0,
-            cluster_total: val,
-            cluster_wait_queue: wait,
-            nodes: Vec::new(),
-        });
+    // set the total took time of the search request, it includes everything.
+    pub fn set_took(&mut self, val: usize) {
+        self.took = val;
+        self.took_detail.total = val;
     }
 
-    pub fn set_local_took(&mut self, val: usize, wait: usize) {
-        if self.took_detail.is_some() {
-            self.took_detail.as_mut().unwrap().total = val;
-            if wait > 0 {
-                self.took_detail.as_mut().unwrap().wait_queue = wait;
-            }
-        }
+    pub fn set_cache_took(&mut self, val: usize) {
+        self.took_detail.cache_took = val;
     }
 
-    pub fn set_idx_took(&mut self, val: usize) {
-        if self.took_detail.is_some() {
-            self.took_detail.as_mut().unwrap().idx_took = val;
-        }
+    pub fn set_wait_in_queue(&mut self, val: usize) {
+        self.took_detail.wait_in_queue = val;
+    }
+
+    pub fn set_search_took(&mut self, total: usize, file_list: usize, idx: usize) {
+        self.took_detail.search_took = total - file_list - idx;
+        self.took_detail.file_list_took = file_list;
+        self.took_detail.idx_took = idx;
     }
 
     pub fn set_total(&mut self, val: usize) {
@@ -663,6 +644,7 @@ pub struct ScanStats {
     pub querier_disk_cached_files: i64,
     pub idx_scan_size: i64,
     pub idx_took: i64,
+    pub file_list_took: i64,
 }
 
 impl ScanStats {
@@ -680,6 +662,7 @@ impl ScanStats {
         self.querier_disk_cached_files += other.querier_disk_cached_files;
         self.idx_scan_size += other.idx_scan_size;
         self.idx_took = std::cmp::max(self.idx_took, other.idx_took);
+        self.file_list_took = std::cmp::max(self.file_list_took, other.file_list_took);
     }
 
     pub fn format_to_mb(&mut self) {
@@ -720,6 +703,7 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             querier_disk_cached_files: req.querier_disk_cached_files,
             idx_scan_size: req.idx_scan_size,
             idx_took: req.idx_took,
+            file_list_took: req.file_list_took,
         }
     }
 }
@@ -736,6 +720,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             querier_disk_cached_files: req.querier_disk_cached_files,
             idx_scan_size: req.idx_scan_size,
             idx_took: req.idx_took,
+            file_list_took: req.file_list_took,
         }
     }
 }
@@ -815,6 +800,14 @@ impl TryFrom<&str> for SearchEventType {
             )),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ValuesEventContext {
+    pub top_k: Option<i64>,
+    pub no_count: bool,
+    pub field: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
@@ -1057,6 +1050,33 @@ impl MultiStreamRequest {
 pub struct PaginationQuery {
     pub from: Option<i64>,
     pub size: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ValuesRequest {
+    pub fields: Vec<String>,
+    #[serde(default)]
+    pub size: Option<i64>,
+    pub no_count: bool,
+    #[serde(default)]
+    pub regions: Vec<String>,
+    #[serde(default)]
+    pub clusters: Vec<String>,
+    #[serde(default)]
+    pub vrl_fn: Option<String>,
+    #[serde(default)]
+    pub start_time: Option<i64>,
+    #[serde(default)]
+    pub end_time: Option<i64>,
+    #[serde(default)]
+    pub filter: Option<String>,
+    #[serde(default)]
+    pub timeout: Option<i64>,
+    #[serde(default)]
+    pub use_cache: bool,
+    pub stream_name: String,
+    pub stream_type: StreamType,
+    pub sql: String,
 }
 
 #[cfg(test)]

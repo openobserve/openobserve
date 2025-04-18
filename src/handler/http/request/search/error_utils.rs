@@ -20,7 +20,7 @@ use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse, handler::http::router::ERROR_HEADER,
 };
 
-pub fn map_error_to_http_response(err: errors::Error, trace_id: String) -> HttpResponse {
+pub fn map_error_to_http_response(err: &errors::Error, trace_id: String) -> HttpResponse {
     match err {
         errors::Error::ErrorCode(code) => match code {
             errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()

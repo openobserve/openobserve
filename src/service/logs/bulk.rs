@@ -22,7 +22,8 @@ use actix_web::web;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
+    ALL_VALUES_COL_NAME, BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
+    get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
@@ -85,6 +86,7 @@ pub async fn ingest(
 
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
     let mut store_original_when_pipeline_exists = false;
 
     let mut json_data_by_stream = HashMap::new();
@@ -172,6 +174,7 @@ pub async fn ingest(
                 &streams,
                 &mut user_defined_schema_map,
                 &mut streams_need_original_map,
+                &mut streams_need_all_values_map,
             )
             .await;
 
@@ -254,6 +257,31 @@ pub async fn ingest(
                     local_val.insert(
                         ID_COL_NAME.to_string(),
                         json::Value::String(record_id.to_string()),
+                    );
+                }
+
+                // add `_all_values` if required by StreamSettings
+                if streams_need_all_values_map
+                    .get(&stream_name)
+                    .is_some_and(|v| *v)
+                {
+                    let mut values = Vec::with_capacity(local_val.len());
+                    for (k, value) in local_val.iter() {
+                        if [
+                            TIMESTAMP_COL_NAME,
+                            ID_COL_NAME,
+                            ORIGINAL_DATA_COL_NAME,
+                            ALL_VALUES_COL_NAME,
+                        ]
+                        .contains(&k.as_str())
+                        {
+                            continue;
+                        }
+                        values.push(value.to_string());
+                    }
+                    local_val.insert(
+                        ALL_VALUES_COL_NAME.to_string(),
+                        json::Value::String(values.join(" ")),
                     );
                 }
 
@@ -386,6 +414,7 @@ pub async fn ingest(
                                 &[stream_params],
                                 &mut user_defined_schema_map,
                                 &mut streams_need_original_map,
+                                &mut streams_need_all_values_map,
                             )
                             .await;
                         }
@@ -429,6 +458,31 @@ pub async fn ingest(
                                 local_val.insert(
                                     ID_COL_NAME.to_string(),
                                     json::Value::String(record_id.to_string()),
+                                );
+                            }
+
+                            // add `_all_values` if required by StreamSettings
+                            if streams_need_all_values_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v)
+                            {
+                                let mut values = Vec::with_capacity(local_val.len());
+                                for (k, value) in local_val.iter() {
+                                    if [
+                                        TIMESTAMP_COL_NAME,
+                                        ID_COL_NAME,
+                                        ORIGINAL_DATA_COL_NAME,
+                                        ALL_VALUES_COL_NAME,
+                                    ]
+                                    .contains(&k.as_str())
+                                    {
+                                        continue;
+                                    }
+                                    values.push(value.to_string());
+                                }
+                                local_val.insert(
+                                    ALL_VALUES_COL_NAME.to_string(),
+                                    json::Value::String(values.join(" ")),
                                 );
                             }
 
@@ -516,6 +570,7 @@ pub async fn ingest(
     // drop memory-intensive variables
     drop(stream_pipeline_inputs);
     drop(streams_need_original_map);
+    drop(streams_need_all_values_map);
     drop(user_defined_schema_map);
 
     let (metric_rpt_status_code, response_body) = {

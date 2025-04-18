@@ -59,6 +59,7 @@ use crate::service::{
             table_provider::uniontable::NewUnionTable,
         },
         index::IndexCondition,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         match_file,
         request::FlightSearchRequest,
     },
@@ -81,7 +82,8 @@ pub async fn search(
 
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx =
-        prepare_datafusion_context(work_group.clone(), vec![], false, cfg.limit.cpu_num).await?;
+        prepare_datafusion_context(work_group.clone(), vec![], vec![], false, cfg.limit.cpu_num)
+            .await?;
 
     // register udf
     register_udf(&ctx, &org_id)?;
@@ -212,10 +214,21 @@ pub async fn search(
         )
         .await?;
         log::info!(
-            "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, files: {}, took: {} ms",
-            req.query_identifier.partition,
-            file_list.len(),
-            file_list_took,
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, files: {}, took: {} ms",
+                    req.query_identifier.partition,
+                    file_list.len(),
+                    file_list_took,
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("flight:do_get::search get file_list by ids".to_string())
+                    .search_role("follower".to_string())
+                    .duration(file_list_took)
+                    .build()
+            )
         );
 
         if physical_plan.name() == "AggregateExec"
@@ -351,8 +364,19 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
-        start.elapsed().as_millis()
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:do_get::search generated physical plan".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
     );
 
     Ok((ctx, physical_plan, scan_stats))

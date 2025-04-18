@@ -25,6 +25,7 @@ use config::{
         search::{SearchEventContext, SearchEventType},
         sql::resolve_stream_names,
     },
+    utils::sql::is_timestamp_selected,
 };
 use cron::Schedule;
 
@@ -43,7 +44,15 @@ pub async fn save(
             if let Some(sql) = &derived_stream.query_condition.sql {
                 if sql.is_empty() {
                     return Err(anyhow::anyhow!(
-                        "DerivedStreams with SQL mode should have a query"
+                        "Scheduled pipeline with SQL mode should have a query"
+                    ));
+                }
+
+                // check if _timestamp is a selected field, or _timestamp as an alias
+                if !is_timestamp_selected(sql).map_err(|e| anyhow::anyhow!("Invalid SQL: {}", e))? {
+                    return Err(anyhow::anyhow!(
+                        "SQL for scheduled pipeline must include _timestamp, or aliased as _timestamp.\n\
+                        e.g. SELECT app_name, MAX(_timestamp) AS _timestamp FROM ..."
                     ));
                 }
 
@@ -73,7 +82,7 @@ pub async fn save(
                 }
             } else {
                 return Err(anyhow::anyhow!(
-                    "DerivedStreams with SQL mode should have a query"
+                    "Scheduled pipeline with SQL mode should have a query"
                 ));
             }
         }
@@ -86,7 +95,7 @@ pub async fn save(
                 || derived_stream.query_condition.promql_condition.is_none()
             {
                 return Err(anyhow::anyhow!(
-                    "DerivedStreams with SQL mode should have a query"
+                    "Scheduled pipeline with PromQL mode should have a query and condition"
                 ));
             }
         }
@@ -119,7 +128,11 @@ pub async fn save(
                 .num_microseconds()
                 .unwrap();
         if let Err(e) = &derived_stream
-            .evaluate((Some(test_start_time), test_end_time), &trigger_module_key)
+            .evaluate(
+                (Some(test_start_time), test_end_time),
+                &trigger_module_key,
+                None,
+            )
             .await
         {
             return Err(anyhow::anyhow!(
@@ -171,6 +184,7 @@ pub trait DerivedStreamExt: Sync + Send + 'static {
         &self,
         (start_time, end_time): (Option<i64>, i64),
         module_key: &str,
+        trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error>;
 }
 
@@ -180,6 +194,7 @@ impl DerivedStreamExt for DerivedStream {
         &self,
         (start_time, end_time): (Option<i64>, i64),
         module_key: &str,
+        trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error> {
         self.query_condition
             .evaluate_scheduled(
@@ -192,6 +207,7 @@ impl DerivedStreamExt for DerivedStream {
                 Some(SearchEventContext::with_derived_stream(Some(
                     module_key.to_string(),
                 ))),
+                trace_id,
             )
             .await
     }

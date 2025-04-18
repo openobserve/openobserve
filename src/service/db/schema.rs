@@ -23,7 +23,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     is_local_disk_storage,
     meta::{cluster::RoleGroup, stream::StreamType},
-    utils::json,
+    utils::{json, time::now_micros},
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -315,9 +315,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let ts_range = if ev_start_dt == 0 && prev_start_dt == 0 {
                     None
                 } else if ev_start_dt == 0 || (prev_start_dt > 0 && ev_start_dt > prev_start_dt) {
-                    Some((prev_start_dt, chrono::Utc::now().timestamp_micros()))
+                    Some((prev_start_dt, now_micros()))
                 } else {
-                    Some((ev_start_dt, chrono::Utc::now().timestamp_micros()))
+                    Some((ev_start_dt, now_micros()))
                 };
 
                 let mut schema_versions =
@@ -351,7 +351,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let latest_schema = latest_schema.pop().unwrap();
                 let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
-                if settings.store_original_data {
+                if settings.store_original_data || settings.index_original_data {
                     if let dashmap::Entry::Vacant(entry) =
                         STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
                     {
@@ -513,7 +513,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let latest_schema = latest_schema.last().unwrap();
         let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
-        if settings.store_original_data {
+        if settings.store_original_data || settings.index_original_data {
             if let dashmap::Entry::Vacant(entry) =
                 STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
             {

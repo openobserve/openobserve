@@ -24,6 +24,7 @@ use {
         utils::auth::{remove_ownership, set_ownership},
     },
     actix_web::http,
+    config::utils::time::now_micros,
     infra::table::cipher::CipherEntry,
     o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates},
 };
@@ -95,7 +96,7 @@ pub async fn save(
 
         match crate::service::db::keys::add(CipherEntry {
             org: org_id.to_string(),
-            created_at: chrono::Utc::now().timestamp_micros(),
+            created_at: now_micros(),
             created_by: user_id.to_string(),
             name: req.name.clone(),
             data: serde_json::to_string(&cd).unwrap(),
@@ -370,7 +371,7 @@ pub async fn update(
 
         match crate::service::db::keys::update(CipherEntry {
             org: org_id.to_string(),
-            created_at: chrono::Utc::now().timestamp_micros(),
+            created_at: now_micros(),
             created_by: user_id.to_string(),
             name: req.name,
             data: serde_json::to_string(&cd).unwrap(),

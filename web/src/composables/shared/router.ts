@@ -67,6 +67,8 @@ const ApiDashboard = () =>
 const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
 const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
+const ImportPipeline = () => import("@/components/pipeline/ImportPipeline.vue");
+
 const ActionScipts = () =>
   import("@/components/actionScripts/ActionScipts.vue");
 
@@ -287,6 +289,14 @@ const useRoutes = () => {
               path: "add",
               name: "createPipeline",
               component: PipelineEditor,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "import",
+              name: "importPipeline",
+              component: ImportPipeline,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },

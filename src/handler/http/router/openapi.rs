@@ -284,7 +284,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::search::RequestEncoding,
             config::meta::search::Response,
             config::meta::search::ResponseTook,
-            config::meta::search::ResponseNodeTook,
             config::meta::search::SearchEventType,
             config::meta::search::SearchEventContext,
             config::meta::search::SearchPartitionRequest,

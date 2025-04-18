@@ -17,15 +17,16 @@ use std::str::FromStr;
 
 use chrono::{TimeZone, Utc};
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
     },
-    metrics,
-    utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
+    utils::{base64, hash::Sum64, json, sql::is_aggregate_query, time::format_duration},
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
@@ -41,7 +42,11 @@ use crate::{
         utils::{functions, http::get_work_group},
     },
     service::{
-        search::{self as SearchService, cache::cacher::check_cache},
+        search::{
+            self as SearchService,
+            cache::cacher::check_cache,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -114,7 +119,6 @@ pub async fn search(
     let hashed_query = h.sum64(&hash_body.join(","));
 
     let mut should_exec_query = true;
-    let mut ext_took_wait = 0;
 
     let mut file_path = format!(
         "{}/{}/{}/{}",
@@ -166,14 +170,12 @@ pub async fn search(
             "[trace_id {trace_id}] Query deltas are: {:?}",
             c_resp.deltas
         );
-        log::info!(
-            "[trace_id {trace_id}] Query original start time: {}, end time : {}",
-            req.query.start_time,
-            req.query.end_time
-        );
     }
 
+    let search_role = "cache".to_string();
+
     // Result caching check ends, start search
+    let cache_took = start.elapsed().as_millis() as usize;
     let mut results = Vec::new();
     let mut work_group_set = Vec::new();
     let mut res = if !should_exec_query {
@@ -205,39 +207,39 @@ pub async fn search(
             }
         }
 
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[org_id])
-            .inc();
-
-        // get a local search queue lock
-        #[cfg(not(feature = "enterprise"))]
-        let locker = SearchService::QUEUE_LOCKER.clone();
-        #[cfg(not(feature = "enterprise"))]
-        let locker = locker.lock().await;
-        #[cfg(not(feature = "enterprise"))]
-        if !cfg.common.feature_query_queue_enabled {
-            drop(locker);
-        }
-        #[cfg(not(feature = "enterprise"))]
-        let took_wait = start.elapsed().as_millis() as usize;
-        #[cfg(feature = "enterprise")]
-        let took_wait = 0;
-        ext_took_wait = took_wait;
-        log::info!(
-            "[trace_id {trace_id}] http search API wait in queue took: {} ms",
-            took_wait
-        );
-
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[org_id])
-            .dec();
-
-        let mut tasks = Vec::new();
-
-        log::info!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas);
         c_resp.deltas.sort();
         c_resp.deltas.dedup();
+        let total = (req.query.end_time - req.query.start_time) as usize;
+        let deltas_total: usize = c_resp
+            .deltas
+            .iter()
+            .map(|d| (d.delta_end_time - d.delta_start_time) as usize)
+            .sum();
 
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("cacher:search deltas".to_string())
+                    .search_role(search_role.clone())
+                    .duration(start.elapsed().as_millis() as usize)
+                    .desc(format!(
+                        "search cacher search from {} reduce to {}",
+                        format_duration(total as u64 / 1000),
+                        format_duration(deltas_total as u64 / 1000)
+                    ))
+                    .build()
+            )
+        );
+        log::info!(
+            "[trace_id {trace_id}] Query original start time: {}, end time : {}",
+            req.query.start_time,
+            req.query.end_time
+        );
+
+        let mut tasks = Vec::new();
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let mut req = req.clone();
             let org_id = org_id.to_string();
@@ -298,7 +300,25 @@ pub async fn search(
     };
 
     // do search
-    let time = start.elapsed().as_secs_f64();
+    let took_time = start.elapsed().as_secs_f64();
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] cache done"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("summary".to_string())
+                .search_role(search_role)
+                .sql(req.query.sql.clone())
+                .time_range((
+                    req.query.start_time.to_string(),
+                    req.query.end_time.to_string()
+                ))
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
+
     let work_group = get_work_group(work_group_set);
 
     let search_type = req
@@ -316,7 +336,8 @@ pub async fn search(
         &search_group,
     );
     res.set_trace_id(trace_id.to_string());
-    res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
+    res.set_took(took_time as usize);
+    res.set_cache_took(cache_took);
 
     if is_aggregate
         && res.histogram_interval.is_none()
@@ -329,7 +350,7 @@ pub async fn search(
     let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
-        response_time: time,
+        response_time: took_time,
         size: res.scan_size as f64,
         request_body: Some(req.query.sql),
         function: req.query.query_fn,
@@ -340,13 +361,7 @@ pub async fn search(
         search_type: req.search_type,
         search_event_context: req.search_event_context.clone(),
         trace_id: Some(trace_id.to_string()),
-        took_wait_in_queue: if res.took_detail.is_some() {
-            let resp_took = res.took_detail.as_ref().unwrap();
-            // Consider only the cluster wait queue duration
-            Some(resp_took.cluster_wait_queue)
-        } else {
-            None
-        },
+        took_wait_in_queue: Some(res.took_detail.wait_in_queue),
         work_group,
         result_cache_ratio: Some(res.result_cache_ratio),
         ..Default::default()
@@ -398,15 +413,22 @@ pub async fn search(
     // 1. VRL error
     // 2. Super cluster error
     // 3. Range error (max_query_limit)
+
+    // let should_cache_results =
+    //     res.new_start_time.is_some() || res.new_end_time.is_some() ||
+    // res.function_error.is_empty();
+
     // Cache partial results only if there is a range error
+    // if !res.function_error.is_empty() && !range_error.is_empty() {
+    //     res.function_error.retain(|err| !err.contains(&range_error));
+    //     should_cache_results = should_cache_results && res.function_error.is_empty();
+    // }
 
-    let mut should_cache_results =
-        res.new_start_time.is_some() || res.new_end_time.is_some() || res.function_error.is_empty();
-
-    if !res.function_error.is_empty() && !range_error.is_empty() {
-        res.function_error.retain(|err| !err.contains(&range_error));
-        should_cache_results = should_cache_results && res.function_error.is_empty();
-    }
+    // Update: Don't cache any partial results
+    let should_cache_results = res.new_start_time.is_none()
+        && res.new_end_time.is_none()
+        && res.function_error.is_empty()
+        && !res.hits.is_empty();
 
     // result cache save changes start
     if cfg.common.result_cache_enabled
@@ -516,17 +538,13 @@ pub fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
-        // TODO: here we can't plus cluster_total, it is query in parallel
-        // TODO: and, use this value also is wrong, the cluster_total should be the total time of
-        // TODO: the query, here only calculate the time of the delta query
-        if let Some(mut took_details) = res.took_detail {
-            res_took.cluster_total += took_details.cluster_total;
-            res_took.cluster_wait_queue += took_details.cluster_wait_queue;
-            res_took.idx_took += took_details.idx_took;
-            res_took.wait_queue += took_details.wait_queue;
-            res_took.total += took_details.total;
-            res_took.nodes.append(&mut took_details.nodes);
-        }
+        // here the searches in paralles, so we use the max value of the took_detail
+        res_took.idx_took = std::cmp::max(res_took.idx_took, res.took_detail.idx_took);
+        res_took.wait_in_queue =
+            std::cmp::max(res_took.wait_in_queue, res.took_detail.wait_in_queue);
+        res_took.search_took = std::cmp::max(res_took.search_took, res.took_detail.search_took);
+        res_took.file_list_took =
+            std::cmp::max(res_took.file_list_took, res.took_detail.file_list_took);
         if !res.function_error.is_empty() {
             fn_error.extend(res.function_error.clone());
         }
@@ -551,7 +569,7 @@ pub fn merge_response(
         cache_hits_len,
         result_cache_len
     );
-    cache_response.took_detail = Some(res_took);
+    cache_response.took_detail = res_took;
     cache_response.order_by = search_response.first().and_then(|res| res.order_by);
     cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
         / ((result_cache_len + cache_hits_len) as f64))

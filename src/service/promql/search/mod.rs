@@ -84,7 +84,7 @@ async fn search_in_cluster(
     user_email: &str,
 ) -> Result<Value> {
     let op_start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
+    let started_at = now_micros();
     let cfg = get_config();
 
     let &cluster_rpc::MetricsQueryStmt {
@@ -140,19 +140,13 @@ async fn search_in_cluster(
     let (start, cached_values) = if cache_disabled {
         (start, vec![])
     } else {
-        config::metrics::QUERY_METRICS_CACHE_REQUESTS
-            .with_label_values(&[&req.org_id])
-            .inc();
         let start_time = std::time::Instant::now();
         match cache::get(query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
                 config::metrics::QUERY_METRICS_CACHE_RATIO
                     .with_label_values(&[&req.org_id])
-                    .inc_by(min(
-                        100,
-                        (new_start - start) as u64 * 100 / (end - start) as u64,
-                    ));
+                    .observe((new_start - start) as f64 / (end - start) as f64);
                 log::info!(
                     "[trace_id {trace_id}] promql->search->cache: hit cache, took: {} ms",
                     took

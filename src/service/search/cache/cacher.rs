@@ -18,7 +18,7 @@ use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{search::Response, sql::OrderBy, stream::StreamType},
-    utils::{file::scan_files, json},
+    utils::{file::scan_files, json, time::now_micros},
 };
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
@@ -146,7 +146,7 @@ pub async fn check_cache(
 
         let mut req_time_range = (req.query.start_time, req.query.end_time);
         if req_time_range.1 == 0 {
-            req_time_range.1 = chrono::Utc::now().timestamp_micros();
+            req_time_range.1 = now_micros();
         }
 
         let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));

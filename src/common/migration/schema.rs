@@ -576,6 +576,7 @@ mod meta {
     use std::collections::HashMap;
 
     use chrono::{DateTime, FixedOffset};
+    use config::utils::time::now_micros;
     use serde::{Deserialize, Serialize};
     use serde_json::Value as JsonValue;
 
@@ -606,7 +607,7 @@ mod meta {
                 let trigger = db::scheduler::Trigger {
                     org: org_id.to_string(),
                     module_key: schedule_key.clone(),
-                    next_run_at: chrono::Utc::now().timestamp_micros(),
+                    next_run_at: now_micros(),
                     is_realtime: alert.is_real_time,
                     is_silenced: false,
                     ..Default::default()
