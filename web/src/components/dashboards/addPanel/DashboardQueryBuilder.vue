@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="xs"
                     dense
                     :data-test="`dashboard-x-item-${itemX?.column}-remove`"
-                    @click="removeXAxisItem(itemX?.column)"
+                    @click="removeXAxisItemByIndex(index)"
                     icon="close"
                   />
                 </div>
@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="xs"
                     dense
                     :data-test="`dashboard-b-item-${itemB?.column}-remove`"
-                    @click="removeBreakdownItem(itemB?.column)"
+                    @click="removeBreakdownItemByIndex(index)"
                     icon="close"
                   />
                 </div>
@@ -807,7 +807,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 dense
                 :data-test="`dashboard-y-item-${itemY?.column}-remove`"
-                @click="removeYAxisItem(itemY?.column)"
+                @click="removeYAxisItemByIndex(index)"
                 icon="close"
               />
             </div>
@@ -1055,7 +1055,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   dense
                   :data-test="`dashboard-z-item-${itemZ?.column}-remove`"
-                  @click="removeZAxisItem(itemZ?.column)"
+                  @click="removeZAxisItemByIndex(index)"
                   icon="close"
                 />
               </div>
@@ -1158,10 +1158,10 @@ export default defineComponent({
       addYAxisItem,
       addZAxisItem,
       addBreakDownAxisItem,
-      removeXAxisItem,
-      removeYAxisItem,
-      removeZAxisItem,
-      removeBreakdownItem,
+      removeXAxisItemByIndex,
+      removeYAxisItemByIndex,
+      removeZAxisItemByIndex,
+      removeBreakdownItemByIndex,
       addFilteredItem,
       promqlMode,
       updateArrayAlias,
@@ -1238,6 +1238,9 @@ export default defineComponent({
     );
 
     const onDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
+      const dragSourceIndex =
+        dashboardPanelData.meta.dragAndDrop.dragSourceIndex;
+
       // reorder items if source and target are same
       if (dashboardPanelData.meta.dragAndDrop.dragSource === targetAxis) {
         // we need to reorder the item
@@ -1288,107 +1291,97 @@ export default defineComponent({
           // move the item from field list to axis
           const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-          console.log(dragElement, "dragElement");
+          // find first arg which is of type field
+          const firstFieldTypeArg = dragElement.args.find(
+            (arg: any) => arg.type === "field",
+          )?.value;
 
-          // Here, we need all fields for all joins streams
-          const dragName =
-            selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
-              (item: any) => item?.name === dragElement?.column,
-            );
-          const customDragName =
-            dashboardPanelData.meta.stream.customQueryFields.find(
-              (item: any) => item?.name === dragElement?.column,
-            );
+          if (!firstFieldTypeArg) {
+            showErrorNotification("Without field, not able to drag");
+            cleanupDraggingFields();
+            return;
+          }
 
-          if (dragName || customDragName) {
-            const axisArray = getAxisArray(targetAxis);
-            const duplicateName = axisArray.some(
-              (item: any) => item.column === (dragName || customDragName).name,
-            );
+          const fieldObj = {
+            name: firstFieldTypeArg.field,
+            streamAlias: firstFieldTypeArg.streamAlias,
+          };
 
-            if (duplicateName) {
-              const errorMessage = `Field '${
-                (dragName || customDragName).name
-              }' already exists in '${targetAxis}' axis.`;
+          const axisArray = getAxisArray(targetAxis);
+
+          if (targetAxis !== "f") {
+            if (
+              (targetAxis === "x" && isAddXAxisNotAllowed.value) ||
+              (targetAxis === "y" && isAddYAxisNotAllowed.value) ||
+              (targetAxis === "z" && isAddZAxisNotAllowed.value) ||
+              (targetAxis === "breakdown" && isAddBreakdownNotAllowed.value)
+            ) {
+              let maxAllowedAxisFields;
+
+              switch (dashboardPanelData.data.type) {
+                case "pie":
+                case "donut":
+                case "heatmap":
+                  maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
+                  break;
+                case "metric":
+                  maxAllowedAxisFields = targetAxis === "x" ? 0 : 1;
+                  break;
+                case "table":
+                  maxAllowedAxisFields = 0;
+                  break;
+                case "area-stacked":
+                case "stacked":
+                case "h-stacked":
+                  maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
+                  break;
+                default:
+                  maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
+                  break;
+              }
+
+              const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
 
               showErrorNotification(errorMessage);
               cleanupDraggingFields();
               return;
             }
 
-            if (targetAxis !== "f") {
-              if (
-                (targetAxis === "x" && isAddXAxisNotAllowed.value) ||
-                (targetAxis === "y" && isAddYAxisNotAllowed.value) ||
-                (targetAxis === "z" && isAddZAxisNotAllowed.value) ||
-                (targetAxis === "breakdown" && isAddBreakdownNotAllowed.value)
-              ) {
-                let maxAllowedAxisFields;
-
-                switch (dashboardPanelData.data.type) {
-                  case "pie":
-                  case "donut":
-                  case "heatmap":
-                    maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
-                    break;
-                  case "metric":
-                    maxAllowedAxisFields = targetAxis === "x" ? 0 : 1;
-                    break;
-                  case "table":
-                    maxAllowedAxisFields = 0;
-                    break;
-                  case "area-stacked":
-                  case "stacked":
-                  case "h-stacked":
-                    maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
-                    break;
-                  default:
-                    maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
-                    break;
-                }
-
-                const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
-
-                showErrorNotification(errorMessage);
-                cleanupDraggingFields();
-                return;
-              }
-
-              // Remove from the original axis
-              const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
-              if (dragSource === "x") {
-                removeXAxisItem((dragName || customDragName).name);
-              } else if (dragSource === "y") {
-                removeYAxisItem((dragName || customDragName).name);
-              } else if (dragSource === "z") {
-                removeZAxisItem((dragName || customDragName).name);
-              } else if (dragSource === "breakdown") {
-                removeBreakdownItem((dragName || customDragName).name);
-              }
+            // Remove from the original axis
+            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
+            if (dragSource === "x") {
+              removeXAxisItemByIndex(dragSourceIndex);
+            } else if (dragSource === "y") {
+              removeYAxisItemByIndex(dragSourceIndex);
+            } else if (dragSource === "z") {
+              removeZAxisItemByIndex(dragSourceIndex);
+            } else if (dragSource === "breakdown") {
+              removeBreakdownItemByIndex(dragSourceIndex);
             }
-
-            if (targetAxis === "f") {
-              return;
-            }
-
-            // Add to the new axis
-            if (targetAxis === "x") {
-              addXAxisItem(dragName || customDragName);
-            } else if (targetAxis === "y") {
-              addYAxisItem(dragName || customDragName);
-            } else if (targetAxis === "z") {
-              addZAxisItem(dragName || customDragName);
-            } else if (targetAxis === "breakdown") {
-              addBreakDownAxisItem(dragName || customDragName);
-            }
-            reorderItems(
-              targetAxis,
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields[targetAxis]?.length - 1 || 0,
-              droppedAtIndex,
-            );
           }
+
+          if (targetAxis === "f") {
+            return;
+          }
+
+          // Add to the new axis
+          if (targetAxis === "x") {
+            addXAxisItem(fieldObj);
+          } else if (targetAxis === "y") {
+            addYAxisItem(fieldObj);
+          } else if (targetAxis === "z") {
+            addZAxisItem(fieldObj);
+          } else if (targetAxis === "breakdown") {
+            addBreakDownAxisItem(fieldObj);
+          }
+          reorderItems(
+            targetAxis,
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields[targetAxis]?.length - 1 || 0,
+            droppedAtIndex,
+          );
+
           updateArrayAlias();
         }
       }
@@ -1641,10 +1634,10 @@ export default defineComponent({
       panelName,
       panelDesc,
       dashboardPanelData,
-      removeXAxisItem,
-      removeYAxisItem,
-      removeZAxisItem,
-      removeBreakdownItem,
+      removeXAxisItemByIndex,
+      removeYAxisItemByIndex,
+      removeZAxisItemByIndex,
+      removeBreakdownItemByIndex,
       triggerOperators,
       pagination: ref({
         rowsPerPage: 0,
