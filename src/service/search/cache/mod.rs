@@ -26,7 +26,6 @@ use config::{
         sql::resolve_stream_names,
         stream::StreamType,
     },
-    metrics,
     utils::{base64, hash::Sum64, json, sql::is_aggregate_query, time::format_duration},
 };
 use infra::{
@@ -120,7 +119,6 @@ pub async fn search(
     let hashed_query = h.sum64(&hash_body.join(","));
 
     let mut should_exec_query = true;
-    let mut ext_took_wait = 0;
 
     let mut file_path = format!(
         "{}/{}/{}/{}",
@@ -208,35 +206,6 @@ pub async fn search(
             }
         }
 
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[org_id])
-            .inc();
-
-        // get a local search queue lock
-        #[cfg(not(feature = "enterprise"))]
-        let locker = SearchService::QUEUE_LOCKER.clone();
-        #[cfg(not(feature = "enterprise"))]
-        let locker = locker.lock().await;
-        #[cfg(not(feature = "enterprise"))]
-        if !cfg.common.feature_query_queue_enabled {
-            drop(locker);
-        }
-        #[cfg(not(feature = "enterprise"))]
-        let took_wait = start.elapsed().as_millis() as usize;
-        #[cfg(feature = "enterprise")]
-        let took_wait = 0;
-        ext_took_wait = took_wait;
-        log::info!(
-            "[trace_id {trace_id}] http search API wait in queue took: {} ms",
-            took_wait
-        );
-
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[org_id])
-            .dec();
-
-        let mut tasks = Vec::new();
-
         c_resp.deltas.sort();
         c_resp.deltas.dedup();
         let total = (req.query.end_time - req.query.start_time) as usize;
@@ -269,6 +238,7 @@ pub async fn search(
             req.query.end_time
         );
 
+        let mut tasks = Vec::new();
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let mut req = req.clone();
             let org_id = org_id.to_string();
@@ -365,7 +335,7 @@ pub async fn search(
         &search_group,
     );
     res.set_trace_id(trace_id.to_string());
-    res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
+    res.set_local_took(start.elapsed().as_millis() as usize);
 
     if is_aggregate
         && res.histogram_interval.is_none()

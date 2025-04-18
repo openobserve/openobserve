@@ -313,12 +313,9 @@ impl Response {
         });
     }
 
-    pub fn set_local_took(&mut self, val: usize, wait: usize) {
+    pub fn set_local_took(&mut self, val: usize) {
         if self.took_detail.is_some() {
             self.took_detail.as_mut().unwrap().total = val;
-            if wait > 0 {
-                self.took_detail.as_mut().unwrap().wait_queue = wait;
-            }
         }
     }
 

@@ -227,7 +227,7 @@ async fn run_partition_job(
     }
     let mut result = res.unwrap();
     let took = start.elapsed().as_millis();
-    result.set_local_took(took as usize, 0);
+    result.set_local_took(took as usize);
 
     // 4. write the result to s3
     let hits = result.total;

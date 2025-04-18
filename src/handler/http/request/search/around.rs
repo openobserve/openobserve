@@ -22,7 +22,6 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
-    metrics,
     utils::{base64, json},
 };
 use hashbrown::HashMap;
@@ -119,30 +118,6 @@ pub(crate) async fn around(
             .map(|s| s.to_string())
             .collect::<Vec<_>>()
     });
-
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[org_id])
-        .inc();
-    // get a local search queue lock
-    #[cfg(not(feature = "enterprise"))]
-    let locker = SearchService::QUEUE_LOCKER.clone();
-    #[cfg(not(feature = "enterprise"))]
-    let locker = locker.lock().await;
-    #[cfg(not(feature = "enterprise"))]
-    if !config::get_config().common.feature_query_queue_enabled {
-        drop(locker);
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let took_wait = start.elapsed().as_millis() as usize;
-    #[cfg(feature = "enterprise")]
-    let took_wait = 0;
-    log::info!(
-        "http search around API wait in queue took: {} ms",
-        took_wait
-    );
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[org_id])
-        .dec();
 
     let timeout = query
         .get("timeout")

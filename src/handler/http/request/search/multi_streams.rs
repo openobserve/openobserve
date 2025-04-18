@@ -324,27 +324,6 @@ pub async fn search_multi(
         // add search type to request
         req.search_type = search_type;
 
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&org_id])
-            .inc();
-        // get a local search queue lock
-        #[cfg(not(feature = "enterprise"))]
-        let locker = SearchService::QUEUE_LOCKER.clone();
-        #[cfg(not(feature = "enterprise"))]
-        let locker = locker.lock().await;
-        #[cfg(not(feature = "enterprise"))]
-        if !cfg.common.feature_query_queue_enabled {
-            drop(locker);
-        }
-        #[cfg(not(feature = "enterprise"))]
-        let took_wait = start.elapsed().as_millis() as usize;
-        #[cfg(feature = "enterprise")]
-        let took_wait = 0;
-        log::info!("http search multi API wait in queue took: {}", took_wait);
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&org_id])
-            .dec();
-
         let trace_id = trace_id.clone();
         // do search
         let search_res = SearchService::search(
@@ -381,7 +360,7 @@ pub async fn search_multi(
                     ])
                     .inc();
                 res.set_trace_id(trace_id);
-                res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
+                res.set_local_took(start.elapsed().as_millis() as usize);
 
                 let req_stats = RequestStats {
                     records: res.hits.len() as i64,
@@ -618,7 +597,6 @@ pub async fn search_multi(
             max_ts: None,
             cached_ratio: None,
             trace_id: None,
-            // took_wait_in_queue: multi_res.t,
             search_type: multi_req.search_type,
             search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()

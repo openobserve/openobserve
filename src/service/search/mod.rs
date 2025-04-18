@@ -50,8 +50,6 @@ use proto::cluster_rpc::{self, SearchQuery};
 use regex::Regex;
 use sql::Sql;
 use tokio::runtime::Runtime;
-#[cfg(not(feature = "enterprise"))]
-use tokio::sync::Mutex;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
@@ -90,10 +88,6 @@ pub static RESULT_ARRAY: Lazy<Regex> =
 
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
-
-#[cfg(not(feature = "enterprise"))]
-pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
-    Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
 pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()

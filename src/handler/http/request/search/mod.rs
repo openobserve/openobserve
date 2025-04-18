@@ -26,7 +26,6 @@ use config::{
         sql::resolve_stream_names,
         stream::StreamType,
     },
-    metrics,
     utils::{
         base64, json,
         time::{BASE_TIME, now_micros},
@@ -1447,34 +1446,6 @@ pub async fn search_history(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-
-    // increment query queue
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&org_id])
-        .inc();
-
-    // handle search queue lock and timing
-    #[cfg(not(feature = "enterprise"))]
-    let locker = SearchService::QUEUE_LOCKER.clone();
-    #[cfg(not(feature = "enterprise"))]
-    let locker = locker.lock().await;
-    #[cfg(not(feature = "enterprise"))]
-    if !cfg.common.feature_query_queue_enabled {
-        drop(locker);
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let took_wait = start.elapsed().as_millis() as usize;
-    #[cfg(feature = "enterprise")]
-    let took_wait = 0;
-
-    log::info!(
-        "http search history API wait in queue took: {} ms",
-        took_wait
-    );
-
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&org_id])
-        .dec();
 
     let history_org_id = META_ORG_ID;
     let stream_type = StreamType::Logs;
