@@ -785,9 +785,7 @@ export const usePanelDataLoader = (
         pageType: string;
       } = {
         queryReq: {
-          query: store.state.zoConfig.sql_base64_enabled
-            ? b64EncodeUnicode(query)
-            : query,
+          query,
           it,
           startISOTimestamp,
           endISOTimestamp,
