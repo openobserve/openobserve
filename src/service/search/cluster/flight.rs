@@ -55,7 +55,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::infra::cluster as infra_cluster,
     service::search::{
-        DATAFUSION_RUNTIME,
+        DATAFUSION_RUNTIME, SearchResult,
         datafusion::{
             distributed_plan::{
                 EmptyExecVisitor,
@@ -85,7 +85,7 @@ pub async fn search(
     sql: Arc<Sql>,
     mut req: Request,
     query: SearchQuery,
-) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize, String)> {
+) -> Result<SearchResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {}", sql);
@@ -102,7 +102,7 @@ pub async fn search(
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
     {
-        return Ok((vec![], ScanStats::new(), 0, false, 0, "".to_string()));
+        return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
     }
 
     // 1. get file id list
@@ -373,12 +373,13 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->search: search finished");
 
     scan_stats.format_to_mb();
+    scan_stats.idx_took += idx_took as i64;
+    scan_stats.file_list_took += file_id_list_took as i64;
     Ok((
         data,
         scan_stats,
         took_wait,
         !partial_err.is_empty(),
-        idx_took,
         partial_err,
     ))
 }

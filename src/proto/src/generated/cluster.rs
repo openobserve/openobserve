@@ -67,6 +67,9 @@ pub struct ScanStats {
     /// unit: ms
     #[prost(int64, tag = "9")]
     pub idx_took: i64,
+    /// unit: ms
+    #[prost(int64, tag = "10")]
+    pub file_list_took: i64,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]

@@ -14,13 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    cluster::LOCAL_NODE,
-    get_config,
-    meta::{
-        cluster::{Role, RoleGroup},
-        stream::FileKey,
-    },
-    metrics,
+    cluster::LOCAL_NODE, get_config, meta::stream::FileKey, metrics,
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
 use infra::cache::file_data::TRACE_ID_FOR_CACHE_LATEST_FILE;
@@ -29,7 +23,7 @@ use proto::cluster_rpc::{EmptyResponse, FileList, event_server::Event};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{common::infra::cluster::get_node_from_consistent_hash, handler::grpc::MetadataMap};
+use crate::handler::grpc::MetadataMap;
 
 pub struct Eventer;
 
@@ -56,18 +50,6 @@ impl Event for Eventer {
         // cache latest files for querier
         if cfg.cache_latest_files.enabled && LOCAL_NODE.is_querier() {
             for item in put_items.iter() {
-                let Some(node_name) = get_node_from_consistent_hash(
-                    &item.key,
-                    &Role::Querier,
-                    Some(RoleGroup::Interactive),
-                )
-                .await
-                else {
-                    continue; // no querier node
-                };
-                if LOCAL_NODE.name.ne(&node_name) {
-                    continue; // not this node
-                }
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
                     if let Err(e) =
