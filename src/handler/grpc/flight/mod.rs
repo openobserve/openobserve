@@ -304,7 +304,7 @@ impl Stream for FlightSenderStream {
                 log::error!(
                     "[trace_id {}] flight->search: stream error: {}, took: {} ms",
                     self.trace_id,
-                    e.to_string(),
+                    e,
                     self.start.elapsed().as_millis()
                 );
                 Poll::Ready(Some(Err(FlightError::Tonic(Status::internal(
