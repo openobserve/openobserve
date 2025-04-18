@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="pipelineObj.currentSelectedPipeline.name"
           :label="t('pipeline.pipelineName')"
-          style="border: 1px solid #eaeaea"
+          style="border: 1px solid #eaeaea; width: calc(30vw);"
           filled
-          dense
+          dense          
         />
       </div>
     </div>
