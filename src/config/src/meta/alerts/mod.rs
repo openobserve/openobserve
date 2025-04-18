@@ -238,6 +238,36 @@ pub enum ConditionList {
     EndCondition(Condition)
 }
 
+impl ConditionList {
+    /// Calculates the depth of the condition list tree
+    /// An EndCondition has depth 1
+    /// Other nodes have depth 1 + max depth of their children
+    pub fn depth(&self) -> usize {
+        match self {
+            ConditionList::OrNode { or } => {
+                let mut max_child_depth = 0;
+                for child in or {
+                    let child_depth = child.depth();
+                    max_child_depth = max_child_depth.max(child_depth);
+                }
+                max_child_depth + 1
+            },
+            ConditionList::AndNode { and } | ConditionList::LegacyConditions(and) => {
+                let mut max_child_depth = 0;
+                for child in and {
+                    let child_depth = child.depth();
+                    max_child_depth = max_child_depth.max(child_depth);
+                }
+                max_child_depth + 1
+            },
+            ConditionList::NotNode { not } => {
+                not.depth() + 1
+            },
+            ConditionList::EndCondition(_) => 1,
+        }
+    }
+}
+
 // Define a separate iterator struct for ConditionList
 pub struct ConditionListIterator {
     inner: Vec<ConditionList>,
