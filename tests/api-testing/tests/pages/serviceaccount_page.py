@@ -25,7 +25,7 @@ class ServiceAccountPage:
             "first_name": "Shyam",
             "last_name": "Panjiyar"
         }
-        print("Payload for service account creation:", payload)  # Log the payload
+        # print("Payload for service account creation:", payload)  # Log the payload
         response = session.post(
             f"{base_url}api/{org_id}/service_accounts", 
             json=payload, 
@@ -33,7 +33,7 @@ class ServiceAccountPage:
         )
         assert response.status_code == 200, f"Failed to create service account: {response.content.decode()}"
 
-        print(f"Service account created successfully: {response.json()}")
+        # print(f"Service account created successfully: {response.json()}")
 
         response_get = session.get(
             f"{base_url}api/{org_id}/service_accounts/{email_address}", 
@@ -45,7 +45,7 @@ class ServiceAccountPage:
 
         token = response_get.json()['token']
 
-        print(f"Token: {token}")
+        # print(f"Token: {token}")
 
         return token
 

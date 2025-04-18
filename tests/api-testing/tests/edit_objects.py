@@ -14,12 +14,12 @@ def edit_objects(session, base_url, user_email, user_password, org_id, stream_na
 
     
 
-        # Update templates
-        template_name_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}"
-        template_page.update_template_webhook(session, base_url, user_email, user_password, org_id, template_name_webhook)
+#         # Update templates
+#         template_name_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}"
+#         template_page.update_template_webhook(session, base_url, user_email, user_password, org_id, template_name_webhook)
 
-        template_name_email = f"template_email_{template_page.Unique_value_temp}_{i}"
-        template_page.update_template_email(session, base_url, user_email, user_password, org_id, template_name_email)
+#         template_name_email = f"template_email_{template_page.Unique_value_temp}_{i}"
+#         template_page.update_template_email(session, base_url, user_email, user_password, org_id, template_name_email)
 
         # Update destinations
         destination_name_webhook = f"destination_webhook_{destination_page.Unique_value_destination}_{i}"

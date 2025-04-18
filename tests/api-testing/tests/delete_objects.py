@@ -1,3 +1,11 @@
+import pytest
+import os
+import random
+from pathlib import Path
+import requests
+from requests.auth import HTTPBasicAuth
+from datetime import datetime, timezone, timedelta
+from pages.cipher_page import CipherPage
 from pages.template_page import TemplatePage
 from pages.destination_page import DestinationPage
 from pages.alert_page import AlertPage
@@ -37,6 +45,6 @@ def delete_objects(session, base_url, user_email, user_password, org_id, stream_
         template_name_webhook = f"template_webhook_{template_page.Unique_value_temp}_{i}"
         template_page.delete_template(session, base_url, user_email, user_password, org_id, template_name_webhook)
 
-        template_name_email = f"template_email_{template_page.Unique_value_temp}_{i}"
-        template_page.delete_template(session, base_url, user_email, user_password, org_id, template_name_email)
+#         template_name_email = f"template_email_{template_page.Unique_value_temp}_{i}"
+#         template_page.delete_template(session, base_url, user_email, user_password, org_id, template_name_email)
 

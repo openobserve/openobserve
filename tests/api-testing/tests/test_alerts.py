@@ -555,12 +555,3 @@ def test_e2e_createalertfloat(create_session, base_url):
     assert (
         resp_delete_template.status_code == 200
     ), f"Deleting this function, but got {resp_delete_template.status_code} {resp_delete_template.content}"
-
-
-
-
-
-
-
-
-
