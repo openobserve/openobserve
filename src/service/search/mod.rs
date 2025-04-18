@@ -194,14 +194,13 @@ pub async fn search(
         Err(e) => Err(Error::Message(e.to_string())),
     };
 
-    let search_role = "leader".to_string();
+    #[allow(unused_mut)]
+    let mut search_role = "leader".to_string();
 
     #[cfg(feature = "enterprise")]
-    let search_role = if get_o2_config().super_cluster.enabled {
-        "super".to_string()
-    } else {
-        search_role
-    };
+    if get_o2_config().super_cluster.enabled {
+        search_role = "super".to_string();
+    }
 
     log::info!(
         "{}",

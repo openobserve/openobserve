@@ -214,6 +214,7 @@ pub async fn search(
         &file_id_list_vec,
         start,
         file_list_took,
+        "leader".to_string(),
     )
     .await?;
     // add work_group
@@ -589,6 +590,7 @@ pub async fn check_work_group(
     file_id_list_vec: &[&FileId],
     start: std::time::Instant,
     file_list_took: usize, // the time took to get file list
+    search_role: String,
 ) -> Result<(
     usize,
     String,
@@ -672,7 +674,7 @@ pub async fn check_work_group(
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:check_work_group".to_string())
-                .search_role("leader".to_string())
+                .search_role(search_role)
                 .duration(took_wait)
                 .build()
         )
