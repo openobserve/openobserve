@@ -18,7 +18,7 @@ use std::{ops::ControlFlow, sync::Arc};
 use arrow_schema::FieldRef;
 use chrono::Duration;
 use config::{
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
+    ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         inverted_index::InvertedIndexOptimizeMode,
         search::SearchEventType,
@@ -181,9 +181,10 @@ impl Sql {
         // 4. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         statement.visit(&mut match_visitor);
+        let need_fst_fields = match_visitor.match_items.is_some();
 
         // 5. check if have full text search filed in stream
-        if stream_names.len() == 1 && match_visitor.match_items.is_some() {
+        if stream_names.len() == 1 && need_fst_fields {
             let schema = total_schemas.values().next().unwrap();
             let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
             let fts_fields = get_stream_setting_fts_fields(&stream_settings);
@@ -210,6 +211,7 @@ impl Sql {
                 query.quick_mode || cfg.limit.quick_mode_force_enabled,
                 cfg.limit.quick_mode_num_fields,
                 &search_event_type,
+                need_fst_fields,
             );
         } else {
             for (stream, schema) in total_schemas.iter() {
@@ -347,6 +349,7 @@ fn generate_select_star_schema(
     quick_mode: bool,
     quick_mode_num_fields: usize,
     search_event_type: &Option<SearchEventType>,
+    need_fst_fields: bool,
 ) -> HashMap<TableReference, Arc<SchemaCache>> {
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
@@ -359,7 +362,8 @@ fn generate_select_star_schema(
             // don't automatically skip _original for scheduled pipeline searches
             let skip_original_column = !has_original_column
                 && !matches!(search_event_type, Some(SearchEventType::DerivedStream))
-                && schema.contains_field(ORIGINAL_DATA_COL_NAME);
+                && (schema.contains_field(ORIGINAL_DATA_COL_NAME)
+                    || schema.contains_field(ALL_VALUES_COL_NAME));
             if quick_mode || skip_original_column {
                 let fields = if quick_mode {
                     let mut columns = columns.get(&name).cloned();
@@ -376,11 +380,17 @@ fn generate_select_star_schema(
                         columns,
                         &fts_fields,
                         skip_original_column,
+                        need_fst_fields,
                     )
                 } else {
                     // skip selecting "_original" column if `SELECT * ...`
                     let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
-                    fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
+                    if !need_fst_fields {
+                        fields.retain(|field| {
+                            field.name() != ORIGINAL_DATA_COL_NAME
+                                && field.name() != ALL_VALUES_COL_NAME
+                        });
+                    }
                     fields
                 };
                 let schema = Arc::new(SchemaCache::new(
@@ -430,6 +440,7 @@ fn generate_quick_mode_fields(
     columns: Option<HashSet<String>>,
     fts_fields: &[String],
     skip_original_column: bool,
+    need_fst_fields: bool,
 ) -> Vec<Arc<arrow_schema::Field>> {
     let cfg = get_config();
     let strategy = cfg.limit.quick_mode_strategy.to_lowercase();
@@ -466,7 +477,20 @@ fn generate_quick_mode_fields(
         .map(|f| f.name().to_string())
         .collect::<HashSet<_>>();
 
-    // check _timestamp
+    // check _all column
+    if cfg.common.feature_query_exclude_all {
+        if fields_name.contains(&cfg.common.column_all) {
+            fields.retain(|field| field.name().ne(&cfg.common.column_all));
+        }
+        if fields_name.contains(ORIGINAL_DATA_COL_NAME) {
+            fields.retain(|field| field.name().ne(ORIGINAL_DATA_COL_NAME));
+        }
+        if fields_name.contains(ALL_VALUES_COL_NAME) {
+            fields.retain(|field| field.name().ne(ALL_VALUES_COL_NAME));
+        }
+    }
+
+    // check _timestamp column
     if !fields_name.contains(TIMESTAMP_COL_NAME) {
         if let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME) {
             fields.push(Arc::new(field.clone()));
@@ -485,14 +509,19 @@ fn generate_quick_mode_fields(
         }
     }
     // check fts fields
-    for field in fts_fields {
-        if !fields_name.contains(field) {
-            if let Ok(field) = schema.field_with_name(field) {
-                fields.push(Arc::new(field.clone()));
-                fields_name.insert(field.to_string());
+    if need_fst_fields {
+        for field in fts_fields {
+            if !fields_name.contains(field) {
+                if let Ok(field) = schema.field_with_name(field) {
+                    fields.push(Arc::new(field.clone()));
+                    fields_name.insert(field.to_string());
+                }
             }
         }
+    } else if fields_name.contains(ALL_VALUES_COL_NAME) {
+        fields.retain(|field| field.name() != ALL_VALUES_COL_NAME);
     }
+
     // check quick mode fields
     for field in config::QUICK_MODEL_FIELDS.iter() {
         if !fields_name.contains(field) {
@@ -502,7 +531,7 @@ fn generate_quick_mode_fields(
             }
         }
     }
-    if skip_original_column && fields_name.contains(ORIGINAL_DATA_COL_NAME) {
+    if !need_fst_fields && skip_original_column && fields_name.contains(ORIGINAL_DATA_COL_NAME) {
         fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
     }
     fields
@@ -1624,7 +1653,8 @@ fn o2_id_is_needed(
     !matches!(search_event_type, Some(SearchEventType::DerivedStream))
         && schemas.values().any(|schema| {
             let stream_setting = unwrap_stream_settings(schema.schema());
-            stream_setting.is_some_and(|setting| setting.store_original_data)
+            stream_setting
+                .is_some_and(|setting| setting.store_original_data || setting.index_original_data)
         })
 }
 

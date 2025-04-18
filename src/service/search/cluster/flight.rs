@@ -63,7 +63,7 @@ use crate::{
                 rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
             },
             exec::{prepare_datafusion_context, register_udf},
-            optimizer::generate_optimizer_rules,
+            optimizer::{generate_analyzer_rules, generate_optimizer_rules},
             table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
         },
         generate_filter_from_equal_items,
@@ -820,9 +820,11 @@ pub async fn generate_context(
     sql: &Arc<Sql>,
     target_partitions: usize,
 ) -> Result<SessionContext> {
+    let analyzer_rules = generate_analyzer_rules(sql);
     let optimizer_rules = generate_optimizer_rules(sql);
     let mut ctx = prepare_datafusion_context(
         req.work_group.clone(),
+        analyzer_rules,
         optimizer_rules,
         sql.sorted_by_time,
         target_partitions,
