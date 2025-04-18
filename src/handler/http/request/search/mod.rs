@@ -345,7 +345,10 @@ pub async fn search(
     .instrument(http_span)
     .await;
     match res {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Ok(mut res) => {
+            res.set_took(start.elapsed().as_millis() as usize);
+            Ok(HttpResponse::Ok().json(res))
+        }
         Err(err) => {
             let search_type = req
                 .search_type
@@ -1206,13 +1209,7 @@ async fn values_v1(
         cached_ratio: Some(resp.cached_ratio),
         search_type: Some(SearchEventType::Values),
         trace_id: Some(trace_id),
-        took_wait_in_queue: if resp.took_detail.is_some() {
-            let resp_took = resp.took_detail.as_ref().unwrap();
-            // Consider only the cluster wait queue duration
-            Some(resp_took.cluster_wait_queue)
-        } else {
-            None
-        },
+        took_wait_in_queue: Some(resp.took_detail.wait_in_queue),
         work_group: get_work_group(work_group_set),
         ..Default::default()
     };
@@ -1369,11 +1366,9 @@ pub async fn search_partition(
         (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json ! ({
             "took": 40,
             "took_detail": {
-                "total": 0,
+                "total": 40,
                 "idx_took": 0,
-                "wait_queue": 0,
-                "cluster_total": 40,
-                "cluster_wait_queue": 0
+                "wait_in_queue": 0
             },
             "hits": [
                 {
@@ -1509,12 +1504,7 @@ pub async fn search_history(
 
     // prepare usage metrics
     let time_taken = start.elapsed().as_secs_f64();
-    let took_wait_in_queue = if search_res.took_detail.is_some() {
-        let resp_took = search_res.took_detail.as_ref().unwrap();
-        Some(resp_took.cluster_wait_queue)
-    } else {
-        None
-    };
+    let took_wait_in_queue = Some(search_res.took_detail.wait_in_queue);
     let req_stats = RequestStats {
         records: search_res.hits.len() as i64,
         response_time: time_taken,

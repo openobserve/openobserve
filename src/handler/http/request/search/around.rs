@@ -229,17 +229,9 @@ pub(crate) async fn around(
         max_ts: Some(around_end_time),
         cached_ratio: Some(resp.cached_ratio),
         trace_id: Some(trace_id.to_string()),
-        took_wait_in_queue: match (
-            resp_forward.took_detail.as_ref(),
-            resp_backward.took_detail.as_ref(),
-        ) {
-            (Some(forward_took), Some(backward_took)) => {
-                Some(forward_took.cluster_wait_queue + backward_took.cluster_wait_queue)
-            }
-            (Some(forward_took), None) => Some(forward_took.cluster_wait_queue),
-            (None, Some(backward_took)) => Some(backward_took.cluster_wait_queue),
-            _ => None,
-        },
+        took_wait_in_queue: Some(
+            resp_forward.took_detail.wait_in_queue + resp_backward.took_detail.wait_in_queue,
+        ),
         work_group: get_work_group(vec![
             resp_forward.work_group.clone(),
             resp_backward.work_group.clone(),

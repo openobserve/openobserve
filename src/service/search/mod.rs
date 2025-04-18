@@ -279,13 +279,7 @@ pub async fn search(
                     search_type,
                     search_event_context,
                     trace_id: Some(trace_id),
-                    took_wait_in_queue: if res.took_detail.is_some() {
-                        let resp_took = res.took_detail.as_ref().unwrap();
-                        // Consider only the cluster wait queue duration
-                        Some(resp_took.cluster_wait_queue)
-                    } else {
-                        None
-                    },
+                    took_wait_in_queue: Some(res.took_detail.wait_in_queue),
                     work_group: _work_group,
                     result_cache_ratio: Some(res.result_cache_ratio),
                     ..Default::default()

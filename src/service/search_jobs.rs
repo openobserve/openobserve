@@ -227,7 +227,7 @@ async fn run_partition_job(
     }
     let mut result = res.unwrap();
     let took = start.elapsed().as_millis();
-    result.set_local_took(took as usize);
+    result.set_took(took as usize);
 
     // 4. write the result to s3
     let hits = result.total;
@@ -398,15 +398,7 @@ pub async fn merge_response(
     let mut resp = response.remove(0);
     for r in response {
         resp.took += r.took;
-        resp.took_detail = match (resp.took_detail, r.took_detail.as_ref()) {
-            (Some(mut a), Some(b)) => {
-                a.add(b);
-                Some(a)
-            }
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b.clone()),
-            (None, None) => None,
-        };
+        resp.took_detail.add(&r.took_detail);
         resp.hits.extend(r.hits);
         resp.total += r.total;
         resp.file_count += r.file_count;

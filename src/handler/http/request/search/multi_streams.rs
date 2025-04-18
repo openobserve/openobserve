@@ -326,12 +326,13 @@ pub async fn search_multi(
 
         let trace_id = trace_id.clone();
         // do search
-        let search_res = SearchService::search(
+        let search_res = SearchService::cache::search(
             &trace_id,
             &org_id,
             stream_type,
             Some(user_id.to_string()),
             &req,
+            range_error.clone(),
         )
         .instrument(http_span.clone())
         .await;
@@ -360,7 +361,7 @@ pub async fn search_multi(
                     ])
                     .inc();
                 res.set_trace_id(trace_id);
-                res.set_local_took(start.elapsed().as_millis() as usize);
+                res.set_took(start.elapsed().as_millis() as usize);
 
                 let req_stats = RequestStats {
                     records: res.hits.len() as i64,
@@ -374,13 +375,7 @@ pub async fn search_multi(
                     search_type,
                     search_event_context: search_event_context.clone(),
                     trace_id: Some(res.trace_id.clone()),
-                    took_wait_in_queue: if res.took_detail.is_some() {
-                        let resp_took = res.took_detail.as_ref().unwrap();
-                        // Consider only the cluster wait queue duration
-                        Some(resp_took.cluster_wait_queue)
-                    } else {
-                        None
-                    },
+                    took_wait_in_queue: Some(res.took_detail.wait_in_queue),
                     work_group: res.work_group,
                     ..Default::default()
                 };

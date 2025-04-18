@@ -176,8 +176,7 @@ impl Request {
 pub struct Response {
     pub took: usize,
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub took_detail: Option<ResponseTook>,
+    pub took_detail: ResponseTook,
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub columns: Vec<String>,
@@ -221,39 +220,26 @@ pub struct Response {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct ResponseTook {
-    pub total: usize,
+    pub cache_took: usize,
+    pub wait_in_queue: usize,
     pub idx_took: usize,
-    pub wait_queue: usize,
-    pub cluster_total: usize,
-    pub cluster_wait_queue: usize,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub nodes: Vec<ResponseNodeTook>,
+    pub search_took: usize,
 }
 
 impl ResponseTook {
     pub fn add(&mut self, other: &ResponseTook) {
-        self.total += other.total;
+        self.cache_took += other.cache_took;
+        self.wait_in_queue += other.wait_in_queue;
         self.idx_took += other.idx_took;
-        self.wait_queue += other.wait_queue;
-        self.cluster_total += other.cluster_total;
-        self.cluster_wait_queue += other.cluster_wait_queue;
-        self.nodes.extend(other.nodes.clone());
+        self.search_took += other.search_took;
     }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
-pub struct ResponseNodeTook {
-    pub node: String,
-    pub is_ingester: bool,
-    pub took: usize,
 }
 
 impl Response {
     pub fn new(from: i64, size: i64) -> Self {
         Response {
             took: 0,
-            took_detail: None,
+            took_detail: ResponseTook::default(),
             total: 0,
             from,
             size,
@@ -293,7 +279,6 @@ impl Response {
             .take(size as usize)
             .cloned()
             .collect();
-        // self.total = self.hits.len();
     }
 
     pub fn add_hit(&mut self, hit: &json::Value) {
@@ -301,28 +286,25 @@ impl Response {
         self.total += 1;
     }
 
-    pub fn set_cluster_took(&mut self, val: usize, wait: usize) {
-        self.took = val - wait;
-        self.took_detail = Some(ResponseTook {
-            total: 0,
-            idx_took: 0,
-            wait_queue: 0,
-            cluster_total: val,
-            cluster_wait_queue: wait,
-            nodes: Vec::new(),
-        });
+    // set the total took time of the search request, it includes everything.
+    pub fn set_took(&mut self, val: usize) {
+        self.took = val;
     }
 
-    pub fn set_local_took(&mut self, val: usize) {
-        if self.took_detail.is_some() {
-            self.took_detail.as_mut().unwrap().total = val;
-        }
+    pub fn set_cache_took(&mut self, val: usize) {
+        self.took_detail.cache_took = val;
+    }
+
+    pub fn set_wait_in_queue(&mut self, val: usize) {
+        self.took_detail.wait_in_queue = val;
     }
 
     pub fn set_idx_took(&mut self, val: usize) {
-        if self.took_detail.is_some() {
-            self.took_detail.as_mut().unwrap().idx_took = val;
-        }
+        self.took_detail.idx_took = val;
+    }
+
+    pub fn set_search_took(&mut self, val: usize) {
+        self.took_detail.search_took = val;
     }
 
     pub fn set_total(&mut self, val: usize) {

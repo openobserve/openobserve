@@ -265,10 +265,14 @@ pub async fn search(
             .unwrap_or_default()
     };
 
+    let took_time = start.elapsed().as_millis() as usize;
+
     result.set_total(total);
     result.set_histogram_interval(sql.histogram_interval);
     result.set_partial(is_partial, partial_err);
-    result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
+    result.set_took(took_time);
+    result.set_wait_in_queue(took_wait);
+    result.set_search_took(took_time - took_wait);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
     result.set_scan_records(scan_stats.records as usize);
