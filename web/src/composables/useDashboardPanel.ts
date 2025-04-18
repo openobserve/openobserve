@@ -1354,23 +1354,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     );
   };
 
-  const removeXAxisItem = (name: string) => {
-    // HERE NEED CHANGES
-    const index = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.x.findIndex((it: any) => it.column == name);
-    if (index >= 0) {
+  const removeXAxisItemByIndex = (index: number) => {
+      if (index >= 0) {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.splice(index, 1);
     }
   };
 
-  const removeBreakdownItem = (name: string) => {
-    // HERE NEED CHANGES
-    const index = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.breakdown.findIndex((it: any) => it.column == name);
+  const removeBreakdownItemByIndex = (index: number) => {
     if (index >= 0) {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1378,11 +1370,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
-  const removeYAxisItem = (name: string) => {
-    // HERE NEED CHANGES
-    const index = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.y.findIndex((it: any) => it.column == name);
+  const removeYAxisItemByIndex = (index: number) => {
     if (index >= 0) {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1390,11 +1378,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
-  const removeZAxisItem = (name: string) => {
-    // HERE NEED CHANGES
-    const index = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.z.findIndex((it: any) => it.column == name);
+  const removeZAxisItemByIndex = (index: number) => {
     if (index >= 0) {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -3372,10 +3356,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     addSource,
     addTarget,
     addValue,
-    removeXAxisItem,
-    removeYAxisItem,
-    removeZAxisItem,
-    removeBreakdownItem,
+    removeXAxisItemByIndex,
+    removeYAxisItemByIndex,
+    removeZAxisItemByIndex,
+    removeBreakdownItemByIndex,
     removeFilterItem,
     removeLatitude,
     removeLongitude,
