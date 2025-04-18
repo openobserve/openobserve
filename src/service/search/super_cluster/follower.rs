@@ -154,6 +154,7 @@ pub async fn search(
     let mut scan_stats = ScanStats {
         files: file_id_list_vec.len() as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
+        file_list_took: file_id_list_took as i64,
         ..Default::default()
     };
 
