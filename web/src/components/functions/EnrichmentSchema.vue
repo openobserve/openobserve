@@ -161,13 +161,9 @@
     <script lang="ts">
     // @ts-nocheck
     import {
-    computed,
     defineComponent,
-    onBeforeMount,
-    reactive,
     ref,
     onMounted,
-    watch,
     } from "vue";
     import { useI18n } from "vue-i18n";
     import { useStore } from "vuex";
@@ -249,7 +245,7 @@
         const schemaData = ref(defaultStreamData);
         const isCloud = config.isCloud;
         const resultTotal = ref<number>(0);
-        const selectedPerPage = ref<number>(10);
+        const selectedPerPage = ref<number>(20);
         const filterField = ref('');
         const perPageOptions : any = [
             { label: "5", value: 5 },
@@ -277,8 +273,7 @@
 
 
         const filterFieldFn = (rows: any, terms: any) => {
-            let [field, fieldType] = terms.split("@");
-            return rows.filter((row: any) => row.name.toLowerCase().includes(field));
+            return rows.filter((row: any) => row.name.toLowerCase().includes(terms));
         }
         const pagination: any = ref({
             rowsPerPage: 20,

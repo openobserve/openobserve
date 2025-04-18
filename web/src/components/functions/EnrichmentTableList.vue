@@ -270,14 +270,15 @@ export default defineComponent({
 
       getStreams("enrichment_tables", false)
         .then((res: any) => {
-          let doc_num = "";
-          let storage_size = "";
-          let compressed_size = "";
-          let original_storage_size = "";
-          let original_compressed_size = "";
+
           let counter = 1;
           resultTotal.value = res.list.length;
           jsTransforms.value = res.list.map((data: any) => {
+            let doc_num = "";
+            let storage_size = "";
+            let compressed_size = "";
+            let original_storage_size = "";
+            let original_compressed_size = "";
 
             if (data.stats) {
               doc_num = data.stats.doc_num;
