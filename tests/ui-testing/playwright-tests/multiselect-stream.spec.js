@@ -134,7 +134,7 @@ async function multistreamselect(page) {
 
   test("should add a function and display it in streams", async ({ page }) => {
 await multistreamselect(page);
-await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+await page.locator('#fnEditor').locator('.inputarea').fill('.a=2');
 await page.waitForTimeout(1000);
     await applyQueryButton(page);
     await page

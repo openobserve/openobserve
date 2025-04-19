@@ -405,7 +405,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page
       .locator('[data-test="dashboard-vrl-function-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".vrl=100");
 
     await page.waitForTimeout(2000);
@@ -484,7 +484,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page
       .locator('[data-test="dashboard-vrl-function-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".vrl=100");
 
     await page.locator('[data-test="selected-chart-table-item"] img').click();

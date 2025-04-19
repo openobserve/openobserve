@@ -1,6 +1,6 @@
 {
-  "include": ["env.d.ts", "src/**/*", "src/**/*.vue", "src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["src/**/__tests__/*", "node_modules", "dist"],
+  "include": ["env.d.ts", "src/**/*", "src/**/*.vue", "src/**/*.{ts,tsx,js}"],
+  "exclude": ["src/**/__tests__/*", "node_modules", "dist", "src/**/*.spec.{ts,js}"],
   "compilerOptions": {
     "composite": true,
     "baseUrl": ".",

@@ -1,0 +1,50 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Streams > Should match previous table snapshot 1`] = `
+"<table class="q-table">
+  <thead>
+    <tr>
+      <th class="q-table--col-auto-width">
+        <div data-v-d611dbca="" class="q-checkbox cursor-pointer no-outline row inline no-wrap items-center" tabindex="0" role="checkbox" aria-checked="false">
+          <div class="q-checkbox__inner relative-position non-selectable q-checkbox__inner--falsy" style="font-size: 35px;" aria-hidden="true"><input class="hidden q-checkbox__native absolute q-ma-none q-pa-none" type="checkbox">
+            <div class="q-checkbox__bg absolute"><svg class="q-checkbox__svg fit absolute-full" viewBox="0 0 24 24">
+                <path class="q-checkbox__truthy" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59"></path>
+                <path class="q-checkbox__indet" d="M4,14H20V10H4"></path>
+              </svg></div>
+          </div><span class="no-outline" tabindex="-1"></span>
+        </div>
+      </th>
+      <th class="text-left">#</th>
+      <th class="text-left sortable sorted ">Name<i class="q-icon notranslate material-icons q-table__sort-icon q-table__sort-icon--left" aria-hidden="true">arrow_upward</i></th>
+      <th class="text-left">Type</th>
+      <th class="text-left sortable">Events<i class="q-icon notranslate material-icons q-table__sort-icon q-table__sort-icon--left" aria-hidden="true">arrow_upward</i></th>
+      <th class="text-left sortable">Ingested Data<i class="q-icon notranslate material-icons q-table__sort-icon q-table__sort-icon--left" aria-hidden="true">arrow_upward</i></th>
+      <th class="text-left">Compressed Size</th>
+      <th class="text-left sortable">Index Size<i class="q-icon notranslate material-icons q-table__sort-icon q-table__sort-icon--left" aria-hidden="true">arrow_upward</i></th>
+      <th class="text-center">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="">
+      <td class="q-table--col-auto-width">
+        <div data-v-d611dbca="" class="q-checkbox cursor-pointer no-outline row inline no-wrap items-center" tabindex="0" role="checkbox" aria-checked="false">
+          <div class="q-checkbox__inner relative-position non-selectable q-checkbox__inner--falsy" style="font-size: 35px;" aria-hidden="true"><input class="hidden q-checkbox__native absolute q-ma-none q-pa-none" type="checkbox">
+            <div class="q-checkbox__bg absolute"><svg class="q-checkbox__svg fit absolute-full" viewBox="0 0 24 24">
+                <path class="q-checkbox__truthy" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59"></path>
+                <path class="q-checkbox__indet" d="M4,14H20V10H4"></path>
+              </svg></div>
+          </div><span class="no-outline" tabindex="-1"></span>
+        </div>
+      </td>
+      <td class="text-left">01</td>
+      <td class="text-left">k8s_json</td>
+      <td class="text-left">logs</td>
+      <td class="text-left">400</td>
+      <td class="text-left">0.74 MB</td>
+      <td class="text-left">0.03 MB</td>
+      <td class="text-left">NaN MB</td>
+      <td data-v-d611dbca="" class="q-td text-center"><button data-v-d611dbca="" class="q-btn q-btn-item non-selectable no-outline q-btn--flat q-btn--round q-btn--actionable q-focusable q-hoverable q-ml-xs" style="font-size: 10px; padding: 8px; min-width: 0; min-height: 0;" tabindex="0" type="button" title="Explore"><span class="q-focus-helper"></span><span class="q-btn__content text-center col items-center q-anchor--skip justify-center row"><i class="q-icon notranslate material-icons" aria-hidden="true" role="img">search</i></span></button><button data-v-d611dbca="" class="q-btn q-btn-item non-selectable no-outline q-btn--flat q-btn--round q-btn--actionable q-focusable q-hoverable q-ml-xs" style="font-size: 10px; padding: 8px; min-width: 0; min-height: 0;" tabindex="0" type="button" title="Stream Detail"><span class="q-focus-helper"></span><span class="q-btn__content text-center col items-center q-anchor--skip justify-center row"><i class="q-icon notranslate material-icons" aria-hidden="true" role="img">list_alt</i></span></button><button data-v-d611dbca="" class="q-btn q-btn-item non-selectable no-outline q-btn--flat q-btn--round q-btn--actionable q-focusable q-hoverable q-ml-xs" style="font-size: 10px; padding: 8px; min-width: 0; min-height: 0;" tabindex="0" type="button" title="Delete"><span class="q-focus-helper"></span><span class="q-btn__content text-center col items-center q-anchor--skip justify-center row"><i class="q-icon" aria-hidden="true" role="img"><svg viewBox="0 0 24 24"><path style="fill: none;" d="M0 0h24v24H0V0z"></path><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"></path></svg></i></span></button></td>
+    </tr>
+  </tbody>
+</table>"
+`;
