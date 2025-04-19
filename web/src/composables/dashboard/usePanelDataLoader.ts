@@ -339,8 +339,13 @@ export const usePanelDataLoader = (
     endISOTimestamp: string,
     histogramInterval: string | null,
   ) => {
+    const sql = store.state.zoConfig.sql_base64_enabled
+      ? b64EncodeUnicode(
+          await changeHistogramInterval(query, histogramInterval ?? null),
+        )
+      : await changeHistogramInterval(query, histogramInterval ?? null);
     return {
-      sql: await changeHistogramInterval(query, histogramInterval ?? null),
+      sql,
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
@@ -370,7 +375,14 @@ export const usePanelDataLoader = (
           queryService.partition({
             org_identifier: store.state.selectedOrganization.identifier,
             query: {
-              sql: query,
+              sql: store.state.zoConfig.sql_base64_enabled
+                ? b64EncodeUnicode(query)
+                : query,
+              // pass encodig if enabled,
+              // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+              ...(store.state.zoConfig.sql_base64_enabled
+                ? { encoding: "base64" }
+                : {}),
               query_fn: it.vrlFunctionQuery
                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                 : null,
@@ -658,6 +670,11 @@ export const usePanelDataLoader = (
             payload.queryReq.endISOTimestamp,
             null,
           ),
+          // pass encodig if enabled,
+          // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
         },
         stream_type: payload.pageType,
         search_type: searchType.value ?? "dashboards",
@@ -739,6 +756,11 @@ export const usePanelDataLoader = (
           startISOTimestamp,
           endISOTimestamp,
           currentQueryIndex,
+          // pass encodig if enabled,
+          // make sure that encoding: null is not being passed, that's why used object extraction logic
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
         },
         type: "histogram",
         isPagination: false,
