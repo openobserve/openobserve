@@ -638,6 +638,7 @@ pub async fn search_partition(
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
+                trace_id,
                 &sql.org_id,
                 stream_type,
                 &stream_name,

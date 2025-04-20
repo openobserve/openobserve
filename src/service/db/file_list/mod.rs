@@ -27,7 +27,6 @@ use o2_enterprise::enterprise::{
     super_cluster::stream::client::super_cluster_cache_stats,
 };
 use once_cell::sync::Lazy;
-
 pub mod broadcast;
 pub mod local;
 
@@ -134,9 +133,10 @@ async fn single_cache_stats() -> Result<()> {
     for org_id in orgs {
         let ret = infra::file_list::get_stream_stats(&org_id, None, None).await;
         if ret.is_err() {
-            log::error!("Load stream stats error: {}", ret.err().unwrap());
+            log::error!("Load stream stats from db  error: {}", ret.err().unwrap());
             continue;
         }
+
         for (stream, stats) in ret.unwrap() {
             let columns = stream.split('/').collect::<Vec<&str>>();
             let org_id = columns[0];

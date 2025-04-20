@@ -134,6 +134,9 @@ pub async fn merge_parquet_files(
             "SELECT MIN({}) AS {}, SUM(count) as count, {} FROM tbl GROUP BY {} ORDER BY {} DESC",
             TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, fields_str, fields_str, TIMESTAMP_COL_NAME
         )
+    } else if stream_type == StreamType::Filelist {
+        // for file list we do not have timestamp, so we instead sort by min ts of entries
+        "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
     } else {
         format!("SELECT * FROM tbl ORDER BY {} DESC", TIMESTAMP_COL_NAME)
     };

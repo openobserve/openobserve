@@ -59,6 +59,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_remove(&self, files: &[String]) -> Result<()>;
+    async fn batch_remove_by_ids(&self, ids: &[i64]) -> Result<()>;
     async fn batch_add_deleted(
         &self,
         org_id: &str,
@@ -170,6 +171,16 @@ pub trait FileList: Sync + Send + 'static {
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
+    async fn get_entries_in_range(
+        &self,
+        org: &str,
+        stream: Option<&str>,
+        start_time: i64,
+        end_time: i64,
+        min_id: Option<i64>,
+    ) -> Result<Vec<FileRecord>>;
+    async fn get_pending_dump_jobs(&self) -> Result<Vec<(i64, String, String, i64)>>;
+    async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -208,6 +219,11 @@ pub async fn batch_add_history(files: &[FileKey]) -> Result<()> {
 #[inline]
 pub async fn batch_remove(files: &[String]) -> Result<()> {
     CLIENT.batch_remove(files).await
+}
+
+#[inline]
+pub async fn batch_remove_by_ids(ids: &[i64]) -> Result<()> {
+    CLIENT.batch_remove_by_ids(ids).await
 }
 
 #[inline]
@@ -464,6 +480,29 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
     CLIENT.clean_done_jobs(before_date).await
 }
 
+#[inline]
+pub async fn get_entries_in_range(
+    org: &str,
+    stream: Option<&str>,
+    start_time: i64,
+    end_time: i64,
+    min_id: Option<i64>,
+) -> Result<Vec<FileRecord>> {
+    CLIENT
+        .get_entries_in_range(org, stream, start_time, end_time, min_id)
+        .await
+}
+
+#[inline]
+pub async fn get_pending_dump_jobs() -> Result<Vec<(i64, String, String, i64)>> {
+    CLIENT.get_pending_dump_jobs().await
+}
+
+#[inline]
+pub async fn set_job_dumped_status(id: i64, dumped: bool) -> Result<()> {
+    CLIENT.set_job_dumped_status(id, dumped).await
+}
+
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
         let cfg = config::get_config();
@@ -499,7 +538,7 @@ fn validate_time_range(time_range: Option<(i64, i64)>) -> Result<()> {
     Ok(())
 }
 
-fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
+pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
     let ts = super::schema::unwrap_partition_time_level(None, stream_type).duration();
     if ts > 0 {
         time_end + second_micros(ts)
@@ -512,6 +551,8 @@ fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
 pub struct FileRecord {
     #[sqlx(default)]
     pub id: i64,
+    #[sqlx(default)]
+    pub org: String,
     #[sqlx(default)]
     pub stream: String,
     pub date: String,
