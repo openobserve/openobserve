@@ -304,35 +304,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn-dropdown>
       </q-bar>
     </div>
-    <PanelSchemaRenderer
-      :panelSchema="props.data"
-      :selectedTimeObj="props.selectedTimeDate"
-      :width="props.width"
-      :height="props.height"
-      :variablesData="props.variablesData"
-      :forceLoad="props.forceLoad"
-      :searchType="searchType"
-      :dashboard-id="props.dashboardId"
-      :folder-id="props.folderId"
-      :report-id="props.reportId"
-      @loading-state-change="handleLoadingStateChange"
-      @metadata-update="metaDataValue"
-      @limit-number-of-series-warning-message-update="
-        handleLimitNumberOfSeriesWarningMessageUpdate
-      "
-      @result-metadata-update="handleResultMetadataUpdate"
-      @last-triggered-at-update="handleLastTriggeredAtUpdate"
-      @is-cached-data-differ-with-current-time-range-update="
-        handleIsCachedDataDifferWithCurrentTimeRangeUpdate
-      "
-      @updated:data-zoom="$emit('updated:data-zoom', $event)"
-      @update:initial-variable-values="
-        (...args) => $emit('update:initial-variable-values', ...args)
-      "
-      @error="onError"
-      ref="PanleSchemaRendererRef"
-      :allowAnnotationsAdd="true"
-    ></PanelSchemaRenderer>
+    <div class="panel-content">
+      <PanelSchemaRenderer
+        :panelSchema="props.data"
+        :selectedTimeObj="props.selectedTimeDate"
+        :width="props.width"
+        :height="props.height"
+        :variablesData="props.variablesData"
+        :forceLoad="props.forceLoad"
+        :searchType="searchType"
+        :dashboard-id="props.dashboardId"
+        :folder-id="props.folderId"
+        :report-id="props.reportId"
+        @loading-state-change="handleLoadingStateChange"
+        @metadata-update="metaDataValue"
+        @limit-number-of-series-warning-message-update="
+          handleLimitNumberOfSeriesWarningMessageUpdate
+        "
+        @result-metadata-update="handleResultMetadataUpdate"
+        @last-triggered-at-update="handleLastTriggeredAtUpdate"
+        @is-cached-data-differ-with-current-time-range-update="
+          handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+        "
+        @updated:data-zoom="$emit('updated:data-zoom', $event)"
+        @update:initial-variable-values="
+          (...args) => $emit('update:initial-variable-values', ...args)
+        "
+        @error="onError"
+        ref="PanleSchemaRendererRef"
+        :allowAnnotationsAdd="true"
+      />
+    </div>
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
     </q-dialog>
@@ -383,6 +385,8 @@ import { getFunctionErrorMessage } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
+import { useVariablesComposable } from "@/composables/dashboard/useVariablesComposable";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -400,27 +404,28 @@ export default defineComponent({
     "update:initial-variable-values",
     "onEditLayout",
   ],
-  props: [
-    "data",
-    "selectedTimeDate",
-    "viewOnly",
-    "width",
-    "height",
-    "variablesData",
-    "dashboardId",
-    "metaData",
-    "forceLoad",
-    "searchType",
-    "folderId",
-    "reportId",
-    "currentVariablesData",
-  ],
+  props: {
+    data: { type: Object, required: true },
+    selectedTimeDate: { type: Object, required: true },
+    viewOnly: { type: Boolean, default: false },
+    width: { type: Number, required: true },
+    height: { type: Number, required: true },
+    variablesData: { type: Object, required: true },
+    dashboardId: { type: String, required: true },
+    forceLoad: { type: Boolean, default: false },
+    searchType: { type: String, default: null },
+    folderId: { type: String, required: true },
+    reportId: { type: String, required: true },
+    currentVariablesData: { type: Object, required: true },
+    initialVariableValues: { type: Object, default: () => ({ value: {} }) },
+  },
   components: {
     PanelSchemaRenderer,
     QueryInspector,
     ConfirmDialog,
     SinglePanelMove,
     RelativeTime,
+    VariablesValueSelector,
   },
   setup(props, { emit }) {
     const store = useStore();
@@ -699,8 +704,8 @@ export default defineComponent({
 
     const isPanelLoading = ref(false);
 
-    const handleLoadingStateChange = (isLoading: any) => {
-      isPanelLoading.value = isLoading;
+    const handleLoadingStateChange = (isLoadingState: boolean) => {
+      isPanelLoading.value = isLoadingState;
     };
 
     const onRefreshPanel = async () => {
@@ -776,6 +781,27 @@ export default defineComponent({
       }
     };
 
+    const variablesData = ref({});
+    const currentVariablesDataRef = ref({});
+
+    const { setPanelLoadingStatus, addSearchRequestTraceIds } =
+      useVariablesComposable({
+        scope: "panels",
+        panelId: props.data.id,
+      });
+
+    // Track panel loading state
+    const isLoading = ref(false);
+
+    watch(isLoading, (newValue) => {
+      setPanelLoadingStatus(props.data.id, newValue);
+    });
+
+    // When making search requests, track the trace IDs
+    const trackSearchRequest = (traceIds: string[]) => {
+      addSearchRequestTraceIds(props.data.id, traceIds);
+    };
+
     return {
       props,
       onEditPanel,
@@ -810,6 +836,10 @@ export default defineComponent({
       handleLoadingStateChange,
       limitNumberOfSeriesWarningMessage,
       handleLimitNumberOfSeriesWarningMessageUpdate,
+      isLoading,
+      trackSearchRequest,
+      variablesData,
+      currentVariablesDataRef,
     };
   },
   methods: {
@@ -836,6 +866,14 @@ export default defineComponent({
 <style lang="scss" scoped>
 .panelcontainer {
   height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-content {
+  flex: 1;
+  overflow: auto;
+  position: relative;
 }
 
 .panelHeader {

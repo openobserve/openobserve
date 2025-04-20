@@ -30,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
       :selectedTimeDate="currentTimeObj['__global']"
       :initialVariableValues="initialVariableValues"
+      :currentTabId="null"
+      :currentPanelId="null"
       @variablesData="variablesDataUpdated"
       ref="variablesValueSelectorRef"
     />
@@ -40,6 +42,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :viewOnly="viewOnly"
       @refresh="refreshDashboard"
     />
+    <div v-if="showTabs && selectedTabId !== null">
+      <VariablesValueSelector
+        :variablesConfig="dashboardData?.variables"
+        :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
+        :selectedTimeDate="
+          currentTimeObj[selectedTabId] || currentTimeObj['__global']
+        "
+        :initialVariableValues="initialVariableValues"
+        :currentTabId="selectedTabId"
+        :currentPanelId="null"
+        @variablesData="variablesDataUpdated"
+      />
+    </div>
     <slot name="before_panels" />
     <div class="displayDiv">
       <div
@@ -110,6 +125,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           drag-allow-from=".drag-allow"
         >
           <div style="height: 100%">
+            <VariablesValueSelector
+              v-if="item.id"
+              :variablesConfig="dashboardData?.variables"
+              :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
+              :selectedTimeDate="
+                currentTimeObj[item.id] || currentTimeObj['__global']
+              "
+              :initialVariableValues="initialVariableValues"
+              :currentTabId="selectedTabId"
+              :currentPanelId="item.id"
+              @variablesData="variablesDataUpdated"
+            />
             <PanelContainer
               @onDeletePanel="onDeletePanel"
               @onViewPanel="onViewPanel"
@@ -393,8 +420,15 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       try {
+        // Merge the new data with existing variables data
+        const updatedData = {
+          ...variablesData.value,
+          ...data,
+        };
+
         // update the variables data
-        variablesData.value = data;
+        variablesData.value = updatedData;
+
         if (needsVariablesAutoUpdate) {
           // check if the length is > 0
           if (checkIfVariablesAreLoaded(variablesData.value)) {

@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    v-if="variablesData.values?.length > 0"
+    v-if="filteredVariables.length > 0"
     :key="variablesData.isVariablesLoading"
     class="flex q-mt-xs q-ml-xs"
   >
     <div
-      v-for="(item, index) in variablesData.values"
+      v-for="(item, index) in filteredVariables"
       :key="
         item.name +
         item.value +
@@ -91,8 +91,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { getCurrentInstance, onMounted, ref, watch } from "vue";
-import { defineComponent, reactive } from "vue";
+import {
+  getCurrentInstance,
+  onMounted,
+  ref,
+  watch,
+  computed,
+  defineComponent,
+  reactive,
+} from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
@@ -105,21 +112,38 @@ import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/varia
 import { useGlobalComposable } from "@/composables/dashboard/useGlobalComposable";
 import { useVariablesComposable } from "@/composables/dashboard/useVariablesComposable";
 
+interface Variable {
+  type: string;
+  name: string;
+  label: string;
+  query_data?: any;
+  value: any;
+  options: any[];
+  multiSelect: boolean;
+  hideOnDashboard: boolean;
+  selectAllValueForMultiSelect: string;
+  customMultiSelectValue: any[];
+  scope?: "global" | "tabs" | "panels";
+  tabs?: string[];
+  panels?: string[];
+}
+
 export default defineComponent({
   name: "VariablesValueSelector",
-  props: [
-    "selectedTimeDate",
-    "variablesConfig",
-    "initialVariableValues",
-    "showDynamicFilters",
-  ],
+  props: {
+    selectedTimeDate: { type: Object },
+    variablesConfig: { type: Object },
+    initialVariableValues: { type: Object },
+    showDynamicFilters: { type: Boolean },
+    currentTabId: { type: String },
+    currentPanelId: { type: String },
+  },
   emits: ["variablesData"],
   components: {
     VariableQueryValueSelector,
     VariableAdHocValueSelector,
     VariableCustomValueSelector,
   },
-  // in VariablesValueSelector.vue, update the setup function
   setup(props: any, { emit }) {
     const instance = getCurrentInstance();
     const store = useStore();
@@ -984,6 +1008,50 @@ export default defineComponent({
       addSearchRequestTraceIds(panelId, traceIds);
     };
 
+    // Add computed property for filtered variables
+    const filteredVariables = computed(() => {
+      if (!variablesData.values) return [];
+
+      return variablesData.values.filter((variable: Variable) => {
+        // If no scope is defined, it's a global variable
+        if (!variable.scope) {
+          // Only show global variables when no tab or panel is selected
+          return !props.currentTabId && !props.currentPanelId;
+        }
+
+        // Handle tab-scoped variables
+        if (variable.scope === "tabs") {
+          // Only show tab variables when a tab is selected but no panel
+          if (!props.currentTabId || props.currentPanelId) return false;
+
+          // If no tabs specified, show for all tabs
+          if (!variable.tabs || variable.tabs.length === 0) return true;
+
+          // Show if current tab matches
+          return variable.tabs.includes(props.currentTabId);
+        }
+
+        // Handle panel-scoped variables
+        if (variable.scope === "panels") {
+          // Only show panel variables when both tab and panel are selected
+          if (!props.currentTabId || !props.currentPanelId) return false;
+
+          // Must match both tab and panel
+          const tabMatch =
+            !variable.tabs ||
+            variable.tabs.length === 0 ||
+            variable.tabs.includes(props.currentTabId);
+          const panelMatch =
+            !variable.panels ||
+            variable.panels.length === 0 ||
+            variable.panels.includes(props.currentPanelId);
+          return tabMatch && panelMatch;
+        }
+
+        return false;
+      });
+    });
+
     return {
       // Return existing values
       props,
@@ -994,6 +1062,7 @@ export default defineComponent({
       // Add new functions
       updatePanelLoadingState,
       trackSearchRequestTraceIds,
+      filteredVariables,
     };
   },
 });
