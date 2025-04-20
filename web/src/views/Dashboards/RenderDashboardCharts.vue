@@ -200,6 +200,7 @@ import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { useLoading } from "@/composables/useLoading";
+import { useGlobalComposable } from "@/composables/dashboard/useGlobalComposable";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -251,6 +252,7 @@ export default defineComponent({
     ViewPanel,
     TabList,
   },
+  // in RenderDashboardCharts.vue, update the setup function
   setup(props: any, { emit }) {
     const { t } = useI18n();
     const route = useRoute();
@@ -266,6 +268,17 @@ export default defineComponent({
     // inject selected tab, default will be default tab
     const selectedTabId = inject("selectedTabId", ref("default"));
 
+    // Use the global composable to provide state
+    const { provideGlobalState } = useGlobalComposable();
+    const globalLoadingState = provideGlobalState();
+
+    const loadingState = reactive({
+      variablesData: {},
+      panels: {},
+      searchRequestTraceIds: {},
+    });
+
+    // Set up panels computed
     const panels: any = computed(() => {
       return selectedTabId.value !== null
         ? (props.dashboardData?.tabs?.find(
@@ -279,6 +292,7 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
+
     const refreshDashboard = (onlyIfRequired = false) => {
       emit("refresh", onlyIfRequired);
     };
@@ -287,36 +301,17 @@ export default defineComponent({
       emit("onMovePanel", panelId, newTabId);
     };
 
-    // variables data
     const variablesData = ref({});
     const currentVariablesDataRef: any = ref({ __global: {} });
 
-    // ======= [START] dashboard PrintMode =======
-
-    //reactive object for loading state of variablesData and panels
-    const variablesAndPanelsDataLoadingState = reactive({
-      variablesData: {},
-      panels: {},
-      searchRequestTraceIds: {},
-    });
-
-    // provide variablesAndPanelsDataLoadingState to share data between components
-    provide(
-      "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState,
-    );
-
-    //computed property based on panels and variables loading state
+    // Remove the old reactive state since we're now using the composable
+    // Instead, create a computed property to track loading state
     const isDashboardVariablesAndPanelsDataLoaded = computed(() => {
-      // Get values of variablesData and panels
       const variablesDataValues = Object.values(
-        variablesAndPanelsDataLoadingState.variablesData,
+        globalLoadingState.variablesData,
       );
-      const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
-      );
+      const panelsValues = Object.values(globalLoadingState.panels);
 
-      // Check if every value in both variablesData and panels is false
       const isAllVariablesAndPanelsDataLoaded =
         variablesDataValues.every((value) => value === false) &&
         panelsValues.every((value) => value === false);
@@ -328,7 +323,6 @@ export default defineComponent({
       emit("panelsValues", isDashboardVariablesAndPanelsDataLoaded.value);
     });
 
-    // watch on currentTimeObj to update the variablesData
     watch(
       () => props?.currentTimeObj?.__global,
       () => {
@@ -357,9 +351,7 @@ export default defineComponent({
     );
 
     const currentQueryTraceIds = computed(() => {
-      const traceIds = Object.values(
-        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
-      );
+      const traceIds = Object.values(globalLoadingState.searchRequestTraceIds);
 
       if (traceIds.length > 0) {
         return traceIds?.flat();
@@ -371,6 +363,7 @@ export default defineComponent({
       emit("searchRequestTraceIds", currentQueryTraceIds.value);
     });
 
+    // Rest of your code...
     // Create debouncer for isDashboardVariablesAndPanelsDataLoaded
     let {
       valueRef: isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
@@ -591,6 +584,7 @@ export default defineComponent({
     };
 
     return {
+      // Return all the existing values...
       store,
       addPanelData,
       t,
@@ -618,6 +612,8 @@ export default defineComponent({
       openEditLayout,
       saveDashboardData,
       currentVariablesDataRef,
+      isDashboardVariablesAndPanelsDataLoaded,
+      // other returns...
     };
   },
   methods: {
