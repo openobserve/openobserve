@@ -172,15 +172,20 @@ impl proto::cluster_rpc::node_service_server::NodeService for NodeService {
     }
 }
 
-pub async fn get_node_list(node: Arc<dyn NodeInfo>) -> Result<Vec<ConfigNode>, anyhow::Error> {
+pub async fn get_node_list(
+    trace_id: &str,
+    node: Arc<dyn NodeInfo>,
+) -> Result<Vec<ConfigNode>, anyhow::Error> {
     let mut nodes = Vec::new();
 
     // Create a task to fetch nodes from this cluster node
+    let trace_id = trace_id.to_string();
     let task: tokio::task::JoinHandle<Result<Vec<NodeDetails>, infra::errors::Error>> =
         tokio::task::spawn(async move {
             let empty_request = EmptyRequest {};
             let mut request = Request::new(empty_request.clone());
-            let mut client = super::grpc::make_grpc_node_client(&mut request, &node).await?;
+            let mut client =
+                super::grpc::make_grpc_node_client(&trace_id, &mut request, &node).await?;
             let nodes = match client.get_nodes(Request::new(empty_request)).await {
                 Ok(remote_nodes) => remote_nodes.into_inner().nodes,
                 Err(err) => {
