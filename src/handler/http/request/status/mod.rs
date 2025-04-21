@@ -575,6 +575,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             })
             .unwrap();
             let cfg = get_config();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -654,6 +655,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             })
             .unwrap();
             let conf = get_config();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -673,6 +675,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
         Err(_) => {
             let conf = get_config();
             let tokens = json::to_string(&AuthTokens::default()).unwrap();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -701,6 +704,7 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
     conf: &Arc<Config>,
 ) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
+    let tokens = base64::encode(&tokens);
     let mut auth_cookie = Cookie::new(cookie_name, tokens);
     auth_cookie.set_expires(
         cookie::time::OffsetDateTime::now_utc()
@@ -729,7 +733,9 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     let user_email = get_user_email_from_auth_str(&auth_str).await;
 
     if let Some(cookie) = req.cookie("auth_tokens") {
-        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens =
+            json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
 
         if access_token.starts_with("session") {
