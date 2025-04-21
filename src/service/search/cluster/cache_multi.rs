@@ -126,11 +126,8 @@ pub async fn get_cached_results(
                             &node.grpc_addr,
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(super::super::server_internal_error("querier node error"));
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
                     }
                 };
 
