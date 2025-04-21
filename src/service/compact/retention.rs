@@ -464,15 +464,13 @@ async fn write_file_list(
         for _ in 0..5 {
             // only store the file_list into history, don't delete files
             if cfg.compact.data_retention_history {
-                let del_items = events.to_vec();
-                if let Err(e) = infra_file_list::batch_add_history(&del_items).await {
+                if let Err(e) = infra_file_list::batch_add_history(events).await {
                     log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
                     return Err(e.into());
                 }
             }
             // delete from file_list table
-            let del_items = events.to_vec();
-            if let Err(e) = infra_file_list::batch_remove(&del_items).await {
+            if let Err(e) = infra_file_list::batch_process(events).await {
                 log::error!("[COMPACTOR] batch_delete to db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;

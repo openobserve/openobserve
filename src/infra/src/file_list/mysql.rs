@@ -101,10 +101,6 @@ impl super::FileList for MysqlFileList {
         self.inner_batch_process("file_list_history", files).await
     }
 
-    async fn batch_remove(&self, files: &[FileKey]) -> Result<()> {
-        self.inner_batch_process("file_list", files).await
-    }
-
     async fn batch_process(&self, files: &[FileKey]) -> Result<()> {
         self.inner_batch_process("file_list", files).await
     }
