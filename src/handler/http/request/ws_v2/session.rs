@@ -696,10 +696,9 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
 }
 
 #[instrument(
-    name = "ws::session::send_message",
     skip_all,
     fields(req_id = %req_id, trace_id = ?trace_id),
-    level = "info"
+    level = "debug"
 )]
 pub async fn send_message(
     req_id: &str,

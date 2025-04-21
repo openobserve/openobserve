@@ -25,6 +25,13 @@ enum SortStrategy {
 }
 
 /// Determines and applies sorting to search results
+#[tracing::instrument(
+    skip_all,
+    fields(
+        trace_id = %search_res.trace_id,
+    ),
+    level = "info"
+)]
 pub(crate) fn order_search_results(
     mut search_res: Response,
     fallback_order_by_col: Option<String>,
@@ -40,6 +47,13 @@ pub(crate) fn order_search_results(
 }
 
 /// Applies the chosen sort strategy to results
+#[tracing::instrument(
+    skip_all,
+    fields(
+        trace_id = %search_res.trace_id,
+    ),
+    level = "info"
+)]
 fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
     match strategy {
         SortStrategy::FallbackColumn(col, order) => {
@@ -73,6 +87,13 @@ fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
 }
 
 /// Determines which sorting strategy to use
+#[tracing::instrument(
+    skip_all,
+    fields(
+        trace_id = %search_res.trace_id,
+    ),
+    level = "info"
+)]
 fn determine_sort_strategy(
     search_res: &Response,
     fallback_order_by_col: Option<String>,
@@ -108,6 +129,13 @@ fn determine_sort_strategy(
 }
 
 /// Finds and validates fallback column in results
+#[tracing::instrument(
+    skip_all,
+    fields(
+        trace_id = %search_res.trace_id,
+    ),
+    level = "info"
+)]
 fn find_fallback_column(search_res: &Response, fallback_col: Option<String>) -> Option<String> {
     let fallback_col = fallback_col?;
     let first_hit = search_res.hits.first()?.as_object()?;
@@ -127,6 +155,13 @@ fn find_fallback_column(search_res: &Response, fallback_col: Option<String>) -> 
 }
 
 /// Sorts results by a specific column
+#[tracing::instrument(
+    skip_all,
+    fields(
+        trace_id = %search_res.trace_id,
+    ),
+    level = "info"
+)]
 fn sort_by_column(search_res: &mut Response, column: &str, is_string: bool, descending: bool) {
     search_res.hits.sort_by(|a, b| {
         let ordering = if is_string {

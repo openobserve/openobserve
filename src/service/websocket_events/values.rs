@@ -40,6 +40,15 @@ use crate::{
     },
 };
 
+#[tracing::instrument(
+    skip_all,
+    fields(
+        org_id = %org_id,
+        request_id = %request_id,
+        trace_id = %req.trace_id,
+    ),
+    level = "info"
+)]
 pub async fn handle_values_request(
     org_id: &str,
     user_id: &str,

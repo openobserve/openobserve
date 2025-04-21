@@ -28,7 +28,6 @@ use config::{
     utils::json::{Map, Value},
 };
 use infra::errors::{Error, ErrorCodes};
-use tracing::Instrument;
 
 use super::sort::order_search_results;
 #[allow(unused_imports)]
@@ -54,6 +53,7 @@ use crate::{
 };
 
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(skip_all, fields(trace_id = %trace_id, org_id = %org_id), level = "info")]
 pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     match crate::service::search::cancel_query(org_id, trace_id).await {
         Ok(ret) => {
@@ -81,6 +81,15 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     }
 }
 
+#[tracing::instrument(
+    skip_all,
+    fields(
+        req_id = %req_id,
+        trace_id = %req.trace_id,
+        org_id = %org_id,
+    ),
+    level = "info"
+)]
 pub async fn handle_search_request(
     req_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
@@ -305,17 +314,19 @@ pub async fn handle_search_request(
     Ok(())
 }
 
+#[tracing::instrument(
+    skip_all,
+    fields(
+        trace_id = %req.trace_id,
+        org_id = %req.org_id,
+    ),
+    level = "info"
+)]
 async fn do_search(
     req: &SearchEventReq,
     user_id: &str,
     use_cache: bool,
 ) -> Result<Response, Error> {
-    let span = tracing::info_span!(
-        "src::handler::http::request::websocket::search::do_search",
-        trace_id = %req.trace_id,
-        org_id = %req.org_id,
-    );
-
     let mut req = req.clone();
     req.payload.use_cache = Some(use_cache);
     let res = SearchService::cache::search(
@@ -326,7 +337,6 @@ async fn do_search(
         &req.payload,
         "".to_string(),
     )
-    .instrument(span)
     .await;
 
     res.map(handle_partial_response)
@@ -345,7 +355,14 @@ fn handle_partial_response(mut res: Response) -> Response {
     res
 }
 
-#[allow(clippy::too_many_arguments)]
+#[tracing::instrument(
+    skip_all,
+    fields(
+        req_id = %req_id,
+        trace_id = %trace_id,
+    ),
+    level = "info"
+)]
 pub async fn handle_cache_responses_and_deltas(
     req_id: &str,
     req: &SearchEventReq,
@@ -504,8 +521,14 @@ pub async fn handle_cache_responses_and_deltas(
     Ok(())
 }
 
-// Process a single delta (time range not covered by cache)
-#[allow(clippy::too_many_arguments)]
+#[tracing::instrument(
+    skip_all,
+    fields(
+        req_id = %req_id,
+        trace_id = %trace_id,
+    ),
+    level = "info"
+)]
 async fn process_delta(
     req_id: &str,
     req: &SearchEventReq,
@@ -696,6 +719,14 @@ async fn process_delta(
     Ok(())
 }
 
+#[tracing::instrument(
+    skip_all,
+    fields(
+        trace_id = %req.trace_id,
+        org_id = %req.org_id,
+    ),
+    level = "info"
+)]
 async fn get_partitions(
     req: &SearchEventReq,
     user_id: &str,
@@ -721,14 +752,19 @@ async fn get_partitions(
         &search_partition_req,
         false,
     )
-    .instrument(tracing::info_span!(
-        "src::handler::http::request::websocket::search::get_partitions"
-    ))
     .await?;
 
     Ok(res)
 }
 
+#[tracing::instrument(
+    skip_all,
+    fields(
+        req_id = %req_id,
+        trace_id = %trace_id,
+    ),
+    level = "info"
+)]
 async fn send_cached_responses(
     req_id: &str,
     trace_id: &str,
@@ -810,8 +846,14 @@ async fn send_cached_responses(
     Ok(())
 }
 
-// Do partitioned search without cache
-#[allow(clippy::too_many_arguments)]
+#[tracing::instrument(
+    skip_all,
+    fields(
+        req_id = %req_id,
+        trace_id = %trace_id,
+    ),
+    level = "info"
+)]
 pub async fn do_partitioned_search(
     req_id: &str,
     req: &mut SearchEventReq,
@@ -985,6 +1027,14 @@ pub async fn do_partitioned_search(
     Ok(())
 }
 
+#[tracing::instrument(
+    skip_all,
+    fields(
+        req_id = %req_id,
+        trace_id = %trace_id,
+    ),
+    level = "info"
+)]
 async fn send_partial_search_resp(
     req_id: &str,
     trace_id: &str,
@@ -1028,6 +1078,13 @@ async fn send_partial_search_resp(
     Ok(())
 }
 
+#[tracing::instrument(
+    skip_all,
+    fields(
+        trace_id = %c_resp.trace_id,
+    ),
+    level = "info"
+)]
 pub async fn write_results_to_cache(
     c_resp: MultiCachedQueryResponse,
     start_time: i64,
