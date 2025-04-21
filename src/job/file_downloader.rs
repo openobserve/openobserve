@@ -104,7 +104,7 @@ async fn download_file(
     cache_type: file_data::CacheType,
 ) -> Result<usize, anyhow::Error> {
     let cfg = get_config();
-    let ret = match cache_type {
+    match cache_type {
         file_data::CacheType::Memory => {
             let mut disk_exists = false;
             let mem_exists = file_data::memory::exist(file_name).await;
@@ -126,8 +126,7 @@ async fn download_file(
             }
         }
         _ => Ok(0),
-    };
-    Ok(ret?)
+    }
 }
 
 pub async fn queue_background_download(
