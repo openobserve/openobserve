@@ -31,6 +31,7 @@ use o2_enterprise::enterprise::common::{
 };
 use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
+use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
 use crate::common::infra::cluster::get_cached_online_router_nodes;
@@ -149,6 +150,20 @@ pub async fn run(
         cfg.common.instance_name
     );
 
+    // Create a span for the main websocket session loop
+    let session_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+        tracing::info_span!(
+            "ws:session:run",
+            req_id = req_id.as_str(),
+            path = path.as_str(),
+        )
+    } else {
+        tracing::Span::none()
+    };
+
+    // Enter the span for the run loop
+    let _guard = session_span.enter();
+
     let mut ping_interval = tokio::time::interval(Duration::from_secs(
         get_ping_interval_secs_with_jitter() as _,
     ));
@@ -171,6 +186,14 @@ pub async fn run(
 
                 match msg {
                     Ok(actix_ws::AggregatedMessage::Ping(bytes)) => {
+                        // Create a span for ping handling
+                        let ping_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+                            tracing::info_span!("ws:ping", req_id = req_id.as_str())
+                        } else {
+                            tracing::Span::none()
+                        };
+                        let _ping_guard = ping_span.enter();
+
                         log::debug!(
                             "[WS_HANDLER]: Received ping from client for req_id: {}, querier: {}",
                             req_id,
@@ -195,6 +218,14 @@ pub async fn run(
                         }
                     }
                     Ok(actix_ws::AggregatedMessage::Pong(_)) => {
+                        // Create a span for pong message
+                        let pong_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+                            tracing::info_span!("ws:pong", req_id = req_id.as_str())
+                        } else {
+                            tracing::Span::none()
+                        };
+                        let _pong_guard = pong_span.enter();
+
                         log::debug!(
                             "[WS_HANDLER]: Received pong from client for req_id: {}, querier: {}",
                             req_id,
@@ -202,6 +233,14 @@ pub async fn run(
                         );
                     }
                     Ok(actix_ws::AggregatedMessage::Text(msg)) => {
+                        // Create a span for text message handling
+                        let text_msg_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+                            tracing::info_span!("ws:text_message", req_id = req_id.as_str())
+                        } else {
+                            tracing::Span::none()
+                        };
+                        let _text_msg_guard = text_msg_span.enter();
+
                         log::debug!("[WS_HANDLER]: Request Id: {} Node Role: {}, querier: {}, Received message: {}",
                             req_id,
                             cfg.common.node_role,
@@ -211,6 +250,14 @@ pub async fn run(
                         handle_text_message(&user_id, &req_id, msg.to_string(), path.clone()).await;
                     }
                     Ok(actix_ws::AggregatedMessage::Close(reason)) => {
+                        // Create a span for close message
+                        let close_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+                            tracing::info_span!("ws:close", req_id = req_id.as_str())
+                        } else {
+                            tracing::Span::none()
+                        };
+                        let _close_guard = close_span.enter();
+
                         if let Some(reason) = reason.as_ref() {
                             match reason.code {
                                 CloseCode::Normal | CloseCode::Error => {
@@ -229,10 +276,26 @@ pub async fn run(
                         break;
                     }
                     Err(e) => {
+                        // Create a span for error handling
+                        let error_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+                            tracing::info_span!("ws:error", req_id = req_id.as_str(), error = e.to_string().as_str())
+                        } else {
+                            tracing::Span::none()
+                        };
+                        let _error_guard = error_span.enter();
+
                         log::error!("[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}", req_id, get_config().common.instance_name, e);
                         break;
                     }
                     _ => {
+                        // Create a span for unknown message
+                        let unknown_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+                            tracing::info_span!("ws:unknown_message", req_id = req_id.as_str())
+                        } else {
+                            tracing::Span::none()
+                        };
+                        let _unknown_guard = unknown_span.enter();
+
                         log::error!("[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}", req_id, get_config().common.instance_name, "Unknown error");
                         break;
                     }
@@ -240,6 +303,14 @@ pub async fn run(
             }
             // Heartbeat to keep the connection alive
             _ = ping_interval.tick() => {
+                // Create a span for heartbeat ping
+                let heartbeat_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+                    tracing::info_span!("ws:heartbeat", req_id = req_id.as_str())
+                } else {
+                    tracing::Span::none()
+                };
+                let _heartbeat_guard = heartbeat_span.enter();
+
                 if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
                     log::debug!(
                         "[WS_HANDLER]: Sending heartbeat ping to client for req_id: {}, querier: {}",
@@ -269,6 +340,15 @@ pub async fn run(
             }
         }
     }
+
+    // Create a cleanup span for session cleanup
+    let cleanup_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+        tracing::info_span!("ws:cleanup", req_id = req_id.as_str())
+    } else {
+        tracing::Span::none()
+    };
+    let _cleanup_guard = cleanup_span.enter();
+
     cleanup_and_close_session(&req_id, close_reason).await;
 }
 
@@ -312,6 +392,7 @@ async fn resolve_enterprise_user_id(
 /// Depending on each event type, audit must be done
 /// Currently audit is done only for the search event
 pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path: String) {
+    let cfg = get_config();
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             // Validate the events
@@ -331,6 +412,20 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 WsClientEvents::Search(ref search_req) => {
                     #[allow(unused_mut)]
                     let mut user_id = user_id.to_string();
+                    // Create a span for the search operation
+                    let ws_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled
+                    {
+                        let org_id = &search_req.org_id;
+                        tracing::info_span!(
+                            "ws::session::handle_text_message::search",
+                            trace_id = search_req.trace_id.as_str(),
+                            org_id = org_id.as_str(),
+                            req_id = req_id,
+                        )
+                    } else {
+                        tracing::Span::none()
+                    };
+
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
@@ -356,6 +451,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                                 }
                             };
                     }
+
                     handle_search_event(
                         search_req,
                         &search_req.org_id,
@@ -363,11 +459,26 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         req_id,
                         path.clone(),
                     )
+                    .instrument(ws_span)
                     .await;
                 }
                 WsClientEvents::Values(ref values_req) => {
                     #[allow(unused_mut)]
                     let mut user_id = user_id.to_string();
+                    // Create a span for the values operation
+                    let ws_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled
+                    {
+                        let org_id = &values_req.org_id;
+                        tracing::info_span!(
+                            "ws::session::handle_text_message::values",
+                            trace_id = values_req.trace_id.as_str(),
+                            org_id = org_id.as_str(),
+                            req_id = req_id,
+                        )
+                    } else {
+                        tracing::Span::none()
+                    };
+
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
@@ -393,6 +504,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                                 }
                             };
                     }
+
                     handle_values_event(
                         values_req,
                         &values_req.org_id,
@@ -400,12 +512,28 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         req_id,
                         path.clone(),
                     )
+                    .instrument(ws_span)
                     .await;
                 }
                 #[cfg(feature = "enterprise")]
                 WsClientEvents::Cancel {
                     trace_id, org_id, ..
                 } => {
+                    // Create a span for the cancel operation
+                    let ws_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled
+                    {
+                        tracing::info_span!(
+                            "ws::session::handle_text_message::cancel",
+                            trace_id = trace_id.as_str(),
+                            org_id = org_id.as_str(),
+                            req_id = req_id,
+                        )
+                    } else {
+                        tracing::Span::none()
+                    };
+
+                    let _span_guard = ws_span.enter();
+
                     if org_id.is_empty() {
                         log::error!(
                             "[WS_HANDLER]: Request Id: {} Node Role: {} Org id not found",
@@ -613,6 +741,19 @@ async fn handle_search_event(
     let trace_id_for_task = trace_id.clone();
     let search_req = search_req.clone();
 
+    // Create a span for the search task that will be spawned
+    let cfg = get_config();
+    let task_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+        tracing::info_span!(
+            "ws::session::handle_search_event",
+            trace_id = trace_id.as_str(),
+            org_id = org_id.as_str(),
+            req_id = req_id.as_str(),
+        )
+    } else {
+        tracing::Span::none()
+    };
+
     #[cfg(feature = "enterprise")]
     let is_audit_enabled = get_o2_config().common.audit_enabled;
 
@@ -630,100 +771,103 @@ async fn handle_search_event(
     );
     drop(w);
 
-    // Spawn the search task
-    tokio::spawn(async move {
-        // Handle the search request
-        // If search is cancelled, the task will exit
-        // Otherwise, the task will complete and the results will be sent to the client
-        // The task will also update the search state to completed
-        // The task will also close the session
-        // The task will also cleanup the search resources
-        tokio::select! {
-            search_result = handle_search_request(
-                &req_id,
-                &mut accumulated_results,
-                &org_id,
-                &user_id,
-                search_req.clone(),
-            ) => {
-                match search_result {
-                    Ok(_) => {
-                        let mut w = WS_SEARCH_REGISTRY.write().await;
-                        if let Some(state) = w.get_mut(&trace_id_for_task) {
-                            *state = SearchState::Completed {
-                                req_id: req_id.to_string(),
-                            };
-                        }
-                        drop(w);
+    // Spawn the search task with the task span
+    tokio::spawn(
+        async move {
+            // Handle the search request
+            // If search is cancelled, the task will exit
+            // Otherwise, the task will complete and the results will be sent to the client
+            // The task will also update the search state to completed
+            // The task will also close the session
+            // The task will also cleanup the search resources
+            tokio::select! {
+                search_result = handle_search_request(
+                    &req_id,
+                    &mut accumulated_results,
+                    &org_id,
+                    &user_id,
+                    search_req.clone(),
+                ) => {
+                    match search_result {
+                        Ok(_) => {
+                            let mut w = WS_SEARCH_REGISTRY.write().await;
+                            if let Some(state) = w.get_mut(&trace_id_for_task) {
+                                *state = SearchState::Completed {
+                                    req_id: req_id.to_string(),
+                                };
+                            }
+                            drop(w);
 
-                        // Add audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                            audit(AuditMessage {
-                                user_email: user_id,
-                                org_id,
-                                _timestamp: chrono::Utc::now().timestamp(),
-                                protocol: Protocol::Ws,
-                                response_meta: ResponseMeta {
-                                    http_method: "".to_string(),
-                                    http_path: path.clone(),
-                                    http_query_params: "".to_string(),
-                                    http_body: client_msg.to_json(),
-                                    http_response_code: 200,
-                                    error_msg: None,
-                                    trace_id: Some(trace_id.to_string()),
-                                },
-                            })
-                            .await;
-                        }
+                            // Add audit before closing
+                            #[cfg(feature = "enterprise")]
+                            if is_audit_enabled {
+                                audit(AuditMessage {
+                                    user_email: user_id,
+                                    org_id,
+                                    _timestamp: chrono::Utc::now().timestamp(),
+                                    protocol: Protocol::Ws,
+                                    response_meta: ResponseMeta {
+                                        http_method: "".to_string(),
+                                        http_path: path.clone(),
+                                        http_query_params: "".to_string(),
+                                        http_body: client_msg.to_json(),
+                                        http_response_code: 200,
+                                        error_msg: None,
+                                        trace_id: Some(trace_id.to_string()),
+                                    },
+                                })
+                                .await;
+                            }
 
-                        cleanup_search_resources(&trace_id_for_task).await;
-                    }
-                    Err(e) => {
-                        let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
-
-                        #[cfg(feature = "enterprise")]
-                        let http_response_code: u16;
-                        #[cfg(feature = "enterprise")]
-                        {
-                            let http_response = map_error_to_http_response(&e, trace_id.to_string());
-                            http_response_code = http_response.status().into();
+                            cleanup_search_resources(&trace_id_for_task).await;
                         }
-                        // Add audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                          audit(AuditMessage {
-                                  user_email: user_id,
-                                  org_id,
-                                  _timestamp: chrono::Utc::now().timestamp(),
-                                  protocol: Protocol::Ws,
-                                  response_meta: ResponseMeta {
-                                      http_method: "".to_string(),
-                                      http_path: path.clone(),
-                                      http_query_params: "".to_string(),
-                                      http_body: client_msg.to_json(),
-                                      http_response_code,
-                                      error_msg: Some(e.to_string()),
-                                      trace_id: Some(trace_id.to_string()),
-                                  },
-                              })
-                              .await;
-                        }
+                        Err(e) => {
+                            let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
 
-                        // Even if the search is cancelled, we need to cleanup the resources
-                        cleanup_search_resources(&trace_id_for_task).await;
+                            #[cfg(feature = "enterprise")]
+                            let http_response_code: u16;
+                            #[cfg(feature = "enterprise")]
+                            {
+                                let http_response = map_error_to_http_response(&e, trace_id.to_string());
+                                http_response_code = http_response.status().into();
+                            }
+                            // Add audit before closing
+                            #[cfg(feature = "enterprise")]
+                            if is_audit_enabled {
+                              audit(AuditMessage {
+                                      user_email: user_id,
+                                      org_id,
+                                      _timestamp: chrono::Utc::now().timestamp(),
+                                      protocol: Protocol::Ws,
+                                      response_meta: ResponseMeta {
+                                          http_method: "".to_string(),
+                                          http_path: path.clone(),
+                                          http_query_params: "".to_string(),
+                                          http_body: client_msg.to_json(),
+                                          http_response_code,
+                                          error_msg: Some(e.to_string()),
+                                          trace_id: Some(trace_id.to_string()),
+                                      },
+                                  })
+                                  .await;
+                            }
+
+                            // Even if the search is cancelled, we need to cleanup the resources
+                            cleanup_search_resources(&trace_id_for_task).await;
+                        }
                     }
                 }
-            }
-            _ = cancel_rx.recv() => {
-                // if search is cancelled, update the state
-                // the cancel handler will close the session
+                _ = cancel_rx.recv() => {
+                    // if search is cancelled, update the state
+                    // the cancel handler will close the session
 
-                // Just cleanup resources when cancelled
-                cleanup_search_resources(&trace_id_for_task).await;
+                    // Just cleanup resources when cancelled
+                    cleanup_search_resources(&trace_id_for_task).await;
+                }
             }
         }
-    });
+        .instrument(task_span)
+    );
 }
 
 // Cancel handler
@@ -832,6 +976,19 @@ async fn handle_values_event(
     let trace_id_for_task = trace_id.clone();
     let values_req = values_req.clone();
 
+    // Create a span for the values task that will be spawned
+    let cfg = get_config();
+    let task_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+        tracing::info_span!(
+            "ws::session::handle_values_event",
+            trace_id = trace_id.as_str(),
+            org_id = org_id.as_str(),
+            req_id = req_id.as_str(),
+        )
+    } else {
+        tracing::Span::none()
+    };
+
     #[cfg(feature = "enterprise")]
     let is_audit_enabled = get_o2_config().common.audit_enabled;
 
@@ -852,99 +1009,102 @@ async fn handle_values_event(
     // Create a vector to accumulate results
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
 
-    // Spawn the values task
-    tokio::spawn(async move {
-        // Handle the values request
-        // If values search is cancelled, the task will exit
-        // Otherwise, the task will complete and the results will be sent to the client
-        // The task will also update the values state to completed
-        // The task will also cleanup the values search resources
-        tokio::select! {
-            values_result = handle_values_request(
-                &org_id,
-                &user_id,
-                &req_id,
-                values_req.clone(),
-                &mut accumulated_results,
-            ) => {
-                match values_result {
-                    Ok(_) => {
-                        let mut w = WS_SEARCH_REGISTRY.write().await;
-                        if let Some(state) = w.get_mut(&trace_id_for_task) {
-                            *state = SearchState::Completed {
-                                req_id: req_id.to_string(),
-                            };
-                        }
-                        drop(w);
+    // Spawn the values task with the task span
+    tokio::spawn(
+        async move {
+            // Handle the values request
+            // If values search is cancelled, the task will exit
+            // Otherwise, the task will complete and the results will be sent to the client
+            // The task will also update the values state to completed
+            // The task will also cleanup the values search resources
+            tokio::select! {
+                values_result = handle_values_request(
+                    &org_id,
+                    &user_id,
+                    &req_id,
+                    values_req.clone(),
+                    &mut accumulated_results,
+                ) => {
+                    match values_result {
+                        Ok(_) => {
+                            let mut w = WS_SEARCH_REGISTRY.write().await;
+                            if let Some(state) = w.get_mut(&trace_id_for_task) {
+                                *state = SearchState::Completed {
+                                    req_id: req_id.to_string(),
+                                };
+                            }
+                            drop(w);
 
-                        // Add audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                            audit(AuditMessage {
-                                user_email: user_id,
-                                org_id,
-                                _timestamp: chrono::Utc::now().timestamp(),
-                                protocol: Protocol::Ws,
-                                response_meta: ResponseMeta {
-                                    http_method: "".to_string(),
-                                    http_path: path.clone(),
-                                    http_query_params: "".to_string(),
-                                    http_body: client_msg.to_json(),
-                                    http_response_code: 200,
-                                    error_msg: None,
-                                    trace_id: Some(trace_id.to_string()),
-                                },
-                            })
-                            .await;
-                        }
+                            // Add audit before closing
+                            #[cfg(feature = "enterprise")]
+                            if is_audit_enabled {
+                                audit(AuditMessage {
+                                    user_email: user_id,
+                                    org_id,
+                                    _timestamp: chrono::Utc::now().timestamp(),
+                                    protocol: Protocol::Ws,
+                                    response_meta: ResponseMeta {
+                                        http_method: "".to_string(),
+                                        http_path: path.clone(),
+                                        http_query_params: "".to_string(),
+                                        http_body: client_msg.to_json(),
+                                        http_response_code: 200,
+                                        error_msg: None,
+                                        trace_id: Some(trace_id.to_string()),
+                                    },
+                                })
+                                .await;
+                            }
 
-                        cleanup_search_resources(&trace_id_for_task).await;
-                    }
-                    Err(e) => {
-                        // Convert anyhow::Error to our Error type
-                        let error = Error::Message(e.to_string());
-                        let _ = handle_search_error(&error, &req_id, &trace_id_for_task).await;
-
-                        #[cfg(feature = "enterprise")]
-                        let http_response_code: u16;
-                        #[cfg(feature = "enterprise")]
-                        {
-                            let http_response = map_error_to_http_response(&error, trace_id.to_string());
-                            http_response_code = http_response.status().into();
+                            cleanup_search_resources(&trace_id_for_task).await;
                         }
-                        // Add audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                          audit(AuditMessage {
-                                  user_email: user_id,
-                                  org_id,
-                                  _timestamp: chrono::Utc::now().timestamp(),
-                                  protocol: Protocol::Ws,
-                                  response_meta: ResponseMeta {
-                                      http_method: "".to_string(),
-                                      http_path: path.clone(),
-                                      http_query_params: "".to_string(),
-                                      http_body: client_msg.to_json(),
-                                      http_response_code,
-                                      error_msg: Some(e.to_string()),
-                                      trace_id: Some(trace_id.to_string()),
-                                  },
-                              })
-                              .await;
-                        }
+                        Err(e) => {
+                            // Convert anyhow::Error to our Error type
+                            let error = Error::Message(e.to_string());
+                            let _ = handle_search_error(&error, &req_id, &trace_id_for_task).await;
 
-                        // Even if the values search is cancelled, we need to cleanup the resources
-                        cleanup_search_resources(&trace_id_for_task).await;
+                            #[cfg(feature = "enterprise")]
+                            let http_response_code: u16;
+                            #[cfg(feature = "enterprise")]
+                            {
+                                let http_response = map_error_to_http_response(&error, trace_id.to_string());
+                                http_response_code = http_response.status().into();
+                            }
+                            // Add audit before closing
+                            #[cfg(feature = "enterprise")]
+                            if is_audit_enabled {
+                              audit(AuditMessage {
+                                      user_email: user_id,
+                                      org_id,
+                                      _timestamp: chrono::Utc::now().timestamp(),
+                                      protocol: Protocol::Ws,
+                                      response_meta: ResponseMeta {
+                                          http_method: "".to_string(),
+                                          http_path: path.clone(),
+                                          http_query_params: "".to_string(),
+                                          http_body: client_msg.to_json(),
+                                          http_response_code,
+                                          error_msg: Some(e.to_string()),
+                                          trace_id: Some(trace_id.to_string()),
+                                      },
+                                  })
+                                  .await;
+                            }
+
+                            // Even if the values search is cancelled, we need to cleanup the resources
+                            cleanup_search_resources(&trace_id_for_task).await;
+                        }
                     }
                 }
-            }
-            _ = cancel_rx.recv() => {
-                // if values search is cancelled, update the state
-                // the cancel handler will close the session
+                _ = cancel_rx.recv() => {
+                    // if values search is cancelled, update the state
+                    // the cancel handler will close the session
 
-                // Just cleanup resources when cancelled
-                cleanup_search_resources(&trace_id_for_task).await;
+                    // Just cleanup resources when cancelled
+                    cleanup_search_resources(&trace_id_for_task).await;
+                }
             }
         }
-    });
+        .instrument(task_span)
+    );
 }

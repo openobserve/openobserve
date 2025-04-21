@@ -20,6 +20,7 @@ use std::sync::Arc;
 use actix_web::{Error, HttpRequest, HttpResponse, get, web};
 use config::{cluster::LOCAL_NODE, get_config};
 use tokio::sync::RwLock;
+use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::extract_auth_expiry_and_user_id;
@@ -46,6 +47,13 @@ pub async fn websocket(
     }
 
     let (_, router_id) = path_params.into_inner();
+
+    // Create a tracing span for the whole websocket connection
+    let ws_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+        tracing::info_span!("ws_connection", router_id = router_id.as_str())
+    } else {
+        tracing::Span::none()
+    };
 
     let prefix = format!("{}/api/", get_config().common.base_uri);
     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
@@ -86,8 +94,10 @@ pub async fn websocket(
         cfg.common.instance_name
     );
 
-    // Spawn the handler
-    actix_web::rt::spawn(session::run(msg_stream, user_id, router_id, path));
+    // Spawn the handler with the tracing span
+    actix_web::rt::spawn(
+        session::run(msg_stream, user_id, router_id, path).instrument(ws_span.clone()),
+    );
 
     Ok(res)
 }
