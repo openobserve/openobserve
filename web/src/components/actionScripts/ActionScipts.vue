@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="secondary"
             no-caps
             :label="t(`actions.add`)"
-            @click="showAddUpdateFn({})"
+            @click="openAddScriptDrawer"
           />
 
           <QTablePagination
@@ -152,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </template>
+
     <ConfirmDialog
       title="Delete Action"
       message="Are you sure you want to delete Action?"
@@ -237,6 +238,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card>
       </q-dialog>
     </template>
+
+    <q-dialog
+      v-model="showAddScriptDrawer"
+      position="right"
+      full-height
+      maximized
+    >
+      <AddScript
+        class="!tw-w-[450px]"
+        :class="store.state.theme === 'dark' ? 'q-dark' : 'tw-bg-white'"
+        @update:list="refreshList"
+        @cancel:hideform="showAddScriptDrawer = false"
+      />
+    </q-dialog>
   </div>
 </template>
 
@@ -248,6 +263,7 @@ import {
   onActivated,
   watch,
   defineAsyncComponent,
+  computed,
 } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
@@ -300,6 +316,9 @@ export default defineComponent({
     QTablePagination,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),
+    ),
+    AddScript: defineAsyncComponent(
+      () => import("@/components/actionScripts/AddScript.vue"),
     ),
     NoData,
     ConfirmDialog,
@@ -666,28 +685,36 @@ export default defineComponent({
         });
       }
     };
+    const openAddScriptDrawer = () => {
+      router.push({
+        name: "actionScripts",
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+
+      if (config.enableAnalytics == "true") {
+        segment.track("Button Click", {
+          button: "Add Action",
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Alerts",
+        });
+      }
+    };
     const showAddUpdateFn = (props: any) => {
       formData.value = alerts.value.find(
         (alert: any) => alert.uuid === props.row?.uuid,
       ) as Alert;
-      //use this comment for testing multi_time_range shifts
-      // if( formData.value){
-      //   formData.value.query_condition.multi_time_range = [{offSet:"30m"}];
-      // }
-      let action;
+
       if (!props.row) {
         isUpdated.value = false;
-        action = "Add Alert";
-        router.push({
-          name: "actionScripts",
-          query: {
-            action: "add",
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
+        openAddScriptDrawer();
+        return;
       } else {
         isUpdated.value = true;
-        action = "Update Alert";
+        let action = "Update Alert";
         router.push({
           name: "actionScripts",
           query: {
@@ -696,15 +723,16 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-      }
-      addAlert();
-      if (config.enableAnalytics == "true") {
-        segment.track("Button Click", {
-          button: action,
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          page: "Alerts",
-        });
+        addAlert();
+
+        if (config.enableAnalytics == "true") {
+          segment.track("Button Click", {
+            button: action,
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Alerts",
+          });
+        }
       }
     };
     const refreshList = () => {
@@ -853,6 +881,24 @@ export default defineComponent({
       });
     };
 
+    // Compute the drawer visibility based on the router query
+    const showAddScriptDrawer = computed({
+      get: () => {
+        return router.currentRoute.value.query.action === "add";
+      },
+      set: (value) => {
+        if (!value) {
+          // If drawer is closing, update the route
+          router.push({
+            name: "actionScripts",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          });
+        }
+      },
+    });
+
     // const refreshDestination = async () => {
     //   await getDestinations();
     // };
@@ -942,6 +988,8 @@ export default defineComponent({
       alertStateLoadingMap,
       templates,
       routeTo,
+      openAddScriptDrawer,
+      showAddScriptDrawer,
     };
   },
 });
