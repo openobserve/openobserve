@@ -116,7 +116,12 @@ fn get_skipped_timestamps(
     let final_timestamp = if skipped_timestamps.is_empty() {
         supposed_to_run_at
     } else {
-        next_run_at
+        // Pop the last timestamp if it is greater than the supposed to run at
+        if skipped_timestamps.last().unwrap() > &supposed_to_run_at {
+            skipped_timestamps.pop().unwrap()
+        } else {
+            next_run_at
+        }
     };
     (skipped_timestamps, final_timestamp)
 }
