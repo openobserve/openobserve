@@ -480,15 +480,7 @@ pub async fn update_action_details(
             }
             
             if multipart_data.file_data.is_empty() {
-                // Create Action without source code. Only update metadata
-                match register_empty_action(multipart_data.action).await {
-                    Ok(ksuid) => {
-                        return Ok(MetaHttpResponse::json(serde_json::json!({"uuid":ksuid})));
-                    }
-                    Err(e) => {
-                        return Ok(MetaHttpResponse::bad_request(e));
-                    }
-                }
+                return Ok(HttpResponse::BadRequest().body("Uploaded file is empty"));
             }
             
             let file_path = format!("files/{}/actions/{}", org_id, multipart_data.action.zip_file_name);
@@ -731,9 +723,17 @@ pub async fn upload_zipped_action(
             return Ok(HttpResponse::Forbidden().body("Unauthorized Access"));
         }
         
-        if multipart_data.file_data.is_empty() {
-            return Ok(HttpResponse::BadRequest().body("Uploaded file is empty"));
-        }
+            if multipart_data.file_data.is_empty() {
+                // Create Action without source code. Only update metadata
+                match register_empty_action(multipart_data.action).await {
+                    Ok(ksuid) => {
+                        return Ok(MetaHttpResponse::json(serde_json::json!({"uuid":ksuid})));
+                    }
+                    Err(e) => {
+                        return Ok(MetaHttpResponse::bad_request(e));
+                    }
+                }
+            }
         
         let file_path = format!("files/{}/actions/{}", org_id, multipart_data.action.zip_file_name);
         
