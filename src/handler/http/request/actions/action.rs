@@ -36,7 +36,7 @@ use {
     infra::table::action_scripts,
     o2_enterprise::enterprise::actions::action_manager::{
         delete_app_from_target_cluster, get_action_details, get_actions, register_app,
-        serve_file_from_s3, update_app_on_target_cluster,
+        serve_file_from_s3, update_app_on_target_cluster, register_empty_action
     },
     once_cell::sync::Lazy,
     regex::Regex,
@@ -48,8 +48,8 @@ use {
 use crate::common::utils::auth::UserEmail;
 
 #[cfg(feature = "enterprise")]
-const MANDATORY_FIELDS_FOR_ACTION_CREATION: [&str; 5] =
-    ["name", "owner", "file", "filename", "execution_details"];
+const MANDATORY_FIELDS_FOR_ACTION_CREATION: [&str; 3] =
+    ["name", "owner", "execution_details"];
 #[cfg(feature = "enterprise")]
 static ENV_VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[A-Z][A-Z0-9_]*$").unwrap());
 #[cfg(feature = "enterprise")]
@@ -60,6 +60,276 @@ fn validate_environment_variables(env_vars: &HashMap<String, String>) -> Result<
         }
     }
     Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+struct MultipartActionData {
+    action: Action,
+    file_data: Vec<u8>,
+    received_fields: Vec<String>,
+}
+
+#[cfg(feature = "enterprise")]
+async fn process_action_multipart(
+    org_id: String,
+    mut payload: Multipart,
+    req: &HttpRequest,
+) -> Result<MultipartActionData, HttpResponse> {
+    let mut file_data = Vec::new();
+    let mut action = Action {
+        org_id: org_id.clone(),
+        ..Default::default()
+    };
+
+    // Validate Content-Type
+    if let Some(content_type) = req.headers().get("Content-Type") {
+        match content_type.to_str() {
+            Ok(content_type_str) => {
+                if !content_type_str.contains("multipart/form-data") {
+                    return Err(HttpResponse::BadRequest().body("Invalid Content-Type"));
+                }
+            }
+            Err(_) => {
+                return Err(HttpResponse::BadRequest().body("Invalid Content-Type header value"));
+            }
+        }
+    }
+
+    let mut received_fields = Vec::new();
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        match field.name().unwrap_or("") {
+            "description" => {
+                received_fields.push("description".to_string());
+                let mut description = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => description.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Err(HttpResponse::BadRequest()
+                                .body("Failed to read description field"));
+                        }
+                    }
+                }
+                if let Ok(description) = String::from_utf8(description) {
+                    action.description = Some(description);
+                } else {
+                    return Err(HttpResponse::BadRequest()
+                        .body("Description field contains invalid UTF-8 data"));
+                }
+            }
+            "file" => {
+                received_fields.push("file".to_string());
+                if let Some(name) = field.content_disposition() {
+                    action.zip_file_name = name.to_string();
+                }
+
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => file_data.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Err(HttpResponse::BadRequest().body("Failed to read file"));
+                        }
+                    }
+                }
+                if file_data.is_empty() {
+                    return Err(HttpResponse::BadRequest().body("File is missing or empty"));
+                }
+            }
+            "filename" => {
+                received_fields.push("filename".to_string());
+                let mut filename = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => filename.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Err(HttpResponse::BadRequest()
+                                .body("Failed to read filename field"));
+                        }
+                    }
+                }
+                if filename.is_empty() {
+                    return Err(
+                        HttpResponse::BadRequest().body("Filename field is missing or empty")
+                    );
+                }
+                if let Ok(filename) = String::from_utf8(filename) {
+                    action.zip_file_name = filename;
+                } else {
+                    return Err(HttpResponse::BadRequest()
+                        .body("Filename field contains invalid UTF-8 data"));
+                }
+            }
+            "name" => {
+                received_fields.push("name".to_string());
+                let mut name = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => name.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Err(
+                                HttpResponse::BadRequest().body("Failed to read name field")
+                            );
+                        }
+                    }
+                }
+                if name.is_empty() {
+                    return Err(
+                        HttpResponse::BadRequest().body("Name field is missing or empty")
+                    );
+                }
+                if let Ok(name) = String::from_utf8(name) {
+                    action.name = name;
+                } else {
+                    return Err(HttpResponse::BadRequest()
+                        .body("Name field contains invalid UTF-8 data"));
+                }
+            }
+            "execution_details" => {
+                received_fields.push("execution_details".to_string());
+                let mut details = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => details.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Err(HttpResponse::BadRequest()
+                                .body("Failed to read execution_details field"));
+                        }
+                    }
+                }
+                if details.is_empty() {
+                    return Err(HttpResponse::BadRequest()
+                        .body("Execution details field is missing or empty"));
+                }
+                if let Ok(exec_details) = std::str::from_utf8(&details) {
+                    if let Ok(exec_details_type) = ExecutionDetailsType::try_from(exec_details)
+                    {
+                        action.execution_details = exec_details_type;
+                    } else {
+                        return Err(HttpResponse::BadRequest().body("Invalid execution details"));
+                    }
+                } else {
+                    return Err(HttpResponse::BadRequest()
+                        .body("Execution details field contains invalid UTF-8 data"));
+                }
+            }
+            "cron_expr" => {
+                received_fields.push("cron_expr".to_string());
+                let mut cron = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => cron.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Err(HttpResponse::BadRequest()
+                                .body("Failed to read cron_expr field"));
+                        }
+                    }
+                }
+                if let Ok(cron) = String::from_utf8(cron) {
+                    action.cron_expr = Some(cron);
+                } else {
+                    return Err(HttpResponse::BadRequest()
+                        .body("Cron expression contains invalid UTF-8 data"));
+                }
+            }
+            "environment_variables" => {
+                received_fields.push("environment_variables".to_string());
+                let mut env_vars = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => env_vars.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Err(HttpResponse::BadRequest()
+                                .body("Failed to read environment_variables field"));
+                        }
+                    }
+                }
+                if let Ok(env_vars) = String::from_utf8(env_vars) {
+                    if let Ok(env_vars) = serde_json::from_str(&env_vars) {
+                        // Validate environment variables before assigning
+                        if let Err(e) = validate_environment_variables(&env_vars) {
+                            return Err(MetaHttpResponse::bad_request(e));
+                        }
+                        action.environment_variables = env_vars;
+                    } else {
+                        return Err(HttpResponse::BadRequest()
+                            .body("Invalid JSON in environment variables"));
+                    }
+                } else {
+                    return Err(HttpResponse::BadRequest()
+                        .body("Invalid JSON in environment variables"));
+                }
+            }
+            "owner" => {
+                received_fields.push("owner".to_string());
+                let mut owner = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => owner.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Err(
+                                HttpResponse::BadRequest().body("Failed to read owner field")
+                            );
+                        }
+                    }
+                }
+                if let Ok(owner) = String::from_utf8(owner) {
+                    action.created_by = owner;
+                } else {
+                    return Err(HttpResponse::BadRequest()
+                        .body("Owner field contains invalid UTF-8 data"));
+                }
+            }
+            "id" => {
+                received_fields.push("id".to_string());
+                let mut id = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => id.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Err(
+                                HttpResponse::BadRequest().body("Failed to read id field")
+                            );
+                        }
+                    }
+                }
+                if let Ok(id) = String::from_utf8(id) {
+                    if let Ok(id) = Ksuid::from_str(&id) {
+                        action.id = Some(id);
+                    } else {
+                        return Err(HttpResponse::BadRequest().body("Invalid ID"));
+                    }
+                } else {
+                    return Err(HttpResponse::BadRequest().body("Invalid ID"));
+                }
+            }
+            "service_account" => {
+                received_fields.push("service_account".to_string());
+                let mut service_account = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => service_account.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Err(HttpResponse::BadRequest()
+                                .body("Failed to read service_account field"));
+                        }
+                    }
+                }
+                if let Ok(service_account) = String::from_utf8(service_account) {
+                    action.service_account = service_account;
+                } else {
+                    return Err(HttpResponse::BadRequest()
+                        .body("Service account field contains invalid UTF-8 data"));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(MultipartActionData {
+        action,
+        file_data,
+        received_fields,
+    })
 }
 
 /// Delete Action
@@ -170,45 +440,125 @@ body = HttpResponse),     )
 #[put("/{org_id}/actions/{action_id}")]
 pub async fn update_action_details(
     path: web::Path<(String, Ksuid)>,
-    req: web::Json<UpdateActionDetailsRequest>,
+    req: Option<web::Json<UpdateActionDetailsRequest>>,
+    payload: Option<Multipart>,
+    http_req: HttpRequest,
+    user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let (org_id, ksuid) = path.into_inner();
-        let mut req = req.into_inner();
-
-        // Validate environment variables if they are being updated
-        if let Some(ref env_vars) = req.environment_variables {
-            if let Err(e) =
-                crate::handler::http::request::actions::action::validate_environment_variables(
-                    env_vars,
-                )
+        
+        // Check if this is a multipart request (ZIP update) or JSON request
+        if let Some(payload) = payload {
+            // Process the multipart request
+            let multipart_data = match process_action_multipart(org_id.clone(), payload, &http_req).await {
+                Ok(data) => data,
+                Err(response) => return Ok(response),
+            };
+            
+            // Check for mandatory fields
+            if !MANDATORY_FIELDS_FOR_ACTION_CREATION
+                .iter()
+                .all(|field| multipart_data.received_fields.contains(&field.to_string()))
             {
-                return Ok(MetaHttpResponse::bad_request(e));
+                return Ok(HttpResponse::BadRequest().body("Missing mandatory fields"));
             }
-        }
-
-        let sa = match req.service_account.clone() {
-            None => {
-                if let Ok(action) = action_scripts::get(&ksuid.to_string(), &org_id).await {
-                    action.service_account
-                } else {
-                    return Ok(MetaHttpResponse::bad_request("Failed to fetch action"));
+            
+            // Check permissions
+            if !check_permissions(
+                multipart_data.action.id.map(|ksuid| ksuid.to_string()),
+                &org_id,
+                &user_email.user_id,
+                "actions",
+                "PUT",
+                "",
+            )
+            .await
+            {
+                return Ok(HttpResponse::Forbidden().body("Unauthorized Access"));
+            }
+            
+            if multipart_data.file_data.is_empty() {
+                // Create Action without source code. Only update metadata
+                match register_empty_action(multipart_data.action).await {
+                    Ok(ksuid) => {
+                        return Ok(MetaHttpResponse::json(serde_json::json!({"uuid":ksuid})));
+                    }
+                    Err(e) => {
+                        return Ok(MetaHttpResponse::bad_request(e));
+                    }
                 }
             }
-            Some(sa) => sa,
-        };
-        let passcode =
-            if let Ok(res) = crate::service::organization::get_passcode(Some(&org_id), &sa).await {
+            
+            let file_path = format!("files/{}/actions/{}", org_id, multipart_data.action.zip_file_name);
+            
+            let passcode = if let Ok(res) = get_passcode(Some(&org_id), &multipart_data.action.service_account).await {
                 res.passcode
             } else {
-                return Ok(MetaHttpResponse::bad_request("Failed to fetch passcode"));
+                return Ok(HttpResponse::BadRequest().body("Failed to fetch passcode"));
             };
+            
+            // Upload and register the app
+            match zip::read::ZipArchive::new(std::io::Cursor::new(multipart_data.file_data)) {
+                Ok(archive) => {
+                    log::info!("Successfully read ZIP archive with {} files", archive.len());
+                    match register_app(multipart_data.action, archive, &file_path, &passcode).await {
+                        Ok(uuid) => {
+                            // No need to set ownership on update (PUT)
+                            Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid})))
+                        }
+                        Err(e) => Ok(HttpResponse::BadRequest().json(
+                            serde_json::json!({"message":format!("Failed to process action:{}", e)}),
+                        )),
+                    }
+                }
+                Err(e) => {
+                    log::error!("Error reading ZIP file: {:?}", e);
+                    Ok(HttpResponse::BadRequest().json(
+                        serde_json::json!({"message":format!("Error reading ZIP file: {:?}", e)}),
+                    ))
+                }
+            }
+        } else if let Some(req) = req {
+            // Handle JSON update as before
+            let mut req = req.into_inner();
 
-        req.service_account = Some(sa);
-        match update_app_on_target_cluster(&org_id, ksuid, req, &passcode).await {
-            Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
-            Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+            // Validate environment variables if they are being updated
+            if let Some(ref env_vars) = req.environment_variables {
+                if let Err(e) =
+                    crate::handler::http::request::actions::action::validate_environment_variables(
+                        env_vars,
+                    )
+                {
+                    return Ok(MetaHttpResponse::bad_request(e));
+                }
+            }
+
+            let sa = match req.service_account.clone() {
+                None => {
+                    if let Ok(action) = action_scripts::get(&ksuid.to_string(), &org_id).await {
+                        action.service_account
+                    } else {
+                        return Ok(MetaHttpResponse::bad_request("Failed to fetch action"));
+                    }
+                }
+                Some(sa) => sa,
+            };
+            let passcode =
+                if let Ok(res) = crate::service::organization::get_passcode(Some(&org_id), &sa).await {
+                    res.passcode
+                } else {
+                    return Ok(MetaHttpResponse::bad_request("Failed to fetch passcode"));
+                };
+
+            req.service_account = Some(sa);
+            match update_app_on_target_cluster(&org_id, ksuid, req, &passcode).await {
+                Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
+                Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+            }
+        } else {
+            Ok(MetaHttpResponse::bad_request("Invalid request format"))
         }
     }
 
@@ -216,6 +566,9 @@ pub async fn update_action_details(
     {
         drop(path);
         drop(req);
+        drop(payload);
+        drop(http_req);
+        drop(user_email);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
@@ -338,312 +691,65 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
 #[post("/{org_id}/actions/upload")]
 pub async fn upload_zipped_action(
     path: web::Path<String>,
-    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))] mut payload: Multipart,
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))] payload: Multipart,
     req: HttpRequest,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let org_id = path.into_inner();
-        let mut file_data = Vec::new();
-        let mut is_update = false;
-        let mut action = Action {
-            org_id: org_id.clone(),
-            ..Default::default()
+        
+        // Process the multipart request
+        let multipart_data = match process_action_multipart(org_id.clone(), payload, &req).await {
+            Ok(data) => data,
+            Err(response) => return Ok(response),
         };
-
-        // Validate Content-Type
-        if let Some(content_type) = req.headers().get("Content-Type") {
-            match content_type.to_str() {
-                Ok(content_type_str) => {
-                    if !content_type_str.contains("multipart/form-data") {
-                        return Ok(HttpResponse::BadRequest().body("Invalid Content-Type"));
-                    }
-                }
-                Err(_) => {
-                    return Ok(HttpResponse::BadRequest().body("Invalid Content-Type header value"));
-                }
-            }
+        
+        // Check if the multipart data has an id
+        if multipart_data.action.id.is_some() {
+            return Ok(HttpResponse::BadRequest().body("ID is not allowed in multipart request"));
         }
-
-        let mut received_fields = Vec::new();
-        while let Ok(Some(mut field)) = payload.try_next().await {
-            match field.name().unwrap_or("") {
-                "description" => {
-                    received_fields.push("description");
-                    let mut description = Vec::new();
-                    while let Some(chunk) = field.next().await {
-                        match chunk {
-                            Ok(bytes) => description.extend_from_slice(&bytes),
-                            Err(_) => {
-                                return Ok(HttpResponse::BadRequest()
-                                    .body("Failed to read description field"));
-                            }
-                        }
-                    }
-                    if let Ok(description) = String::from_utf8(description) {
-                        action.description = Some(description);
-                    } else {
-                        return Ok(HttpResponse::BadRequest()
-                            .body("Description field contains invalid UTF-8 data"));
-                    }
-                }
-                "file" => {
-                    received_fields.push("file");
-                    if let Some(name) = field.content_disposition() {
-                        action.zip_file_name = name.to_string();
-                    }
-
-                    while let Some(chunk) = field.next().await {
-                        match chunk {
-                            Ok(bytes) => file_data.extend_from_slice(&bytes),
-                            Err(_) => {
-                                return Ok(HttpResponse::BadRequest().body("Failed to read file"));
-                            }
-                        }
-                    }
-                    if file_data.is_empty() {
-                        return Ok(HttpResponse::BadRequest().body("File is missing or empty"));
-                    }
-                }
-                "filename" => {
-                    received_fields.push("filename");
-                    let mut filename = Vec::new();
-                    while let Some(chunk) = field.next().await {
-                        match chunk {
-                            Ok(bytes) => filename.extend_from_slice(&bytes),
-                            Err(_) => {
-                                return Ok(HttpResponse::BadRequest()
-                                    .body("Failed to read filename field"));
-                            }
-                        }
-                    }
-                    if filename.is_empty() {
-                        return Ok(
-                            HttpResponse::BadRequest().body("Filename field is missing or empty")
-                        );
-                    }
-                    if let Ok(filename) = String::from_utf8(filename) {
-                        action.zip_file_name = filename;
-                    } else {
-                        return Ok(HttpResponse::BadRequest()
-                            .body("Filename field contains invalid UTF-8 data"));
-                    }
-                }
-                "name" => {
-                    received_fields.push("name");
-                    let mut name = Vec::new();
-                    while let Some(chunk) = field.next().await {
-                        match chunk {
-                            Ok(bytes) => name.extend_from_slice(&bytes),
-                            Err(_) => {
-                                return Ok(
-                                    HttpResponse::BadRequest().body("Failed to read name field")
-                                );
-                            }
-                        }
-                    }
-                    if name.is_empty() {
-                        return Ok(
-                            HttpResponse::BadRequest().body("Name field is missing or empty")
-                        );
-                    }
-                    if let Ok(name) = String::from_utf8(name) {
-                        action.name = name;
-                    } else {
-                        return Ok(HttpResponse::BadRequest()
-                            .body("Name field contains invalid UTF-8 data"));
-                    }
-                }
-                "execution_details" => {
-                    received_fields.push("execution_details");
-                    let mut details = Vec::new();
-                    while let Some(chunk) = field.next().await {
-                        match chunk {
-                            Ok(bytes) => details.extend_from_slice(&bytes),
-                            Err(_) => {
-                                return Ok(HttpResponse::BadRequest()
-                                    .body("Failed to read execution_details field"));
-                            }
-                        }
-                    }
-                    if details.is_empty() {
-                        return Ok(HttpResponse::BadRequest()
-                            .body("Execution details field is missing or empty"));
-                    }
-                    if let Ok(exec_details) = std::str::from_utf8(&details) {
-                        if let Ok(exec_details_type) = ExecutionDetailsType::try_from(exec_details)
-                        {
-                            action.execution_details = exec_details_type;
-                        } else {
-                            return Ok(HttpResponse::BadRequest().body("Invalid execution details"));
-                        }
-                    } else {
-                        return Ok(HttpResponse::BadRequest()
-                            .body("Execution details field contains invalid UTF-8 data"));
-                    }
-                }
-                "cron_expr" => {
-                    received_fields.push("cron_expr");
-                    let mut cron = Vec::new();
-                    while let Some(chunk) = field.next().await {
-                        match chunk {
-                            Ok(bytes) => cron.extend_from_slice(&bytes),
-                            Err(_) => {
-                                return Ok(HttpResponse::BadRequest()
-                                    .body("Failed to read cron_expr field"));
-                            }
-                        }
-                    }
-                    if let Ok(cron) = String::from_utf8(cron) {
-                        action.cron_expr = Some(cron);
-                    } else {
-                        return Ok(HttpResponse::BadRequest()
-                            .body("Cron expression contains invalid UTF-8 data"));
-                    }
-                }
-                "environment_variables" => {
-                    received_fields.push("environment_variables");
-                    let mut env_vars = Vec::new();
-                    while let Some(chunk) = field.next().await {
-                        match chunk {
-                            Ok(bytes) => env_vars.extend_from_slice(&bytes),
-                            Err(_) => {
-                                return Ok(HttpResponse::BadRequest()
-                                    .body("Failed to read environment_variables field"));
-                            }
-                        }
-                    }
-                    if let Ok(env_vars) = String::from_utf8(env_vars) {
-                        if let Ok(env_vars) = serde_json::from_str(&env_vars) {
-                            // Validate environment variables before assigning
-                            if let Err(e) = validate_environment_variables(&env_vars) {
-                                return Ok(MetaHttpResponse::bad_request(e));
-                            }
-                            action.environment_variables = env_vars;
-                        } else {
-                            return Ok(HttpResponse::BadRequest()
-                                .body("Invalid JSON in environment variables"));
-                        }
-                    } else {
-                        return Ok(HttpResponse::BadRequest()
-                            .body("Invalid JSON in environment variables"));
-                    }
-                }
-                "owner" => {
-                    received_fields.push("owner");
-                    let mut owner = Vec::new();
-                    while let Some(chunk) = field.next().await {
-                        match chunk {
-                            Ok(bytes) => owner.extend_from_slice(&bytes),
-                            Err(_) => {
-                                return Ok(
-                                    HttpResponse::BadRequest().body("Failed to read owner field")
-                                );
-                            }
-                        }
-                    }
-                    if let Ok(owner) = String::from_utf8(owner) {
-                        action.created_by = owner;
-                    } else {
-                        return Ok(HttpResponse::BadRequest()
-                            .body("Owner field contains invalid UTF-8 data"));
-                    }
-                }
-                "id" => {
-                    received_fields.push("id");
-                    let mut id = Vec::new();
-                    while let Some(chunk) = field.next().await {
-                        match chunk {
-                            Ok(bytes) => id.extend_from_slice(&bytes),
-                            Err(_) => {
-                                return Ok(
-                                    HttpResponse::BadRequest().body("Failed to read id field")
-                                );
-                            }
-                        }
-                    }
-                    if let Ok(id) = String::from_utf8(id) {
-                        if let Ok(id) = Ksuid::from_str(&id) {
-                            action.id = Some(id);
-                            is_update = true;
-                        } else {
-                            return Ok(HttpResponse::BadRequest().body("Invalid ID"));
-                        }
-                    } else {
-                        return Ok(HttpResponse::BadRequest().body("Invalid ID"));
-                    }
-                }
-                "service_account" => {
-                    received_fields.push("service_account");
-                    let mut service_account = Vec::new();
-                    while let Some(chunk) = field.next().await {
-                        match chunk {
-                            Ok(bytes) => service_account.extend_from_slice(&bytes),
-                            Err(_) => {
-                                return Ok(HttpResponse::BadRequest()
-                                    .body("Failed to read service_account field"));
-                            }
-                        }
-                    }
-                    if let Ok(service_account) = String::from_utf8(service_account) {
-                        action.service_account = service_account;
-                    } else {
-                        return Ok(HttpResponse::BadRequest()
-                            .body("Service account field contains invalid UTF-8 data"));
-                    }
-                }
-                _ => {}
-            }
-        }
-
+        
+        // Check for mandatory fields
         if !MANDATORY_FIELDS_FOR_ACTION_CREATION
             .iter()
-            .all(|field| received_fields.contains(field))
+            .all(|field| multipart_data.received_fields.contains(&field.to_string()))
         {
             return Ok(HttpResponse::BadRequest().body("Missing mandatory fields"));
         }
-
-        // If action ID is present as field then we know its an update request
-        // Hence we treat it as a PUT request and check for permissions
-        let method = match action.id {
-            Some(_) => "PUT",
-            None => "POST",
-        };
+        
         if !check_permissions(
-            action.id.map(|ksuid| ksuid.to_string()),
+            multipart_data.action.id.map(|ksuid| ksuid.to_string()),
             &org_id,
             &user_email.user_id,
             "actions",
-            method,
+            "POST",
             "",
         )
         .await
         {
             return Ok(HttpResponse::Forbidden().body("Unauthorized Access"));
         }
-
-        if file_data.is_empty() {
+        
+        if multipart_data.file_data.is_empty() {
             return Ok(HttpResponse::BadRequest().body("Uploaded file is empty"));
         }
-
-        let file_path = format!("files/{}/actions/{}", org_id, action.zip_file_name);
-
-        let passcode = if let Ok(res) = get_passcode(Some(&org_id), &action.service_account).await {
+        
+        let file_path = format!("files/{}/actions/{}", org_id, multipart_data.action.zip_file_name);
+        
+        let passcode = if let Ok(res) = get_passcode(Some(&org_id), &multipart_data.action.service_account).await {
             res.passcode
         } else {
             return Ok(HttpResponse::BadRequest().body("Failed to fetch passcode"));
         };
-
-        // Attempt to read the uploaded data as a ZIP file
-        match zip::read::ZipArchive::new(std::io::Cursor::new(file_data)) {
+        
+        // Upload and register the app
+        match zip::read::ZipArchive::new(std::io::Cursor::new(multipart_data.file_data)) {
             Ok(archive) => {
                 log::info!("Successfully read ZIP archive with {} files", archive.len());
-                match register_app(action, archive, &file_path, &passcode).await {
+                match register_app(multipart_data.action, archive, &file_path, &passcode).await {
                     Ok(uuid) => {
-                        if !is_update {
-                            set_ownership(&org_id, "actions", Authz::new(&uuid.to_string())).await;
-                        }
+                        set_ownership(&org_id, "actions", Authz::new(&uuid.to_string())).await;
                         Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid})))
                     }
                     Err(e) => Ok(HttpResponse::BadRequest().json(
