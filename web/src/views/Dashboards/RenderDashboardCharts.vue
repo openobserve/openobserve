@@ -434,8 +434,28 @@ export default defineComponent({
           if (checkIfVariablesAreLoaded(variablesData.value)) {
             needsVariablesAutoUpdate = false;
           }
-          currentVariablesDataRef.value = { __global: variablesData.value };
         }
+
+        // Update the appropriate scope in currentVariablesDataRef
+        if (data.scope === "global") {
+          currentVariablesDataRef.value = {
+            ...currentVariablesDataRef.value,
+            __global: updatedData,
+          };
+        } else if (data.scope === "tabs" && selectedTabId.value) {
+          currentVariablesDataRef.value = {
+            ...currentVariablesDataRef.value,
+            [selectedTabId.value]: updatedData,
+          };
+        } else if (data.scope === "panels" && data.panelId) {
+          currentVariablesDataRef.value = {
+            ...currentVariablesDataRef.value,
+            [data.panelId]: updatedData,
+          };
+        }
+
+        // Emit the updated data
+        emit("variablesData", updatedData);
         return;
       } catch (error) {
         console.error("Error in variablesDataUpdated", error);

@@ -158,7 +158,11 @@ export default defineComponent({
       addSearchRequestTraceIds,
       stateKey,
     } = useVariablesComposable({
-      scope: props.scope,
+      scope: props.currentPanelId
+        ? "panels"
+        : props.currentTabId
+          ? "tabs"
+          : "global",
       tabId: props.currentTabId,
       panelId: props.currentPanelId,
     });
@@ -312,7 +316,17 @@ export default defineComponent({
 
     const emitVariablesData = () => {
       instance?.proxy?.$forceUpdate();
-      emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
+      const dataToEmit = {
+        ...JSON.parse(JSON.stringify(variablesData)),
+        scope: props.currentPanelId
+          ? "panels"
+          : props.currentTabId
+            ? "tabs"
+            : "global",
+        tabId: props.currentTabId,
+        panelId: props.currentPanelId,
+      };
+      emit("variablesData", dataToEmit);
     };
 
     // it is used to change/update initial variables values from outside the component
@@ -482,6 +496,7 @@ export default defineComponent({
 
       if (parentVariables.length === 0) return false;
 
+      // Check loading state in the current scope
       return hasLoadingDependencies(variableObject.name, parentVariables);
     };
 
@@ -736,7 +751,7 @@ export default defineComponent({
         resetVariableState(variableObject);
       }
     };
-    // Update the finalizeVariableLoading function to use the composable
+    // Update the finalizeVariableLoading function to use scoped state
     const finalizeVariableLoading = async (
       variableObject: any,
       success: boolean,
@@ -751,7 +766,7 @@ export default defineComponent({
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
 
-        // Update loading status in global state
+        // Update loading status in global state with proper scope
         setVariableLoadingStatus(name, false);
 
         variablesData.isVariablesLoading = variablesData.values.some(
@@ -769,7 +784,7 @@ export default defineComponent({
           if (oldVariablesData[name] !== variableObject.value) {
             await Promise.all(
               childVariableObjects.map((childVariable: any) => {
-                // Set loading state for child variables
+                // Set loading state for child variables in the current scope
                 setVariableLoadingStatus(childVariable.name, true);
                 return loadSingleVariableDataByName(childVariable);
               }),
