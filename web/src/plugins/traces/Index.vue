@@ -150,8 +150,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchObj.data.queryResults?.hits?.length == 0 &&
                 searchObj.loading == false
               "
+              class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
             >
-              <h5 class="text-center">No result found.</h5>
+              <q-icon name="info" color="primary" size="md" /> No traces found.
+              Please adjust the filters and try again.
             </div>
             <div
               data-test="logs-search-search-result"
