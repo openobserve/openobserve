@@ -6,8 +6,7 @@ import { LogsPage } from '../pages/logsPage.js';
 import DashboardFolder from "../pages/dashboardPages/dashboard-folder.js";
 
 test.describe.configure({ mode: "serial" });
-const folderName = `Folder ${Date.now()}`;
-const dashboardName = `AutomatedDashboard${Date.now()}`;
+
 
 async function login(page) {
  
@@ -198,7 +197,7 @@ test.describe("Alert folders testcases", () => {
     return folderName;
   }
 
-  async function moveAlertToFolder(page, alertName, folderName) {
+  async function moveAlertToFolder(page, folderName) {
     await page.locator('[data-test="stream-association-table-undefined-row"]').getByRole('checkbox').first().click()
     await page.locator('[data-test="alert-list-move-across-folders-btn"]').click();
     await page.locator('[data-test="alerts-index-dropdown-stream_type"]').click();
@@ -214,7 +213,7 @@ test.describe("Alert folders testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   }
 
-  async function moveMultipleAlertsToFolder(page, alertNames, folderName) {
+  async function moveMultipleAlertsToFolder(page, folderName) {
     // Select all alerts using the header checkbox
     await page.getByRole('row', { name: '# Name Owner Period Frequency' }).getByRole('checkbox').click();
     
@@ -235,7 +234,6 @@ test.describe("Alert folders testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
     await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
   });
