@@ -123,10 +123,10 @@ pub async fn query(
     Ok(file_keys)
 }
 
-
 /// NOTE: This will not query the files from file_dump. If you also want files from the dump, use
 /// query function instead. Currently this is used only when compacting on stream, and we do not
-/// support re-compaction of already dumped files, so this function completely ignores the files from dump
+/// support re-compaction of already dumped files, so this function completely ignores the files
+/// from dump
 #[tracing::instrument(
     name = "service::file_list::query_for_merge",
     skip_all,
@@ -279,7 +279,7 @@ pub async fn query_by_ids(
         stream,
         stream_type,
         time_range.unwrap_or((0, Utc::now().timestamp_micros())),
-        ids.iter().min().map(|v| *v),
+        ids.iter().min().copied(),
     )
     .await?;
 
