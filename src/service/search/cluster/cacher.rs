@@ -127,7 +127,7 @@ pub async fn get_cached_results(
                             err
                         );
                         let err = ErrorCodes::from_json(err.message())?;
-                    return Err(Error::ErrorCode(err));
+                        return Err(Error::ErrorCode(err));
                     }
                 };
 
@@ -336,7 +336,7 @@ pub async fn delete_cached_results(path: String) -> bool {
                             err
                         );
                         let err = ErrorCodes::from_json(err.message())?;
-                    return Err(Error::ErrorCode(err));
+                        return Err(Error::ErrorCode(err));
                     }
                 };
 
