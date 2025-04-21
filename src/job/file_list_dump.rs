@@ -65,7 +65,8 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
         Field::new("index_size", arrow_schema::DataType::Int64, true),
     ]))
 });
-pub const FILE_LIST_CACHE_DIR_NAME: &str = "_oo_file_list_dump";
+
+const DUMP_JOB_MIN_INTERVAL: i64 = 30;
 
 // these correspond to job_id, org_id, stream and offset
 // job id is the id from db for that job row
@@ -182,15 +183,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
-    // because we depend on the compact jobs, we run it at 1/3 interval of
-    // either compact interval or job cleanup interval, whichever is smaller
-    // that way we can be sure that we will run at least twice before jobs are cleaned up
-    // and we won't miss a job.
-    let interval = (std::cmp::min(
-        config.compact.interval as i64,
-        config.compact.job_clean_wait_time,
-    ) / 3)
-        + 1;
+    let interval: u64 = std::cmp::max(config.compact.interval as i64, DUMP_JOB_MIN_INTERVAL)
+        .try_into()
+        .unwrap();
 
     // loop and keep checking on file_list_jobs for next dump jobs
     loop {
@@ -199,10 +194,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
 
         // sleep
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            interval.try_into().unwrap(),
-        ))
-        .await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
 
         let pending = infra::file_list::get_pending_dump_jobs().await?;
         let threshold_hour = Utc::now().timestamp_micros()

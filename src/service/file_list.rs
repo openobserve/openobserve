@@ -123,6 +123,10 @@ pub async fn query(
     Ok(file_keys)
 }
 
+
+/// NOTE: This will not query the files from file_dump. If you also want files from the dump, use
+/// query function instead. Currently this is used only when compacting on stream, and we do not
+/// support re-compaction of already dumped files, so this function completely ignores the files from dump
 #[tracing::instrument(
     name = "service::file_list::query_by_date",
     skip_all,
