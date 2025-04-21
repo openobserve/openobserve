@@ -81,7 +81,6 @@ impl DownloadQueue {
 }
 
 const FILE_LIST_DUMP_QUEUE_SIZE: usize = 10000;
-const FILE_LIST_DUMP_THREAD_COUNT: usize = 25;
 static FILE_LIST_DUMP_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
     let (tx, rx) = tokio::sync::mpsc::channel::<JobInfo>(FILE_LIST_DUMP_QUEUE_SIZE);
     DownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
@@ -148,7 +147,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // spawn threads which will do the actual dumping
-    for _ in 0..FILE_LIST_DUMP_THREAD_COUNT {
+    for _ in 0..config.limit.file_merge_thread_num {
         let rx = FILE_LIST_DUMP_CHANNEL.receiver.clone();
         tokio::spawn(async move {
             loop {
@@ -171,11 +170,27 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
+    // because we depend on the compact jobs, we run it at 1/3 interval of
+    // either compact interval or job cleanup interval, whichever is smaller
+    // that way we can be sure that we will run at least twice before jobs are cleaned up
+    // and we won't miss a job.
+    let interval = (std::cmp::min(
+        config.compact.interval as i64,
+        config.compact.job_clean_wait_time,
+    ) / 3)
+        + 1;
+
     // loop and keep checking on file_list_jobs for next dump jobs
     loop {
         if cluster::is_offline() {
             break;
         }
+
+        // sleep
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            interval.try_into().unwrap(),
+        ))
+        .await;
 
         let pending = infra::file_list::get_pending_dump_jobs().await?;
         let threshold_hour = Utc::now().timestamp_micros()
@@ -212,20 +227,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 drop(ongoing);
             }
         }
-        // sleep
-        // because we depend on the compact jobs, we run it at 1/3 interval of
-        // either compact interval or job cleanup interval, whichever is smaller
-        // that way we can be sure that we will run at least twice before jobs are cleaned up
-        // and we won't miss a job.
-        let interval = (std::cmp::min(
-            config.compact.interval as i64,
-            config.compact.job_clean_wait_time,
-        ) / 3)
-            + 1;
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            interval.try_into().unwrap(),
-        ))
-        .await;
     }
     log::info!("[COMPACTOR:JOB] job::files::file_list_dump is stopped");
     Ok(())

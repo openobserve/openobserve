@@ -1495,7 +1495,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             .with_label_values(&["select", "file_list_jobs"])
             .inc();
         let ret = sqlx::query_as::<_, (i64,String, String, i64)>(
-            r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = ? AND dumped = ? ORDER BY offsets ASC"#,
+            r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = ? AND dumped = ? limit 1000"#,
         )
         .bind(super::FileListJobStatus::Done)
         .bind(false)

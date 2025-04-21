@@ -1263,7 +1263,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         let pool = CLIENT_RO.clone();
 
         let ret = sqlx::query_as::<_, (i64,String, String, i64)>(
-            r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = $1 AND dumped = $2 ORDER BY offsets ASC"#,
+            r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = $1 AND dumped = $2 limit 1000"#,
         )
         .bind(super::FileListJobStatus::Done)
         .bind(false)
