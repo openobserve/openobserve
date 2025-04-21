@@ -35,6 +35,7 @@ use infra::{
     file_list::FileRecord,
     schema::{STREAM_SCHEMAS_LATEST, SchemaCache},
 };
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use tokio::sync::{
@@ -46,8 +47,6 @@ use crate::{
     common::infra::cluster::get_node_by_uuid,
     service::{self, db},
 };
-
-const FILE_DUMP_RECORD_BATCH_SIZE: usize = 10000;
 
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
     Arc::new(Schema::new(vec![
@@ -83,9 +82,10 @@ impl DownloadQueue {
     }
 }
 
-const FILE_LIST_DUMP_QUEUE_SIZE: usize = 10000;
+// The reason we set it to 1 here is there is no special benefit for having larger queue in this
+// case the sender can simply wait on the channel if there is no worker available.
 static FILE_LIST_DUMP_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
-    let (tx, rx) = tokio::sync::mpsc::channel::<JobInfo>(FILE_LIST_DUMP_QUEUE_SIZE);
+    let (tx, rx) = tokio::sync::mpsc::channel::<JobInfo>(1);
     DownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
 });
 
@@ -344,7 +344,7 @@ async fn remove_files_from_file_list(ids: &[i64]) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn create_record_batch(files: &[FileRecord]) -> Result<RecordBatch, anyhow::Error> {
+fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Error> {
     let schema = FILE_LIST_SCHEMA.clone();
     if files.is_empty() {
         return Ok(RecordBatch::new_empty(schema));
@@ -367,10 +367,10 @@ fn create_record_batch(files: &[FileRecord]) -> Result<RecordBatch, anyhow::Erro
 
     for file in files {
         field_id.append_value(file.id);
-        field_org.append_value(file.org.clone());
-        field_stream.append_value(file.stream.clone());
-        field_date.append_value(file.date.clone());
-        field_file.append_value(file.file.clone());
+        field_org.append_value(file.org);
+        field_stream.append_value(file.stream);
+        field_date.append_value(file.date);
+        field_file.append_value(file.file);
         field_deleted.append_value(file.deleted);
         field_min_ts.append_value(file.min_ts);
         field_max_ts.append_value(file.max_ts);
@@ -415,7 +415,16 @@ async fn generate_dump_file(
     let batch_size = files.len();
     let mut buf = Vec::new();
     let mut writer = get_writer(FILE_LIST_SCHEMA.clone(), &mut buf)?;
-    for chunk in files.chunks(FILE_DUMP_RECORD_BATCH_SIZE) {
+    // we split the file list into vec of vecs, with each sub-vec having PARQUET_BATCH_SIZE elements
+    // at most (last may be shorter) doing this the following way means we don't have to clone
+    // anything, we simply shift the ownership via iterator
+    let chunks: Vec<Vec<_>> = files
+        .into_iter()
+        .chunks(PARQUET_BATCH_SIZE)
+        .into_iter()
+        .map(|c| c.collect())
+        .collect();
+    for chunk in chunks {
         let batch = create_record_batch(chunk)?;
         writer.write(&batch).await?;
     }
