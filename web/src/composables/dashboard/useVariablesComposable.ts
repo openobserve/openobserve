@@ -23,12 +23,11 @@ export function useVariablesComposable(options?: {
 
   const currentVariablesLoadingState = ref<Record<string, boolean>>({});
 
-  // Generate a unique key based on the scope, tabId, and panelId
   const getStateKey = () => {
-    if (scope === "global") return "__global";
+    if (scope === "global") return "global";
     if (scope === "tabs" && tabId) return `tab_${tabId}`;
     if (scope === "panels" && panelId) return `panel_${panelId}`;
-    return "__global"; // Default fallback
+    return "global"; // Default fallback
   };
 
   const stateKey = getStateKey();
@@ -108,9 +107,9 @@ export function useVariablesComposable(options?: {
         if (globalState.variablesData[tabKey] === true) return true;
       }
 
-      // If in tab scope, also check global scope
-      if (scope === "tabs") {
-        const globalKey = `__global_${dependencyName}`;
+      // For tabs and panels, also check global scope
+      if (scope !== "global") {
+        const globalKey = `global_${dependencyName}`;
         if (globalState.variablesData[globalKey] === true) return true;
       }
 
