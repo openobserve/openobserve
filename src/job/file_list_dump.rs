@@ -27,6 +27,7 @@ use config::{
     cluster::{self, LOCAL_NODE},
     get_config, get_parquet_compression,
     meta::stream::{FileMeta, StreamType},
+    utils::time::hour_micros,
 };
 use hashbrown::HashSet;
 use infra::{
@@ -41,9 +42,11 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 
-use crate::{common::infra::cluster::get_node_by_uuid, service::db};
+use crate::{
+    common::infra::cluster::get_node_by_uuid,
+    service::{self, db},
+};
 
-const HOUR_IN_MICRO: i64 = 3600 * 1000 * 1000;
 const FILE_DUMP_RECORD_BATCH_SIZE: usize = 10000;
 
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
@@ -95,6 +98,15 @@ static FILE_LIST_DUMP_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
 // that files in that time range get dumped before they are compacted. So instead we maintain this
 // and before enqueing, check if the job_id is already waiting in queue or not.
 static ONGOING_JOB_IDS: Lazy<RwLock<HashSet<i64>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+
+fn get_dump_stream_key(org: &str, stream: &str) -> String {
+    format!(
+        "{}/{}/{}",
+        org,
+        StreamType::Filelist,
+        stream.replace('/', "_")
+    )
+}
 
 async fn lock_stream(org_id: &str, stream_type: StreamType, stream_name: &str) -> Option<()> {
     let (_, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
@@ -194,13 +206,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
         let pending = infra::file_list::get_pending_dump_jobs().await?;
         let threshold_hour = Utc::now().timestamp_micros()
-            - (config.common.file_list_dump_min_hour as i64 * HOUR_IN_MICRO);
+            - (config.common.file_list_dump_min_hour as i64 * hour_micros(1));
 
         let ongoing = ONGOING_JOB_IDS.read().await;
         let pending = pending
             .into_iter()
             .filter(|(id, _, _, offset)| {
-                let end = offset + HOUR_IN_MICRO;
+                let end = offset + hour_micros(1);
                 if end >= threshold_hour {
                     return false;
                 }
@@ -235,7 +247,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), anyhow::Error> {
     let config = get_config();
     let start = offset;
-    let end = offset + HOUR_IN_MICRO;
+    let end = offset + hour_micros(1);
 
     let columns = stream.split('/').collect::<Vec<&str>>();
     if columns.len() != 3 {
@@ -285,12 +297,7 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
             log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
         }
 
-        let stream_key = format!(
-            "{}/{}/{}",
-            org,
-            StreamType::Filelist,
-            stream.replace('/', "_")
-        );
+        let stream_key = get_dump_stream_key(org, stream);
         let schema_exists = STREAM_SCHEMAS_LATEST
             .read()
             .await
@@ -425,12 +432,7 @@ async fn generate_dump_file(
         config::ider::generate()
     );
 
-    let stream_key = format!(
-        "{}/{}/{}",
-        org,
-        StreamType::Filelist,
-        stream.replace('/', "_")
-    );
+    let stream_key = get_dump_stream_key(org, stream);
     let file_key = format!("files/{stream_key}/{file_name}");
 
     let meta = FileMeta {
@@ -444,6 +446,6 @@ async fn generate_dump_file(
     };
 
     infra::storage::put(&file_key, buf.into()).await?;
-    infra::file_list::add(&file_key, &meta).await?;
+    service::db::file_list::set(&file_key, Some(meta), false).await?;
     Ok(())
 }

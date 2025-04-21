@@ -18,6 +18,7 @@ use chrono::Utc;
 use config::{
     get_config,
     meta::stream::{FileKey, FileListDeleted, StreamStats, StreamType},
+    utils::time::hour_micros,
 };
 use hashbrown::HashMap;
 use infra::{
@@ -28,8 +29,6 @@ use rayon::slice::ParallelSliceMut;
 
 use super::search::datafusion::exec::prepare_datafusion_context;
 use crate::service::search::datafusion::exec::create_parquet_table;
-
-const HOUR_IN_MICRO: i64 = 3600 * 1000 * 1000;
 
 macro_rules! get_col {
     ($var:ident, $name:literal, $typ:ty, $rbatch:ident) => {
@@ -44,7 +43,7 @@ macro_rules! get_col {
 
 #[inline]
 fn round_down_to_hour(v: i64) -> i64 {
-    v - (v % HOUR_IN_MICRO)
+    v - (v % hour_micros(1))
 }
 
 async fn get_dump_files_in_range(
@@ -54,7 +53,7 @@ async fn get_dump_files_in_range(
     min_id: Option<i64>,
 ) -> Result<Vec<FileRecord>, errors::Error> {
     let start = round_down_to_hour(range.0);
-    let end = round_down_to_hour(range.1) + HOUR_IN_MICRO;
+    let end = round_down_to_hour(range.1) + hour_micros(1);
 
     let list = infra::file_list::get_entries_in_range(org, stream, start, end, min_id).await?;
     let list = list
@@ -165,7 +164,7 @@ async fn exec(
     )
     .await?;
 
-    let ctx = prepare_datafusion_context(None, vec![], vec![], false, 16).await?;
+    let ctx = prepare_datafusion_context(None, vec![], vec![], false, partitions).await?;
     ctx.register_table("file_list", tbl).unwrap();
     let df = ctx.sql(query).await.unwrap();
     let ret = df.collect().await.unwrap();
@@ -216,7 +215,7 @@ pub async fn get_file_list_entries_in_range(
     let process_time = process_start.elapsed().as_millis();
 
     log::info!(
-        "[FILE_LIST_DUMP] : getting dump files from db took {db_time} ms, searching for entries took {process_time} ms"
+        "[FILE_LIST_DUMP: {trace_id}] : getting dump files from db took {db_time} ms, searching for entries took {process_time} ms"
     );
 
     Ok(ret)
