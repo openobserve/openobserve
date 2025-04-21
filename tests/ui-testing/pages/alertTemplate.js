@@ -28,5 +28,7 @@ export class  AlertTemplate {
     async checkForTextInTable(text) {
         await expect(this.page.locator('tbody')).toContainText(text);
     }
+
+    
 }
 
