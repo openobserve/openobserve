@@ -127,12 +127,7 @@ async fn download_file(
         }
         _ => Ok(0),
     };
-    let data_len = ret?;
-    log::debug!(
-        "[trace_id {trace_id}] successfully downloaded file {file_name} into cache {:?}",
-        cache_type
-    );
-    Ok(data_len)
+    Ok(ret?)
 }
 
 pub async fn queue_background_download(
