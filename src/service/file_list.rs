@@ -25,11 +25,7 @@ use config::{
     utils::file::get_file_meta as util_get_file_meta,
 };
 use hashbrown::HashSet;
-use infra::{
-    errors::Result,
-    file_list::{self, FileId},
-    storage,
-};
+use infra::{errors::Result, file_list, storage};
 use rayon::slice::ParallelSliceMut;
 
 use crate::service::{
@@ -67,6 +63,7 @@ pub async fn query(
         stream_name,
         stream_type,
         (time_min, time_max),
+        None,
     )
     .await?;
     if cfg.common.file_list_dump_debug_check {
@@ -270,12 +267,15 @@ pub async fn query_by_ids(
     );
 
     // query from file_list_dump
+    // we use the min(id) as id hint because that automatically filter outs any dump files
+    // which cannot have the ids we are looking for
     let dumped_files = file_list_dump::get_file_list_entries_in_range(
         trace_id,
         org,
         stream,
         stream_type,
         time_range.unwrap_or((0, Utc::now().timestamp_micros())),
+        ids.iter().min().map(|v| *v),
     )
     .await?;
 
@@ -387,7 +387,7 @@ pub async fn query_ids(
 ) -> Result<Vec<file_list::FileId>> {
     let cfg = get_config();
     let mut files = file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
-    let dumped_files = super::file_list_dump::get_file_list_entries_in_range(
+    let dumped_files = super::file_list_dump::get_ids_in_range(
         trace_id,
         org_id,
         stream_name,
@@ -411,12 +411,7 @@ pub async fn query_ids(
         }
     }
     if !cfg.common.file_list_dump_dual_write {
-        files.extend(dumped_files.into_iter().map(|r| FileId {
-            id: r.id,
-            records: r.records,
-            original_size: r.original_size,
-            deleted: r.deleted,
-        }));
+        files.extend(dumped_files.into_iter());
     }
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);

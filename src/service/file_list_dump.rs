@@ -23,7 +23,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     errors,
-    file_list::{FileRecord, calculate_max_ts_upper_bound},
+    file_list::{FileId, FileRecord, calculate_max_ts_upper_bound},
 };
 use rayon::slice::ParallelSliceMut;
 
@@ -109,6 +109,26 @@ fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     ret
 }
 
+fn record_batch_to_file_id(rb: RecordBatch) -> Vec<FileId> {
+    get_col!(id_col, "id", Int64Array, rb);
+    get_col!(records_col, "records", Int64Array, rb);
+    get_col!(original_size_col, "original_size", Int64Array, rb);
+
+    let mut ret = Vec::with_capacity(rb.num_rows());
+    for idx in 0..rb.num_rows() {
+        let t = FileId {
+            id: id_col.value(idx),
+            records: records_col.value(idx),
+            original_size: original_size_col.value(idx),
+            deleted: false,
+        };
+        ret.push(t);
+    }
+    ret.par_sort_unstable_by_key(|f| f.id);
+    ret.dedup_by_key(|f| f.id);
+    ret
+}
+
 fn record_batch_to_stats(rb: RecordBatch) -> Vec<(String, StreamStats)> {
     get_col!(stream_col, "stream", StringArray, rb);
     get_col!(min_ts_col, "min_ts", Int64Array, rb);
@@ -178,6 +198,7 @@ pub async fn get_file_list_entries_in_range(
     stream: &str,
     stream_type: StreamType,
     range: (i64, i64),
+    id_hint: Option<i64>,
 ) -> Result<Vec<FileRecord>, errors::Error> {
     let cfg = get_config();
     let stream_key = format!(
@@ -185,7 +206,7 @@ pub async fn get_file_list_entries_in_range(
         StreamType::Filelist
     );
     let db_start = std::time::Instant::now();
-    let dump_files = get_dump_files_in_range(org, Some(&stream_key), range, None).await?;
+    let dump_files = get_dump_files_in_range(org, Some(&stream_key), range, id_hint).await?;
     let db_time = db_start.elapsed().as_millis();
 
     let process_start = std::time::Instant::now();
@@ -212,6 +233,53 @@ pub async fn get_file_list_entries_in_range(
         .into_iter()
         .flat_map(record_batch_to_file_record)
         .collect();
+    let process_time = process_start.elapsed().as_millis();
+
+    log::info!(
+        "[FILE_LIST_DUMP: {trace_id}] : getting dump files from db took {db_time} ms, searching for entries took {process_time} ms"
+    );
+
+    Ok(ret)
+}
+
+pub async fn get_ids_in_range(
+    trace_id: &str,
+    org: &str,
+    stream: &str,
+    stream_type: StreamType,
+    range: (i64, i64),
+) -> Result<Vec<FileId>, errors::Error> {
+    let cfg = get_config();
+    let stream_key = format!(
+        "{org}/{}/{org}_{stream_type}_{stream}",
+        StreamType::Filelist
+    );
+    let db_start = std::time::Instant::now();
+    let dump_files = get_dump_files_in_range(org, Some(&stream_key), range, None).await?;
+    let db_time = db_start.elapsed().as_millis();
+
+    let process_start = std::time::Instant::now();
+    let dump_files: Vec<_> = dump_files
+        .into_iter()
+        .map(|f| FileKey {
+            key: format!("files/{}/{}/{}", stream_key, f.date, f.file),
+            meta: (&f).into(),
+            deleted: false,
+            segment_ids: None,
+        })
+        .collect();
+    let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
+
+    let stream_key = format!("{org}/{stream_type}/{stream}");
+
+    let query = format!(
+        "SELECT id,records,original_size FROM file_list WHERE org= '{org}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",
+        range.0, max_ts_upper_bound, range.1
+    );
+
+    let t = exec(trace_id, cfg.limit.cpu_num, &dump_files, &query).await?;
+
+    let ret = t.into_iter().flat_map(record_batch_to_file_id).collect();
     let process_time = process_start.elapsed().as_millis();
 
     log::info!(
@@ -292,12 +360,12 @@ pub async fn delete_in_time_range(
     move_and_delete(org, stream_type, stream, range).await
 }
 
+// we never store deleted file in dump, so we never have to consider deleted in this
 pub async fn stats(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
     pk_value: Option<(i64, i64)>,
-    deleted: bool,
 ) -> Result<Vec<(String, StreamStats)>, errors::Error> {
     let cfg = get_config();
 
@@ -353,7 +421,7 @@ pub async fn stats(
         })
         .collect();
 
-    let mut sql = format!(
+    let sql = format!(
         r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num, 
 SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size
@@ -361,18 +429,11 @@ FROM file_list
 WHERE {field} = '{value}'
         "#
     );
-    if deleted {
-        sql = format!("{} AND deleted IS TRUE", sql);
-    }
     let sql = match pk_value {
         None => format!("{} GROUP BY stream", sql),
         Some((0, 0)) => format!("{} GROUP BY stream", sql),
         Some((min, max)) => {
-            if deleted {
-                format!("{} AND id <= {} GROUP BY stream", sql, max)
-            } else {
-                format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
-            }
+            format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
         }
     };
 

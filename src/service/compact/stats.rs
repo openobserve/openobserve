@@ -52,15 +52,13 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
         let add_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, false)
             .await
             .unwrap_or_default();
-        let dumped_add_stats = file_list_dump::stats(&org_id, None, None, pk_value, false)
+        let dumped_add_stats = file_list_dump::stats(&org_id, None, None, pk_value)
             .await
             .unwrap_or_default();
         let del_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, true)
             .await
             .unwrap_or_default();
-        let dumped_del_stats = file_list_dump::stats(&org_id, None, None, pk_value, true)
-            .await
-            .unwrap_or_default();
+        // dump never store deleted files, so we do not have to consider deleted here
         let mut stream_stats = HashMap::new();
         for (stream, stats) in add_stream_stats {
             stream_stats.insert(stream, stats);
@@ -70,10 +68,6 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
             *entry = &*entry + &stats;
         }
         for (stream, stats) in del_stream_stats {
-            let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
-            *entry = &*entry - &stats;
-        }
-        for (stream, stats) in dumped_del_stats {
             let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
             *entry = &*entry - &stats;
         }
