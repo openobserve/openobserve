@@ -131,6 +131,7 @@ impl Search for Searcher {
         &self,
         req: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
+        let start = std::time::Instant::now();
         let req = req.into_inner();
         let request = json::from_slice::<search::Request>(&req.request)
             .map_err(|e| Status::internal(format!("failed to parse search request: {e}")))?;
@@ -146,7 +147,8 @@ impl Search for Searcher {
         .await;
 
         match ret {
-            Ok(ret) => {
+            Ok(mut ret) => {
+                ret.set_took(start.elapsed().as_millis() as usize);
                 let response = json::to_vec(&ret).map_err(|e| {
                     Status::internal(format!("failed to serialize search response: {e}"))
                 })?;

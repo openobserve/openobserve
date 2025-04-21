@@ -76,7 +76,7 @@
               flat
               size="xs"
               :icon="
-                expandedRow != convertTraceIdAndSqlToKey(props.row.trace_id, props.row.sql)
+                expandedRow != props.row.uuid
                   ? 'expand_more'
                   : 'expand_less'
               "
@@ -87,7 +87,7 @@
           {{ props.row[col.field] }}
         </q-td>
         </q-tr>
-        <q-tr v-show="expandedRow === convertTraceIdAndSqlToKey(props.row.trace_id, props.row.sql)" :props="props" >
+        <q-tr v-show="expandedRow === props.row.uuid" :props="props" >
 
           <q-td  colspan="100%">
             <div class="app-tabs-schedule-list report-list-tabs">
@@ -210,7 +210,8 @@
   //@ts-nocheck
   import { ref, watch, onMounted  , nextTick,computed, onUnmounted} from 'vue';
   import {
-    timestampToTimezoneDate , b64EncodeUnicode,convertDateToTimestamp } from "@/utils/zincutils";
+    timestampToTimezoneDate , b64EncodeUnicode,convertDateToTimestamp, 
+    getUUID} from "@/utils/zincutils";
   import { useRouter, useRoute } from 'vue-router';
   import { useStore } from 'vuex';
   import { defineAsyncComponent ,defineComponent} from 'vue';
@@ -360,7 +361,10 @@
            }
            columnsToBeRendered.value = generateColumns(filteredHits);
            filteredHits.forEach((hit:any)=>{
-
+            //adding uuid to each which will be used to track the expanded row 
+            //why not trace_id ? because trace_id is not unique for each hit
+            //and it can be same for multiple hits
+            hit.uuid = getUUID();
             const {formatted, raw} = calculateDuration(hit.start_time, hit.end_time);
             hit.duration = formatted;
             hit.rawDuration = raw;
@@ -548,11 +552,11 @@
 
       const triggerExpand = (props) =>{
         moreDetailsToDisplay.value = JSON.stringify(filterRow(props.row), null, 2);
-        if (expandedRow.value === convertTraceIdAndSqlToKey(props.row.trace_id, props.row.sql)) {
+        if (expandedRow.value === props.row.uuid) {
             expandedRow.value = null;
           } else {
             // Otherwise, expand the clicked row and collapse any other row
-            expandedRow.value = convertTraceIdAndSqlToKey(props.row.trace_id, props.row.sql);
+            expandedRow.value = props.row.uuid;
           }
         }
       const   goToLogs = ( row) => {
@@ -633,9 +637,6 @@
         return filtered;
       }, {});
     }
-    const convertTraceIdAndSqlToKey = (traceId, sql) => {
-      return `${traceId}-${sql}`;
-    }
       return {
         searchObj,
         store,
@@ -664,7 +665,6 @@
         activeTab,
         tabs,
         moreDetailsToDisplay,
-        convertTraceIdAndSqlToKey,
         wrapText
       };
       // Watch the searchObj for changes
