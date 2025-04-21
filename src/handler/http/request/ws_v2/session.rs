@@ -341,20 +341,13 @@ pub async fn run(
 /// # Parameters
 /// * `default_user_id` - Default user ID from the HTTP request
 /// * `user_id_from_event` - Optional user ID from the event
-/// * `trace_id` - The trace ID for tracing
 ///
 /// # Returns
 /// * `Option<String>` - Resolved user ID if successful, None otherwise
 #[cfg(feature = "enterprise")]
-#[instrument(
-    skip_all,
-    fields(trace_id = %trace_id),
-    level = "info"
-)]
 async fn resolve_enterprise_user_id(
     default_user_id: &str,
     user_id_from_event: Option<&String>,
-    trace_id: &str,
 ) -> Option<String> {
     if get_config().common.local_mode {
         // Single node mode, use user_id from the HTTP request header
@@ -444,33 +437,38 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
-                        user_id = match resolve_enterprise_user_id(
-                            &user_id,
-                            search_req.user_id.as_ref(),
-                            &search_req.trace_id,
-                        )
-                        .await
-                        {
-                            Some(id) => id,
-                            None => {
-                                log::error!("[WS_HANDLER]: User id not found in search request");
-                                let err_res = WsServerEvents::error_response(
-                                    &errors::Error::Message(
-                                        "User id not found in search request".to_string(),
-                                    ),
-                                    Some(req_id.to_string()),
-                                    Some(search_req.trace_id.to_string()),
-                                    Default::default(),
-                                );
-                                let trace_id = if err_res.get_trace_id().is_empty() {
-                                    None
-                                } else {
-                                    Some(err_res.get_trace_id())
-                                };
-                                let _ = send_message(req_id, err_res.to_json(), trace_id).await;
-                                return;
-                            }
-                        };
+                        let resolve_span = tracing::info_span!(
+                            "ws::session::resolve_enterprise_user_id",
+                            trace_id = search_req.trace_id.as_str()
+                        );
+
+                        let _guard = resolve_span.enter();
+                        user_id =
+                            match resolve_enterprise_user_id(&user_id, search_req.user_id.as_ref())
+                                .await
+                            {
+                                Some(id) => id,
+                                None => {
+                                    log::error!(
+                                        "[WS_HANDLER]: User id not found in search request"
+                                    );
+                                    let err_res = WsServerEvents::error_response(
+                                        &errors::Error::Message(
+                                            "User id not found in search request".to_string(),
+                                        ),
+                                        Some(req_id.to_string()),
+                                        Some(search_req.trace_id.to_string()),
+                                        Default::default(),
+                                    );
+                                    let trace_id = if err_res.get_trace_id().is_empty() {
+                                        None
+                                    } else {
+                                        Some(err_res.get_trace_id())
+                                    };
+                                    let _ = send_message(req_id, err_res.to_json(), trace_id).await;
+                                    return;
+                                }
+                            };
                     }
 
                     handle_search_event(
@@ -503,33 +501,38 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
-                        user_id = match resolve_enterprise_user_id(
-                            &user_id,
-                            values_req.user_id.as_ref(),
-                            &values_req.trace_id,
-                        )
-                        .await
-                        {
-                            Some(id) => id,
-                            None => {
-                                log::error!("[WS_HANDLER]: User id not found in values request");
-                                let err_res = WsServerEvents::error_response(
-                                    &errors::Error::Message(
-                                        "User id not found in values request".to_string(),
-                                    ),
-                                    Some(req_id.to_string()),
-                                    Some(values_req.trace_id.to_string()),
-                                    Default::default(),
-                                );
-                                let _ = send_message(
-                                    req_id,
-                                    err_res.to_json(),
-                                    Some(values_req.trace_id.to_string()),
-                                )
-                                .await;
-                                return;
-                            }
-                        };
+                        let resolve_span = tracing::info_span!(
+                            "ws::session::resolve_enterprise_user_id",
+                            trace_id = values_req.trace_id.as_str()
+                        );
+
+                        let _guard = resolve_span.enter();
+                        user_id =
+                            match resolve_enterprise_user_id(&user_id, values_req.user_id.as_ref())
+                                .await
+                            {
+                                Some(id) => id,
+                                None => {
+                                    log::error!(
+                                        "[WS_HANDLER]: User id not found in values request"
+                                    );
+                                    let err_res = WsServerEvents::error_response(
+                                        &errors::Error::Message(
+                                            "User id not found in values request".to_string(),
+                                        ),
+                                        Some(req_id.to_string()),
+                                        Some(values_req.trace_id.to_string()),
+                                        Default::default(),
+                                    );
+                                    let _ = send_message(
+                                        req_id,
+                                        err_res.to_json(),
+                                        Some(values_req.trace_id.to_string()),
+                                    )
+                                    .await;
+                                    return;
+                                }
+                            };
                     }
 
                     handle_values_event(
@@ -693,6 +696,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
 }
 
 #[instrument(
+    name = "ws::session::send_message",
     skip_all,
     fields(req_id = %req_id, trace_id = ?trace_id),
     level = "info"
@@ -770,11 +774,6 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
 }
 
 // Main search handler
-#[instrument(
-    skip_all,
-    fields(trace_id = %search_req.trace_id, org_id = %org_id, req_id = %req_id),
-    level = "info"
-)]
 async fn handle_search_event(
     search_req: &SearchEventReq,
     org_id: &str,
@@ -832,13 +831,21 @@ async fn handle_search_event(
             // The task will also close the session
             // The task will also cleanup the search resources
             tokio::select! {
-                search_result = handle_search_request(
-                    &req_id,
-                    &mut accumulated_results,
-                    &org_id,
-                    &user_id,
-                    search_req.clone(),
-                ) => {
+                search_result = {
+                    let search_span = tracing::info_span!(
+                        "ws::session::handle_search_request", 
+                        trace_id = %trace_id,
+                        org_id = %org_id
+                    );
+                    let _guard = search_span.enter();
+                    handle_search_request(
+                        &req_id,
+                        &mut accumulated_results,
+                        &org_id,
+                        &user_id,
+                        search_req.clone(),
+                    )
+                } => {
                     match search_result {
                         Ok(_) => {
                             let mut w = WS_SEARCH_REGISTRY.write().await;
@@ -1089,13 +1096,21 @@ async fn handle_values_event(
             // The task will also update the values state to completed
             // The task will also cleanup the values search resources
             tokio::select! {
-                values_result = handle_values_request(
-                    &org_id,
-                    &user_id,
-                    &req_id,
-                    values_req.clone(),
-                    &mut accumulated_results,
-                ) => {
+                values_result = {
+                    let values_span = tracing::info_span!(
+                        "ws::session::handle_values_request", 
+                        trace_id = %trace_id,
+                        org_id = %org_id
+                    );
+                    let _guard = values_span.enter();
+                    handle_values_request(
+                        &org_id,
+                        &user_id,
+                        &req_id,
+                        values_req.clone(),
+                        &mut accumulated_results,
+                    )
+                } => {
                     match values_result {
                         Ok(_) => {
                             let mut w = WS_SEARCH_REGISTRY.write().await;
