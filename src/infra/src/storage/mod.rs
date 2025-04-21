@@ -112,7 +112,7 @@ pub async fn del(files: &[&str]) -> object_store::Result<()> {
         .map(|file| file.to_string())
         .collect::<Vec<_>>();
 
-    if !is_local_disk_storage() && get_config().s3.feature_stream_delete {
+    if !is_local_disk_storage() && get_config().s3.feature_bulk_delete {
         let files_stream = futures::stream::iter(files)
             .map(|file| Ok(Path::from(file)))
             .boxed();

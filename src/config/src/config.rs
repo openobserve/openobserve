@@ -1674,8 +1674,8 @@ pub struct S3 {
     pub feature_http1_only: bool,
     #[env_config(name = "ZO_S3_FEATURE_HTTP2_ONLY", default = false)]
     pub feature_http2_only: bool,
-    #[env_config(name = "ZO_S3_FEATURE_STREAM_DELETE", default = false)]
-    pub feature_stream_delete: bool,
+    #[env_config(name = "ZO_S3_FEATURE_BULK_DELETE", default = false)]
+    pub feature_bulk_delete: bool,
     #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
     #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
