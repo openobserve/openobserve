@@ -823,11 +823,8 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                             &node.get_grpc_addr(),
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(server_internal_error("search node error"));
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
                     }
                 };
                 Ok(response)
@@ -958,11 +955,8 @@ pub async fn cancel_query(
                                 &node.get_grpc_addr(),
                                 err
                             );
-                            if err.code() == tonic::Code::Internal {
-                                let err = ErrorCodes::from_json(err.message())?;
-                                return Err(Error::ErrorCode(err));
-                            }
-                            return Err(server_internal_error("search node error"));
+                            let err = ErrorCodes::from_json(err.message())?;
+                            return Err(Error::ErrorCode(err));
                         }
                     };
                 Ok(response)

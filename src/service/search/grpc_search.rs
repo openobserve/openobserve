@@ -143,11 +143,8 @@ pub async fn grpc_search_partition(
                         &trace_id,
                         &node.get_grpc_addr(),
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(server_internal_error("search node error"));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)

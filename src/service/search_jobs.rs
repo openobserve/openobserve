@@ -461,13 +461,8 @@ pub async fn get_result(
                         &node.get_grpc_addr(),
                         err
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        "search node error".to_string(),
-                    )));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)
@@ -512,13 +507,8 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
                             &node.get_grpc_addr(),
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                            "search node error".to_string(),
-                        )));
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
                     }
                 };
                 Ok(response)
