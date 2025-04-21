@@ -47,11 +47,8 @@ pub async fn ingest(
                 "[InternalIngestion] export partial_success node: {addr}, response: {:?}",
                 err
             );
-            if err.code() == tonic::Code::Internal {
-                return Err(err.into());
-            }
             return Err(Error::msg(format!(
-                "Ingest node {addr}, response error: {}",
+                "Ingest node {addr}, response error: {:?}",
                 err
             )));
         }

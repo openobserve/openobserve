@@ -74,7 +74,7 @@ pub async fn grpc_search(
                 request: req,
             });
             let node = Arc::new(node) as _;
-            let mut client = make_grpc_search_client(&mut request, &node).await?;
+            let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
             let response = match client.search(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -146,7 +146,7 @@ pub async fn grpc_search_multi(
                 request: req,
             });
             let node = Arc::new(node) as _;
-            let mut client = make_grpc_search_client(&mut request, &node).await?;
+            let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
             let response = match client.search_multi(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -217,7 +217,7 @@ pub async fn grpc_search_partition(
                 skip_max_query_range,
             });
             let node = Arc::new(node) as _;
-            let mut client = make_grpc_search_client(&mut request, &node).await?;
+            let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
             let response = match client.search_partition(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
