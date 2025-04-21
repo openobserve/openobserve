@@ -850,7 +850,14 @@ pub async fn write_results_v2(
     });
 }
 
-#[tracing::instrument(name = "service:search:cacher:check_cache_v2", skip_all)]
+#[tracing::instrument(
+    skip_all,
+    fields(
+        trace_id = %trace_id,
+        org_id = %org_id,
+    ),
+    level = "info"
+)]
 pub async fn check_cache_v2(
     trace_id: &str,
     org_id: &str,
