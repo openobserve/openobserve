@@ -62,10 +62,14 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
     }
 }
 
-pub async fn get_super_cluster_info(node: Arc<dyn NodeInfo>) -> Result<ClusterInfo, anyhow::Error> {
+pub async fn get_super_cluster_info(
+    trace_id: &str,
+    node: Arc<dyn NodeInfo>,
+) -> Result<ClusterInfo, anyhow::Error> {
     let empty_request = EmptyRequest {};
     let mut request = Request::new(empty_request.clone());
-    let mut client = super::grpc::make_grpc_cluster_info_client(&mut request, &node).await?;
+    let mut client =
+        super::grpc::make_grpc_cluster_info_client(trace_id, &mut request, &node).await?;
     let response = match client.get_cluster_info(Request::new(empty_request)).await {
         Ok(response) => convert_response_to_cluster_info(response.into_inner()),
         Err(err) => {
