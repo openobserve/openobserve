@@ -730,8 +730,9 @@ impl FromRequest for AuthExtractor {
     #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
-            let val = base64::decode_url(cookie.value()).unwrap_or_default();
-            let auth_tokens: AuthTokens = json::from_str(&val).unwrap_or_default();
+            let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+            let auth_tokens: AuthTokens =
+                json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
             let access_token = auth_tokens.access_token;
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token

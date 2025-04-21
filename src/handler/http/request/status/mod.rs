@@ -28,7 +28,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
     meta::{cluster::NodeStatus, function::ZoFunction},
-    utils::{json, schema_ext::SchemaExt},
+    utils::{base64, json, schema_ext::SchemaExt},
 };
 use hashbrown::HashMap;
 use infra::{
