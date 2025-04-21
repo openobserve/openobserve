@@ -462,7 +462,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_by_date(
+    async fn query_for_merge(
         &self,
         org_id: &str,
         stream_type: StreamType,
@@ -479,7 +479,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["query_by_date", "file_list", ""])
+            .with_label_values(&["query_for_merge", "file_list", ""])
             .inc();
         let start = std::time::Instant::now();
 
@@ -498,7 +498,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .await;
         let time = start.elapsed().as_secs_f64();
         DB_QUERY_TIME
-            .with_label_values(&["query_by_date", "file_list"])
+            .with_label_values(&["query_for_merge", "file_list"])
             .observe(time);
         Ok(ret?
             .iter()

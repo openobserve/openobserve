@@ -416,7 +416,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_by_date(
+    async fn query_for_merge(
         &self,
         org_id: &str,
         stream_type: StreamType,

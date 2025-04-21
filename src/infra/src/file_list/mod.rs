@@ -81,7 +81,7 @@ pub trait FileList: Sync + Send + 'static {
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_by_date(
+    async fn query_for_merge(
         &self,
         org_id: &str,
         stream_type: StreamType,
@@ -289,15 +289,15 @@ pub async fn query(
 }
 
 #[inline]
-#[tracing::instrument(name = "infra:file_list:db:query_by_date")]
-pub async fn query_by_date(
+#[tracing::instrument(name = "infra:file_list:db:query_for_merge")]
+pub async fn query_for_merge(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_range: Option<(String, String)>,
 ) -> Result<Vec<(String, FileMeta)>> {
     CLIENT
-        .query_by_date(org_id, stream_type, stream_name, date_range)
+        .query_for_merge(org_id, stream_type, stream_name, date_range)
         .await
 }
 

@@ -128,18 +128,18 @@ pub async fn query(
 /// query function instead. Currently this is used only when compacting on stream, and we do not
 /// support re-compaction of already dumped files, so this function completely ignores the files from dump
 #[tracing::instrument(
-    name = "service::file_list::query_by_date",
+    name = "service::file_list::query_for_merge",
     skip_all,
     fields(org_id = org_id, stream_name = stream_name)
 )]
-pub async fn query_by_date(
+pub async fn query_for_merge(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     date_start: &str,
     date_end: &str,
 ) -> Result<Vec<FileKey>> {
-    let files = file_list::query_by_date(
+    let files = file_list::query_for_merge(
         org_id,
         stream_type,
         stream_name,
