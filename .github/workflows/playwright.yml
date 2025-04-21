@@ -97,6 +97,7 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: [
+            "alertsfolders.spec.js",
             "sanity.spec.js",
             "alerts.spec.js",
             "schema.spec.js",
