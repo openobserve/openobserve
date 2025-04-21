@@ -440,7 +440,7 @@ export default defineComponent({
         if (data.scope === "global") {
           currentVariablesDataRef.value = {
             ...currentVariablesDataRef.value,
-            __global: updatedData,
+            global: updatedData,
           };
         } else if (data.scope === "tabs" && selectedTabId.value) {
           currentVariablesDataRef.value = {
