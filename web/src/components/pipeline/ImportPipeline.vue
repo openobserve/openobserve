@@ -999,9 +999,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       };
       const validateNodesForOrg = (input: any) => {
         return input.nodes.some((node: any) => {
-          return !node.data.org_id || (node.data.org_id != store.state.selectedOrganization.identifier)
-        }) ? false : true; // If condition is met (returns true), return false, otherwise return true
-      }
+          const isFunction = node.data.node_type === 'function';
+          const isCondition = node.data.node_type === 'condition';
+          const orgId = node.data.org_id;
+          const selectedOrgId = store.state.selectedOrganization.identifier;
+
+          return !isFunction && !isCondition && (!orgId || orgId !== selectedOrgId);
+        }) ? false : true;
+      };
+
 
 
   
