@@ -31,7 +31,7 @@ use o2_enterprise::enterprise::common::{
 };
 use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
-use tracing::Instrument;
+use tracing::{Instrument, instrument};
 
 #[cfg(feature = "enterprise")]
 use crate::common::infra::cluster::get_cached_online_router_nodes;
@@ -136,6 +136,11 @@ impl WsSession {
     }
 }
 
+#[instrument(
+    skip_all,
+    fields(req_id = %req_id, path = %path),
+    level = "info"
+)]
 pub async fn run(
     mut msg_stream: AggregatedMessageStream,
     user_id: String,
@@ -149,20 +154,6 @@ pub async fn run(
         path,
         cfg.common.instance_name
     );
-
-    // Create a span for the main websocket session loop
-    let session_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
-        tracing::info_span!(
-            "ws:session:run",
-            req_id = req_id.as_str(),
-            path = path.as_str(),
-        )
-    } else {
-        tracing::Span::none()
-    };
-
-    // Enter the span for the run loop
-    let _guard = session_span.enter();
 
     let mut ping_interval = tokio::time::interval(Duration::from_secs(
         get_ping_interval_secs_with_jitter() as _,
@@ -341,14 +332,7 @@ pub async fn run(
         }
     }
 
-    // Create a cleanup span for session cleanup
-    let cleanup_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
-        tracing::info_span!("ws:cleanup", req_id = req_id.as_str())
-    } else {
-        tracing::Span::none()
-    };
-    let _cleanup_guard = cleanup_span.enter();
-
+    // Cleanup span is now handled by the instrument macro on cleanup_and_close_session
     cleanup_and_close_session(&req_id, close_reason).await;
 }
 
@@ -357,13 +341,20 @@ pub async fn run(
 /// # Parameters
 /// * `default_user_id` - Default user ID from the HTTP request
 /// * `user_id_from_event` - Optional user ID from the event
+/// * `trace_id` - The trace ID for tracing
 ///
 /// # Returns
 /// * `Option<String>` - Resolved user ID if successful, None otherwise
 #[cfg(feature = "enterprise")]
+#[instrument(
+    skip_all,
+    fields(trace_id = %trace_id),
+    level = "info"
+)]
 async fn resolve_enterprise_user_id(
     default_user_id: &str,
     user_id_from_event: Option<&String>,
+    trace_id: &str,
 ) -> Option<String> {
     if get_config().common.local_mode {
         // Single node mode, use user_id from the HTTP request header
@@ -391,8 +382,31 @@ async fn resolve_enterprise_user_id(
 /// Text message is parsed into `WsClientEvents` and processed accordingly
 /// Depending on each event type, audit must be done
 /// Currently audit is done only for the search event
+#[instrument(
+    skip_all,
+    fields(req_id = %req_id),
+    level = "info"
+)]
 pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path: String) {
     let cfg = get_config();
+
+    // Early parse to extract trace_id for tracing
+    let trace_id = match serde_json::from_str::<WsClientEvents>(&msg) {
+        Ok(client_msg) => match client_msg {
+            WsClientEvents::Search(ref search_req) => Some(search_req.trace_id.clone()),
+            WsClientEvents::Values(ref values_req) => Some(values_req.trace_id.clone()),
+            #[cfg(feature = "enterprise")]
+            WsClientEvents::Cancel { ref trace_id, .. } => Some(trace_id.clone()),
+            _ => None,
+        },
+        Err(_) => None,
+    };
+
+    // Add trace_id to the current span if available
+    if let Some(trace_id) = trace_id.as_ref() {
+        tracing::Span::current().record("trace_id", trace_id);
+    }
+
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             // Validate the events
@@ -404,7 +418,8 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     None,
                     Default::default(),
                 );
-                let _ = send_message(req_id, err_res.to_json()).await;
+                let _ =
+                    send_message(req_id, err_res.to_json(), Some(client_msg.get_trace_id())).await;
                 return;
             }
 
@@ -429,27 +444,33 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
-                        user_id =
-                            match resolve_enterprise_user_id(&user_id, search_req.user_id.as_ref())
-                                .await
-                            {
-                                Some(id) => id,
-                                None => {
-                                    log::error!(
-                                        "[WS_HANDLER]: User id not found in search request"
-                                    );
-                                    let err_res = WsServerEvents::error_response(
-                                        &errors::Error::Message(
-                                            "User id not found in search request".to_string(),
-                                        ),
-                                        Some(req_id.to_string()),
-                                        Some(search_req.trace_id.to_string()),
-                                        Default::default(),
-                                    );
-                                    let _ = send_message(req_id, err_res.to_json()).await;
-                                    return;
-                                }
-                            };
+                        user_id = match resolve_enterprise_user_id(
+                            &user_id,
+                            search_req.user_id.as_ref(),
+                            &search_req.trace_id,
+                        )
+                        .await
+                        {
+                            Some(id) => id,
+                            None => {
+                                log::error!("[WS_HANDLER]: User id not found in search request");
+                                let err_res = WsServerEvents::error_response(
+                                    &errors::Error::Message(
+                                        "User id not found in search request".to_string(),
+                                    ),
+                                    Some(req_id.to_string()),
+                                    Some(search_req.trace_id.to_string()),
+                                    Default::default(),
+                                );
+                                let trace_id = if err_res.get_trace_id().is_empty() {
+                                    None
+                                } else {
+                                    Some(err_res.get_trace_id())
+                                };
+                                let _ = send_message(req_id, err_res.to_json(), trace_id).await;
+                                return;
+                            }
+                        };
                     }
 
                     handle_search_event(
@@ -482,27 +503,33 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     // verify user_id for handling stream permissions
                     #[cfg(feature = "enterprise")]
                     {
-                        user_id =
-                            match resolve_enterprise_user_id(&user_id, values_req.user_id.as_ref())
-                                .await
-                            {
-                                Some(id) => id,
-                                None => {
-                                    log::error!(
-                                        "[WS_HANDLER]: User id not found in values request"
-                                    );
-                                    let err_res = WsServerEvents::error_response(
-                                        &errors::Error::Message(
-                                            "User id not found in values request".to_string(),
-                                        ),
-                                        Some(req_id.to_string()),
-                                        Some(values_req.trace_id.to_string()),
-                                        Default::default(),
-                                    );
-                                    let _ = send_message(req_id, err_res.to_json()).await;
-                                    return;
-                                }
-                            };
+                        user_id = match resolve_enterprise_user_id(
+                            &user_id,
+                            values_req.user_id.as_ref(),
+                            &values_req.trace_id,
+                        )
+                        .await
+                        {
+                            Some(id) => id,
+                            None => {
+                                log::error!("[WS_HANDLER]: User id not found in values request");
+                                let err_res = WsServerEvents::error_response(
+                                    &errors::Error::Message(
+                                        "User id not found in values request".to_string(),
+                                    ),
+                                    Some(req_id.to_string()),
+                                    Some(values_req.trace_id.to_string()),
+                                    Default::default(),
+                                );
+                                let _ = send_message(
+                                    req_id,
+                                    err_res.to_json(),
+                                    Some(values_req.trace_id.to_string()),
+                                )
+                                .await;
+                                return;
+                            }
+                        };
                     }
 
                     handle_values_event(
@@ -557,7 +584,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     );
 
                     let res = handle_cancel(&trace_id, &org_id).await;
-                    let _ = send_message(req_id, res.to_json()).await;
+                    let _ = send_message(req_id, res.to_json(), Some(trace_id.to_string())).await;
 
                     // Only used for audit
                     #[cfg(feature = "enterprise")]
@@ -608,7 +635,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         "id": id,
                         "took": delay,
                     });
-                    let _ = send_message(req_id, response.to_string()).await;
+                    let _ = send_message(req_id, response.to_string(), Some(id.to_string())).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
                         description: None,
@@ -642,7 +669,12 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 None,
                 Default::default(),
             );
-            let _ = send_message(req_id, err_res.to_json()).await;
+            let trace_id = if err_res.get_trace_id().is_empty() {
+                None
+            } else {
+                Some(err_res.get_trace_id())
+            };
+            let _ = send_message(req_id, err_res.to_json(), trace_id).await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
                 description: None,
@@ -660,7 +692,16 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
     }
 }
 
-pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
+#[instrument(
+    skip_all,
+    fields(req_id = %req_id, trace_id = ?trace_id),
+    level = "info"
+)]
+pub async fn send_message(
+    req_id: &str,
+    msg: String,
+    trace_id: Option<String>,
+) -> Result<(), Error> {
     let session = if let Some(session) = sessions_cache_utils::get_session(req_id).await {
         session
     } else {
@@ -681,6 +722,11 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
     Ok(())
 }
 
+#[instrument(
+    skip_all,
+    fields(req_id = %req_id),
+    level = "info"
+)]
 async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
     let cfg = get_config();
     log::info!(
@@ -724,6 +770,11 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
 }
 
 // Main search handler
+#[instrument(
+    skip_all,
+    fields(trace_id = %search_req.trace_id, org_id = %org_id, req_id = %req_id),
+    level = "info"
+)]
 async fn handle_search_event(
     search_req: &SearchEventReq,
     org_id: &str,
@@ -872,6 +923,11 @@ async fn handle_search_event(
 
 // Cancel handler
 #[cfg(feature = "enterprise")]
+#[instrument(
+    skip_all,
+    fields(trace_id = %trace_id),
+    level = "info"
+)]
 async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
     let mut w = WS_SEARCH_REGISTRY.write().await;
     if let Some(state) = w.get_mut(trace_id) {
@@ -900,6 +956,11 @@ async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[instrument(
+    skip_all,
+    fields(trace_id = %trace_id, req_id = %req_id),
+    level = "info"
+)]
 async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
     // if the error is due to search cancellation, return.
     // the cancel handler will close the session
@@ -927,7 +988,7 @@ async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<
         Some(trace_id.to_string()),
         Default::default(),
     );
-    let _ = send_message(req_id, err_res.to_json()).await;
+    let _ = send_message(req_id, err_res.to_json(), Some(trace_id.to_string())).await;
 
     // Close with error
     let close_reason = CloseReason {
@@ -952,6 +1013,11 @@ async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<
 }
 
 // Add cleanup function
+#[instrument(
+    skip_all,
+    fields(trace_id = %trace_id),
+    level = "info"
+)]
 async fn cleanup_search_resources(trace_id: &str) {
     let mut w = WS_SEARCH_REGISTRY.write().await;
     w.remove(trace_id);
@@ -960,6 +1026,11 @@ async fn cleanup_search_resources(trace_id: &str) {
 }
 
 // Main values handler
+#[instrument(
+    skip_all,
+    fields(trace_id = %values_req.trace_id, org_id = %org_id, req_id = %req_id),
+    level = "info"
+)]
 async fn handle_values_event(
     values_req: &ValuesEventReq,
     org_id: &str,

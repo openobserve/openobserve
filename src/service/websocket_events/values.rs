@@ -74,10 +74,10 @@ pub async fn handle_values_request(
             let err_res = WsServerEvents::error_response(
                 &infra::errors::Error::Message(e),
                 Some(request_id.to_string()),
-                Some(trace_id),
+                Some(trace_id.to_string()),
                 Default::default(),
             );
-            send_message(request_id, err_res.to_json()).await?;
+            send_message(request_id, err_res.to_json(), Some(trace_id)).await?;
             return Ok(());
         }
     }
@@ -282,7 +282,7 @@ pub async fn handle_values_request(
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
-    send_message(request_id, end_res.to_json()).await?;
+    send_message(request_id, end_res.to_json(), Some(trace_id)).await?;
 
     Ok(())
 }

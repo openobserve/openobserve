@@ -95,9 +95,7 @@ pub async fn websocket(
     );
 
     // Spawn the handler with the tracing span
-    actix_web::rt::spawn(
-        session::run(msg_stream, user_id, router_id, path).instrument(ws_span.clone()),
-    );
+    actix_web::rt::spawn(session::run(msg_stream, user_id, router_id, path).instrument(ws_span));
 
     Ok(res)
 }
