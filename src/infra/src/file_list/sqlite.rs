@@ -119,7 +119,7 @@ impl super::FileList for SqliteFileList {
         let meta = &dump_file.meta;
 
         if let Err(e) = sqlx::query(r#" INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);"#)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);"#)
         .bind(org_id)
         .bind(stream_key)
         .bind(date_key)
