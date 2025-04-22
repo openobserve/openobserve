@@ -16,10 +16,10 @@
 use std::io::Error;
 
 use actix_web::{HttpResponse, get};
-use config::meta::cluster::RoleGroup;
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
+    config::meta::cluster::RoleGroup,
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
     std::io::ErrorKind,
 };
