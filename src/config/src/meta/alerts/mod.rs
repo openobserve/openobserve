@@ -57,7 +57,7 @@ pub struct TriggerCondition {
     pub align_time: bool,
 }
 
-fn default_align_time() -> bool {
+pub fn default_align_time() -> bool {
     true
 }
 

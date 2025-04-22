@@ -17,7 +17,9 @@ pub mod requests;
 pub mod responses;
 
 use config::meta::{
-    alerts as meta_alerts, search as meta_search, stream as meta_stream, triggers::Trigger,
+    alerts::{self as meta_alerts, default_align_time},
+    search as meta_search, stream as meta_stream,
+    triggers::Trigger,
 };
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
@@ -127,7 +129,7 @@ pub struct TriggerCondition {
     #[serde(default)]
     pub tolerance_seconds: Option<i64>,
 
-    #[serde(default)]
+    #[serde(default = "default_align_time")]
     pub align_time: bool,
 }
 

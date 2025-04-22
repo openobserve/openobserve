@@ -127,7 +127,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
                 .map(|ds| ds.into_iter().map(|d| d.into()).collect()),
         };
         alert.trigger_condition = MetaTriggerCondition {
-            align_time: true,
+            align_time: value.align_time,
             // DB model stores period in seconds, but service layer stores
             // minutes.
             period: value.trigger_period_seconds / 60,
