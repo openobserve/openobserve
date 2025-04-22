@@ -109,6 +109,8 @@ pub struct ReportFrequency {
     #[serde(rename = "type")]
     #[serde(default)]
     pub frequency_type: ReportFrequencyType,
+    #[serde(default)]
+    pub align_time: bool,
 }
 
 impl Default for ReportFrequency {
@@ -117,6 +119,7 @@ impl Default for ReportFrequency {
             interval: 1,
             cron: "".to_string(),
             frequency_type: Default::default(),
+            align_time: true,
         }
     }
 }
