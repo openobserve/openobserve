@@ -262,7 +262,7 @@ pub async fn handle_search_request(
                 remaining_query_range,
                 &order_by,
             )
-            .instrument(ws_search_span)
+            .instrument(ws_search_span.clone())
             .await?;
         } else {
             // Step 2: Search without cache
@@ -283,13 +283,14 @@ pub async fn handle_search_request(
                 accumulated_results,
                 max_query_range,
             )
-            .instrument(ws_search_span)
+            .instrument(ws_search_span.clone())
             .await?;
         }
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
         if req.payload.query.from == 0 {
             write_results_to_cache(c_resp, start_time, end_time, accumulated_results)
+                .instrument(ws_search_span.clone())
                 .await
                 .map_err(|e| {
                     log::error!(
@@ -947,10 +948,15 @@ pub async fn do_partitioned_search(
             }
 
             if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
+                let ws_search_span = tracing::info_span!(
+                    "src::service::websocket_events::search::do_partitioned_search::get_top_k_values",
+                    org_id = %req.org_id,
+                );
                 let instant = Instant::now();
                 let top_k_values = tokio::task::spawn_blocking(move || {
                     get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
                 })
+                .instrument(ws_search_span.clone())
                 .await
                 .unwrap();
                 search_res.hits = top_k_values?;
@@ -1050,6 +1056,10 @@ async fn send_partial_search_resp(
     Ok(())
 }
 
+#[tracing::instrument(
+    name = "service:websocket_events:search::write_results_to_cache",
+    skip_all
+)]
 pub async fn write_results_to_cache(
     c_resp: MultiCachedQueryResponse,
     start_time: i64,
@@ -1137,7 +1147,7 @@ pub async fn write_results_to_cache(
 }
 
 /// This function will compute top k values for values request
-/// This is a com
+#[tracing::instrument(name = "service:websocket_events:search::get_top_k_values", skip_all)]
 pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<Vec<Value>, Error> {
     let mut top_k_values: Vec<Value> = Vec::new();
 
