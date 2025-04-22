@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { routeGuard } from "@/utils/zincutils";
-import Home from "@/views/HomeView.vue";
+import Home from "@/views/HomeViewLatest.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import Tickets from "@/views/TicketsView.vue";
 import About from "@/views/About.vue";
