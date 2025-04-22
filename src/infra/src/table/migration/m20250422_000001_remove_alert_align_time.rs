@@ -23,7 +23,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        add_updated_at_column(manager).await?;
+        add_align_time_column(manager).await?;
         Ok(())
     }
 
@@ -33,8 +33,8 @@ impl MigrationTrait for Migration {
     }
 }
 
-// Removes the old created_at column.
-async fn add_updated_at_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+// Adds the alerts's align_time column.
+async fn add_align_time_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
         manager
             .alter_table(
