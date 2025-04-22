@@ -234,8 +234,6 @@ export default defineComponent({
       "str_match",
       "str_match_ignore_case",
       "match_all",
-      "match_all_raw",
-      "match_all_raw_ignore_case",
       "re_match",
       "re_not_match",
       "Contains",
