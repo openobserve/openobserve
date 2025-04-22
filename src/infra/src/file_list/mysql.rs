@@ -105,13 +105,40 @@ impl super::FileList for MysqlFileList {
         self.inner_batch_process("file_list", files).await
     }
 
-    async fn batch_remove_by_ids(&self, ids: &[i64]) -> Result<()> {
-        if ids.is_empty() {
-            return Ok(());
-        }
+    async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
         let pool = CLIENT.clone();
+        let mut tx = pool.begin().await?;
 
-        for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(&dump_file.key).map_err(|e| Error::Message(e.to_string()))?;
+        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+        let meta = &dump_file.meta;
+        DB_QUERY_NUMS
+            .with_label_values(&["insert", "file_list", ""])
+            .inc();
+        if let Err(e) =  sqlx::query(r#"INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"#)
+        .bind(org_id)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .bind(false)
+        .bind(meta.min_ts)
+        .bind(meta.max_ts)
+        .bind(meta.records)
+        .bind(meta.original_size)
+        .bind(meta.compressed_size)
+        .bind(meta.index_size)
+        .bind(meta.flattened)
+        .execute(&pool)
+        .await {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback file_list update file dump error: {e}",);
+            }
+            return Err(e.into());
+        }
+
+        for chunk in dumped_ids.chunks(get_config().limit.file_list_id_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -125,12 +152,22 @@ impl super::FileList for MysqlFileList {
                 .with_label_values(&["delete_by_ids", "file_list"])
                 .inc();
             let start = std::time::Instant::now();
-            let res = sqlx::query(&query_str).fetch_all(&pool).await;
+            let res = sqlx::query(&query_str).execute(&mut *tx).await;
             let time = start.elapsed().as_secs_f64();
             DB_QUERY_TIME
                 .with_label_values(&["delete_by_ids", "file_list"])
                 .observe(time);
-            res?;
+            if let Err(e) = res {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[MYSQL] rollback file_list update file dump error: {e}",);
+                }
+                return Err(e.into());
+            }
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[MYSQL] commit file_list update dump file error: {e}");
+            return Err(e.into());
         }
         Ok(())
     }

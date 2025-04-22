@@ -58,7 +58,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
-    async fn batch_remove_by_ids(&self, ids: &[i64]) -> Result<()>;
+    async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()>;
     async fn batch_process(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_deleted(
         &self,
@@ -222,8 +222,8 @@ pub async fn batch_process(files: &[FileKey]) -> Result<()> {
 }
 
 #[inline]
-pub async fn batch_remove_by_ids(ids: &[i64]) -> Result<()> {
-    CLIENT.batch_remove_by_ids(ids).await
+pub async fn update_dump_records(dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
+    CLIENT.update_dump_records(dump_file, dumped_ids).await
 }
 
 #[inline]

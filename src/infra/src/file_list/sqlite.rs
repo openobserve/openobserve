@@ -107,16 +107,40 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_process("file_list", files).await
     }
 
-    async fn batch_remove_by_ids(&self, ids: &[i64]) -> Result<()> {
-        if ids.is_empty() {
-            return Ok(());
-        }
-
+    async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        let pool = client.clone();
 
-        for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
+        let mut tx = client.begin().await?;
+
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(&dump_file.key).map_err(|e| Error::Message(e.to_string()))?;
+        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+        let meta = &dump_file.meta;
+
+        if let Err(e) = sqlx::query(r#" INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);"#)
+        .bind(org_id)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .bind(false)
+        .bind(meta.min_ts)
+        .bind(meta.max_ts)
+        .bind(meta.records)
+        .bind(meta.original_size)
+        .bind(meta.compressed_size)
+        .bind(meta.index_size)
+        .bind(meta.flattened)
+        .execute(&mut *tx)
+        .await{
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SQLITE] rollback file_list dump file update error: {e}",);
+            }
+            return Err(e.into());
+        }
+
+        for chunk in dumped_ids.chunks(get_config().limit.file_list_id_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -126,7 +150,17 @@ impl super::FileList for SqliteFileList {
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
-            sqlx::query(&query_str).fetch_all(&pool).await?;
+            if let Err(e) = sqlx::query(&query_str).execute(&mut *tx).await {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback file_list dump file update error: {e}",);
+                }
+                return Err(e.into());
+            }
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] transaction commit error for dump file update {e}");
+            return Err(e.into());
         }
         Ok(())
     }
