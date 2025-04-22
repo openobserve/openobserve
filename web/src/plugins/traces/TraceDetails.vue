@@ -645,12 +645,6 @@ export default defineComponent({
           filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
         else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
 
-        console.log(
-          "org_identifier",
-          (router.currentRoute.value?.query?.org_identifier as string) ||
-            store.state.selectedOrganization?.identifier,
-        );
-
         const streamName =
           (router.currentRoute.value.query.stream as string) ||
           searchObj.data.stream.selectedStream.value;
@@ -745,7 +739,6 @@ export default defineComponent({
               return;
             }
             searchObj.data.traceDetails.spanList = res.data?.hits || [];
-            console.log(res.data?.hits);
             buildTracesTree();
           })
           .finally(() => {
