@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="custom-first-chart"  style="height: 100%; min-height: 145px;" >
+              <div class="custom-first-chart"  style="height: calc(100vh - 630px) " >
                 <CustomChartRenderer
                   :key="panelDataKey"
                   :data="panelData"
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="custom-second-chart"  style="height: 100%; min-height: 145px;" >
+              <div class="custom-second-chart"  style="height: calc(100vh - 630px); " >
                 <CustomChartRenderer
                   :key="panelDataKey"
                   :data="panelData2"
