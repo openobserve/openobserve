@@ -82,6 +82,7 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     }
 }
 
+#[tracing::instrument(name = "service:search:websocket::handle_search_request", skip_all)]
 pub async fn handle_search_request(
     req_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
@@ -203,6 +204,7 @@ pub async fn handle_search_request(
     if req.payload.query.from == 0 {
         let c_resp =
             cache::check_cache_v2(&trace_id, org_id, stream_type, &req.payload, req.use_cache)
+                .instrument(ws_search_span.clone())
                 .await?;
         let local_c_resp = c_resp.clone();
         let cached_resp = local_c_resp.cached_response;
