@@ -581,6 +581,8 @@ async fn process_delta(
             return Ok(());
         }
 
+        let start = Instant::now();
+
         let mut req = req.clone();
         req.payload.query.start_time = start_time;
         req.payload.query.end_time = end_time;
@@ -606,6 +608,9 @@ async fn process_delta(
             let queried_range =
                 calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
             *remaining_query_range -= queried_range;
+
+            // set took
+            search_res.set_took(start.elapsed().as_millis() as usize);
 
             // when searching with limit queries
             // the limit in sql takes precedence over the requested size
@@ -901,6 +906,8 @@ pub async fn do_partitioned_search(
             return Ok(());
         }
 
+        let start = Instant::now();
+
         let mut req = req.clone();
         req.payload.query.start_time = start_time;
         req.payload.query.end_time = end_time;
@@ -915,6 +922,9 @@ pub async fn do_partitioned_search(
 
         if !search_res.hits.is_empty() {
             search_res = order_search_results(search_res, req.fallback_order_by_col);
+
+            // set took
+            search_res.set_took(start.elapsed().as_millis() as usize);
 
             // check range error
             if !range_error.is_empty() {
