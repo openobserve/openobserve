@@ -60,7 +60,10 @@ export const convertMultiSQLData = async (
   annotations: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
-    return { options: null };
+    // this sets a blank object until it loads
+    // because of this, it will go to UI and draw something, even 0 or a blank chart
+    // this will give a sence of progress to the user
+    searchQueryData = [[]];
   }
 
   // loop on all search query data
@@ -346,7 +349,7 @@ export const convertSQLData = async (
 
   const missingValue = () => {
     // Get the interval in minutes
-    const interval = resultMetaData?.map((it: any) => it.histogram_interval)[0];
+    const interval = resultMetaData?.map((it: any) => it?.histogram_interval)?.[0];
 
     if (
       !interval ||
