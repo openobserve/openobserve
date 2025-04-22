@@ -993,7 +993,7 @@ async fn handle_derived_stream_triggers(
     // evaluate and ingest 1 period at a time.
     let suppossed_to_be_run_at = trigger.next_run_at;
     let delay = current_time - suppossed_to_be_run_at; // delay is in microseconds
-    let mut final_end_time = if derived_stream.trigger_condition.align_time {
+    let mut final_end_time = if !derived_stream.trigger_condition.align_time {
         current_time
     } else {
         suppossed_to_be_run_at
