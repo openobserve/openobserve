@@ -18,7 +18,7 @@ use std::time::Duration;
 use actix_http::ws::{CloseCode, CloseReason};
 use actix_ws::{AggregatedMessageStream, Session};
 use config::{
-    get_config,
+    get_config, ider,
     meta::websocket::{SearchEventReq, SearchResultType, ValuesEventReq},
     utils::time::now_micros,
 };
@@ -334,14 +334,20 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
             // Start - tracing setup
             let mut headers: std::collections::HashMap<String, String> =
                 std::collections::HashMap::new();
-            headers.insert("traceparent".to_string(), client_msg.get_trace_id());
+            let traceparent = format!(
+                "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be
+                                * recorded/exported */
+                client_msg.get_trace_id(),
+                ider::generate_span_id()
+            );
+            headers.insert("traceparent".to_string(), traceparent);
             let parent_ctx =
                 opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
             let ws_span = tracing::info_span!(
-                "src::handler::http::request::websocket::ws_v2::session::run",
+                "src::handler::http::request::websocket::ws_v2::session::handle_text_message",
                 req_id = %req_id,
             );
-            tracing::Span::current().set_parent(parent_ctx.clone());
+            tracing::Span::current().set_parent(parent_ctx);
             // End - tracing setup
 
             match client_msg {
@@ -652,7 +658,7 @@ async fn handle_search_event(
     // Spawn the search task
     tokio::spawn(async move {
         // Handle the search request
-        // If search is cancelled, the task will exit
+        // If search is cancelled, the taek will exit
         // Otherwise, the task will complete and the results will be sent to the client
         // The task will also update the search state to completed
         // The task will also close the session
