@@ -16,7 +16,7 @@
 use std::{cmp::Reverse, collections::BinaryHeap, time::Instant};
 
 use config::{
-    get_config,
+    get_config, ider,
     meta::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
@@ -104,7 +104,13 @@ pub async fn handle_search_request(
 
     // Start - tracing setup
     let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    headers.insert("traceparent".to_string(), req.trace_id.clone());
+    let traceparent = format!(
+        "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be
+                        * recorded/exported */
+        req.trace_id,
+        ider::generate_span_id()
+    );
+    headers.insert("traceparent".to_string(), traceparent);
     let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
     let ws_search_span = tracing::info_span!(
         "src::service::websocket_events::search::handle_search_request",
