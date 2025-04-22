@@ -5251,16 +5251,10 @@ const useLogs = () => {
             response.content.results.scan_size;
         } else {
           if (response.content?.streaming_aggs) {
-            if (!Object.keys(searchObj.data.queryResults)?.length) {
-              searchObj.data.queryResults = response.content.results;
-            } else {
-              searchObj.data.queryResults.hits = response.content.results.hits;
-              searchObj.data.queryResults.total =
-                response.content.results.total;
-
-              searchObj.data.queryResults.took += response.content.results.took;
-              searchObj.data.queryResults.scan_size +=
-                response.content.results.scan_size;
+            searchObj.data.queryResults = {
+              ...response.content.results,
+              took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
+              scan_size: (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
             }
           } else if (isPagination) {
             searchObj.data.queryResults.hits = response.content.results.hits;
