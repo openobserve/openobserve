@@ -57,7 +57,7 @@ pub async fn query(
         None,
     )
     .await?;
-    let dumped_files = file_list_dump::get_file_list_entries_in_range(
+    let dumped_files = file_list_dump::query(
         trace_id,
         org_id,
         stream_name,
@@ -273,7 +273,7 @@ pub async fn query_by_ids(
     // query from file_list_dump
     // we use the min(id) as id hint because that automatically filter outs any dump files
     // which cannot have the ids we are looking for
-    let dumped_files = file_list_dump::get_file_list_entries_in_range(
+    let dumped_files = file_list_dump::query(
         trace_id,
         org,
         stream,

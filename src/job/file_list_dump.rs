@@ -440,18 +440,8 @@ async fn generate_dump(
     // and if both pass only then set the job as dumped=true
 
     infra::storage::put(&file_key, buf.into()).await?;
-
-    if let Err(e) = infra::file_list::update_dump_records(&dump_file, &ids).await {
-        log::error!(
-            "error in removing dumped files from file_list, error : {}, ids {:?}",
-            e,
-            ids
-        )
-    }
-
-    if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
-        log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
-    }
+    infra::file_list::update_dump_records(&dump_file, &ids).await?;
+    infra::file_list::set_job_dumped_status(job_id, true).await?;
     log::info!(
         "successfully dumped file list {stream} offset {} count {batch_size}",
         range.0

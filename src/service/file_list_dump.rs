@@ -192,7 +192,7 @@ async fn exec(
     Ok(ret)
 }
 
-pub async fn get_file_list_entries_in_range(
+pub async fn query(
     trace_id: &str,
     org: &str,
     stream: &str,
@@ -207,6 +207,9 @@ pub async fn get_file_list_entries_in_range(
     );
     let db_start = std::time::Instant::now();
     let dump_files = get_dump_files_in_range(org, Some(&stream_key), range, id_hint).await?;
+    if dump_files.is_empty() {
+        return Ok(vec![]);
+    }
     let db_time = db_start.elapsed().as_millis();
 
     let process_start = std::time::Instant::now();
@@ -256,6 +259,9 @@ pub async fn get_ids_in_range(
     );
     let db_start = std::time::Instant::now();
     let dump_files = get_dump_files_in_range(org, Some(&stream_key), range, None).await?;
+    if dump_files.is_empty() {
+        return Ok(vec![]);
+    }
     let db_time = db_start.elapsed().as_millis();
 
     let process_start = std::time::Instant::now();
@@ -429,6 +435,10 @@ pub async fn stats(
             ("org", org_id.to_string(), dump_files)
         }
     };
+
+    if dump_files.is_empty() {
+        return Ok(vec![]);
+    }
 
     let dump_files: Vec<_> = dump_files
         .into_iter()
