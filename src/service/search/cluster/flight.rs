@@ -153,7 +153,7 @@ pub async fn search(
 
     // 3. get nodes
     let get_node_start = std::time::Instant::now();
-    let node_group = req
+    let role_group = req
         .search_event_type
         .as_ref()
         .map(|v| {
@@ -162,7 +162,7 @@ pub async fn search(
                 .map(RoleGroup::from)
         })
         .unwrap_or(None);
-    let mut nodes = get_online_querier_nodes(trace_id, node_group).await?;
+    let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
     if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
@@ -268,7 +268,7 @@ pub async fn search(
     });
 
     // 5. partition file list
-    let partitioned_file_lists = partition_file_lists(file_id_list, &nodes, node_group).await?;
+    let partitioned_file_lists = partition_file_lists(file_id_list, &nodes, role_group).await?;
 
     #[cfg(feature = "enterprise")]
     super::super::SEARCH_SERVER
@@ -519,14 +519,14 @@ pub async fn run_datafusion(
 
 pub async fn get_online_querier_nodes(
     trace_id: &str,
-    node_group: Option<RoleGroup>,
+    role_group: Option<RoleGroup>,
 ) -> Result<Vec<Node>> {
     // get nodes from cluster
     let cfg = get_config();
     let nodes = if cfg.common.feature_query_skip_wal {
-        infra_cluster::get_cached_online_querier_nodes(node_group).await
+        infra_cluster::get_cached_online_querier_nodes(role_group).await
     } else {
-        infra_cluster::get_cached_online_query_nodes(node_group).await
+        infra_cluster::get_cached_online_query_nodes(role_group).await
     };
     let mut nodes = match nodes {
         Some(nodes) => nodes,
