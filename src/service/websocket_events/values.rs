@@ -21,6 +21,7 @@ use config::{
         websocket::{SearchResultType, ValuesEventReq},
     },
 };
+use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
 use crate::service::websocket_events::enterprise_utils;
@@ -36,10 +37,12 @@ use crate::{
             search::{
                 do_partitioned_search, handle_cache_responses_and_deltas, write_results_to_cache,
             },
+            setup_tracing_with_trace_id,
         },
     },
 };
 
+#[tracing::instrument(name = "service:search:websocket::handle_values_request", skip_all)]
 pub async fn handle_values_request(
     org_id: &str,
     user_id: &str,
@@ -55,6 +58,13 @@ pub async fn handle_values_request(
     let end_time = payload.end_time;
     let stream_name = payload.stream_name.clone();
     let no_count = payload.no_count;
+
+    // Setup tracing
+    let ws_values_span = setup_tracing_with_trace_id(
+        &trace_id,
+        tracing::info_span!("src::service::websocket_events::values::handle_values_request"),
+    )
+    .await;
 
     log::info!(
         "[WS_VALUES] trace_id: {} Received values request, start_time: {}, end_time: {}",
@@ -87,7 +97,9 @@ pub async fn handle_values_request(
     let top_k = payload.size.or(Some(cfg.limit.query_default_limit));
 
     // get values req query
-    let reqs = build_search_request_per_field(&payload, org_id, stream_type, &stream_name).await?;
+    let reqs = build_search_request_per_field(&payload, org_id, stream_type, &stream_name)
+        .instrument(ws_values_span.clone())
+        .await?;
 
     for (search_req, stream_type, field) in reqs {
         // Convert the request query to SearchQuery type if needed
@@ -105,6 +117,7 @@ pub async fn handle_values_request(
                 &search_req,
                 search_req.use_cache.unwrap_or(false),
             )
+            .instrument(ws_values_span.clone())
             .await?;
             let local_c_resp = c_resp.clone();
             let cached_resp = local_c_resp.cached_response;
@@ -181,6 +194,7 @@ pub async fn handle_values_request(
                     remaining_query_range,
                     &order_by,
                 )
+                .instrument(ws_values_span.clone())
                 .await?;
             } else {
                 // Step 2: Search without cache
@@ -220,6 +234,7 @@ pub async fn handle_values_request(
                     accumulated_results,
                     max_query_range,
                 )
+                .instrument(ws_values_span.clone())
                 .await?;
             }
             // Step 3: Write to results cache
@@ -230,6 +245,7 @@ pub async fn handle_values_request(
                 let safe_end_time = end_time.unwrap_or(0);
 
                 write_results_to_cache(c_resp, safe_start_time, safe_end_time, accumulated_results)
+                    .instrument(ws_values_span.clone())
                     .await
                     .map_err(|e| {
                         log::error!(
@@ -273,6 +289,7 @@ pub async fn handle_values_request(
                 accumulated_results,
                 max_query_range,
             )
+            .instrument(ws_values_span.clone())
             .await?;
         }
     }
