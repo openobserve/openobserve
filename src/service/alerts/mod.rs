@@ -485,8 +485,139 @@ impl QueryConditionExt for QueryCondition {
 }
 
 #[async_trait]
+pub trait ConditionListExt: Sync + Send + 'static {
+    async fn len(&self) -> u32;
+    async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error>;
+    async fn is_empty(&self) -> bool;
+}
+
+#[async_trait]
+impl ConditionListExt for ConditionList {
+    /// Returns end node count of a Condition list
+    async fn len(&self) -> u32 {
+        match self {
+            ConditionList::OrNode { or: conditions }
+            | ConditionList::AndNode { and: conditions } => {
+                let mut count = 0;
+                for condition in conditions.iter() {
+                    count += condition.len().await
+                }
+                count
+            }
+            ConditionList::NotNode { not: inner } => inner.len().await,
+            ConditionList::EndCondition(_) => 1,
+            ConditionList::LegacyConditions(conditions) => {
+                conditions.len() as u32
+            }
+        }
+    }
+
+    /// Converts Condition list to SQL query as per schema
+    async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error> {
+        match self {
+            ConditionList::OrNode { or: conditions } => {
+                let mut cond_sql_list = Vec::new();
+                for condition in conditions.iter() {
+                    cond_sql_list.push(condition.to_sql(schema).await?);
+                }
+                Ok(format!("({})", cond_sql_list.join(" OR ")))
+            }
+            ConditionList::LegacyConditions(conditions) => {
+                let mut cond_sql_list = Vec::new();
+                for cond in conditions {
+                    let data_type = match schema.field_with_name(&cond.column) {
+                        Ok(field) => field.data_type(),
+                        Err(_) => {
+                            return Err(anyhow::anyhow!("Column {} not found", &cond.column,));
+                        }
+                    };
+                    cond_sql_list.push(build_expr(cond, "", data_type)?);
+                }
+                Ok(format!("({})", cond_sql_list.join(" AND ")))
+            }
+            ConditionList::AndNode { and: conditions } => {
+                let mut cond_sql_list = Vec::new();
+                for condition in conditions.iter() {
+                    cond_sql_list.push(condition.to_sql(schema).await?);
+                }
+                Ok(format!("({})", cond_sql_list.join(" AND ")))
+            }
+            ConditionList::NotNode { not: inner } => {
+                Ok(format!("NOT ({})", inner.to_sql(schema).await?))
+            }
+            ConditionList::EndCondition(node) => {
+                let data_type = match schema.field_with_name(&node.column) {
+                    Ok(field) => field.data_type(),
+                    Err(_) => {
+                        return Err(anyhow::anyhow!("Column {} not found", &node.column,));
+                    }
+                };
+                build_expr(node, "", data_type)
+            }
+        }
+    }
+
+    async fn is_empty(&self) -> bool {
+        match self {
+            ConditionList::OrNode { or: conditions } => {
+                for condition in conditions.iter() {
+                    if condition.is_empty().await {
+                        return true;
+                    }
+                }
+                false
+            }
+            ConditionList::AndNode { and: conditions } => {
+                for condition in conditions.iter() {
+                    if !condition.is_empty().await {
+                        return false;
+                    }
+                }
+                true
+            }
+            ConditionList::NotNode { not: inner } => inner.is_empty().await,
+            ConditionList::LegacyConditions(conditions) => {
+                conditions.is_empty()
+            }
+            ConditionList::EndCondition(_) => false,
+        }
+    }
+}
+
+#[async_trait]
 pub trait ConditionExt: Sync + Send + 'static {
     async fn evaluate(&self, row: &Map<String, Value>) -> bool;
+}
+
+#[async_trait]
+impl ConditionExt for ConditionList {
+    async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+        match self {
+            ConditionList::OrNode { or: conditions } => {
+                let mut eval = false;
+                for condition in conditions {
+                    eval = eval || condition.evaluate(row).await
+                }
+                eval
+            }
+            ConditionList::LegacyConditions(conditions) => {
+                let mut eval = true;
+                for condition in conditions {
+                    eval = eval && condition.evaluate(row).await
+                }
+                eval
+            }
+            ConditionList::AndNode { and: conditions } => {
+                let mut eval = true;
+                for condition in conditions {
+                    eval = eval && condition.evaluate(row).await
+                }
+                eval
+            }
+            ConditionList::NotNode { not: conditions } => !conditions.evaluate(row).await,
+            ConditionList::EndCondition(condition) => condition.evaluate(row).await,
+        }
+    }
 }
 
 #[async_trait]
