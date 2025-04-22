@@ -101,10 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="text-subtitle2 text-bold q-mr-sm"
                 :class="{
-                  highlighted: isHighlighted(index),
+                  highlighted: isHighlighted(span.spanId),
                   'tw-text-gray-900':
-                    store.state.theme === 'dark' && isHighlighted(index),
-                  'current-match': currentSelectedValue === index, // Current match class
+                    store.state.theme === 'dark' && isHighlighted(span.spanId),
+                  'current-match': currentSelectedValue === span.spanId, // Current match class
                 }"
               >
                 {{ span.serviceName }}
@@ -277,13 +277,14 @@ export default defineComponent({
             return false; // Skip non-string/non-number values
           });
           // Return the index if a match is found, otherwise return -1
-          return matches ? index : -1;
+          return matches ? span.span_id : -1;
         })
         .filter((index: any) => index !== -1);
     };
     const updateSearch = () => {
       if (props.searchQuery?.trim()) {
         searchResults.value = findMatches(props.spanList, props.searchQuery);
+        console.log("Search Results", searchResults.value);
         currentIndex.value = 0; // Reset to first match
         nextTick(() => {
           scrollToMatch(); // Wait for DOM updates before scrolling
