@@ -281,8 +281,6 @@ function getQueryTransform() {
 
     return;
   } catch (e) {
-    console.log("Turn off loading");
-    console.log("Turn off loading");
     searchObj.loading = false;
     showErrorNotification("Error while getting functions");
   }
@@ -302,7 +300,6 @@ async function getStreamList() {
           //extract stream data from response
           loadStreamLists();
         } else {
-          console.log("Turn off loading");
           searchObj.loading = false;
           searchObj.data.errorMsg = "";
           searchObj.data.stream.streamLists = [];
@@ -327,7 +324,6 @@ async function getStreamList() {
           });
       })
       .catch((e) => {
-        console.log("Turn off loading");
         searchObj.loading = false;
         $q.notify({
           type: "negative",
@@ -337,13 +333,11 @@ async function getStreamList() {
         });
       })
       .finally(() => {
-        console.log("Turn off loading");
         searchObj.loading = false;
       });
   } catch (e) {
-    console.log("Turn off loading");
     searchObj.loading = false;
-    console.log(e);
+    console.error("Error while getting streams", e);
     showErrorNotification("Error while getting streams");
   }
 }
@@ -377,7 +371,6 @@ function loadStreamLists() {
         searchObj.data.stream.selectedStream = selectedStreamItemObj;
       } else {
         searchObj.data.stream.selectedStream = {};
-        console.log("Turn off loading");
         searchObj.loading = false;
         searchObj.data.queryResults = {};
         searchObj.data.sortedQueryResults = [];
@@ -388,11 +381,9 @@ function loadStreamLists() {
         };
       }
     } else {
-      console.log("Turn off loading");
       searchObj.loading = false;
     }
   } catch (e) {
-    console.log("Turn off loading");
     searchObj.loading = false;
     showErrorNotification("Error while loading streams");
   }
@@ -465,9 +456,8 @@ function getConsumableDateTime() {
       return rVal;
     }
   } catch (e) {
-    console.log("Turn off loading");
     searchObj.loading = false;
-    console.log("Error while getting consumable date time");
+    console.error("Error while getting consumable date time");
   }
 }
 
@@ -551,8 +541,7 @@ function buildSearch() {
     router.push({ query: queryParams });
     return req;
   } catch (e) {
-    console.log(e);
-    console.log("Turn off loading");
+    console.error("Error while constructing the search query", e);
     searchObj.loading = false;
     showErrorNotification(
       "An error occurred while constructing the search query.",
@@ -682,7 +671,6 @@ async function getQueryData() {
         stream_name: selectedStreamName.value,
       })
       .then(async (res) => {
-        console.log("Turn off loading");
         searchObj.loading = false;
         const formattedHits = getTracesMetaData(res.data.hits);
         if (res.data.from > 0) {
@@ -705,7 +693,6 @@ async function getQueryData() {
         // dismiss();
       })
       .catch((err) => {
-        console.log("Turn off loading");
         searchObj.loading = false;
         // dismiss();
         if (err.response != undefined) {
@@ -729,8 +716,7 @@ async function getQueryData() {
         if (dismiss) dismiss();
       });
   } catch (e) {
-    console.log(e?.message);
-    console.log("Turn off loading");
+    console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
     showErrorNotification("Search request failed");
   }
@@ -864,9 +850,8 @@ async function extractFields() {
       });
     }
   } catch (e) {
-    console.log("Turn off loading");
     searchObj.loading = false;
-    console.log("Error while extracting fields", e);
+    console.error("Error while extracting fields", e);
   }
 }
 
@@ -925,12 +910,10 @@ function updateGridColumns() {
       format: (val) => formatTimeWithSuffix(val),
     });
 
-    console.log("Turn off loading");
     searchObj.loading = false;
   } catch (e) {
-    console.log("Turn off loading");
     searchObj.loading = false;
-    console.log("Error while updating grid columns");
+    console.error("Error while updating grid columns");
   }
 }
 
@@ -1062,12 +1045,11 @@ onActivated(() => {
   ) {
     setTimeout(() => {
       if (searchResultRef.value) searchResultRef.value.reDrawChart();
-    }, 1500);
+    }, 300);
   }
 });
 
 const runQueryFn = () => {
-  console.log("runQueryFn");
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.runQuery = false;
   getQueryData();
@@ -1109,6 +1091,7 @@ const onSplitterUpdate = () => {
 const refreshTimezone = () => {
   updateGridColumns();
   generateHistogramData();
+
   searchResultRef.value.reDrawChart();
 };
 
@@ -1153,7 +1136,6 @@ const setHistogramDate = async (date: any) => {
   await nextTick();
   await nextTick();
 
-  console.log("setHistogramDate");
   searchData();
 };
 
@@ -1171,7 +1153,6 @@ const searchData = () => {
     return;
   }
 
-  console.log("searchData");
   runQueryFn();
   indexListRef.value.filterExpandedFieldValues();
 
