@@ -590,7 +590,7 @@ def handle_websocket_connection(message):
     """Simple WebSocket handler - just get results and return"""
   
     ws = None
-    cookie_header = f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}"
+    cookie_header = f"auth_tokens=base64.b64encode({{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}})"
     
     # Generate a dynamic UUID
     connection_uuid = str(uuid.uuid4())  # Renamed from uuid to connection_uuid

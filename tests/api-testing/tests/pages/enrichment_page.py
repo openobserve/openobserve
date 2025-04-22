@@ -59,8 +59,8 @@ class EnrichmentPage:
         }
 
         cookies = {
-            'auth_ext': '{"auth_ext":"","refresh_token":"","request_time":0,"expires_in":0}',
-            'auth_tokens': f'{{"access_token":"Basic {base64.b64encode((user_email + ":" + user_password).encode()).decode()}","refresh_token":""}}'
+            'auth_ext': 'base64.b64encode({"auth_ext":"","refresh_token":"","request_time":0,"expires_in":0})',
+            'auth_tokens': f'base64.b64encode({{"access_token":"Basic {base64.b64encode((user_email + ":" + user_password).encode()).decode()}","refresh_token":""}})'
         }
 
         # Create sample data directly instead of reading from file
