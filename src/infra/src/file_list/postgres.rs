@@ -1366,7 +1366,7 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
 
         let del_items = files.iter().filter(|v| v.deleted).collect::<Vec<_>>();
         if !del_items.is_empty() {
-            let chunks = files.chunks(1000);
+            let chunks = del_items.chunks(1000);
             for files in chunks {
                 // get ids of the files
                 let mut ids = Vec::with_capacity(files.len());

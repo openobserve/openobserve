@@ -19,6 +19,7 @@ use actix_web::{HttpResponse, get};
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
+    config::meta::cluster::RoleGroup,
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
     std::io::ErrorKind,
 };
@@ -41,9 +42,11 @@ use {
 pub async fn list_clusters() -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     let clusters = if get_o2_config().super_cluster.enabled {
-        let clusters = o2_enterprise::enterprise::super_cluster::kv::cluster::list()
-            .await
-            .map_err(|e| Error::new(ErrorKind::Other, e))?;
+        let clusters = o2_enterprise::enterprise::super_cluster::kv::cluster::list_by_role_group(
+            Some(RoleGroup::Interactive),
+        )
+        .await
+        .map_err(|e| Error::new(ErrorKind::Other, e))?;
         let mut regions = HashMap::with_capacity(clusters.len());
         for c in clusters {
             let region: &mut Vec<_> = regions.entry(c.region).or_insert_with(Vec::new);

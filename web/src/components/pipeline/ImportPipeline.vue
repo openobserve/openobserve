@@ -348,39 +348,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-red"
                         v-else-if="
                           typeof errorMessage === 'object' &&
-                          errorMessage.field == 'destination_stream_name'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-select
-                            data-test="pipeline-import-source-stream-name-input"
-                            v-model="userSelectedDestinationStreamName[index]"
-                            :options="streamData"
-                            :label="t('alerts.stream_name') + ' *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            @update:model-value="updateDestinationStreamFields(userSelectedDestinationStreamName[index], index)"
-                            behavior="menu"
-                          >
-                          </q-select>
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
                           errorMessage.field == 'org_id'
                         "
                       >
@@ -415,14 +382,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-red"
                         v-else-if="
                           typeof errorMessage === 'object' &&
-                          (errorMessage.field == 'function_name')
+                          errorMessage.field.startsWith('function_name')
                         "
                       >
                         {{ errorMessage.message }}
                         <div>
                           <q-select
                             data-test="pipeline-import-destination-function-name-input"
-                            v-model="userSelectedFunctionName[index]"
+                            v-model="userSelectedFunctionName[errorMessage.nodeIndex]"
                             :options="existingFunctions"
                             :label="'Function Name'"
                             :popup-content-style="{ textTransform: 'lowercase' }"
@@ -433,12 +400,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             outlined
                             filled
                             dense
-                            @update:model-value="updateFunctionName(userSelectedFunctionName[index],index)"
+                            @update:model-value="updateFunctionName(userSelectedFunctionName[errorMessage.nodeIndex], index, errorMessage.nodeIndex)"
                             :rules="[(val: any) => !!val || 'Field is required!']"
                             style="width: 300px"
                           />
                         </div>
                       </span>
+
                       <span
                         class="text-red"
                         v-else-if="
@@ -572,6 +540,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       type ErrorMessage = {
         field: string;
         message: string;
+        nodeIndex?: any;
+        currentValue?: string;
       };
       type alertCreator = {
         message: string;
@@ -621,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const pipelineDestinations = ref<any>([]);
       const alertDestinations = ref<any>([]);
       const userSelectedSqlQuery = ref<string[]>([]);
-      const userSelectedFunctionName = ref<string[]>([]);
+      const userSelectedFunctionName = ref<any[]>([]);
       const scheduledPipelines = ref<any>([]);
       const userSelectedOrgId = ref<any[]>([]);
       const organizationData = computed(() => {
@@ -712,15 +682,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         jsonArrayOfObj.value[index].name = pipelineName;
         jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
       };
+      //this function helps in updating the function name in the pipeline
+      //we use the pipelineIndex to get the correct pipeline and the nodeIndex to get the correct node
+      //we use the nodeIndex to push the error to the correct node
 
-      const updateFunctionName = (functionName: string, index: number) => {
-        jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
-          if(node.io_type == "default" && node.data.node_type == "function"){
-            node.data.name = functionName;
-          }
-        });
+      const updateFunctionName = (functionName: any, pipelineIndex: any, nodeIndex: any) => {
+        const node = jsonArrayOfObj.value[pipelineIndex].nodes[nodeIndex];
+        
+        if (
+          node &&
+          node.io_type === "default" &&
+          node.data.node_type === "function"
+        ) {
+          node.data.name = functionName;
+        }
+
         jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
       };
+
   
       watch(jsonFiles, async (newVal:any, oldVal:any) => {
         if (newVal && newVal.length > 0) {
@@ -999,14 +978,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       };
       const validateNodesForOrg = (input: any) => {
         return input.nodes.some((node: any) => {
-          return !node.data.org_id || (node.data.org_id != store.state.selectedOrganization.identifier)
-        }) ? false : true; // If condition is met (returns true), return false, otherwise return true
-      }
+          const isFunction = node.data.node_type === 'function';
+          const isCondition = node.data.node_type === 'condition';
+          const orgId = node.data.org_id;
+          const selectedOrgId = store.state.selectedOrganization.identifier;
+
+          return !isFunction && !isCondition && (!orgId || orgId !== selectedOrgId);
+        }) ? false : true;
+      };
+
 
 
   
       const validatePipelineInputs = async (input: any, index: number) => {
-        let pipelineErrors: (string | { message: string; field: string })[] = [];
+        let pipelineErrors: (string | { message: string; field: string; nodeIndex?: number; currentValue?: string })[] = [];
 
         // 1. validate name it should not be empty 
         if(!input.name.trim() || input.name.trim() === ""){
@@ -1131,14 +1116,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
 
         //validate function node in pipeline
-        const validateFunctionNode = async (input: any) => {
-          const isValid = !input.nodes.some((node: any) => {
-            return node.io_type == "default" && 
-                  node.data.node_type == "function" && 
-                  (!node.data.name || !existingFunctions.value.includes(node.data.name));
+        //this function helps in validating the function node and pushing the errors to the pipelineErrors array
+        //we track the function counter to get the correct node index because all nodes are not function nodes
+        //we use the nodeIndex to push the error to the correct node
+        const validateFunctionNode = (input: any, pipelineIndex: number) => {
+          let functionCounter = 0;
+
+          input.nodes.forEach((node: any, nodeIndex: number) => {
+            if (node.io_type === "default" && node.data.node_type === "function") {
+              functionCounter++;
+
+              if (!node.data.name || !existingFunctions.value.includes(node.data.name)) {
+                pipelineErrors.push({
+                  message: `Pipeline - ${pipelineIndex}, Function-${functionCounter}: Function name is required and should be in the existing functions list`,
+                  field: `function_name_${nodeIndex}`,
+                  nodeIndex: nodeIndex,
+                });
+              }
+            }
           });
-          return isValid; 
-        }
+        };
+
         const validateConditionNode = (input: any) => {
           const isValid = !input.nodes.some((node: any) => {
             return node.io_type == "default" && 
@@ -1147,11 +1145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           });
           return isValid; 
         }
-
-        const isValidFunctionNode = await validateFunctionNode(input);
-        if(!isValidFunctionNode){
-          pipelineErrors.push({ message: `Pipeline - ${index}: Function name is required and should be in the existing functions list`, field: "function_name" });
-        }
+        validateFunctionNode(input, index);
         //validate condition node 
         if(!validateConditionNode(input)){
           pipelineErrors.push({ message: `Pipeline - ${index}: Condition is required`, field: "empty_condition" });
