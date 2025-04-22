@@ -131,6 +131,7 @@ jobs:
             "sanity2.spec.js",
             "schemaload.spec.js",
             "websocket.spec.js",
+            "alertImportTDA.spec.js",
             # "remotepipeline.spec.js",
 
           ]

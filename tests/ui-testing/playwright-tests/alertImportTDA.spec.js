@@ -3,9 +3,8 @@ import { LoginPage } from '../pages/loginPage.js';
 import { ManagementPage } from "../pages/managementPage.js";
 import { AlertTemplate } from "../pages/alertTemplate.js";  
 
-
 // Function to generate a random 5-character alphabetic name
-function generateRandomLogoName() {
+function generateRandomName() {
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
     let randomName = '';
     for (let i = 0; i < 5; i++) {
@@ -14,11 +13,9 @@ function generateRandomLogoName() {
     return randomName;
 }
 
-
 test.describe("Import for Template, Destination, Alert", () => {
+    
     let loginPage, managementPage, alertTemplate;
-    const emailName = `email${Date.now()}@gmail.com`;
-
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
         managementPage = new ManagementPage(page);
@@ -30,28 +27,42 @@ test.describe("Import for Template, Destination, Alert", () => {
     });
 
 
-    test("Import Template from JSON file", async ({ page }) => {
+    test("Import Webhook Template from JSON file", async ({ page }) => {
 
         await managementPage.navigateToManagement();
         await alertTemplate.navigateToAlertTemplate();
         await alertTemplate.importTemplateButton();
-
         //file name to be used for import
         const fileContentPath = "../test-data/AlertMultiTemplateWebHook.json";
-
         // Locate the file input field and set the JSON file
         const inputFile = await page.locator('input[type="file"]');
-        //is used for setting the file to be imported
         await inputFile.setInputFiles(fileContentPath);
-
-        // await page.locator('.view-lines').click();
         await alertTemplate.ClickTemplateImportJsonButton();
-        // Example usage in Playwright POM
-        const WebHookTemplateOne = generateRandomLogoName();
-        const WebHookTemplateTwo = generateRandomLogoName();
+        const WebHookTemplateOne = generateRandomName();
+        const WebHookTemplateTwo = generateRandomName();
         console.log(`Generated logo name: ${WebHookTemplateOne}`);
         console.log(`Generated logo name: ${WebHookTemplateTwo}`);
-        
+        await alertTemplate.ClickTemplateImportError00NameInput(WebHookTemplateOne);
+        await alertTemplate.ClickTemplateImportError10NameInput(WebHookTemplateTwo);
+        await alertTemplate.ClickTemplateImportJsonButton();
+        await expect(page.locator('#q-notify')).toContainText('Successfully imported template(s)');
+    
+    });
+
+    
+    test("Import Webhook Template from URL", async ({ page }) => {
+
+        await managementPage.navigateToManagement();
+        await alertTemplate.navigateToAlertTemplate();
+        await alertTemplate.importTemplateButton();
+        const url = 'https://raw.githubusercontent.com/ShyamOOAI/Alerts_test/refs/heads/main/Alert_Multi_Template_Web_Hook';
+        await alertTemplate.importTemplateFromUrl(url);
+        await page.waitForTimeout(5000);
+        await alertTemplate.ClickTemplateImportJsonButton();
+        const WebHookTemplateOne = generateRandomName();
+        const WebHookTemplateTwo = generateRandomName();
+        console.log(`Generated logo name: ${WebHookTemplateOne}`);
+        console.log(`Generated logo name: ${WebHookTemplateTwo}`);
         await alertTemplate.ClickTemplateImportError00NameInput(WebHookTemplateOne);
         await alertTemplate.ClickTemplateImportError10NameInput(WebHookTemplateTwo);
         await alertTemplate.ClickTemplateImportJsonButton();
@@ -59,12 +70,54 @@ test.describe("Import for Template, Destination, Alert", () => {
 
     });
 
-    
 
+    test("Validate Cancel button on Import Template Page", async ({ page }) => {
+
+        await managementPage.navigateToManagement();
+        await alertTemplate.navigateToAlertTemplate();
+        await alertTemplate.importTemplateButton();
+        await page.waitForTimeout(5000);
+        await alertTemplate.ClickTemplateImportCancelButton();
+        await expect(page.locator('[data-test="alert-templates-list-title"]')).toContainText('Templates');
+
+    });
         
+    test("Validate JSON string is empty", async ({ page }) => {
 
+        await managementPage.navigateToManagement();
+        await alertTemplate.navigateToAlertTemplate();
+        await alertTemplate.importTemplateButton();
+        await alertTemplate.ClickTemplateImportJsonButton();
+        await expect(page.locator('#q-notify')).toContainText('JSON string is empty');
+
+
+    });
     
+    test("Download Webhook Template after import", async ({ page }) => {
 
+        await managementPage.navigateToManagement();
+        await alertTemplate.navigateToAlertTemplate();
+        await alertTemplate.importTemplateButton();
+        const fileContentPath = "../test-data/AlertMultiTemplateWebHook.json";
+        const inputFile = await page.locator('input[type="file"]');
+        await inputFile.setInputFiles(fileContentPath);
+        await alertTemplate.ClickTemplateImportJsonButton();
+        const WebHookTemplateOne = generateRandomName();
+        const WebHookTemplateTwo = generateRandomName();
+        console.log(`Generated logo name: ${WebHookTemplateOne}`);
+        console.log(`Generated logo name: ${WebHookTemplateTwo}`);
+        await alertTemplate.ClickTemplateImportError00NameInput(WebHookTemplateOne);
+        await alertTemplate.ClickTemplateImportError10NameInput(WebHookTemplateTwo);
+        await alertTemplate.ClickTemplateImportJsonButton();
+        await expect(page.locator('#q-notify')).toContainText('Successfully imported template(s)');
+        await page.waitForTimeout(5000);
+        const downloadPromise = page.waitForEvent('download');
+        await page.getByRole('row', { name: WebHookTemplateOne }).locator('[data-test="destination-export"]').click();
+        const downloadedFile = await downloadPromise;
+        const filePath = await downloadedFile.path();
+        console.log(`Downloaded file saved at: ${filePath}`);
+
+    });
     
     
 

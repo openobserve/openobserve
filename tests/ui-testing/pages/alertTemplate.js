@@ -17,6 +17,9 @@ export class  AlertTemplate {
         this.importJsonInput = '[data-test="template-import-json-file-input"]';
         this.alertTemplateTab = '[data-test="alert-templates-tab"]';
         this.alertTemplateList = '[data-test="alert-template-list"]';
+        this.templateImportUrlInput = '[data-test="template-import-url-input"]';
+        this.templateImportUrlTab = '[data-test="tab-import_json_url"]';
+        this.templateImportCancelButton = '[data-test="template-import-cancel-btn"]';
     }
 
     async navigateToAlertTemplate() {
@@ -34,6 +37,11 @@ export class  AlertTemplate {
         await this.page.locator(this.templateImportJsonButton).click();
     }
 
+    async ClickTemplateImportCancelButton() {
+        await this.page.waitForSelector(this.templateImportCancelButton);
+        await this.page.locator(this.templateImportCancelButton).click();
+    }
+
     async ClickTemplateImportError00NameInput(name) {
         await this.page.waitForSelector(this.templateImportError00NameInput);
         await this.page.locator(this.templateImportError00NameInput).click();
@@ -46,6 +54,15 @@ export class  AlertTemplate {
         await this.page.locator(this.templateImportError10NameInput).fill(name);
     }
     
+
+    async importTemplateFromUrl(url) {
+        await this.page.waitForSelector(this.templateImportUrlTab);
+        await this.page.locator(this.templateImportUrlTab).click();
+        await this.page.waitForSelector(this.templateImportUrlInput);
+        await this.page.locator(this.templateImportUrlInput).click();
+        await this.page.locator(this.templateImportUrlInput).fill(url);    
+    }
+
     async importTemplate(filePath) {
         await this.page.waitForSelector(this.importJsonInput);
         await this.page.locator(this.importJsonInput).setInputFiles(filePath);
