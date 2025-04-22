@@ -481,7 +481,7 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
 
     if get_o2_config().super_cluster.enabled {
         let trace_id = config::ider::generate_trace_id();
-        let nodes = get_cluster_nodes("delete_result", vec![], vec![]).await?;
+        let nodes = get_cluster_nodes("delete_result", vec![], vec![], None).await?;
         // delete result in all cluster,
         // because for retry job, we don't know partition in which cluster
         for node in nodes {
