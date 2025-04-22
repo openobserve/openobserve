@@ -16,7 +16,7 @@
 use std::{cmp::Reverse, collections::BinaryHeap, time::Instant};
 
 use config::{
-    get_config, ider,
+    get_config,
     meta::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
@@ -29,7 +29,6 @@ use config::{
 };
 use infra::errors::{Error, ErrorCodes};
 use tracing::Instrument;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::sort::order_search_results;
 #[allow(unused_imports)]
@@ -50,7 +49,9 @@ use crate::{
             self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
             sql::Sql,
         },
-        websocket_events::{TimeOffset, WsServerEvents, search_registry_utils},
+        websocket_events::{
+            TimeOffset, WsServerEvents, search_registry_utils, setup_tracing_with_trace_id,
+        },
     },
 };
 
@@ -104,22 +105,12 @@ pub async fn handle_search_request(
         end_time
     );
 
-    // Start - tracing setup
-    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    let traceparent = format!(
-        "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be
-                        * recorded/exported */
-        req.trace_id,
-        ider::generate_span_id()
-    );
-    headers.insert("traceparent".to_string(), traceparent);
-    let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
-    let ws_search_span = tracing::info_span!(
-        "src::service::websocket_events::search::handle_search_request",
-        org_id = %req.org_id,
-    );
-    ws_search_span.set_parent(parent_ctx.clone());
-    // End - tracing setup
+    // Setup tracing
+    let ws_search_span = setup_tracing_with_trace_id(
+        &req.trace_id,
+        tracing::info_span!("src::service::websocket_events::search::handle_search_request"),
+    )
+    .await;
 
     // check and append search event type
     if req.payload.search_type.is_none() {

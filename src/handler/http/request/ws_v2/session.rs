@@ -18,7 +18,7 @@ use std::time::Duration;
 use actix_http::ws::{CloseCode, CloseReason};
 use actix_ws::{AggregatedMessageStream, Session};
 use config::{
-    get_config, ider,
+    get_config,
     meta::websocket::{SearchEventReq, SearchResultType, ValuesEventReq},
     utils::time::now_micros,
 };
@@ -32,7 +32,6 @@ use o2_enterprise::enterprise::common::{
 use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
 use tracing::Instrument;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[cfg(feature = "enterprise")]
 use crate::common::infra::cluster::get_cached_online_router_nodes;
@@ -49,7 +48,7 @@ use crate::{
     },
     service::websocket_events::{
         WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
-        search_registry_utils::SearchState, sessions_cache_utils,
+        search_registry_utils::SearchState, sessions_cache_utils, setup_tracing_with_trace_id,
     },
 };
 
@@ -331,24 +330,14 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 return;
             }
 
-            // Start - tracing setup
-            let mut headers: std::collections::HashMap<String, String> =
-                std::collections::HashMap::new();
-            let traceparent = format!(
-                "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be
-                                * recorded/exported */
-                client_msg.get_trace_id(),
-                ider::generate_span_id()
-            );
-            headers.insert("traceparent".to_string(), traceparent);
-            let parent_ctx =
-                opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
-            let ws_span = tracing::info_span!(
-                "src::handler::http::request::websocket::ws_v2::session::handle_text_message",
-                req_id = %req_id,
-            );
-            tracing::Span::current().set_parent(parent_ctx);
-            // End - tracing setup
+            // Setup tracing
+            let ws_span = setup_tracing_with_trace_id(
+                &client_msg.get_trace_id(),
+                tracing::info_span!(
+                    "src::handler::http::request::websocket::ws_v2::session::handle_text_message"
+                ),
+            )
+            .await;
 
             match client_msg {
                 WsClientEvents::Search(ref search_req) => {

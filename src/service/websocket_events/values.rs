@@ -15,14 +15,13 @@
 
 use chrono::DateTime;
 use config::{
-    get_config, ider,
+    get_config,
     meta::{
         search::{SearchEventType, ValuesEventContext},
         websocket::{SearchResultType, ValuesEventReq},
     },
 };
 use tracing::Instrument;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[cfg(feature = "enterprise")]
 use crate::service::websocket_events::enterprise_utils;
@@ -38,6 +37,7 @@ use crate::{
             search::{
                 do_partitioned_search, handle_cache_responses_and_deltas, write_results_to_cache,
             },
+            setup_tracing_with_trace_id,
         },
     },
 };
@@ -59,22 +59,12 @@ pub async fn handle_values_request(
     let stream_name = payload.stream_name.clone();
     let no_count = payload.no_count;
 
-    // Start - tracing setup
-    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    let traceparent = format!(
-        "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be
-                        * recorded/exported */
-        req.trace_id,
-        ider::generate_span_id()
-    );
-    headers.insert("traceparent".to_string(), traceparent);
-    let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
-    let ws_values_span = tracing::info_span!(
-        "src::service::websocket_events::values::handle_values_request",
-        org_id = %org_id,
-    );
-    ws_values_span.set_parent(parent_ctx.clone());
-    // End - tracing setup
+    // Setup tracing
+    let ws_values_span = setup_tracing_with_trace_id(
+        &trace_id,
+        tracing::info_span!("src::service::websocket_events::values::handle_values_request"),
+    )
+    .await;
 
     log::info!(
         "[WS_VALUES] trace_id: {} Received values request, start_time: {}, end_time: {}",
