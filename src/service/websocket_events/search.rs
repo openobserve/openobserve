@@ -29,6 +29,7 @@ use config::{
 };
 use infra::errors::{Error, ErrorCodes};
 use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::sort::order_search_results;
 #[allow(unused_imports)]
@@ -100,6 +101,17 @@ pub async fn handle_search_request(
         start_time,
         end_time
     );
+
+    // Start - tracing setup
+    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    headers.insert("traceparent".to_string(), req.trace_id.clone());
+    let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
+    let ws_search_span = tracing::info_span!(
+        "src::service::websocket_events::search::handle_search_request",
+        org_id = %req.org_id,
+    );
+    ws_search_span.set_parent(parent_ctx.clone());
+    // End - tracing setup
 
     // check and append search event type
     if req.payload.search_type.is_none() {
@@ -242,6 +254,7 @@ pub async fn handle_search_request(
                 remaining_query_range,
                 &order_by,
             )
+            .instrument(ws_search_span)
             .await?;
         } else {
             // Step 2: Search without cache
@@ -262,6 +275,7 @@ pub async fn handle_search_request(
                 accumulated_results,
                 max_query_range,
             )
+            .instrument(ws_search_span)
             .await?;
         }
         // Step 3: Write to results cache
@@ -292,6 +306,7 @@ pub async fn handle_search_request(
             accumulated_results,
             max_query_range,
         )
+        .instrument(ws_search_span)
         .await?;
     }
 
@@ -305,17 +320,12 @@ pub async fn handle_search_request(
     Ok(())
 }
 
+#[tracing::instrument(name = "service:search:websocket::do_search", skip_all)]
 async fn do_search(
     req: &SearchEventReq,
     user_id: &str,
     use_cache: bool,
 ) -> Result<Response, Error> {
-    let span = tracing::info_span!(
-        "src::handler::http::request::websocket::search::do_search",
-        trace_id = %req.trace_id,
-        org_id = %req.org_id,
-    );
-
     let mut req = req.clone();
     req.payload.use_cache = Some(use_cache);
     let res = SearchService::cache::search(
@@ -326,7 +336,6 @@ async fn do_search(
         &req.payload,
         "".to_string(),
     )
-    .instrument(span)
     .await;
 
     res.map(handle_partial_response)
@@ -345,6 +354,10 @@ fn handle_partial_response(mut res: Response) -> Response {
     res
 }
 
+#[tracing::instrument(
+    name = "service:search:websocket::handle_cache_responses_and_deltas",
+    skip_all
+)]
 #[allow(clippy::too_many_arguments)]
 pub async fn handle_cache_responses_and_deltas(
     req_id: &str,
@@ -811,6 +824,7 @@ async fn send_cached_responses(
 }
 
 // Do partitioned search without cache
+#[tracing::instrument(name = "service:search:websocket::do_partitioned_search", skip_all)]
 #[allow(clippy::too_many_arguments)]
 pub async fn do_partitioned_search(
     req_id: &str,

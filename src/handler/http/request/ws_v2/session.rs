@@ -31,6 +31,8 @@ use o2_enterprise::enterprise::common::{
 };
 use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[cfg(feature = "enterprise")]
 use crate::common::infra::cluster::get_cached_online_router_nodes;
@@ -208,7 +210,8 @@ pub async fn run(
                             cfg.common.instance_name,
                             msg
                         );
-                        handle_text_message(&user_id, &req_id, msg.to_string(), path.clone()).await;
+                        handle_text_message(&user_id, &req_id, msg.to_string(), path.clone())
+                        .await;
                     }
                     Ok(actix_ws::AggregatedMessage::Close(reason)) => {
                         if let Some(reason) = reason.as_ref() {
@@ -311,6 +314,7 @@ async fn resolve_enterprise_user_id(
 /// Text message is parsed into `WsClientEvents` and processed accordingly
 /// Depending on each event type, audit must be done
 /// Currently audit is done only for the search event
+#[tracing::instrument(name = "service:search:websocket::handle_text_message", skip_all)]
 pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path: String) {
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
@@ -326,6 +330,19 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 let _ = send_message(req_id, err_res.to_json()).await;
                 return;
             }
+
+            // Start - tracing setup
+            let mut headers: std::collections::HashMap<String, String> =
+                std::collections::HashMap::new();
+            headers.insert("traceparent".to_string(), client_msg.get_trace_id());
+            let parent_ctx =
+                opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
+            let ws_span = tracing::info_span!(
+                "src::handler::http::request::websocket::ws_v2::session::run",
+                req_id = %req_id,
+            );
+            tracing::Span::current().set_parent(parent_ctx.clone());
+            // End - tracing setup
 
             match client_msg {
                 WsClientEvents::Search(ref search_req) => {
@@ -363,6 +380,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         req_id,
                         path.clone(),
                     )
+                    .instrument(ws_span)
                     .await;
                 }
                 WsClientEvents::Values(ref values_req) => {
@@ -596,6 +614,7 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
 }
 
 // Main search handler
+#[tracing::instrument(name = "service:search:websocket::handle_search_event", skip_all)]
 async fn handle_search_event(
     search_req: &SearchEventReq,
     org_id: &str,
