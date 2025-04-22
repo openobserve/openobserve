@@ -106,36 +106,6 @@ impl super::FileList for PostgresFileList {
         self.inner_batch_process("file_list", files).await
     }
 
-    async fn batch_remove_by_ids(&self, ids: &[i64]) -> Result<()> {
-        if ids.is_empty() {
-            return Ok(());
-        }
-        let pool = CLIENT.clone();
-
-        for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
-            if chunk.is_empty() {
-                continue;
-            }
-            let ids = chunk
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<String>>()
-                .join(",");
-            let query_str = format!("delete FROM file_list WHERE id IN ({ids})");
-            DB_QUERY_NUMS
-                .with_label_values(&["delete_by_ids", "file_list"])
-                .inc();
-            let start = std::time::Instant::now();
-            let res = sqlx::query(&query_str).fetch_all(&pool).await;
-            let time = start.elapsed().as_secs_f64();
-            DB_QUERY_TIME
-                .with_label_values(&["delete_by_ids", "file_list"])
-                .observe(time);
-            res?;
-        }
-        Ok(())
-    }
-
     async fn batch_add_deleted(
         &self,
         org_id: &str,

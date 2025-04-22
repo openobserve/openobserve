@@ -107,30 +107,6 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_process("file_list", files).await
     }
 
-    async fn batch_remove_by_ids(&self, ids: &[i64]) -> Result<()> {
-        if ids.is_empty() {
-            return Ok(());
-        }
-
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        let pool = client.clone();
-
-        for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
-            if chunk.is_empty() {
-                continue;
-            }
-            let ids = chunk
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<String>>()
-                .join(",");
-            let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
-            sqlx::query(&query_str).fetch_all(&pool).await?;
-        }
-        Ok(())
-    }
-
     async fn batch_add_deleted(
         &self,
         org_id: &str,

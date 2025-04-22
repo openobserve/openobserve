@@ -303,7 +303,7 @@ async fn move_and_delete(
         infra::file_list::get_entries_in_range(org, Some(&stream_key), range.0, range.1, None)
             .await?;
     let del_items: Vec<_> = list
-        .into_iter()
+        .iter()
         .map(|f| FileListDeleted {
             file: format!("files/{}/{}/{}", stream_key, f.date, f.file),
             index_file: false,
@@ -328,8 +328,16 @@ async fn move_and_delete(
             }
         }
         inserted_into_deleted = true;
-        let items: Vec<_> = del_items.iter().map(|item| item.file.clone()).collect();
-        if let Err(e) = infra::file_list::batch_remove(&items).await {
+        let items: Vec<_> = list
+            .iter()
+            .map(|f| FileKey {
+                key: format!("files/{}/{}/{}", f.stream, f.date, f.file),
+                meta: f.into(),
+                deleted: true,
+                segment_ids: None,
+            })
+            .collect();
+        if let Err(e) = infra::file_list::batch_process(&items).await {
             log::error!(
                 "[FILE_LIST_DUMP] batch_delete to db failed, retrying: {}",
                 e

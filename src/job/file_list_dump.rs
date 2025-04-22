@@ -26,7 +26,7 @@ use config::{
     PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
     cluster::{self, LOCAL_NODE},
     get_config, get_parquet_compression,
-    meta::stream::{FileMeta, StreamType},
+    meta::stream::{FileKey, FileMeta, StreamType},
     utils::time::hour_micros,
 };
 use hashbrown::HashSet;
@@ -43,10 +43,7 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 
-use crate::{
-    common::infra::cluster::get_node_by_uuid,
-    service::{self, db},
-};
+use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
     Arc::new(Schema::new(vec![
@@ -237,7 +234,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), anyhow::Error> {
-    let config = get_config();
     let start = offset;
     let end = offset + hour_micros(1);
 
@@ -265,30 +261,9 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
         }
         return Ok(());
     }
-    let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
-    let count = files.len();
-    if let Err(e) = generate_dump_file(org, stream, (start, end), files).await {
+    if let Err(e) = generate_dump(org, stream, (start, end), files, job_id).await {
         log::error!("[COMPACTOR:JOB] file_list dump file generation error : {e}");
     } else {
-        log::info!("successfully dumped file list {stream} offset {offset} count {count}");
-        // we remove files only if not dual writing
-        if !config.common.file_list_dump_dual_write {
-            if let Err(e) = remove_files_from_file_list(&ids).await {
-                log::error!(
-                    "error in removing dumped files from file_list, error : {}, ids {:?}",
-                    e,
-                    ids
-                )
-            } else {
-                log::info!(
-                    "successfully removed dumped files from file_list for {stream} offset {offset}"
-                );
-            }
-        }
-        if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
-            log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
-        }
-
         let stream_key = get_dump_stream_key(org, stream);
         let schema_exists = STREAM_SCHEMAS_LATEST
             .read()
@@ -329,11 +304,6 @@ fn get_writer(
     let writer_props = writer_props.build();
     let writer = AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props))?;
     Ok(writer)
-}
-
-async fn remove_files_from_file_list(ids: &[i64]) -> Result<(), anyhow::Error> {
-    infra::file_list::batch_remove_by_ids(ids).await?;
-    Ok(())
 }
 
 fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Error> {
@@ -394,17 +364,34 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Er
     Ok(batch)
 }
 
-async fn generate_dump_file(
+async fn generate_dump(
     org: &str,
     stream: &str,
     range: (i64, i64),
     files: Vec<FileRecord>,
+    job_id: i64,
 ) -> Result<(), anyhow::Error> {
     // if there are no files to dump, no point in making a dump file
     if files.is_empty() {
         return Ok(());
     }
+
+    let config = get_config();
     let batch_size = files.len();
+
+    let mut fkeys = Vec::with_capacity(files.len());
+    // we only delete if dual write is disabled, so we only create the entries if it is disabled
+    if !config.common.file_list_dump_dual_write {
+        files.iter().for_each(|f| {
+            fkeys.push(FileKey {
+                key: "files/".to_string() + &f.stream + "/" + &f.date + "/" + &f.file,
+                meta: f.into(),
+                deleted: true,
+                segment_ids: None,
+            })
+        });
+    }
+
     let mut buf = Vec::new();
     let mut writer = get_writer(FILE_LIST_SCHEMA.clone(), &mut buf)?;
     // we split the file list into vec of vecs, with each sub-vec having PARQUET_BATCH_SIZE elements
@@ -446,7 +433,27 @@ async fn generate_dump_file(
         flattened: false,
     };
 
+    fkeys.push(FileKey {
+        key: file_key.clone(),
+        meta: meta.clone(),
+        deleted: false,
+        segment_ids: None,
+    });
+
+    // first store the file in storage
+    // then update the entries in db,
+    // and if both pass only then set the job as dumped=true
+
     infra::storage::put(&file_key, buf.into()).await?;
-    service::db::file_list::set(&file_key, Some(meta), false).await?;
+    infra::file_list::batch_process(&fkeys).await?;
+
+    // this should rarely fail, and even if it fails and we try to dump again, it is ok
+    if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
+        log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
+    }
+    log::info!(
+        "successfully dumped file list {stream} offset {} count {batch_size}",
+        range.0
+    );
     Ok(())
 }
