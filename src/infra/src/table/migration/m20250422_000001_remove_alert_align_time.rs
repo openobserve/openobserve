@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Adds the dashboard's updated_at column
+//! Adds the alerts's align_time column
 
 use sea_orm_migration::prelude::*;
 
