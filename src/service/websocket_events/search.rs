@@ -55,6 +55,7 @@ use crate::{
 };
 
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "service:websocket_events:search::handle_cancel", skip_all)]
 pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     match crate::service::search::cancel_query(org_id, trace_id).await {
         Ok(ret) => {

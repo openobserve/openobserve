@@ -424,6 +424,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         req_id,
                         path.clone(),
                     )
+                    .instrument(ws_span.clone())
                     .await;
                 }
                 #[cfg(feature = "enterprise")]
@@ -441,7 +442,10 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
 
                     // First handle the cancel event
                     // send a cancel flag to the search task
-                    if let Err(e) = handle_cancel_event(&trace_id).await {
+                    if let Err(e) = handle_cancel_event(&trace_id)
+                        .instrument(ws_span.clone())
+                        .await
+                    {
                         log::warn!("[WS_HANDLER]: Error in cancelling : {}", e);
                         return;
                     }
@@ -753,6 +757,10 @@ async fn handle_search_event(
 
 // Cancel handler
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(
+    name = "service:websocket_events:search::handle_cancel_event",
+    skip_all
+)]
 async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
     let mut w = WS_SEARCH_REGISTRY.write().await;
     if let Some(state) = w.get_mut(trace_id) {
@@ -781,6 +789,10 @@ async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[tracing::instrument(
+    name = "service:websocket_events:search::handle_search_error",
+    skip_all
+)]
 async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
     // if the error is due to search cancellation, return.
     // the cancel handler will close the session
@@ -841,6 +853,10 @@ async fn cleanup_search_resources(trace_id: &str) {
 }
 
 // Main values handler
+#[tracing::instrument(
+    name = "service:websocket_events:search::handle_values_event",
+    skip_all
+)]
 async fn handle_values_event(
     values_req: &ValuesEventReq,
     org_id: &str,
