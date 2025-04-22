@@ -557,6 +557,7 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
         "list_nodes",
         regions.to_vec(),
         vec![],
+        None,
     )
     .await
     {
@@ -626,6 +627,7 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
         "cluster_info",
         regions.to_vec(),
         vec![],
+        None,
     )
     .await
     {

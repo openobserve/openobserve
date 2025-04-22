@@ -179,7 +179,7 @@ async fn get_url(path: &str) -> URLDetails {
     let nodes = if is_querier_path {
         node_type = Role::Querier;
         let query_str = path[path.find("?").unwrap_or(path.len())..].to_string();
-        let node_group = web::Query::<HashMap<String, String>>::from_query(&query_str)
+        let role_group = web::Query::<HashMap<String, String>>::from_query(&query_str)
             .map(|query_params| {
                 get_search_type_from_request(&query_params)
                     .unwrap_or(None)
@@ -187,7 +187,7 @@ async fn get_url(path: &str) -> URLDetails {
                     .unwrap_or(RoleGroup::Interactive)
             })
             .unwrap_or(RoleGroup::Interactive);
-        let nodes = cluster::get_cached_online_querier_nodes(Some(node_group)).await;
+        let nodes = cluster::get_cached_online_querier_nodes(Some(role_group)).await;
         if is_fixed_querier_route(path) && nodes.is_some() && !nodes.as_ref().unwrap().is_empty() {
             nodes.map(|v| v.into_iter().take(1).collect())
         } else {

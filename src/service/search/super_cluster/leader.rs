@@ -20,7 +20,11 @@ use async_recursion::async_recursion;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::{cluster::NodeInfo, search::ScanStats, sql::TableReferenceExt},
+    meta::{
+        cluster::{NodeInfo, RoleGroup},
+        search::{ScanStats, SearchEventType},
+        sql::TableReferenceExt,
+    },
     metrics,
     utils::json,
 };
@@ -87,7 +91,17 @@ pub async fn search(
 
     // 2. get nodes
     let get_node_start = std::time::Instant::now();
-    let nodes = get_cluster_nodes(trace_id, req_regions, req_clusters).await?;
+    let role_group = req
+        .search_event_type
+        .as_ref()
+        .map(|v| {
+            SearchEventType::try_from(v.as_str())
+                .ok()
+                .map(RoleGroup::from)
+        })
+        .unwrap_or(None);
+
+    let nodes = get_cluster_nodes(trace_id, req_regions, req_clusters, role_group).await?;
     log::info!(
         "{}",
         search_inspector_fields(
