@@ -969,8 +969,8 @@ pub async fn do_partitioned_search(
             send_message(req_id, ws_search_res.to_json()).await?;
         }
 
-        // Stop if reached the requested result size
-        if req_size != -1 && curr_res_size >= req_size {
+        // Stop if reached the requested result size and it is not a streaming aggs query
+        if req_size != -1 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
                 "[WS_SEARCH]: Reached requested result size ({}), stopping search",
                 req_size
