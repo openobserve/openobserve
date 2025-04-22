@@ -21,8 +21,8 @@ use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
         alerts::{
-            AggFunction, Condition, Operator, QueryCondition, QueryType,
-            TriggerCondition, TriggerEvalResults,
+            AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition,
+            TriggerEvalResults,
         },
         cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
