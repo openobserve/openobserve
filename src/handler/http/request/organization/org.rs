@@ -552,30 +552,30 @@ async fn get_local_nodes() -> NodeListResponse {
 async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse, anyhow::Error> {
     let mut response = NodeListResponse::new();
 
-    // Get all nodes in the super cluster
-    let cluster_nodes = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
-        "list_nodes",
+    // Get all clusters in the super cluster
+    let clusters = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
+        "list_clusters_for_nodes",
         regions.to_vec(),
         vec![],
-        None,
+        Some(config::meta::cluster::RoleGroup::Interactive),
     )
     .await
     {
         Ok(nodes) => nodes,
         Err(e) => {
-            log::error!("Failed to get super cluster nodes: {:?}", e);
+            log::error!("Failed to get super clusters: {:?}", e);
             return Ok(response); // Return empty response instead of failing
         }
     };
 
     // For each node in the super cluster
     let trace_id = config::ider::generate_trace_id();
-    for node in cluster_nodes {
-        let region = node.get_region();
-        let cluster_name = node.get_cluster_name();
+    for cluster in clusters {
+        let region = cluster.get_region();
+        let cluster_name = cluster.get_cluster_name();
 
-        // Fetch child nodes from this cluster node
-        match crate::service::node::get_node_list(&trace_id, node).await {
+        // Fetch child nodes from this cluster
+        match crate::service::node::get_node_list(&trace_id, cluster).await {
             Ok(cluster_nodes) => {
                 for node in cluster_nodes {
                     response.add_node(node.clone(), region.clone(), cluster_name.clone());
@@ -622,12 +622,12 @@ async fn get_local_cluster_info() -> Result<ClusterInfoResponse, anyhow::Error> 
 async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoResponse, anyhow::Error> {
     let mut response = ClusterInfoResponse::default();
 
-    // Get all nodes in the super cluster
-    let cluster_nodes = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
-        "cluster_info",
+    // Get all clusters in the super cluster
+    let clusters = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
+        "list_clusters_for_info",
         regions.to_vec(),
         vec![],
-        None,
+        Some(config::meta::cluster::RoleGroup::Interactive),
     )
     .await
     {
@@ -640,12 +640,12 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
 
     // For each node in the super cluster
     let trace_id = config::ider::generate_trace_id();
-    for node in cluster_nodes {
-        let region = node.get_region();
-        let cluster_name = node.get_cluster_name();
+    for cluster in clusters {
+        let region = cluster.get_region();
+        let cluster_name = cluster.get_cluster_name();
 
         // Fetch cluster info from this cluster node
-        match crate::service::cluster_info::get_super_cluster_info(&trace_id, node).await {
+        match crate::service::cluster_info::get_super_cluster_info(&trace_id, cluster).await {
             Ok(cluster_info_obj) => {
                 response.add_cluster_info(cluster_info_obj, cluster_name.clone(), region.clone());
             }
