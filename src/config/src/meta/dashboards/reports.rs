@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::datetime_now;
+use crate::meta::alerts::default_align_time;
 
 #[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
 pub enum ReportDestination {
@@ -109,7 +110,7 @@ pub struct ReportFrequency {
     #[serde(rename = "type")]
     #[serde(default)]
     pub frequency_type: ReportFrequencyType,
-    #[serde(default)]
+    #[serde(default = "default_align_time")]
     pub align_time: bool,
 }
 
@@ -119,7 +120,7 @@ impl Default for ReportFrequency {
             interval: 1,
             cron: "".to_string(),
             frequency_type: Default::default(),
-            align_time: true,
+            align_time: default_align_time(),
         }
     }
 }
