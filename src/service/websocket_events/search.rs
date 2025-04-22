@@ -49,11 +49,14 @@ use crate::{
             self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
             sql::Sql,
         },
-        websocket_events::{TimeOffset, WsServerEvents, search_registry_utils},
+        websocket_events::{
+            TimeOffset, WsServerEvents, search_registry_utils, setup_tracing_with_trace_id,
+        },
     },
 };
 
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "service:websocket_events:search::handle_cancel", skip_all)]
 pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     match crate::service::search::cancel_query(org_id, trace_id).await {
         Ok(ret) => {
@@ -81,6 +84,7 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     }
 }
 
+#[tracing::instrument(name = "service:search:websocket::handle_search_request", skip_all)]
 pub async fn handle_search_request(
     req_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
@@ -100,6 +104,13 @@ pub async fn handle_search_request(
         start_time,
         end_time
     );
+
+    // Setup tracing
+    let ws_search_span = setup_tracing_with_trace_id(
+        &req.trace_id,
+        tracing::info_span!("src::service::websocket_events::search::handle_search_request"),
+    )
+    .await;
 
     // check and append search event type
     if req.payload.search_type.is_none() {
@@ -185,6 +196,7 @@ pub async fn handle_search_request(
     if req.payload.query.from == 0 {
         let c_resp =
             cache::check_cache_v2(&trace_id, org_id, stream_type, &req.payload, req.use_cache)
+                .instrument(ws_search_span.clone())
                 .await?;
         let local_c_resp = c_resp.clone();
         let cached_resp = local_c_resp.cached_response;
@@ -242,6 +254,7 @@ pub async fn handle_search_request(
                 remaining_query_range,
                 &order_by,
             )
+            .instrument(ws_search_span.clone())
             .await?;
         } else {
             // Step 2: Search without cache
@@ -262,12 +275,14 @@ pub async fn handle_search_request(
                 accumulated_results,
                 max_query_range,
             )
+            .instrument(ws_search_span.clone())
             .await?;
         }
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
         if req.payload.query.from == 0 {
             write_results_to_cache(c_resp, start_time, end_time, accumulated_results)
+                .instrument(ws_search_span.clone())
                 .await
                 .map_err(|e| {
                     log::error!(
@@ -292,6 +307,7 @@ pub async fn handle_search_request(
             accumulated_results,
             max_query_range,
         )
+        .instrument(ws_search_span)
         .await?;
     }
 
@@ -305,17 +321,12 @@ pub async fn handle_search_request(
     Ok(())
 }
 
+#[tracing::instrument(name = "service:search:websocket::do_search", skip_all)]
 async fn do_search(
     req: &SearchEventReq,
     user_id: &str,
     use_cache: bool,
 ) -> Result<Response, Error> {
-    let span = tracing::info_span!(
-        "src::handler::http::request::websocket::search::do_search",
-        trace_id = %req.trace_id,
-        org_id = %req.org_id,
-    );
-
     let mut req = req.clone();
     req.payload.use_cache = Some(use_cache);
     let res = SearchService::cache::search(
@@ -326,7 +337,6 @@ async fn do_search(
         &req.payload,
         "".to_string(),
     )
-    .instrument(span)
     .await;
 
     res.map(handle_partial_response)
@@ -345,6 +355,10 @@ fn handle_partial_response(mut res: Response) -> Response {
     res
 }
 
+#[tracing::instrument(
+    name = "service:search:websocket::handle_cache_responses_and_deltas",
+    skip_all
+)]
 #[allow(clippy::too_many_arguments)]
 pub async fn handle_cache_responses_and_deltas(
     req_id: &str,
@@ -811,6 +825,7 @@ async fn send_cached_responses(
 }
 
 // Do partitioned search without cache
+#[tracing::instrument(name = "service:search:websocket::do_partitioned_search", skip_all)]
 #[allow(clippy::too_many_arguments)]
 pub async fn do_partitioned_search(
     req_id: &str,
@@ -925,10 +940,15 @@ pub async fn do_partitioned_search(
             }
 
             if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
+                let ws_search_span = tracing::info_span!(
+                    "src::service::websocket_events::search::do_partitioned_search::get_top_k_values",
+                    org_id = %req.org_id,
+                );
                 let instant = Instant::now();
                 let top_k_values = tokio::task::spawn_blocking(move || {
                     get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
                 })
+                .instrument(ws_search_span.clone())
                 .await
                 .unwrap();
                 search_res.hits = top_k_values?;
@@ -1028,6 +1048,10 @@ async fn send_partial_search_resp(
     Ok(())
 }
 
+#[tracing::instrument(
+    name = "service:websocket_events:search::write_results_to_cache",
+    skip_all
+)]
 pub async fn write_results_to_cache(
     c_resp: MultiCachedQueryResponse,
     start_time: i64,
@@ -1115,7 +1139,7 @@ pub async fn write_results_to_cache(
 }
 
 /// This function will compute top k values for values request
-/// This is a com
+#[tracing::instrument(name = "service:websocket_events:search::get_top_k_values", skip_all)]
 pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<Vec<Value>, Error> {
     let mut top_k_values: Vec<Value> = Vec::new();
 

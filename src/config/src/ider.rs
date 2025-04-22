@@ -20,6 +20,7 @@ use std::{
 
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use rand::Rng;
 use svix_ksuid::{Ksuid, KsuidLike};
 
 static IDER: Lazy<Mutex<SnowflakeIdGenerator>> = Lazy::new(|| {
@@ -47,6 +48,21 @@ pub fn generate_trace_id() -> String {
     let trace_id = crate::utils::rand::get_rand_u128()
         .unwrap_or_else(|| crate::utils::time::now_micros() as u128);
     opentelemetry::trace::TraceId::from(trace_id).to_string()
+}
+
+/// Generate a new span_id.
+pub fn generate_span_id() -> String {
+    let mut rng = rand::thread_rng();
+    let mut bytes = [0u8; 8];
+    rng.fill(&mut bytes);
+
+    let hex = hex::encode(bytes);
+
+    if hex == "0000000000000000" {
+        return generate_span_id();
+    }
+
+    hex
 }
 
 /// Convert a snowflake id to a timestamp in milliseconds.
