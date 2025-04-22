@@ -258,6 +258,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             source_node: Some(LOCAL_NODE.name.clone()),
             query_took: None,
             scheduler_trace_id: None,
+            time_in_queue_ms: None,
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
