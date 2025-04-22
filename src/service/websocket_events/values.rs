@@ -50,6 +50,8 @@ pub async fn handle_values_request(
     req: ValuesEventReq,
     accumulated_results: &mut Vec<SearchResultType>,
 ) -> Result<(), anyhow::Error> {
+    let mut start_timer = std::time::Instant::now();
+
     let cfg = get_config();
     let trace_id = req.trace_id.clone();
     let stream_type = req.stream_type;
@@ -193,6 +195,7 @@ pub async fn handle_values_request(
                     max_query_range,
                     remaining_query_range,
                     &order_by,
+                    &mut start_timer,
                 )
                 .instrument(ws_values_span.clone())
                 .await?;
@@ -233,6 +236,7 @@ pub async fn handle_values_request(
                     user_id,
                     accumulated_results,
                     max_query_range,
+                    &mut start_timer,
                 )
                 .instrument(ws_values_span.clone())
                 .await?;
@@ -288,6 +292,7 @@ pub async fn handle_values_request(
                 user_id,
                 accumulated_results,
                 max_query_range,
+                &mut start_timer,
             )
             .instrument(ws_values_span.clone())
             .await?;
