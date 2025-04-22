@@ -348,39 +348,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-red"
                         v-else-if="
                           typeof errorMessage === 'object' &&
-                          errorMessage.field == 'destination_stream_name'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-select
-                            data-test="pipeline-import-source-stream-name-input"
-                            v-model="userSelectedDestinationStreamName[index]"
-                            :options="streamData"
-                            :label="t('alerts.stream_name') + ' *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            @update:model-value="updateDestinationStreamFields(userSelectedDestinationStreamName[index], index)"
-                            behavior="menu"
-                          >
-                          </q-select>
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
                           errorMessage.field == 'org_id'
                         "
                       >
