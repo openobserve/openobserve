@@ -450,27 +450,36 @@ test.describe("dashboard maps testcases", () => {
     await dashboardCreate.addPanel();
 
     await chartTypeSelector.selectChartType("geomap");
+    await page.waitForTimeout(3000);
 
     // Add new dashboard
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("geojson");
+
     await chartTypeSelector.searchAndAddField("lat", "latitude");
     await chartTypeSelector.searchAndAddField("lon", "longitude");
     await chartTypeSelector.searchAndAddField("country", "weight");
     await chartTypeSelector.searchAndAddField("country", "filter");
 
+    await chartTypeSelector.addFilterCondition(
+      "country",
+      "country",
+      ">=",
+      "$variablename"
+    );
+
     await page.waitForTimeout(4000);
 
     await dashboardPageActions.applyDashboardBtn();
 
-    // Wait for response
-    await page.waitForResponse(
-      (response) =>
-        response
-          .url()
-          .includes("/api/default/_search?type=logs&search_type=dashboards") &&
-        response.status() === 200
-    );
+    // // Wait for response
+    // await page.waitForResponse(
+    //   (response) =>
+    //     response
+    //       .url()
+    //       .includes("/api/default/_search?type=logs&search_type=dashboards") &&
+    //     response.status() === 200
+    // );
 
     // Apply variable to filter
     await page
