@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :field-list="searchObj.data.stream.selectedStreamFields"
               data-test="logs-search-index-list"
               :key="searchObj.data.stream.streamLists"
+              @update:changeStream="onChangeStream"
             />
           </template>
           <template #separator>
@@ -167,7 +168,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:datetime="setHistogramDate"
                 @update:scroll="getMoreData"
                 @shareLink="copyTracesUrl"
-                @get:traceDetails="getTraceDetails"
               />
             </div>
           </template>
@@ -560,44 +560,6 @@ function buildSearch() {
   }
 }
 
-const openTraceDetails = () => {
-  searchObj.loading = true;
-  const queryReq = buildSearch();
-
-  let filter = searchObj.data.editorValue;
-
-  if (filter?.length)
-    filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
-  else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
-
-  searchService
-    .get_traces({
-      org_identifier: searchObj.organizationIdentifier,
-      start_time: queryReq.query.start_time,
-      end_time: queryReq.query.end_time,
-      filter: filter || "",
-      size: 1,
-      from: 0,
-      stream_name: selectedStreamName.value,
-    })
-    .then(async (res) => {
-      const trace = getTracesMetaData(res.data.hits)[0];
-      if (!trace) {
-        showTraceDetailsError();
-        return;
-      }
-      searchObj.data.traceDetails.selectedTrace = trace;
-      getTraceDetails();
-    })
-    .catch(() => {
-      showTraceDetailsError();
-    })
-    .finally(() => {
-      console.log("Turn off loading");
-      searchObj.loading = false;
-    });
-};
-
 const showTraceDetailsError = () => {
   showErrorNotification(
     `Trace ${router.currentRoute.value.query.trace_id} not found`,
@@ -625,36 +587,6 @@ const buildTraceSearchQuery = (trace: string) => {
   );
 
   return req;
-};
-
-const getTraceDetails = () => {
-  searchObj.meta.showTraceDetails = true;
-  searchObj.data.traceDetails.loading = true;
-  searchObj.data.traceDetails.spanList = [];
-  const req = buildTraceSearchQuery(searchObj.data.traceDetails.selectedTrace);
-
-  delete req.aggs;
-
-  searchService
-    .search(
-      {
-        org_identifier: searchObj.organizationIdentifier,
-        query: req,
-        page_type: "traces",
-      },
-      "ui",
-    )
-    .then((res) => {
-      searchObj.data.traceDetails.spanList = res.data?.hits || [];
-      if (router.currentRoute.value.query.span_id) {
-        searchObj.data.traceDetails.showSpanDetails = true;
-        searchObj.data.traceDetails.selectedSpanId =
-          router.currentRoute.value.query.span_id;
-      }
-    })
-    .finally(() => {
-      searchObj.data.traceDetails.loading = false;
-    });
 };
 
 const updateFieldValues = (data) => {
@@ -1274,6 +1206,11 @@ const getMoreData = () => {
   }
 };
 
+const onChangeStream = () => {
+  runQueryFn();
+  extractFields();
+};
+
 const showFields = computed(() => {
   return searchObj.meta.showFields;
 });
@@ -1359,16 +1296,6 @@ watch(updateSelectedColumns, () => {
   setTimeout(() => {
     updateGridColumns();
   }, 300);
-});
-
-// watch(runQuery, () => {
-//   if (searchObj.runQuery == true) {
-//     runQueryFn();
-//   }
-// });
-
-watch(searchObj.loading, () => {
-  console.log("searchObj.loading -----", searchObj.loading);
 });
 </script>
 
