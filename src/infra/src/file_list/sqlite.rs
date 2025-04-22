@@ -88,7 +88,7 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
-        self.inner_batch_add("file_list", files).await
+        self.inner_batch_process("file_list", files).await
     }
 
     async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()> {
@@ -96,59 +96,15 @@ impl super::FileList for SqliteFileList {
             .iter()
             .map(|(id, f)| (Some(*id), *f))
             .collect::<Vec<_>>();
-        self.inner_batch_add_with_id("file_list", &files).await
+        self.inner_batch_process_with_id("file_list", &files).await
     }
 
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
-        self.inner_batch_add("file_list_history", files).await
+        self.inner_batch_process("file_list_history", files).await
     }
 
-    async fn batch_remove(&self, files: &[String]) -> Result<()> {
-        if files.is_empty() {
-            return Ok(());
-        }
-        let chunks = files.chunks(100);
-        for files in chunks {
-            // get ids of the files
-            let client = CLIENT_RW.clone();
-            let client = client.lock().await;
-            let pool = client.clone();
-            let mut ids = Vec::with_capacity(files.len());
-            for file in files {
-                let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-                let ret: Option<i64> = match sqlx::query_scalar(
-                    r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
-                )
-                .bind(stream_key)
-                .bind(date_key)
-                .bind(file_name)
-                .fetch_one(&pool)
-                .await
-                {
-                    Ok(v) => v,
-                    Err(sqlx::Error::RowNotFound) => continue,
-                    Err(e) => return Err(e.into()),
-                };
-                match ret {
-                    Some(v) => ids.push(v.to_string()),
-                    None => {
-                        return Err(Error::Message(
-                            "[SQLITE] query error: id should not empty from file_list".to_string(),
-                        ));
-                    }
-                }
-            }
-            // delete files by ids
-            if !ids.is_empty() {
-                let sql = format!(
-                    "UPDATE file_list SET deleted = true WHERE id IN({});",
-                    ids.join(",")
-                );
-                _ = pool.execute(sql.as_str()).await?;
-            }
-        }
-        Ok(())
+    async fn batch_process(&self, files: &[FileKey]) -> Result<()> {
+        self.inner_batch_process("file_list", files).await
     }
 
     async fn batch_add_deleted(
@@ -1213,12 +1169,12 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
         }
     }
 
-    async fn inner_batch_add(&self, table: &str, files: &[FileKey]) -> Result<()> {
+    async fn inner_batch_process(&self, table: &str, files: &[FileKey]) -> Result<()> {
         let files: Vec<(Option<i64>, _)> = files.iter().map(|f| (None, f)).collect::<Vec<_>>();
-        self.inner_batch_add_with_id(table, &files).await
+        self.inner_batch_process_with_id(table, &files).await
     }
 
-    async fn inner_batch_add_with_id(
+    async fn inner_batch_process_with_id(
         &self,
         table: &str,
         files: &[(Option<i64>, &FileKey)],
@@ -1226,73 +1182,107 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
         if files.is_empty() {
             return Ok(());
         }
-        let chunks = files.chunks(100);
-        for files in chunks {
-            let client = CLIENT_RW.clone();
-            let client = client.lock().await;
-            let mut tx = client.begin().await?;
-            let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let mut tx = client.begin().await?;
+
+        let add_items = files.iter().filter(|v| !v.1.deleted).collect::<Vec<_>>();
+        if !add_items.is_empty() {
+            let chunks = add_items.chunks(100);
+            for files in chunks {
+                let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
                 format!("INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str(),
-            );
-            query_builder.push_values(files, |mut b, (id, item)| {
-                let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(&item.key).expect("parse file key failed");
-                let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                b.push_bind(id)
-                    .push_bind(org_id)
-                    .push_bind(stream_key)
-                    .push_bind(date_key)
-                    .push_bind(file_name)
-                    .push_bind(false)
-                    .push_bind(item.meta.min_ts)
-                    .push_bind(item.meta.max_ts)
-                    .push_bind(item.meta.records)
-                    .push_bind(item.meta.original_size)
-                    .push_bind(item.meta.compressed_size)
-                    .push_bind(item.meta.index_size)
-                    .push_bind(item.meta.flattened);
-            });
-            let need_single_insert = match query_builder.build().execute(&mut *tx).await {
-                Ok(_) => false,
-                Err(sqlx::Error::Database(e)) => {
-                    if e.is_unique_violation() {
-                        true
-                    } else {
-                        if let Err(e) = tx.rollback().await {
-                            log::error!("[SQLITE] rollback {table} batch add error: {}", e);
-                        }
-                        return Err(Error::Message(e.to_string()));
-                    }
-                }
-                Err(e) => {
+                );
+                query_builder.push_values(files, |mut b, (id, item)| {
+                    let (stream_key, date_key, file_name) =
+                        parse_file_key_columns(&item.key).expect("parse file key failed");
+                    let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+                    b.push_bind(id)
+                        .push_bind(org_id)
+                        .push_bind(stream_key)
+                        .push_bind(date_key)
+                        .push_bind(file_name)
+                        .push_bind(false)
+                        .push_bind(item.meta.min_ts)
+                        .push_bind(item.meta.max_ts)
+                        .push_bind(item.meta.records)
+                        .push_bind(item.meta.original_size)
+                        .push_bind(item.meta.compressed_size)
+                        .push_bind(item.meta.index_size)
+                        .push_bind(item.meta.flattened);
+                });
+                if let Err(e) = query_builder.build().execute(&mut *tx).await {
                     if let Err(e) = tx.rollback().await {
-                        log::error!("[SQLITE] rollback {table} batch add error: {}", e);
+                        log::error!(
+                            "[SQLITE] rollback {table} batch process for add error: {}",
+                            e
+                        );
                     }
                     return Err(e.into());
                 }
-            };
-            if need_single_insert {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[SQLITE] rollback {table} batch add error: {}", e);
-                    return Err(e.into());
-                }
-                // release lock
-                drop(client);
-                // add file one by one
-                for (id, item) in files {
-                    if let Err(e) = self
-                        .inner_add_with_id(table, *id, &item.key, &item.meta)
-                        .await
-                    {
-                        log::error!("[SQLITE] single insert {table} add error: {}", e);
-                        return Err(e);
-                    }
-                }
-            } else if let Err(e) = tx.commit().await {
-                log::error!("[SQLITE] commit {table} batch add error: {}", e);
-                return Err(e.into());
             }
         }
+
+        let del_items = files.iter().filter(|v| v.1.deleted).collect::<Vec<_>>();
+        if !del_items.is_empty() {
+            let chunks = files.chunks(1000);
+            for files in chunks {
+                // get ids of the files
+                let mut ids = Vec::with_capacity(files.len());
+                for file in files {
+                    let (stream_key, date_key, file_name) = parse_file_key_columns(&file.1.key)
+                        .map_err(|e| Error::Message(e.to_string()))?;
+                    let query_res: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
+                    r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
+                    )
+                    .bind(stream_key)
+                    .bind(date_key)
+                    .bind(file_name)
+                    .fetch_one(&mut *tx)
+                    .await;
+                    match query_res {
+                        Ok(Some(v)) => ids.push(v.to_string()),
+                        Ok(None) => continue,
+                        Err(sqlx::Error::RowNotFound) => continue,
+                        Err(e) => {
+                            if let Err(e) = tx.rollback().await {
+                                log::error!(
+                                    "[SQLITE] rollback {table} batch process for delete error: {}",
+                                    e
+                                );
+                            }
+                            return Err(e.into());
+                        }
+                    };
+                }
+                // delete files by ids
+                if !ids.is_empty() {
+                    let sql = format!(
+                        "UPDATE file_list SET deleted = true WHERE id IN({});",
+                        ids.join(",")
+                    );
+                    if let Err(e) = sqlx::query(sql.as_str()).execute(&mut *tx).await {
+                        if let Err(e) = tx.rollback().await {
+                            log::error!(
+                                "[SQLITE] rollback {table} batch process for delete error: {}",
+                                e
+                            );
+                        }
+                        return Err(e.into());
+                    }
+                }
+            }
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit {table} batch process error: {}", e);
+            return Err(e.into());
+        }
+
+        // release lock
+        drop(client);
+
         Ok(())
     }
 }

@@ -1147,11 +1147,6 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         return Ok(());
     }
 
-    let put_items = events
-        .iter()
-        .filter(|v| !v.deleted)
-        .map(|v| v.to_owned())
-        .collect::<Vec<_>>();
     let del_items = events
         .iter()
         .filter(|v| v.deleted)
@@ -1167,6 +1162,11 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
     let mut success = false;
     let created_at = config::utils::time::now_micros();
     for _ in 0..5 {
+        if let Err(e) = infra_file_list::batch_process(events).await {
+            log::error!("[COMPACTOR] batch_process to db failed, retrying: {}", e);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
         if !del_items.is_empty() {
             if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
             {
@@ -1178,34 +1178,22 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
                 continue;
             }
         }
-        if let Err(e) = infra_file_list::batch_add(&put_items).await {
-            log::error!("[COMPACTOR] batch_add to db failed, retrying: {}", e);
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        if !del_items.is_empty() {
-            let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
-            if let Err(e) = infra_file_list::batch_remove(&del_files).await {
-                log::error!("[COMPACTOR] batch_delete to db failed, retrying: {}", e);
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-        };
+        success = true;
+        break;
+    }
+
+    if success {
         // send broadcast to other nodes
         if get_config().cache_latest_files.enabled {
             if let Err(e) = db::file_list::broadcast::send(events, None).await {
                 log::error!("[COMPACTOR] send broadcast for file_list failed: {}", e);
             }
         }
-        // broadcast success
-        success = true;
-        break;
-    }
-    if !success {
-        Err(anyhow::anyhow!("batch_write to db failed"))
     } else {
-        Ok(())
+        return Err(anyhow::anyhow!("batch_write to db failed"));
     }
+
+    Ok(())
 }
 
 pub fn generate_inverted_idx_recordbatch(
