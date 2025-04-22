@@ -166,36 +166,43 @@ pub struct QueryCondition {
 
 /// Validator module to check that condition list doesn't exceed maximum depth
 mod condition_list_depth_validator {
-    use serde::{de, ser, Deserialize, Serialize};
     use config::meta::alerts as meta_alerts;
-    
+    use serde::{Deserialize, Serialize, de, ser};
+
     const MAX_DEPTH: usize = 3;
-    
+
     /// Serialize implementation - simply pass through to the default serializer
-    pub fn serialize<S>(value: &Option<meta_alerts::ConditionList>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(
+        value: &Option<meta_alerts::ConditionList>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
     {
         value.serialize(serializer)
     }
-    
+
     /// Deserialize implementation with depth check
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<meta_alerts::ConditionList>, D::Error>
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<Option<meta_alerts::ConditionList>, D::Error>
     where
         D: de::Deserializer<'de>,
     {
         // First deserialize to the normal type
-        let condition_list: std::option::Option<meta_alerts::ConditionList> = Option::deserialize(deserializer)?;
-        
+        let condition_list: std::option::Option<meta_alerts::ConditionList> =
+            Option::deserialize(deserializer)?;
+
         // Then check depth if Some
         if let Some(ref list) = condition_list {
             if list.depth() > MAX_DEPTH {
                 return Err(de::Error::custom(format!(
-                    "Condition list exceeds maximum allowed depth of {}", MAX_DEPTH
+                    "Condition list exceeds maximum allowed depth of {}",
+                    MAX_DEPTH
                 )));
             }
         }
-        
+
         Ok(condition_list)
     }
 }

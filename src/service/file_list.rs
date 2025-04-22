@@ -451,7 +451,7 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64> {
 // Delete one parquet file and update the file list
 pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<()> {
     // delete from file list in metastore
-    file_list::batch_remove(&[key.to_string()]).await?;
+    file_list::batch_process(&[FileKey::new(key.to_string(), Default::default(), true)]).await?;
 
     // delete the parquet whaterever the file is exists or not
     if !file_list_only {
