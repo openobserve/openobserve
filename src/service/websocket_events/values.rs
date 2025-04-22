@@ -41,13 +41,8 @@ use crate::{
 };
 
 #[tracing::instrument(
-    skip_all,
-    fields(
-        org_id = %org_id,
-        request_id = %request_id,
-        trace_id = %req.trace_id,
-    ),
-    level = "info"
+    name = "src::service::websocket_events::values::handle_values_request",
+    skip_all
 )]
 pub async fn handle_values_request(
     org_id: &str,

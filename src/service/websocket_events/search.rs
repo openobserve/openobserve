@@ -53,7 +53,10 @@ use crate::{
 };
 
 #[cfg(feature = "enterprise")]
-#[tracing::instrument(skip_all, fields(trace_id = %trace_id, org_id = %org_id), level = "info")]
+#[tracing::instrument(
+    name = "src::service::websocket_events::search::handle_cancel",
+    skip_all
+)]
 pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     match crate::service::search::cancel_query(org_id, trace_id).await {
         Ok(ret) => {
@@ -82,13 +85,8 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
 }
 
 #[tracing::instrument(
-    skip_all,
-    fields(
-        req_id = %req_id,
-        trace_id = %req.trace_id,
-        org_id = %org_id,
-    ),
-    level = "info"
+    name = "src::service::websocket_events::search::handle_search_request",
+    skip_all
 )]
 pub async fn handle_search_request(
     req_id: &str,
@@ -102,6 +100,13 @@ pub async fn handle_search_request(
     let stream_type = req.stream_type;
     let start_time = req.payload.query.start_time;
     let end_time = req.payload.query.end_time;
+
+    // Create and enter a tracing span that will connect all child operations
+    let span = tracing::info_span!(
+        "src::service::websocket_events::search::handle_search_request",
+        org_id = %org_id,
+    );
+    let _enter = span.enter();
 
     log::info!(
         "[WS_SEARCH] trace_id: {} Received search request, start_time: {}, end_time: {}",
@@ -314,14 +319,7 @@ pub async fn handle_search_request(
     Ok(())
 }
 
-#[tracing::instrument(
-    skip_all,
-    fields(
-        trace_id = %req.trace_id,
-        org_id = %req.org_id,
-    ),
-    level = "info"
-)]
+#[tracing::instrument(name = "src::service::websocket_events::search::do_search", skip_all)]
 async fn do_search(
     req: &SearchEventReq,
     user_id: &str,
@@ -847,12 +845,8 @@ async fn send_cached_responses(
 }
 
 #[tracing::instrument(
-    skip_all,
-    fields(
-        req_id = %req_id,
-        trace_id = %trace_id,
-    ),
-    level = "info"
+    name = "src::service::websocket_events::search::do_partitioned_search",
+    skip_all
 )]
 pub async fn do_partitioned_search(
     req_id: &str,

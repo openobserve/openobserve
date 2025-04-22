@@ -31,13 +31,7 @@ pub mod enterprise_utils {
     #[cfg(feature = "enterprise")]
     #[tracing::instrument(
         name = "src::service::websocket_events::enterprise_utils::check_permissions",
-        skip(stream_name, stream_type, user_id, org_id),
-        fields(
-            stream_name = %stream_name,
-            stream_type = ?stream_type,
-            user_id = %user_id,
-            org_id = %org_id
-        )
+        skip_all
     )]
     pub async fn check_permissions(
         stream_name: &str,
@@ -112,9 +106,6 @@ pub mod sessions_cache_utils {
         handler::http::request::ws_v2::session::WsSession,
     };
 
-    #[tracing::instrument(
-        name = "src::service::websocket_events::sessions_cache_utils::run_gc_ws_sessions"
-    )]
     pub async fn run_gc_ws_sessions() {
         log::debug!("[WS_GC] Running garbage collector for websocket sessions");
         let cfg = get_config();
@@ -149,10 +140,6 @@ pub mod sessions_cache_utils {
         });
     }
 
-    #[tracing::instrument(
-        name = "src::service::websocket_events::sessions_cache_utils::cleanup_expired_sessions",
-        level = "debug"
-    )]
     async fn cleanup_expired_sessions() {
         // get expired sessions
         let r = WS_SESSIONS.read().await;
@@ -202,12 +189,6 @@ pub mod sessions_cache_utils {
         );
     }
 
-    #[tracing::instrument(
-        name = "src::service::websocket_events::sessions_cache_utils::cleanup_searches_for_session",
-        skip(session_id),
-        fields(session_id = %session_id),
-        level = "debug"
-    )]
     async fn cleanup_searches_for_session(session_id: &str) {
         let r = WS_SEARCH_REGISTRY.read().await;
         let searches_to_remove: Vec<String> = r
@@ -247,12 +228,7 @@ pub mod sessions_cache_utils {
         }
     }
 
-    #[tracing::instrument(
-        name = "src::service::websocket_events::sessions_cache_utils::insert_session",
-        skip(session_id, session),
-        fields(session_id = %session_id),
-        level = "debug"
-    )]
+    /// Insert a new session into the cache
     pub async fn insert_session(session_id: &str, session: Arc<RwLock<WsSession>>) {
         let mut w = WS_SESSIONS.write().await;
         w.insert(session_id.to_string(), session);
@@ -264,12 +240,7 @@ pub mod sessions_cache_utils {
         );
     }
 
-    #[tracing::instrument(
-        name = "src::service::websocket_events::sessions_cache_utils::remove_session",
-        skip(session_id),
-        fields(session_id = %session_id),
-        level = "debug"
-    )]
+    /// Remove a session from the cache
     pub async fn remove_session(session_id: &str) {
         let mut w = WS_SESSIONS.write().await;
         w.remove(session_id);
@@ -281,12 +252,7 @@ pub mod sessions_cache_utils {
         );
     }
 
-    #[tracing::instrument(
-        name = "src::service::websocket_events::sessions_cache_utils::get_session",
-        skip(session_id),
-        fields(session_id = %session_id),
-        level = "debug"
-    )]
+    // Return a mutable reference to the session
     pub async fn get_session(session_id: &str) -> Option<Arc<RwLock<WsSession>>> {
         let r = WS_SESSIONS.read().await;
         let session = r.get(session_id).cloned();
@@ -336,12 +302,7 @@ pub mod search_registry_utils {
         }
     }
 
-    #[tracing::instrument(
-        name = "src::service::websocket_events::search_registry_utils::is_cancelled",
-        skip(trace_id),
-        fields(trace_id = %trace_id),
-        level = "debug"
-    )]
+    // Add this function to check if a search is cancelled
     pub async fn is_cancelled(trace_id: &str) -> Option<bool> {
         let r = WS_SEARCH_REGISTRY.read().await;
         let is_cancelled = r

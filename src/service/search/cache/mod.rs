@@ -853,10 +853,8 @@ pub async fn write_results_v2(
 #[tracing::instrument(
     skip_all,
     fields(
-        trace_id = %trace_id,
         org_id = %org_id,
     ),
-    level = "info"
 )]
 pub async fn check_cache_v2(
     trace_id: &str,

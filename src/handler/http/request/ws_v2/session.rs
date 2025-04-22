@@ -138,7 +138,7 @@ impl WsSession {
 
 #[instrument(
     skip_all,
-    fields(req_id = %req_id, path = %path),
+    fields(req_id = req_id, path = path),
     level = "info"
 )]
 pub async fn run(
@@ -383,23 +383,6 @@ async fn resolve_enterprise_user_id(
 pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path: String) {
     let cfg = get_config();
 
-    // Early parse to extract trace_id for tracing
-    let trace_id = match serde_json::from_str::<WsClientEvents>(&msg) {
-        Ok(client_msg) => match client_msg {
-            WsClientEvents::Search(ref search_req) => Some(search_req.trace_id.clone()),
-            WsClientEvents::Values(ref values_req) => Some(values_req.trace_id.clone()),
-            #[cfg(feature = "enterprise")]
-            WsClientEvents::Cancel { ref trace_id, .. } => Some(trace_id.clone()),
-            _ => None,
-        },
-        Err(_) => None,
-    };
-
-    // Add trace_id to the current span if available
-    if let Some(trace_id) = trace_id.as_ref() {
-        tracing::Span::current().record("trace_id", trace_id);
-    }
-
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             // Validate the events
@@ -426,9 +409,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         let org_id = &search_req.org_id;
                         tracing::info_span!(
                             "ws::session::handle_text_message::search",
-                            trace_id = search_req.trace_id.as_str(),
                             org_id = org_id.as_str(),
-                            req_id = req_id,
                         )
                     } else {
                         tracing::Span::none()
@@ -490,9 +471,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         let org_id = &values_req.org_id;
                         tracing::info_span!(
                             "ws::session::handle_text_message::values",
-                            trace_id = values_req.trace_id.as_str(),
                             org_id = org_id.as_str(),
-                            req_id = req_id,
                         )
                     } else {
                         tracing::Span::none()
@@ -697,14 +676,14 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
 
 #[instrument(
     skip_all,
-    fields(req_id = %req_id, trace_id = ?trace_id),
-    level = "debug"
+    fields(req_id = req_id)
 )]
 pub async fn send_message(
     req_id: &str,
     msg: String,
     trace_id: Option<String>,
 ) -> Result<(), Error> {
+    let _ = trace_id;
     let session = if let Some(session) = sessions_cache_utils::get_session(req_id).await {
         session
     } else {
@@ -836,14 +815,13 @@ async fn handle_search_event(
                         trace_id = %trace_id,
                         org_id = %org_id
                     );
-                    let _guard = search_span.enter();
                     handle_search_request(
                         &req_id,
                         &mut accumulated_results,
                         &org_id,
                         &user_id,
                         search_req.clone(),
-                    )
+                    ).instrument(search_span)
                 } => {
                     match search_result {
                         Ok(_) => {
@@ -929,11 +907,7 @@ async fn handle_search_event(
 
 // Cancel handler
 #[cfg(feature = "enterprise")]
-#[instrument(
-    skip_all,
-    fields(trace_id = %trace_id),
-    level = "info"
-)]
+#[instrument(skip_all)]
 async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
     let mut w = WS_SEARCH_REGISTRY.write().await;
     if let Some(state) = w.get_mut(trace_id) {
