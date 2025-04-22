@@ -1365,7 +1365,6 @@ export default defineComponent({
       sqlQueryErrorMsg,
       vrlFunctionError,
       updateFunctionVisibility,
-      convertDateToTimestamp,
       getTimezonesByOffset,
       showTimezoneWarning,
       updateMultiTimeRange,
