@@ -412,8 +412,6 @@ const saveQueryData = async () => {
   if (formData.trigger_condition.frequency_type === "cron") {
     queryPayload.tz_offset =
       getTimezoneOffset(formData.trigger_condition.timezone) || 0;
-  } else {
-    delete queryPayload.tz_offset;
   }
 
   if (formData.query_condition.type == "promql") {
