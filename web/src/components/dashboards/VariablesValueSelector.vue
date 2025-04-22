@@ -260,8 +260,6 @@ export default defineComponent({
       );
     };
 
-    // ... Rest of your existing code
-
     const rejectAllPromises = () => {
       Object.keys(currentlyExecutingPromises).forEach((key) => {
         if (currentlyExecutingPromises[key])
@@ -1007,8 +1005,6 @@ export default defineComponent({
 
       emitVariablesData();
     };
-
-    // ...Rest of the code
 
     // Add a function to update panel loading state
     const updatePanelLoadingState = (panelId: string, isLoading: boolean) => {
