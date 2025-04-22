@@ -573,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       type ErrorMessage = {
         field: string;
         message: string;
-        nodeIndex?: number;
+        nodeIndex?: any;
         currentValue?: string;
       };
       type alertCreator = {
@@ -624,7 +624,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const pipelineDestinations = ref<any>([]);
       const alertDestinations = ref<any>([]);
       const userSelectedSqlQuery = ref<string[]>([]);
-      const userSelectedFunctionName = ref<string[]>([]);
+      const userSelectedFunctionName = ref<any[]>([]);
       const scheduledPipelines = ref<any>([]);
       const userSelectedOrgId = ref<any[]>([]);
       const organizationData = computed(() => {
@@ -719,7 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       //we use the pipelineIndex to get the correct pipeline and the nodeIndex to get the correct node
       //we use the nodeIndex to push the error to the correct node
 
-      const updateFunctionName = (functionName: string, pipelineIndex: number, nodeIndex: number) => {
+      const updateFunctionName = (functionName: any, pipelineIndex: any, nodeIndex: any) => {
         const node = jsonArrayOfObj.value[pipelineIndex].nodes[nodeIndex];
         
         if (
