@@ -235,13 +235,19 @@ pub struct QueryCondition {
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
 #[serde(untagged)]
 pub enum ConditionList {
-    OrNode{or: Vec<ConditionList>},
-    AndNode{and: Vec<ConditionList>},
-    NotNode{not: Box<ConditionList>},
+    OrNode {
+        or: Vec<ConditionList>,
+    },
+    AndNode {
+        and: Vec<ConditionList>,
+    },
+    NotNode {
+        not: Box<ConditionList>,
+    },
     /// This variant handles data serialized in `Vec<Condition>`
     /// where all conditions are evaluated as conjunction
     LegacyConditions(Vec<ConditionList>),
-    EndCondition(Condition)
+    EndCondition(Condition),
 }
 
 impl ConditionList {
@@ -257,7 +263,7 @@ impl ConditionList {
                     max_child_depth = max_child_depth.max(child_depth);
                 }
                 max_child_depth + 1
-            },
+            }
             ConditionList::AndNode { and } | ConditionList::LegacyConditions(and) => {
                 let mut max_child_depth = 0;
                 for child in and {
@@ -265,10 +271,8 @@ impl ConditionList {
                     max_child_depth = max_child_depth.max(child_depth);
                 }
                 max_child_depth + 1
-            },
-            ConditionList::NotNode { not } => {
-                not.depth() + 1
-            },
+            }
+            ConditionList::NotNode { not } => not.depth() + 1,
             ConditionList::EndCondition(_) => 1,
         }
     }
@@ -277,7 +281,7 @@ impl ConditionList {
 // Define a separate iterator struct for ConditionList
 pub struct ConditionListIterator {
     inner: Vec<ConditionList>,
-    index: usize
+    index: usize,
 }
 
 impl Iterator for ConditionListIterator {
@@ -466,6 +470,7 @@ impl std::fmt::Display for Operator {
 #[cfg(test)]
 mod test {
     use chrono::{DateTime, FixedOffset, TimeZone};
+
     use super::*;
 
     #[test]
@@ -635,25 +640,24 @@ mod test {
             "ignore_case": false
         }
         ]"#;
-        let expected_legacy_condition_list: ConditionList = serde_json::from_str(backcompat_condition_list).unwrap();
+        let expected_legacy_condition_list: ConditionList =
+            serde_json::from_str(backcompat_condition_list).unwrap();
         assert_eq!(
             expected_legacy_condition_list,
-            ConditionList::LegacyConditions(
-                vec![
-                    ConditionList::EndCondition(Condition{
-                        column: "level".into(),
-                        operator: Operator::EqualTo,
-                        value: Value::String("error".into()),
-                        ignore_case: false,
-                    }),
-                    ConditionList::EndCondition(Condition{
-                        column: "job".to_string(),
-                        operator: Operator::EqualTo,
-                        value: Value::String("something".into()),
-                        ignore_case: false,
-                    })
-                ]
-            )
+            ConditionList::LegacyConditions(vec![
+                ConditionList::EndCondition(Condition {
+                    column: "level".into(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".into()),
+                    ignore_case: false,
+                }),
+                ConditionList::EndCondition(Condition {
+                    column: "job".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("something".into()),
+                    ignore_case: false,
+                })
+            ])
         );
     }
 
@@ -677,25 +681,27 @@ mod test {
                 ]
             }
         }"#;
-        let expected_not_condition_list: ConditionList = serde_json::from_str(and_condition_list).unwrap();
+        let expected_not_condition_list: ConditionList =
+            serde_json::from_str(and_condition_list).unwrap();
         assert_eq!(
             expected_not_condition_list,
             ConditionList::NotNode {
-                not: { Box::new(ConditionList::AndNode {
-                    and: vec![
-                        ConditionList::EndCondition(Condition{
-                            column: "level".into(),
-                            operator: Operator::EqualTo,
-                            value: Value::String("error".into()),
-                            ignore_case: false,
-                        }),
-                        ConditionList::EndCondition(Condition{
-                            column: "job".to_string(),
-                            operator: Operator::EqualTo,
-                            value: Value::String("something".into()),
-                            ignore_case: false,
-                        })
-                    ]
+                not: {
+                    Box::new(ConditionList::AndNode {
+                        and: vec![
+                            ConditionList::EndCondition(Condition {
+                                column: "level".into(),
+                                operator: Operator::EqualTo,
+                                value: Value::String("error".into()),
+                                ignore_case: false,
+                            }),
+                            ConditionList::EndCondition(Condition {
+                                column: "job".to_string(),
+                                operator: Operator::EqualTo,
+                                value: Value::String("something".into()),
+                                ignore_case: false,
+                            }),
+                        ],
                     })
                 }
             }
@@ -719,18 +725,19 @@ mod test {
             "ignore_case": false
         }
         ]}"#;
-        let expected_and_condition_list: ConditionList = serde_json::from_str(and_condition_list).unwrap();
+        let expected_and_condition_list: ConditionList =
+            serde_json::from_str(and_condition_list).unwrap();
         assert_eq!(
             expected_and_condition_list,
             ConditionList::AndNode {
                 and: vec![
-                    ConditionList::EndCondition(Condition{
+                    ConditionList::EndCondition(Condition {
                         column: "level".into(),
                         operator: Operator::EqualTo,
                         value: Value::String("error".into()),
                         ignore_case: false,
                     }),
-                    ConditionList::EndCondition(Condition{
+                    ConditionList::EndCondition(Condition {
                         column: "job".to_string(),
                         operator: Operator::EqualTo,
                         value: Value::String("something".into()),
@@ -769,20 +776,21 @@ mod test {
             }
         ]
         }"#;
-        let expected_complex_condition_list: ConditionList = serde_json::from_str(complex_condition_list).unwrap();
+        let expected_complex_condition_list: ConditionList =
+            serde_json::from_str(complex_condition_list).unwrap();
         assert_eq!(
             expected_complex_condition_list,
             ConditionList::OrNode {
                 or: vec![
-                    ConditionList::AndNode{
+                    ConditionList::AndNode {
                         and: vec![
-                            ConditionList::EndCondition(Condition{
+                            ConditionList::EndCondition(Condition {
                                 column: "column1".into(),
                                 operator: Operator::EqualTo,
                                 value: Value::String("value1".into()),
                                 ignore_case: true,
                             }),
-                            ConditionList::EndCondition(Condition{
+                            ConditionList::EndCondition(Condition {
                                 column: "level".to_string(),
                                 operator: Operator::EqualTo,
                                 value: Value::String("error".into()),
@@ -790,7 +798,7 @@ mod test {
                             })
                         ]
                     },
-                    ConditionList::EndCondition(Condition{
+                    ConditionList::EndCondition(Condition {
                         column: "column3".to_string(),
                         operator: Operator::GreaterThan,
                         value: Value::String("value3".into()),

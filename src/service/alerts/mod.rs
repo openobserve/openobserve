@@ -14,15 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use alert::to_float;
-use arrow_schema::{Schema, DataType};
+use arrow_schema::{DataType, Schema};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
         alerts::{
-            AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition,
-            TriggerEvalResults,
+            AggFunction, Condition, ConditionList, Operator, QueryCondition, QueryType,
+            TriggerCondition, TriggerEvalResults,
         },
         cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
@@ -37,7 +37,6 @@ use config::{
 
 use super::promql;
 use crate::service::{search as SearchService, self_reporting::http_report_metrics};
-use config::meta::alerts::ConditionList;
 
 pub mod alert;
 pub mod derived_streams;
@@ -480,7 +479,6 @@ impl QueryConditionExt for QueryCondition {
     }
 }
 
-
 #[async_trait]
 pub trait ConditionListExt: Sync + Send + 'static {
     async fn len(&self) -> u32;
@@ -493,49 +491,46 @@ impl ConditionListExt for ConditionList {
     /// Returns end node count of a Condition list
     async fn len(&self) -> u32 {
         match self {
-            ConditionList::OrNode{ or: conditions} |
-            ConditionList::LegacyConditions(conditions) |
-            ConditionList::AndNode{ and: conditions} => {
+            ConditionList::OrNode { or: conditions }
+            | ConditionList::LegacyConditions(conditions)
+            | ConditionList::AndNode { and: conditions } => {
                 let mut count = 0;
                 for condition in conditions.iter() {
                     count += condition.len().await
                 }
                 count
             }
-            ConditionList::NotNode{ not: inner } => inner.len().await,
-            ConditionList::EndCondition(_) => 1
+            ConditionList::NotNode { not: inner } => inner.len().await,
+            ConditionList::EndCondition(_) => 1,
         }
     }
 
     /// Converts Condition list to SQL query as per schema
     async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error> {
         match self {
-            ConditionList::OrNode{or:conditions} => {
+            ConditionList::OrNode { or: conditions } => {
                 let mut cond_sql_list = Vec::new();
                 for condition in conditions.iter() {
                     cond_sql_list.push(condition.to_sql(schema).await?);
                 }
-                Ok(format!("({})",cond_sql_list.join(" OR ")))
+                Ok(format!("({})", cond_sql_list.join(" OR ")))
             }
-            ConditionList::LegacyConditions(conditions) |
-            ConditionList::AndNode{and:conditions} => {
+            ConditionList::LegacyConditions(conditions)
+            | ConditionList::AndNode { and: conditions } => {
                 let mut cond_sql_list = Vec::new();
                 for condition in conditions.iter() {
                     cond_sql_list.push(condition.to_sql(schema).await?);
                 }
-                Ok(format!("({})",cond_sql_list.join(" AND ")))
+                Ok(format!("({})", cond_sql_list.join(" AND ")))
             }
-            ConditionList::NotNode{not:inner} => {
+            ConditionList::NotNode { not: inner } => {
                 Ok(format!("NOT ({})", inner.to_sql(schema).await?))
             }
             ConditionList::EndCondition(node) => {
                 let data_type = match schema.field_with_name(&node.column) {
                     Ok(field) => field.data_type(),
                     Err(_) => {
-                        return Err(anyhow::anyhow!(
-                            "Column {} not found",
-                            &node.column,
-                        ));
+                        return Err(anyhow::anyhow!("Column {} not found", &node.column,));
                     }
                 };
                 build_expr(node, "", data_type)
@@ -545,23 +540,23 @@ impl ConditionListExt for ConditionList {
 
     async fn is_empty(&self) -> bool {
         match self {
-            ConditionList::OrNode{or:conditions} => {
+            ConditionList::OrNode { or: conditions } => {
                 for condition in conditions.iter() {
                     if condition.is_empty().await {
                         return true;
                     }
                 }
                 false
-            },
-            ConditionList::AndNode{and:conditions} => {
+            }
+            ConditionList::AndNode { and: conditions } => {
                 for condition in conditions.iter() {
                     if !condition.is_empty().await {
                         return false;
                     }
                 }
                 true
-            },
-            ConditionList::NotNode{not:inner} => inner.is_empty().await,
+            }
+            ConditionList::NotNode { not: inner } => inner.is_empty().await,
             ConditionList::LegacyConditions(conditions) => {
                 for condition in conditions.iter() {
                     if !condition.is_empty().await {
@@ -569,8 +564,8 @@ impl ConditionListExt for ConditionList {
                     }
                 }
                 true
-            },
-            ConditionList::EndCondition(_) => false
+            }
+            ConditionList::EndCondition(_) => false,
         }
     }
 }
@@ -584,26 +579,23 @@ pub trait ConditionExt: Sync + Send + 'static {
 impl ConditionExt for ConditionList {
     async fn evaluate(&self, row: &Map<String, Value>) -> bool {
         match self {
-            ConditionList::OrNode { or: conditions} => {
+            ConditionList::OrNode { or: conditions } => {
                 let mut eval = false;
                 for condition in conditions {
                     eval = eval || condition.evaluate(row).await
                 }
                 eval
             }
-            ConditionList::AndNode{ and: conditions } | ConditionList::LegacyConditions(conditions) => {
+            ConditionList::AndNode { and: conditions }
+            | ConditionList::LegacyConditions(conditions) => {
                 let mut eval = true;
                 for condition in conditions {
                     eval = eval && condition.evaluate(row).await
                 }
                 eval
             }
-            ConditionList::NotNode{ not: conditions } => {
-                !conditions.evaluate(row).await
-            }
-            ConditionList::EndCondition(condition) => {
-                condition.evaluate(row).await
-            }
+            ConditionList::NotNode { not: conditions } => !conditions.evaluate(row).await,
+            ConditionList::EndCondition(condition) => condition.evaluate(row).await,
         }
     }
 }
@@ -683,15 +675,15 @@ async fn build_sql(
     conditions: &ConditionList,
 ) -> Result<String, anyhow::Error> {
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let where_sql = conditions.to_sql(&schema).await.map_err(|err| {
-        anyhow::anyhow!(
-            "Error building SQL on stream {}: {}",
-            &stream_name,
-            err
-        )
-    })?;
+    let where_sql = conditions
+        .to_sql(&schema)
+        .await
+        .map_err(|err| anyhow::anyhow!("Error building SQL on stream {}: {}", &stream_name, err))?;
     if query_condition.aggregation.is_none() {
-        return Ok(format!("SELECT * FROM \"{}\" WHERE {}", stream_name, where_sql));
+        return Ok(format!(
+            "SELECT * FROM \"{}\" WHERE {}",
+            stream_name, where_sql
+        ));
     }
 
     // handle aggregation

@@ -797,7 +797,7 @@ impl VisitorMut for IndexVisitor {
                 if other_expr.is_none() && select.selection.is_some() && can_remove_filter {
                     self.can_optimize = true;
                 }
-                if self.is_remove_filter && can_remove_filter {
+                if self.is_remove_filter || can_remove_filter {
                     select.selection = other_expr;
                 }
             }
