@@ -302,8 +302,18 @@ async fn move_and_delete(
     let list =
         infra::file_list::get_entries_in_range(org, Some(&stream_key), range.0, range.1, None)
             .await?;
+
+    // for deleting dump files themselves, we explicitly make sure that
+    // the min and max ts both are in the range given, so to not accidentally delete
+    // dump files which may have entries outside the range
+    let dump_files: Vec<_> = get_dump_files_in_range(org, Some(stream), range, None)
+        .await?
+        .into_iter()
+        .filter(|f| f.min_ts >= range.0 && f.max_ts <= range.1)
+        .collect();
     let del_items: Vec<_> = list
         .iter()
+        .chain(dump_files.iter())
         .map(|f| FileListDeleted {
             file: format!("files/{}/{}/{}", stream_key, f.date, f.file),
             index_file: false,
@@ -330,6 +340,7 @@ async fn move_and_delete(
         inserted_into_deleted = true;
         let items: Vec<_> = list
             .iter()
+            .chain(dump_files.iter())
             .map(|f| FileKey {
                 key: format!("files/{}/{}/{}", f.stream, f.date, f.file),
                 meta: f.into(),
