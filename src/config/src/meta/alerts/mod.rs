@@ -310,7 +310,7 @@ impl IntoIterator for ConditionList {
         let inner = match self {
             ConditionList::OrNode { or } => or,
             ConditionList::AndNode { and } => and,
-            ConditionList::LegacyConditions(conditions) => conditions.into_iter().map(|cond| ConditionList::EndCondition(cond)).collect(),
+            ConditionList::LegacyConditions(conditions) => conditions.into_iter().map(ConditionList::EndCondition).collect(),
             ConditionList::NotNode { not } => vec![*not],
             ConditionList::EndCondition(condition) => vec![ConditionList::EndCondition(condition)],
         };
