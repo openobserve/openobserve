@@ -186,6 +186,7 @@ pub enum ErrorCodes {
     SearchCancelQuery(String),
     SearchTimeout(String),
     InvalidParams(String),
+    RatelimitExceeded(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -239,6 +240,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(_) => 20009,
             ErrorCodes::SearchTimeout(_) => 20010,
             ErrorCodes::InvalidParams(_) => 20011,
+            ErrorCodes::RatelimitExceeded(_) => 20012,
         }
     }
 
@@ -264,6 +266,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(_) => "Search query was cancelled".to_string(),
             ErrorCodes::SearchTimeout(_) => "Search query timed out".to_string(),
             ErrorCodes::InvalidParams(_) => "Invalid parameters".to_string(),
+            ErrorCodes::RatelimitExceeded(_) => "Ratelimit exceeded".to_string(),
         }
     }
 
@@ -281,6 +284,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(msg) => msg.to_owned(),
             ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
+            ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
         }
     }
 
@@ -298,6 +302,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(msg) => msg.to_string(),
             ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
+            ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
         }
     }
 

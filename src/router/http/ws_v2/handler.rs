@@ -23,6 +23,11 @@ use actix_web::{Error, HttpRequest, HttpResponse, web};
 use actix_ws::{CloseCode, CloseReason};
 use config::{get_config, meta::cluster::RoleGroup, utils::json};
 use futures_util::StreamExt;
+#[cfg(feature = "enterprise")]
+use {
+    crate::common::utils::auth::extract_auth_expiry_and_user_id, actix_http::Method, infra::errors,
+    std::str::FromStr,
+};
 
 use super::{
     connection::{Connection, QuerierConnection},
@@ -30,8 +35,6 @@ use super::{
     pool::QuerierConnectionPool,
     session::SessionManager,
 };
-#[cfg(feature = "enterprise")]
-use crate::common::utils::auth::extract_auth_expiry_and_user_id;
 use crate::{
     common::utils::websocket::get_ping_interval_secs_with_jitter,
     service::websocket_events::{WsClientEvents, WsServerEvents},
@@ -186,6 +189,18 @@ impl WsHandler {
                                         }
                                         #[allow(unused_mut)]
                                         Ok(mut message) => {
+                                            #[cfg(feature = "enterprise")]
+                                            {
+                                                let auth_str = crate::common::utils::auth::extract_auth_str(&req);
+                                                if let Err(e) = ratelimit_check(&message, auth_str).await {
+                                                    let err_msg = WsServerEvents::error_response(&e, Some(client_id.clone()), Some(message.get_trace_id()), false);
+                                                    if let Err(e) = response_tx.send(err_msg).await {
+                                                        log::error!("[WS::Router::Handler] Error sending error message to client_id: {}, error: {}", client_id, e);
+                                                    }
+                                                    continue;
+                                                }
+                                            }
+
                                             // check if cookie is valid for each client event only
                                             // for enterprise
                                             if !is_session_drain_state.load(Ordering::SeqCst) && !session_manager.is_client_cookie_valid(&client_id).await {
@@ -631,4 +646,68 @@ async fn select_querier(trace_id: &str, role_group: Option<RoleGroup>) -> WsResu
     .await
     .ok_or_else(|| WsError::QuerierNotAvailable(format!("for trace_id {}", trace_id)))?;
     Ok(node)
+}
+#[cfg(feature = "enterprise")]
+async fn ratelimit_check(event: &WsClientEvents, auth_str: String) -> Result<(), errors::Error> {
+    let mut method = Method::GET;
+    let path = match event {
+        WsClientEvents::Search(s) => {
+            let org_id = s.org_id.clone();
+            let path = format!("/api/{org_id}/_search");
+            method = Method::from_str("POST").unwrap();
+            path
+        }
+
+        WsClientEvents::Values(s) => {
+            let org_id = s.org_id.clone();
+            let stream_name = s.payload.stream_name.clone();
+            let path = format!("/api/{org_id}/{stream_name}/_values");
+            path
+        }
+
+        _ => return Ok(()),
+    };
+
+    let trace_id = event.get_trace_id();
+    if let Err(err) = crate::router::ratelimit::resource_extractor::ws_extractor(
+        trace_id.as_str(),
+        auth_str,
+        path.clone(),
+        &method,
+    )
+    .await
+    {
+        log::warn!(
+            "[{trace_id}] Rate limit exceeded for path: {path}, err: {:?}",
+            err
+        );
+        let blocked_err = if err.to_string().starts_with("TokenResult::Blocked: ") {
+            o2_ratelimit::middleware::parse_blocked_err(&err.to_string())
+        } else {
+            None
+        };
+
+        let err = if let Some((blocked_err, rule)) = blocked_err {
+            log::warn!(
+                "block_msg: {}, rule_id: {}, threshold: {}, resource: {}",
+                blocked_err.block_msg(),
+                rule.id,
+                rule.threshold,
+                rule.resource
+            );
+            Err(errors::Error::ErrorCode(
+                errors::ErrorCodes::RatelimitExceeded(format!(
+                    "Request limit reached for {path}. Please try again in a few moments"
+                )),
+            ))
+        } else {
+            Err(errors::Error::ErrorCode(
+                errors::ErrorCodes::RatelimitExceeded(err.to_string()),
+            ))
+        };
+
+        return err;
+    }
+
+    Ok(())
 }
