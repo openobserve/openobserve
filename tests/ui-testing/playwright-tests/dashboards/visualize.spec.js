@@ -165,7 +165,7 @@ test.describe(" visualize UI testcases", () => {
     ).toBeVisible();
   });
 
-  test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart", async ({
+  test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
     page,
   }) => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -261,9 +261,9 @@ test.describe(" visualize UI testcases", () => {
     await page
       .locator('[data-test="selected-chart-area-stacked-item"]')
       .click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    await page;
+    // .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    // .click();
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -274,9 +274,9 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-h-bar-item"]').click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -287,9 +287,9 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-scatter-item"]').click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -301,9 +301,9 @@ test.describe(" visualize UI testcases", () => {
       });
     await page.locator('[data-test="selected-chart-pie-item"]').click();
 
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
 
     await page
       .locator('[data-test="chart-renderer"] canvas')
@@ -316,9 +316,9 @@ test.describe(" visualize UI testcases", () => {
       });
     await page.locator('[data-test="selected-chart-donut-item"]').click();
 
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -330,9 +330,9 @@ test.describe(" visualize UI testcases", () => {
       });
     await page.locator('[data-test="selected-chart-gauge-item"]').click();
 
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
