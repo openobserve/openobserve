@@ -197,12 +197,9 @@ pub async fn run(
                         );
                     }
                     Ok(actix_ws::AggregatedMessage::Text(msg)) => {
-                        log::info!("[WS_HANDLER]: Received text message for req_id: {}, querier: {}", req_id, cfg.common.instance_name);
-                        log::debug!("[WS_HANDLER]: Request Id: {} Node Role: {}, querier: {}, Received message: {}",
+                        log::info!("[WS_HANDLER]: Received text message for req_id: {}, querier: {}",
                             req_id,
-                            cfg.common.node_role,
                             cfg.common.instance_name,
-                            msg
                         );
                         handle_text_message(&user_id, &req_id, msg.to_string(), path.clone())
                         .await;
@@ -313,9 +310,10 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             log::info!(
-                "[WS_HANDLER]: Parsed text message for req_id: {}, querier: {}",
+                "[WS_HANDLER]: Parsed text message for req_id: {}, querier: {}, trace_id: {}",
                 req_id,
-                get_config().common.instance_name
+                get_config().common.instance_name,
+                client_msg.get_trace_id()
             );
             // Validate the events
             if !client_msg.is_valid() {
@@ -544,8 +542,6 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
             req_id
         )));
     };
-
-    log::debug!("[WS_HANDLER]: req_id: {} sending message: {}", req_id, msg);
 
     let mut session = session.write().await;
     let _ = session.text(msg).await.map_err(|e| {
