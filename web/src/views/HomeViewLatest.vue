@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- 2nd section -->
           <div class="charts-main-container row tw-gap-4 q-mt-md " style="display: flex; gap: 16px; height: calc(100% - 22px); ">
             <!-- Chart 1 --> 
-            <div class=" first-chart-container rounded-borders " style= "padding: 16px; display: flex; flex-direction: column;"
+            <div class=" first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[35%]  tw-p-4 " style= " display: flex; flex-direction: column;"
             :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
             >
               <div class="details-container" style="margin-bottom: 16px;">
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div class=" second-chart-container rounded-borders" style=" padding: 16px; display: flex; flex-direction: column;"
+            <div class=" second-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[calc(65%-16px)] tw-p-4 " style=" display: flex; flex-direction: column;"
             :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
             >
               <div class="details-container" style="margin-bottom: 16px;">
@@ -681,10 +681,10 @@ export default defineComponent({
 .charts-main-container{
   gap: 12px;
 }
-.first-chart-container{
-  width: 35%;
-}
-.second-chart-container{
-  width: calc(65% - 16px);
-}
+// .first-chart-container{
+//   width: 35%;
+// }
+// .second-chart-container{
+//   width: calc(65% - 16px);
+// }
 </style>
