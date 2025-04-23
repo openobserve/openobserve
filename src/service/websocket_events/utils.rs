@@ -142,14 +142,10 @@ pub mod sessions_cache_utils {
         // get expired sessions
         let r = WS_SESSIONS.read().await;
         let session_ids: Vec<String> = r.keys().cloned().collect();
-        drop(r);
         let mut expired = Vec::new();
 
         for session_id in session_ids {
-            let r = WS_SESSIONS.read().await;
-            let session = r.get(&session_id).cloned();
-            drop(r);
-            if let Some(session) = session {
+            if let Some(session) = r.get(&session_id) {
                 let session_lock = session.read().await;
                 if session_lock.is_expired() {
                     expired.push(session_id);
@@ -157,6 +153,7 @@ pub mod sessions_cache_utils {
                 drop(session_lock);
             }
         }
+        drop(r);
 
         // close and remove expired sessions
         for session_id in expired {

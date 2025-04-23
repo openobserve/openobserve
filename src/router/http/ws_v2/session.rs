@@ -94,13 +94,12 @@ impl SessionManager {
         let r = self.sessions.read().await;
         let session_info = r.get(client_id).cloned();
         drop(r);
-        let is_none = session_info.is_none_or(|session_info| {
+        session_info.is_none_or(|session_info| {
             Utc::now()
                 .signed_duration_since(session_info.last_active)
                 .num_seconds()
                 > config::get_config().websocket.session_idle_timeout_secs
-        });
-        is_none
+        })
     }
 
     pub async fn unregister_client(&self, client_id: &ClientId) {
@@ -113,13 +112,12 @@ impl SessionManager {
         let r = self.sessions.read().await;
         let session_info = r.get(client_id).cloned();
         drop(r);
-        let is_valid = match session_info {
+        match session_info {
             Some(session_info) => session_info
                 .cookie_expiry
                 .is_none_or(|expiry| expiry > Utc::now()),
             None => false, // not set is treated as unauthenticated
-        };
-        is_valid
+        }
     }
 
     pub async fn remove_querier_connection(&self, querier_name: &str) {
