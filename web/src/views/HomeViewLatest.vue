@@ -214,11 +214,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="custom-first-chart"  style="height: calc(100vh - 645px) " >
+              <div class="custom-first-chart tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)] tw-w-full"  >
                 <CustomChartRenderer
                   :key="panelDataKey"
                   :data="panelData"
-                  style="width: 100%; height: 100%"
+                  class="tw-w-full tw-h-full "
                 />
               </div>
             </div>
@@ -248,58 +248,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="custom-second-chart"  style="height: calc(100vh - 645px); " >
+              <div class="custom-second-chart tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)]"  >
                 <CustomChartRenderer
                   :key="panelDataKey"
                   :data="panelData2"
-                  style="width: 100%; height: 100%"
+                  class="tw-w-full tw-h-full "
                 />
               </div>
             </div>
           </div>
 
-        <!-- 3rd section -->
-        <div class="row tw-gap-4" style="max-height: 200px; margin-top: 16px; display: flex; flex-wrap: wrap;">
-          <div class="tw-w-full sm:tw-w-[240px] tw-max-w-full">
-            <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-              style="min-height: 150px; gap: 12px;">
-              <!-- Top Section -->
-              <div class="column justify-between">
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.functionTitle") }}</div>
-                  <div>
-                    <img :src="getImageURL('images/home/compressed_size.svg')" />
+          <div class="tw-flex flex-col sm:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-flex-wrap tw-gap-4 q-mt-md " >
+
+            <div class="tw-w-full sm:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
+              <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
+                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                style="min-height: 150px; gap: 12px;">
+                <div class="column justify-between">
+                  <div class="row justify-between">
+                    <div class="tile-title">{{ t("home.functionTitle") }}</div>
+                    <div>
+                      <img :src="getImageURL('images/home/compressed_size.svg')" />
+                    </div>
                   </div>
                 </div>
+                <div class="data-to-display row items-end">
+                  {{ summary.function_count }}
+                </div>
               </div>
-              <!-- Bottom Section -->
-              <div class="data-to-display row items-end">
-                {{ summary.function_count }}
+            </div>
+
+            <!-- Tile 2 -->
+            <div class="tw-w-full sm:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
+              <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
+                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                style="min-height: 150px; gap: 12px;">
+                <div class="column justify-between">
+                  <div class="row justify-between">
+                    <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
+                    <div>
+                      <img :src="getImageURL('images/home/compressed_size.svg')" />
+                    </div>
+                  </div>
+                </div>
+                <div class="data-to-display row items-end">
+                  {{ summary.dashboard_count }}
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="tw-w-full sm:tw-w-[240px] tw-max-w-full">
-            <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-              style="min-height: 150px; gap: 12px;">
-              <!-- Top Section -->
-              <div class="column justify-between">
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
-                  <div>
-                    <img :src="getImageURL('images/home/compressed_size.svg')" />
-                  </div>
-                </div>
-              </div>
-              <!-- Bottom Section -->
-              <div class="data-to-display row items-end">
-                {{ summary.dashboard_count }}
-              </div>
-            </div>
-          </div>
-        </div>
+
+
 
 
       </div>
