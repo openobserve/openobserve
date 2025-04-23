@@ -721,7 +721,9 @@ const validateChartFieldsConfiguration = (
           argDefIndex = variableArgPosition;
         }
 
-        const allowedTypes = argsDefinition[argDefIndex].type;
+        const allowedTypes = argsDefinition[argDefIndex].type.map(
+          (t: any) => t.value,
+        );
 
         // Check if current argument type is among the allowed types
         if (arg && !allowedTypes.includes(arg.type)) {
@@ -1181,12 +1183,12 @@ export function addMissingArgs(fields: any): any {
   functionDef.args.forEach((argDef: any) => {
     const isArgProvided = updatedArgs.some((arg: any) => {
       // Check if the argument's type matches any of the required types
-      return argDef.type.includes(arg.type);
+      return argDef.type.map((t: any) => t.value).includes(arg.type);
     });
 
     if (!isArgProvided) {
       // If the argument is missing, add it
-      const argType = argDef.type[0]; // Always take the first type
+      const argType = argDef.type[0].value; // Always take the first type
       const defaultValue =
         argDef.defaultValue !== undefined
           ? argDef.defaultValue
