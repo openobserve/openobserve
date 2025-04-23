@@ -30,7 +30,6 @@ use o2_enterprise::enterprise::common::{
     infra::config::get_config as get_o2_config,
 };
 use rand::prelude::SliceRandom;
-use tokio::sync::mpsc;
 use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
@@ -38,17 +37,12 @@ use crate::common::infra::cluster::get_cached_online_router_nodes;
 #[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 #[cfg(feature = "enterprise")]
-use crate::service::{
-    self_reporting::audit,
-    websocket_events::{handle_cancel, search_registry_utils},
-};
+use crate::service::{self_reporting::audit, websocket_events::handle_cancel};
 use crate::{
-    common::{
-        infra::config::WS_SEARCH_REGISTRY, utils::websocket::get_ping_interval_secs_with_jitter,
-    },
+    common::utils::websocket::get_ping_interval_secs_with_jitter,
     service::websocket_events::{
         WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
-        search_registry_utils::SearchState, sessions_cache_utils, setup_tracing_with_trace_id,
+        sessions_cache_utils, setup_tracing_with_trace_id,
     },
 };
 
@@ -203,6 +197,7 @@ pub async fn run(
                         );
                     }
                     Ok(actix_ws::AggregatedMessage::Text(msg)) => {
+                        log::info!("[WS_HANDLER]: Received text message for req_id: {}, querier: {}", req_id, cfg.common.instance_name);
                         log::debug!("[WS_HANDLER]: Request Id: {} Node Role: {}, querier: {}, Received message: {}",
                             req_id,
                             cfg.common.node_role,
@@ -317,6 +312,11 @@ async fn resolve_enterprise_user_id(
 pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path: String) {
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
+            log::info!(
+                "[WS_HANDLER]: Parsed text message for req_id: {}, querier: {}",
+                req_id,
+                get_config().common.instance_name
+            );
             // Validate the events
             if !client_msg.is_valid() {
                 log::error!("[WS_HANDLER]: Invalid event: {:?}", client_msg);
@@ -429,21 +429,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         return;
                     };
 
-                    // First handle the cancel event
-                    // send a cancel flag to the search task
-                    if let Err(e) = handle_cancel_event(&trace_id)
-                        .instrument(ws_span.clone())
-                        .await
-                    {
-                        log::warn!("[WS_HANDLER]: Error in cancelling : {}", e);
-                        return;
-                    }
-
-                    log::info!(
-                        "[WS_HANDLER]: trace_id: {}, Cancellation flag set to: {:?}",
-                        trace_id,
-                        search_registry_utils::is_cancelled(&trace_id).await
-                    );
+                    log::info!("[WS_HANDLER]: trace_id: {}, Cancelling search", trace_id,);
 
                     let res = handle_cancel(&trace_id, &org_id).await;
                     let _ = send_message(req_id, res.to_json()).await;
@@ -621,7 +607,6 @@ async fn handle_search_event(
     req_id: &str,
     #[allow(unused_variables)] path: String,
 ) {
-    let (cancel_tx, mut cancel_rx) = mpsc::channel(1);
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
 
     let org_id = org_id.to_string();
@@ -636,17 +621,6 @@ async fn handle_search_event(
 
     #[cfg(feature = "enterprise")]
     let client_msg = WsClientEvents::Search(Box::new(search_req.clone()));
-
-    // Register running search BEFORE spawning the search task
-    let mut w = WS_SEARCH_REGISTRY.write().await;
-    w.insert(
-        trace_id.clone(),
-        SearchState::Running {
-            cancel_tx,
-            req_id: req_id.to_string(),
-        },
-    );
-    drop(w);
 
     // Spawn the search task
     tokio::spawn(async move {
@@ -666,14 +640,6 @@ async fn handle_search_event(
             ) => {
                 match search_result {
                     Ok(_) => {
-                        let mut w = WS_SEARCH_REGISTRY.write().await;
-                        if let Some(state) = w.get_mut(&trace_id_for_task) {
-                            *state = SearchState::Completed {
-                                req_id: req_id.to_string(),
-                            };
-                        }
-                        drop(w);
-
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
                         if is_audit_enabled {
@@ -694,8 +660,6 @@ async fn handle_search_event(
                             })
                             .await;
                         }
-
-                        cleanup_search_resources(&trace_id_for_task).await;
                     }
                     Err(e) => {
                         let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
@@ -727,55 +691,11 @@ async fn handle_search_event(
                               })
                               .await;
                         }
-
-                        // Even if the search is cancelled, we need to cleanup the resources
-                        cleanup_search_resources(&trace_id_for_task).await;
                     }
                 }
             }
-            _ = cancel_rx.recv() => {
-                // if search is cancelled, update the state
-                // the cancel handler will close the session
-
-                // Just cleanup resources when cancelled
-                cleanup_search_resources(&trace_id_for_task).await;
-            }
         }
     });
-}
-
-// Cancel handler
-#[cfg(feature = "enterprise")]
-#[tracing::instrument(
-    name = "service:websocket_events:search::handle_cancel_event",
-    skip_all
-)]
-async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
-    let mut w = WS_SEARCH_REGISTRY.write().await;
-    if let Some(state) = w.get_mut(trace_id) {
-        let cancel_tx = match state {
-            SearchState::Running { cancel_tx, .. } => cancel_tx.clone(),
-            state => {
-                let err_msg = format!("Cannot cancel search in state: {:?}", state);
-                log::warn!("[WS_HANDLER]: {}", err_msg);
-                drop(w);
-                return Err(anyhow::anyhow!(err_msg));
-            }
-        };
-
-        *state = SearchState::Cancelled {
-            req_id: trace_id.to_string(),
-        };
-
-        if let Err(e) = cancel_tx.send(()).await {
-            log::error!("[WS_HANDLER]: Failed to send cancel signal: {}", e);
-        }
-
-        log::info!("[WS_HANDLER]: Search cancelled for trace_id: {}", trace_id);
-    }
-    drop(w);
-
-    Ok(())
 }
 
 #[tracing::instrument(
@@ -783,24 +703,6 @@ async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
     skip_all
 )]
 async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
-    // if the error is due to search cancellation, return.
-    // the cancel handler will close the session
-    if let errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) = e {
-        log::info!(
-            "[WS_HANDLER]: trace_id: {}, Return from search handler, search canceled",
-            trace_id
-        );
-        // Update state to cancelled before returning
-        let mut w = WS_SEARCH_REGISTRY.write().await;
-        if let Some(state) = w.get_mut(trace_id) {
-            *state = SearchState::Cancelled {
-                req_id: req_id.to_string(),
-            };
-        }
-        drop(w);
-        return None;
-    }
-
     log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
     // Send error response
     let err_res = WsServerEvents::error_response(
@@ -817,28 +719,7 @@ async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<
         description: None,
     };
 
-    // Update registry state
-    let mut w = WS_SEARCH_REGISTRY.write().await;
-    w.entry(trace_id.to_string())
-        .and_modify(|state| {
-            *state = SearchState::Completed {
-                req_id: trace_id.to_string(),
-            }
-        })
-        .or_insert(SearchState::Completed {
-            req_id: trace_id.to_string(),
-        });
-    drop(w);
-
     Some(close_reason)
-}
-
-// Add cleanup function
-async fn cleanup_search_resources(trace_id: &str) {
-    let mut w = WS_SEARCH_REGISTRY.write().await;
-    w.remove(trace_id);
-    drop(w);
-    log::debug!("[WS_HANDLER]: trace_id: {}, Resources cleaned up", trace_id);
 }
 
 // Main values handler
@@ -853,8 +734,6 @@ async fn handle_values_event(
     req_id: &str,
     #[allow(unused_variables)] path: String,
 ) {
-    let (cancel_tx, mut cancel_rx) = mpsc::channel(1);
-
     let org_id = org_id.to_string();
     let user_id = user_id.to_string();
     let req_id = req_id.to_string();
@@ -867,17 +746,6 @@ async fn handle_values_event(
 
     #[cfg(feature = "enterprise")]
     let client_msg = WsClientEvents::Values(Box::new(values_req.clone()));
-
-    // Register running values search BEFORE spawning the values task
-    let mut w = WS_SEARCH_REGISTRY.write().await;
-    w.insert(
-        trace_id.clone(),
-        SearchState::Running {
-            cancel_tx,
-            req_id: req_id.to_string(),
-        },
-    );
-    drop(w);
 
     // Create a vector to accumulate results
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
@@ -899,14 +767,6 @@ async fn handle_values_event(
             ) => {
                 match values_result {
                     Ok(_) => {
-                        let mut w = WS_SEARCH_REGISTRY.write().await;
-                        if let Some(state) = w.get_mut(&trace_id_for_task) {
-                            *state = SearchState::Completed {
-                                req_id: req_id.to_string(),
-                            };
-                        }
-                        drop(w);
-
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
                         if is_audit_enabled {
@@ -927,8 +787,6 @@ async fn handle_values_event(
                             })
                             .await;
                         }
-
-                        cleanup_search_resources(&trace_id_for_task).await;
                     }
                     Err(e) => {
                         // Convert anyhow::Error to our Error type
@@ -962,18 +820,8 @@ async fn handle_values_event(
                               })
                               .await;
                         }
-
-                        // Even if the values search is cancelled, we need to cleanup the resources
-                        cleanup_search_resources(&trace_id_for_task).await;
                     }
                 }
-            }
-            _ = cancel_rx.recv() => {
-                // if values search is cancelled, update the state
-                // the cancel handler will close the session
-
-                // Just cleanup resources when cancelled
-                cleanup_search_resources(&trace_id_for_task).await;
             }
         }
     });
