@@ -152,10 +152,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
     let config = get_config();
 
+    if !config.common.file_list_dump_enabled {
+        return Ok(());
+    }
+
     // spawn threads which will do the actual dumping
     for _ in 0..config.limit.file_merge_thread_num {
         let rx = FILE_LIST_DUMP_CHANNEL.receiver.clone();
-        let config = config.clone();
         tokio::spawn(async move {
             loop {
                 let ret = rx.lock().await.recv().await;
@@ -165,16 +168,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((job_id, org, stream, offset)) => {
-                        if !config.common.file_list_dump_enabled {
-                            if let Err(e) =
-                                infra::file_list::set_job_dumped_status(job_id, true).await
-                            {
-                                log::error!(
-                                    "[FILE_LIST_DUMP:JOB] error in setting job with id {job_id} to dumped=true : {e} "
-                                );
-                            }
-                            continue;
-                        }
                         if let Err(e) = dump(job_id, &org, &stream, offset).await {
                             log::error!("error in dumping files {stream} offset {offset} : {e}");
                         }
