@@ -138,7 +138,7 @@ impl TriggerCondition {
             .with_timezone(&timezone);
 
         // Convert frequency from seconds to minutes
-        let frequency_minutes = frequency / 60;
+        let frequency_minutes = std::cmp::max(1, frequency / 60); // Ensure at least 1 minute
 
         // Get the minute and second of the next_run_at time
         let minute = dt.minute() as i64;
