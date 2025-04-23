@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
 use chrono::Utc;
 use config::{
@@ -20,6 +22,7 @@ use config::{
     meta::stream::{FileKey, FileListDeleted, StreamStats, StreamType},
     utils::time::hour_micros,
 };
+use datafusion::catalog::TableProvider;
 use hashbrown::HashMap;
 use infra::{
     errors,
@@ -157,16 +160,29 @@ fn record_batch_to_stats(rb: RecordBatch) -> Vec<(String, StreamStats)> {
     ret
 }
 
+async fn inner_exec(
+    partitions: usize,
+    provider: Arc<dyn TableProvider>,
+    query: &str,
+) -> Result<Vec<RecordBatch>, errors::Error> {
+    let ctx = prepare_datafusion_context(None, vec![], vec![], false, partitions).await?;
+    ctx.register_table("file_list", provider)?;
+    let df = ctx.sql(query).await?;
+    let ret = df.collect().await?;
+    Ok(ret)
+}
+
 async fn exec(
     trace_id: &str,
     partitions: usize,
     dump_files: &[FileKey],
     query: &str,
 ) -> Result<Vec<RecordBatch>, errors::Error> {
+    let trace_id = format!("{trace_id}-file-list-dump");
     let schema = super::super::job::FILE_LIST_SCHEMA.clone();
 
     let session = config::meta::search::Session {
-        id: trace_id.to_string(),
+        id: trace_id.clone(),
         storage_type: config::meta::search::StorageType::Memory,
         work_group: None,
         target_partitions: partitions,
@@ -184,12 +200,10 @@ async fn exec(
     )
     .await?;
 
-    let ctx = prepare_datafusion_context(None, vec![], vec![], false, partitions).await?;
-    ctx.register_table("file_list", tbl).unwrap();
-    let df = ctx.sql(query).await.unwrap();
-    let ret = df.collect().await.unwrap();
-
-    Ok(ret)
+    let ret = inner_exec(partitions, tbl, query).await;
+    // we always have to clear the files loaded
+    super::search::datafusion::storage::file_list::clear(&trace_id);
+    ret
 }
 
 pub async fn query(
@@ -471,8 +485,6 @@ WHERE {field} = '{value}'
         .unwrap_or_else(|| rand::random::<u64>().to_string());
     let fake_trace_id = format!("stats_on_dump-{}", task_id);
     let t = exec(&fake_trace_id, cfg.limit.cpu_num, &dump_files, &sql).await?;
-    // we have to do this manually here, otherwise it will not get cleared.
-    super::search::datafusion::storage::file_list::clear(&fake_trace_id);
     let ret = t.into_iter().flat_map(record_batch_to_stats).collect();
     Ok(ret)
 }

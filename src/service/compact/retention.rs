@@ -446,8 +446,6 @@ async fn delete_from_file_list(
         time_range.1,
     )
     .await?;
-    // we have to do this manually here, otherwise it will not get cleared.
-    super::super::search::datafusion::storage::file_list::clear(&fake_trace_id);
     if files.is_empty() {
         return Ok(());
     }
