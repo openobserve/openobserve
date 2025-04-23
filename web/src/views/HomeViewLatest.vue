@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
             >
               <div class="details-container" style="margin-bottom: 16px;">
-                <div class="row justify-between">
+                <div class="row justify-between items-center">
                   <span class="text-title">Alerts</span>
                   <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
                     <router-link
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
             >
               <div class="details-container" style="margin-bottom: 16px;">
-                <div class="row justify-between">
+                <div class="row justify-between items-center">
                   <span class="text-title">Pipelines</span>
                   <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
                     <router-link
