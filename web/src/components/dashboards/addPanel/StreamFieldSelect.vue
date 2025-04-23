@@ -138,7 +138,10 @@ export default defineComponent({
       filteredOptions.value = [...options?.value];
     }
 
-    function filterFields(val: string, update: any) {
+    function filterFields(val: string | object, update: any) {
+      // Handle both string and object values for val
+      let searchText = "";
+
       if (val === "") {
         update(() => {
           filteredOptions.value = [...options?.value];
@@ -146,8 +149,19 @@ export default defineComponent({
         return;
       }
 
+      // Check if val is string or object
+      if (typeof val === "string" && val !== "") {
+        searchText = val.toLowerCase();
+      } else {
+        // If we can't determine the search text, just show all options
+        update(() => {
+          filteredOptions.value = [...options?.value];
+        });
+        return;
+      }
+
       update(() => {
-        const needle = val?.toLowerCase();
+        const needle = searchText;
         // Filter options where either stream name (label) or field name contains the search term
         filteredOptions.value = options?.value
           ?.map((stream) => {
