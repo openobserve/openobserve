@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
 use chrono::Utc;
 use config::{
@@ -22,7 +20,6 @@ use config::{
     meta::stream::{FileKey, FileListDeleted, StreamStats, StreamType},
     utils::time::hour_micros,
 };
-use datafusion::catalog::TableProvider;
 use hashbrown::HashMap;
 use infra::{
     errors,
@@ -161,28 +158,15 @@ fn record_batch_to_stats(rb: RecordBatch) -> Vec<(String, StreamStats)> {
 }
 
 async fn inner_exec(
-    partitions: usize,
-    provider: Arc<dyn TableProvider>,
-    query: &str,
-) -> Result<Vec<RecordBatch>, errors::Error> {
-    let ctx = prepare_datafusion_context(None, vec![], vec![], false, partitions).await?;
-    ctx.register_table("file_list", provider)?;
-    let df = ctx.sql(query).await?;
-    let ret = df.collect().await?;
-    Ok(ret)
-}
-
-async fn exec(
     trace_id: &str,
     partitions: usize,
     dump_files: &[FileKey],
     query: &str,
 ) -> Result<Vec<RecordBatch>, errors::Error> {
-    let trace_id = format!("{trace_id}-file-list-dump");
     let schema = super::super::job::FILE_LIST_SCHEMA.clone();
 
     let session = config::meta::search::Session {
-        id: trace_id.clone(),
+        id: trace_id.to_string(),
         storage_type: config::meta::search::StorageType::Memory,
         work_group: None,
         target_partitions: partitions,
@@ -199,8 +183,21 @@ async fn exec(
         false,
     )
     .await?;
+    let ctx = prepare_datafusion_context(None, vec![], vec![], false, partitions).await?;
+    ctx.register_table("file_list", tbl)?;
+    let df = ctx.sql(query).await?;
+    let ret = df.collect().await?;
+    Ok(ret)
+}
 
-    let ret = inner_exec(partitions, tbl, query).await;
+async fn exec(
+    trace_id: &str,
+    partitions: usize,
+    dump_files: &[FileKey],
+    query: &str,
+) -> Result<Vec<RecordBatch>, errors::Error> {
+    let trace_id = format!("{trace_id}-file-list-dump");
+    let ret = inner_exec(&trace_id, partitions, dump_files, query).await;
     // we always have to clear the files loaded
     super::search::datafusion::storage::file_list::clear(&trace_id);
     ret
