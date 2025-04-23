@@ -444,7 +444,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
   });
 
-  test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization", async ({
+  test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
     page,
   }) => {
     // Chart should not reflect changes made to X or Y axis.
