@@ -218,7 +218,7 @@ test.describe(" visualize UI testcases", () => {
       });
   });
 
-  test("should correctly plot the data according to the new chart type when changing the chart type", async ({
+  test(" should correctly plot the data according to the new chart type when changing the chart type", async ({
     page,
   }) => {
     await page.locator('[data-test="logs-visualize-toggle"]').click();
