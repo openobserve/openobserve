@@ -332,7 +332,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
             let ws_span = setup_tracing_with_trace_id(
                 &client_msg.get_trace_id(),
                 tracing::info_span!(
-                    "src::handler::http::request::websocket::ws_v2::session::handle_text_message"
+                    "src::handler::http::request::websocket::ws::session::handle_text_message"
                 ),
             )
             .await;

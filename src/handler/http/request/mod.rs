@@ -41,7 +41,7 @@ pub mod stream;
 pub mod syslog;
 pub mod traces;
 pub mod users;
-pub mod ws_v2;
+pub mod ws;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";

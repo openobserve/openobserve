@@ -101,7 +101,7 @@ pub mod sessions_cache_utils {
     use tokio::sync::RwLock;
 
     use crate::{
-        common::infra::config::WS_SESSIONS, handler::http::request::ws_v2::session::WsSession,
+        common::infra::config::WS_SESSIONS, handler::http::request::ws::session::WsSession,
     };
 
     pub async fn run_gc_ws_sessions() {
