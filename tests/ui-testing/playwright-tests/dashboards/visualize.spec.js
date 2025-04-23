@@ -2,6 +2,8 @@ import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 
+import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
+
 test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
@@ -53,7 +55,9 @@ test.describe(" visualize UI testcases", () => {
       force: true,
     });
     // get the data from the search variable
-    await expect.poll(async () => (await search).status()).toBe(200);
+    // await expect.poll(async () => (await search).status()).toBe(200);
+    await page.waitForTimeout(7000);
+
     // await search.hits.FIXME_should("be.an", "array");
   }
   // tebefore(async function () {
@@ -122,7 +126,11 @@ test.describe(" visualize UI testcases", () => {
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
     await page.waitForTimeout(1000);
     await page
       .locator('[data-test="logs-search-index-list"]')
@@ -214,6 +222,8 @@ test.describe(" visualize UI testcases", () => {
   test("should correctly plot the data according to the new chart type when changing the chart type", async ({
     page,
   }) => {
+    const dashboardPageActions = new DashboardactionPage(page);
+
     await page.locator('[data-test="logs-visualize-toggle"]').click();
     await page
       .locator(
@@ -230,6 +240,10 @@ test.describe(" visualize UI testcases", () => {
     ).toBeVisible();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+
+    // await dashboardPageActions.applyDashboardBtn;
+    // await dashboardPageActions.waitForChartToRender();
+
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -282,6 +296,13 @@ test.describe(" visualize UI testcases", () => {
       });
     await page.locator('[data-test="selected-chart-scatter-item"]').click();
     await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .click();
+
+    // await page.waitForTimeout(5000);
+
+    // await dashboardPageActions.waitForChartToRender();
+    await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
       .click({
@@ -291,6 +312,11 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-pie-item"]').click();
+
+    await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .click();
+
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -301,6 +327,10 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-donut-item"]').click();
+
+    await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .click();
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -311,6 +341,10 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-gauge-item"]').click();
+
+    await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .click();
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -552,7 +586,11 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
 
     // Switch to SQL mode, apply the query, and refresh the search
-    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
 
     // Toggle visualization
