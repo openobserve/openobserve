@@ -691,6 +691,7 @@ async fn handle_search_event(
                         };
                         match &e {
                             errors::Error::ErrorCode(code) => match code {
+                                #[cfg(feature = "enterprise")]
                                 errors::ErrorCodes::SearchCancelQuery(_) =>  {
                                     let cancel_res = WsServerEvents::CancelResponse {
                                         trace_id: trace_id.to_string(),
