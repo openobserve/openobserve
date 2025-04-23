@@ -977,7 +977,7 @@ async fn handle_derived_stream_triggers(
             // final_end_time is the last multiple of given frequency after the "suppossed to be run
             // at" timestamp
             let frequency_count = delay / period_num_microseconds;
-            final_end_time = suppossed_to_be_run_at + (frequency_count * period_num_microseconds);
+            final_end_time = suppossed_to_be_run_at.saturating_add(frequency_count.saturating_mul(period_num_microseconds));
             (
                 Some(t0),
                 std::cmp::min(suppossed_to_be_run_at, t0 + period_num_microseconds),
