@@ -221,8 +221,6 @@ test.describe(" visualize UI testcases", () => {
   test("should correctly plot the data according to the new chart type when changing the chart type", async ({
     page,
   }) => {
-    const dashboardPageActions = new DashboardactionPage(page);
-
     await page.locator('[data-test="logs-visualize-toggle"]').click();
     await page
       .locator(
@@ -294,10 +292,6 @@ test.describe(" visualize UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-
-    // await page.waitForTimeout(5000);
-
-    // await dashboardPageActions.waitForChartToRender();
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
