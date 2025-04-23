@@ -29,15 +29,16 @@ use super::{
 #[derive(Debug, Default)]
 pub struct SessionManager {
     sessions: RwAHashMap<ClientId, SessionInfo>,
-    mapped_queriers: RwAHashMap<QuerierName, HashSet<TraceId>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct SessionInfo {
-    pub querier_mappings: HashMap<TraceId, QuerierName>,
+    pub trace_id_map: HashMap<TraceId, QuerierName>,
     pub cookie_expiry: Option<DateTime<Utc>>,
     pub last_active: DateTime<Utc>,
     pub is_session_drain_state: Arc<AtomicBool>,
+    // Used to lookup trace_ids for a given querier
+    pub querier_map: HashMap<QuerierName, HashSet<TraceId>>,
 }
 
 impl SessionManager {
@@ -54,10 +55,11 @@ impl SessionManager {
         drop(r);
 
         let session_info = SessionInfo {
-            querier_mappings: HashMap::default(),
+            trace_id_map: HashMap::default(),
             cookie_expiry,
             last_active: Utc::now(),
             is_session_drain_state: Arc::new(AtomicBool::new(false)),
+            querier_map: HashMap::default(),
         };
 
         let mut write_guard = self.sessions.write().await;
@@ -76,34 +78,16 @@ impl SessionManager {
     }
 
     pub async fn remove_trace_id(&self, client_id: &str, trace_id: &str) {
-        let querier_name = {
-            let mut session_write = self.sessions.write().await;
-            let removed_querier_name = session_write
-                .get_mut(client_id)
-                .and_then(|session_info| session_info.querier_mappings.remove(trace_id));
-            drop(session_write);
-            removed_querier_name
-        };
-
-        if let Some(querier_name) = querier_name {
-            log::debug!(
-                "[WS::Session] removed querier {querier_name} from sessions-session_info-querier_mappings"
-            );
-            let mut mapping_write = self.mapped_queriers.write().await;
-            if let Some(trace_ids) = mapping_write.get_mut(&querier_name) {
-                trace_ids.remove(trace_id);
-                log::debug!(
-                    "[WS::Session] removed trace_id {trace_id} from mapped_queriers-trace_ids"
-                );
-                if trace_ids.is_empty() {
-                    log::debug!(
-                        "[WS::Session] no more trace_id's mapped to querier {querier_name}. removing querier from mapped_queriers"
-                    );
-                    mapping_write.remove(&querier_name);
-                }
-            }
-            drop(mapping_write);
+        let mut session_write = self.sessions.write().await;
+        let session_info = session_write.get_mut(client_id);
+        if let Some(session_info) = session_info {
+            let querier_name = session_info
+                .trace_id_map
+                .remove(trace_id)
+                .unwrap_or_default();
+            session_info.querier_map.remove(&querier_name);
         }
+        drop(session_write);
     }
 
     pub async fn reached_max_idle_time(&self, client_id: &ClientId) -> bool {
@@ -121,23 +105,8 @@ impl SessionManager {
 
     pub async fn unregister_client(&self, client_id: &ClientId) {
         let mut session_write = self.sessions.write().await;
-        let session_info = session_write.remove(client_id);
+        session_write.remove(client_id);
         drop(session_write);
-        if let Some(session_info) = session_info {
-            let mut mapped_querier_write = self.mapped_queriers.write().await;
-
-            for (trace_id, querier_name) in session_info.querier_mappings {
-                if let Some(trace_ids) = mapped_querier_write.get_mut(&querier_name) {
-                    trace_ids.retain(|tid| tid != &trace_id);
-                    if !trace_ids.is_empty() {
-                        trace_ids.shrink_to_fit();
-                    } else {
-                        mapped_querier_write.remove(&querier_name);
-                    }
-                }
-            }
-            drop(mapped_querier_write);
-        }
     }
 
     pub async fn is_client_cookie_valid(&self, client_id: &ClientId) -> bool {
@@ -154,16 +123,6 @@ impl SessionManager {
     }
 
     pub async fn remove_querier_connection(&self, querier_name: &str) {
-        // Remove from mapped_querier
-        let mut write_guard = self.mapped_queriers.write().await;
-        let trace_ids = write_guard.remove(querier_name).unwrap_or_default(); // existence validated
-        drop(write_guard);
-
-        if trace_ids.is_empty() {
-            return;
-        }
-
-        // get all the client_ids
         let client_ids = {
             let session_read = self.sessions.read().await;
             let client_ids = session_read.keys().cloned().collect::<Vec<_>>();
@@ -175,10 +134,15 @@ impl SessionManager {
         let mut session_write = self.sessions.write().await;
         for client_id in client_ids {
             if let Some(session_info) = session_write.get_mut(&client_id) {
-                session_info
-                    .querier_mappings
-                    .retain(|tid, _| !trace_ids.contains(tid));
-                session_info.querier_mappings.shrink_to_fit();
+                let trace_ids = session_info
+                    .querier_map
+                    .remove(querier_name)
+                    .unwrap_or_default();
+                for trace_id in trace_ids {
+                    session_info.trace_id_map.remove(&trace_id);
+                }
+                session_info.trace_id_map.shrink_to_fit();
+                session_info.querier_map.shrink_to_fit();
             }
         }
         drop(session_write);
@@ -191,18 +155,19 @@ impl SessionManager {
         querier_name: &QuerierName,
     ) -> WsResult<()> {
         let mut w = self.sessions.write().await;
-        w.get_mut(client_id)
-            .ok_or(WsError::SessionNotFound(format!("client_id {}", client_id)))?
-            .querier_mappings
+        let session_info = w
+            .get_mut(client_id)
+            .ok_or(WsError::SessionNotFound(format!("client_id {}", client_id)))?;
+        session_info
+            .trace_id_map
             .insert(trace_id.clone(), querier_name.clone());
-        drop(w);
-
-        // mapped_queriers
-        let mut w = self.mapped_queriers.write().await;
-        w.entry(querier_name.clone())
+        session_info
+            .querier_map
+            .entry(querier_name.clone())
             .or_insert_with(HashSet::new)
             .insert(trace_id.clone());
         drop(w);
+
         Ok(())
     }
 
@@ -215,7 +180,7 @@ impl SessionManager {
         let querier_name = r
             .get(client_id)
             .ok_or(WsError::SessionNotFound(format!("client_id {}", client_id)))?
-            .querier_mappings
+            .trace_id_map
             .get(trace_id)
             .cloned();
         drop(r);
@@ -226,7 +191,7 @@ impl SessionManager {
         let r = self.sessions.read().await;
         let querier_names = r
             .get(client_id)
-            .map(|session_info| session_info.querier_mappings.values().cloned().collect())
+            .map(|session_info| session_info.trace_id_map.values().cloned().collect())
             .unwrap_or_default();
         drop(r);
         querier_names
@@ -236,7 +201,7 @@ impl SessionManager {
         let r = self.sessions.read().await;
         let trace_ids = r
             .get(client_id)
-            .map(|session_info| session_info.querier_mappings.keys().cloned().collect())
+            .map(|session_info| session_info.trace_id_map.keys().cloned().collect())
             .unwrap_or_default();
         drop(r);
         trace_ids
