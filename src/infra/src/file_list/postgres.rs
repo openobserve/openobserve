@@ -91,7 +91,7 @@ impl super::FileList for PostgresFileList {
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
-        self.inner_batch_add("file_list", files).await
+        self.inner_batch_process("file_list", files).await
     }
 
     async fn batch_add_with_id(&self, _files: &[(i64, &FileKey)]) -> Result<()> {
@@ -99,70 +99,11 @@ impl super::FileList for PostgresFileList {
     }
 
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
-        self.inner_batch_add("file_list_history", files).await
+        self.inner_batch_process("file_list_history", files).await
     }
 
-    async fn batch_remove(&self, files: &[String]) -> Result<()> {
-        if files.is_empty() {
-            return Ok(());
-        }
-        let chunks = files.chunks(100);
-        for files in chunks {
-            // get ids of the files
-            let pool = CLIENT.clone();
-            let mut ids = Vec::with_capacity(files.len());
-            for file in files {
-                let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-                DB_QUERY_NUMS
-                    .with_label_values(&["select_id", "file_list", ""])
-                    .inc();
-                let start = std::time::Instant::now();
-                let query_res = sqlx::query_scalar(
-                    r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
-                )
-                .bind(stream_key)
-                .bind(date_key)
-                .bind(file_name)
-                .fetch_one(&pool)
-                .await;
-                let time = start.elapsed().as_secs_f64();
-                DB_QUERY_TIME
-                    .with_label_values(&["select_id", "file_list"])
-                    .observe(time);
-                let ret: Option<i64> = match query_res {
-                    Ok(v) => v,
-                    Err(sqlx::Error::RowNotFound) => continue,
-                    Err(e) => return Err(e.into()),
-                };
-                match ret {
-                    Some(v) => ids.push(v.to_string()),
-                    None => {
-                        return Err(Error::Message(
-                            "[POSTGRES] query error: id should not empty from file_list"
-                                .to_string(),
-                        ));
-                    }
-                }
-            }
-            // delete files by ids
-            if !ids.is_empty() {
-                DB_QUERY_NUMS
-                    .with_label_values(&["delete_id", "file_list", ""])
-                    .inc();
-                let sql = format!(
-                    "UPDATE file_list SET deleted = true WHERE id IN({});",
-                    ids.join(",")
-                );
-                let start = std::time::Instant::now();
-                _ = pool.execute(sql.as_str()).await?;
-                let time = start.elapsed().as_secs_f64();
-                DB_QUERY_TIME
-                    .with_label_values(&["delete_id", "file_list"])
-                    .observe(time);
-            }
-        }
-        Ok(())
+    async fn batch_process(&self, files: &[FileKey]) -> Result<()> {
+        self.inner_batch_process("file_list", files).await
     }
 
     async fn batch_add_deleted(
@@ -1376,74 +1317,125 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
         }
     }
 
-    async fn inner_batch_add(&self, table: &str, files: &[FileKey]) -> Result<()> {
+    async fn inner_batch_process(&self, table: &str, files: &[FileKey]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
+
         let pool = CLIENT.clone();
-        let chunks = files.chunks(100);
-        for files in chunks {
-            let mut tx = pool.begin().await?;
-            let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                format!(
-                    "INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)"
-                ).as_str()
-            );
-            query_builder.push_values(files, |mut b, item| {
-                let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(&item.key).expect("parse file key failed");
-                let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                b.push_bind(org_id)
-                    .push_bind(stream_key)
-                    .push_bind(date_key)
-                    .push_bind(file_name)
-                    .push_bind(false)
-                    .push_bind(item.meta.min_ts)
-                    .push_bind(item.meta.max_ts)
-                    .push_bind(item.meta.records)
-                    .push_bind(item.meta.original_size)
-                    .push_bind(item.meta.compressed_size)
-                    .push_bind(item.meta.index_size)
-                    .push_bind(item.meta.flattened);
-            });
-            DB_QUERY_NUMS
-                .with_label_values(&["insert", table, ""])
-                .inc();
-            let need_single_insert = match query_builder.build().execute(&mut *tx).await {
-                Ok(_) => false,
-                Err(sqlx::Error::Database(e)) => {
-                    if e.is_unique_violation() {
-                        true
-                    } else {
-                        if let Err(e) = tx.rollback().await {
-                            log::error!("[POSTGRES] rollback {table} batch add error: {}", e);
-                        }
-                        return Err(Error::Message(e.to_string()));
-                    }
-                }
-                Err(e) => {
+        let mut tx = pool.begin().await?;
+
+        let add_items = files.iter().filter(|v| !v.deleted).collect::<Vec<_>>();
+        if !add_items.is_empty() {
+            let chunks = add_items.chunks(100);
+            for files in chunks {
+                let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str()
+                );
+                query_builder.push_values(files, |mut b, item| {
+                    let (stream_key, date_key, file_name) =
+                        parse_file_key_columns(&item.key).expect("parse file key failed");
+                    let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+                    b.push_bind(org_id)
+                        .push_bind(stream_key)
+                        .push_bind(date_key)
+                        .push_bind(file_name)
+                        .push_bind(false)
+                        .push_bind(item.meta.min_ts)
+                        .push_bind(item.meta.max_ts)
+                        .push_bind(item.meta.records)
+                        .push_bind(item.meta.original_size)
+                        .push_bind(item.meta.compressed_size)
+                        .push_bind(item.meta.index_size)
+                        .push_bind(item.meta.flattened);
+                });
+                DB_QUERY_NUMS
+                    .with_label_values(&["insert", table, ""])
+                    .inc();
+                if let Err(e) = query_builder.build().execute(&mut *tx).await {
                     if let Err(e) = tx.rollback().await {
-                        log::error!("[POSTGRES] rollback {table} batch add error: {}", e);
+                        log::error!(
+                            "[POSTGRES] rollback {table} batch process for add error: {}",
+                            e
+                        );
                     }
                     return Err(e.into());
                 }
-            };
-            if need_single_insert {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[POSTGRES] rollback {table} batch add error: {}", e);
-                    return Err(e.into());
-                }
-                for item in files {
-                    if let Err(e) = self.inner_add(table, &item.key, &item.meta).await {
-                        log::error!("[POSTGRES] single insert {table} add error: {}", e);
-                        return Err(e);
-                    }
-                }
-            } else if let Err(e) = tx.commit().await {
-                log::error!("[POSTGRES] commit {table} batch add error: {}", e);
-                return Err(e.into());
             }
         }
+
+        let del_items = files.iter().filter(|v| v.deleted).collect::<Vec<_>>();
+        if !del_items.is_empty() {
+            let chunks = del_items.chunks(1000);
+            for files in chunks {
+                // get ids of the files
+                let mut ids = Vec::with_capacity(files.len());
+                for file in files {
+                    let (stream_key, date_key, file_name) = parse_file_key_columns(&file.key)
+                        .map_err(|e| Error::Message(e.to_string()))?;
+                    DB_QUERY_NUMS
+                        .with_label_values(&["select_id", "file_list", ""])
+                        .inc();
+                    let start = std::time::Instant::now();
+                    let query_res: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
+                    r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
+                    )
+                    .bind(stream_key)
+                    .bind(date_key)
+                    .bind(file_name)
+                    .fetch_one(&mut *tx)
+                    .await;
+                    let time = start.elapsed().as_secs_f64();
+                    DB_QUERY_TIME
+                        .with_label_values(&["select_id", "file_list"])
+                        .observe(time);
+                    match query_res {
+                        Ok(Some(v)) => ids.push(v.to_string()),
+                        Ok(None) => continue,
+                        Err(sqlx::Error::RowNotFound) => continue,
+                        Err(e) => {
+                            if let Err(e) = tx.rollback().await {
+                                log::error!(
+                                    "[POSTGRES] rollback {table} batch process for delete error: {}",
+                                    e
+                                );
+                            }
+                            return Err(e.into());
+                        }
+                    };
+                }
+                // delete files by ids
+                if !ids.is_empty() {
+                    DB_QUERY_NUMS
+                        .with_label_values(&["delete_id", "file_list", ""])
+                        .inc();
+                    let sql = format!(
+                        "UPDATE file_list SET deleted = true WHERE id IN({});",
+                        ids.join(",")
+                    );
+                    let start = std::time::Instant::now();
+                    if let Err(e) = sqlx::query(sql.as_str()).execute(&mut *tx).await {
+                        if let Err(e) = tx.rollback().await {
+                            log::error!(
+                                "[POSTGRES] rollback {table} batch process for delete error: {}",
+                                e
+                            );
+                        }
+                        return Err(e.into());
+                    }
+                    let time = start.elapsed().as_secs_f64();
+                    DB_QUERY_TIME
+                        .with_label_values(&["delete_id", "file_list"])
+                        .observe(time);
+                }
+            }
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit {table} batch process error: {}", e);
+            return Err(e.into());
+        }
+
         Ok(())
     }
 }

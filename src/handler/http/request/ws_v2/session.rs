@@ -31,6 +31,7 @@ use o2_enterprise::enterprise::common::{
 };
 use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
+use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
 use crate::common::infra::cluster::get_cached_online_router_nodes;
@@ -47,7 +48,7 @@ use crate::{
     },
     service::websocket_events::{
         WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
-        search_registry_utils::SearchState, sessions_cache_utils,
+        search_registry_utils::SearchState, sessions_cache_utils, setup_tracing_with_trace_id,
     },
 };
 
@@ -208,7 +209,8 @@ pub async fn run(
                             cfg.common.instance_name,
                             msg
                         );
-                        handle_text_message(&user_id, &req_id, msg.to_string(), path.clone()).await;
+                        handle_text_message(&user_id, &req_id, msg.to_string(), path.clone())
+                        .await;
                     }
                     Ok(actix_ws::AggregatedMessage::Close(reason)) => {
                         if let Some(reason) = reason.as_ref() {
@@ -311,6 +313,7 @@ async fn resolve_enterprise_user_id(
 /// Text message is parsed into `WsClientEvents` and processed accordingly
 /// Depending on each event type, audit must be done
 /// Currently audit is done only for the search event
+#[tracing::instrument(name = "service:search:websocket::handle_text_message", skip_all)]
 pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path: String) {
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
@@ -326,6 +329,15 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 let _ = send_message(req_id, err_res.to_json()).await;
                 return;
             }
+
+            // Setup tracing
+            let ws_span = setup_tracing_with_trace_id(
+                &client_msg.get_trace_id(),
+                tracing::info_span!(
+                    "src::handler::http::request::websocket::ws_v2::session::handle_text_message"
+                ),
+            )
+            .await;
 
             match client_msg {
                 WsClientEvents::Search(ref search_req) => {
@@ -363,6 +375,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         req_id,
                         path.clone(),
                     )
+                    .instrument(ws_span)
                     .await;
                 }
                 WsClientEvents::Values(ref values_req) => {
@@ -400,6 +413,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         req_id,
                         path.clone(),
                     )
+                    .instrument(ws_span.clone())
                     .await;
                 }
                 #[cfg(feature = "enterprise")]
@@ -417,7 +431,10 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
 
                     // First handle the cancel event
                     // send a cancel flag to the search task
-                    if let Err(e) = handle_cancel_event(&trace_id).await {
+                    if let Err(e) = handle_cancel_event(&trace_id)
+                        .instrument(ws_span.clone())
+                        .await
+                    {
                         log::warn!("[WS_HANDLER]: Error in cancelling : {}", e);
                         return;
                     }
@@ -596,6 +613,7 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
 }
 
 // Main search handler
+#[tracing::instrument(name = "service:search:websocket::handle_search_event", skip_all)]
 async fn handle_search_event(
     search_req: &SearchEventReq,
     org_id: &str,
@@ -633,7 +651,7 @@ async fn handle_search_event(
     // Spawn the search task
     tokio::spawn(async move {
         // Handle the search request
-        // If search is cancelled, the task will exit
+        // If search is cancelled, the taek will exit
         // Otherwise, the task will complete and the results will be sent to the client
         // The task will also update the search state to completed
         // The task will also close the session
@@ -728,6 +746,10 @@ async fn handle_search_event(
 
 // Cancel handler
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(
+    name = "service:websocket_events:search::handle_cancel_event",
+    skip_all
+)]
 async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
     let mut w = WS_SEARCH_REGISTRY.write().await;
     if let Some(state) = w.get_mut(trace_id) {
@@ -756,6 +778,10 @@ async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[tracing::instrument(
+    name = "service:websocket_events:search::handle_search_error",
+    skip_all
+)]
 async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
     // if the error is due to search cancellation, return.
     // the cancel handler will close the session
@@ -816,6 +842,10 @@ async fn cleanup_search_resources(trace_id: &str) {
 }
 
 // Main values handler
+#[tracing::instrument(
+    name = "service:websocket_events:search::handle_values_event",
+    skip_all
+)]
 async fn handle_values_event(
     values_req: &ValuesEventReq,
     org_id: &str,

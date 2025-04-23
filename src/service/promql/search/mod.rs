@@ -251,11 +251,9 @@ async fn search_in_cluster(
                             &node.get_grpc_addr(),
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(server_internal_error("search node error"));
+                        let err = ErrorCodes::from_json(err.message())
+                            .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
+                        return Err(Error::ErrorCode(err));
                     }
                 };
                 let scan_stats = response.scan_stats.as_ref().unwrap();

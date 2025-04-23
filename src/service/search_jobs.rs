@@ -440,11 +440,12 @@ pub async fn get_result(
 
     // super cluster
     if get_o2_config().super_cluster.enabled {
+        let trace_id = config::ider::generate_trace_id();
         let node = get_cluster_node_by_name(cluster).await?;
         let path = path.to_string();
         let task = tokio::task::spawn(async move {
             let mut request = tonic::Request::new(proto::cluster_rpc::GetResultRequest { path });
-            let mut client = make_grpc_search_client(&mut request, &node).await?;
+            let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
             let response = match client.get_result(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -453,13 +454,8 @@ pub async fn get_result(
                         &node.get_grpc_addr(),
                         err
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        "search node error".to_string(),
-                    )));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)
@@ -484,7 +480,8 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
     storage::del(&local_paths).await?;
 
     if get_o2_config().super_cluster.enabled {
-        let nodes = get_cluster_nodes("delete_result", vec![], vec![]).await?;
+        let trace_id = config::ider::generate_trace_id();
+        let nodes = get_cluster_nodes("delete_result", vec![], vec![], None).await?;
         // delete result in all cluster,
         // because for retry job, we don't know partition in which cluster
         for node in nodes {
@@ -492,10 +489,11 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
                 continue;
             }
             let paths = paths.clone();
+            let trace_id = trace_id.clone();
             let task = tokio::task::spawn(async move {
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::DeleteResultRequest { paths });
-                let mut client = make_grpc_search_client(&mut request, &node).await?;
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
                 let response = match client.delete_result(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
@@ -504,13 +502,8 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
                             &node.get_grpc_addr(),
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                            "search node error".to_string(),
-                        )));
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
                     }
                 };
                 Ok(response)

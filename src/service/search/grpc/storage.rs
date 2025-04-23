@@ -442,21 +442,15 @@ async fn cache_files(
     tokio::spawn(async move {
         let files_num = files.len();
         for (file, size) in files {
-            match job::queue_background_download(&trace_id, &file, size, cache_type).await {
-                Ok(_) => {
-                    log::debug!(
-                        "[trace_id {trace_id}] file {file} successfully queued for download"
-                    );
-                }
-                Err(e) => {
-                    log::error!(
-                        "[trace_id {trace_id}] error in queuing file {file} for background download : {e}"
-                    );
-                }
+            if let Err(e) = job::queue_background_download(&trace_id, &file, size, cache_type).await
+            {
+                log::error!(
+                    "[trace_id {trace_id}] error in queuing file {file} for background download: {e}"
+                );
             }
         }
         log::info!(
-            "[trace_id {}] search->storage: successfully enqueued {} files of {} for background download into {:?} ",
+            "[trace_id {}] search->storage: successfully enqueued {} files of {} for background download into {:?}",
             trace_id,
             files_num,
             file_type,

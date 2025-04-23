@@ -681,6 +681,7 @@ pub type FieldName = String;
 /// The `Request` contains the SQL query, from, size, start_time, end_time, etc.
 /// The `StreamType` is the type of the stream to search on.
 /// The `FieldName` is the name of the field to search on.
+#[tracing::instrument(name = "handler:search:build_search_request_per_field", skip_all)]
 pub async fn build_search_request_per_field(
     req: &config::meta::search::ValuesRequest,
     org_id: &str,

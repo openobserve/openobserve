@@ -172,7 +172,7 @@ pub async fn search(
 
     // get nodes
     let get_node_start = std::time::Instant::now();
-    let node_group = req
+    let role_group = req
         .search_event_type
         .as_ref()
         .map(|v| {
@@ -181,7 +181,7 @@ pub async fn search(
                 .map(RoleGroup::from)
         })
         .unwrap_or(None);
-    let mut nodes = get_online_querier_nodes(&trace_id, node_group).await?;
+    let mut nodes = get_online_querier_nodes(&trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
     if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
@@ -251,7 +251,7 @@ pub async fn search(
     });
 
     // partition file list
-    let partition_file_lists = partition_filt_list(file_id_list, &nodes, node_group).await?;
+    let partition_file_lists = partition_filt_list(file_id_list, &nodes, role_group).await?;
 
     // update search session scan stats
     super::super::SEARCH_SERVER
