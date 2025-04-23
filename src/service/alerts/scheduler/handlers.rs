@@ -311,12 +311,12 @@ async fn handle_alert_triggers(
                 time_in_queue_ms: Some(time_in_queue),
             })
             .await;
-            log::info!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] alert {} skipped due to delay: {}",
-                &trigger.module_key,
-                delay
-            );
         }
+        log::info!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] alert {} skipped due to delay: {}",
+            &trigger.module_key,
+            delay
+        );
         (now - final_end_time, true)
     };
 
