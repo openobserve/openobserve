@@ -703,16 +703,6 @@ async fn handle_search_event(
     skip_all
 )]
 async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
-    // if the error is due to search cancellation, return.
-    // the cancel handler will close the session
-    if let errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) = e {
-        log::info!(
-            "[WS_HANDLER]: trace_id: {}, Return from search handler, search canceled",
-            trace_id
-        );
-        return None;
-    }
-
     log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
     // Send error response
     let err_res = WsServerEvents::error_response(
