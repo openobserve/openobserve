@@ -259,12 +259,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
         <!-- 3rd section -->
-        <div class="row tw-gap-4"
-            style="max-height: 200px; overflow-y: auto; margin-top: 16px; ">
-          <div style="width: 240px !important; max-width: 100%;">
+        <div class="row tw-gap-4" style="max-height: 200px; margin-top: 16px; display: flex; flex-wrap: wrap;">
+          <div class="tw-w-full sm:tw-w-[240px] tw-max-w-full">
             <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
-            :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-             style="min-height: 150px; gap: 12px;">
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+              style="min-height: 150px; gap: 12px;">
               <!-- Top Section -->
               <div class="column justify-between">
                 <div class="row justify-between">
@@ -281,10 +280,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div style="width: 240px !important; max-width: 100%;">
+          <div class="tw-w-full sm:tw-w-[240px] tw-max-w-full">
             <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
-            :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-             style="min-height: 150px; gap: 12px;">
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+              style="min-height: 150px; gap: 12px;">
               <!-- Top Section -->
               <div class="column justify-between">
                 <div class="row justify-between">
@@ -301,6 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+
 
       </div>
 
