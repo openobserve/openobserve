@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <CustomChartRenderer
                   :key="panelDataKey"
                   :data="panelData"
-                  class="tw-w-full tw-h-full "
+                  class="tw-w-full tw-h-full md:tw-h-[calc(100vh-400px)] "
                 />
               </div>
             </div>
