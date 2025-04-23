@@ -690,18 +690,14 @@ async fn handle_search_event(
                             }
                         };
                         match &e {
-                            errors::Error::ErrorCode(code) => match code {
-                                #[cfg(feature = "enterprise")]
-                                errors::ErrorCodes::SearchCancelQuery(_) =>  {
-                                    let cancel_res = WsServerEvents::CancelResponse {
+                            #[cfg(feature = "enterprise")]
+                            errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
+                                let cancel_res = WsServerEvents::CancelResponse {
                                         trace_id: trace_id.to_string(),
                                         is_success: true,
                                     };
                                     let _ = send_message(&req_id, cancel_res.to_json()).await;
-                                    return;
                                 }
-                                _ => handle_err().await
-                            }
                             _ => handle_err().await
                         }
 
