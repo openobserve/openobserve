@@ -60,7 +60,10 @@ export const convertMultiSQLData = async (
   annotations: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
-    return { options: null };
+    // this sets a blank object until it loads
+    // because of this, it will go to UI and draw something, even 0 or a blank chart
+    // this will give a sence of progress to the user
+    searchQueryData = [[]];
   }
 
   // loop on all search query data
@@ -346,7 +349,7 @@ export const convertSQLData = async (
 
   const missingValue = () => {
     // Get the interval in minutes
-    const interval = resultMetaData?.map((it: any) => it.histogram_interval)[0];
+    const interval = resultMetaData?.map((it: any) => it?.histogram_interval)?.[0];
 
     if (
       !interval ||
@@ -2050,7 +2053,7 @@ export const convertSQLData = async (
       const gridDataForGauge = calculateGridPositions(
         chartPanelRef.value.offsetWidth,
         chartPanelRef.value.offsetHeight,
-        yAxisValue.length,
+        yAxisValue.length || 1,
       );
 
       options.dataset = { source: [[]] };
@@ -2091,7 +2094,10 @@ export const convertSQLData = async (
       // for each gague we have separate grid
       options.grid = gridDataForGauge.gridArray;
 
-      options.series = yAxisValue.map((it: any, index: any) => {
+      const gaugeData = yAxisValue.length > 0 ? yAxisValue : [0];
+      const gaugeNames = xAxisValue.length > 0 ? xAxisValue : [""];
+
+      options.series = gaugeData.map((it: any, index: any) => {
         return {
           ...defaultSeriesProps,
           min: panelSchema?.queries[0]?.config?.min || 0,
@@ -2149,7 +2155,7 @@ export const convertSQLData = async (
           data: [
             {
               // gauge name may have or may not have
-              name: xAxisValue[index] ?? "",
+              name: gaugeNames[index] ?? "",
               value: it,
               detail: {
                 formatter: function (value: any) {
@@ -2166,7 +2172,7 @@ export const convertSQLData = async (
                 color:
                   getSeriesColor(
                     panelSchema?.config?.color,
-                    xAxisValue[index] ?? "",
+                    gaugeNames[index] ?? "",
                     [it],
                     chartMin,
                     chartMax,
