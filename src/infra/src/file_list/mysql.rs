@@ -1812,6 +1812,11 @@ pub async fn create_table_index() -> Result<()> {
             "file_list",
             &["stream", "date"],
         ),
+        (
+            "file_list_org_deleted_stream_idx",
+            "file_list",
+            &["org", "deleted", "stream"],
+        ),
         ("file_list_history_org_idx", "file_list_history", &["org"]),
         (
             "file_list_history_stream_ts_idx",
