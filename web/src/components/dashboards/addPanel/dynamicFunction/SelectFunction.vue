@@ -52,6 +52,10 @@
                 argIndex,
               )
             "
+            option-label="label"
+            option-value="value"
+            behavior="menu"
+            emit-value
             dense
             filled
             label="Select Type"
@@ -176,17 +180,9 @@ export default {
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData, selectedStreamFieldsBasedOnUserDefinedSchema, getAllSelectedStreams } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
-
-    // const schemaOptions = computed(() =>
-    //   selectedStreamFieldsBasedOnUserDefinedSchema?.value?.map(
-    //     (field: any) => ({
-    //       label: field.name,
-    //       value: field.name,
-    //     }),
-    //   ),
-    // );
+    const { getAllSelectedStreams } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
 
     const fields = ref(addMissingArgs(props.modelValue));
 
@@ -266,13 +262,13 @@ export default {
       if (canAddArgument(fields.value.functionName)) {
         if (funcValidation.allowAddArgAt === "n") {
           fields.value.args.push({
-            type: funcValidation?.args?.[adjustedIndex]?.type?.[0],
+            type: funcValidation?.args?.[adjustedIndex]?.type?.[0]?.value,
             value: "",
           });
         } else if (funcValidation.allowAddArgAt === "n-1") {
           // Add an argument before the separator
           fields.value.args.splice(fields.value.args.length - 1, 0, {
-            type: funcValidation?.args?.[adjustedIndex]?.type?.[0], // Add default type (e.g., field, string, etc.)
+            type: funcValidation?.args?.[adjustedIndex]?.type?.[0]?.value, // Add default type (e.g., field, string, etc.)
             value: "",
           });
         }
@@ -360,7 +356,7 @@ export default {
       (newVal) => {
         // Save the old args
         const oldArgs = [...fields.value.args];
-        
+
         // get the validation for the selected function
         const funcValidation: any = getValidationForFunction(
           fields.value.functionName,
@@ -372,18 +368,18 @@ export default {
           const newArgs = (funcValidation?.args ?? []).flatMap((arg: any) =>
             // need to consider `min` config for each arg
             Array.from({ length: arg.min ?? 1 }).map(() => ({
-              type: arg.type[0],
-              value: arg.type[0] === "field" ? {} : arg?.defaultValue,
+              type: arg.type[0]?.value,
+              value: arg.type[0]?.value === "field" ? {} : arg?.defaultValue,
             })),
           );
-          
+
           // Preserve field values where both old and new types are "field"
           for (let i = 0; i < newArgs.length && i < oldArgs.length; i++) {
             if (newArgs[i].type === "field" && oldArgs[i].type === "field") {
               newArgs[i].value = oldArgs[i].value;
             }
           }
-          
+
           fields.value.args = newArgs;
         }
       },
@@ -408,8 +404,6 @@ export default {
         arg.value = null;
       }
     };
-
-  
 
     return {
       fields,
