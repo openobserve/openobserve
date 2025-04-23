@@ -155,7 +155,6 @@ export default defineComponent({
       shouldLoadVariable,
       hasLoadingDependencies,
       setPanelLoadingStatus,
-      addSearchRequestTraceIds,
       stateKey,
     } = useVariablesComposable({
       scope: props.currentPanelId
@@ -1011,14 +1010,6 @@ export default defineComponent({
       setPanelLoadingStatus(panelId, isLoading);
     };
 
-    // Add a function to track search request trace IDs
-    const trackSearchRequestTraceIds = (
-      panelId: string,
-      traceIds: string[],
-    ) => {
-      addSearchRequestTraceIds(panelId, traceIds);
-    };
-
     // Add computed property for filtered variables
     const filteredVariables = computed(() => {
       if (!variablesData.values) return [];
@@ -1072,7 +1063,6 @@ export default defineComponent({
       loadVariableOptions,
       // Add new functions
       updatePanelLoadingState,
-      trackSearchRequestTraceIds,
       filteredVariables,
     };
   },
