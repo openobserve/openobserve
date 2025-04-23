@@ -23,16 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="streams-container q-pa-lg "
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
          >
-          <div class="row justify-between">
-            <div class="text-h6 q-mb-md">Streams</div>
-            <div :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
-              View
-            </div>
+          <div class="row justify-between items-center q-mb-md">
+            <div class="text-h6 ">Streams</div>
+              <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+               >View
+                <router-link
+                  exact
+                  :to="{ name: 'logstreams' }"
+                  class="absolute full-width full-height"
+                ></router-link>
+            </q-btn>
           </div>
 
 
           <!-- Tiles -->
-          <div class="row wrap justify-evenly q-gutter-md q-px-sm">
+          <div class="row wrap justify-evenly q-gutter-md ">
             <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
               <div class="tile-content q-pa-md rounded-borders text-center column "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
@@ -181,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <!-- 2nd section -->
-          <div class="charts-main-container row tw-gap-4 q-mt-md " style="display: flex; gap: 16px; height: calc(100% - 20px); ">
+          <div class="charts-main-container row tw-gap-4 q-mt-md " style="display: flex; gap: 16px; height: calc(100% - 22px); ">
             <!-- Chart 1 --> 
             <div class=" first-chart-container rounded-borders " style= "padding: 16px; display: flex; flex-direction: column;"
             :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
@@ -189,7 +194,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="details-container" style="margin-bottom: 16px;">
                 <div class="row justify-between">
                   <span class="text-title">Alerts</span>
-                  <span :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View</span>
+                  <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
+                    <router-link
+                      exact
+                      :to="{ name: 'alertList' }"
+                      class="absolute full-width full-height"
+                    ></router-link>
+                </q-btn>
                 </div>
                 <div class="row q-pt-sm" style="gap: 16px;">
                   <div class="column">
@@ -203,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="custom-first-chart"  style="height: calc(100vh - 630px) " >
+              <div class="custom-first-chart"  style="height: calc(100vh - 645px) " >
                 <CustomChartRenderer
                   :key="panelDataKey"
                   :data="panelData"
@@ -217,7 +228,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="details-container" style="margin-bottom: 16px;">
                 <div class="row justify-between">
                   <span class="text-title">Pipelines</span>
-                  <span :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View</span>
+                  <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
+                    <router-link
+                      exact
+                      :to="{ name: 'pipelines' }"
+                      class="absolute full-width full-height"
+                    ></router-link>
+                </q-btn>
                 </div>
                 <div class="row q-pt-sm" style="gap: 16px;">
                   <div class="column">
@@ -231,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="custom-second-chart"  style="height: calc(100vh - 630px); " >
+              <div class="custom-second-chart"  style="height: calc(100vh - 645px); " >
                 <CustomChartRenderer
                   :key="panelDataKey"
                   :data="panelData2"
@@ -567,12 +584,14 @@ export default defineComponent({
 }
 .view-button-light {
   cursor: pointer;
-  color: #5960B2
+  color: #5960B2;
+  padding: 0px
 }
 .view-button-dark {
   cursor: pointer;
   color: #929BFF;
-
+  padding: 0px;
+  margin: 0px;
 }
 .tile {
   flex: 1 1 240px; /* grow, shrink, basis */
@@ -587,11 +606,13 @@ export default defineComponent({
 .dark-tile-content {
   background: #2B2C2D;
   border: 1px solid #444444;
+  color: #D2D2D2;
 }
 
 .light-tile-content {
   background: #ffffff;
   border: 1px solid #E7EAEE;
+  color: #2D2D2D;
 }
 .tile-title {
   font-size: 16px;
