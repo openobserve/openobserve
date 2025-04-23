@@ -108,26 +108,31 @@ impl SessionManager {
 
     pub async fn reached_max_idle_time(&self, client_id: &ClientId) -> bool {
         let r = self.sessions.read().await;
-        let is_none = r.get(client_id).is_none_or(|session_info| {
+        let session_info = r.get(client_id).cloned();
+        drop(r);
+        let is_none = session_info.is_none_or(|session_info| {
             Utc::now()
                 .signed_duration_since(session_info.last_active)
                 .num_seconds()
                 > config::get_config().websocket.session_idle_timeout_secs
         });
-        drop(r);
         is_none
     }
 
     pub async fn unregister_client(&self, client_id: &ClientId) {
-        if let Some(session_info) = self.sessions.write().await.remove(client_id) {
+        let mut session_write = self.sessions.write().await;
+        let session_info = session_write.remove(client_id);
+        drop(session_write);
+        if let Some(session_info) = session_info {
             let mut mapped_querier_write = self.mapped_queriers.write().await;
 
             for (trace_id, querier_name) in session_info.querier_mappings {
-                if let Some(mut trace_ids) = mapped_querier_write.remove(&querier_name) {
+                if let Some(trace_ids) = mapped_querier_write.get_mut(&querier_name) {
                     trace_ids.retain(|tid| tid != &trace_id);
                     if !trace_ids.is_empty() {
                         trace_ids.shrink_to_fit();
-                        mapped_querier_write.insert(querier_name.to_string(), trace_ids);
+                    } else {
+                        mapped_querier_write.remove(&querier_name);
                     }
                 }
             }
@@ -137,38 +142,34 @@ impl SessionManager {
 
     pub async fn is_client_cookie_valid(&self, client_id: &ClientId) -> bool {
         let r = self.sessions.read().await;
-        let is_valid = match r.get(client_id) {
+        let session_info = r.get(client_id).cloned();
+        drop(r);
+        let is_valid = match session_info {
             Some(session_info) => session_info
                 .cookie_expiry
                 .is_none_or(|expiry| expiry > Utc::now()),
             None => false, // not set is treated as unauthenticated
         };
-        drop(r);
         is_valid
     }
 
     pub async fn remove_querier_connection(&self, querier_name: &str) {
-        let client_ids = {
-            let (mapped_read, sessions_read) =
-                tokio::join!(self.mapped_queriers.read(), self.sessions.read());
-
-            let client_ids = match mapped_read.get(querier_name) {
-                Some(_) => sessions_read.keys().cloned().collect::<Vec<_>>(),
-                None => {
-                    drop(mapped_read);
-                    drop(sessions_read);
-                    return;
-                }
-            };
-            drop(mapped_read);
-            drop(sessions_read);
-            client_ids
-        };
-
         // Remove from mapped_querier
         let mut write_guard = self.mapped_queriers.write().await;
-        let trace_ids = write_guard.remove(querier_name).unwrap(); // existence validated
+        let trace_ids = write_guard.remove(querier_name).unwrap_or_default(); // existence validated
         drop(write_guard);
+
+        if trace_ids.is_empty() {
+            return;
+        }
+
+        // get all the client_ids
+        let client_ids = {
+            let session_read = self.sessions.read().await;
+            let client_ids = session_read.keys().cloned().collect::<Vec<_>>();
+            drop(session_read);
+            client_ids
+        };
 
         // Batch update sessions
         let mut session_write = self.sessions.write().await;
