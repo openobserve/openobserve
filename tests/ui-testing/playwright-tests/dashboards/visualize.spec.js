@@ -55,8 +55,7 @@ test.describe(" visualize UI testcases", () => {
       force: true,
     });
     // get the data from the search variable
-    // await expect.poll(async () => (await search).status()).toBe(200);
-    await page.waitForTimeout(7000);
+    await expect.poll(async () => (await search).status()).toBe(200);
 
     // await search.hits.FIXME_should("be.an", "array");
   }
@@ -240,9 +239,6 @@ test.describe(" visualize UI testcases", () => {
     ).toBeVisible();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-
-    // await dashboardPageActions.applyDashboardBtn;
-    // await dashboardPageActions.waitForChartToRender();
 
     await page
       .locator('[data-test="chart-renderer"] canvas')
