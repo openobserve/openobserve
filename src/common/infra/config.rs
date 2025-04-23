@@ -44,7 +44,6 @@ use crate::{
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
         pipeline::batch_execution::ExecutablePipeline,
-        websocket_events::search_registry_utils::SearchState,
     },
 };
 
@@ -102,5 +101,3 @@ pub static WS_SESSIONS: Lazy<RwAHashMap<String, Arc<TokioRwLock<WsSession>>>> =
     Lazy::new(Default::default);
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
-// Global registry for search requests by `trace_id`
-pub static WS_SEARCH_REGISTRY: Lazy<RwAHashMap<String, SearchState>> = Lazy::new(Default::default);
