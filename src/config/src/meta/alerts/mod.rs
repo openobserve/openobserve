@@ -13,12 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
+use chrono::{Duration, FixedOffset, Timelike, Utc};
+use cron::Schedule;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
     meta::search::SearchEventType,
-    utils::json::{Map, Value},
+    utils::{
+        json::{Map, Value},
+        rand::get_rand_num_within,
+    },
 };
 
 pub mod alert;
@@ -48,6 +55,143 @@ pub struct TriggerCondition {
     /// (seconds)
     #[serde(default)]
     pub tolerance_in_secs: Option<i64>,
+}
+
+impl TriggerCondition {
+    // TODO: Currently, the frequency for alert is in seconds, but the
+    // frequency for derived stream is in minutes. This needs to be fixed for alert.
+    /// freq_in_secs is true if the frequency is in seconds, false if it is in minutes
+    pub fn get_next_trigger_time(
+        &self,
+        freq_in_secs: bool,
+        timezone_offset: i32,
+        apply_silence: bool,
+    ) -> Result<i64, anyhow::Error> {
+        let frequency = if freq_in_secs {
+            self.frequency
+        } else {
+            self.frequency * 60
+        };
+        let tolerance = match self.tolerance_in_secs {
+            Some(tolerance) if tolerance > 0 => {
+                Duration::seconds(get_rand_num_within(0, tolerance as u64) as i64)
+                    .num_microseconds()
+                    .unwrap()
+            }
+            _ => 0,
+        };
+        let timezone_offset = FixedOffset::east_opt(timezone_offset * 60).unwrap();
+        if self.frequency_type == FrequencyType::Cron {
+            let schedule = Schedule::from_str(&self.cron)?;
+            if apply_silence {
+                let silence = Utc::now() + Duration::try_minutes(self.silence).unwrap();
+                let silence = silence.with_timezone(&timezone_offset);
+                // Check for the cron timestamp after the silence period
+                Ok(schedule.after(&silence).next().unwrap().timestamp_micros() + tolerance)
+            } else {
+                // Check for the cron timestamp in the future
+                Ok(schedule
+                    .upcoming(timezone_offset)
+                    .next()
+                    .unwrap()
+                    .timestamp_micros()
+                    + tolerance)
+            }
+        } else if apply_silence {
+            // silence is in minutes, frequency is in seconds
+            // When the silence period is less than the frequency, the alert runs after the silence
+            // period completely ignoring the frequency. So, if frequency is 60 mins and
+            // silence is 10 mins, the condition is satisfied, in that case, the alert
+            // will run after 10 mins of silence period. To avoid this scenario, we
+            // should use the max of (frequency, silence) as the next_run_at.
+            // Silence period is in minutes, and the frequency is in seconds.
+            let delta = std::cmp::max(frequency, self.silence * 60);
+            Ok(Utc::now().timestamp_micros()
+                + Duration::try_seconds(delta)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap()
+                + tolerance)
+        } else {
+            Ok(Utc::now().timestamp_micros()
+                + Duration::try_seconds(frequency)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap()
+                + tolerance)
+        }
+    }
+
+    /// Aligns the next trigger time to the previous interval boundary
+    /// `next_run_at` is the timestamp to align
+    /// `timezone_offset` is the timezone offset in minutes
+    /// `frequency` is the frequency in seconds
+    /// Returns the aligned timestamp
+    /// Next trigger time should align with the pipeline timezone time
+    /// if the frequency is 5 mins., and it is 11:03:00 now, the next trigger time should be
+    /// 11:05:00
+    pub fn align_time(next_run_at: i64, timezone_offset: i32, frequency: i64) -> i64 {
+        // Convert the timestamp to a DateTime with the specified timezone offset
+        let timezone = FixedOffset::east_opt(timezone_offset * 60).unwrap();
+        let dt = chrono::DateTime::from_timestamp_micros(next_run_at)
+            .unwrap_or_default()
+            .with_timezone(&timezone);
+
+        // Convert frequency from seconds to minutes
+        let frequency_minutes = std::cmp::max(1, frequency / 60); // Ensure at least 1 minute
+
+        // Get the minute and second of the next_run_at time
+        let minute = dt.minute() as i64;
+        let second = dt.second() as i64;
+
+        // Calculate how many minutes to subtract to reach the previous interval boundary
+        let minutes_to_subtract = minute % frequency_minutes;
+
+        // If we're exactly at an interval boundary and seconds are 0, don't adjust
+        let minutes_to_subtract = if minutes_to_subtract == 0 && second == 0 {
+            0
+        } else {
+            minutes_to_subtract
+        };
+
+        // Create a new DateTime with the aligned time
+        let aligned_dt = dt
+            .checked_sub_signed(chrono::Duration::minutes(minutes_to_subtract))
+            .unwrap_or(dt)
+            .with_second(0)
+            .unwrap_or(dt)
+            .with_nanosecond(0)
+            .unwrap_or(dt);
+
+        // Convert back to microsecond timestamp
+        aligned_dt.timestamp_micros()
+    }
+
+    /// Get the next trigger time aligned to the previous interval boundary
+    /// `freq_in_secs` is true if the frequency is in seconds, false if it is in minutes
+    /// `timezone_offset` is the timezone offset in minutes
+    /// `apply_silence` is true if the silence period is applied, false otherwise
+    pub fn get_aligned_next_trigger_time(
+        &self,
+        freq_in_secs: bool,
+        timezone_offset: i32,
+        apply_silence: bool,
+    ) -> Result<i64, anyhow::Error> {
+        let next_run_at =
+            self.get_next_trigger_time(freq_in_secs, timezone_offset, apply_silence)?;
+        // Cron frequency is handled by the cron library, so we don't need to align it
+        if self.frequency_type != FrequencyType::Cron {
+            // `align_time` expects frequency in seconds, so convert if necessary
+            let frequency = if freq_in_secs {
+                self.frequency
+            } else {
+                self.frequency * 60
+            };
+            Ok(Self::align_time(next_run_at, timezone_offset, frequency))
+        } else {
+            Ok(next_run_at)
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -239,5 +383,163 @@ impl std::fmt::Display for Operator {
             Operator::Contains => write!(f, "contains"),
             Operator::NotContains => write!(f, "not contains"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{DateTime, FixedOffset, TimeZone};
+
+    use super::*;
+
+    #[test]
+    fn test_align_time() {
+        // Test case 1: Align to 5-minute intervals
+        let timezone = FixedOffset::east_opt(0).unwrap(); // UTC
+        let dt = timezone.with_ymd_and_hms(2025, 1, 1, 11, 3, 0).unwrap();
+        let next_run_at = dt.timestamp_micros();
+        let aligned_time = TriggerCondition::align_time(next_run_at, 0, 300); // 5 minutes in seconds
+        let aligned_dt = DateTime::from_timestamp_micros(aligned_time).unwrap();
+        assert_eq!(aligned_dt.hour(), 11);
+        assert_eq!(aligned_dt.minute(), 0);
+        assert_eq!(aligned_dt.second(), 0);
+
+        // Test case 2: Align to 1-hour intervals
+        let dt = timezone.with_ymd_and_hms(2025, 1, 1, 17, 19, 30).unwrap();
+        let next_run_at = dt.timestamp_micros();
+        let aligned_time = TriggerCondition::align_time(next_run_at, 0, 3600); // 1 hour in seconds
+        let aligned_dt = DateTime::from_timestamp_micros(aligned_time).unwrap();
+        assert_eq!(aligned_dt.hour(), 17);
+        assert_eq!(aligned_dt.minute(), 0);
+        assert_eq!(aligned_dt.second(), 0);
+
+        // Test case 3: Align to 1-minute intervals
+        let dt = timezone.with_ymd_and_hms(2025, 1, 1, 17, 19, 11).unwrap();
+        let next_run_at = dt.timestamp_micros();
+        let aligned_time = TriggerCondition::align_time(next_run_at, 0, 60); // 1 minute in seconds
+        let aligned_dt = DateTime::from_timestamp_micros(aligned_time).unwrap();
+        assert_eq!(aligned_dt.hour(), 17);
+        assert_eq!(aligned_dt.minute(), 19);
+        assert_eq!(aligned_dt.second(), 0);
+
+        // Test case 4: Already at interval boundary
+        let dt = timezone.with_ymd_and_hms(2025, 1, 1, 17, 0, 0).unwrap();
+        let next_run_at = dt.timestamp_micros();
+        let aligned_time = TriggerCondition::align_time(next_run_at, 0, 3600); // 1 hour in seconds
+        let aligned_dt = DateTime::from_timestamp_micros(aligned_time).unwrap();
+        assert_eq!(aligned_dt.hour(), 17);
+        assert_eq!(aligned_dt.minute(), 0);
+        assert_eq!(aligned_dt.second(), 0);
+
+        // Test case 5: Different timezone (UTC+8)
+        let timezone = FixedOffset::east_opt(8 * 60 * 60).unwrap(); // UTC+8
+        let dt = timezone.with_ymd_and_hms(2025, 1, 1, 17, 19, 30).unwrap();
+        let next_run_at = dt.timestamp_micros();
+        // `align_time` expects frequency in minutes, so convert 8 hours to minutes
+        let aligned_time = TriggerCondition::align_time(next_run_at, 8 * 60, 3600); // 1 hour in seconds
+        let aligned_dt = DateTime::from_timestamp_micros(aligned_time)
+            .unwrap()
+            .with_timezone(&timezone);
+        assert_eq!(aligned_dt.hour(), 17);
+        assert_eq!(aligned_dt.minute(), 0);
+        assert_eq!(aligned_dt.second(), 0);
+    }
+
+    #[test]
+    fn test_get_next_trigger_time() {
+        // Test case 1: Regular frequency (5 minutes)
+        let condition = TriggerCondition {
+            frequency: 300, // 5 minutes in seconds
+            frequency_type: FrequencyType::Minutes,
+            ..Default::default()
+        };
+        let result = condition.get_next_trigger_time(true, 0, false).unwrap();
+        let dt = DateTime::from_timestamp_micros(result).unwrap();
+        let after_5_minutes = Utc::now() + Duration::minutes(5);
+        assert_eq!(dt.minute(), after_5_minutes.minute());
+
+        // Test case 2: Cron expression
+        let condition = TriggerCondition {
+            frequency: 300,
+            frequency_type: FrequencyType::Cron,
+            cron: "0 */5 * * * *".to_string(), // Every 5 minutes
+            ..Default::default()
+        };
+        let result = condition.get_next_trigger_time(true, 0, false).unwrap();
+        let dt = DateTime::from_timestamp_micros(result).unwrap();
+        assert_eq!(dt.minute() % 5, 0);
+        assert_eq!(dt.second(), 0);
+
+        // Test case 3: With silence period
+        let condition = TriggerCondition {
+            frequency: 300,
+            silence: 10, // 10 minutes silence
+            ..Default::default()
+        };
+        let result = condition.get_next_trigger_time(true, 0, true).unwrap();
+        let dt = DateTime::from_timestamp_micros(result).unwrap();
+        // The next trigger should be after the silence period
+        let now = Utc::now();
+        let silence_end = now + Duration::minutes(10);
+        assert_eq!(dt.minute(), silence_end.minute());
+
+        // Test case 4: With tolerance
+        let condition = TriggerCondition {
+            frequency: 300,
+            tolerance_in_secs: Some(60), // 1 minute tolerance
+            ..Default::default()
+        };
+        let result = condition.get_next_trigger_time(true, 0, false).unwrap();
+        let dt = DateTime::from_timestamp_micros(result).unwrap();
+        // The next trigger should be within the tolerance range
+        let now = Utc::now();
+        let expected = now + Duration::minutes(5);
+        let min_expected = expected - Duration::minutes(1);
+        let max_expected = expected + Duration::minutes(1);
+        assert!(dt >= min_expected && dt <= max_expected);
+    }
+
+    #[test]
+    fn test_get_aligned_next_trigger_time() {
+        // Test case 1: Regular frequency with alignment
+        let condition = TriggerCondition {
+            frequency: 300, // 5 minutes in seconds
+            frequency_type: FrequencyType::Minutes,
+            ..Default::default()
+        };
+
+        // Mock the current time for testing
+        let result = condition
+            .get_aligned_next_trigger_time(true, 0, false)
+            .unwrap();
+        let dt = DateTime::from_timestamp_micros(result).unwrap();
+
+        // The next trigger should be aligned to the previous 5-minute boundary
+        // If current time is 11:03:00, the next trigger should be at 11:05:00
+        let now = Utc::now();
+        let expected = now + Duration::minutes(6);
+        assert!(dt < expected);
+        assert_eq!(dt.minute() % 5, 0);
+        assert_eq!(dt.second(), 0);
+
+        // Test case 2: Cron expression (should not be aligned)
+        let condition = TriggerCondition {
+            frequency: 300,
+            frequency_type: FrequencyType::Cron,
+            cron: "0 */5 * * * *".to_string(), // Every 5 minutes at 0th second
+            ..Default::default()
+        };
+
+        // For cron expressions, the time should not be aligned by our function
+        // as it's handled by the cron library
+        let result = condition
+            .get_aligned_next_trigger_time(true, 0, false)
+            .unwrap();
+        let dt = DateTime::from_timestamp_micros(result).unwrap();
+
+        // The next trigger should still be at a 5-minute boundary, but this is
+        // handled by the cron library, not our alignment function
+        assert_eq!(dt.minute() % 5, 0);
+        assert_eq!(dt.second(), 0);
     }
 }

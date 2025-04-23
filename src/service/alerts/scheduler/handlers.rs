@@ -15,12 +15,12 @@
 
 use std::{collections::HashMap, str::FromStr, time::Instant};
 
-use chrono::{Duration, FixedOffset, Utc};
+use chrono::{DateTime, Duration, FixedOffset, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::FrequencyType,
+        alerts::TriggerCondition,
         dashboards::reports::ReportFrequencyType,
         self_reporting::{
             error::{ErrorData, ErrorSource, PipelineError},
@@ -64,8 +64,67 @@ pub async fn handle_triggers(
     }
 }
 
+/// Returns the skipped timestamps and the final timestamp to evaluate the alert.
+/// `tz_offset` is in minutes
+/// Frequency is in seconds
+fn get_skipped_timestamps(
+    supposed_to_run_at: i64,
+    cron: &str,
+    tz_offset: i32,
+    frequency: i64,
+    delay: i64,
+) -> (Vec<i64>, i64) {
+    let mut skipped_timestamps = Vec::new();
+    let mut next_run_at;
+    if !cron.is_empty() {
+        let cron = Schedule::from_str(cron).unwrap();
+        let suppposed_to_run_at_dt = DateTime::from_timestamp_micros(supposed_to_run_at).unwrap();
+        let suppposed_to_run_at_dt =
+            suppposed_to_run_at_dt.with_timezone(&FixedOffset::east_opt(tz_offset * 60).unwrap());
+        next_run_at = cron
+            .after(&suppposed_to_run_at_dt)
+            .next()
+            .unwrap()
+            .timestamp_micros();
+        while next_run_at <= supposed_to_run_at + delay {
+            skipped_timestamps.push(next_run_at);
+            let suppposed_to_run_at_dt = DateTime::from_timestamp_micros(next_run_at).unwrap();
+            let suppposed_to_run_at_dt = suppposed_to_run_at_dt
+                .with_timezone(&FixedOffset::east_opt(tz_offset * 60).unwrap());
+            next_run_at = cron
+                .after(&suppposed_to_run_at_dt)
+                .next()
+                .unwrap()
+                .timestamp_micros();
+        }
+    } else {
+        next_run_at = TriggerCondition::align_time(
+            supposed_to_run_at + second_micros(frequency),
+            tz_offset,
+            frequency,
+        );
+
+        while next_run_at <= supposed_to_run_at + delay {
+            skipped_timestamps.push(next_run_at);
+            next_run_at += second_micros(frequency);
+        }
+    }
+    // Final timestamp is what we should use to evaluate the alert
+    let final_timestamp = if skipped_timestamps.is_empty() {
+        supposed_to_run_at
+    } else {
+        // Pop the last timestamp if it is greater than the supposed to run at
+        if skipped_timestamps.last().unwrap() > &supposed_to_run_at {
+            skipped_timestamps.pop().unwrap()
+        } else {
+            next_run_at
+        }
+    };
+    (skipped_timestamps, final_timestamp)
+}
+
 /// Returns maximum considerable delay in microseconds - minimum of 1 hour or 20% of the frequency.
-fn get_max_considerable_delay(frequency: i64) -> i64 {
+fn _get_max_considerable_delay(frequency: i64) -> i64 {
     // Calculate the maximum delay that can be considered for the alert evaluation.
     // If the delay is more than this, the alert will be skipped.
     // The maximum delay is the lowest of 1 hour or 20% of the frequency.
@@ -96,7 +155,10 @@ async fn handle_alert_triggers(
     let alert_name = columns[2];
     let is_realtime = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
+    let now = Utc::now().timestamp_micros();
+    let mut final_end_time = trigger.next_run_at;
     let triggered_at = trigger.start_time.unwrap_or_default();
+    let time_in_queue = Duration::microseconds(now - triggered_at).num_milliseconds();
     let source_node = LOCAL_NODE.name.clone();
 
     if is_realtime && is_silenced {
@@ -129,7 +191,6 @@ async fn handle_alert_triggers(
             ));
         }
     };
-    let now = Utc::now().timestamp_micros();
 
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: now,
@@ -167,21 +228,12 @@ async fn handle_alert_triggers(
             &new_trigger.org,
             &new_trigger.module_key
         );
-        if alert.trigger_condition.frequency_type == FrequencyType::Cron {
-            let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
-            // tz_offset is in minutes
-            let tz_offset = FixedOffset::east_opt(alert.tz_offset * 60).unwrap();
-            new_trigger.next_run_at = schedule
-                .upcoming(tz_offset)
-                .next()
-                .unwrap()
-                .timestamp_micros();
-        } else {
-            new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-        }
+
+        new_trigger.next_run_at =
+            alert
+                .trigger_condition
+                .get_aligned_next_trigger_time(true, alert.tz_offset, false)?;
+
         // Keep the last_satisfied_at field
         trigger_data.reset();
         new_trigger.data = json::to_string(&trigger_data).unwrap();
@@ -190,10 +242,20 @@ async fn handle_alert_triggers(
     }
 
     // The delay in processing the trigger from the time it was supposed to run
-    let (processing_delay, use_period) = if trigger.next_run_at == 0 {
+    let (processing_delay, _use_period) = if trigger.next_run_at == 0 {
         (0, true)
     } else {
         let delay = now - trigger.next_run_at;
+
+        let skipped_timestamps_end_timestamp = get_skipped_timestamps(
+            trigger.next_run_at,
+            alert.trigger_condition.cron.as_str(),
+            alert.tz_offset,
+            alert.trigger_condition.frequency,
+            delay,
+        );
+        final_end_time = skipped_timestamps_end_timestamp.1;
+        let skipped_timestamps = skipped_timestamps_end_timestamp.0;
 
         // Skip Alerts: Say for some reason, this alert trigger (period: 10mins, frequency 5mins)
         // which was supposed to run at 10am is now processed after a delay of 5 mins (may be alert
@@ -201,9 +263,16 @@ async fn handle_alert_triggers(
         // the alert. If the delay is within the max considerable delay, consider the delay with
         // period, otherwise strictly use the period only. Also, since we are skipping this alert
         // (9:50am to 10am timerange), we need to report this event to the `triggers` usage stream.
-        if delay > get_max_considerable_delay(alert.trigger_condition.frequency) {
+        for timestamp in skipped_timestamps {
+            let start_time = timestamp
+                - Duration::try_minutes(alert.trigger_condition.period)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap();
+            // If delay is greater than the alert frequency, skip them and report the event
+            // to the `triggers` usage stream.
             publish_triggers_usage(TriggerData {
-                _timestamp: triggered_at - 1,
+                _timestamp: timestamp,
                 org: org_id.clone(),
                 module: TriggerDataType::Alert,
                 key: trigger.module_key.clone(),
@@ -211,14 +280,10 @@ async fn handle_alert_triggers(
                 is_realtime: trigger.is_realtime,
                 is_silenced: trigger.is_silenced,
                 status: TriggerDataStatus::Skipped,
-                start_time: trigger.next_run_at
-                    - Duration::try_minutes(alert.trigger_condition.period)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap(),
-                end_time: trigger.next_run_at,
+                start_time,
+                end_time: timestamp,
                 retries: trigger.retries,
-                delay_in_secs: Some(Duration::microseconds(delay).num_seconds()),
+                delay_in_secs: Some(Duration::microseconds(now - timestamp).num_seconds()),
                 error: None,
                 success_response: None,
                 is_partial: None,
@@ -226,6 +291,7 @@ async fn handle_alert_triggers(
                 source_node: Some(source_node.clone()),
                 query_took: None,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                time_in_queue_ms: Some(time_in_queue),
             })
             .await;
             log::info!(
@@ -233,33 +299,24 @@ async fn handle_alert_triggers(
                 &trigger.module_key,
                 delay
             );
-            (0, true)
-        } else {
-            (delay, false)
         }
+        (now - final_end_time, true)
     };
 
     // This is the end time of the last trigger timerange  + 1.
     // This will be used in alert evaluation as the start time.
     // If this is None, alert will use the period to evaluate alert
-    let start_time = if trigger_data.period_end_time.is_none() || use_period {
+    let start_time =
         // approximate the start time involving the alert manager delay
-        Some(
-            now - Duration::try_minutes(alert.trigger_condition.period)
+            final_end_time - Duration::try_minutes(alert.trigger_condition.period)
                 .unwrap()
                 .num_microseconds()
-                .unwrap()
-                - trigger_data.tolerance
-                - processing_delay,
-        )
-    } else {
-        Some(trigger_data.period_end_time.unwrap() + 1)
-    };
+                .unwrap();
 
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
     let mut trigger_data_stream: TriggerData = TriggerData {
-        _timestamp: triggered_at,
+        _timestamp: now,
         org: trigger.org,
         module: TriggerDataType::Alert,
         key: trigger.module_key.clone(),
@@ -267,12 +324,8 @@ async fn handle_alert_triggers(
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         status: TriggerDataStatus::Completed,
-        start_time: now
-            - Duration::try_minutes(alert.trigger_condition.period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
-        end_time: now,
+        start_time,
+        end_time: final_end_time,
         retries: trigger.retries,
         error: None,
         success_response: None,
@@ -282,11 +335,14 @@ async fn handle_alert_triggers(
         source_node: Some(source_node),
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
+        time_in_queue_ms: Some(time_in_queue),
     };
 
     let evaluation_took = Instant::now();
     // evaluate alert
-    let result = alert.evaluate(None, (start_time, now)).await;
+    let result = alert
+        .evaluate(None, (Some(start_time), final_end_time))
+        .await;
     let evaluation_took = evaluation_took.elapsed().as_secs_f64();
     trigger_data_stream.evaluation_took_in_secs = Some(evaluation_took);
     if result.is_err() {
@@ -317,21 +373,11 @@ async fn handle_alert_triggers(
                 }
             }
             // This didn't work, update the next_run_at to the next expected trigger time
-            if alert.trigger_condition.frequency_type == FrequencyType::Cron {
-                let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
-                // tz_offset is in minutes
-                let tz_offset = FixedOffset::east_opt(alert.tz_offset * 60).unwrap();
-                new_trigger.next_run_at = schedule
-                    .upcoming(tz_offset)
-                    .next()
-                    .unwrap()
-                    .timestamp_micros();
-            } else {
-                new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap();
-            }
+            new_trigger.next_run_at = alert.trigger_condition.get_aligned_next_trigger_time(
+                true,
+                alert.tz_offset,
+                false,
+            )?;
             trigger_data.reset();
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             trigger_data_stream.next_run_at = new_trigger.next_run_at;
@@ -366,67 +412,29 @@ async fn handle_alert_triggers(
             &new_trigger.module_key
         );
     }
-    let tolerance = match alert.trigger_condition.tolerance_in_secs {
-        Some(tolerance) if tolerance > 0 => {
+    if let Some(tolerance) = alert.trigger_condition.tolerance_in_secs {
+        if tolerance > 0 {
             let tolerance = Duration::seconds(get_rand_num_within(0, tolerance as u64) as i64)
                 .num_microseconds()
                 .unwrap();
             if tolerance > 0 {
                 trigger_data.tolerance = tolerance;
             }
-            tolerance
         }
-        _ => 0,
-    };
+    }
     if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 {
-        if alert.trigger_condition.frequency_type == FrequencyType::Cron {
-            let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
-            let silence =
-                Utc::now() + Duration::try_minutes(alert.trigger_condition.silence).unwrap();
-            let silence = silence.with_timezone(
-                FixedOffset::east_opt(alert.tz_offset * 60)
-                    .as_ref()
-                    .unwrap(),
-            );
-            // Check for the cron timestamp after the silence period
-            new_trigger.next_run_at =
-                schedule.after(&silence).next().unwrap().timestamp_micros() + tolerance;
-        } else {
-            // When the silence period is less than the frequency, the alert runs after the silence
-            // period completely ignoring the frequency. So, if frequency is 60 mins and
-            // silence is 10 mins, the condition is satisfied, in that case, the alert
-            // will run after 10 mins of silence period. To avoid this scenario, we
-            // should use the max of (frequency, silence) as the next_run_at.
-            // Silence period is in minutes, and the frequency is in seconds.
-            let next_run_in_seconds = std::cmp::max(
-                alert.trigger_condition.silence * 60,
-                alert.trigger_condition.frequency,
-            );
-            new_trigger.next_run_at += Duration::try_seconds(next_run_in_seconds)
-                .unwrap()
-                .num_microseconds()
-                .unwrap()
-                + tolerance;
-        }
+        new_trigger.next_run_at =
+            alert
+                .trigger_condition
+                .get_aligned_next_trigger_time(true, alert.tz_offset, true)?;
         new_trigger.is_silenced = true;
         // For silence period, no need to store last end time
         should_store_last_end_time = false;
-    } else if alert.trigger_condition.frequency_type == FrequencyType::Cron {
-        let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
-        // tz_offset is in minutes
-        let tz_offset = FixedOffset::east_opt(alert.tz_offset * 60).unwrap();
-        new_trigger.next_run_at = schedule
-            .upcoming(tz_offset)
-            .next()
-            .unwrap()
-            .timestamp_micros()
-            + tolerance;
     } else {
-        new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
-            .unwrap()
-            .num_microseconds()
-            .unwrap()
-            + tolerance;
+        new_trigger.next_run_at =
+            alert
+                .trigger_condition
+                .get_aligned_next_trigger_time(true, alert.tz_offset, false)?;
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
@@ -450,13 +458,18 @@ async fn handle_alert_triggers(
             &vars,
             alert.trigger_condition.period,
             trigger_results.end_time,
-            start_time,
+            Some(start_time),
             use_given_time,
         );
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
         match alert
-            .send_notification(&data, trigger_results.end_time, start_time, now)
+            .send_notification(
+                &data,
+                trigger_results.end_time,
+                Some(start_time),
+                final_end_time,
+            )
             .await
         {
             Ok((success_msg, err_msg)) => {
@@ -549,16 +562,7 @@ async fn handle_alert_triggers(
         };
         new_trigger.data = json::to_string(&trigger_data).unwrap();
         db::scheduler::update_trigger(new_trigger).await?;
-        trigger_data_stream.start_time = match start_time {
-            Some(start_time) => start_time,
-            None => {
-                trigger_results.end_time
-                    - Duration::try_minutes(alert.trigger_condition.period)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap()
-            }
-        };
+        trigger_data_stream.start_time = start_time;
         trigger_data_stream.end_time = trigger_results.end_time;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
     }
@@ -661,6 +665,7 @@ async fn handle_report_triggers(
 
     let triggered_at = trigger.start_time.unwrap_or_default();
     let processing_delay = triggered_at - trigger.next_run_at;
+    let time_in_queue = Utc::now().timestamp_micros() - triggered_at;
 
     let mut trigger_data_stream = TriggerData {
         _timestamp: triggered_at,
@@ -686,6 +691,7 @@ async fn handle_report_triggers(
         source_node: Some(LOCAL_NODE.name.clone()),
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
+        time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
     };
 
     if trigger.retries >= max_retries {
@@ -773,7 +779,12 @@ async fn handle_derived_stream_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    let scheduler_trace_id = format!("{}/{}", trace_id, ider::uuid());
+    let query_trace_id = ider::generate_trace_id();
+    let current_time = Utc::now().timestamp_micros();
+    let time_in_queue =
+        Duration::microseconds(current_time - trigger.start_time.unwrap_or_default())
+            .num_milliseconds();
+    let scheduler_trace_id = format!("{}/{}", trace_id, query_trace_id);
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_derived_stream_triggers processing trigger: {}",
         trigger.module_key
@@ -835,6 +846,7 @@ async fn handle_derived_stream_triggers(
             source_node: Some(LOCAL_NODE.name.clone()),
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(time_in_queue),
         };
 
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {}", err_msg);
@@ -876,6 +888,7 @@ async fn handle_derived_stream_triggers(
             source_node: Some(LOCAL_NODE.name.clone()),
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(time_in_queue),
         };
         log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {}", msg);
         db::scheduler::update_trigger(new_trigger).await?;
@@ -912,6 +925,7 @@ async fn handle_derived_stream_triggers(
             source_node: Some(LOCAL_NODE.name.clone()),
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(time_in_queue),
         };
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {}", err_msg);
         db::scheduler::update_trigger(new_trigger).await?;
@@ -936,15 +950,43 @@ async fn handle_derived_stream_triggers(
 
     // in case the range [start_time, end_time] is greater than querying period, it needs to
     // evaluate and ingest 1 period at a time.
-    let now = Utc::now().timestamp_micros();
+    let suppossed_to_be_run_at = trigger.next_run_at;
+    let delay = current_time - suppossed_to_be_run_at; // delay is in microseconds
+    let mut final_end_time = suppossed_to_be_run_at;
+    // let now = Utc::now().timestamp_micros();
     let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
         .unwrap()
         .num_microseconds()
         .unwrap();
+
     let (mut start, mut end) = if let Some(t0) = start_time {
-        (Some(t0), std::cmp::min(now, t0 + period_num_microseconds))
+        // Don't use only the period_num_microseconds, because, the the delay is lets say 10 secs
+        // The following code will make a separate query to cover the delay period of 10 secs which
+        // is unnecessary. Hence, we need to check how big the delay is.
+        // Note: For pipeline, period and frequency both have the same value.
+
+        // If the delay is equal to or greater than the frequency, we need to ingest data one by one
+        // If the delay is less than the frequency, we need to ingest data for the "next run at"
+        // period, For example, if the current time is 5:19pm, frequency is 5 mins, and
+        // delay is 4mins (supposed to be run at 5:15pm), we need to ingest data for the
+        // period from 5:10pm to 5:15pm only. The next run at will be 5:20pm which will
+        // query for the period from 5:15pm to 5:20pm. But, if the suppossed to be run at is
+        // 5:10pm, then we need ingest data for the period from 5:05pm to 5:15pm.
+        // Which is to cover the skipped period from 5:05pm to 5:15pm.
+        if delay >= period_num_microseconds {
+            // final_end_time is the last multiple of given frequency after the "suppossed to be run
+            // at" timestamp
+            let frequency_count = delay / period_num_microseconds;
+            final_end_time = suppossed_to_be_run_at.saturating_add(frequency_count.saturating_mul(period_num_microseconds));
+            (
+                Some(t0),
+                std::cmp::min(suppossed_to_be_run_at, t0 + period_num_microseconds),
+            )
+        } else {
+            (Some(t0), suppossed_to_be_run_at)
+        }
     } else {
-        (None, now)
+        (None, suppossed_to_be_run_at)
     };
 
     // In case the scheduler background job (watch_timeout) updates the trigger retries
@@ -958,34 +1000,21 @@ async fn handle_derived_stream_triggers(
             new_trigger.module_key
         );
         // Go to the next nun at, but use the same trigger start time
-        if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
-            let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
-            // tz_offset is in minutes
-            let tz_offset = FixedOffset::east_opt(derived_stream.tz_offset * 60).unwrap();
-            new_trigger.next_run_at = schedule
-                .upcoming(tz_offset)
-                .next()
-                .unwrap()
-                .timestamp_micros();
-        } else {
-            new_trigger.next_run_at +=
-                Duration::try_minutes(derived_stream.trigger_condition.frequency)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap();
-        }
+        new_trigger.next_run_at = derived_stream
+            .trigger_condition
+            .get_aligned_next_trigger_time(false, derived_stream.tz_offset, false)?;
         // Start over next time
         new_trigger.retries = 0;
         db::scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
 
-    while end <= now {
+    while end <= final_end_time {
         log::debug!(
             "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream: querying for time range: start_time {}, end_time {}. Final end_time is {}",
             start.unwrap_or_default(),
             end,
-            now
+            final_end_time
         );
 
         let mut trigger_data_stream = TriggerData {
@@ -1012,6 +1041,7 @@ async fn handle_derived_stream_triggers(
             source_node: Some(LOCAL_NODE.name.clone()),
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(time_in_queue),
         };
 
         // evaluate trigger and configure trigger next run time
@@ -1048,7 +1078,7 @@ async fn handle_derived_stream_triggers(
                 // incr trigger retry count
                 new_trigger.retries += 1;
                 // set end to now to exit the loop below
-                end = now + 1;
+                end = final_end_time + 1;
             }
             Ok(trigger_results) => {
                 let is_satisfied = trigger_results
@@ -1180,7 +1210,7 @@ async fn handle_derived_stream_triggers(
                         .await;
 
                         // set end to now to exit the loop below but not moving time range forward
-                        end = now + 1;
+                        end = final_end_time + 1;
                     } else {
                         // SUCCESS: move the time range forward by frequency and continue
                         start = Some(trigger_results.end_time);
@@ -1189,10 +1219,10 @@ async fn handle_derived_stream_triggers(
                         // remaining time whichever is smaller
                         let _end = period_num_microseconds + 1;
                         // If the gap is less than or equal to 0, we need to break the loop
-                        end = if now - end <= 0 {
+                        end = if final_end_time - end <= 0 {
                             end + _end
                         } else {
-                            std::cmp::min(end + _end, now)
+                            std::cmp::min(end + _end, final_end_time)
                         };
                         trigger_data_stream.query_took = trigger_results.query_took;
                     }
@@ -1212,17 +1242,17 @@ async fn handle_derived_stream_triggers(
                     // time whichever is smaller
                     let _end = period_num_microseconds + 1;
                     // If the gap is less than or equal to 0, we need to break the loop
-                    end = if now - end <= 0 {
+                    end = if final_end_time - end <= 0 {
                         end + _end
                     } else {
-                        std::cmp::min(end + _end, now)
+                        std::cmp::min(end + _end, final_end_time)
                     };
                 }
             }
         };
 
         // configure next run time before exiting the loop
-        if end > now {
+        if end > final_end_time {
             // Store the last used derived stream period end time
             if let Some(start_time) = start {
                 new_trigger.data = json::to_string(&ScheduledTriggerData {
@@ -1241,22 +1271,9 @@ async fn handle_derived_stream_triggers(
                 && new_trigger.retries < max_retries)
             {
                 // Go to the next nun at, but use the same trigger start time
-                if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
-                    let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
-                    // tz_offset is in minutes
-                    let tz_offset = FixedOffset::east_opt(derived_stream.tz_offset * 60).unwrap();
-                    new_trigger.next_run_at = schedule
-                        .upcoming(tz_offset)
-                        .next()
-                        .unwrap()
-                        .timestamp_micros();
-                } else {
-                    new_trigger.next_run_at +=
-                        Duration::try_minutes(derived_stream.trigger_condition.frequency)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap();
-                }
+                new_trigger.next_run_at = derived_stream
+                    .trigger_condition
+                    .get_aligned_next_trigger_time(false, derived_stream.tz_offset, false)?;
 
                 // If the trigger didn't fail, we need to reset the `retries` count.
                 // Only cumulative failures should be used to check with `max_retries`
