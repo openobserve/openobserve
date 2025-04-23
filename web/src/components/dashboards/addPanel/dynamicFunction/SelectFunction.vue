@@ -55,6 +55,7 @@
             option-label="label"
             option-value="value"
             behavior="menu"
+            map-options
             emit-value
             dense
             filled
