@@ -1284,6 +1284,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     }
 
     async fn set_job_done(&self, ids: &[i64]) -> Result<()> {
+        let config = get_config();
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "file_list_jobs", ""])
@@ -1295,10 +1296,12 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                 .collect::<Vec<_>>()
                 .join(",")
         );
+        // if dump enabled we set dumped to false, so dump job can work
+        // id dump disabled, we set it to true, so cleanup can remvoe the jobs
         sqlx::query(&sql)
             .bind(super::FileListJobStatus::Done)
             .bind(config::utils::time::now_micros())
-            .bind(false)
+            .bind(!config.common.file_list_dump_enabled)
             .execute(&pool)
             .await?;
         Ok(())
