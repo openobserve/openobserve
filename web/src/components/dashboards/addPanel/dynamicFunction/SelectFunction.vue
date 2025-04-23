@@ -358,7 +358,9 @@ export default {
     watch(
       () => fields.value.functionName,
       (newVal) => {
-        // Reset the args array
+        // Save the old args
+        const oldArgs = [...fields.value.args];
+        
         // get the validation for the selected function
         const funcValidation: any = getValidationForFunction(
           fields.value.functionName,
@@ -366,14 +368,23 @@ export default {
 
         // rebuild fields.value.args based on funcValidation.args
         if (funcValidation) {
-          // need to add args based on funcValidation.args
-          fields.value.args = (funcValidation?.args ?? []).flatMap((arg: any) =>
+          // Create new args array based on validation
+          const newArgs = (funcValidation?.args ?? []).flatMap((arg: any) =>
             // need to consider `min` config for each arg
             Array.from({ length: arg.min ?? 1 }).map(() => ({
               type: arg.type[0],
               value: arg.type[0] === "field" ? {} : arg?.defaultValue,
             })),
           );
+          
+          // Preserve field values where both old and new types are "field"
+          for (let i = 0; i < newArgs.length && i < oldArgs.length; i++) {
+            if (newArgs[i].type === "field" && oldArgs[i].type === "field") {
+              newArgs[i].value = oldArgs[i].value;
+            }
+          }
+          
+          fields.value.args = newArgs;
         }
       },
     );
