@@ -20,10 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
         <!-- 1st section -->
-        <div class="streams-container q-pa-lg " >
+        <div class="streams-container q-pa-lg "
+        :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
+         >
           <div class="row justify-between">
             <div class="text-h6 q-mb-md">Streams</div>
-            <div class="view-button">
+            <div :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
               View
             </div>
           </div>
@@ -32,7 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Tiles -->
           <div class="row wrap justify-evenly q-gutter-md q-px-sm">
             <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column" style="height: 100%; gap: 12px">
+              <div class="tile-content q-pa-md rounded-borders text-center column "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
               <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
@@ -44,7 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Performance text -->
-                <div class="performance-text positive-increase">
+                <div class="performance-text "
+                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                >
                   <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
                 </div>
               </div>
@@ -57,7 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column" style="height: 100%; gap: 12px">
+              <div class="tile-content q-pa-md rounded-borders text-center column "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
               <!-- Top Section (60%) -->
               <div class="column justify-between" >
                 <!-- Title row -->
@@ -69,7 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Performance text -->
-                <div class="performance-text negative-increase">
+                <div class="performance-text "
+                :class="store.state.theme === 'dark' ? 'negative-increase-dark' : 'negative-increase-light'"
+                >
                   <q-icon name="arrow_downward" size="14px" /> 2.89% from last week
                 </div>
               </div>
@@ -82,7 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column" style="height: 100%; gap: 12px">
+              <div class="tile-content q-pa-md rounded-borders text-center column "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
               <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
@@ -94,7 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Performance text -->
-                <div class="performance-text positive-increase " >
+                <div class="performance-text "
+                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                >
                   <q-icon name="arrow_upward" size="14px" /> 0.00% from last week
                 </div>
               </div>
@@ -107,7 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column" style="height: 100%; gap: 12px">
+              <div class="tile-content q-pa-md rounded-borders text-center column "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
               <!-- Top Section (60%) -->
               <div class="column justify-between" >
                 <!-- Title row -->
@@ -119,7 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Performance text -->
-                <div class="performance-text positive-increase">
+                <div class="performance-text "
+                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                >
                   <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
                 </div>
               </div>
@@ -132,7 +150,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column" style="height: 100%; gap: 12px">
+              <div class="tile-content q-pa-md rounded-borders text-center column "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
               <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
@@ -144,7 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Performance text -->
-                <div class="performance-text positive-increase">
+                <div class="performance-text"
+                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                >
                   <q-icon name="arrow_upward" size="14px"  /> 2.89% from last week
                 </div>
               </div>
@@ -161,11 +183,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- 2nd section -->
           <div class="charts-main-container row tw-gap-4 q-mt-md " style="display: flex; gap: 16px; height: calc(100% - 20px); ">
             <!-- Chart 1 --> 
-            <div class=" chart-container first-chart-container rounded-borders " style= "padding: 16px; display: flex; flex-direction: column;">
+            <div class=" first-chart-container rounded-borders " style= "padding: 16px; display: flex; flex-direction: column;"
+            :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
+            >
               <div class="details-container" style="margin-bottom: 16px;">
                 <div class="row justify-between">
                   <span class="text-title">Alerts</span>
-                  <span class="view-button">View</span>
+                  <span :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View</span>
                 </div>
                 <div class="row q-pt-sm" style="gap: 16px;">
                   <div class="column">
@@ -187,11 +211,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div class="chart-container second-chart-container rounded-borders" style=" padding: 16px; display: flex; flex-direction: column;">
+            <div class=" second-chart-container rounded-borders" style=" padding: 16px; display: flex; flex-direction: column;"
+            :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
+            >
               <div class="details-container" style="margin-bottom: 16px;">
                 <div class="row justify-between">
                   <span class="text-title">Pipelines</span>
-                  <span class="view-button">View</span>
+                  <span :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View</span>
                 </div>
                 <div class="row q-pt-sm" style="gap: 16px;">
                   <div class="column">
@@ -220,7 +246,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="max-height: 200px; overflow-y: auto; margin-top: 16px; ">
           <div style="width: 240px !important; max-width: 100%;">
             <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
-                style="min-height: 150px; gap: 12px;">
+            :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+             style="min-height: 150px; gap: 12px;">
               <!-- Top Section -->
               <div class="column justify-between">
                 <div class="row justify-between">
@@ -239,7 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div style="width: 240px !important; max-width: 100%;">
             <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
-                style="min-height: 150px; gap: 12px;">
+            :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+             style="min-height: 150px; gap: 12px;">
               <!-- Top Section -->
               <div class="column justify-between">
                 <div class="row justify-between">
@@ -267,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { useQuasar } from "quasar";
-import { defineComponent, ref, watch } from "vue";
+import { computed, defineComponent, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
@@ -354,140 +382,141 @@ export default defineComponent({
       getSummary(store.state.selectedOrganization.identifier);
     }
 
-    const panelData = ref(
-      {
-      "chartType": "custom_chart",
-      "title": {
-          "text": "Last 15 minutes",
-          "left": "70%",
-          "top": "35%",
-          "textStyle": {
-              "fontSize": 16,
-              "fontWeight": "normal"
-          }
-      },
-      "tooltip": {
-          "trigger": "item"
-      },
-      "legend": {
-          "top": "50%",
-          "orient": "vertical",
-          "left": "70%"
-      },
-      "series": [
-          {
-              "name": "Alert Status",
-              "type": "pie",
-              "radius": [
-                  "40%",
-                  "60%"
-              ],
-              "center": [
-                  "50%",
-                  "50%"
-              ],
-              "right": "40%",
-              "startAngle": 0,
-              "endAngle": 360,
-              "label": {
-                  "formatter": "{d}%",
-                  "show": true,
-                  "fontSize": 16
-              },
-              "labelLine": {
-                  "show": true,
-                  "length": 10,
-                  "length2": 10,
-                  "lineStyle": {
-                      "width": 2
-                  }
-              },
-              "data": [
-                  {
-                      "value": 80,
-                      "name": "Success Alerts",
-                      "itemStyle": {
-                          "color": "#15ba73"
-                      }
-                  },
-                  {
-                      "value": 30,
-                      "name": "Failed Alerts",
-                      "itemStyle": {
-                          "color": "#db373a"
-                      }
-                  }
-              ]
-          }
-      ]
-  }
-    );
-    const panelData2 = ref(
-      {
-    "chartType": "custom_chart",
-    "xAxis": {
-        "type": "category",
-        "data": [
-            "Healthy",
-            "Failed",
-            "Warning"
-        ],
-        "name": "Last 15 minutes",
-        "nameLocation": "middle",
-        "nameGap": 30,
-        "nameTextStyle": {
-            "fontSize": 16,
-            "fontWeight": "normal"
-        },
-        "axisLabel": {
-            "fontSize": 14
+    const panelData = computed (() => ({
+      chartType: "custom_chart",
+      title: {
+        text: "Last 15 minutes",
+        left: "70%",
+        top: "35%",
+        textStyle: {
+          fontSize: 16,
+          fontWeight: "normal",
+          color: store.state.theme === 'dark' ? '#D9D9D9' : '#262626'
         }
-    },
-    "yAxis": {
-        "type": "value",
-        "min": 0,
-        "max": 50,
-        "interval": 10,
-        "name": "Number of Pipelines",
-        "nameLocation": "middle",
-        "nameGap": 60,
-        "nameRotate": 90,
-        "nameTextStyle": {
-            "fontSize": 16,
-            "fontWeight": "normal"
-        },
-        "axisLabel": {
-            "fontSize": 12
+      },
+      tooltip: {
+        trigger: "item"
+      },
+      legend: {
+        top: "50%",
+        orient: "vertical",
+        left: "70%",
+        textStyle: {
+          color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
         }
-    },
-    "series": [
+      },
+      series: [
         {
-            "data": [
-                33,
-                43,
-                49
-            ],
-            "type": "bar",
-            "barWidth": "50%",
-            "label": {
-                "show": true,
-                "position": "top",
-                "fontSize": 14,
-                "fontWeight": "bold"
-            },
-            "itemStyle": {
-                "color": "function (params) {\n          const colors = ['#16b26a', '#db373b', '#FFc328'];\n          return colors[params.dataIndex];\n        }"
+          name: "Alert Status",
+          type: "pie",
+          radius: ["40%", "60%"],
+          center: ["50%", "50%"],
+          right: "40%",
+          startAngle: 0,
+          endAngle: 360,
+          label: {
+            formatter: "{d}%",
+            show: true,
+            fontSize: 16,
+            color: store.state.theme === 'dark' ? '#ffffff' : '#000000'
+          },
+          labelLine: {
+            show: true,
+            length: 10,
+            length2: 10,
+            lineStyle: {
+              width: 2
             }
+          },
+          data: [
+            {
+              value: 80,
+              name: "Success Alerts",
+              itemStyle: {
+                color: "#15ba73"
+              }
+            },
+            {
+              value: 30,
+              name: "Failed Alerts",
+              itemStyle: {
+                color: "#db373a"
+              }
+            }
+          ]
         }
-    ]
-    }
-    )
+      ]
+    }));
 
-    watch (() => window.innerWidth, () => {
-      panelDataKey.value++; // Increment the key to force a re-render
-  // Trigger reactivity by modifying the panelData
-  panelData.value = { ...panelData.value }; // or update any relevant field
+    const panelData2 = computed(() => {
+
+      return {
+        chartType: "custom_chart",
+        xAxis: {
+          type: "category",
+          data: ["Healthy", "Failed", "Warning"],
+          name: "Last 15 minutes",
+          nameLocation: "middle",
+          nameGap: 30,
+          nameTextStyle: {
+            fontSize: 16,
+            fontWeight: "normal",
+            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+          },
+          axisLabel: {
+            fontSize: 14,
+            color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+          }
+        },
+        yAxis: {
+          type: "value",
+          min: 0,
+          max: 50,
+          interval: 10,
+          name: "Number of Pipelines",
+          nameLocation: "middle",
+          nameGap: 60,
+          nameRotate: 90,
+          nameTextStyle: {
+            fontSize: 16,
+            fontWeight: "normal",
+            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+          },
+          axisLabel: {
+            fontSize: 12,
+            color: store.state.theme === 'dark' ? '#B7B7B&' : '#72777B'
+          },
+          splitLine: {
+            lineStyle: {
+              color: store.state.theme === 'dark' ? '#444' : '#e0e0e0'
+            }
+          }
+
+        },
+
+        series: [
+          {
+            data: [33, 43, 49],
+            type: "bar",
+            barWidth: "50%",
+            label: {
+              show: true,
+              position: "top",
+              fontSize: 14,
+              fontWeight: "bold",
+              color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+            },
+            itemStyle: {
+              color: function (params: any) {
+                const colors = ['#16b26a', '#db373b', '#ffc328'];
+                return colors[params.dataIndex];
+              }
+            }
+          }
+          ]
+      };
 });
+
 
 
     return {
@@ -525,13 +554,25 @@ export default defineComponent({
 <style scoped lang="scss">
 .streams-container {
   background: linear-gradient(to bottom, #fdfdfe, #f3f3f9);
-  border: 1px solid #E7EAEE;
   border-radius: 8px;
   box-sizing: border-box;
 }
-.view-button {
+.dark-stream-container {
+  background: #222526;
+  border: 1px solid #444444;
+}
+.light-stream-container {
+  background: linear-gradient(to bottom, #fdfdfe, #f3f3f9);
+  border: 1px solid #E7EAEE;
+}
+.view-button-light {
   cursor: pointer;
   color: #5960B2
+}
+.view-button-dark {
+  cursor: pointer;
+  color: #929BFF;
+
 }
 .tile {
   flex: 1 1 240px; /* grow, shrink, basis */
@@ -540,10 +581,17 @@ export default defineComponent({
 
 .tile-content {
   height: 140px !important; /* or any fixed height */
-  background-color: #ffffff;
   padding: 16px;
-  border: 1px solid #E7EAEE;
   border-radius: 8px;
+}
+.dark-tile-content {
+  background: #2B2C2D;
+  border: 1px solid #444444;
+}
+
+.light-tile-content {
+  background: #ffffff;
+  border: 1px solid #E7EAEE;
 }
 .tile-title {
   font-size: 16px;
@@ -552,7 +600,6 @@ export default defineComponent({
   letter-spacing: 0%;
 }
 .performance-text{
-  border: 1px solid #E4E7EC;
   border-radius: 50px;
   width: 160px;
   padding: 0px 8px;
@@ -562,21 +609,34 @@ export default defineComponent({
   color: #0e6842;
   font-size: 12px !important;
 }
-.positive-increase{
+.positive-increase-light{
   background-color: #EBFDF5;
+  border: 1px solid #E4E7EC;
   color: #0e6842;
 }
-.negative-increase{
+.negative-increase-light{
   background-color: #FFEBE9;
+  border: 1px solid #E4E7EC;
   color: #B42318;
+}
+.positive-increase-dark{
+  background-color: #254421;
+  color: #A1FFd6;
+}
+.negative-increase-dark{
+  background-color: #4A2323;
+  color: #FFD6D6;
 }
 .data-to-display{
   font-size: 24px;
   font-weight: 600;
 }
-.chart-container{
+.chart-container-light{
   border: 1px solid #E7EAEE;
-
+}
+.chart-container-dark{
+  border: 1px solid #444444;
+  background: #2B2C2D;
 }
 .text-title{
   font-size: 18px;
