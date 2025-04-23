@@ -2,8 +2,6 @@ import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
-
 test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
@@ -218,7 +216,7 @@ test.describe(" visualize UI testcases", () => {
       });
   });
 
-  test(" should correctly plot the data according to the new chart type when changing the chart type", async ({
+  test("should correctly plot the data according to the new chart type when changing the chart type", async ({
     page,
   }) => {
     await page.locator('[data-test="logs-visualize-toggle"]').click();
