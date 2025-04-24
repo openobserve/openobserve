@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       <!-- 2nd section -->
-        <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[450px] " style="display: flex; gap: 16px; height: calc(100% - 22px);  ">
+        <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[350px] " style="display: flex; gap: 16px; height: calc(100% - 22px);  ">
           <!-- Chart 1 --> 
           <div class=" first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[35%]  tw-p-4 " style= " display: flex; flex-direction: column;"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="custom-first-chart xl:tw-min-h-[350px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)] tw-w-full"  >
+            <div class="custom-first-chart xl:tw-min-h-[220px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)] tw-w-full"  >
               <CustomChartRenderer
                 :key="panelDataKey"
                 :data="panelData"
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="custom-second-chart xl:tw-min-h-[350px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)]"  >
+            <div class="custom-second-chart xl:tw-min-h-[220px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)]"  >
               <CustomChartRenderer
                 :key="panelDataKey"
                 :data="panelData2"
