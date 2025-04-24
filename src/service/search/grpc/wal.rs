@@ -388,22 +388,28 @@ pub async fn search_memtable(
         schema_latest_map.insert(field.name(), field);
     }
 
+    let mut adapt_batch_time = 0;
+    let mut merge_batch_time = 0;
+    let mut create_memtable_time = 0;
     let mut tables = Vec::new();
     for (schema, mut record_batches) in batch_groups {
         if record_batches.is_empty() {
             continue;
         }
 
+        let start_adapt_batch = std::time::Instant::now();
         let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map);
         for batch in record_batches.iter_mut() {
             *batch = adapt_batch(schema_latest.clone(), batch);
         }
+        adapt_batch_time += start_adapt_batch.elapsed().as_millis();
 
         // merge small batches into big batches
         let mut merge_groupes = Vec::new();
         let mut current_group = Vec::new();
         let group_limit = config::PARQUET_BATCH_SIZE;
         let mut group_size = 0;
+        let start_merge_batch = std::time::Instant::now();
         for batch in record_batches {
             if group_size > 0 && group_size + batch.num_rows() > group_limit {
                 merge_groupes.push(current_group);
@@ -420,7 +426,9 @@ pub async fn search_memtable(
             .into_iter()
             .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
             .collect::<Vec<_>>();
+        merge_batch_time += start_merge_batch.elapsed().as_millis();
 
+        let start_create_memtable = std::time::Instant::now();
         let table = match NewMemTable::try_new(
             record_batches[0].schema().clone(),
             vec![record_batches],
@@ -441,7 +449,16 @@ pub async fn search_memtable(
         };
         let table = Arc::new(table);
         tables.push(table as _);
+        create_memtable_time += start_create_memtable.elapsed().as_millis();
     }
+
+    log::info!(
+        "[trace_id {}] wal->mem->search: adapt_batch_time {}, merge_batch_time {}, create_memtable_time {}",
+        query.trace_id,
+        adapt_batch_time,
+        merge_batch_time,
+        create_memtable_time
+    );
 
     Ok((tables, scan_stats))
 }
