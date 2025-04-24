@@ -804,8 +804,17 @@ export default defineComponent({
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
-      loadDashboard();
+      await loadDashboard();
       // console.timeEnd("add panel loadDashboard");
+      
+      // Call makeAutoSQLQuery after dashboard data is loaded
+      // Only generate SQL if we're in auto query mode
+      if (!editMode.value && 
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery) {
+        await makeAutoSQLQuery();
+      }
     });
 
     let list = computed(function () {
