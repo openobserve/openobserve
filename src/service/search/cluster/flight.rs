@@ -107,6 +107,7 @@ pub async fn search(
 
     // 1. get file id list
     let file_id_list = get_file_id_lists(
+        trace_id,
         &sql.org_id,
         sql.stream_type,
         &sql.stream_names,
@@ -873,6 +874,7 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
 
 #[tracing::instrument(name = "service:search:cluster:flight:get_file_id_lists", skip_all)]
 pub async fn get_file_id_lists(
+    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_names: &[TableReference],
@@ -893,7 +895,8 @@ pub async fn get_file_id_lists(
         }
         // get file list
         let file_id_list =
-            crate::service::file_list::query_ids(org_id, stream_type, &name, time_range).await?;
+            crate::service::file_list::query_ids(trace_id, org_id, stream_type, &name, time_range)
+                .await?;
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)

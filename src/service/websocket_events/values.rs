@@ -27,9 +27,7 @@ use tracing::Instrument;
 use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::utils::stream::get_max_query_range,
-    handler::http::request::{
-        search::build_search_request_per_field, ws_v2::session::send_message,
-    },
+    handler::http::request::{search::build_search_request_per_field, ws::session::send_message},
     service::{
         search::{cache, sql::Sql},
         websocket_events::{

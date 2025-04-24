@@ -462,9 +462,10 @@ pub async fn merge_by_stream(
             offset_time.format("%Y/%m/%d/%H").to_string(),
         )
     };
-    let files = file_list::query_by_date(org_id, stream_name, stream_type, &date_start, &date_end)
-        .await
-        .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+    let files =
+        file_list::query_for_merge(org_id, stream_name, stream_type, &date_start, &date_end)
+            .await
+            .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",
