@@ -66,7 +66,7 @@
         <span class="tw-w-full tw-text-center tw-mt-5 tw-text-lg">On</span>
         <div
           v-for="(arg, argIndex) in modelValue.conditions"
-          :key="argIndex"
+          :key="argIndex + JSON.stringify(arg)"
           class="tw-w-full tw-flex tw-flex-col"
         >
           <div>
@@ -307,18 +307,18 @@ export default defineComponent({
       ];
     };
 
-    const filterStreamOptions = (val, update) => {
-      if (val === '') {
+    const filterStreamOptions = (val: any, update: any) => {
+      if (val === "") {
         update(() => {
           filteredStreamOptions.value = [...streamOptions?.value];
         });
         return;
       }
-      
+
       update(() => {
         const needle = val.toLowerCase();
         filteredStreamOptions.value = streamOptions?.value?.filter(
-          stream => stream?.label?.toLowerCase()?.includes(needle)
+          (stream: any) => stream?.label?.toLowerCase()?.includes(needle),
         );
       });
     };
@@ -332,7 +332,7 @@ export default defineComponent({
       operationOptions,
       getStreamsBasedJoinIndex,
       filteredStreamOptions,
-      filterStreamOptions
+      filterStreamOptions,
     };
   },
 });
