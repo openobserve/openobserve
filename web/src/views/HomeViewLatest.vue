@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row justify-between">
                   <div class="tile-title">   {{ t("home.streams") }}</div>
                   <div>
-                    <img :src="getImageURL('images/home/records.svg')" />
+                    <img height="32px" :src="getImageURL('images/home/streams.svg')" />
                   </div>
                 </div>
 
