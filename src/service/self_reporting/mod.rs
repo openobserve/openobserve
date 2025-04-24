@@ -38,6 +38,7 @@ use tokio::sync::oneshot;
 
 mod ingestion;
 mod queues;
+pub mod search;
 
 pub async fn run() {
     let cfg = get_config();
