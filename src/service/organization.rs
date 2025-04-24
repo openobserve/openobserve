@@ -18,9 +18,10 @@ use std::io::{Error, ErrorKind};
 use config::{
     meta::{
         alerts::alert::ListAlertsParams, dashboards::ListDashboardsParams,
-        pipeline::components::PipelineSource, stream::StreamType,
+        pipeline::components::PipelineSource,
+        self_reporting::usage, stream::StreamType,
     },
-    utils::rand::generate_random_string,
+    utils::{json, rand::generate_random_string, time},
 };
 use infra::table;
 
@@ -30,13 +31,14 @@ use crate::{
         meta::{
             organization::{
                 AlertSummary, IngestionPasscode, IngestionTokensContainer, OrgSummary,
-                Organization, PipelineSummary, RumIngestionToken, StreamSummary,
+                Organization, PipelineSummary, RumIngestionToken, StreamSummary, TriggerStatus,
+                TriggerStatusSearchResult,
             },
             user::{UserOrg, UserRole},
         },
         utils::auth::is_root_user,
     },
-    service::{db, stream::get_streams},
+    service::{db, self_reporting, stream::get_streams},
 };
 
 pub async fn get_summary(org_id: &str) -> OrgSummary {
@@ -54,6 +56,20 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         }
     }
 
+    let sql = format!(
+        "SELECT module, status FROM {} WHERE org = '{}' GROUP BY module, status, key",
+        usage::TRIGGERS_USAGE_STREAM,
+        org_id
+    );
+    let end_time = time::now_micros();
+    let start_time = end_time - time::second_micros(900); // 15 mins
+    let trigger_status_results = self_reporting::search::get_usage(sql, start_time, end_time)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|v| json::from_value::<TriggerStatusSearchResult>(v).ok())
+        .collect::<Vec<_>>();
+
     let pipelines = db::pipeline::list_by_org(org_id).await.unwrap_or_default();
     let pipeline_summary = PipelineSummary {
         num_realtime: pipelines
@@ -64,6 +80,10 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             .iter()
             .filter(|p| matches!(p.source, PipelineSource::Scheduled(_)))
             .count() as i64,
+        trigger_status: TriggerStatus::from_search_results(
+            &trigger_status_results,
+            usage::TriggerDataType::DerivedStream,
+        ),
     };
 
     let alerts = super::alerts::alert::list_with_folders_db(ListAlertsParams::new(org_id))
@@ -72,6 +92,10 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     let alert_summary = AlertSummary {
         num_realtime: alerts.iter().filter(|(_, a)| a.is_real_time).count() as i64,
         num_scheduled: alerts.iter().filter(|(_, a)| !a.is_real_time).count() as i64,
+        trigger_status: TriggerStatus::from_search_results(
+            &trigger_status_results,
+            usage::TriggerDataType::Alert,
+        ),
     };
 
     let functions = db::functions::list(org_id).await.unwrap_or_default();
