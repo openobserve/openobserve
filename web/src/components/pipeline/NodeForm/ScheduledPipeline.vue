@@ -880,8 +880,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       max-width="300px"
                     >
                       <span style="font-size: 14px"
-                        >Delay for which the query should run.<br />
-                        e.g. 10 minutes means that the query will run after 10 minutes.</span 
+                        >Delay for which the pipeline is scheduled to run.<br />
+                        e.g. 10 minutes delay means that the pipeline will run 10 minutes after its scheduled time.</span 
                       >
                     </q-tooltip>
                   </q-icon>
