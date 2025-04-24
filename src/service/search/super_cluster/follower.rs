@@ -129,7 +129,8 @@ pub async fn search(
     let stream_type = stream.get_stream_type(req.stream_type);
 
     // 1. get file id list
-    let file_id_list = get_file_id_lists(&req.org_id, stream_type, &stream, req.time_range).await?;
+    let file_id_list =
+        get_file_id_lists(&trace_id, &req.org_id, stream_type, &stream, req.time_range).await?;
 
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
@@ -303,6 +304,7 @@ pub async fn search(
     skip_all
 )]
 pub async fn get_file_id_lists(
+    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream: &TableReference,
@@ -318,8 +320,14 @@ pub async fn get_file_id_lists(
             time_range = Some((start, end));
         }
     }
-    let file_id_list =
-        crate::service::file_list::query_ids(org_id, stream_type, &stream_name, time_range).await?;
+    let file_id_list = crate::service::file_list::query_ids(
+        trace_id,
+        org_id,
+        stream_type,
+        &stream_name,
+        time_range,
+    )
+    .await?;
     Ok(file_id_list)
 }
 

@@ -1842,7 +1842,6 @@ const useLogs = () => {
             );
           }
           else{
-            console.log('here it is')
             resetHistogramWithError(
               "Histogram unavailable for CTEs, DISTINCT and LIMIT queries",
               -1
@@ -2098,7 +2097,6 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
 
-      console.log(parser.astify(filteredQuery))
       return parser.astify(filteredQuery);
 
       // return convertPostgreToMySql(parser.astify(filteredQuery));
@@ -4600,12 +4598,9 @@ const useLogs = () => {
       if (parsedSQL?.with) {
         let withObj = parsedSQL.with;
         withObj.forEach((obj: any) => {
-          console.log("inside withobj", obj)
           // Map through each "from" array in the _next object, as it can contain multiple tables
           if (obj?.stmt?.from) {
-            console.log(obj.stmt.from, "obj.stmt.from")
             obj?.stmt?.from.forEach((stream: { table: string }) => {
-              console.log(stream.table , "stream");
               newSelectedStreams.push(stream.table);
             }
             );

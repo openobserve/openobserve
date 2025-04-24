@@ -27,7 +27,7 @@ use config::{
     },
     utils::json::{Map, Value},
 };
-use infra::errors::{Error, ErrorCodes};
+use infra::errors::Error;
 use tracing::Instrument;
 
 use super::sort::order_search_results;
@@ -43,15 +43,13 @@ use crate::{
             },
         },
     },
-    handler::http::request::ws_v2::session::send_message,
+    handler::http::request::ws::session::send_message,
     service::{
         search::{
             self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
             sql::Sql,
         },
-        websocket_events::{
-            TimeOffset, WsServerEvents, search_registry_utils, setup_tracing_with_trace_id,
-        },
+        websocket_events::{TimeOffset, WsServerEvents, setup_tracing_with_trace_id},
     },
 };
 
@@ -92,6 +90,8 @@ pub async fn handle_search_request(
     user_id: &str,
     mut req: SearchEventReq,
 ) -> Result<(), Error> {
+    let mut start_timer = Instant::now();
+
     let cfg = get_config();
     let trace_id = req.trace_id.clone();
     let stream_type = req.stream_type;
@@ -253,6 +253,7 @@ pub async fn handle_search_request(
                 max_query_range,
                 remaining_query_range,
                 &order_by,
+                &mut start_timer,
             )
             .instrument(ws_search_span.clone())
             .await?;
@@ -274,6 +275,7 @@ pub async fn handle_search_request(
                 user_id,
                 accumulated_results,
                 max_query_range,
+                &mut start_timer,
             )
             .instrument(ws_search_span.clone())
             .await?;
@@ -306,6 +308,7 @@ pub async fn handle_search_request(
             user_id,
             accumulated_results,
             max_query_range,
+            &mut start_timer,
         )
         .instrument(ws_search_span)
         .await?;
@@ -372,6 +375,7 @@ pub async fn handle_cache_responses_and_deltas(
     max_query_range: i64,
     remaining_query_range: i64,
     mut order_by: &OrderBy,
+    start_timer: &mut Instant,
 ) -> Result<(), Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -453,6 +457,7 @@ pub async fn handle_cache_responses_and_deltas(
                     user_id,
                     &mut remaining_query_range,
                     cached_search_duration,
+                    start_timer,
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -466,6 +471,7 @@ pub async fn handle_cache_responses_and_deltas(
                     accumulated_results,
                     &mut curr_res_size,
                     req.fallback_order_by_col.clone(),
+                    start_timer,
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -487,6 +493,7 @@ pub async fn handle_cache_responses_and_deltas(
                 user_id,
                 &mut remaining_query_range,
                 cached_search_duration,
+                start_timer,
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -500,6 +507,7 @@ pub async fn handle_cache_responses_and_deltas(
                 accumulated_results,
                 &mut curr_res_size,
                 req.fallback_order_by_col.clone(),
+                start_timer,
             )
             .await?;
         }
@@ -531,6 +539,7 @@ async fn process_delta(
     user_id: &str,
     remaining_query_range: &mut f64,
     cache_req_duration: i64,
+    start_timer: &mut Instant,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
@@ -570,17 +579,6 @@ async fn process_delta(
     }
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
-        // Check if the cancellation flag is set
-        if let Some(is_cancelled) = search_registry_utils::is_cancelled(&trace_id).await {
-            if is_cancelled {
-                // Search is cancelled, stop processing
-                return Ok(());
-            }
-        } else {
-            // Search not found in registry, stop processing
-            return Ok(());
-        }
-
         let mut req = req.clone();
         req.payload.query.start_time = start_time;
         req.payload.query.end_time = end_time;
@@ -606,6 +604,11 @@ async fn process_delta(
             let queried_range =
                 calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
             *remaining_query_range -= queried_range;
+
+            // set took
+            search_res.set_took(start_timer.elapsed().as_millis() as usize);
+            // reset start timer
+            *start_timer = Instant::now();
 
             // when searching with limit queries
             // the limit in sql takes precedence over the requested size
@@ -743,6 +746,7 @@ async fn get_partitions(
     Ok(res)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_cached_responses(
     req_id: &str,
     trace_id: &str,
@@ -751,26 +755,8 @@ async fn send_cached_responses(
     accumulated_results: &mut Vec<SearchResultType>,
     curr_res_size: &mut i64,
     fallback_order_by_col: Option<String>,
+    start_timer: &mut Instant,
 ) -> Result<(), Error> {
-    if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id).await {
-        if is_cancelled {
-            log::info!(
-                "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping cached response",
-                trace_id
-            );
-            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-                "Search cancel detected for trace_id: {}",
-                trace_id
-            ))));
-        };
-    } else {
-        // Search not found in registry, stop processing
-        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-            "Search cancel detected for trace_id: {}",
-            trace_id
-        ))));
-    }
-
     log::info!(
         "[WS_SEARCH]: Processing cached response for trace_id: {}",
         trace_id
@@ -801,6 +787,13 @@ async fn send_cached_responses(
     cached.cached_response.result_cache_ratio = 100;
     // `scan_size` is 0, as it is not used for cached responses
     cached.cached_response.scan_size = 0;
+
+    // set took
+    cached
+        .cached_response
+        .set_took(start_timer.elapsed().as_millis() as usize);
+    // reset start timer
+    *start_timer = Instant::now();
 
     // Send the cached response
     let ws_search_res = WsServerEvents::SearchResponse {
@@ -835,6 +828,7 @@ pub async fn do_partitioned_search(
     user_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
     max_query_range: i64, // hours
+    start_timer: &mut Instant,
 ) -> Result<(), Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -887,20 +881,6 @@ pub async fn do_partitioned_search(
     );
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
-        // Check if the cancellation flag is set
-        if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id).await {
-            if is_cancelled {
-                log::info!(
-                    "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping partitioned search",
-                    trace_id
-                );
-                return Ok(());
-            }
-        } else {
-            // Search not found in registry, stop processing
-            return Ok(());
-        }
-
         let mut req = req.clone();
         req.payload.query.start_time = start_time;
         req.payload.query.end_time = end_time;
@@ -915,6 +895,11 @@ pub async fn do_partitioned_search(
 
         if !search_res.hits.is_empty() {
             search_res = order_search_results(search_res, req.fallback_order_by_col);
+
+            // set took
+            search_res.set_took(start_timer.elapsed().as_millis() as usize);
+            // reset start time
+            *start_timer = Instant::now();
 
             // check range error
             if !range_error.is_empty() {
@@ -969,8 +954,8 @@ pub async fn do_partitioned_search(
             send_message(req_id, ws_search_res.to_json()).await?;
         }
 
-        // Stop if reached the requested result size
-        if req_size != -1 && curr_res_size >= req_size {
+        // Stop if reached the requested result size and it is not a streaming aggs query
+        if req_size != -1 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
                 "[WS_SEARCH]: Reached requested result size ({}), stopping search",
                 req_size

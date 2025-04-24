@@ -38,7 +38,7 @@ use tokio_tungstenite::{
 use super::pool::QuerierConnectionPool;
 use crate::{
     common::{infra::cluster, utils::websocket::get_ping_interval_secs_with_jitter},
-    router::http::ws_v2::{
+    router::http::ws::{
         error::*,
         handler::{QuerierName, TraceId},
     },
