@@ -153,7 +153,10 @@ pub async fn get_meta_table_stats(
             return None;
         }
     };
-    let stream_meta_stats: EnrichmentTableMetaStreamStats = serde_json::from_slice(&size).unwrap();
+    let stream_meta_stats: EnrichmentTableMetaStreamStats = serde_json::from_slice(&size).map_err(|e| {
+        log::error!("Failed to parse meta stream stats: {}", e);
+        None
+    })?;
     Some(stream_meta_stats)
 }
 
