@@ -1081,6 +1081,8 @@ pub struct Common {
     pub file_list_dump_min_hour: usize,
     #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
     pub file_list_dump_debug_check: bool,
+    #[env_config(name = "ZO_LOGS_HISTOGRAM_ENABLED", default = true)]
+    pub logs_histogram_enabled: bool,
 }
 
 #[derive(EnvConfig)]
