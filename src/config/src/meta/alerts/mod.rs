@@ -446,8 +446,10 @@ pub enum Operator {
     #[serde(rename = "<=")]
     LessThanEquals,
     #[serde(rename = "contains")]
+    #[serde(alias = "Contains")]
     Contains,
     #[serde(rename = "not_contains")]
+    #[serde(alias = "NotContains")]
     NotContains,
 }
 
