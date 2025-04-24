@@ -12,6 +12,7 @@
         behavior="menu"
         hide-selected
         @filter="filterFields"
+        @blur="updateInputValue(internalModel.value?.field)"
       >
         <template v-slot:option="scope">
           <q-expansion-item
