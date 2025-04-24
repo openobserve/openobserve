@@ -15,10 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-md ">
-    <div class="column " style="height: auto; overflow: auto; ">
-
-
+  <q-page class="q-pa-md " style="overflow-y: auto; ">
+    <div class="column " style="height: auto; overflow-y: auto; ">
         <!-- 1st section -->
         <div class="streams-container q-pa-lg "
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
@@ -185,122 +183,118 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         </div>
-        <!-- 2nd section -->
-          <div class="charts-main-container row tw-gap-4 q-mt-md " style="display: flex; gap: 16px; height: calc(100% - 22px); ">
-            <!-- Chart 1 --> 
-            <div class=" first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[35%]  tw-p-4 " style= " display: flex; flex-direction: column;"
-            :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
-            >
-              <div class="details-container" style="margin-bottom: 16px;">
-                <div class="row justify-between items-center">
-                  <span class="text-title">Alerts</span>
-                  <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
-                    <router-link
-                      exact
-                      :to="{ name: 'alertList' }"
-                      class="absolute full-width full-height"
-                    ></router-link>
-                </q-btn>
-                </div>
-                <div class="row q-pt-sm" style="gap: 16px;">
-                  <div class="column">
-                    <span class="text-subtitle">Scheduled</span>
-                    <span class="results-count">40</span>
-                  </div>
-                  <q-separator vertical />
-                  <div class="column">
-                    <span class="text-subtitle">Real time</span>
-                    <span class="results-count">88</span>
-                  </div>
-                </div>
+      <!-- 2nd section -->
+        <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[450px] " style="display: flex; gap: 16px; height: calc(100% - 22px);  ">
+          <!-- Chart 1 --> 
+          <div class=" first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[35%]  tw-p-4 " style= " display: flex; flex-direction: column;"
+          :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
+          >
+            <div class="details-container" style="margin-bottom: 16px;">
+              <div class="row justify-between items-center">
+                <span class="text-title">Alerts</span>
+                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
+                  <router-link
+                    exact
+                    :to="{ name: 'alertList' }"
+                    class="absolute full-width full-height"
+                  ></router-link>
+              </q-btn>
               </div>
-              <div class="custom-first-chart tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)] tw-w-full"  >
-                <CustomChartRenderer
-                  :key="panelDataKey"
-                  :data="panelData"
-                  class="tw-w-full tw-h-full md:tw-h-[calc(100vh-400px)] "
-                />
+              <div class="row q-pt-sm" style="gap: 16px;">
+                <div class="column">
+                  <span class="text-subtitle">Scheduled</span>
+                  <span class="results-count">40</span>
+                </div>
+                <q-separator vertical />
+                <div class="column">
+                  <span class="text-subtitle">Real time</span>
+                  <span class="results-count">88</span>
+                </div>
               </div>
             </div>
-            <div class=" second-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[calc(65%-16px)] tw-p-4 " style=" display: flex; flex-direction: column;"
-            :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
-            >
-              <div class="details-container" style="margin-bottom: 16px;">
-                <div class="row justify-between items-center">
-                  <span class="text-title">Pipelines</span>
-                  <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
-                    <router-link
-                      exact
-                      :to="{ name: 'pipelines' }"
-                      class="absolute full-width full-height"
-                    ></router-link>
-                </q-btn>
+            <div class="custom-first-chart xl:tw-min-h-[350px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)] tw-w-full"  >
+              <CustomChartRenderer
+                :key="panelDataKey"
+                :data="panelData"
+                class="tw-w-full tw-h-full md:tw-h-[calc(100vh-400px)] "
+              />
+            </div>
+          </div>
+          <div class=" second-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[calc(65%-16px)] tw-p-4 " style=" display: flex; flex-direction: column;"
+          :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
+          >
+            <div class="details-container" style="margin-bottom: 16px;">
+              <div class="row justify-between items-center">
+                <span class="text-title">Pipelines</span>
+                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
+                  <router-link
+                    exact
+                    :to="{ name: 'pipelines' }"
+                    class="absolute full-width full-height"
+                  ></router-link>
+              </q-btn>
+              </div>
+              <div class="row q-pt-sm" style="gap: 16px;">
+                <div class="column">
+                  <span class="text-subtitle">Scheduled</span>
+                  <span class="results-count">50</span>
                 </div>
-                <div class="row q-pt-sm" style="gap: 16px;">
-                  <div class="column">
-                    <span class="text-subtitle">Scheduled</span>
-                    <span class="results-count">50</span>
-                  </div>
-                  <q-separator vertical />
-                  <div class="column">
-                    <span class="text-subtitle">Real time</span>
-                    <span class="results-count">69</span>
+                <q-separator vertical />
+                <div class="column">
+                  <span class="text-subtitle">Real time</span>
+                  <span class="results-count">69</span>
+                </div>
+              </div>
+            </div>
+            <div class="custom-second-chart xl:tw-min-h-[350px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)]"  >
+              <CustomChartRenderer
+                :key="panelDataKey"
+                :data="panelData2"
+                class="tw-w-full tw-h-full "
+              />
+            </div>
+          </div>
+        </div>
+        <!-- 3rd section -->
+        <div class="tw-flex flex-col sm:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-flex-wrap tw-gap-4 q-mt-md " >
+
+          <div class="tw-w-full sm:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
+            <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+              style="min-height: 150px; gap: 12px;">
+              <div class="column justify-between">
+                <div class="row justify-between">
+                  <div class="tile-title">{{ t("home.functionTitle") }}</div>
+                  <div>
+                    <img :src="getImageURL('images/home/compressed_size.svg')" />
                   </div>
                 </div>
               </div>
-              <div class="custom-second-chart tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)]"  >
-                <CustomChartRenderer
-                  :key="panelDataKey"
-                  :data="panelData2"
-                  class="tw-w-full tw-h-full "
-                />
+              <div class="data-to-display row items-end">
+                {{ summary.function_count }}
               </div>
             </div>
           </div>
 
-          <div class="tw-flex flex-col sm:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-flex-wrap tw-gap-4 q-mt-md " >
-
-            <div class="tw-w-full sm:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
-                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-                style="min-height: 150px; gap: 12px;">
-                <div class="column justify-between">
-                  <div class="row justify-between">
-                    <div class="tile-title">{{ t("home.functionTitle") }}</div>
-                    <div>
-                      <img :src="getImageURL('images/home/compressed_size.svg')" />
-                    </div>
+          <!-- Tile 2 -->
+          <div class="tw-w-full sm:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
+            <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+              style="min-height: 150px; gap: 12px;">
+              <div class="column justify-between">
+                <div class="row justify-between">
+                  <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
+                  <div>
+                    <img :src="getImageURL('images/home/compressed_size.svg')" />
                   </div>
-                </div>
-                <div class="data-to-display row items-end">
-                  {{ summary.function_count }}
                 </div>
               </div>
-            </div>
-
-            <!-- Tile 2 -->
-            <div class="tw-w-full sm:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
-                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-                style="min-height: 150px; gap: 12px;">
-                <div class="column justify-between">
-                  <div class="row justify-between">
-                    <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
-                    <div>
-                      <img :src="getImageURL('images/home/compressed_size.svg')" />
-                    </div>
-                  </div>
-                </div>
-                <div class="data-to-display row items-end">
-                  {{ summary.dashboard_count }}
-                </div>
+              <div class="data-to-display row items-end">
+                {{ summary.dashboard_count }}
               </div>
             </div>
           </div>
-
-
-
-
+        </div>
 
       </div>
 
