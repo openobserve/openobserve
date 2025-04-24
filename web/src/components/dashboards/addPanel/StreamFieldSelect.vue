@@ -2,15 +2,11 @@
   <div>
     <div>
       <q-select
+        ref="streamFieldSelect"
         filled
         v-model="internalModel"
         :options="filteredOptions"
-        option-label="name"
-        option-value="name"
-        :display-value="internalModel?.field ?? 'Select a Field'"
-        map-options
         dense
-        fill-input
         use-input
         input-debounce="0"
         behavior="menu"
@@ -90,6 +86,8 @@ export default defineComponent({
       dashboardPanelDataPageKey,
     );
 
+    const streamFieldSelect = ref<any>(null);
+
     async function loadStreamFields(streamName: string) {
       try {
         if (streamName != "") {
@@ -114,6 +112,9 @@ export default defineComponent({
       if (!props.streams || props.streams.length === 0) {
         options.value = [];
         filteredOptions.value = [];
+        streamFieldSelect?.value?.updateInputValue?.(
+          internalModel.value?.field,
+        );
         return;
       }
 
@@ -136,13 +137,15 @@ export default defineComponent({
 
       // Initialize filtered options with all options
       filteredOptions.value = [...options?.value];
+
+      streamFieldSelect?.value?.updateInputValue?.(internalModel.value?.field);
     }
 
     function filterFields(val: string | object, update: any) {
       // Handle both string and object values for val
       let searchText = "";
 
-      if (val === "") {
+      if (val === "" || val === internalModel.value?.field) {
         update(() => {
           filteredOptions.value = [...options?.value];
         });
@@ -169,12 +172,8 @@ export default defineComponent({
             const streamMatches = stream?.label?.toLowerCase().includes(needle);
 
             // Then filter child fields that match
-            const matchingFields = stream?.children?.filter(
-              (field: {
-                name: string;
-                stream: { streamAlias: string; stream: string };
-                type: string;
-              }) => field?.name?.toLowerCase()?.includes(needle),
+            const matchingFields = stream?.children?.filter((field: any) =>
+              field?.name?.toLowerCase()?.includes(needle),
             );
 
             // If stream name matches or has matching fields, include in results
@@ -197,6 +196,7 @@ export default defineComponent({
         streamAlias: field?.stream?.streamAlias,
         field: field.name,
       };
+      streamFieldSelect?.value?.updateInputValue?.(field.name);
     }
 
     // Watch for v-model changes
@@ -213,6 +213,7 @@ export default defineComponent({
       filteredOptions,
       selectField,
       filterFields,
+      streamFieldSelect,
     };
   },
 });
