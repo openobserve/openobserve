@@ -499,6 +499,10 @@ const validateChartFieldsConfiguration = (
   xAxisLabel: string = "X-Axis",
   yAxisLabel: string = "Y-Axis",
 ) => {
+  if (!chartType || !fields) {
+    return;
+  }
+
   switch (chartType) {
     case "donut":
     case "pie": {
