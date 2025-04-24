@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-md " style="overflow-y: auto; ">
-    <div class="column " style="height: auto; overflow-y: auto; ">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="column " style="height: auto; overflow-y: auto; ">
         <!-- 1st section -->
         <div class="streams-container q-pa-lg "
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="details-container" style="margin-bottom: 16px;">
               <div class="row justify-between items-center">
-                <span class="text-title">Alerts</span>
+                <span class="text-title">{{ t("home.alertTitle") }}</span>
                 <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
                   <router-link
                     exact
@@ -202,13 +202,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="row q-pt-sm" style="gap: 16px;">
                 <div class="column">
-                  <span class="text-subtitle">Scheduled</span>
-                  <span class="results-count">40</span>
+                  <span class="text-subtitle">{{ t("home.scheduledAlert") }}</span>
+                  <span class="results-count">{{ summary.scheduled_alerts }}</span>
                 </div>
                 <q-separator vertical />
                 <div class="column">
-                  <span class="text-subtitle">Real time</span>
-                  <span class="results-count">88</span>
+                  <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
+                  <span class="results-count">{{ summary.rt_alerts }}</span>
                 </div>
               </div>
             </div>
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="details-container" style="margin-bottom: 16px;">
               <div class="row justify-between items-center">
-                <span class="text-title">Pipelines</span>
+                <span class="text-title">{{ t("home.pipelineTitle") }}</span>
                 <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
                   <router-link
                     exact
@@ -236,13 +236,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="row q-pt-sm" style="gap: 16px;">
                 <div class="column">
-                  <span class="text-subtitle">Scheduled</span>
-                  <span class="results-count">50</span>
+                  <span class="text-subtitle"> {{ t("home.schedulePipelineTitle") }}</span>
+                  <span class="results-count">{{ summary.scheduled_pipelines }}</span>
                 </div>
                 <q-separator vertical />
                 <div class="column">
-                  <span class="text-subtitle">Real time</span>
-                  <span class="results-count">69</span>
+                  <span class="text-subtitle">{{ t("home.rtPipelineTitle") }}</span>
+                  <span class="results-count">{{ summary.rt_pipelines }}</span>
                 </div>
               </div>
             </div>
@@ -295,10 +295,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-
       </div>
+      <div
+      v-if="no_data_ingest && !isLoadingSummary"
+      class="q-pa-md row items-start q-gutter-md"
+      style="margin: 0 auto; justify-content: center"
+    >
+      <div class="my-card card-container">
+        <div align="center" flat
+bordered class="my-card q-py-md">
+          <div class="text-h6">{{ t("home.noData") }}</div>
+          <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
+        </div>
 
+        <q-separator />
 
+        <div align="center" class="q-py-sm">
+          <q-btn
+            no-caps
+            color="primary"
+            @click="() => $router.push({ name: 'ingestion' })"
+            flat
+            >{{ t("home.findIngestion") }}
+          </q-btn>
+        </div>
+      </div>
+    </div>
+    <div v-if="isLoadingSummary" style="height: calc(100vh - 200px);" class=" tw-w-full tw-h-full q-mt-lg tw-flex tw-justify-center tw-items-center">
+      <q-spinner-hourglass color="primary" size="lg" />
+    </div>
   </q-page>
 
 
@@ -328,9 +353,11 @@ export default defineComponent({
     const isCloud = config.isCloud;
     const { setStreams } = useStreams();
     const panelDataKey = ref(0); // Start with a default key
+    const isLoadingSummary = ref(false);
 
 
     const getSummary = (org_id: any) => {
+      isLoadingSummary.value = true;
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading summary...",
@@ -371,6 +398,12 @@ export default defineComponent({
             scheduled_alerts: res.data.alerts?.num_scheduled ?? 0,
             dashboard_count: res.data.total_dashboards ?? 0,
             function_count: res.data.total_functions ?? 0,
+            failed_pipelines: res.data.pipelines?.trigger_status.failed ?? 0,
+            healthy_pipelines: res.data.pipelines?.trigger_status.healthy ?? 0,
+            warning_pipelines: res.data.pipelines?.trigger_status.warning ?? 0,
+            failed_alerts: res.data.alerts?.trigger_status.failed ?? 0,
+            healthy_alerts: res.data.alerts?.trigger_status.healthy ?? 0,
+            warning_alerts: res.data.alerts?.trigger_status.warning ?? 0,
           };
           no_data_ingest.value = false;
           dismiss();
@@ -383,6 +416,9 @@ export default defineComponent({
             message: "Error while pulling summary.",
             timeout: 2000,
           });
+        })
+        .finally(() => {
+          isLoadingSummary.value = false;
         });
     };
 
@@ -441,14 +477,14 @@ export default defineComponent({
           },
           data: [
             {
-              value: 80,
+              value: summary.value.healthy_alerts,
               name: "Success Alerts",
               itemStyle: {
                 color: "#15ba73"
               }
             },
             {
-              value: 30,
+              value: summary.value.failed_alerts,
               name: "Failed Alerts",
               itemStyle: {
                 color: "#db373a"
@@ -482,7 +518,7 @@ export default defineComponent({
         yAxis: {
           type: "value",
           min: 0,
-          max: 50,
+          max:Math.ceil((summary.value.healthy_pipelines + summary.value.failed_pipelines + summary.value.warning_pipelines) / 3 / 10) * 10 ,
           interval: 10,
           name: "Number of Pipelines",
           nameLocation: "middle",
@@ -507,7 +543,7 @@ export default defineComponent({
 
         series: [
           {
-            data: [33, 43, 49],
+            data: [summary.value.healthy_pipelines, summary.value.failed_pipelines, summary.value.warning_pipelines],
             type: "bar",
             barWidth: "50%",
             label: {
@@ -574,6 +610,7 @@ const streamsIcon = computed(() => {
       indexSizeIcon,
       recordsIcon,
       streamsIcon,
+      isLoadingSummary,
     };
   },
   computed: {
