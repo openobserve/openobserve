@@ -40,8 +40,6 @@ use crate::{
     },
 };
 
-#[allow(deprecated)]
-pub mod deprecated;
 pub mod destinations;
 pub mod templates;
 

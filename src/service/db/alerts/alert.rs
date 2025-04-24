@@ -282,7 +282,7 @@ pub async fn list(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
 ) -> Result<Vec<Alert>, infra::errors::Error> {
-    let params = ListAlertsParams::new(org_id).in_folder("default");
+    let params = ListAlertsParams::new(org_id);
     let params = if let Some(stream_name) = stream_name {
         params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
     } else {
