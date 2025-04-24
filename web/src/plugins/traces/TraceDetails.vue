@@ -706,7 +706,7 @@ export default defineComponent({
     const buildTraceSearchQuery = (trace: any) => {
       const req = getDefaultRequest();
       req.query.from = 0;
-      req.query.size = 2500;
+      req.query.size = -1;
       req.query.start_time = trace.from;
       req.query.end_time = trace.to;
 
