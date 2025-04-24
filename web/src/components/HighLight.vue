@@ -15,24 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <span v-for="item in list" :key="item.key" v-bind="item">
-      <span :title="title" v-if="item.isKeyWord" class="highlight">{{
-        item.text
-      }}</span>
-      <span :title="title" v-else>{{ item.text }}</span>
+    <span
+      v-for="(item, index) in list"
+      :key="index"
+      :title="title"
+      :class="{ highlight: item.isKeyWord }"
+    >
+      {{ item.text }}
     </span>
-  </div>
 </template>
 
 <script lang="ts">
-// @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch, computed } from "vue";
 
 export default defineComponent({
   name: "HighLight",
   props: {
-    // eslint-disable-next-line vue/require-prop-types
     content: {
       required: true,
     },
@@ -45,113 +43,66 @@ export default defineComponent({
       default: "",
     },
   },
-  data() {
-    return {
-      list: ref([]),
-      keywords: ref([]),
-    };
-  },
-  watch: {
-    content: {
-      handler() {
-        this.init();
-      },
-    },
-    queryString: {
-      handler() {
-        //added timeout to delay the highlight process to avoid
-        //performance issue while writing query in editor
-        setTimeout(() => {
-          this.keywords = this.getKeywords(this.queryString);
-          this.init();
-        }, 2000);
-      },
-    },
-  },
-  mounted() {
-    this.keywords = this.getKeywords(this.queryString);
-    this.init();
-  },
-  methods: {
-    init() {
-      this.list = this.splitToList(this.content, this.keywords);
-    },
-    splitToList(content: any, keywords: string | any[]) {
-      let arr = [
-        {
-          isKeyWord: false,
-          text: typeof content === "number" ? content.toString() : content,
-        },
-      ];
-      for (let i = 0; i < keywords.length; i++) {
-        const keyword = keywords[i];
-        let j = 0;
-        while (j < arr.length) {
-          let rec = arr[j];
-          let record =
-            rec.text != undefined ? rec.text.split(keyword) : undefined;
-          if (
-            record != undefined &&
-            typeof record == "object" &&
-            record.length > 1
-          ) {
-            // delete j replace by new
-            arr.splice(j, 1);
-            let recKeyword = {
-              isKeyWord: true,
-              text: keyword,
-            };
-            for (let k = 0; k < record.length; k++) {
-              let r = {
-                isKeyWord: false,
-                text: record[k],
-              };
-              if (k == record.length - 1) {
-                arr.splice(j + k * 2, 0, r);
-              } else {
-                arr.splice(j + k * 2, 0, r, recKeyword);
-              }
-            }
-          }
-          if (record != undefined && typeof record == "object") {
-            j = j + record.length;
-          } else {
-            j++;
-          }
-        }
-      }
-      return arr;
-    },
-    getKeywords(queryString: string) {
-      if (!queryString || queryString.trim().length == 0) {
-        return [];
-      }
-
+  setup(props) {
+    const list = ref([]);
+    let timeoutId: ReturnType<typeof setTimeout>;
+    //this function is used to get the keywords from the query string
+    //which matches match_all(string)
+    const getKeywords = (queryString: string): string[] => {
+      if (!queryString?.trim()) return [];
       const regex = /(?:match_all\((['"])([^'"]+)\1\)|(['"])([^'"]+)\5)/g;
-
-      let result = [];
+      const result: string[] = [];
       let match;
 
       while ((match = regex.exec(queryString)) !== null) {
-        // Group 1: match_all values
-        if (match[2]) {
-          result.push(match[2]);
+        if (match[2]) result.push(match[2]);
+        else if (match[4] && !/^[a-zA-Z_]+\s*=\s*$/.test(match[4])) {
+          result.push(match[4]);
         }
-        // Group 2: other string values
-        else if (match[4]) {
-          const columnNamePattern = /^[a-zA-Z_]+\s*=\s*$/;
-          if (!columnNamePattern.test(match[4])) {
-            result.push(match[4]);
-          }
-        }
+      }
+      //remove duplicates
+      //this is done because the query string can have multiple match_all(string) with same string in it 
+      //and we need to highlight the string only once
+      return Array.from(new Set(result)); 
+    };
+
+    //it takes the content and the keywords and returns the content with the keywords highlighted
+    const highlightText = (content: any, keywords: string[]) => {
+      const result = [];
+      let remaining = typeof content === "number" ? content.toString() : content;
+      if (!keywords.length || !remaining) return [{ isKeyWord: false, text: remaining }];
+
+      //this pattern is used to highlight the keywords in the content
+      //it is a regular expression that matches the keywords in the content
+      const pattern = new RegExp(`(${keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+      const parts = remaining.split(pattern);
+
+      for (const part of parts) {
+        if (!part) continue;
+        const isKeyWord = keywords.some(k => k.toLowerCase() === part.toLowerCase());
+        result.push({ isKeyWord, text: part });
       }
 
       return result;
-    },
+    };
+
+    const updateList = () => {
+      const keywords = getKeywords(props.queryString);
+      list.value = highlightText(props.content, keywords);
+    };
+
+    watch(() => props.content, updateList, { immediate: true });
+    watch(() => props.queryString, () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(updateList, 300); // debounce duration
+    });
+
+    return { list };
   },
 });
 </script>
-<style lang="scss">
+
+<style scoped>
 .highlight {
   background-color: rgb(255, 213, 0);
 }

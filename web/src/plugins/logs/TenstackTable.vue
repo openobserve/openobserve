@@ -339,7 +339,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @add-field-to-table="addFieldToTable"
                   />
                 </template>
-                {{ cell.renderValue() }}
+                <HighLight
+                  :content="cell.renderValue()"
+                  :query-string="
+                    searchObj.meta.sqlMode
+                      ? searchObj.data.query.split('where')[1]
+                      : searchObj.data.query
+                  "
+                />
               </td>
             </template>
           </tr>
@@ -352,6 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, defineEmits, watch, nextTick, onMounted } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
+import HighLight from "@/components/HighLight.vue";
 import {
   FlexRender,
   type ColumnDef,
@@ -366,6 +374,7 @@ import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "quasar";
+import useLogs from "@/composables/useLogs";
 
 const props = defineProps({
   rows: {
@@ -456,6 +465,8 @@ const tableRows = ref(props.rows);
 const isFunctionErrorOpen = ref(false);
 
 const activeCellActionId = ref("");
+
+const {searchObj} = useLogs();
 
 watch(
   () => props.columns,
