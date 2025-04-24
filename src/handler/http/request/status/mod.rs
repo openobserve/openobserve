@@ -322,7 +322,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
         actions_enabled,
-        histogram_enabled: cfg.common.logs_histogram_enabled,
+        histogram_enabled: cfg.limit.histogram_enabled,
     }))
 }
 
