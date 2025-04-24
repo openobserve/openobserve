@@ -107,6 +107,64 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_process("file_list", files).await
     }
 
+    async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+
+        let mut tx = client.begin().await?;
+
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(&dump_file.key).map_err(|e| Error::Message(e.to_string()))?;
+        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+        let meta = &dump_file.meta;
+
+        if let Err(e) = sqlx::query(r#" INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);"#)
+        .bind(org_id)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .bind(false)
+        .bind(meta.min_ts)
+        .bind(meta.max_ts)
+        .bind(meta.records)
+        .bind(meta.original_size)
+        .bind(meta.compressed_size)
+        .bind(meta.index_size)
+        .bind(meta.flattened)
+        .execute(&mut *tx)
+        .await{
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SQLITE] rollback file_list dump file update error: {e}",);
+            }
+            return Err(e.into());
+        }
+
+        for chunk in dumped_ids.chunks(get_config().limit.file_list_id_batch_size) {
+            if chunk.is_empty() {
+                continue;
+            }
+            let ids = chunk
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(",");
+            let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
+            if let Err(e) = sqlx::query(&query_str).execute(&mut *tx).await {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback file_list dump file update error: {e}",);
+                }
+                return Err(e.into());
+            }
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] transaction commit error for dump file update {e}");
+            return Err(e.into());
+        }
+        Ok(())
+    }
+
     async fn batch_add_deleted(
         &self,
         org_id: &str,
@@ -348,7 +406,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_by_date(
+    async fn query_for_merge(
         &self,
         org_id: &str,
         stream_type: StreamType,
@@ -1020,18 +1078,22 @@ SELECT stream, max(id) as id, COUNT(*) AS num
     }
 
     async fn set_job_done(&self, ids: &[i64]) -> Result<()> {
+        let config = get_config();
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let sql = format!(
-            "UPDATE file_list_jobs SET status = $1, updated_at = $2 WHERE id IN ({});",
+            "UPDATE file_list_jobs SET status = $1, updated_at = $2, dumped = $3 WHERE id IN ({});",
             ids.iter()
                 .map(|id| id.to_string())
                 .collect::<Vec<_>>()
                 .join(",")
         );
+        // if dump enabled we set dumped to false, so dump job can work
+        // id dump disabled, we set it to true, so cleanup can remvoe the jobs
         sqlx::query(&sql)
             .bind(super::FileListJobStatus::Done)
             .bind(config::utils::time::now_micros())
+            .bind(!config.common.file_list_dump_enabled)
             .execute(&*client)
             .await?;
         Ok(())
@@ -1074,12 +1136,14 @@ SELECT stream, max(id) as id, COUNT(*) AS num
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        let ret =
-            sqlx::query(r#"DELETE FROM file_list_jobs WHERE status = $1 AND updated_at < $2;"#)
-                .bind(super::FileListJobStatus::Done)
-                .bind(before_date)
-                .execute(&*client)
-                .await?;
+        let ret = sqlx::query(
+            r#"DELETE FROM file_list_jobs WHERE status = $1 AND updated_at < $2 AND dumped = $3;"#,
+        )
+        .bind(super::FileListJobStatus::Done)
+        .bind(before_date)
+        .bind(true)
+        .execute(&*client)
+        .await?;
         if ret.rows_affected() > 0 {
             log::warn!("[SQLITE] clean done jobs");
         }
@@ -1118,6 +1182,104 @@ SELECT stream, max(id) as id, COUNT(*) AS num
             }
         }
         Ok(job_status)
+    }
+
+    async fn get_entries_in_range(
+        &self,
+        org: &str,
+        stream: Option<&str>,
+        time_start: i64,
+        time_end: i64,
+        min_id: Option<i64>,
+    ) -> Result<Vec<super::FileRecord>> {
+        if time_start == 0 && time_end == 0 {
+            return Ok(Vec::new());
+        }
+
+        let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
+            || time_end - time_start > DAY_MICRO_SECS * 30
+            || !get_config().limit.file_list_multi_thread
+        {
+            vec![(time_start, time_end)]
+        } else {
+            let mut partitions = Vec::new();
+            let mut start = time_start;
+            while start < time_end {
+                let end_of_day = std::cmp::min(end_of_the_day(start), time_end);
+                partitions.push((start, end_of_day));
+                start = end_of_day + 1; // next day, use end_of_day + 1 microsecond
+            }
+            partitions
+        };
+
+        let mut tasks = Vec::with_capacity(day_partitions.len());
+
+        for (time_start, time_end) in day_partitions {
+            let o = org.to_string();
+            let sql = "SELECT * FROM file_list WHERE max_ts >= $1 AND min_ts <= $2 AND org = $3 AND deleted = $4";
+            let sql = match stream {
+                Some(stream) => format!("{sql} AND stream = '{stream}'"),
+                None => sql.to_string(),
+            };
+            let sql = match min_id {
+                Some(id) => format!("{sql} AND id >= {id}"),
+                None => sql,
+            };
+            tasks.push(tokio::task::spawn(async move {
+                let pool = CLIENT_RO.clone();
+                sqlx::query_as::<_, super::FileRecord>(&sql)
+                    .bind(time_start)
+                    .bind(time_end)
+                    .bind(o)
+                    .bind(false)
+                    .fetch_all(&pool)
+                    .await
+            }));
+        }
+
+        let mut rets = Vec::new();
+        for task in tasks {
+            match task.await {
+                Ok(Ok(r)) => rets.extend(r.into_iter().filter(|r| !r.deleted)),
+                Ok(Err(e)) => {
+                    return Err(e.into());
+                }
+                Err(e) => {
+                    return Err(Error::Message(e.to_string()));
+                }
+            };
+        }
+        Ok(rets)
+    }
+
+    async fn get_pending_dump_jobs(&self) -> Result<Vec<(i64, String, String, i64)>> {
+        let pool = CLIENT_RO.clone();
+
+        let ret = sqlx::query_as::<_, (i64,String, String, i64)>(
+            r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = $1 AND dumped = $2 limit 1000"#,
+        )
+        .bind(super::FileListJobStatus::Done)
+        .bind(false)
+        .fetch_all(&pool)
+        .await?;
+
+        let mut pending: Vec<(i64, String, String, i64)> = Vec::new();
+
+        for (id, org, stream, offset) in ret.iter() {
+            pending.push((*id, org.to_string(), stream.to_string(), *offset));
+        }
+
+        Ok(pending)
+    }
+    async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        sqlx::query("UPDATE file_list_jobs SET dumped = $1 WHERE id = $2;")
+            .bind(dumped)
+            .bind(id)
+            .execute(&*client)
+            .await?;
+        Ok(())
     }
 }
 
@@ -1414,6 +1576,15 @@ CREATE TABLE IF NOT EXISTS stream_stats
     let data_type = "BOOLEAN default false not null";
     add_column(&client, "file_list_deleted", column, data_type).await?;
 
+    // create col dumped for file_list_jobs for version <=0.14.0
+    add_column(
+        &client,
+        "file_list_jobs",
+        "dumped",
+        "BOOLEAN default false not null",
+    )
+    .await?;
+
     Ok(())
 }
 
@@ -1429,6 +1600,11 @@ pub async fn create_table_index() -> Result<()> {
             "file_list_stream_date_idx",
             "file_list",
             &["stream", "date"],
+        ),
+        (
+            "file_list_org_deleted_stream_idx",
+            "file_list",
+            &["org", "deleted", "stream"],
         ),
         ("file_list_history_org_idx", "file_list_history", &["org"]),
         (

@@ -97,10 +97,8 @@ pub mod sessions_cache_utils {
     use futures::FutureExt;
     use tokio::sync::RwLock;
 
-    use super::search_registry_utils::SearchState;
     use crate::{
-        common::infra::config::{WS_SEARCH_REGISTRY, WS_SESSIONS},
-        handler::http::request::ws_v2::session::WsSession,
+        common::infra::config::WS_SESSIONS, handler::http::request::ws::session::WsSession,
     };
 
     pub async fn run_gc_ws_sessions() {
@@ -156,9 +154,6 @@ pub mod sessions_cache_utils {
 
         // close and remove expired sessions
         for session_id in expired {
-            // Clean up associated searches first
-            cleanup_searches_for_session(&session_id).await;
-
             // Close and remove session
             if let Some(session) = get_session(&session_id).await {
                 log::info!("[WS_GC] Closing expired session: {}", session_id);
@@ -184,45 +179,6 @@ pub mod sessions_cache_utils {
             "[WS_GC] Remaining active sessions: {}",
             len_sessions().await
         );
-    }
-
-    async fn cleanup_searches_for_session(session_id: &str) {
-        let r = WS_SEARCH_REGISTRY.read().await;
-        let searches_to_remove: Vec<String> = r
-            .iter()
-            .filter_map(|(key, state)| {
-                if state.get_req_id() == session_id {
-                    Some(key.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
-        drop(r);
-
-        for trace_id in searches_to_remove {
-            let mut w = WS_SEARCH_REGISTRY.write().await;
-            if let Some(state) = w.remove(&trace_id) {
-                match state {
-                    SearchState::Running { cancel_tx, req_id } => {
-                        let _ = cancel_tx.try_send(());
-                        log::info!(
-                            "[WS_GC] Cancelled running search: {} for session: {}",
-                            trace_id,
-                            req_id
-                        );
-                    }
-                    _ => {
-                        log::debug!(
-                            "[WS_GC] Removed search: {} for session: {}",
-                            trace_id,
-                            session_id
-                        );
-                    }
-                }
-            }
-            drop(w);
-        }
     }
 
     /// Insert a new session into the cache
@@ -260,53 +216,17 @@ pub mod sessions_cache_utils {
     /// Check if a session exists in the cache
     pub async fn contains_session(session_id: &str) -> bool {
         let r = WS_SESSIONS.read().await;
-        r.contains_key(session_id)
+        let res = r.contains_key(session_id);
+        drop(r);
+        res
     }
 
     /// Get the number of sessions in the cache
     pub async fn len_sessions() -> usize {
         let r = WS_SESSIONS.read().await;
-        r.len()
-    }
-}
-
-pub mod search_registry_utils {
-    use tokio::sync::mpsc;
-
-    use crate::common::infra::config::WS_SEARCH_REGISTRY;
-
-    #[derive(Debug)]
-    pub enum SearchState {
-        Running {
-            cancel_tx: mpsc::Sender<()>,
-            req_id: String,
-        },
-        Cancelled {
-            req_id: String,
-        },
-        Completed {
-            req_id: String,
-        },
-    }
-
-    impl SearchState {
-        pub fn get_req_id(&self) -> &str {
-            match self {
-                SearchState::Running { req_id, .. } => req_id,
-                SearchState::Cancelled { req_id } => req_id,
-                SearchState::Completed { req_id } => req_id,
-            }
-        }
-    }
-
-    // Add this function to check if a search is cancelled
-    pub async fn is_cancelled(trace_id: &str) -> Option<bool> {
-        let r = WS_SEARCH_REGISTRY.read().await;
-        let is_cancelled = r
-            .get(trace_id)
-            .map(|state| matches!(*state, SearchState::Cancelled { .. }));
+        let res = r.len();
         drop(r);
-        is_cancelled
+        res
     }
 }
 

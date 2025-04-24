@@ -219,6 +219,7 @@ async fn get_file_list(
 ) -> Result<Vec<FileKey>> {
     let (time_min, time_max) = time_range;
     let results = match file_list::query(
+        trace_id,
         org_id,
         stream_name,
         StreamType::Metrics,
