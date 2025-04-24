@@ -108,13 +108,15 @@ export default defineComponent({
       }
     }
 
+    function updateInputValue(val: string) {
+      streamFieldSelect?.value?.updateInputValue?.(val);
+    }
+
     async function fetchFieldsForStreams() {
       if (!props.streams || props.streams.length === 0) {
         options.value = [];
         filteredOptions.value = [];
-        streamFieldSelect?.value?.updateInputValue?.(
-          internalModel.value?.field,
-        );
+        updateInputValue(internalModel.value?.field);
         return;
       }
 
@@ -138,7 +140,7 @@ export default defineComponent({
       // Initialize filtered options with all options
       filteredOptions.value = [...options?.value];
 
-      streamFieldSelect?.value?.updateInputValue?.(internalModel.value?.field);
+      updateInputValue(internalModel.value?.field);
     }
 
     function filterFields(val: string | object, update: any) {
@@ -196,7 +198,7 @@ export default defineComponent({
         streamAlias: field?.stream?.streamAlias,
         field: field.name,
       };
-      streamFieldSelect?.value?.updateInputValue?.(field.name);
+      updateInputValue(field.name);
     }
 
     // Watch for v-model changes
@@ -214,6 +216,7 @@ export default defineComponent({
       selectField,
       filterFields,
       streamFieldSelect,
+      updateInputValue,
     };
   },
 });
