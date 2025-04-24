@@ -1301,7 +1301,8 @@ async fn handle_derived_stream_triggers(
             // Store the last used derived stream period end time
             if let Some(start_time) = start {
                 new_trigger.data = json::to_string(&ScheduledTriggerData {
-                    period_end_time: Some(start_time), // updated start_time as end_time
+                    // updated start_time as end_time
+                    period_end_time: Some(start_time + user_defined_delay),
                     tolerance: 0,
                     last_satisfied_at: None,
                 })
