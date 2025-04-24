@@ -871,7 +871,7 @@ export default defineComponent({
       return store.state.zoConfig.quick_mode_enabled;
     }
 
-    // Helper function to check if quick mode is enabled
+    // Helper function to check if histogram is enabled
     function isHistogramEnabled() {
       return store.state.zoConfig.histogram_enabled;
     }
