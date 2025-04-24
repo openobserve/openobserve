@@ -197,12 +197,9 @@ pub async fn run(
                         );
                     }
                     Ok(actix_ws::AggregatedMessage::Text(msg)) => {
-                        log::info!("[WS_HANDLER]: Received text message for req_id: {}, querier: {}", req_id, cfg.common.instance_name);
-                        log::debug!("[WS_HANDLER]: Request Id: {} Node Role: {}, querier: {}, Received message: {}",
+                        log::info!("[WS_HANDLER]: Received text message for req_id: {}, querier: {}",
                             req_id,
-                            cfg.common.node_role,
                             cfg.common.instance_name,
-                            msg
                         );
                         handle_text_message(&user_id, &req_id, msg.to_string(), path.clone())
                         .await;
@@ -313,9 +310,10 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             log::info!(
-                "[WS_HANDLER]: Parsed text message for req_id: {}, querier: {}",
+                "[WS_HANDLER]: Parsed text message for req_id: {}, querier: {}, trace_id: {}",
                 req_id,
-                get_config().common.instance_name
+                get_config().common.instance_name,
+                client_msg.get_trace_id()
             );
             // Validate the events
             if !client_msg.is_valid() {
@@ -334,7 +332,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
             let ws_span = setup_tracing_with_trace_id(
                 &client_msg.get_trace_id(),
                 tracing::info_span!(
-                    "src::handler::http::request::websocket::ws_v2::session::handle_text_message"
+                    "src::handler::http::request::websocket::ws::session::handle_text_message"
                 ),
             )
             .await;
@@ -545,8 +543,6 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
         )));
     };
 
-    log::debug!("[WS_HANDLER]: req_id: {} sending message: {}", req_id, msg);
-
     let mut session = session.write().await;
     let _ = session.text(msg).await.map_err(|e| {
         log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
@@ -662,35 +658,49 @@ async fn handle_search_event(
                         }
                     }
                     Err(e) => {
-                        let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
+                        let handle_err = async || {
+                            let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
 
-                        #[cfg(feature = "enterprise")]
-                        let http_response_code: u16;
-                        #[cfg(feature = "enterprise")]
-                        {
-                            let http_response = map_error_to_http_response(&e, trace_id.to_string());
-                            http_response_code = http_response.status().into();
+                            #[cfg(feature = "enterprise")]
+                            let http_response_code: u16;
+                            #[cfg(feature = "enterprise")]
+                            {
+                                let http_response = map_error_to_http_response(&e, trace_id.to_string());
+                                http_response_code = http_response.status().into();
+                            }
+                            // Add audit before closing
+                            #[cfg(feature = "enterprise")]
+                            if is_audit_enabled {
+                                audit(AuditMessage {
+                                    user_email: user_id,
+                                    org_id,
+                                    _timestamp: chrono::Utc::now().timestamp(),
+                                    protocol: Protocol::Ws,
+                                    response_meta: ResponseMeta {
+                                        http_method: "".to_string(),
+                                        http_path: path.clone(),
+                                        http_query_params: "".to_string(),
+                                        http_body: client_msg.to_json(),
+                                        http_response_code,
+                                        error_msg: Some(e.to_string()),
+                                        trace_id: Some(trace_id.to_string()),
+                                    },
+                                })
+                                .await;
+                            }
+                        };
+                        match &e {
+                            #[cfg(feature = "enterprise")]
+                            errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
+                                let cancel_res = WsServerEvents::CancelResponse {
+                                        trace_id: trace_id.to_string(),
+                                        is_success: true,
+                                    };
+                                    let _ = send_message(&req_id, cancel_res.to_json()).await;
+                                }
+                            _ => handle_err().await
                         }
-                        // Add audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                          audit(AuditMessage {
-                                  user_email: user_id,
-                                  org_id,
-                                  _timestamp: chrono::Utc::now().timestamp(),
-                                  protocol: Protocol::Ws,
-                                  response_meta: ResponseMeta {
-                                      http_method: "".to_string(),
-                                      http_path: path.clone(),
-                                      http_query_params: "".to_string(),
-                                      http_body: client_msg.to_json(),
-                                      http_response_code,
-                                      error_msg: Some(e.to_string()),
-                                      trace_id: Some(trace_id.to_string()),
-                                  },
-                              })
-                              .await;
-                        }
+
                     }
                 }
             }
