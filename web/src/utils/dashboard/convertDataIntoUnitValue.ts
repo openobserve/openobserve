@@ -1126,8 +1126,8 @@ export function buildSQLJoinsFromInput(
     const { stream, streamAlias, joinType, conditions } = join;
 
     if (!stream || !joinType || !conditions || conditions.length === 0) {
-      // Invalid join, return empty string
-      return "";
+      // Invalid join, skip it and continue to the next one
+      continue;
     }
 
     let joinConditionStrings: string[] = [];
@@ -1136,8 +1136,8 @@ export function buildSQLJoinsFromInput(
       const { leftField, rightField, operation, logicalOperator } = condition;
 
       if (!leftField?.field || !rightField?.field || !operation) {
-        // Invalid condition, return empty string
-        return "";
+        // Invalid condition, skip it and continue to the next one
+        continue;
       }
 
       const leftFieldStr = leftField.streamAlias
@@ -1153,6 +1153,11 @@ export function buildSQLJoinsFromInput(
       );
     }
 
+    // Skip joins with no valid conditions
+    if (joinConditionStrings.length === 0) {
+      continue;
+    }
+
     // Combine conditions with logical operators (e.g., AND, OR)
     const joinConditionsSQL = joinConditionStrings.join(" AND ");
 
@@ -1160,6 +1165,11 @@ export function buildSQLJoinsFromInput(
     joinClauses.push(
       `${joinType.toUpperCase()} JOIN "${stream}" AS ${streamAlias ?? defaultStream} ON ${joinConditionsSQL}`,
     );
+  }
+
+  // Only return empty string if there are no valid joins after processing
+  if (joinClauses.length === 0) {
+    return "";
   }
 
   return joinClauses.join(" ");
