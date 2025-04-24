@@ -102,7 +102,14 @@ async fn can_use_distinct_stream(
 
     // all the fields used in the query sent must be in the distinct stream
     #[allow(deprecated)]
-    let query_fields: Vec<String> = match crate::service::search::sql::Sql::new(&(query.clone().into()), org, stream_type, None).await {
+    let query_fields: Vec<String> = match crate::service::search::sql::Sql::new(
+        &(query.clone().into()),
+        org,
+        stream_type,
+        None,
+    )
+    .await
+    {
         // if sql is invalid, we let it follow the original search and fail
         Err(_) => return false,
         Ok(sql) => {
@@ -113,10 +120,9 @@ async fn can_use_distinct_stream(
             if sql.match_items.is_some() {
                 return false;
             }
-            sql.columns.values().cloned().flatten().collect()
+            sql.columns.values().flatten().cloned().collect()
         }
     };
-
 
     let all_query_fields_distinct = query_fields.iter().all(|f| {
         if DISTINCT_FIELDS.contains(f) {
@@ -982,8 +988,6 @@ async fn values_v1(
         (start_time, end_time)
     };
 
-
-
     let regions = query.get("regions").map_or(vec![], |regions| {
         regions
             .split(',')
@@ -1004,7 +1008,7 @@ async fn values_v1(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
-    
+
     // search
     let req_query = config::meta::search::Query {
         sql: query_sql,
