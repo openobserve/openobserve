@@ -26,10 +26,7 @@ use config::{
         sql::resolve_stream_names,
         stream::StreamType,
     },
-    utils::{
-        base64, json,
-        time::{BASE_TIME, now_micros},
-    },
+    utils::{base64, json, time::now_micros},
 };
 use hashbrown::HashMap;
 use tracing::{Instrument, Span};
@@ -52,6 +49,7 @@ use crate::{
         },
     },
     service::{
+        db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
         search as SearchService,
         self_reporting::{http_report_metrics, report_request_usage_stats},
@@ -716,7 +714,7 @@ pub async fn build_search_request_per_field(
     let no_count = req.no_count;
 
     let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
-        BASE_TIME.timestamp_micros()
+        enrichment_table::get_start_time(org_id, stream_name).await
     } else {
         req.start_time.unwrap_or(0)
     };
@@ -948,7 +946,7 @@ async fn values_v1(
 
     // EnrichmentTable need query without time range
     let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
-        BASE_TIME.timestamp_micros()
+        enrichment_table::get_start_time(org_id, stream_name).await
     } else {
         query
             .get("start_time")

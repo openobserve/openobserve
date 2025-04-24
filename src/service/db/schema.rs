@@ -135,6 +135,7 @@ pub async fn delete(
         // Since we are storing the current size of the table in bytes in the meta table,
         // when we delete enrichment table, we need to delete the size from the db as well.
         let _ = super::enrichment_table::delete_table_size(org_id, stream_name).await;
+        let _ = super::enrichment_table::delete_meta_table_stats(org_id, stream_name).await;
     }
 
     // super cluster
