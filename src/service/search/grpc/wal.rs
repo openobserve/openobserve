@@ -453,7 +453,7 @@ pub async fn search_memtable(
     }
 
     log::info!(
-        "[trace_id {}] wal->mem->search: adapt_batch_time {}, merge_batch_time {}, create_memtable_time {}",
+        "[trace_id {}] wal->mem->search: adapt_batch_time {} ms, merge_batch_time {} ms, create_memtable_time {} ms",
         query.trace_id,
         adapt_batch_time,
         merge_batch_time,
