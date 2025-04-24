@@ -137,7 +137,8 @@ pub async fn delete(
         if let Err(e) = super::enrichment_table::delete_table_size(org_id, stream_name).await {
             log::error!("Failed to delete table size: {}", e);
         }
-        if let Err(e) = super::enrichment_table::delete_meta_table_stats(org_id, stream_name).await {
+        if let Err(e) = super::enrichment_table::delete_meta_table_stats(org_id, stream_name).await
+        {
             log::error!("Failed to delete meta table stats: {}", e);
         }
     }
