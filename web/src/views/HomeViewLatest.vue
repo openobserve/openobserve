@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row justify-between">
                   <div class="tile-title">{{ t("home.functionTitle") }}</div>
                   <div>
-                    <img :src="getImageURL('images/home/compressed_size.svg')" />
+                    <img :src="functionsIcon" />
                   </div>
                 </div>
               </div>
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row justify-between">
                   <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
                   <div>
-                    <img :src="getImageURL('images/home/compressed_size.svg')" />
+                    <img :src="dashboardsIcon" />
                   </div>
                 </div>
               </div>
@@ -589,6 +589,17 @@ const streamsIcon = computed(() => {
   return getImageURL(icon);
 });
 
+const functionsIcon = computed(() => {
+  const icon = store.state.theme === 'dark' ? 'images/home/function_dark.svg' : 'images/home/function.svg';
+  return getImageURL(icon);
+});
+
+const dashboardsIcon = computed(() => {
+  const icon = store.state.theme === 'dark' ? 'images/home/dashboard_dark.svg' : 'images/home/dashboard.svg';
+  return getImageURL(icon);
+});
+
+
 
 
 
@@ -610,6 +621,8 @@ const streamsIcon = computed(() => {
       indexSizeIcon,
       recordsIcon,
       streamsIcon,
+      functionsIcon,
+      dashboardsIcon,
       isLoadingSummary,
     };
   },
