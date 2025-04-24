@@ -101,7 +101,7 @@ pub mod sessions_cache_utils {
     use tokio::sync::RwLock;
 
     use crate::{
-        common::infra::config::WS_SESSIONS, handler::http::request::ws_v2::session::WsSession,
+        common::infra::config::WS_SESSIONS, handler::http::request::ws::session::WsSession,
     };
 
     pub async fn run_gc_ws_sessions() {
@@ -219,13 +219,17 @@ pub mod sessions_cache_utils {
     /// Check if a session exists in the cache
     pub async fn contains_session(session_id: &str) -> bool {
         let r = WS_SESSIONS.read().await;
-        r.contains_key(session_id)
+        let res = r.contains_key(session_id);
+        drop(r);
+        res
     }
 
     /// Get the number of sessions in the cache
     pub async fn len_sessions() -> usize {
         let r = WS_SESSIONS.read().await;
-        r.len()
+        let res = r.len();
+        drop(r);
+        res
     }
 }
 

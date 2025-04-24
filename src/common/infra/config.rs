@@ -40,7 +40,7 @@ use crate::{
     common::meta::{
         maxmind::MaxmindClient, organization::OrganizationSetting, syslog::SyslogRoute, user::User,
     },
-    handler::http::request::ws_v2::session::WsSession,
+    handler::http::request::ws::session::WsSession,
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
         pipeline::batch_execution::ExecutablePipeline,
