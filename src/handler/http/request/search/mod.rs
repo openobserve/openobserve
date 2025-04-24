@@ -74,6 +74,7 @@ async fn can_use_distinct_stream(
     fields: &[String],
     query_sql: &str,
     start_time: i64,
+    where_str: &str,
 ) -> bool {
     if !matches!(stream_type, StreamType::Logs | StreamType::Traces) {
         return false;
@@ -111,6 +112,22 @@ async fn can_use_distinct_stream(
             .filter(|f| f != "_timestamp")// _timestamp is hardcoded in queries
             .collect(),
     };
+
+    use crate::service::search::datafusion::udf::match_all_udf::{
+        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
+        MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME,
+    };
+    // check if sql contains any filters from which field cannot be inferred.
+    // where clause can contain match_all and a valid field which is in distinct stream
+    // but since there is match_all, we cannot infer the field from the where clause
+    // so we need to return false
+    if where_str.contains(FUZZY_MATCH_ALL_UDF_NAME)
+        || where_str.contains(MATCH_ALL_UDF_NAME)
+        || where_str.contains(MATCH_ALL_RAW_UDF_NAME)
+        || where_str.contains(MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME)
+    {
+        return false;
+    }
 
     let all_query_fields_distinct = query_fields.iter().all(|f| {
         if DISTINCT_FIELDS.contains(f) {
@@ -766,6 +783,7 @@ pub async fn build_search_request_per_field(
                         &fields,
                         &sql,
                         start_time,
+                        &sql_where_from_query,
                     )
                     .await;
                     (sql_where_from_query, can_use_distinct_stream)
@@ -797,6 +815,7 @@ pub async fn build_search_request_per_field(
                     &fields,
                     &format!("{} {}", default_sql, sql_where),
                     start_time,
+                    &sql_where,
                 )
                 .await;
 
@@ -975,15 +994,16 @@ async fn values_v1(
     };
 
     // check if we can use the distinct stream for this query
-    let use_distinct_stream = can_use_distinct_stream(
+    let use_distinct_stream = dbg!(can_use_distinct_stream(
         org_id,
         stream_name,
         stream_type,
         &fields,
         &query_sql,
         start_time,
+        &where_str,
     )
-    .await;
+    .await);
 
     let regions = query.get("regions").map_or(vec![], |regions| {
         regions
