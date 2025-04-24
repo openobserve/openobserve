@@ -45,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Title row -->
                 <div class="row justify-between">
                   <div class="tile-title"> {{ t("home.totalDataCompressed") }}</div>
-                  <div>
-                    <img :src="getImageURL('images/home/compressed_size.svg')" />
+                  <div style="opacity: 0.8;">
+                    <img :src="compressedSizeIcon" />
                   </div>
                 </div>
 
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row justify-between">
                   <div class="tile-title"> {{ t("home.totalDataIngested") }}</div>
                   <div>
-                    <img :src="getImageURL('images/home/ingested_size.svg')" />
+                    <img :src="ingestedSizeIcon" />
                   </div>
                 </div>
 
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row justify-between">
                   <div class="tile-title">  {{ t("home.indexSizeLbl") }}</div>
                   <div>
-                    <img :src="getImageURL('images/home/index_size.svg')" />
+                    <img :src="indexSizeIcon" />
                   </div>
                 </div>
 
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row justify-between">
                   <div class="tile-title">   {{ t("home.docsCountLbl") }}</div>
                   <div>
-                    <img :src="getImageURL('images/home/records.svg')" />
+                    <img :src="recordsIcon" />
                   </div>
                 </div>
 
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row justify-between">
                   <div class="tile-title">   {{ t("home.streams") }}</div>
                   <div>
-                    <img height="32px" :src="getImageURL('images/home/streams.svg')" />
+                    <img height="32px" :src="streamsIcon" />
                   </div>
                 </div>
 
@@ -528,6 +528,34 @@ export default defineComponent({
       };
 });
 
+const compressedSizeIcon = computed(() => {
+  const icon = store.state.theme === 'dark' ? 'images/home/compressed_size_dark.svg' : 'images/home/compressed_size.svg';
+  return getImageURL(icon);
+});
+
+const ingestedSizeIcon = computed(() => {
+  const icon = store.state.theme === 'dark' ? 'images/home/ingested_size_dark.svg' : 'images/home/ingested_size.svg';
+  return getImageURL(icon);
+});
+
+const indexSizeIcon = computed(() => {
+  const icon = store.state.theme === 'dark' ? 'images/home/index_size_dark.svg' : 'images/home/index_size.svg';
+  return getImageURL(icon);
+});
+
+const recordsIcon = computed(() => {
+  const icon = store.state.theme === 'dark' ? 'images/home/records_dark.svg' : 'images/home/records.svg';
+  return getImageURL(icon);
+});
+
+const streamsIcon = computed(() => {
+  const icon = store.state.theme === 'dark' ? 'images/home/streams_dark.svg' : 'images/home/streams.svg';
+  return getImageURL(icon);
+});
+
+
+
+
 
 
     return {
@@ -541,6 +569,11 @@ export default defineComponent({
       panelData,
       panelData2,
       panelDataKey,
+      compressedSizeIcon,
+      ingestedSizeIcon,
+      indexSizeIcon,
+      recordsIcon,
+      streamsIcon,
     };
   },
   computed: {
