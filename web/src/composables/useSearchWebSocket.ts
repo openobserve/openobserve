@@ -60,10 +60,7 @@ const useSearchWebSocket = () => {
   const onMessage = (response: any) => {
     if (response.type === "end") {
       socketFailureCount.value = 0;
-      traces[response.content.trace_id]?.close?.forEach((handler: any) =>
-        handler(response),
-      );
-      cleanUpListeners(response.content.trace_id);
+      closeSearchTrace(response.content.trace_id, response);
       return;
     }
 
@@ -100,16 +97,15 @@ const useSearchWebSocket = () => {
               type: "close",
               code: 1000,
             }));
-            traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data));
-            cleanUpListeners(traceId);        
+
+            closeSearchTrace(traceId, traces[traceId].data);      
           }
         });
       }, 1000);
     } else {
       Object.keys(traces).forEach((traceId) => {
         if((traces[traceId].socketId === _socketId) && traces[traceId].isInitiated) {
-          traces[traceId]?.close.forEach((handler: any) => handler(response));
-          cleanUpListeners(traceId);
+            closeSearchTrace(traceId, response);
         }
       });
     }
@@ -123,10 +119,9 @@ const useSearchWebSocket = () => {
               if(canceledTraceIds.has(response.content.trace_id)) {
                 // Don't retry the search
                 // clean up listeners will be called on cancel query response
-                traces[response.content.trace_id]?.close.forEach((handler: any) => handler({
+                closeSearchTrace(response.content.trace_id, {
                   code: response.code,
-                }));
-                cleanUpListeners(response.content.trace_id);
+                });
                 return;
               }
               retryActiveTrace(response.content.trace_id, response);
@@ -161,12 +156,11 @@ const useSearchWebSocket = () => {
         return;     
       }
     }
-    // closeDrainingSocket();
 
     traces[response.content.trace_id]?.error?.forEach((handler: any) =>
       handler(response),
     );
-    // cleanUpListeners(response.traceId)
+    closeSearchTrace(response.content.trace_id, response);
   };
   // const closeDrainingSocket = () => {
   //   const areAllTraceIdsActive = Object.keys(traces).every((traceId) => traces[traceId].isActive);
@@ -362,6 +356,11 @@ const useSearchWebSocket = () => {
     traces[traceId]?.close.forEach((handler: any) => handler(response));
     traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data, traceId));
     cleanUpListeners(traceId);   
+  }
+
+  const closeSearchTrace = (traceId: string, response: any) => {
+    traces[traceId]?.close?.forEach((handler: any) => handler(response));
+    cleanUpListeners(traceId);
   }
 
   const resetAuthToken = async () => {
