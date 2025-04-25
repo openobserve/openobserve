@@ -1120,6 +1120,13 @@ impl std::fmt::Display for Operator {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EnrichmentTableMetaStreamStats {
+    pub start_time: i64,
+    pub end_time: i64,
+    pub size: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
