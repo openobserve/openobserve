@@ -44,7 +44,7 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const list = ref([]);
+    const list = ref<any>([]);
     let timeoutId: ReturnType<typeof setTimeout>;
     //this function is used to get the keywords from the query string
     //which matches match_all(string) , fuzzy_match_all(string)
