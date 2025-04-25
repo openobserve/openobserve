@@ -64,6 +64,8 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await dateTimeHelper.setRelativeTimeRange("6-w");
 
+    await dashboardPageActions.applyDashboardBtn();
+
     await dashboardPageActions.waitForChartToRender();
 
     await page
