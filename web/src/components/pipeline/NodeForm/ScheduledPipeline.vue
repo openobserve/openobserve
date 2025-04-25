@@ -854,8 +854,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Note: The period should be the same as frequency.
                   </div>
+                  
+
+
           
               </div>
+              <div class="flex items-center q-mr-sm q-mt-lg">
+                <div
+                  data-test="scheduled-pipeline-delay-title"
+                  class="text-bold flex items-center q-pb-sm"
+                  style="width: 130px"
+                >
+                  {{ t("pipeline.delay") + " *" }}
+                  <q-icon
+                    :name="outlinedInfo"
+                    size="17px"
+                    class="q-ml-xs cursor-pointer"
+                    :class="
+                      store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                    "
+                  >
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                    >
+                      <span style="font-size: 14px"
+                        >Delay for which the pipeline is scheduled to run.<br />
+                        e.g. 10 minutes delay means that the pipeline will run 10 minutes after its scheduled time.</span 
+                      >
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <div style="min-height: 58px">
+                  <div
+                    class="flex items-center q-mr-sm"
+                    style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
+                  >
+                    <div
+                      data-test="scheduled-pipeline-delay-input"
+                      style="width: 87px; margin-left: 0 !important"
+                      class="silence-notification-input"
+                    >
+                      <q-input
+                        v-model="delayCondition"
+                        type="number"
+                        dense
+                        filled
+                        min="0"
+                        style="background: none"
+                        @update:model-value="updateDelay"
+                      />
+                    </div>
+                    <div
+                      data-test="scheduled-pipeline-delay-unit"
+                      style="
+                        min-width: 90px;
+                        margin-left: 0 !important;
+                        height: 40px;
+                        font-weight: normal;
+                      "
+                      :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+                      class="flex justify-center items-center"
+                    >
+                      {{ t("alerts.minutes") }}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              </div>
+
+              <div>
+                
               </div>
 
                 <div
@@ -1115,7 +1187,8 @@ const props = defineProps([
   "disableQueryTypeSelection",
   "showTimezoneWarning",
   "streamType",
-  "validatingSqlQuery"
+  "validatingSqlQuery",
+  "delay"
 ]);
 
 const emits = defineEmits([
@@ -1139,6 +1212,7 @@ const emits = defineEmits([
   "delete:node",
   "update:fullscreen",
   "update:stream_type",
+  "update:delay"
 ]);
 const {  pipelineObj } = useDragAndDrop();
 const { searchObj } = useLogs();
@@ -1197,6 +1271,8 @@ const getColumns = computed(() => {
 
 
 
+
+
 const { t } = useI18n();
 
 const triggerData = ref(props.trigger);
@@ -1204,6 +1280,8 @@ const triggerData = ref(props.trigger);
 const query = ref(props.sql);
 
 const promqlQuery = ref(props.promql);
+
+const delayCondition = ref(props.delay);
 
 const tab = ref(props.query_type || "custom");
 const stream_type = ref(props.streamType || "logs");
@@ -1977,6 +2055,10 @@ const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   );
 };
 
+const updateDelay = (val: any) => {
+  emits("update:delay",val)
+}
+
 defineExpose({
   tab,
   validateInputs,
@@ -2006,6 +2088,8 @@ defineExpose({
   expandedLogs,
   copyLogToClipboard,
   copyToClipboard,
+  updateDelay,
+  delayCondition
 });
 
 </script>

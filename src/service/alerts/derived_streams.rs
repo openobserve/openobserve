@@ -143,7 +143,7 @@ pub async fn save(
     }
 
     // Save the trigger to db
-    let next_run_at = Utc::now().timestamp_micros();
+    let next_run_at = get_next_run_at(&derived_stream)?;
     let trigger = db::scheduler::Trigger {
         org: derived_stream.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
@@ -219,4 +219,20 @@ impl DerivedStreamExt for DerivedStream {
             )
             .await
     }
+}
+
+pub(super) fn get_next_run_at(derived_stream: &DerivedStream) -> Result<i64, anyhow::Error> {
+    let delay_in_mins = derived_stream.delay.unwrap_or_default();
+    // validate & parse delay value
+    if delay_in_mins < 0 {
+        return Err(anyhow::anyhow!(
+            "Invalid delay value. Value must be non-negative"
+        ));
+    }
+
+    let delay = chrono::Duration::minutes(delay_in_mins as _);
+    Ok(chrono::Utc::now()
+        .checked_add_signed(delay)
+        .ok_or(anyhow::anyhow!("DateTime arithmetic overflow"))?
+        .timestamp_micros())
 }
