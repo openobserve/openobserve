@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-use config::get_config;
 use datafusion::{
     common::{
         tree_node::{
@@ -99,6 +98,7 @@ impl TreeNodeRewriter for AddSortAndLimit {
             }
             LogicalPlan::Limit(mut limit) => match limit.input.as_ref() {
                 LogicalPlan::Sort(_) => (Transformed::no(LogicalPlan::Limit(limit)), None),
+                LogicalPlan::Projection(_) => (Transformed::no(LogicalPlan::Limit(limit)), None),
                 _ => {
                     if is_complex {
                         (Transformed::no(LogicalPlan::Limit(limit)), None)
@@ -210,15 +210,15 @@ fn generate_sort_plan(
     input: Arc<LogicalPlan>,
     limit: usize,
 ) -> (LogicalPlan, Option<Arc<DFSchema>>) {
-    let config = get_config();
+    let cfg = config::get_config();
     let timestamp = SortExpr {
-        expr: col(config.common.column_timestamp.clone()),
+        expr: col(cfg.common.column_timestamp.clone()),
         asc: false,
         nulls_first: false,
     };
     let schema = input.schema().clone();
     if schema
-        .field_with_name(None, config.common.column_timestamp.as_str())
+        .field_with_name(None, cfg.common.column_timestamp.as_str())
         .is_err()
     {
         let mut input = input.as_ref().clone();
@@ -292,15 +292,17 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
     fn f_up(&mut self, node: LogicalPlan) -> Result<Transformed<LogicalPlan>> {
         let mut transformed = match node {
             LogicalPlan::TableScan(scan) => {
+                let cfg = config::get_config();
                 let schema = scan.source.schema();
-                let timestamp_idx =
-                    schema.index_of(get_config().common.column_timestamp.as_str())?;
-                let mut projection = scan.projection.clone().unwrap();
-                projection.push(timestamp_idx);
+                let timestamp_idx = schema.index_of(cfg.common.column_timestamp.as_str())?;
+                let projection = scan.projection.clone().map(|mut p| {
+                    p.push(timestamp_idx);
+                    p
+                });
                 let mut table_scan = TableScan::try_new(
                     scan.table_name,
                     scan.source,
-                    Some(projection),
+                    projection,
                     scan.filters,
                     scan.fetch,
                 )?;

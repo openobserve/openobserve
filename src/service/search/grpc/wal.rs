@@ -391,6 +391,8 @@ pub async fn search_memtable(
     let mut adapt_batch_time = 0;
     let mut merge_batch_time = 0;
     let mut create_memtable_time = 0;
+    let schema_fields = schema_latest.fields().len();
+    let mut max_batch_fields = 0;
     let mut tables = Vec::new();
     for (schema, mut record_batches) in batch_groups {
         if record_batches.is_empty() {
@@ -418,6 +420,7 @@ pub async fn search_memtable(
             }
             group_size += batch.num_rows();
             current_group.push(batch);
+            tokio::task::coop::consume_budget().await;
         }
         if !current_group.is_empty() {
             merge_groupes.push(current_group);
@@ -426,7 +429,16 @@ pub async fn search_memtable(
             .into_iter()
             .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
             .collect::<Vec<_>>();
+        max_batch_fields = std::cmp::max(
+            max_batch_fields,
+            record_batches
+                .iter()
+                .map(|b| b.num_columns())
+                .max()
+                .unwrap_or(0),
+        );
         merge_batch_time += start_merge_batch.elapsed().as_millis();
+        tokio::task::coop::consume_budget().await;
 
         let start_create_memtable = std::time::Instant::now();
         let table = match NewMemTable::try_new(
@@ -453,11 +465,13 @@ pub async fn search_memtable(
     }
 
     log::info!(
-        "[trace_id {}] wal->mem->search: adapt_batch_time {} ms, merge_batch_time {} ms, create_memtable_time {} ms",
+        "[trace_id {}] wal->mem->search: adapt_batch_time {} ms, merge_batch_time {} ms, create_memtable_time {} ms, schema_fields {}, max_batch_fields {}",
         query.trace_id,
         adapt_batch_time,
         merge_batch_time,
-        create_memtable_time
+        create_memtable_time,
+        schema_fields,
+        max_batch_fields
     );
 
     Ok((tables, scan_stats))

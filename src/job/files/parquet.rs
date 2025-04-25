@@ -1327,8 +1327,7 @@ async fn prepare_index_record_batches(
             }
         }
 
-        // yield, this operation is time-consuming
-        tokio::task::yield_now().await;
+        tokio::task::coop::consume_budget().await;
     }
 
     // build record batch
@@ -1398,8 +1397,7 @@ async fn prepare_index_record_batches(
                 .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
                 indexed_record_batches_to_merge.push(record_batch);
 
-                // yield, this operation is time-consuming
-                tokio::task::yield_now().await;
+                tokio::task::coop::consume_budget().await;
             }
         }
     }
@@ -1573,9 +1571,8 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 };
                 for (i, doc) in docs.iter_mut().enumerate() {
                     doc.add_text(field, column_data.value(i));
+                    tokio::task::coop::consume_budget().await;
                 }
-                // yield, this operation is time-consuming
-                // tokio::task::yield_now().await;
             }
 
             tx.send(docs).await?;
@@ -1592,6 +1589,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 );
                 return Err(anyhow::anyhow!("Failed to add document to index: {}", e));
             }
+            tokio::task::coop::consume_budget().await;
         }
     }
     let total_num_rows = task.await??;
@@ -1601,13 +1599,16 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     }
     log::debug!("write documents to tantivy index success");
 
-    let index = index_writer.finalize().map_err(|e| {
-        log::error!(
-            "generate_tantivy_index: Failed to finalize the index writer: {}",
-            e
-        );
-        anyhow::anyhow!("Failed to finalize the index writer: {}", e)
-    })?;
+    let index = tokio::task::spawn_blocking(move || {
+        index_writer.finalize().map_err(|e| {
+            log::error!(
+                "generate_tantivy_index: Failed to finalize the index writer: {}",
+                e
+            );
+            anyhow::anyhow!("Failed to finalize the index writer: {}", e)
+        })
+    })
+    .await??;
 
     Ok(Some(index))
 }
