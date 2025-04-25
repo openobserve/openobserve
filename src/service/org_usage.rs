@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    ider,
+    META_ORG_ID, ider,
     meta::{
         search::{Query, Request, SearchEventType},
         self_reporting::usage::UsageEvent,
@@ -60,7 +60,7 @@ pub async fn get_org_usage(
         use_cache: None,
         local_mode: None,
     };
-    let resp = SearchService::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
+    let resp = SearchService::search(&trace_id, META_ORG_ID, StreamType::Logs, None, &req).await?;
 
     if resp.is_partial {
         return Err(billings::BillingError::PartialUsageResults(
