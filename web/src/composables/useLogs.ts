@@ -5557,7 +5557,7 @@ const useLogs = () => {
     // Any case where below logic may end in recursion
     if (payload.traceId) delete searchPartitionMap[payload.traceId];
 
-    if (searchObj.data.isOperationCancelled && !response?.content?.should_client_retry) {
+    if (searchObj.data.isOperationCancelled) {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
       searchObj.data.isOperationCancelled = false;
