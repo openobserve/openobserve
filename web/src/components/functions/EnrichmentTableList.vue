@@ -462,7 +462,7 @@ export default defineComponent({
               streamResponse.stats.doc_time_min &&
               streamResponse.stats.doc_time_max
             ) {
-              dateTime["from"] = streamResponse.stats.doc_time_min - 60000000;
+              dateTime["from"] = streamResponse.stats.doc_time_min - 1000000;
               dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
             } else if (streamResponse.stats.created_at) {
               // When enrichment table is uploaded, stats will not have doc_time_min and doc_time_max.
