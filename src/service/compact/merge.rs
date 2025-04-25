@@ -972,7 +972,9 @@ pub async fn merge_files(
 
             // upload file to storage
             let buf = Bytes::from(buf);
-            if cfg.cache_latest_files.cache_parquet {
+            if cfg.cache_latest_files.cache_parquet
+                && cfg.cache_latest_files.download_from_node_enabled
+            {
                 infra::cache::file_data::disk::set(
                     TRACE_ID_FOR_CACHE_LATEST_FILE,
                     &new_file_key,
@@ -1016,7 +1018,9 @@ pub async fn merge_files(
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
-                if cfg.cache_latest_files.cache_parquet {
+                if cfg.cache_latest_files.cache_parquet
+                    && cfg.cache_latest_files.download_from_node_enabled
+                {
                     infra::cache::file_data::disk::set(
                         TRACE_ID_FOR_CACHE_LATEST_FILE,
                         &new_file_key,

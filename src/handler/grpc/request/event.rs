@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::ops::Range;
+
 use anyhow::{Context, Result};
 use bytes::Bytes;
 use config::{
@@ -22,18 +24,16 @@ use config::{
     metrics,
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
-use infra::cache::file_data::TRACE_ID_FOR_CACHE_LATEST_FILE;
+use futures_util::StreamExt;
+use infra::cache::file_data::{TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
 use opentelemetry::global;
-use proto::{
-    cluster_rpc,
-    cluster_rpc::{
-        EmptyResponse, FileContent, FileContentResponse, FileList, event_client::EventClient,
-        event_server::Event,
-    },
+use proto::cluster_rpc::{
+    EmptyResponse, FileContent, FileContentResponse, FileList, SimpleFileList,
+    event_client::EventClient, event_server::Event,
 };
 use tonic::{
-    Request, Response, Status, codec::CompressionEncoding, metadata::MetadataValue,
-    transport::Channel,
+    Request, Response, Status, codec::CompressionEncoding, codegen::tokio_stream,
+    metadata::MetadataValue, transport::Channel,
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -41,8 +41,14 @@ use crate::handler::grpc::MetadataMap;
 
 pub struct Eventer;
 
+const DOWNLOAD_FROM_NODE_NOT_ENABLED: &str = "download from node not enabled";
+const CHUNK_SIZE: usize = 5 * 1024 * 1024; // 4MB chunks
+
 #[tonic::async_trait]
 impl Event for Eventer {
+    type GetFilesStream =
+        tokio_stream::wrappers::ReceiverStream<Result<FileContentResponse, Status>>;
+
     async fn send_file_list(
         &self,
         req: Request<FileList>,
@@ -67,8 +73,12 @@ impl Event for Eventer {
             for item in put_items.iter() {
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
-                    if let Err(e) = get_files_from_notifier(&grpc_addr, item).await {
-                        log::error!("Failed to get files from notifier: {}", e);
+                    log::info!("get_files_from_notifier: {grpc_addr}");
+                    if let Err(e) = get_files_from_notifier(&grpc_addr, &item.key).await {
+                        if e.to_string() != *DOWNLOAD_FROM_NODE_NOT_ENABLED {
+                            log::error!("Failed to get files from notifier: {}", e);
+                        };
+
                         if let Err(e) = infra::cache::file_data::download(
                             TRACE_ID_FOR_CACHE_LATEST_FILE,
                             &item.key,
@@ -83,9 +93,10 @@ impl Event for Eventer {
                 if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
                     if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
                     {
-                        let filekey = FileKey::from_file_name(&ttv_file);
-                        if let Err(e) = get_files_from_notifier(&grpc_addr, &filekey).await {
-                            log::error!("Failed to get files from notifier: {}", e);
+                        if let Err(e) = get_files_from_notifier(&grpc_addr, &ttv_file).await {
+                            if e.to_string() != *DOWNLOAD_FROM_NODE_NOT_ENABLED {
+                                log::error!("Failed to get files from notifier: {}", e);
+                            };
                             if let Err(e) = infra::cache::file_data::download(
                                 TRACE_ID_FOR_CACHE_LATEST_FILE,
                                 &ttv_file,
@@ -145,62 +156,97 @@ impl Event for Eventer {
 
     async fn get_files(
         &self,
-        request: Request<FileList>,
-    ) -> Result<Response<FileContentResponse>, Status> {
+        request: Request<SimpleFileList>,
+    ) -> Result<Response<Self::GetFilesStream>, Status> {
         let file_list = request.into_inner();
-        let mut entries = Vec::new();
-        let mut errors = Vec::new();
+        let (tx, rx) = tokio::sync::mpsc::channel(32);
 
-        for file_key in file_list.items {
-            match handle_file(&file_key.key).await {
-                Ok(content) => {
-                    entries.push(content);
-                }
-                Err(e) => {
-                    log::error!("Failed to retrieve file {}: {}", file_key.key, e);
-                    errors.push((file_key.key, e));
+        // Spawn a task to handle the streaming
+        tokio::spawn(async move {
+            for path in file_list.paths.iter() {
+                log::info!("handle_file_chunked: {}", path);
+                if let Err(e) = handle_file_chunked(path, tx.clone()).await {
+                    log::error!("Failed to handle file {}: {}", path, e);
+                    break;
                 }
             }
-        }
+        });
 
-        // If we have any errors, return them in a single status
-        if !errors.is_empty() {
-            let error_msg = errors
-                .into_iter()
-                .map(|(file, err)| format!("{}: {}", file, err))
-                .collect::<Vec<_>>()
-                .join("; ");
-            return Err(Status::internal(error_msg));
-        }
-
-        Ok(Response::new(FileContentResponse { entries }))
+        Ok(Response::new(tokio_stream::wrappers::ReceiverStream::new(
+            rx,
+        )))
     }
 }
 
-async fn handle_file(path: &str) -> Result<FileContent, Status> {
+async fn handle_file_chunked(
+    path: &str,
+    tx: tokio::sync::mpsc::Sender<Result<FileContentResponse, Status>>,
+) -> Result<(), Status> {
     let start = std::time::Instant::now();
+    let filename = path.to_string();
+    let mut offset = 0usize;
+    let total_size = disk::get_size(path).await.unwrap_or(0);
 
-    let file_data = match infra::cache::file_data::disk::get(path, None).await {
-        Some(file_data) => file_data,
-        None => return Err(Status::not_found(path)),
-    };
+    while offset < total_size as usize {
+        let chunk_size = std::cmp::min(CHUNK_SIZE, total_size - offset);
+        log::debug!(
+            "handle_file_chunked {} offset: {}, chunk_size: {}",
+            filename,
+            offset,
+            chunk_size
+        );
 
-    // Create the FileContent response
-    let content = FileContent {
-        content: file_data.to_vec(),
-        filename: path.to_string(),
-    };
+        let chunk = match infra::cache::file_data::disk::get(
+            path,
+            Some(Range {
+                start: offset,
+                end: offset + chunk_size,
+            }),
+        )
+        .await
+        {
+            Some(file_data) => file_data,
+            None => {
+                if let Err(e) = tx.send(Err(Status::not_found(path))).await {
+                    log::error!("Failed to send error: {}", e);
+                }
+                return Err(Status::not_found(path));
+            }
+        };
+
+        let response = FileContentResponse {
+            entries: vec![FileContent {
+                content: chunk.to_vec(),
+                filename: filename.clone(),
+            }],
+        };
+
+        if let Err(e) = tx.send(Ok(response)).await {
+            log::error!("Failed to send file chunk: {}", e);
+            return Err(Status::internal("Failed to send file chunk"));
+        }
+
+        offset += chunk_size;
+    }
 
     log::info!(
-        "handle file:{path} elapsed: {}",
+        "handle file:{}, total_size: {}, offset: {} elapsed: {}ms",
+        path,
+        total_size,
+        offset,
         start.elapsed().as_millis()
     );
 
-    Ok(content)
+    Ok(())
 }
-// filekey: files/default/logs/pipeline/2025/04/23/04/7320670336138084366.parquet
-async fn get_files_from_notifier(addr: &str, filekey: &FileKey) -> Result<()> {
+
+async fn get_files_from_notifier(addr: &str, filekey: &str) -> Result<()> {
+    if !get_config().cache_latest_files.download_from_node_enabled {
+        return Err(anyhow::anyhow!(DOWNLOAD_FROM_NODE_NOT_ENABLED));
+    }
+
     let start = std::time::Instant::now();
+    log::debug!("get_files_from_notifier start, file: {}", filekey);
     let token: MetadataValue<_> = get_internal_grpc_token()
         .parse()
         .map_err(|_| anyhow::anyhow!("Invalid token"))?;
@@ -218,10 +264,8 @@ async fn get_files_from_notifier(addr: &str, filekey: &FileKey) -> Result<()> {
         Ok(req)
     });
 
-    let key = filekey.key.clone();
-    let mut request = Request::new(FileList {
-        items: vec![cluster_rpc::FileKey::from(filekey)],
-        node_addr: LOCAL_NODE.grpc_addr.clone(),
+    let mut request = Request::new(SimpleFileList {
+        paths: vec![filekey.to_string()],
     });
     request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
@@ -232,28 +276,40 @@ async fn get_files_from_notifier(addr: &str, filekey: &FileKey) -> Result<()> {
         .max_encoding_message_size(250 * 1024 * 1024)
         .get_files(request)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to get file: {key} from {addr}, {e}"))?;
+        .map_err(|e| anyhow::anyhow!("Failed to get file: {filekey} from {addr}, {e}"))?;
 
-    let response_data = response.into_inner();
-    let file = response_data
-        .entries
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("No file content returned from {}", addr))?;
+    let mut response_stream = response.into_inner();
+    let mut file_content = Vec::new();
+
+    while let Some(response) = response_stream.next().await {
+        let response =
+            response.map_err(|e| anyhow::anyhow!("Failed to receive file chunk: {}", e))?;
+        if let Some(content) = response.entries.first() {
+            file_content.extend_from_slice(&content.content);
+        }
+    }
+
+    if file_content.is_empty() {
+        return Err(anyhow::anyhow!(
+            "No file: {} content returned from {}",
+            filekey,
+            addr
+        ));
+    }
 
     let time = start.elapsed().as_millis();
     log::info!(
         "Successfully retrieved file:{} from {} in {}ms",
-        file.filename,
+        filekey,
         addr,
         time
     );
 
     // Cache the file content
-    let bytes = Bytes::from(file.content.clone());
-    match infra::cache::file_data::set(TRACE_ID_FOR_CACHE_LATEST_FILE, &file.filename, bytes).await
-    {
+    let bytes = Bytes::from(file_content);
+    match infra::cache::file_data::set(TRACE_ID_FOR_CACHE_LATEST_FILE, filekey, bytes).await {
         Ok(res) => {
-            log::info!("file:{} infra cache set successfully", file.filename);
+            log::info!("file:{} infra cache set successfully", filekey);
             Ok(res)
         }
         Err(e) => Err(e),

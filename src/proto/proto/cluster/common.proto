@@ -65,3 +65,7 @@ message FileContent {
     bytes content = 1;  // The actual parquet file content
     string filename = 2;  // The name of the file
 }
+
+message SimpleFileList {
+    repeated string paths = 1;
+}

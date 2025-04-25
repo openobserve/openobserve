@@ -120,6 +120,12 @@ pub struct FileContent {
     #[prost(string, tag = "2")]
     pub filename: ::prost::alloc::string::String,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleFileList {
+    #[prost(string, repeated, tag = "1")]
+    pub paths: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
 /// Generated client implementations.
 pub mod event_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -229,9 +235,9 @@ pub mod event_client {
         }
         pub async fn get_files(
             &mut self,
-            request: impl tonic::IntoRequest<super::FileList>,
+            request: impl tonic::IntoRequest<super::SimpleFileList>,
         ) -> std::result::Result<
-            tonic::Response<super::FileContentResponse>,
+            tonic::Response<tonic::codec::Streaming<super::FileContentResponse>>,
             tonic::Status,
         > {
             self.inner
@@ -247,7 +253,7 @@ pub mod event_client {
             let path = http::uri::PathAndQuery::from_static("/cluster.Event/GetFiles");
             let mut req = request.into_request();
             req.extensions_mut().insert(GrpcMethod::new("cluster.Event", "GetFiles"));
-            self.inner.unary(req, path, codec).await
+            self.inner.server_streaming(req, path, codec).await
         }
     }
 }
@@ -262,13 +268,16 @@ pub mod event_server {
             &self,
             request: tonic::Request<super::FileList>,
         ) -> std::result::Result<tonic::Response<super::EmptyResponse>, tonic::Status>;
+        /// Server streaming response type for the GetFiles method.
+        type GetFilesStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::FileContentResponse, tonic::Status>,
+            >
+            + Send
+            + 'static;
         async fn get_files(
             &self,
-            request: tonic::Request<super::FileList>,
-        ) -> std::result::Result<
-            tonic::Response<super::FileContentResponse>,
-            tonic::Status,
-        >;
+            request: tonic::Request<super::SimpleFileList>,
+        ) -> std::result::Result<tonic::Response<Self::GetFilesStream>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct EventServer<T: Event> {
@@ -396,16 +405,19 @@ pub mod event_server {
                 "/cluster.Event/GetFiles" => {
                     #[allow(non_camel_case_types)]
                     struct GetFilesSvc<T: Event>(pub Arc<T>);
-                    impl<T: Event> tonic::server::UnaryService<super::FileList>
+                    impl<
+                        T: Event,
+                    > tonic::server::ServerStreamingService<super::SimpleFileList>
                     for GetFilesSvc<T> {
                         type Response = super::FileContentResponse;
+                        type ResponseStream = T::GetFilesStream;
                         type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
+                            tonic::Response<Self::ResponseStream>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::FileList>,
+                            request: tonic::Request<super::SimpleFileList>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
@@ -432,7 +444,7 @@ pub mod event_server {
                                 max_decoding_message_size,
                                 max_encoding_message_size,
                             );
-                        let res = grpc.unary(method, req).await;
+                        let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
