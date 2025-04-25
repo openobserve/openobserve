@@ -264,9 +264,7 @@ impl ConditionList {
                 }
                 max_child_depth + 1
             }
-            ConditionList::LegacyConditions(_) => {
-                1
-            }
+            ConditionList::LegacyConditions(_) => 1,
             ConditionList::AndNode { and } => {
                 let mut max_child_depth = 0;
                 for child in and {
@@ -310,7 +308,10 @@ impl IntoIterator for ConditionList {
         let inner = match self {
             ConditionList::OrNode { or } => or,
             ConditionList::AndNode { and } => and,
-            ConditionList::LegacyConditions(conditions) => conditions.into_iter().map(ConditionList::EndCondition).collect(),
+            ConditionList::LegacyConditions(conditions) => conditions
+                .into_iter()
+                .map(ConditionList::EndCondition)
+                .collect(),
             ConditionList::NotNode { not } => vec![*not],
             ConditionList::EndCondition(condition) => vec![ConditionList::EndCondition(condition)],
         };
@@ -636,64 +637,56 @@ mod test {
         let test_cases = vec![
             (
                 r#"[{"value": "10", "column": "e2e", "operator": "=", "ignore_case": false}]"#,
-                ConditionList::LegacyConditions(vec![
-                    Condition {
-                        column: "e2e".into(),
-                        operator: Operator::EqualTo,
-                        value: Value::String("10".into()),
-                        ignore_case: false,
-                    },
-                ])
+                ConditionList::LegacyConditions(vec![Condition {
+                    column: "e2e".into(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("10".into()),
+                    ignore_case: false,
+                }]),
             ),
             (
                 r#"[{"value": "monitor", "column": "k8s_namespace_name", "operator": "not_contains", "ignore_case": false}]"#,
-                ConditionList::LegacyConditions(vec![
-                    Condition {
-                        column: "k8s_namespace_name".into(),
-                        operator: Operator::NotContains,
-                        value: Value::String("monitor".into()),
-                        ignore_case: false,
-                    },
-                ])
+                ConditionList::LegacyConditions(vec![Condition {
+                    column: "k8s_namespace_name".into(),
+                    operator: Operator::NotContains,
+                    value: Value::String("monitor".into()),
+                    ignore_case: false,
+                }]),
             ),
             (
                 r#"[{"value": "something", "column": "body", "operator": "contains", "ignore_case": false}]"#,
-                ConditionList::LegacyConditions(vec![
-                    Condition {
-                        column: "body".into(),
-                        operator: Operator::Contains,
-                        value: Value::String("something".into()),
-                        ignore_case: false,
-                    },
-                ])
+                ConditionList::LegacyConditions(vec![Condition {
+                    column: "body".into(),
+                    operator: Operator::Contains,
+                    value: Value::String("something".into()),
+                    ignore_case: false,
+                }]),
             ),
             (
                 r#"[{"value": "error", "column": "level", "operator": "=", "ignore_case": false}]"#,
-                ConditionList::LegacyConditions(vec![
-                    Condition {
-                        column: "level".into(),
-                        operator: Operator::EqualTo,
-                        value: Value::String("error".into()),
-                        ignore_case: false,
-                    },
-                ])
+                ConditionList::LegacyConditions(vec![Condition {
+                    column: "level".into(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".into()),
+                    ignore_case: false,
+                }]),
             ),
-            (
-                r#"[]"#,
-                ConditionList::LegacyConditions(vec![])
-            )
+            (r#"[]"#, ConditionList::LegacyConditions(vec![])),
         ];
-        
+
         for (json, expected) in test_cases {
             println!("Testing: {}", json);
             let deserialized: ConditionList = serde_json::from_str(json).unwrap_or_else(|e| {
                 panic!("Failed to deserialize '{}': {}", json, e);
             });
-            
+
             // Use pattern matching to verify enum variant
-            assert!(matches!(deserialized, ConditionList::LegacyConditions(_)), 
-                "Expected LegacyConditions variant for '{}'", json);
-            
+            assert!(
+                matches!(deserialized, ConditionList::LegacyConditions(_)),
+                "Expected LegacyConditions variant for '{}'",
+                json
+            );
+
             // Then verify equality with the expected value
             assert_eq!(deserialized, expected, "Value mismatch for '{}'", json);
         }

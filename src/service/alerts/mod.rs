@@ -14,15 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use alert::to_float;
-use arrow_schema::DataType;
+use arrow_schema::{DataType, Schema};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
         alerts::{
-            AggFunction, Condition, ConditionList, Operator, QueryCondition, QueryType, TriggerCondition,
-            TriggerEvalResults,
+            AggFunction, Condition, ConditionList, Operator, QueryCondition, QueryType,
+            TriggerCondition, TriggerEvalResults,
         },
         cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
@@ -506,9 +506,7 @@ impl ConditionListExt for ConditionList {
             }
             ConditionList::NotNode { not: inner } => inner.len().await,
             ConditionList::EndCondition(_) => 1,
-            ConditionList::LegacyConditions(conditions) => {
-                conditions.len() as u32
-            }
+            ConditionList::LegacyConditions(conditions) => conditions.len() as u32,
         }
     }
 
@@ -576,9 +574,7 @@ impl ConditionListExt for ConditionList {
                 true
             }
             ConditionList::NotNode { not: inner } => inner.is_empty().await,
-            ConditionList::LegacyConditions(conditions) => {
-                conditions.is_empty()
-            }
+            ConditionList::LegacyConditions(conditions) => conditions.is_empty(),
             ConditionList::EndCondition(_) => false,
         }
     }
