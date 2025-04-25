@@ -14,6 +14,10 @@ export default class DateTimeHelper {
     // Minutes= m	Hours= h	Days= d	Weeks= w	Months= M
     await this.applyQueryBtn.click();
     await this.timePickerBtn.click();
+    await this.page.waitForSelector(
+      `[data-test="date-time-relative-${rangeCode}-btn"]:not([disabled])`,
+      { timeout: 15000 }
+    );
     await this.page
       .locator(`[data-test="date-time-relative-${rangeCode}-btn"]`)
       .click();
