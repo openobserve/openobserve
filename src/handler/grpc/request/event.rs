@@ -149,6 +149,7 @@ impl Event for Eventer {
     ) -> Result<Response<FileContentResponse>, Status> {
         let file_list = request.into_inner();
         let mut entries = Vec::new();
+        let mut errors = Vec::new();
 
         for file_key in file_list.items {
             match handle_file(&file_key.key).await {
@@ -157,9 +158,19 @@ impl Event for Eventer {
                 }
                 Err(e) => {
                     log::error!("Failed to retrieve file {}: {}", file_key.key, e);
-                    return Err(e);
+                    errors.push((file_key.key, e));
                 }
             }
+        }
+
+        // If we have any errors, return them in a single status
+        if !errors.is_empty() {
+            let error_msg = errors
+                .into_iter()
+                .map(|(file, err)| format!("{}: {}", file, err))
+                .collect::<Vec<_>>()
+                .join("; ");
+            return Err(Status::internal(error_msg));
         }
 
         Ok(Response::new(FileContentResponse { entries }))
@@ -181,7 +192,7 @@ async fn handle_file(path: &str) -> Result<FileContent, Status> {
     };
 
     log::info!(
-        "handle file:{path} elasped: {}",
+        "handle file:{path} elapsed: {}",
         start.elapsed().as_millis()
     );
 
