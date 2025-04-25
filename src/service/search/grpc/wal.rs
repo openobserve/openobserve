@@ -449,16 +449,19 @@ pub async fn search_memtable(
 
     let mut tables = Vec::new();
     let start = std::time::Instant::now();
-    for (schema, mut record_batches) in batch_groups {
+    for (schema, record_batches) in batch_groups {
         if record_batches.is_empty() {
             continue;
         }
 
         let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
-
-        for batch in record_batches.iter_mut() {
-            *batch = adapt_batch(latest_schema.clone(), batch);
+        let mut adapt_batches = Vec::with_capacity(record_batches.len());
+        for batch in record_batches {
+            adapt_batches.push(adapt_batch(latest_schema.clone(), batch));
         }
+        let record_batches = adapt_batches;
+
+        tokio::task::coop::consume_budget().await;
 
         // merge small batches into big batches
         let mut merge_groupes = Vec::new();
@@ -481,6 +484,8 @@ pub async fn search_memtable(
             .into_iter()
             .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
             .collect::<Vec<_>>();
+
+        tokio::task::coop::consume_budget().await;
 
         let table = match NewMemTable::try_new(
             record_batches[0].schema().clone(),
@@ -638,7 +643,7 @@ async fn get_file_list(
     .await
 }
 
-pub fn adapt_batch(latest_schema: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
+pub fn adapt_batch(latest_schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
 
