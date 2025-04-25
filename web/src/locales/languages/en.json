@@ -495,7 +495,8 @@
     "export":"Export",
     "edit":"Edit",
     "delete":"Delete",
-    "view":"View"
+    "view":"View",
+    "delay":"Delay"
   },
   "function": {
     "header": "Functions",
