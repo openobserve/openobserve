@@ -23,7 +23,6 @@ use config::{
         sql::TableReferenceExt,
         stream::{FileKey, StreamType},
     },
-    utils::time::BASE_TIME,
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
@@ -39,25 +38,28 @@ use infra::{
 use proto::cluster_rpc::{KvItem, SearchQuery};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::search::{
-    cluster::flight::{
-        check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
-        partition_filt_list,
-    },
-    datafusion::{
-        distributed_plan::{
-            NewEmptyExecVisitor,
-            codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-            empty_exec::NewEmptyExec,
-            node::{RemoteScanNode, SearchInfos},
-            remote_scan::RemoteScanExec,
+use crate::service::{
+    db::enrichment_table,
+    search::{
+        cluster::flight::{
+            check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
+            partition_filt_list,
         },
-        exec::{prepare_datafusion_context, register_udf},
+        datafusion::{
+            distributed_plan::{
+                NewEmptyExecVisitor,
+                codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+                empty_exec::NewEmptyExec,
+                node::{RemoteScanNode, SearchInfos},
+                remote_scan::RemoteScanExec,
+            },
+            exec::{prepare_datafusion_context, register_udf},
+        },
+        generate_filter_from_equal_items,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        request::{FlightSearchRequest, Request},
+        utils::AsyncDefer,
     },
-    generate_filter_from_equal_items,
-    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    request::{FlightSearchRequest, Request},
-    utils::AsyncDefer,
 };
 
 /// in cluster search function only single stream take part in
@@ -311,7 +313,7 @@ pub async fn get_file_id_lists(
     // if stream is enrich, rewrite the time_range
     if let Some(schema) = stream.schema() {
         if schema == "enrich" || schema == "enrichment_tables" {
-            let start = BASE_TIME.timestamp_micros();
+            let start = enrichment_table::get_start_time(org_id, &stream_name).await;
             let end = config::utils::time::now_micros();
             time_range = Some((start, end));
         }
