@@ -41,6 +41,9 @@ const isInDrainMode = ref(false);
 
 const socketMeta = ref<{[key: string]: { isReadOnly: boolean, socketId: string }}>({})
 
+// Add a set to track canceled trace IDs
+const canceledTraceIds = new Set<string>();
+
 const useSearchWebSocket = () => {
   const store = useStore();
 
@@ -90,6 +93,13 @@ const useSearchWebSocket = () => {
       // console.log("shouldRetry", JSON.parse(JSON.stringify(traces)));
       setTimeout(() => {
         Object.keys(traces).forEach((traceId) => {
+          // Skip retrying if this trace ID was explicitly canceled
+          if(canceledTraceIds.has(traceId)) {
+            // Don't retry the search
+            // clean up listeners will be called on cancel query response
+            return;
+          }
+          
           if(((traces[traceId].socketId === _socketId) && traces[traceId].isInitiated) || !traces[traceId].socketId) {
             // Don't send error event when retry is happening
             traces[traceId]?.close.forEach((handler: any) => handler({
@@ -288,6 +298,9 @@ const useSearchWebSocket = () => {
     org_id: string;
   }) => {
     const _socketId = traces[payload.trace_id]?.socketId
+    
+    // Mark this trace ID as canceled to prevent retries
+    canceledTraceIds.add(payload.trace_id);
 
     const socket = webSocket.getWebSocketBasedOnSocketId(
       _socketId as string,
@@ -321,6 +334,9 @@ const useSearchWebSocket = () => {
     if (traces[traceId]) traces[traceId].open.length = 0;
 
     delete traces[traceId];
+    
+    // Remove from canceled set when cleaning up
+    canceledTraceIds.delete(traceId);
   };
 
   const closeSocketWithError = () => {
