@@ -41,6 +41,9 @@ const isInDrainMode = ref(false);
 
 const socketMeta = ref<{[key: string]: { isReadOnly: boolean, socketId: string }}>({})
 
+// Add a set to track canceled trace IDs
+const canceledTraceIds = new Set<string>();
+
 const useSearchWebSocket = () => {
   const store = useStore();
 
@@ -57,10 +60,7 @@ const useSearchWebSocket = () => {
   const onMessage = (response: any) => {
     if (response.type === "end") {
       socketFailureCount.value = 0;
-      traces[response.content.trace_id]?.close?.forEach((handler: any) =>
-        handler(response),
-      );
-      cleanUpListeners(response.content.trace_id);
+      closeSearchTrace(response.content.trace_id, response);
       return;
     }
 
@@ -97,16 +97,15 @@ const useSearchWebSocket = () => {
               type: "close",
               code: 1000,
             }));
-            traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data));
-            cleanUpListeners(traceId);        
+
+            closeSearchTrace(traceId, traces[traceId].data);      
           }
         });
       }, 1000);
     } else {
       Object.keys(traces).forEach((traceId) => {
         if((traces[traceId].socketId === _socketId) && traces[traceId].isInitiated) {
-          traces[traceId]?.close.forEach((handler: any) => handler(response));
-          cleanUpListeners(traceId);
+            closeSearchTrace(traceId, response);
         }
       });
     }
@@ -116,7 +115,16 @@ const useSearchWebSocket = () => {
     if(response.type === 'error'){
       if(response.content.should_client_retry && response.content.trace_id){
         setTimeout(() => {
-          retryActiveTrace(response.content.trace_id, response);
+              // Skip retrying if this trace ID was explicitly canceled
+              if(canceledTraceIds.has(response.content.trace_id)) {
+                // Don't retry the search
+                // clean up listeners will be called on cancel query response
+                closeSearchTrace(response.content.trace_id, {
+                  code: response.code,
+                });
+                return;
+              }
+              retryActiveTrace(response.content.trace_id, response);
         }, 300)
 
         return;
@@ -148,12 +156,11 @@ const useSearchWebSocket = () => {
         return;     
       }
     }
-    // closeDrainingSocket();
 
     traces[response.content.trace_id]?.error?.forEach((handler: any) =>
       handler(response),
     );
-    // cleanUpListeners(response.traceId)
+    closeSearchTrace(response.content.trace_id, response);
   };
   // const closeDrainingSocket = () => {
   //   const areAllTraceIdsActive = Object.keys(traces).every((traceId) => traces[traceId].isActive);
@@ -288,6 +295,9 @@ const useSearchWebSocket = () => {
     org_id: string;
   }) => {
     const _socketId = traces[payload.trace_id]?.socketId
+    
+    // Mark this trace ID as canceled to prevent retries
+    canceledTraceIds.add(payload.trace_id);
 
     const socket = webSocket.getWebSocketBasedOnSocketId(
       _socketId as string,
@@ -321,6 +331,9 @@ const useSearchWebSocket = () => {
     if (traces[traceId]) traces[traceId].open.length = 0;
 
     delete traces[traceId];
+    
+    // Remove from canceled set when cleaning up
+    canceledTraceIds.delete(traceId);
   };
 
   const closeSocketWithError = () => {
@@ -343,6 +356,11 @@ const useSearchWebSocket = () => {
     traces[traceId]?.close.forEach((handler: any) => handler(response));
     traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data, traceId));
     cleanUpListeners(traceId);   
+  }
+
+  const closeSearchTrace = (traceId: string, response: any) => {
+    traces[traceId]?.close?.forEach((handler: any) => handler(response));
+    cleanUpListeners(traceId);
   }
 
   const resetAuthToken = async () => {

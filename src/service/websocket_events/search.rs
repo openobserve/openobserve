@@ -292,7 +292,7 @@ pub async fn handle_search_request(
                         trace_id,
                         e
                     );
-                    Error::Message(e.to_string())
+                    e
                 })?;
         }
     } else {
