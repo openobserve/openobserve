@@ -123,6 +123,10 @@ const useSearchWebSocket = () => {
               if(canceledTraceIds.has(response.content.trace_id)) {
                 // Don't retry the search
                 // clean up listeners will be called on cancel query response
+                traces[response.content.trace_id]?.close.forEach((handler: any) => handler({
+                  code: response.code,
+                }));
+                cleanUpListeners(response.content.trace_id);
                 return;
               }
               retryActiveTrace(response.content.trace_id, response);
