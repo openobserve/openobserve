@@ -47,33 +47,33 @@ export default class ChartTypeSelector {
     await streamOption.click();
   }
 
-  // Search field and added for X, Y,Breakdown etc.
-  async searchAndAddField(fieldName, target) {
-    const searchInput = this.page.locator(
-      '[data-test="index-field-search-input"]'
-    );
-    await searchInput.click();
-    await searchInput.fill(fieldName);
+  // // Search field and added for X, Y,Breakdown etc.
+  // async searchAndAddField(fieldName, target) {
+  //   const searchInput = this.page.locator(
+  //     '[data-test="index-field-search-input"]'
+  //   );
+  //   await searchInput.click();
+  //   await searchInput.fill(fieldName);
 
-    const buttonSelectors = {
-      x: '[data-test="dashboard-add-x-data"]',
-      y: '[data-test="dashboard-add-y-data"]',
-      b: '[data-test="dashboard-add-b-data"]',
-      filter: '[data-test="dashboard-add-filter-data"]',
-      latitude: '[data-test="dashboard-add-latitude-data"]',
-      longitude: '[data-test="dashboard-add-longitude-data"]',
-      weight: '[data-test="dashboard-add-weight-data"]',
-      z: '[data-test="dashboard-add-z-data"]',
-    };
+  //   const buttonSelectors = {
+  //     x: '[data-test="dashboard-add-x-data"]',
+  //     y: '[data-test="dashboard-add-y-data"]',
+  //     b: '[data-test="dashboard-add-b-data"]',
+  //     filter: '[data-test="dashboard-add-filter-data"]',
+  //     latitude: '[data-test="dashboard-add-latitude-data"]',
+  //     longitude: '[data-test="dashboard-add-longitude-data"]',
+  //     weight: '[data-test="dashboard-add-weight-data"]',
+  //     z: '[data-test="dashboard-add-z-data"]',
+  //   };
 
-    const buttonSelector = buttonSelectors[target];
+  //   const buttonSelector = buttonSelectors[target];
 
-    if (!buttonSelector) {
-      throw new Error(`Invalid target type: ${target}`);
-    }
+  //   if (!buttonSelector) {
+  //     throw new Error(`Invalid target type: ${target}`);
+  //   }
 
-    await this.page.locator(buttonSelector).click();
-  }
+  //   await this.page.locator(buttonSelector).click();
+  // }
 
   // Add filter condition
   async addFilterCondition(initialFieldName, newFieldName, operator, value) {
@@ -137,5 +137,40 @@ export default class ChartTypeSelector {
         .first();
       await expect(errorMessageLocator).toBeVisible();
     }
+  }
+
+  async searchAndAddField(fieldName, target) {
+    const searchInput = this.page.locator(
+      '[data-test="index-field-search-input"]'
+    );
+    await searchInput.click();
+    await searchInput.fill(fieldName);
+
+    const buttonSelectors = {
+      x: "dashboard-add-x-data",
+      y: "dashboard-add-y-data",
+      b: "dashboard-add-b-data",
+      filter: "dashboard-add-filter-data",
+      latitude: "dashboard-add-latitude-data",
+      longitude: "dashboard-add-longitude-data",
+      weight: "dashboard-add-weight-data",
+      z: "dashboard-add-z-data",
+    };
+
+    const buttonTestId = buttonSelectors[target];
+    if (!buttonTestId) {
+      throw new Error(`Invalid target type: ${target}`);
+    }
+
+    // Locate the specific field item container that contains the field name
+    const fieldItem = this.page.locator(`[data-test^="field-list-item-"]`, {
+      hasText: fieldName,
+    });
+
+    // Now locate the button within that field item
+    const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
+
+    // Click the button
+    await button.click();
   }
 }
