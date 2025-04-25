@@ -98,7 +98,7 @@ const useLocalStorage = (
 
     return value;
   } catch (e) {
-    console.log(
+    console.error(
       `Error: Error in UseLocalStorage for key: ${key}, error-message : ${e}`,
     );
   }
@@ -143,7 +143,7 @@ export const getUserInfo = (loginString: string) => {
 
     return decToken;
   } catch (e) {
-    console.log(`Error in getUserInfo util with loginString: ${loginString}`);
+    console.error(`Error in getUserInfo util with loginString: ${loginString}`);
   }
 };
 
@@ -172,7 +172,7 @@ export const getDecodedAccessToken = (token: string) => {
       return "";
     }
   } catch (e) {
-    console.log("error decoding token");
+    console.error("error decoding token", e);
   }
 };
 
@@ -188,7 +188,7 @@ export const b64EncodeUnicode = (str: string) => {
       .replace(/\//g, "_")
       .replace(/=/g, ".");
   } catch (e) {
-    console.log("Error: getBase64Encode: error while encoding.");
+    console.error("Error: getBase64Encode: error while encoding.");
     return null;
   }
 };
@@ -207,7 +207,7 @@ export const b64DecodeUnicode = (str: string) => {
         .join(""),
     );
   } catch (e) {
-    console.log("Error: getBase64Decode: error while decoding.");
+    console.error("Error: getBase64Decode: error while decoding.");
   }
 };
 
@@ -222,7 +222,7 @@ export const b64EncodeStandard = (str: string) => {
       ),
     );
   } catch (e) {
-    console.log("Error: getBase64Encode: error while encoding.");
+    console.error("Error: getBase64Encode: error while encoding.");
   }
 };
 
@@ -236,7 +236,7 @@ export const b64DecodeStandard = (str: string) => {
         .join(""),
     );
   } catch (e) {
-    console.log("Error: getBase64Decode: error while decoding.");
+    console.error("Error: getBase64Decode: error while decoding.");
   }
 };
 
@@ -244,7 +244,7 @@ export const getSessionStorageVal = (key: string) => {
   try {
     return window.sessionStorage.getItem(key);
   } catch (e) {
-    console.log(`Error: Error while pull sessionstorage value ${key}`);
+    console.error(`Error: Error while pull sessionstorage value ${key}`);
   }
 };
 
@@ -261,7 +261,7 @@ export const useLocalOrganization = (val: any = {}, isDelete = false) => {
       return organizationDataLocal;
     }
   } catch (e) {
-    console.log(`Error: Error in useLocalOrganization: ${e}`);
+    console.error(`Error: Error in useLocalOrganization: ${e}`);
     return ref({});
   }
 };
@@ -309,7 +309,7 @@ export const deleteSessionStorageVal = (key: string) => {
   try {
     return sessionStorage.removeItem(key);
   } catch (e) {
-    console.log(`Error: Error while pull sessionstorage value ${key}`);
+    console.error(`Error: Error while pull sessionstorage value ${key}`);
   }
 };
 
@@ -322,7 +322,7 @@ export const getDecodedUserInfo = () => {
       return null;
     }
   } catch (e) {
-    console.log("Error: Error while pull sessionstorage value.");
+    console.error("Error: Error while pull sessionstorage value.");
   }
 };
 
@@ -335,7 +335,7 @@ export const validateEmail = (email: string) => {
       return false;
     }
   } catch (e) {
-    console.log(`Error: Error while validatig email id ${email}`);
+    console.error(`Error: Error while validatig email id ${email}`);
   }
 };
 
@@ -361,7 +361,7 @@ export const getLocalTime = (datetime: string) => {
       return datetime;
     }
   } catch (e) {
-    console.log(`Error: Error while covert localtime ${datetime}`);
+    console.error(`Error: Error while covert localtime ${datetime}`);
   }
 };
 
@@ -652,7 +652,7 @@ export const localTimeSelectedTimezoneUTCTime = async (
   // Convert the moment object to a Unix timestamp (in seconds)
   const unixTimestamp = convertedDate.unix() * 1000000;
 
-  console.log(unixTimestamp);
+  logger.log(unixTimestamp);
   return unixTimestamp;
 };
 
@@ -1044,3 +1044,13 @@ export function isAboveMinRefreshInterval(
   const minInterval = Number(config?.min_auto_refresh_interval) || 1;
   return value >= minInterval;
 }
+
+
+export const logger = {
+  log: (...args: any[]) => {
+    if (config.mode !== "production" || (window as any).use_debug) {
+      console.log(...args);
+    }
+  },
+};
+

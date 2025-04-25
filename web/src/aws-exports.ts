@@ -54,6 +54,7 @@ const config = {
   ddAPPID: import.meta.env.VITE_DD_APP_ID,
   ddClientToken: import.meta.env.VITE_DD_CLIENT_TOKEN,
   ddSite: import.meta.env.VITE_DD_SITE,
+  mode: import.meta.env.MODE,
 };
 
 export default config;
