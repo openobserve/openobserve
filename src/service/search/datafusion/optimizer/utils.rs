@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -161,7 +161,7 @@ impl TreeNodeRewriter for AddSortAndLimit {
             }
 
             if schema
-                .field_with_name(None, cfg.common.column_timestamp.as_str())
+                .field_with_name(None, &cfg.common.column_timestamp)
                 .is_ok()
             {
                 sort_columns.push(SortExpr {
@@ -218,7 +218,7 @@ fn generate_sort_plan(
     };
     let schema = input.schema().clone();
     if schema
-        .field_with_name(None, cfg.common.column_timestamp.as_str())
+        .field_with_name(None, &cfg.common.column_timestamp)
         .is_err()
     {
         let mut input = input.as_ref().clone();
@@ -294,7 +294,7 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
             LogicalPlan::TableScan(scan) => {
                 let cfg = config::get_config();
                 let schema = scan.source.schema();
-                let timestamp_idx = schema.index_of(cfg.common.column_timestamp.as_str())?;
+                let timestamp_idx = schema.index_of(&cfg.common.column_timestamp)?;
                 let projection = scan.projection.clone().map(|mut p| {
                     p.push(timestamp_idx);
                     p

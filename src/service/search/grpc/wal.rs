@@ -392,19 +392,22 @@ pub async fn search_memtable(
     let mut merge_batch_time = 0;
     let mut create_memtable_time = 0;
     let schema_fields = schema_latest.fields().len();
-    let mut max_batch_fields = 0;
     let mut tables = Vec::new();
-    for (schema, mut record_batches) in batch_groups {
+    for (schema, record_batches) in batch_groups {
         if record_batches.is_empty() {
             continue;
         }
 
         let start_adapt_batch = std::time::Instant::now();
         let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map);
-        for batch in record_batches.iter_mut() {
-            *batch = adapt_batch(schema_latest.clone(), batch);
+        let mut adapt_batches = Vec::with_capacity(record_batches.len());
+        for batch in record_batches {
+            adapt_batches.push(adapt_batch(schema_latest.clone(), batch));
         }
+        let record_batches = adapt_batches;
         adapt_batch_time += start_adapt_batch.elapsed().as_millis();
+
+        tokio::task::coop::consume_budget().await;
 
         // merge small batches into big batches
         let mut merge_groupes = Vec::new();
@@ -429,15 +432,8 @@ pub async fn search_memtable(
             .into_iter()
             .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
             .collect::<Vec<_>>();
-        max_batch_fields = std::cmp::max(
-            max_batch_fields,
-            record_batches
-                .iter()
-                .map(|b| b.num_columns())
-                .max()
-                .unwrap_or(0),
-        );
         merge_batch_time += start_merge_batch.elapsed().as_millis();
+
         tokio::task::coop::consume_budget().await;
 
         let start_create_memtable = std::time::Instant::now();
@@ -465,13 +461,12 @@ pub async fn search_memtable(
     }
 
     log::info!(
-        "[trace_id {}] wal->mem->search: adapt_batch_time {} ms, merge_batch_time {} ms, create_memtable_time {} ms, schema_fields {}, max_batch_fields {}",
+        "[trace_id {}] wal->mem->search: adapt_batch_time {} ms, merge_batch_time {} ms, create_memtable_time {} ms, schema_fields {}",
         query.trace_id,
         adapt_batch_time,
         merge_batch_time,
         create_memtable_time,
         schema_fields,
-        max_batch_fields
     );
 
     Ok((tables, scan_stats))
@@ -593,7 +588,7 @@ async fn get_file_list(
     .await
 }
 
-pub fn adapt_batch(schema_latest: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
+pub fn adapt_batch(schema_latest: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
 
