@@ -93,13 +93,6 @@ const useSearchWebSocket = () => {
       // console.log("shouldRetry", JSON.parse(JSON.stringify(traces)));
       setTimeout(() => {
         Object.keys(traces).forEach((traceId) => {
-          // Skip retrying if this trace ID was explicitly canceled
-          if(canceledTraceIds.has(traceId)) {
-            // Don't retry the search
-            // clean up listeners will be called on cancel query response
-            return;
-          }
-          
           if(((traces[traceId].socketId === _socketId) && traces[traceId].isInitiated) || !traces[traceId].socketId) {
             // Don't send error event when retry is happening
             traces[traceId]?.close.forEach((handler: any) => handler({
@@ -126,7 +119,13 @@ const useSearchWebSocket = () => {
     if(response.type === 'error'){
       if(response.content.should_client_retry && response.content.trace_id){
         setTimeout(() => {
-          retryActiveTrace(response.content.trace_id, response);
+              // Skip retrying if this trace ID was explicitly canceled
+              if(canceledTraceIds.has(response.content.trace_id)) {
+                // Don't retry the search
+                // clean up listeners will be called on cancel query response
+                return;
+              }
+              retryActiveTrace(response.content.trace_id, response);
         }, 300)
 
         return;
