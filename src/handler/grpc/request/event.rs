@@ -15,7 +15,7 @@
 
 use std::ops::Range;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use bytes::Bytes;
 use config::{
     cluster::LOCAL_NODE,
@@ -33,7 +33,7 @@ use proto::cluster_rpc::{
 };
 use tonic::{
     Request, Response, Status, codec::CompressionEncoding, codegen::tokio_stream,
-    metadata::MetadataValue, transport::Channel,
+    metadata::MetadataValue,
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -251,14 +251,7 @@ async fn get_files_from_notifier(addr: &str, filekey: &str) -> Result<()> {
         .parse()
         .map_err(|_| anyhow::anyhow!("Invalid token"))?;
 
-    let cfg = config::get_config();
-    let channel = Channel::from_shared(addr.to_string())
-        .map_err(|e| anyhow::anyhow!("Invalid address format: {}", e))?
-        .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-        .connect()
-        .await
-        .with_context(|| format!("Failed to connect to cluster: {}", addr))?;
-
+    let channel = crate::service::grpc::get_cached_channel(addr).await?;
     let client = EventClient::with_interceptor(channel, move |mut req: Request<()>| {
         req.metadata_mut().insert("authorization", token.clone());
         Ok(req)
@@ -267,7 +260,9 @@ async fn get_files_from_notifier(addr: &str, filekey: &str) -> Result<()> {
     let mut request = Request::new(SimpleFileList {
         paths: vec![filekey.to_string()],
     });
-    request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
+    request.set_timeout(std::time::Duration::from_secs(
+        get_config().limit.query_timeout,
+    ));
 
     let response = client
         .send_compressed(CompressionEncoding::Gzip)
