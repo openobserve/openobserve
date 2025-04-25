@@ -230,10 +230,7 @@ pub(super) fn get_next_run_at(derived_stream: &DerivedStream) -> Result<i64, any
         ));
     }
 
-    let delay = chrono::Duration::try_minutes(delay_in_mins as _).ok_or(anyhow::anyhow!(
-        "Invalid delay value. Value must be a number in minutes"
-    ))?;
-
+    let delay = chrono::Duration::minutes(delay_in_mins as _);
     Ok(chrono::Utc::now()
         .checked_add_signed(delay)
         .ok_or(anyhow::anyhow!("DateTime arithmetic overflow"))?
