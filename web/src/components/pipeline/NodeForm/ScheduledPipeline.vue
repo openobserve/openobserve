@@ -901,7 +901,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         type="number"
                         dense
                         filled
-                        min="1"
+                        min="0"
                         style="background: none"
                         @update:model-value="updateDelay"
                       />
