@@ -14,26 +14,6 @@ function generateRandomName() {
     return randomName;
 }
 
-
-    const WebHookTemplateOneJson = generateRandomName();
-    const WebHookTemplateTwoJson = generateRandomName();
-    const WebHookTemplateOneUrl = generateRandomName();
-    const WebHookTemplateTwoUrl = generateRandomName();
-    const EmailTemplateOneJson = generateRandomName();
-    const EmailTemplateTwoJson = generateRandomName();
-    const EmailTemplateOneUrl = generateRandomName();
-    const EmailTemplateTwoUrl = generateRandomName();
-    const WebHookDestinationOneJson = generateRandomName();
-    const WebHookDestinationTwoJson = generateRandomName();
-    const WebHookDestinationOneUrl = generateRandomName();
-    const WebHookDestinationTwoUrl = generateRandomName();
-    const EmailDestinationOneJson = generateRandomName();
-    const EmailDestinationTwoJson = generateRandomName();
-    const EmailDestinationOneUrl = generateRandomName();
-    const EmailDestinationTwoUrl = generateRandomName();
-      
-
-
 test.describe("Import for Template, Destination, Alert", () => {
     
     let loginPage, managementPage, alertTemplate, alertDestination;
@@ -50,6 +30,13 @@ test.describe("Import for Template, Destination, Alert", () => {
 
 
     test("Import Webhook Template, Destination and Alert from JSON file", async ({ page }) => {
+
+        const WebHookTemplateOneJson = generateRandomName();
+        const WebHookTemplateTwoJson = generateRandomName();
+        const WebHookDestinationOneJson = generateRandomName();
+        const WebHookDestinationTwoJson = generateRandomName();
+
+
 
         await managementPage.navigateToManagement();
         await alertTemplate.navigateToAlertTemplate();
@@ -75,15 +62,10 @@ test.describe("Import for Template, Destination, Alert", () => {
         const inputDestinationFile = await page.locator('input[type="file"]');
         await inputDestinationFile.setInputFiles(fileDestinationContentPath);
         await alertDestination.clickImportDestinationJsonButton();
-        await page.locator('[data-test="destination-import-error-0-0"] [data-test="destination-import-template-input"]').click();
-        await page.getByRole('option', { name: WebHookTemplateOneJson }).locator('div').nth(2).click();
-        await page.locator('[data-test="destination-import-error-0-1"] [data-test="destination-import-name-input"]').click();
-        await page.locator('[data-test="destination-import-error-0-1"] [data-test="destination-import-name-input"]').fill(WebHookDestinationOneJson);
-
-        await page.locator('[data-test="destination-import-error-1-0"] [data-test="destination-import-template-input"]').click();
-        await page.getByRole('option', { name: WebHookTemplateTwoJson }).locator('div').nth(2).click();
-        await page.locator('[data-test="destination-import-error-1-1"] [data-test="destination-import-name-input"]').click();
-        await page.locator('[data-test="destination-import-error-1-1"] [data-test="destination-import-name-input"]').fill(WebHookDestinationTwoJson);
+        await alertDestination.ClickDestinationImportError00Input(WebHookTemplateOneJson);
+        await alertDestination.ClickDestinationImportError01Input(WebHookDestinationOneJson);
+        await alertDestination.ClickDestinationImportError10Input(WebHookTemplateTwoJson);
+        await alertDestination.ClickDestinationImportError11Input(WebHookDestinationTwoJson);   
 
         await alertDestination.clickImportDestinationJsonButton();
         await alertDestination.checkForTextInNotification('Successfully imported destination(s)');
@@ -92,6 +74,11 @@ test.describe("Import for Template, Destination, Alert", () => {
 
     
     test("Import Webhook Template, Destination and Alert from URL", async ({ page }) => {
+
+        const WebHookTemplateOneUrl = generateRandomName();
+        const WebHookTemplateTwoUrl = generateRandomName();
+        const WebHookDestinationOneUrl = generateRandomName();
+        const WebHookDestinationTwoUrl = generateRandomName();
 
         await managementPage.navigateToManagement();
         await alertTemplate.navigateToAlertTemplate();
@@ -114,15 +101,10 @@ test.describe("Import for Template, Destination, Alert", () => {
         await alertDestination.importDestinationFromUrl(urlDestination);
         await page.waitForTimeout(5000);
         await alertDestination.clickImportDestinationJsonButton();
-        await page.locator('[data-test="destination-import-error-0-0"] [data-test="destination-import-template-input"]').click();
-        await page.getByRole('option', { name: WebHookTemplateOneUrl }).locator('div').nth(2).click();
-        await page.locator('[data-test="destination-import-error-0-1"] [data-test="destination-import-name-input"]').click();
-        await page.locator('[data-test="destination-import-error-0-1"] [data-test="destination-import-name-input"]').fill(WebHookDestinationOneUrl);
-
-        await page.locator('[data-test="destination-import-error-1-0"] [data-test="destination-import-template-input"]').click();
-        await page.getByRole('option', { name: WebHookTemplateTwoUrl }).locator('div').nth(2).click();
-        await page.locator('[data-test="destination-import-error-1-1"] [data-test="destination-import-name-input"]').click();
-        await page.locator('[data-test="destination-import-error-1-1"] [data-test="destination-import-name-input"]').fill(WebHookDestinationTwoUrl);
+        await alertDestination.ClickDestinationImportError00Input(WebHookTemplateOneUrl);
+        await alertDestination.ClickDestinationImportError01Input(WebHookDestinationOneUrl);
+        await alertDestination.ClickDestinationImportError10Input(WebHookTemplateTwoUrl);
+        await alertDestination.ClickDestinationImportError11Input(WebHookDestinationTwoUrl);
 
         await alertDestination.clickImportDestinationJsonButton();
         await alertDestination.checkForTextInNotification('Successfully imported destination(s)');
@@ -154,7 +136,7 @@ test.describe("Import for Template, Destination, Alert", () => {
 
     });
     
-    test("Download Webhook Template after import", async ({ page }) => {
+    test("Download Webhook Template, Destination and Alert after import", async ({ page }) => {
 
         await managementPage.navigateToManagement();
         await alertTemplate.navigateToAlertTemplate();
@@ -165,22 +147,56 @@ test.describe("Import for Template, Destination, Alert", () => {
         await alertTemplate.ClickTemplateImportJsonButton();
         const WebHookTemplateOneJsonDownload = generateRandomName();
         const WebHookTemplateTwoJsonDownload = generateRandomName();
-        console.log(`Generated logo name: ${WebHookTemplateOneJsonDownload}`);
-        console.log(`Generated logo name: ${WebHookTemplateTwoJsonDownload}`);
         await alertTemplate.ClickTemplateImportError00NameInput(WebHookTemplateOneJsonDownload);
         await alertTemplate.ClickTemplateImportError10NameInput(WebHookTemplateTwoJsonDownload);
         await alertTemplate.ClickTemplateImportJsonButton();
         await expect(page.locator('#q-notify')).toContainText('Successfully imported template(s)');
         await page.waitForTimeout(5000);
-        const downloadPromise = page.waitForEvent('download');
+        const downloadPromiseTemplate = page.waitForEvent('download');
         await page.getByRole('row', { name: WebHookTemplateOneJsonDownload }).locator('[data-test="destination-export"]').click();
-        const downloadedFile = await downloadPromise;
-        const filePath = await downloadedFile.path();
-        console.log(`Downloaded file saved at: ${filePath}`);
+        const downloadedFileTemplate = await downloadPromiseTemplate;
+        const filePathTemplate = await downloadedFileTemplate.path();
+        console.log(`Downloaded file saved at: ${filePathTemplate}`);
+
+
+        // Import Destination
+        const WebHookDestinationOneJsonDownload = generateRandomName();
+        const WebHookDestinationTwoJsonDownload = generateRandomName();
+        await managementPage.navigateToManagement();
+        await alertDestination.navigateToAlertDestinations();
+        await alertDestination.clickImportDestinationButton();
+        await page.waitForTimeout(5000);
+        // Define file path to the JSON file
+        const fileDestinationContentPath = "../test-data/AlertMultiDestinationWebHook.json";
+        const inputDestinationFile = await page.locator('input[type="file"]');
+        await inputDestinationFile.setInputFiles(fileDestinationContentPath);
+        await alertDestination.clickImportDestinationJsonButton();
+
+        await alertDestination.ClickDestinationImportError00Input(WebHookTemplateOneJsonDownload);
+        await alertDestination.ClickDestinationImportError01Input(WebHookDestinationOneJsonDownload);
+        await alertDestination.ClickDestinationImportError10Input(WebHookTemplateTwoJsonDownload);
+        await alertDestination.ClickDestinationImportError11Input(WebHookDestinationTwoJsonDownload);
+
+        await alertDestination.clickImportDestinationJsonButton();
+        await alertDestination.checkForTextInNotification('Successfully imported destination(s)');
+
+        await page.waitForTimeout(5000);
+        const downloadPromiseDestination = page.waitForEvent('download');
+        await page.getByRole('row', { name: WebHookDestinationOneJsonDownload }).locator('[data-test="destination-export"]').click();
+        const downloadedFileDestination = await downloadPromiseDestination;
+        const filePathDestination = await downloadedFileDestination.path();
+        console.log(`Downloaded file saved at: ${filePathDestination}`);
+
+
 
     });
     
     test("Import Email Template, Destination and Alert from JSON file", async ({ page }) => {
+
+        const EmailTemplateOneJson = generateRandomName();
+        const EmailTemplateTwoJson = generateRandomName();
+        const EmailDestinationOneJson = generateRandomName();
+        const EmailDestinationTwoJson = generateRandomName();
 
         await managementPage.navigateToManagement();
         await alertTemplate.navigateToAlertTemplate();
@@ -207,18 +223,12 @@ test.describe("Import for Template, Destination, Alert", () => {
         await alertDestination.clickImportDestinationJsonButton();
 
 
-        await page.locator('[data-test="destination-import-error-0-0"] [data-test="destination-import-template-input"]').click();
-        await page.getByRole('option', { name: EmailTemplateOneJson }).locator('div').nth(2).click();
-        await page.locator('[data-test="destination-import-error-0-1"] [data-test="destination-import-name-input"]').click();
-        await page.locator('[data-test="destination-import-error-0-1"] [data-test="destination-import-name-input"]').fill(EmailDestinationOneJson);
-        await page.locator('[data-test="destination-import-error-0-2"] [data-test="destination-import-emails-input"]').click();
-        await page.locator('[data-test="destination-import-error-0-2"] [data-test="destination-import-emails-input"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
-        await page.locator('[data-test="destination-import-error-1-0"] [data-test="destination-import-template-input"]').click();
-        await page.getByRole('option', { name: EmailTemplateTwoJson }).locator('div').nth(2).click();
-        await page.locator('[data-test="destination-import-error-1-1"] [data-test="destination-import-name-input"]').click();
-        await page.locator('[data-test="destination-import-error-1-1"] [data-test="destination-import-name-input"]').fill(EmailDestinationTwoJson);
-        await page.locator('[data-test="destination-import-error-1-2"] [data-test="destination-import-emails-input"]').click();
-        await page.locator('[data-test="destination-import-error-1-2"] [data-test="destination-import-emails-input"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
+        await alertDestination.ClickDestinationImportError00Input(EmailTemplateOneJson);
+        await alertDestination.ClickDestinationImportError01Input(EmailDestinationOneJson);
+        await alertDestination.ClickDestinationImportError02Input(process.env["ZO_ROOT_USER_EMAIL"]);
+        await alertDestination.ClickDestinationImportError10Input(EmailTemplateTwoJson);
+        await alertDestination.ClickDestinationImportError11Input(EmailDestinationTwoJson);
+        await alertDestination.ClickDestinationImportError12Input(process.env["ZO_ROOT_USER_EMAIL"]);
         await alertDestination.clickImportDestinationJsonButton();
         await alertDestination.checkForTextInNotification('Successfully imported destination(s)');
     
@@ -226,6 +236,11 @@ test.describe("Import for Template, Destination, Alert", () => {
 
     
     test("Import Email Template, Destination and Alert from URL", async ({ page }) => {
+
+        const EmailTemplateOneUrl = generateRandomName();
+        const EmailTemplateTwoUrl = generateRandomName();
+        const EmailDestinationOneUrl = generateRandomName();
+        const EmailDestinationTwoUrl = generateRandomName();
 
         await managementPage.navigateToManagement();
         await alertTemplate.navigateToAlertTemplate();
@@ -248,18 +263,12 @@ test.describe("Import for Template, Destination, Alert", () => {
         await alertDestination.importDestinationFromUrl(urlDestination);
         await page.waitForTimeout(5000);
         await alertDestination.clickImportDestinationJsonButton();
-        await page.locator('[data-test="destination-import-error-0-0"] [data-test="destination-import-template-input"]').click();
-        await page.getByRole('option', { name: EmailTemplateOneUrl }).locator('div').nth(2).click();
-        await page.locator('[data-test="destination-import-error-0-1"] [data-test="destination-import-name-input"]').click();
-        await page.locator('[data-test="destination-import-error-0-1"] [data-test="destination-import-name-input"]').fill(EmailDestinationOneUrl);
-        await page.locator('[data-test="destination-import-error-0-2"] [data-test="destination-import-emails-input"]').click();
-        await page.locator('[data-test="destination-import-error-0-2"] [data-test="destination-import-emails-input"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
-        await page.locator('[data-test="destination-import-error-1-0"] [data-test="destination-import-template-input"]').click();
-        await page.getByRole('option', { name: EmailTemplateTwoUrl }).locator('div').nth(2).click();
-        await page.locator('[data-test="destination-import-error-1-1"] [data-test="destination-import-name-input"]').click();
-        await page.locator('[data-test="destination-import-error-1-1"] [data-test="destination-import-name-input"]').fill(EmailDestinationTwoUrl);
-        await page.locator('[data-test="destination-import-error-1-2"] [data-test="destination-import-emails-input"]').click();
-        await page.locator('[data-test="destination-import-error-1-2"] [data-test="destination-import-emails-input"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
+        await alertDestination.ClickDestinationImportError00Input(EmailTemplateOneUrl);
+        await alertDestination.ClickDestinationImportError01Input(EmailDestinationOneUrl);
+        await alertDestination.ClickDestinationImportError02Input(process.env["ZO_ROOT_USER_EMAIL"]);
+        await alertDestination.ClickDestinationImportError10Input(EmailTemplateTwoUrl);
+        await alertDestination.ClickDestinationImportError11Input(EmailDestinationTwoUrl);
+        await alertDestination.ClickDestinationImportError12Input(process.env["ZO_ROOT_USER_EMAIL"]);   
         await alertDestination.clickImportDestinationJsonButton();
         await alertDestination.checkForTextInNotification('Successfully imported destination(s)');
     
