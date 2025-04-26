@@ -532,11 +532,16 @@ test.describe("dashboard filter testcases", () => {
           .map((node) => node.textContent.trim()) // Trim whitespace
           .join("");
       });
-    console.log(textContent, "Text content");
-    console.log(`[data-test="dashboard-add-condition-label-0-${textContent}"]`);
+    // await page
+    //   .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
+    //   .click({ force: true });
+
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
-      .click({ force: true });
+      .waitFor({ state: "visible" });
+    await page
+      .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
+      .click();
 
     await page
       .locator('[data-test="dashboard-add-condition-column-0\\}"]')
@@ -577,12 +582,6 @@ test.describe("dashboard filter testcases", () => {
       .locator('[data-test="dashboard-add-condition-column-0\\}"]')
       .first()
       .fill("kubernetes_container_image");
-
-    // await page
-    //   .getByRole("option", { name: "kubernetes_container_image" })
-    //   .first()
-    //   .click();
-    // await page.waitForTimeout(5000);
 
     await page.getByText("kubernetes_container_image", { exact: true }).click();
 
