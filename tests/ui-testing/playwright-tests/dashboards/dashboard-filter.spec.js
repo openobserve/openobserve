@@ -581,26 +581,10 @@ test.describe("dashboard filter testcases", () => {
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
     //   .first()
-    //   .click({ force: true });
-
-    // await page
-    //   .getByRole("option", { name: "kubernetes_container_image" })
-    //   .first()
     //   .click();
-    // await page.waitForTimeout(5000); // optional but helpful
+    // await page.waitForTimeout(5000);
 
     await page.getByText("kubernetes_container_image", { exact: true }).click();
-
-    // await page.getByText("kubernetes_labels_name", { exact: true }).click();
-
-    // await page
-    //   .getByRole("option", { name: "kubernetes_container_image" })
-    //   .first()
-    //   .waitFor({ state: "visible" });
-    // await page
-    //   .getByRole("option", { name: "kubernetes_container_image" })
-    //   .first()
-    //   .click();
 
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
