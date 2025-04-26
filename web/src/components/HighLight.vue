@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, computed } from "vue";
+import { defineComponent, ref, watch, computed, onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "HighLight",
@@ -94,6 +94,12 @@ export default defineComponent({
     watch(() => props.queryString, () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(updateList, 300); // debounce duration
+    });
+
+    //this is used to clear the timeout when the component is destroyed
+    //this is used to prevent memory leaks
+    onBeforeMount(() => {
+      clearTimeout(timeoutId);
     });
 
     return { list };
