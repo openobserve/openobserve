@@ -28,7 +28,7 @@ test.describe("dashboard filter testcases", () => {
     await orgNavigation;
   });
 
-  test.skip("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
+  test("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -187,7 +187,7 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should successfully apply filter conditions using both AND and OR operators", async ({
+  test("should successfully apply filter conditions using both AND and OR operators", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -573,10 +573,10 @@ test.describe("dashboard filter testcases", () => {
       .first()
       .click();
 
-    await page
-      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .first()
-      .fill("kubernetes_container_image");
+    // await page
+    //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
+    //   .first()
+    //   .fill("kubernetes_container_image");
 
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
@@ -586,8 +586,16 @@ test.describe("dashboard filter testcases", () => {
     const option = page
       .getByRole("option", { name: "kubernetes_container_image" })
       .first();
+
+    console.log("Checking if the option is visible...");
+
     await expect(option).toBeVisible({ timeout: 11000 }); // 11s max
+
+    console.log("Option is visible now!");
+
     await option.click();
+
+    console.log("Clicked on the option successfully!");
 
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
@@ -815,9 +823,7 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("Should  apply the  filter using the field button", async ({
-    page,
-  }) => {
+  test("Should  apply the  filter using the field button", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -934,7 +940,7 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("Should disply an error massge if added the invalid oprator", async ({
+  test("Should disply an error massge if added the invalid oprator", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -1075,7 +1081,7 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("Should Filter work correcly if Added the breakdwon filed", async ({
+  test("Should Filter work correcly if Added the breakdwon filed", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
