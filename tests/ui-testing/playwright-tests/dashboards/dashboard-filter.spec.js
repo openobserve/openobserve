@@ -578,10 +578,6 @@ test.describe("dashboard filter testcases", () => {
       .first()
       .fill("kubernetes_container_image");
 
-    await page
-      .getByRole("option", { name: "kubernetes_container_image" })
-      .click();
-
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
     //   .first()
@@ -591,6 +587,10 @@ test.describe("dashboard filter testcases", () => {
     //   .getByRole("option", { name: "kubernetes_container_image" })
     //   .first()
     //   .click();
+    await page.waitForTimeout(5000); // optional but helpful
+
+    await page.getByText("kubernetes_container_image", { exact: true }).click();
+
     // await page.getByText("kubernetes_labels_name", { exact: true }).click();
 
     // await page
