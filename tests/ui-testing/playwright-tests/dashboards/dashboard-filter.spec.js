@@ -587,7 +587,7 @@ test.describe("dashboard filter testcases", () => {
     //   .getByRole("option", { name: "kubernetes_container_image" })
     //   .first()
     //   .click();
-    await page.waitForTimeout(5000); // optional but helpful
+    // await page.waitForTimeout(5000); // optional but helpful
 
     await page.getByText("kubernetes_container_image", { exact: true }).click();
 
