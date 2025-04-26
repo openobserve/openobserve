@@ -573,29 +573,24 @@ test.describe("dashboard filter testcases", () => {
       .first()
       .click();
 
-    // await page
-    //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-    //   .first()
-    //   .fill("kubernetes_container_image");
+    await page
+      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
+      .first()
+      .fill("kubernetes_container_image");
 
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
     //   .first()
     //   .click({ force: true });
 
-    const option = page
+    await page
       .getByRole("option", { name: "kubernetes_container_image" })
-      .first();
+      .first()
+      .waitFor({ state: "visible" });
 
-    console.log("Checking if the option is visible...");
-
-    await expect(option).toBeVisible({ timeout: 11000 }); // 11s max
-
-    console.log("Option is visible now!");
-
-    await option.click();
-
-    console.log("Clicked on the option successfully!");
+    console.log('Waiting for exact text "kubernetes_container_image"...');
+    await page.getByText("kubernetes_container_image", { exact: true }).click();
+    console.log('Clicked on exact text "kubernetes_container_image"!');
 
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
