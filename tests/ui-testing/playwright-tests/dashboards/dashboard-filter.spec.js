@@ -417,7 +417,7 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("Should  apply the  filter group inside group", async ({ page }) => {
+  test("Should  apply the  filter group inside group", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -582,6 +582,7 @@ test.describe("dashboard filter testcases", () => {
       .getByRole("option", { name: "kubernetes_container_image" })
       .first()
       .click({ force: true });
+
     // const option = page.getByRole("option", { name: "kubernetes_container_image" }).first();
 
     // await option.waitFor({ state: "visible", timeout: 10000 });
