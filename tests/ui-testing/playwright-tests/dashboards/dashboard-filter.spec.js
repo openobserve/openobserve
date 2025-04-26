@@ -586,11 +586,7 @@ test.describe("dashboard filter testcases", () => {
     await page
       .getByRole("option", { name: "kubernetes_container_image" })
       .first()
-      .waitFor({ state: "visible" });
-
-    console.log('Waiting for exact text "kubernetes_container_image"...');
-    await page.getByText("kubernetes_container_image", { exact: true }).click();
-    console.log('Clicked on exact text "kubernetes_container_image"!');
+      .click();
 
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
