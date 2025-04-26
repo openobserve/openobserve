@@ -578,23 +578,20 @@ test.describe("dashboard filter testcases", () => {
     //   .first()
     //   .fill("kubernetes_container_image");
 
-    console.log("Filling input with value: kubernetes_container_image");
-
-    await page
-      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .first()
-      .fill("kubernetes_container_image");
-
-    console.log("Filled successfully!");
-
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
     //   .first()
     //   .click({ force: true });
 
+    // await page
+    //   .getByRole("option", { name: "kubernetes_container_image" })
+    //   .first()
+    //   .click();
+
     await page
       .getByRole("option", { name: "kubernetes_container_image" })
-      .first()
+      .locator("div")
+      .nth(2)
       .click();
 
     // await page
