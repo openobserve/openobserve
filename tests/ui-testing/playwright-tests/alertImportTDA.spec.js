@@ -225,6 +225,7 @@ test.describe("Import for Template, Destination, Alert", () => {
         await alertDestination.ClickDestinationImportError01Input(WebHookDestinationOneJsonDownload);
         await alertDestination.ClickDestinationImportError10Input(WebHookTemplateTwoJsonDownload);
         await alertDestination.ClickDestinationImportError11Input(WebHookDestinationTwoJsonDownload);
+        await page.waitForTimeout(5000);
 
         await alertDestination.clickImportDestinationJsonButton();
         await alertDestination.checkForTextInNotification('Successfully imported destination(s)');
