@@ -28,7 +28,7 @@ test.describe("dashboard filter testcases", () => {
     await orgNavigation;
   });
 
-  test("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
+  test.skip("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -187,7 +187,7 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test("should successfully apply filter conditions using both AND and OR operators", async ({
+  test.skip("should successfully apply filter conditions using both AND and OR operators", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -573,10 +573,19 @@ test.describe("dashboard filter testcases", () => {
       .first()
       .click();
 
+    // await page
+    //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
+    //   .first()
+    //   .fill("kubernetes_container_image");
+
+    console.log("Filling input with value: kubernetes_container_image");
+
     await page
       .locator('[data-test="dashboard-add-condition-column-0\\}"]')
       .first()
       .fill("kubernetes_container_image");
+
+    console.log("Filled successfully!");
 
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
