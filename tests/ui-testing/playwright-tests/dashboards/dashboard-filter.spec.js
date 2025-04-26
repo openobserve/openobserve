@@ -567,16 +567,20 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
-    // await page.waitForTimeout(3000);
+    await page.waitForTimeout(3000);
     await page
       .locator('[data-test="dashboard-add-condition-column-0\\}"]')
       .first()
       .click();
 
-    // await page
-    //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-    //   .first()
-    //   .fill("kubernetes_container_image");
+    await page
+      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
+      .first()
+      .fill("kubernetes_container_image");
+
+    await page
+      .getByRole("option", { name: "kubernetes_container_image" })
+      .click();
 
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
@@ -587,7 +591,7 @@ test.describe("dashboard filter testcases", () => {
     //   .getByRole("option", { name: "kubernetes_container_image" })
     //   .first()
     //   .click();
-    await page.getByText("kubernetes_labels_name", { exact: true }).click();
+    // await page.getByText("kubernetes_labels_name", { exact: true }).click();
 
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
@@ -597,12 +601,6 @@ test.describe("dashboard filter testcases", () => {
     //   .getByRole("option", { name: "kubernetes_container_image" })
     //   .first()
     //   .click();
-
-    // const option = page.getByRole("option", { name: "kubernetes_container_image" }).first();
-
-    // await option.waitFor({ state: "visible", timeout: 10000 });
-
-    // await option.click();
 
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
