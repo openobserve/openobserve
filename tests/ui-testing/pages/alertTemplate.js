@@ -71,59 +71,6 @@ export class  AlertTemplate {
     async checkForTextInTable(text) {
         await expect(this.page.locator('tbody')).toContainText(text);
     }
-
-    async createWebhookAlertTemplate(templateName) {
-        await this.page.locator('[data-test="alert-templates-tab"]').waitFor();
-        await this.page.locator('[data-test="alert-templates-tab"]').click();
-        
-        await this.page.waitForResponse(response =>
-          response.url().includes("/api/default/alerts/templates") && response.status() === 200
-        );
-        
-        await this.page.locator('[data-test="alert-template-list-add-alert-btn"]').click();
-        await this.page.locator('[data-test="add-template-name-input"]').waitFor();
-        await this.page.locator('[data-test="add-template-name-input"]').fill(templateName);
-        
-        const jsonString = '{"text": "{alert_name} is active"}';
-        await this.page.locator(".view-line").click();
-        await this.page.keyboard.type(jsonString);
-        await this.page.waitForTimeout(500);
-        
-        await this.page.locator('[data-test="add-template-submit-btn"]').click();
-        await expect(this.page.locator(".q-notification__message").getByText(/Template Saved Successfully/)).toBeVisible();
-      }
     
-
-      
-    
-    async createEmailAlertTemplate(templateName) {
-        await this.page.locator('[data-test="alert-templates-tab"]').waitFor();
-        await this.page.locator('[data-test="alert-templates-tab"]').click();
-        
-        await this.page.waitForResponse(response =>
-          response.url().includes("/api/default/alerts/templates") && response.status() === 200 
-        );
-
-        await this.page.locator('[data-test="alert-template-list-add-alert-btn"]').click();
-        await this.page.locator('[data-test="add-template-name-input"]').waitFor();
-        await this.page.locator('[data-test="add-template-name-input"]').fill(templateName);    
-        
-        const jsonString = '{"text": "Alert {alert_name} is active"}';
-        await this.page.locator(".view-line").click();
-        await this.page.keyboard.type(jsonString);
-        await this.page.waitForTimeout(500);
-        
-        await this.page.locator('[data-test="add-template-submit-btn"]').click();
-        await expect(this.page.locator(".q-notification__message").getByText(/Template Saved Successfully/)).toBeVisible();
-      }
-        
-
-    async deleteTemplate(templateName) {
-        await this.page.locator('[data-test="alert-templates-tab"]').click();
-        await this.page.locator('[data-test="template-list-search-input"]').fill(templateName);
-        await this.page.waitForTimeout(500);
-        await this.page.locator(`[data-test="alert-template-list-${templateName}-delete-template"]`).click();
-        await this.page.locator('[data-test="confirm-button"]').click();
-      }
 }
 
