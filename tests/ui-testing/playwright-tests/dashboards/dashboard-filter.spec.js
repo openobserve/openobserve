@@ -587,12 +587,7 @@ test.describe("dashboard filter testcases", () => {
     //   .getByRole("option", { name: "kubernetes_container_image" })
     //   .first()
     //   .click();
-
-    await page
-      .getByRole("option", { name: "kubernetes_container_image" })
-      .locator("div")
-      .nth(2)
-      .click();
+    await page.getByText("kubernetes_labels_name", { exact: true }).click();
 
     // await page
     //   .getByRole("option", { name: "kubernetes_container_image" })
