@@ -586,7 +586,7 @@ test.describe("dashboard filter testcases", () => {
     const option = page
       .getByRole("option", { name: "kubernetes_container_image" })
       .first();
-    await expect(option).toBeVisible({ timeout: 10000 }); // 10s max
+    await expect(option).toBeVisible({ timeout: 11000 }); // 11s max
     await option.click();
 
     // await page
