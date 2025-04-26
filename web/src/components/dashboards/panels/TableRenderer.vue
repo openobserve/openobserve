@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       'my-sticky-virtscroll-table',
       { 'no-position-absolute': store.state.printMode },
+      { 'wrap-enabled': wrapCells },
     ]"
     virtual-scroll
     v-model:pagination="pagination"
@@ -105,18 +106,18 @@ export default defineComponent({
                     ? col.field(row)
                     : row[col.field === void 0 ? col.name : col.field],
                   col.format,
-                  row
-                )
+                  row,
+                ),
               )
-              .join(",")
-          )
+              .join(","),
+          ),
         )
         .join("\r\n");
 
       const status = exportFile(
         (title ?? "table-export") + ".csv",
         content,
-        "text/csv"
+        "text/csv",
       );
 
       if (status === true) {
@@ -164,7 +165,7 @@ export default defineComponent({
       const foundValue = findFirstValidMappedValue(
         value,
         props?.valueMapping,
-        "color"
+        "color",
       );
 
       if (foundValue && foundValue?.color) {
@@ -257,6 +258,14 @@ export default defineComponent({
     /* bg color is important for th; just specify one */
     //   background-color: #fff;
     background-color: $dark-page !important;
+  }
+}
+
+.wrap-enabled {
+  :deep(.q-td) {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal !important;
   }
 }
 </style>
