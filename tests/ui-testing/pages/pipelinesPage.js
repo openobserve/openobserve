@@ -207,5 +207,14 @@ export class PipelinesPage {
         await expect(this.page.locator('#q-notify')).toContainText(text);
     }
 
+    async fillScheduledPipelineDetails(name, functionName, remoteDestination) {
 
+        await this.page.locator('[data-test="pipeline-import-name-input"]').click();
+        await this.page.locator('[data-test="pipeline-import-name-input"]').fill(name);
+        await this.page.locator('[data-test="pipeline-import-destination-function-name-input"]').click();
+        await this.page.getByText(functionName).click();
+        await this.page.locator('[data-test="pipeline-import-destination-stream-type-input"]').click();
+        await this.page.getByRole('option', { name: remoteDestination }).click();
+        
+    }
 }
