@@ -28,7 +28,7 @@ test.describe("dashboard filter testcases", () => {
     await orgNavigation;
   });
 
-  test.skip("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
+  test("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -187,7 +187,7 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should successfully apply filter conditions using both AND and OR operators", async ({
+  test("should successfully apply filter conditions using both AND and OR operators", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -532,9 +532,6 @@ test.describe("dashboard filter testcases", () => {
           .map((node) => node.textContent.trim()) // Trim whitespace
           .join("");
       });
-    // await page
-    //   .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
-    //   .click({ force: true });
 
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
@@ -629,7 +626,7 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("Should apply the add group filter with apply the list of value successfully", async ({
+  test("Should apply the add group filter with apply the list of value successfully", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
