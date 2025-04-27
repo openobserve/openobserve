@@ -8,7 +8,6 @@ export class PipelinesPage {
         this.pipelinesPageMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
         this.functionStreamTab = '[data-test="function-stream-tab"]';
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
-        this.createFunctionButton = { role: 'button', name: 'Create new function' };
         this.createFunctionButton = this.page.getByRole('button', { name: 'Create new function' });
         this.functionNameInput = '[data-test="add-function-name-input"]';
         this.saveFunctionButton = '[data-test="add-function-save-btn"]';
@@ -79,7 +78,11 @@ export class PipelinesPage {
         await this.page.locator(this.functionNameInput).waitFor({ state: 'visible' });
         await this.page.locator(this.functionNameInput).click();
         await this.page.locator(this.functionNameInput).fill(functionName);
-        await this.page.waitForTimeout(2000);
+        // Wait for the logs search field to be visible and enabled
+        await this.page.locator(this.logsSearchField).waitFor({ state: 'visible' });
+        // Now wait for the child element to be visible before clicking
+        await this.page.locator(this.logsSearchField).locator(".view-lines").waitFor({ state: 'visible' });
+        
         await this.page.locator(this.logsSearchField).locator(".view-lines").click();
         // Type the function text with a delay to ensure each character registers
         await this.page.keyboard.type(".a=41", { delay: 100 });
@@ -101,7 +104,10 @@ export class PipelinesPage {
          await this.page.locator(this.functionNameInput).waitFor({ state: 'visible' });
          await this.page.locator(this.functionNameInput).click();
          await this.page.locator(this.functionNameInput).fill(functionName);
-         await this.page.waitForTimeout(2000);
+         // Wait for the logs search field to be visible and enabled
+        await this.page.locator(this.logsSearchField).waitFor({ state: 'visible' });
+        // Now wait for the child element to be visible before clicking
+        await this.page.locator(this.logsSearchField).locator(".view-lines").waitFor({ state: 'visible' });
          await this.page.locator(this.logsSearchField).locator(".view-lines").click();
          // Type the function text with a delay to ensure each character registers
          await this.page.keyboard.type(".test=2", { delay: 100 });
@@ -109,7 +115,7 @@ export class PipelinesPage {
          await this.page.keyboard.type(".", { delay: 100 });
          // Check if the required text is present in the editor
          await this.page.getByText(".test=2 .");
- 
+        
          await this.page.locator(this.saveFunctionButton).click();
          await this.page.waitForTimeout(2000);
          

@@ -22,8 +22,8 @@ test.describe("Pipeline Import", () => {
     test("Import RealTime Pipeline from URL, download and delete imported pipeline", async ({ page }) => {
 
         const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
-        const randomFirstFunction = `FisrtP${Math.floor(Math.random() * 100000)}`;
-        const randomSecondFunction = `SecondP${Math.floor(Math.random() * 100000)}`;
+        const randomFirstFunction = `firstFunction${Math.floor(Math.random() * 100000)}`;
+        const randomSecondFunction = `secondFunction${Math.floor(Math.random() * 100000)}`;
 
 
         await pipelinesPage.gotoPipelinesPage();
@@ -69,8 +69,8 @@ test.describe("Pipeline Import", () => {
     test("Import RealTime Pipeline from JSON file, download and delete imported pipeline", async ({ page }) => {
 
         const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
-        const randomFirstFunction = `FisrtP${Math.floor(Math.random() * 100000)}`;
-        const randomSecondFunction = `SecondP${Math.floor(Math.random() * 100000)}`;
+        const randomFirstFunction = `firstFunction${Math.floor(Math.random() * 100000)}`;
+        const randomSecondFunction = `secondFunction${Math.floor(Math.random() * 100000)}`;
 
 
         await pipelinesPage.gotoPipelinesPage();
