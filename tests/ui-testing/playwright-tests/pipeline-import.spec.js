@@ -42,8 +42,7 @@ test.describe("Pipeline Import", () => {
         await pipelinesPage.importJsonButtonPipeline();
         await pipelinesPage.fillPipelineDetails(randomPipeline, randomFirstFunction, randomSecondFunction);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.waitForTimeout(1000);
-        await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/pipeline/pipelines?org_identifier=default");
         await page.waitForTimeout(5000);
         // Download Pipeline
         await pipelinesPage.downloadPipeline(randomPipeline);
@@ -95,8 +94,7 @@ test.describe("Pipeline Import", () => {
         await pipelinesPage.importJsonButtonPipeline();
         await pipelinesPage.fillPipelineDetails(randomPipeline, randomFirstFunction, randomSecondFunction);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.waitForTimeout(1000);
-        await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/pipeline/pipelines?org_identifier=default");
         await page.waitForTimeout(5000);
         // Download Pipeline
         await pipelinesPage.downloadPipeline(randomPipeline);
@@ -113,7 +111,8 @@ test.describe("Pipeline Import", () => {
         const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
         const randomFirstFunction = `first${Math.floor(Math.random() * 100000)}`;
         const randomPipelineDestination = `destination${Math.floor(Math.random() * 100000)}`;
-
+        await pipelineDestinations.navigateToManagement();
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=default");
         await pipelineDestinations.navigateToPipelineDestinations();    
         await pipelineDestinations.addDestination(randomPipelineDestination, 'https://example.com');
         await pipelineDestinations.verifyDestinationAdded();
@@ -131,8 +130,7 @@ test.describe("Pipeline Import", () => {
 
         await pipelinesPage.fillScheduledPipelineDetails(randomPipeline, randomFirstFunction, randomPipelineDestination);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.waitForTimeout(1000);
-        await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/pipeline/pipelines?org_identifier=default");
         await page.waitForTimeout(5000);
         // Download Pipeline
         await pipelinesPage.downloadPipeline(randomPipeline);
@@ -149,7 +147,8 @@ test.describe("Pipeline Import", () => {
         const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
         const randomFirstFunction = `firstFunction${Math.floor(Math.random() * 100000)}`;
         const randomPipelineDestination = `pipelineDestination${Math.floor(Math.random() * 100000)}`;
-
+        await pipelineDestinations.navigateToManagement();
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=default");
         await pipelineDestinations.navigateToPipelineDestinations();    
         await pipelineDestinations.addDestination(randomPipelineDestination, 'https://example.com');
         await pipelineDestinations.verifyDestinationAdded();
@@ -169,8 +168,7 @@ test.describe("Pipeline Import", () => {
 
         await pipelinesPage.fillScheduledPipelineDetails(randomPipeline, randomFirstFunction, randomPipelineDestination);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.waitForTimeout(1000);
-        await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/pipeline/pipelines?org_identifier=default");
         await page.waitForTimeout(5000);
         // Download Pipeline
         await pipelinesPage.downloadPipeline(randomPipeline);

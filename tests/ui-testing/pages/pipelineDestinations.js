@@ -5,19 +5,23 @@ import { expect } from '@playwright/test';
 export class PipelineDestinations {
     constructor(page) {
         this.page = page;
+
+        this.pipelineDestinationsTabSelector = '[data-test="pipeline-destinations-tab"]';
         
     }
 
-    async navigateToPipelineDestinations() {
+    async navigateToManagement() {
 
         // Wait for the settings menu link to be visible before clicking
         await this.page.locator('[data-test="menu-link-settings-item"]').waitFor({ state: 'visible' });
         await this.page.locator('[data-test="menu-link-settings-item"]').click();
-        
-        // Wait for the pipeline destinations tab to be visible before clicking
-        await this.page.locator('[data-test="pipeline-destinations-tab"]').waitFor({ state: 'visible' });
-        await this.page.locator('[data-test="pipeline-destinations-tab"]').click();
-        
+    }
+
+    async navigateToPipelineDestinations() {
+        // Wait for the pipeline destinations tab to be visible
+        await this.page.locator(this.pipelineDestinationsTabSelector).waitFor({ state: 'visible' });   
+        // Click the pipeline destinations tab
+        await this.page.locator(this.pipelineDestinationsTabSelector).click();      
     }
 
     async addDestination(name, url) {
