@@ -25,7 +25,7 @@ use config::{
 };
 use futures_util::StreamExt;
 use hashbrown::{HashMap, HashSet};
-use infra::cache::file_data::{TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
+use infra::cache::file_data::disk;
 use opentelemetry::global;
 use proto::cluster_rpc::{
     EmptyResponse, FileContent, FileContentResponse, FileList, SimpleFileList,
@@ -75,14 +75,14 @@ impl Event for Eventer {
             for item in put_items.iter() {
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
-                    files_to_download.push(item.key.clone());
+                    files_to_download.push((item.key.clone(), item.meta.compressed_size as usize));
                 }
 
                 // cache index for the parquet
                 if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
                     if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
                     {
-                        files_to_download.push(ttv_file);
+                        files_to_download.push((ttv_file, item.meta.index_size as usize));
                     }
                 }
             }
@@ -103,21 +103,17 @@ impl Event for Eventer {
                 }
 
                 // Fallback to individual downloads for failed files
-                for file in failed_files {
-                    if let Err(e) =
-                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &file)
-                            .await
-                    {
+                for (file, size) in failed_files {
+                    let size = if size > 0 { Some(size) } else { None };
+                    if let Err(e) = infra::cache::file_data::download(&file, size).await {
                         log::error!("[gRPC:Event] Failed to cache file data: {}", e);
                     }
                 }
             } else {
                 // Direct download when download_from_node_enabled is false
-                for file in files_to_download {
-                    if let Err(e) =
-                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &file)
-                            .await
-                    {
+                for (file, size) in files_to_download {
+                    let size = if size > 0 { Some(size) } else { None };
+                    if let Err(e) = infra::cache::file_data::download(&file, size).await {
                         log::error!("[gRPC:Event] Failed to cache file data: {}", e);
                     }
                 }
@@ -243,7 +239,7 @@ async fn handle_file_chunked(
     Ok(())
 }
 
-async fn download_from_node(addr: &str, files: &[String]) -> Result<Vec<String>> {
+async fn download_from_node(addr: &str, files: &[(String, usize)]) -> Result<Vec<(String, usize)>> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     log::debug!(
@@ -261,11 +257,15 @@ async fn download_from_node(addr: &str, files: &[String]) -> Result<Vec<String>>
         Ok(req)
     });
 
+    let file_size_map = files
+        .iter()
+        .map(|(f, s)| (f, *s))
+        .collect::<HashMap<_, _>>();
     let request = Request::new(SimpleFileList {
-        files: files.to_vec(),
+        files: files.iter().map(|(f, _)| f.to_string()).collect(),
     });
 
-    let response = client
+    let resp = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
@@ -276,11 +276,25 @@ async fn download_from_node(addr: &str, files: &[String]) -> Result<Vec<String>>
 
     let mut file_contents = HashMap::new();
     let mut downloaded_files = HashSet::new();
-    let mut response_stream = response.into_inner();
-    while let Some(response) = response_stream.next().await {
-        let response =
-            response.map_err(|e| anyhow::anyhow!("Failed to receive file chunk: {}", e))?;
-        for content in response.entries {
+    let mut resp_stream = resp.into_inner();
+    while let Some(resp) = resp_stream.next().await {
+        let resp = match resp {
+            Ok(resp) => resp,
+            Err(err) => {
+                if err.code() == tonic::Code::NotFound {
+                    log::debug!(
+                        "[gRPC:Event] Failed to download file {} from {}: file not found",
+                        err.message(),
+                        addr
+                    );
+                    continue;
+                }
+                return Err(anyhow::anyhow!(
+                    "Failed to download file from {addr}, {err}"
+                ));
+            }
+        };
+        for content in resp.entries {
             let entry = file_contents
                 .entry(content.filename.clone())
                 .or_insert(bytes::BytesMut::new());
@@ -298,7 +312,21 @@ async fn download_from_node(addr: &str, files: &[String]) -> Result<Vec<String>>
 
     // Cache the file contents
     for (file, content) in file_contents {
-        if let Err(e) = infra::cache::file_data::set("", &file, content.freeze()).await {
+        let data = content.freeze();
+        if let Some(size) = file_size_map.get(&file) {
+            if *size != data.len() {
+                log::warn!(
+                    "[gRPC:Event] Failed to download file {} from {}: size mismatch, expected {} but got {}",
+                    file,
+                    addr,
+                    size,
+                    data.len()
+                );
+                downloaded_files.remove(&file);
+                continue;
+            }
+        }
+        if let Err(e) = infra::cache::file_data::set(&file, data).await {
             log::error!("[gRPC:Event] Failed to cache file {}: {}", file, e);
             downloaded_files.remove(&file);
         }
@@ -307,7 +335,7 @@ async fn download_from_node(addr: &str, files: &[String]) -> Result<Vec<String>>
     // Return list of failed files
     let failed_files: Vec<_> = files
         .iter()
-        .filter(|f| !downloaded_files.contains(*f))
+        .filter(|(f, _)| !downloaded_files.contains(f))
         .cloned()
         .collect();
 
