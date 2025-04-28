@@ -10,4 +10,5 @@ import "cluster/common.proto";
 
 service Event {
     rpc SendFileList (FileList) returns (EmptyResponse) {}
+    rpc GetFiles (SimpleFileList) returns (stream FileContentResponse) {}
 }
