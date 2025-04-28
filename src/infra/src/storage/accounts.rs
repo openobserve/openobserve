@@ -208,7 +208,12 @@ impl StreamStrategy {
             _ => {
                 let mut stream_map = HashMap::new();
                 for part in strategy.split(",") {
-                    let pos = part.rfind(":").unwrap();
+                    let pos = part
+                        .rfind(":")
+                        .expect("invalid value of ZO_S3_STREAM_STRATEGY");
+                    if pos == 0 || part.len() <= pos + 1 {
+                        panic!("invalid value of ZO_S3_STREAM_STRATEGY");
+                    }
                     let stream_name = part[0..pos].to_string();
                     let account_name = part[pos + 1..].to_string();
                     stream_map.insert(stream_name, account_name);
