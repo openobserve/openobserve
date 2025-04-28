@@ -192,6 +192,21 @@ pub async fn handle_search_request(
         req.trace_id,
         req_size
     );
+
+    // TODO: finish feat
+    send_message(
+        req_id,
+        WsServerEvents::ProgressUpdate {
+            trace_id: trace_id.to_string(),
+            current: 0,
+            total: 3,
+            percentage: 0.0,
+            event_type: "search".to_string(),
+        }
+        .to_json(),
+    )
+    .await?;
+
     // Step 1: Search result cache
     if req.payload.query.from == 0 {
         let c_resp =
@@ -313,6 +328,20 @@ pub async fn handle_search_request(
         .instrument(ws_search_span)
         .await?;
     }
+
+    // TODO: finish feat
+    send_message(
+        req_id,
+        WsServerEvents::ProgressUpdate {
+            trace_id: trace_id.to_string(),
+            current: 100,
+            total: 100,
+            percentage: 100.0,
+            event_type: "search".to_string(),
+        }
+        .to_json(),
+    )
+    .await?;
 
     // Once all searches are complete, write the accumulated results to a file
     log::info!("[WS_SEARCH] trace_id {} all searches completed", trace_id);
@@ -555,6 +584,20 @@ async fn process_delta(
     let partition_resp = get_partitions(&req, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
+    // TODO: finish feat
+    send_message(
+        req_id,
+        WsServerEvents::ProgressUpdate {
+            trace_id: trace_id.to_string(),
+            current: 1,
+            total: partitions.len() + 3,
+            percentage: (1 + 2) as f32 / (partitions.len() + 3) as f32,
+            event_type: "search".to_string(),
+        }
+        .to_json(),
+    )
+    .await?;
+
     if partitions.is_empty() {
         return Ok(());
     }
@@ -579,6 +622,20 @@ async fn process_delta(
     }
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
+        // TODO: finish feat
+        send_message(
+            req_id,
+            WsServerEvents::ProgressUpdate {
+                trace_id: trace_id.to_string(),
+                current: idx + 2,
+                total: partitions.len() + 3,
+                percentage: (idx + 2) as f32 / (partitions.len() + 3) as f32,
+                event_type: "search".to_string(),
+            }
+            .to_json(),
+        )
+        .await?;
+
         let mut req = req.clone();
         req.payload.query.start_time = start_time;
         req.payload.query.end_time = end_time;
@@ -855,6 +912,20 @@ pub async fn do_partitioned_search(
     let partition_resp = get_partitions(req, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
+    // TODO: finish feat
+    send_message(
+        req_id,
+        WsServerEvents::ProgressUpdate {
+            trace_id: trace_id.to_string(),
+            current: 1,
+            total: partitions.len() + 3,
+            percentage: (1 + 2) as f32 / (partitions.len() + 3) as f32,
+            event_type: "search".to_string(),
+        }
+        .to_json(),
+    )
+    .await?;
+
     if partitions.is_empty() {
         return Ok(());
     }
@@ -881,6 +952,20 @@ pub async fn do_partitioned_search(
     );
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
+        // TODO: finish feat
+        send_message(
+            req_id,
+            WsServerEvents::ProgressUpdate {
+                trace_id: trace_id.to_string(),
+                current: idx + 2,
+                total: partitions.len() + 3,
+                percentage: (idx + 2) as f32 / (partitions.len() + 3) as f32,
+                event_type: "search".to_string(),
+            }
+            .to_json(),
+        )
+        .await?;
+
         let mut req = req.clone();
         req.payload.query.start_time = start_time;
         req.payload.query.end_time = end_time;

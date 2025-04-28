@@ -377,6 +377,13 @@ pub enum WsServerEvents {
     End {
         trace_id: Option<String>,
     },
+    ProgressUpdate {
+        trace_id: String,
+        current: usize,
+        total: usize,
+        percentage: f32,
+        event_type: String,
+    },
     Ping(Vec<u8>),
     Pong(Vec<u8>),
 }
@@ -425,6 +432,7 @@ impl WsServerEvents {
             Self::CancelResponse { trace_id, .. } => trace_id.to_string(),
             Self::Error { trace_id, .. } => trace_id.clone().unwrap_or_default(),
             Self::End { trace_id } => trace_id.clone().unwrap_or_default(),
+            Self::ProgressUpdate { trace_id, .. } => trace_id.to_string(),
             Self::Ping(_) => "".to_string(),
             Self::Pong(_) => "".to_string(),
         }
