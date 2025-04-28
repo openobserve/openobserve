@@ -143,13 +143,8 @@ test.describe("dashboard multi y axis testcases", () => {
     await dashboardPageActions.addPanelName(randomDashboardName);
 
     await dashboardPageActions.savePanel();
-    // await page.waitForTimeout(1000);
 
     await dashboardPageActions.selectPanelAction(randomDashboardName, "Edit");
-
-    // await page.waitForTimeout(4000);
-
-    await dashboardPageActions.waitForChartToRender();
 
     await dashboardPageActions.waitForChartToRender();
 
