@@ -13,6 +13,7 @@
         hide-selected
         @filter="filterFields"
         @blur="updateInputValue(internalModel.value?.field)"
+        data-test="stream-field-select"
       >
         <template v-slot:option="scope">
           <q-expansion-item
