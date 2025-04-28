@@ -1671,6 +1671,12 @@ pub struct S3 {
         help = "comma separated list of accounts"
     )]
     pub accounts: String,
+    #[env_config(
+        name = "ZO_S3_STREAM_STRATEGY",
+        default = "",
+        help = "stream strategy, default is: empty, only use default account, other value is: hash, stream1:account1,stream2:account2"
+    )]
+    pub stream_strategy: String,
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
     pub provider: String,
     #[env_config(name = "ZO_S3_SERVER_URL", default = "")]

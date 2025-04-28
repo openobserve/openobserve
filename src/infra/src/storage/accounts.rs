@@ -17,7 +17,7 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::get_config;
+use config::{get_config, utils::hash::Sum64};
 use futures::stream::BoxStream;
 use hashbrown::HashMap;
 use object_store::{
@@ -31,6 +31,7 @@ const DEFAULT_ACCOUNT: &str = "default";
 
 pub struct StorageClientFactory {
     accounts: HashMap<String, Box<dyn ObjectStore>>,
+    stream_strategy: StreamStrategy,
     only_default: bool,
 }
 
@@ -44,10 +45,11 @@ impl Default for StorageClientFactory {
 /// It is used to manage multiple storage clients for different accounts.
 impl StorageClientFactory {
     pub fn new() -> Self {
-        let accounts = parse_storage_config();
+        let (stream_strategy, accounts) = parse_storage_config();
         let mut storage = Self {
             accounts: HashMap::with_capacity(accounts.len()),
             only_default: accounts.len() == 1,
+            stream_strategy,
         };
         for (name, config) in accounts {
             storage
@@ -57,14 +59,29 @@ impl StorageClientFactory {
         storage
     }
 
+    /// Get the account name for the given stream with the given strategy.
+    pub fn get_name_by_stream(&self, stream: &str) -> Option<String> {
+        if self.only_default {
+            return None;
+        }
+        match &self.stream_strategy {
+            StreamStrategy::Default => None,
+            StreamStrategy::Hash(account_names) => {
+                let mut h = config::utils::hash::gxhash::new();
+                let v = h.sum64(stream);
+                let account_name = account_names[v as usize % account_names.len()].clone();
+                Some(account_name)
+            }
+            StreamStrategy::Stream(stream_map) => stream_map.get(stream).map(|s| s.to_string()),
+        }
+    }
+
     /// Get the client name for the given path.
     pub fn get_client_name(&self, path: Option<&Path>) -> Option<String> {
         if !self.only_default && path.is_some() {
             let stream = get_stream_from_file(path.unwrap());
             if let Some(stream) = stream {
-                // TODO: get account by strategy: stream name, stream name hash, etc.
-                let name = stream;
-                return Some(name);
+                return self.get_name_by_stream(&stream);
             }
         }
         None
@@ -91,10 +108,15 @@ impl StorageClientFactory {
     }
 }
 
-pub fn parse_storage_config() -> HashMap<String, StorageConfig> {
+pub fn parse_storage_config() -> (StreamStrategy, HashMap<String, StorageConfig>) {
     let cfg = get_config();
     // check account based on ZO_S3_ACCOUNTS
-    let account_names = cfg.s3.accounts.split(",").collect::<Vec<&str>>();
+    let account_names = cfg
+        .s3
+        .accounts
+        .split(",")
+        .map(|s| s.trim().to_string())
+        .collect::<Vec<String>>();
     let account_num = account_names.len();
     let mut accounts = HashMap::with_capacity(account_num);
 
@@ -113,9 +135,12 @@ pub fn parse_storage_config() -> HashMap<String, StorageConfig> {
         },
     );
 
+    // parse stream strategy
+    let stream_strategy = StreamStrategy::new(&cfg.s3.stream_strategy, account_names.clone());
+
     // only one account, use default
     if account_num <= 1 {
-        return accounts;
+        return (stream_strategy, accounts);
     }
 
     // check multi accounts config
@@ -138,12 +163,11 @@ pub fn parse_storage_config() -> HashMap<String, StorageConfig> {
     }
 
     // add accounts
-    for i in 0..account_num {
-        let name = account_names[i].to_string();
+    for (i, name) in account_names.into_iter().enumerate() {
         accounts.insert(
             name.clone(),
             StorageConfig {
-                name: name.clone(),
+                name,
                 provider: providers[i].to_string(),
                 server_url: server_urls[i].to_string(),
                 region_name: region_names[i].to_string(),
@@ -154,7 +178,7 @@ pub fn parse_storage_config() -> HashMap<String, StorageConfig> {
             },
         );
     }
-    accounts
+    (stream_strategy, accounts)
 }
 
 impl std::fmt::Debug for StorageClientFactory {
@@ -166,6 +190,32 @@ impl std::fmt::Debug for StorageClientFactory {
 impl std::fmt::Display for StorageClientFactory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("storage for StorageClientFactory")
+    }
+}
+
+#[derive(Debug)]
+pub enum StreamStrategy {
+    Default,
+    Hash(Vec<String>),               // account name list
+    Stream(HashMap<String, String>), // stream name -> account name
+}
+
+impl StreamStrategy {
+    pub fn new(strategy: &str, account_names: Vec<String>) -> Self {
+        match strategy.to_lowercase().as_str() {
+            "" => Self::Default,
+            "hash" | "hashing" => Self::Hash(account_names),
+            _ => {
+                let mut stream_map = HashMap::new();
+                for part in strategy.split(",") {
+                    let pos = part.rfind(":").unwrap();
+                    let stream_name = part[0..pos].to_string();
+                    let account_name = part[pos + 1..].to_string();
+                    stream_map.insert(stream_name, account_name);
+                }
+                Self::Stream(stream_map)
+            }
+        }
     }
 }
 
