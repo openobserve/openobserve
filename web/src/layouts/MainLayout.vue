@@ -466,6 +466,7 @@ import {
   getImageURL,
   invlidateLoginData,
   getLogoutURL,
+  logger,
 } from "../utils/zincutils";
 
 import {
@@ -763,6 +764,7 @@ export default defineComponent({
 
     onBeforeMount(() => {
       try {
+        logger.log("onBeforeMount MainLayout -------------");
         const url = new URL(window.location.href);
         const localOrg: any = useLocalOrganization();
         if (
@@ -1173,7 +1175,7 @@ export default defineComponent({
             setRumUser();
           }
         })
-        .catch((error) => console.log(error));
+        .catch((error) => console.error("Error while getting config", error));
     };
 
     if (config.isCloud == "true") {

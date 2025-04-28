@@ -71,7 +71,7 @@ export const usePanelDataLoader = (
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
-    //   console.log(panelSchema?.value?.title + ": ", ...args);
+    //   logger.log(panelSchema?.value?.title + ": ", ...args);
     // }
   };
   let runCount = 0;
@@ -1512,7 +1512,7 @@ export const usePanelDataLoader = (
   watch(
     () => variablesData?.value?.values,
     () => {
-      // console.log("inside watch variablesData");
+      // logger.log("inside watch variablesData");
       // ensure the query is there
       // if (!panelSchema.value.queries?.length) {
       //   return;

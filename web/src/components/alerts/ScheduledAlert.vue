@@ -1039,7 +1039,6 @@ const addField = () => {
 
 const updateDateTimePicker = (data: any) => {
   emits("update:multi_time_range", dateTimePicker.value);
-  console.log("data", dateTimePicker.value);
 };
 
 const removeTimeShift = (index: any) => {
@@ -1230,8 +1229,6 @@ const filterColumns = (options: string[], val: string, update: Function) => {
     });
   }
 
-  console.log("options", options);
-
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter((column: any) => {
@@ -1372,7 +1369,7 @@ const validateFrequency = (frequency: {
 
     if (frequency.frequency < intervalInMins) {
       cronJobError.value =
-        "Minimum frequency should be " + (intervalInMins) + " minutes";
+        "Minimum frequency should be " + intervalInMins + " minutes";
       return;
     }
   }
@@ -1394,7 +1391,7 @@ defineExpose({
   overflow: hidden;
 }
 </style>
-<style lang="scss" >
+<style lang="scss">
 .scheduled-alert-tabs {
   .q-tab--active {
     background-color: $primary;

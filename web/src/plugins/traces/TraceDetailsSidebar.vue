@@ -142,10 +142,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
                 "
               >
-                {{ key }} 
+                {{ key }}
               </td>
               <td class="q-py-xs q-px-sm">
-                <span v-html="highlightSearch(String(val))"></span> 
+                <span v-html="highlightSearch(String(val))"></span>
               </td>
             </tr>
           </template>
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ key }}
               </td>
               <td class="q-py-xs q-px-sm">
-                <span v-html="highlightSearch(val)"></span> 
+                <span v-html="highlightSearch(val)"></span>
               </td>
             </tr>
           </template>
@@ -174,7 +174,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </table>
     </q-tab-panel>
     <q-tab-panel name="attributes">
-      <pre class="attr-text" v-html="highlightedAttributes(spanDetails.attrs)"></pre>
+      <pre
+        class="attr-text"
+        v-html="highlightedAttributes(spanDetails.attrs)"
+      ></pre>
     </q-tab-panel>
     <q-tab-panel name="events">
       <q-virtual-scroll
@@ -209,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="pointer"
           >
             <q-td
-              v-for="(column,columnIndex) in eventColumns"
+              v-for="(column, columnIndex) in eventColumns"
               :key="index + '-' + column.name"
               class="field_list"
               style="cursor: pointer"
@@ -229,16 +232,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mr-xs"
                   @click.stop="expandEvent(index)"
                 ></q-btn>
-                <span  v-if="column.name !== '@timestamp'" v-html="highlightSearch(column.prop(row))"></span> 
-               <span v-else> {{ column.prop(row) }}</span>
+                <span
+                  v-if="column.name !== '@timestamp'"
+                  v-html="highlightSearch(column.prop(row))"
+                ></span>
+                <span v-else> {{ column.prop(row) }}</span>
               </div>
             </q-td>
           </q-tr>
           <q-tr v-if="expandedEvents[index.toString()]">
             <td colspan="2">
               <!-- <pre class="log_json_content">{{ row }}</pre> -->
-              <pre class="log_json_content" v-html="highlightedAttributes(row)"></pre>
-
+              <pre
+                class="log_json_content"
+                v-html="highlightedAttributes(row)"
+              ></pre>
             </td>
           </q-tr>
         </template>
@@ -302,7 +310,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mr-xs"
                   @click.stop="expandEvent(index)"
                 ></q-btn>
-                <span  v-if="column.name !== '@timestamp'" v-html="highlightSearch(column.prop(row))"></span> 
+                <span
+                  v-if="column.name !== '@timestamp'"
+                  v-html="highlightSearch(column.prop(row))"
+                ></span>
                 <span v-else> {{ column.prop(row) }}</span>
               </div>
             </q-td>
@@ -432,7 +443,7 @@ export default defineComponent({
     },
     searchQuery: {
       type: String,
-      default: '',
+      default: "",
     },
   },
   emits: ["close", "view-logs", "select-span", "open-trace"],
@@ -455,40 +466,45 @@ export default defineComponent({
     const { buildQueryDetails, navigateToLogs } = useTraces();
     const isLinksExpanded = ref(false);
     const router = useRouter();
-    const highlightSearch = (value: any,preserveString:any = false): string => {
+    const highlightSearch = (
+      value: any,
+      preserveString: any = false,
+    ): string => {
       if (!props.searchQuery) {
         // Return the object/JSON value as is if there's no search query
-        return typeof value === 'object' && value !== null
+        return typeof value === "object" && value !== null
           ? JSON.stringify(value, null, 2)
           : value;
       }
 
-      if (typeof value === 'string') {
+      if (typeof value === "string") {
         // Highlight text in string values
-        const regex = new RegExp(`(${props.searchQuery})`, 'gi');
-        if(preserveString){
-          return `"${value.replace(regex, (match) => `<span class="highlight ${store.state.theme === 'dark' ? 'tw-text-gray-900' : ''}">${match}</span>`)}"`;
+        const regex = new RegExp(`(${props.searchQuery})`, "gi");
+        if (preserveString) {
+          return `"${value.replace(regex, (match) => `<span class="highlight ${store.state.theme === "dark" ? "tw-text-gray-900" : ""}">${match}</span>`)}"`;
+        } else {
+          return value.replace(
+            regex,
+            (match) =>
+              `<span class="highlight ${store.state.theme === "dark" ? "tw-text-gray-900" : ""}">${match}</span>`,
+          );
         }
-        else{
-          return value.replace(regex, (match) => `<span class="highlight ${store.state.theme === 'dark' ? 'tw-text-gray-900' : ''}">${match}</span>`);
-        }
-
       } else if (Array.isArray(value)) {
-        return `[${value.map((item) => highlightSearch(item)).join(', ')}]`;
-      } else if (typeof value === 'object' && value !== null) {
+        return `[${value.map((item) => highlightSearch(item)).join(", ")}]`;
+      } else if (typeof value === "object" && value !== null) {
         const highlightedEntries = Object.entries(value).map(([key, val]) => {
           // Do not highlight the keys; only process the values
-          const highlightedVal = highlightSearch(val,true);
+          const highlightedVal = highlightSearch(val, true);
           return `"${key}": ${highlightedVal}`;
         });
-        return `{\n  ${highlightedEntries.join(',\n  ')}\n}`;
+        return `{\n  ${highlightedEntries.join(",\n  ")}\n}`;
       } else {
         return JSON.stringify(value);
       }
     };
 
     const highlightedAttributes = computed(() => {
-      return (value: any) => highlightSearch(value,true);
+      return (value: any) => highlightSearch(value, true);
     });
 
     watch(
@@ -500,11 +516,11 @@ export default defineComponent({
       },
       {
         deep: true,
-      }
+      },
     );
 
     const getDuration = computed(() =>
-      formatTimeWithSuffix(props.span.duration)
+      formatTimeWithSuffix(props.span.duration),
     );
 
     onBeforeMount(() => {
@@ -519,12 +535,12 @@ export default defineComponent({
         field: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
         align: "left",
@@ -540,16 +556,20 @@ export default defineComponent({
       },
     ]);
     const secondTdWidth = ref<number | null>(null);
-      // Function to calculate width dynamically
+    // Function to calculate width dynamically
     const getSecondTdWidth = (columnIndex: number) => {
       if (columnIndex === 1) {
-        const tableElement = document.querySelector('.q-virtual-scroll') as HTMLElement | null;
+        const tableElement = document.querySelector(
+          ".q-virtual-scroll",
+        ) as HTMLElement | null;
         const tableWidth = tableElement?.offsetWidth || 0;
 
         const headersWidth = eventColumns.value
           .slice(0, columnIndex)
           .reduce((acc, col) => {
-            const headerElement = document.querySelector(`[data-test="trace-events-table-th-${col.label}"]`) as HTMLElement | null;
+            const headerElement = document.querySelector(
+              `[data-test="trace-events-table-th-${col.label}"]`,
+            ) as HTMLElement | null;
             const colWidth = headerElement?.offsetWidth || 0;
             return acc + colWidth;
           }, 0);
@@ -558,28 +578,30 @@ export default defineComponent({
       }
       return secondTdWidth.value
         ? `width: ${secondTdWidth.value}px; white-space: normal; word-break: break-word;`
-        : '';
-
+        : "";
     };
     // Recalculate width when component is mounted or updated
     onMounted(() => {
       getSecondTdWidth(1);
     });
-    watch(() => eventColumns, () => {
-      getSecondTdWidth(1);
-    });
+    watch(
+      () => eventColumns,
+      () => {
+        getSecondTdWidth(1);
+      },
+    );
     const exceptionEventColumns = ref([
       {
         name: "@timestamp",
         field: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
         align: "left",
@@ -616,7 +638,7 @@ export default defineComponent({
 
     const getExceptionEvents = computed(() => {
       return spanDetails.value.events.filter(
-        (event: any) => event.name === "exception"
+        (event: any) => event.name === "exception",
       );
     });
 
@@ -651,14 +673,14 @@ export default defineComponent({
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
           Math.floor(
-            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000
+            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
           ),
-          "MMM DD, YYYY HH:mm:ss.SSS Z"
+          "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       spanDetails.events = JSON.parse(props.span.events || "[]").map(
-        (event: any) => event
+        (event: any) => event,
       );
 
       return spanDetails;
@@ -697,7 +719,7 @@ export default defineComponent({
       {
         deep: true,
         immediate: true,
-      }
+      },
     );
     function formatStackTrace(trace: any) {
       // Split the trace into lines
@@ -792,7 +814,7 @@ export default defineComponent({
           return props.span.links;
         }
       } catch (e) {
-        console.log("Error parsing span links:", e);
+        console.error("Error parsing span links:", e);
         return [];
       }
     });
@@ -824,7 +846,7 @@ export default defineComponent({
       secondTdWidth,
       getSecondTdWidth,
       highlightSearch,
-      highlightedAttributes
+      highlightedAttributes,
     };
   },
 });

@@ -347,7 +347,7 @@ export function convertOffsetToSeconds(
       periodAsStr: periodAsStr,
     };
   } catch (error) {
-    console.log(error);
+    console.error("Error in convertOffsetToSeconds", error);
     return {
       seconds: 0,
       periodAsStr: "",

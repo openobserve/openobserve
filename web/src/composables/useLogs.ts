@@ -526,7 +526,7 @@ const useLogs = () => {
       }
       return;
     } catch (e: any) {
-      console.log("Error while loading stream list");
+      console.error("Error while loading stream list", e);
     }
   }
 
@@ -548,7 +548,7 @@ const useLogs = () => {
       return;
     } catch (e: any) {
       searchObj.loadingStream = false;
-      console.log("Error while loading stream fields");
+      console.error("Error while loading stream fields", e);
     }
   }
 
@@ -563,7 +563,7 @@ const useLogs = () => {
       await loadStreamLists();
       return;
     } catch (e: any) {
-      console.log("Error while getting stream list");
+      console.error("Error while getting stream list", e);
     }
   };
 
@@ -1374,7 +1374,7 @@ const useLogs = () => {
         }
       }
     } catch (e: any) {
-      console.log("error", e);
+      console.error("Error in getQueryPartitions", e);
       notificationMsg.value = "Error while getting search partitions.";
       searchObj.data.queryResults.error = e.message;
       throw e;
@@ -1538,7 +1538,7 @@ const useLogs = () => {
         searchObj.data.queryResults.partitionDetail = partitionDetail;
       }
     } catch (e: any) {
-      console.log("Error while refreshing partition pagination", e);
+      console.error("Error while refreshing partition pagination", e);
       notificationMsg.value = "Error while refreshing partition pagination.";
       return false;
     }
@@ -2879,7 +2879,7 @@ const useLogs = () => {
         }
       }
     } catch (e: any) {
-      console.log("Error while updating field values", e);
+      console.error("Error while updating field values", e);
     }
   };
 
@@ -3308,7 +3308,7 @@ const useLogs = () => {
       searchObjDebug["extractFieldsEndTime"] = performance.now();
     } catch (e: any) {
       searchObj.loadingStream = false;
-      console.log("Error while extracting fields.", e);
+      console.error("Error while extracting fields.", e);
       notificationMsg.value = "Error while extracting stream fields.";
     }
   }
@@ -3535,7 +3535,7 @@ const useLogs = () => {
         }
       }
     } catch (err) {
-      console.log("Error while calculation column width");
+      console.error("Error while calculation column width", err);
     }
 
     max += 24; // 24px padding
@@ -3633,7 +3633,7 @@ const useLogs = () => {
         ")";
       return title;
     } catch (e: any) {
-      console.log("Error while generating histogram title", e);
+      console.error("Error while generating histogram title", e);
       notificationMsg.value = "Error while generating histogram title.";
       return "";
     }
@@ -3706,7 +3706,7 @@ const useLogs = () => {
         errorDetail: "",
       };
     } catch (e: any) {
-      console.log("Error while generating histogram data", e);
+      console.error("Error while generating histogram data", e);
       notificationMsg.value = "Error while generating histogram data.";
     }
   }
@@ -3959,7 +3959,7 @@ const useLogs = () => {
         store.dispatch("setRefreshIntervalID", 0);
       }
     } catch (e: any) {
-      console.log("Error while refreshing data", e);
+      console.error("Error while refreshing data", e);
     }
   };
 
@@ -3991,7 +3991,7 @@ const useLogs = () => {
       refreshData();
     } catch (e: any) {
       searchObj.loading = false;
-      console.log("Error while loading logs data");
+      console.error("Error while loading logs data", e);
     }
   };
 
@@ -4003,7 +4003,7 @@ const useLogs = () => {
       searchObj.loading = true;
       await getQueryData();
     } catch (e: any) {
-      console.log("Error while loading logs data");
+      console.error("Error while loading logs data", e);
     }
   };
   const saveColumnSizes = () => {};
@@ -4028,7 +4028,7 @@ const useLogs = () => {
       await getQueryData();
       clearTimeout(queryTimeout);
     } catch (e: any) {
-      console.log("Error while loading logs data");
+      console.error("Error while loading logs data", e);
     }
   };
 
@@ -4246,11 +4246,11 @@ const useLogs = () => {
         })
         .catch((err) => {
           searchObj.loadingSavedView = false;
-          console.log(err);
+          console.error("Error while getting saved views", err);
         });
     } catch (e: any) {
       searchObj.loadingSavedView = false;
-      console.log("Error while getting saved views", e);
+      console.error("Error while getting saved views", e);
     }
   };
 
@@ -4578,7 +4578,7 @@ const useLogs = () => {
 
       return expression;
     } catch (e: any) {
-      console.log("Error while getting filter expression by field type", e);
+      console.error("Error while getting filter expression by field type", e);
       return `${field} ${operator} '${field_value}'`;
     }
   };
@@ -5281,7 +5281,7 @@ const useLogs = () => {
       searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
     } catch (e: any) {
       searchObj.loading = false;
-      console.log(e);
+      console.error("Error in handleLogsResponse", e);
       showErrorNotification(
         notificationMsg.value || "Error occurred while handling logs response.",
       );
@@ -5693,7 +5693,7 @@ const useLogs = () => {
         });
       }
     } catch (e: any) {
-      console.log("Error while refreshing partition pagination", e);
+      console.error("Error while refreshing partition pagination", e);
       notificationMsg.value = "Error while refreshing partition pagination.";
       return false;
     }
@@ -5722,9 +5722,8 @@ const useLogs = () => {
           size: rowsPerPage,
         });
       }
-      // console.log("searchObj.data.queryResults.pagination", searchObj.data.queryResults.pagination);
     } catch (e: any) {
-      console.log("Error while refreshing pagination", e);
+      console.error("Error while refreshing pagination", e);
       notificationMsg.value = "Error while refreshing pagination.";
       return false;
     }

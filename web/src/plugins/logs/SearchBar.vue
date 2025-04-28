@@ -1209,6 +1209,7 @@ import {
   queryIndexSplit,
   timestampToTimezoneDate,
   b64EncodeUnicode,
+  logger,
 } from "@/utils/zincutils";
 
 import savedviewsService from "@/services/saved_views";
@@ -1263,7 +1264,7 @@ export default defineComponent({
     },
     changeFunctionName(value) {
       // alert(value)
-      // console.log(value);
+      // logger.log(value);
     },
     createNewValue(inputValue, doneFn) {
       // Call the doneFn with the new value
@@ -1738,9 +1739,12 @@ export default defineComponent({
         if (searchObj.meta.sqlMode === true) {
           searchObj.data.parsedQuery = parser.astify(value);
           if (searchObj.data.parsedQuery?.from?.length > 0) {
-            //this condition is to handle the with queries so for WITH queries the table name is not present in the from array it will be there in the with array 
+            //this condition is to handle the with queries so for WITH queries the table name is not present in the from array it will be there in the with array
             //the table which is there in from array is the temporary array
-            const tableName: string = !searchObj.data.parsedQuery.with ? searchObj.data.parsedQuery.from[0].table || searchObj.data.parsedQuery.from[0].expr?.ast?.from?.[0]?.table : "";
+            const tableName: string = !searchObj.data.parsedQuery.with
+              ? searchObj.data.parsedQuery.from[0].table ||
+                searchObj.data.parsedQuery.from[0].expr?.ast?.from?.[0]?.table
+              : "";
             if (
               !searchObj.data.stream.selectedStream.includes(tableName) &&
               tableName !== streamName
@@ -1794,7 +1798,7 @@ export default defineComponent({
           }
         }
       } catch (e) {
-        console.log(e, "Logs: Error while updating query value");
+        logger.log("Logs: Error while updating query value", e);
       }
     };
     const handleEscKey = (event: KeyboardEvent) => {
@@ -2137,7 +2141,7 @@ export default defineComponent({
           timeout: 3000,
         });
       }
-      console.log(
+      logger.log(
         "fnValue",
         fnValue,
         fnEditorRef?.value,
@@ -2488,7 +2492,7 @@ export default defineComponent({
                 searchObj.shouldIgnoreWatcher = false;
               } catch (e) {
                 searchObj.shouldIgnoreWatcher = false;
-                console.log(e);
+                console.error("Error while applying saved view", e);
               }
             }, 1000);
 
@@ -2547,7 +2551,7 @@ export default defineComponent({
             position: "bottom",
             timeout: 1000,
           });
-          console.log(err);
+          console.error("Error while applying saved view", err);
         });
       // const extractedObj = JSON.parse(b64DecodeUnicode(item.data));
       // searchObj.value = mergeDeep(searchObj, extractedObj);
@@ -2626,10 +2630,10 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            console.log(err);
+            console.error(err);
           });
       } catch (e: any) {
-        console.log("Error while getting saved views", e);
+        console.error("Error while getting saved views", e);
       }
     };
 
@@ -2655,7 +2659,7 @@ export default defineComponent({
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
       } catch (e) {
-        console.log("Error while encoding search obj", e);
+        console.error("Error while encoding search obj", e);
       }
     };
 
@@ -2719,7 +2723,7 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            console.log(err);
+            console.error("Error while creating saved view", err);
           });
       } catch (e: any) {
         isSavedViewAction.value = "create";
@@ -2731,7 +2735,7 @@ export default defineComponent({
           position: "bottom",
           timeout: 1000,
         });
-        console.log("Error while saving view", e);
+        console.error("Error while saving view", e);
       }
     };
 
@@ -2793,7 +2797,7 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            console.log(err);
+            console.error("Error while updating saved view", err);
           });
       } catch (e: any) {
         isSavedViewAction.value = "create";
@@ -2805,7 +2809,7 @@ export default defineComponent({
           position: "bottom",
           timeout: 1000,
         });
-        console.log("Error while saving view", e);
+        console.error("Error while saving view", e);
       }
     };
 
@@ -2984,12 +2988,11 @@ export default defineComponent({
                 (item) => item.view_id != row.view_id,
               );
               // for (const [key, item] of favoriteViewsList.entries()) {
-              //   console.log(item, key);
+              //   logger.log(item, key);
               //   if (item.view_id == row.view_id) {
               //     delete favoriteViewsList[key];
               //   }
               // }
-              console.log(favoriteViewsList);
               localSavedViews.value = favoriteViewsList;
             }
           }
@@ -3261,7 +3264,6 @@ export default defineComponent({
     };
 
     const selectTransform = (item: any, isSelected: boolean) => {
-      console.log("item", item);
       if (searchObj.data.transformType === "function") {
         populateFunctionImplementation(item, isSelected);
       }

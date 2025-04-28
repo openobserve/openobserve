@@ -1,5 +1,6 @@
 // useWebSocket.ts
 
+import { logger } from "@/utils/zincutils";
 import { onBeforeUnmount } from "vue";
 
 type MessageHandler = (event: MessageEvent, socketId: string) => void;
@@ -66,7 +67,7 @@ const onMessage = (socketId: string, event: MessageEvent) => {
 };
 
 const onClose = (socketId: string, event: CloseEvent) => {
-  console.log("onClose", socketId, event.code, event.reason);
+  logger.log("onClose", socketId, event.code, event.reason);
   clearInterval(pingIntervals[socketId]);
   delete pingIntervals[socketId];
   delete sockets[socketId];

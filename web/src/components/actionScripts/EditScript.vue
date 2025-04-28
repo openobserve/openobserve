@@ -924,7 +924,7 @@ const saveActionScript = async () => {
     const isValidForm = await addActionScriptFormRef.value.validate();
     if (!isValidForm) return;
   } catch (err) {
-    console.log(err);
+    console.error("Error while saving Action", err);
   }
 
   const updateAction =

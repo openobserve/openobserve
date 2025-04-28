@@ -1102,7 +1102,7 @@ export default defineComponent({
       } catch (err) {
         fieldValues.value[name]["isLoading"] = false;
 
-        console.log(err);
+        console.error("Error while fetching field values", err);
         $q.notify({
           type: "negative",
           message: "Error while fetching field values",
@@ -1507,9 +1507,9 @@ export default defineComponent({
           searchObj.data.stream.selectedStreamFields,
         );
         let count = 0;
-        // console.log(searchObj.data.stream.selectedStreamFields)
-        // console.log(searchObj.data.stream.expandGroupRows)
-        // console.log(searchObj.data.stream.expandGroupRowsFieldCount)
+        // logger.log(searchObj.data.stream.selectedStreamFields)
+        // logger.log(searchObj.data.stream.expandGroupRows)
+        // logger.log(searchObj.data.stream.expandGroupRowsFieldCount)
         for (let key of expandKeys) {
           if (
             searchObj.data.stream.expandGroupRows[key] == false &&
@@ -1520,11 +1520,11 @@ export default defineComponent({
               selectedStreamFields.length -
               searchObj.data.stream.expandGroupRowsFieldCount[key];
             if (startIndex > 0) {
-              // console.log("startIndex", startIndex)
-              // console.log("count", count)
-              // console.log("selectedStreamFields", selectedStreamFields.length)
-              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key])
-              // console.log("========")
+              // logger.log("startIndex", startIndex)
+              // logger.log("count", count)
+              // logger.log("selectedStreamFields", selectedStreamFields.length)
+              // logger.log(searchObj.data.stream.expandGroupRowsFieldCount[key])
+              // logger.log("========")
               selectedStreamFields.splice(
                 startIndex - count,
                 searchObj.data.stream.expandGroupRowsFieldCount[key],
@@ -1535,7 +1535,7 @@ export default defineComponent({
           }
           count++;
         }
-        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)))
+        // logger.log(JSON.parse(JSON.stringify(selectedStreamFields)))
         return selectedStreamFields;
       }),
       formatLargeNumber,

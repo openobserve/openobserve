@@ -709,7 +709,7 @@ export default defineComponent({
           }
         });
       } catch (e) {
-        console.log("Alerts: Error while parsing SQL query");
+        console.error("Alerts: Error while parsing SQL query", e);
       }
     };
     const editorData = ref("");
@@ -1036,7 +1036,7 @@ export default defineComponent({
         // In catch block we are returning true, as we just wanted to validate if user have added * in the query to select all columns
         // select field from default // here default is not wrapped in "" so node sql parser will throw error as default is a reserved keyword. But our Backend supports this query without quotes
         // Query will be validated in the backend
-        console.log(error);
+        console.error("Error in getParser", error);
         return true;
       }
     };
@@ -1177,7 +1177,7 @@ export default defineComponent({
         try {
           cronParser.parseExpression(input.trigger_condition.cron);
         } catch (err) {
-          console.log(err);
+          console.error("Error in validateInputs", err);
           scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
           return;
         }
@@ -1297,7 +1297,7 @@ export default defineComponent({
 
     const handleAlertError = (err: any) => {
       if (err.response?.status !== HTTP_FORBIDDEN) {
-        console.log(err);
+        console.error("Error in handleAlertError", err);
         q.notify({
           type: "negative",
           message: err.response?.data?.message || err.response?.data?.error,
@@ -1532,7 +1532,7 @@ export default defineComponent({
             await this.validateSqlQueryPromise;
           } catch (error) {
             dismiss();
-            console.log("Error while validating sql query");
+            console.error("Error while validating sql query", error);
             this.isAlertSaving = false;
             return false;
           }

@@ -127,12 +127,14 @@ export default defineComponent({
                 owner:
                   data.email == this.store.state.userInfo.email ? true : false,
               };
-            }
+            },
           );
 
           dismiss();
         })
-        .catch((error: any) => console.log(error));
+        .catch((error: any) =>
+          console.error("Error while getting associated members", error),
+        );
     },
   },
 });

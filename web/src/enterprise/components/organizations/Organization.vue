@@ -276,7 +276,7 @@ export default defineComponent({
         if (action == "add") {
           showAddOrganizationDialog.value = true;
         }
-      }
+      },
     );
 
     onMounted(() => {
@@ -343,7 +343,7 @@ export default defineComponent({
         organizations.value = res.data.data.map((data: any) => {
           const memberrole = data.OrganizationMemberObj.filter(
             (v: any) =>
-              v.user_id == store.state.currentuser.id && v.role == "admin"
+              v.user_id == store.state.currentuser.id && v.role == "admin",
           );
 
           if (
@@ -387,10 +387,6 @@ export default defineComponent({
 
         dismiss();
       });
-    };
-
-    const onAddTeam = (props: any) => {
-      console.log(props);
     };
 
     const inviteTeam = (props: any) => {
@@ -456,7 +452,6 @@ export default defineComponent({
       addOrganization,
       getOrganizations,
       inviteTeam,
-      onAddTeam,
       pagination,
       resultTotal,
       perPageOptions,

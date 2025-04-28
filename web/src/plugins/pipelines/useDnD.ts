@@ -26,6 +26,7 @@ const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
 import { getImageURL } from "@/utils/zincutils";
 import { Notify , useQuasar} from "quasar";
+import { logger } from "@/utils/zincutils";
 
 
 
@@ -200,7 +201,7 @@ export default function useDragAndDrop() {
 
   function onNodeChange(changes:any) {
 
-    console.log("Node change", changes);
+    logger.log("Node change", changes);
   }
 
   function onNodesChange(changes:any) {
@@ -216,7 +217,7 @@ export default function useDragAndDrop() {
     if(changes.length > 0){
       pipelineObj.edgesChange = true;
     }
-    console.log("Edges change", changes);
+    logger.log("Edges change", changes);
   }
 
   function onConnect(connection:any) {

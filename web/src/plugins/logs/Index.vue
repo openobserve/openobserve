@@ -626,7 +626,7 @@ export default defineComponent({
     //     loadLogsData();
     //   } catch (e) {
     //     searchObj.loading = false;
-    //     console.log(e);
+    //     logger.log(e);
     //   }
     // }
     // onUnmounted(() => {
@@ -792,7 +792,7 @@ export default defineComponent({
         refreshHistogramChart();
         showJobScheduler.value = true;
       } catch (e) {
-        console.log(e);
+        console.error("Error while running query", e);
       }
     };
 
@@ -1096,7 +1096,7 @@ export default defineComponent({
           searchBarRef.value.updateQuery();
         }
       } catch (e) {
-        console.log("Logs : Error in setQuery");
+        console.error("Logs : Error in setQuery", e);
       }
     };
 
@@ -1681,14 +1681,17 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",-1
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        } 
-        else if (this.searchObj.meta.sqlMode && (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))) {
+        } else if (
+          this.searchObj.meta.sqlMode &&
+          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
+        ) {
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
-            -1
+            -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (this.searchObj.data.stream.selectedStream.length > 1) {
@@ -1734,7 +1737,7 @@ export default defineComponent({
               this.searchResultRef.reDrawChart();
             })
             .catch((err: any) => {
-              console.log(err, "err in updating chart");
+              console.error("err in updating chart", err);
             })
             .finally(() => {
               this.searchObj.loadingHistogram = false;

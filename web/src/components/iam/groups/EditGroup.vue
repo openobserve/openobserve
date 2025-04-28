@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :removed-roles="removedRoles"
       />
       <GroupServiceAccounts
-      v-show="activeTab === 'serviceAccounts'"
+        v-show="activeTab === 'serviceAccounts'"
         :groupUsers="groupDetails.users"
         :activeTab="activeTab"
         :added-users="addedUsers"
@@ -154,7 +154,6 @@ const getGroupDetails = () => {
 
   getGroup(groupName, store.state.selectedOrganization.identifier)
     .then((res) => {
-      console.log(res,'res in get group')
       groupDetails.value = {
         ...res.data,
         group_name: res.data.name,
@@ -162,7 +161,7 @@ const getGroupDetails = () => {
       groupsState.groups[groupName] = groupDetails.value;
     })
     .catch((err) => {
-      console.log(err);
+      console.error("Error in getGroupDetails", err);
     });
 };
 
@@ -210,7 +209,7 @@ const saveGroupChanges = () => {
 
       // Reset Roles
       groupDetails.value.roles = groupDetails.value.roles.filter(
-        (user) => !removedRoles.value.has(user)
+        (user) => !removedRoles.value.has(user),
       );
 
       addedRoles.value.forEach((value: any) => {
@@ -223,7 +222,7 @@ const saveGroupChanges = () => {
 
       // Reset Users
       groupDetails.value.users = groupDetails.value.users.filter(
-        (user) => !removedUsers.value.has(user)
+        (user) => !removedUsers.value.has(user),
       );
 
       addedUsers.value.forEach((value: any) => {
@@ -235,7 +234,7 @@ const saveGroupChanges = () => {
       removedUsers.value = new Set([]);
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
           type: "negative",
           message: "Error while updating group!",

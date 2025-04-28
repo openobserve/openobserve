@@ -213,7 +213,7 @@ const onScroll = (e: any) => {
   try {
     emit("event-emitted", "scroll", e);
   } catch (e) {
-    console.log("error", e);
+    console.error("error in onScroll", e);
   }
 };
 </script>

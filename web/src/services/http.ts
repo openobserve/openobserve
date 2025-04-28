@@ -42,12 +42,12 @@ const http = ({ headers } = {} as any) => {
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:
-            console.log(
+            console.error(
               JSON.stringify(error.response.data["error"] || "Bad Request")
             );
             break;
           case 401:
-            console.log(
+            console.error(
               JSON.stringify(
                 error.response.data["error"] || "Invalid credentials"
               )
@@ -118,19 +118,19 @@ const http = ({ headers } = {} as any) => {
                 ],
               });
             }
-            console.log(
+            console.error(
               JSON.stringify(
                 error.response.data["error"] || "Unauthorized Access"
               )
             );
             break;
           case 404:
-            console.log(
+            console.error(
               JSON.stringify(error.response.data["error"] || "Not Found")
             );
             break;
           case 500:
-            console.log(
+            console.error(
               JSON.stringify(
                 error.response.data["error"] || "Invalid ServerError"
               )

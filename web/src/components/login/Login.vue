@@ -118,8 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
       class="o2-input login-inputs"
     >
-      <q-form ref="loginform"
-class="q-gutter-md" @submit.prevent="">
+      <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
         <q-input
           v-model="name"
           data-cy="login-user-id"
@@ -281,7 +280,7 @@ export default defineComponent({
                 useLocalCurrentUser(JSON.stringify(userInfo));
                 store.dispatch("setCurrentUser", userInfo);
 
-                if(store.state.zoConfig?.rum?.enabled) {
+                if (store.state.zoConfig?.rum?.enabled) {
                   openobserveRum.setUser({
                     name: userInfo.given_name + " " + userInfo.family_name,
                     email: userInfo.email,
@@ -404,7 +403,7 @@ export default defineComponent({
                 message: "Invalid username or password",
                 timeout: 4000,
               });
-              console.log(e);
+              console.error("Error in onSignIn", e);
             });
         } catch (e) {
           submitting.value = false;
@@ -413,7 +412,7 @@ export default defineComponent({
             color: "negative",
             message: "Please fill all the fields and try again.",
           });
-          console.log(e);
+          console.error("Error in onSignIn", e);
         }
       }
     };

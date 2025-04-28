@@ -469,7 +469,9 @@ export default defineComponent({
             });
           }
         })
-        .catch((err) => console.log(err))
+        .catch((err) =>
+          console.error("Error while getting filtered metric values", err),
+        )
         .finally(() => {
           metricLabelValues.value[name].isLoading = false;
         });

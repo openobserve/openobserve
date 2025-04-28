@@ -211,7 +211,7 @@ const usePromlqSuggestions = () => {
           }
         });
     } catch (e) {
-      console.log(e);
+      console.error("Error in getSuggestions", e);
     }
   };
 

@@ -401,7 +401,8 @@ const handleErrorEvent = (event: any) => {
 
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
-  _event.name = event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
+  _event.name =
+    event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
   // if (event.event.custom.error) {
   //   _event.name = event.event.custom.error.message;
   // }
@@ -430,7 +431,7 @@ const formatEvent = (event: any) => {
 
     return eventTypes[event.type](event);
   } catch (err) {
-    console.log(err);
+    console.error("Error in formatEvent", err);
     return null;
   }
 };
