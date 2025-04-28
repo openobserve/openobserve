@@ -25,10 +25,7 @@ use config::{
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
     },
-    utils::{
-        json,
-        json::{Map, Value},
-    },
+    utils::json::{Map, Value, get_string_value},
 };
 use infra::errors::Error;
 use tracing::Instrument;
@@ -1143,7 +1140,7 @@ pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<V
     for hit in hits {
         let key: String = hit
             .get("zo_sql_key")
-            .map(json::get_string_value)
+            .map(get_string_value)
             .unwrap_or_default();
         let num = hit
             .get("zo_sql_num")

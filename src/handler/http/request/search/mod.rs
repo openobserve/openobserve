@@ -751,8 +751,7 @@ pub async fn build_search_request_per_field(
         (start_time, end_time)
     };
 
-    let decoded_sql = base64::decode_url(&req.sql)
-        .unwrap_or_else(|_| format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME));
+    let decoded_sql = base64::decode_url(&req.sql).unwrap_or_default();
 
     let mut query = config::meta::search::Query {
         sql: decoded_sql.clone(), // Will be populated per field in the loop below
