@@ -730,7 +730,7 @@ impl super::Db for MysqlDb {
 }
 
 pub async fn create_table() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     DB_QUERY_NUMS
         .with_label_values(&["create", "meta", ""])
         .inc();
@@ -788,7 +788,7 @@ CREATE TABLE IF NOT EXISTS meta
 }
 
 async fn add_start_dt_column() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     let mut tx = pool.begin().await?;
 
     DB_QUERY_NUMS
@@ -828,7 +828,7 @@ async fn add_start_dt_column() -> Result<()> {
 }
 
 async fn create_meta_backup() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     let mut tx = pool.begin().await?;
     DB_QUERY_NUMS
         .with_label_values(&["create", "meta_backup_20240330", ""])
@@ -883,7 +883,7 @@ async fn create_meta_backup() -> Result<()> {
 }
 
 pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
-    let client = CLIENT.clone();
+    let client = CLIENT_DDL.clone();
     let indices = INDICES.get_or_init(cache_indices).await;
     if indices.contains(&DBIndex {
         name: index.idx_name.into(),
@@ -918,7 +918,7 @@ pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
 }
 
 pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
-    let client = CLIENT.clone();
+    let client = CLIENT_DDL.clone();
     let indices = INDICES.get_or_init(cache_indices).await;
     if !indices.contains(&DBIndex {
         name: idx_name.into(),
