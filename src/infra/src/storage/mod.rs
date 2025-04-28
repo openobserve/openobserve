@@ -23,6 +23,7 @@ use object_store::{GetRange, ObjectMeta, ObjectStore, WriteMultipart, path::Path
 use once_cell::sync::Lazy;
 use parquet::file::metadata::ParquetMetaDataReader;
 
+pub mod accounts;
 pub mod local;
 pub mod remote;
 
@@ -48,7 +49,7 @@ fn default() -> Box<dyn ObjectStore> {
             .expect("create stream data dir success");
         Box::<local::Local>::default()
     } else {
-        Box::<remote::Remote>::default()
+        Box::<accounts::StorageClientFactory>::default()
     }
 }
 
@@ -206,6 +207,20 @@ pub fn format_key(key: &str, with_prefix: bool) -> String {
     } else {
         key.to_string()
     }
+}
+
+pub fn get_stream_from_file(file: &Path) -> Option<String> {
+    // eg: files/default/logs/olympics/2023/08/21/08/a.parquet
+    // eg: files/default/traces/default/2023/09/04/05/default/service_name=ingester/
+    let parts = file.parts().collect::<Vec<_>>();
+    if parts.len() < 9 || parts[0] != "files".into() {
+        return None;
+    }
+    // 0 files
+    // 1 org_id
+    // 2 stream_type
+    // 3 stream_name
+    Some(parts[3].as_ref().to_string())
 }
 
 fn bytes_size_in_mb(b: &bytes::Bytes) -> f64 {

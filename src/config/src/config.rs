@@ -1649,6 +1649,12 @@ pub struct Nats {
 
 #[derive(Debug, EnvConfig)]
 pub struct S3 {
+    #[env_config(
+        name = "ZO_S3_ACCOUNTS",
+        default = "",
+        help = "comma separated list of accounts"
+    )]
+    pub accounts: String,
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
     pub provider: String,
     #[env_config(name = "ZO_S3_SERVER_URL", default = "")]
