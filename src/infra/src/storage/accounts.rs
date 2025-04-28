@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, utils::hash::Sum64};
 use futures::stream::BoxStream;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use object_store::{
     Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
     PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, path::Path,
@@ -206,6 +206,7 @@ impl StreamStrategy {
             "" => Self::Default,
             "hash" | "hashing" => Self::Hash(account_names),
             _ => {
+                let account_set = account_names.iter().collect::<HashSet<&String>>();
                 let mut stream_map = HashMap::new();
                 for part in strategy.split(",") {
                     let pos = part
@@ -216,6 +217,9 @@ impl StreamStrategy {
                     }
                     let stream_name = part[0..pos].to_string();
                     let account_name = part[pos + 1..].to_string();
+                    if !account_set.contains(&account_name) {
+                        panic!("invalid value of ZO_S3_STREAM_STRATEGY");
+                    }
                     stream_map.insert(stream_name, account_name);
                 }
                 Self::Stream(stream_map)
