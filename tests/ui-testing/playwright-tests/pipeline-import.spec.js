@@ -132,7 +132,7 @@ test.describe("Pipeline Import", () => {
 
         await pipelinesPage.fillScheduledPipelineDetails(randomPipeline, randomFirstFunction, randomPipelineDestination);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000);
         await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
         await page.waitForTimeout(5000);
         // Download Pipeline
@@ -140,7 +140,7 @@ test.describe("Pipeline Import", () => {
         
         // Delete Pipeline
         await pipelinesPage.deletePipeline(randomPipeline);  
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000);
         await pipelinesPage.validateTextMessage('Pipeline deleted successfully');
 
     });
@@ -170,7 +170,7 @@ test.describe("Pipeline Import", () => {
 
         await pipelinesPage.fillScheduledPipelineDetails(randomPipeline, randomFirstFunction, randomPipelineDestination);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000);
         await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
         await page.waitForTimeout(5000);
         // Download Pipeline
@@ -178,7 +178,7 @@ test.describe("Pipeline Import", () => {
         
         // Delete Pipeline
         await pipelinesPage.deletePipeline(randomPipeline);  
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000);
         await pipelinesPage.validateTextMessage('Pipeline deleted successfully');
 
     });
