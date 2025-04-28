@@ -1944,7 +1944,8 @@ export const convertSQLData = async (
         const field = panelSchema.queries[0].fields?.x.find(
           (it: any) =>
             it.functionName == "histogram" &&
-            it.column == store.state.zoConfig.timestamp_column,
+            it?.args?.[0]?.value?.field ==
+              store.state.zoConfig.timestamp_column,
         );
         // if histogram
         if (field) {
@@ -2250,12 +2251,12 @@ export const convertSQLData = async (
     const field = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
         it.functionName == "histogram" &&
-        it.column == store.state.zoConfig.timestamp_column,
+        it?.args?.[0]?.value?.field == store.state.zoConfig.timestamp_column,
     );
 
     const timestampField = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
-        !it.functionName && it.column == store.state.zoConfig.timestamp_column,
+        !it.functionName && it.args[0] == store.state.zoConfig.timestamp_column,
     );
 
     //if x axis has time series
