@@ -195,25 +195,25 @@ export class PipelinesPage {
     }
 
     async downloadPipeline(name) {
-        const pipelineLocator = this.page.locator(`[data-test="pipeline-list-${name}-export-pipeline"]`);
+        const pipelineExportButton = this.page.locator(`[data-test="pipeline-list-${name}-export-pipeline"]`);
     
         // Wait for the element to be visible and enabled before clicking
         try {
-            await pipelineLocator.waitFor({ state: 'visible', timeout: 60000 }); // Increase timeout if necessary
+            await pipelineExportButton.waitFor({ state: 'visible', timeout: 60000 }); // Increase timeout if necessary
         } catch (error) {
-            console.error(`Pipeline button not visible: ${error.message}`);
-            throw new Error(`Pipeline button not visible for: ${name}`);
+            console.error(`Pipeline export button not visible: ${error.message}`);
+            throw new Error(`Pipeline export button not visible for: ${name}`);
         }
     
         // Check if the button is enabled
-        const isEnabled = await pipelineLocator.isEnabled();
+        const isEnabled = await pipelineExportButton.isEnabled();
         if (!isEnabled) {
-            throw new Error(`Pipeline button is not enabled for: ${name}`);
+            throw new Error(`Pipeline export button is not enabled for: ${name}`);
         }
     
         // Click the button to start the download
-        await pipelineLocator.click();
-        console.log(`Clicked on the download button for pipeline: ${name}`);
+        await pipelineExportButton.click();
+        console.log(`Clicked on the export pipeline button for pipeline: ${name}`);
     
     
     }

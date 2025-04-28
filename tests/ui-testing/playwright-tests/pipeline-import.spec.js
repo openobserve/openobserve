@@ -23,7 +23,7 @@ test.describe("Pipeline Import", () => {
 
     test("Import RealTime Pipeline from URL, download and delete imported pipeline", async ({ page }) => {
 
-        const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
+        const randomPipeline = `prealtimeurl${Math.floor(Math.random() * 100000)}`;
         const randomFirstFunction = `first${Math.floor(Math.random() * 100000)}`;
         const randomSecondFunction = `second${Math.floor(Math.random() * 100000)}`;
 
@@ -42,7 +42,6 @@ test.describe("Pipeline Import", () => {
         await pipelinesPage.importJsonButtonPipeline();
         await pipelinesPage.fillPipelineDetails(randomPipeline, randomFirstFunction, randomSecondFunction);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/pipeline/pipelines?org_identifier=default");
         await page.waitForTimeout(5000);
         // Download Pipeline
         await pipelinesPage.downloadPipeline(randomPipeline);
@@ -72,7 +71,7 @@ test.describe("Pipeline Import", () => {
 
     test("Import RealTime Pipeline from JSON file, download and delete imported pipeline", async ({ page }) => {
 
-        const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
+        const randomPipeline = `prealtimefile${Math.floor(Math.random() * 100000)}`;
         const randomFirstFunction = `first${Math.floor(Math.random() * 100000)}`;
         const randomSecondFunction = `second${Math.floor(Math.random() * 100000)}`;
 
@@ -94,7 +93,6 @@ test.describe("Pipeline Import", () => {
         await pipelinesPage.importJsonButtonPipeline();
         await pipelinesPage.fillPipelineDetails(randomPipeline, randomFirstFunction, randomSecondFunction);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/pipeline/pipelines?org_identifier=default");
         await page.waitForTimeout(5000);
         // Download Pipeline
         await pipelinesPage.downloadPipeline(randomPipeline);
@@ -108,7 +106,7 @@ test.describe("Pipeline Import", () => {
 
     test("Import Scheduled Pipeline from URL, download and delete imported pipeline", async ({ page }) => {
 
-        const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
+        const randomPipeline = `scheduledurl${Math.floor(Math.random() * 100000)}`;
         const randomFirstFunction = `first${Math.floor(Math.random() * 100000)}`;
         const randomPipelineDestination = `destination${Math.floor(Math.random() * 100000)}`;
         await pipelineDestinations.navigateToManagement();
@@ -130,7 +128,6 @@ test.describe("Pipeline Import", () => {
 
         await pipelinesPage.fillScheduledPipelineDetails(randomPipeline, randomFirstFunction, randomPipelineDestination);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/pipeline/pipelines?org_identifier=default");
         await page.waitForTimeout(5000);
         // Download Pipeline
         await pipelinesPage.downloadPipeline(randomPipeline);
@@ -144,7 +141,7 @@ test.describe("Pipeline Import", () => {
 
     test("Import Scheduled Pipeline from JSON file, download and delete imported pipeline", async ({ page }) => {
 
-        const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
+        const randomPipeline = `scheduledfile${Math.floor(Math.random() * 100000)}`;
         const randomFirstFunction = `firstFunction${Math.floor(Math.random() * 100000)}`;
         const randomPipelineDestination = `pipelineDestination${Math.floor(Math.random() * 100000)}`;
         await pipelineDestinations.navigateToManagement();
@@ -168,7 +165,6 @@ test.describe("Pipeline Import", () => {
 
         await pipelinesPage.fillScheduledPipelineDetails(randomPipeline, randomFirstFunction, randomPipelineDestination);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/pipeline/pipelines?org_identifier=default");
         await page.waitForTimeout(5000);
         // Download Pipeline
         await pipelinesPage.downloadPipeline(randomPipeline);
