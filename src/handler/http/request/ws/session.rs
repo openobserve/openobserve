@@ -799,36 +799,47 @@ async fn handle_values_event(
                         }
                     }
                     Err(e) => {
-                        // Convert anyhow::Error to our Error type
-                        let error = Error::Message(e.to_string());
-                        let _ = handle_search_error(&error, &req_id, &trace_id_for_task).await;
+                        let handle_err = async || {
+                            let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
 
-                        #[cfg(feature = "enterprise")]
-                        let http_response_code: u16;
-                        #[cfg(feature = "enterprise")]
-                        {
-                            let http_response = map_error_to_http_response(&error, trace_id.to_string());
-                            http_response_code = http_response.status().into();
-                        }
-                        // Add audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                          audit(AuditMessage {
-                                  user_email: user_id,
-                                  org_id,
-                                  _timestamp: chrono::Utc::now().timestamp(),
-                                  protocol: Protocol::Ws,
-                                  response_meta: ResponseMeta {
-                                      http_method: "".to_string(),
-                                      http_path: path.clone(),
-                                      http_query_params: "".to_string(),
-                                      http_body: client_msg.to_json(),
-                                      http_response_code,
-                                      error_msg: Some(e.to_string()),
-                                      trace_id: Some(trace_id.to_string()),
-                                  },
-                              })
-                              .await;
+                            #[cfg(feature = "enterprise")]
+                            let http_response_code: u16;
+                            #[cfg(feature = "enterprise")]
+                            {
+                                let http_response = map_error_to_http_response(&e, trace_id.to_string());
+                                http_response_code = http_response.status().into();
+                            }
+                            // Add audit before closing
+                            #[cfg(feature = "enterprise")]
+                            if is_audit_enabled {
+                                audit(AuditMessage {
+                                    user_email: user_id,
+                                    org_id,
+                                    _timestamp: chrono::Utc::now().timestamp(),
+                                    protocol: Protocol::Ws,
+                                    response_meta: ResponseMeta {
+                                        http_method: "".to_string(),
+                                        http_path: path.clone(),
+                                        http_query_params: "".to_string(),
+                                        http_body: client_msg.to_json(),
+                                        http_response_code,
+                                        error_msg: Some(e.to_string()),
+                                        trace_id: Some(trace_id.to_string()),
+                                    },
+                                })
+                                .await;
+                            }
+                        };
+                        match &e {
+                            #[cfg(feature = "enterprise")]
+                            errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
+                                let cancel_res = WsServerEvents::CancelResponse {
+                                        trace_id: trace_id.to_string(),
+                                        is_success: true,
+                                    };
+                                    let _ = send_message(&req_id, cancel_res.to_json()).await;
+                                }
+                            _ => handle_err().await
                         }
                     }
                 }
