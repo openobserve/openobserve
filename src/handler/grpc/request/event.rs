@@ -16,7 +16,6 @@
 use std::ops::Range;
 
 use anyhow::Result;
-use bytes::Bytes;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -25,12 +24,14 @@ use config::{
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
 use futures_util::StreamExt;
+use hashbrown::{HashMap, HashSet};
 use infra::cache::file_data::{TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
 use opentelemetry::global;
 use proto::cluster_rpc::{
     EmptyResponse, FileContent, FileContentResponse, FileList, SimpleFileList,
     event_client::EventClient, event_server::Event,
 };
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
     Request, Response, Status, codec::CompressionEncoding, codegen::tokio_stream,
     metadata::MetadataValue,
@@ -41,12 +42,11 @@ use crate::handler::grpc::MetadataMap;
 
 pub struct Eventer;
 
-const CHUNK_SIZE: usize = 5 * 1024 * 1024; // 4MB chunks
+const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
 
 #[tonic::async_trait]
 impl Event for Eventer {
-    type GetFilesStream =
-        tokio_stream::wrappers::ReceiverStream<Result<FileContentResponse, Status>>;
+    type GetFilesStream = ReceiverStream<Result<FileContentResponse, Status>>;
 
     async fn send_file_list(
         &self,
@@ -70,7 +70,6 @@ impl Event for Eventer {
         // cache latest files for querier
         if cfg.cache_latest_files.enabled && LOCAL_NODE.is_querier() {
             let mut files_to_download = Vec::new();
-            let mut index_files_to_download = Vec::new();
 
             // Collect files to download
             for item in put_items.iter() {
@@ -83,7 +82,7 @@ impl Event for Eventer {
                 if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
                     if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
                     {
-                        index_files_to_download.push(ttv_file);
+                        files_to_download.push(ttv_file);
                     }
                 }
             }
@@ -91,26 +90,14 @@ impl Event for Eventer {
             // Try batch download first
             if get_config().cache_latest_files.download_from_node {
                 let mut failed_files = Vec::new();
-                let mut failed_index_files = Vec::new();
 
-                // Try batch download for parquet files
+                // Try batch download files
                 if !files_to_download.is_empty() {
-                    match get_files_from_notifier(&grpc_addr, &files_to_download).await {
+                    match download_from_node(&grpc_addr, &files_to_download).await {
                         Ok(failed) => failed_files = failed,
                         Err(e) => {
-                            log::error!("Failed to get files from notifier: {}", e);
+                            log::error!("[gRPC:Event] Failed to get files from notifier: {}", e);
                             failed_files = files_to_download;
-                        }
-                    }
-                }
-
-                // Try batch download for index files
-                if !index_files_to_download.is_empty() {
-                    match get_files_from_notifier(&grpc_addr, &index_files_to_download).await {
-                        Ok(failed) => failed_index_files = failed,
-                        Err(e) => {
-                            log::error!("Failed to get index files from notifier: {}", e);
-                            failed_index_files = index_files_to_download;
                         }
                     }
                 }
@@ -121,16 +108,7 @@ impl Event for Eventer {
                         infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &file)
                             .await
                     {
-                        log::error!("Failed to cache file data: {}", e);
-                    }
-                }
-
-                for file in failed_index_files {
-                    if let Err(e) =
-                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &file)
-                            .await
-                    {
-                        log::error!("Failed to cache index file data: {}", e);
+                        log::error!("[gRPC:Event] Failed to cache file data: {}", e);
                     }
                 }
             } else {
@@ -140,16 +118,7 @@ impl Event for Eventer {
                         infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &file)
                             .await
                     {
-                        log::error!("Failed to cache file data: {}", e);
-                    }
-                }
-
-                for file in index_files_to_download {
-                    if let Err(e) =
-                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &file)
-                            .await
-                    {
-                        log::error!("Failed to cache index file data: {}", e);
+                        log::error!("[gRPC:Event] Failed to cache file data: {}", e);
                     }
                 }
             }
@@ -203,22 +172,19 @@ impl Event for Eventer {
         request: Request<SimpleFileList>,
     ) -> Result<Response<Self::GetFilesStream>, Status> {
         let file_list = request.into_inner();
-        let (tx, rx) = tokio::sync::mpsc::channel(32);
+        let (tx, rx) = tokio::sync::mpsc::channel(4);
 
         // Spawn a task to handle the streaming
         tokio::spawn(async move {
-            for path in file_list.paths.iter() {
-                log::info!("handle_file_chunked: {}", path);
+            for path in file_list.files.iter() {
                 if let Err(e) = handle_file_chunked(path, tx.clone()).await {
-                    log::error!("Failed to handle file {}: {}", path, e);
+                    log::error!("[gRPC:Event] Failed to handle file {}: {}", path, e);
                     break;
                 }
             }
         });
 
-        Ok(Response::new(tokio_stream::wrappers::ReceiverStream::new(
-            rx,
-        )))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 }
 
@@ -233,13 +199,6 @@ async fn handle_file_chunked(
 
     while offset < total_size as usize {
         let chunk_size = std::cmp::min(CHUNK_SIZE, total_size - offset);
-        log::debug!(
-            "handle_file_chunked {} offset: {}, chunk_size: {}",
-            filename,
-            offset,
-            chunk_size
-        );
-
         let chunk = match infra::cache::file_data::disk::get(
             path,
             Some(Range {
@@ -252,7 +211,7 @@ async fn handle_file_chunked(
             Some(file_data) => file_data,
             None => {
                 if let Err(e) = tx.send(Err(Status::not_found(path))).await {
-                    log::error!("Failed to send error: {}", e);
+                    log::error!("[gRPC:Event] Failed to send error: {}", e);
                 }
                 return Err(Status::not_found(path));
             }
@@ -266,7 +225,7 @@ async fn handle_file_chunked(
         };
 
         if let Err(e) = tx.send(Ok(response)).await {
-            log::error!("Failed to send file chunk: {}", e);
+            log::error!("[gRPC:Event] Failed to send file chunk: {}", e);
             return Err(Status::internal("Failed to send file chunk"));
         }
 
@@ -274,7 +233,7 @@ async fn handle_file_chunked(
     }
 
     log::info!(
-        "handle file:{}, total_size: {}, offset: {} elapsed: {}ms",
+        "[gRPC:Event] Send file: {}, total_size: {}, offset: {} took: {} ms",
         path,
         total_size,
         offset,
@@ -284,9 +243,14 @@ async fn handle_file_chunked(
     Ok(())
 }
 
-async fn get_files_from_notifier(addr: &str, filekeys: &[String]) -> Result<Vec<String>> {
+async fn download_from_node(addr: &str, files: &[String]) -> Result<Vec<String>> {
     let start = std::time::Instant::now();
-    log::debug!("get_files_from_notifier start, files: {:?}", filekeys);
+    let cfg = get_config();
+    log::debug!(
+        "[gRPC:Event] Download files from node start, files: {:?}",
+        files.len()
+    );
+
     let token: MetadataValue<_> = get_internal_grpc_token()
         .parse()
         .map_err(|_| anyhow::anyhow!("Invalid token"))?;
@@ -297,71 +261,61 @@ async fn get_files_from_notifier(addr: &str, filekeys: &[String]) -> Result<Vec<
         Ok(req)
     });
 
-    let mut request = Request::new(SimpleFileList {
-        paths: filekeys.to_vec(),
+    let request = Request::new(SimpleFileList {
+        files: files.to_vec(),
     });
-    request.set_timeout(std::time::Duration::from_secs(
-        get_config().limit.query_timeout,
-    ));
 
     let response = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(
-            get_config().cache_latest_files.download_from_node_max_size * 1024 * 1024,
-        )
-        .max_encoding_message_size(
-            get_config().cache_latest_files.download_from_node_max_size * 1024 * 1024,
-        )
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .get_files(request)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to get files from {addr}, {e}"))?;
 
+    let mut file_contents = HashMap::new();
+    let mut downloaded_files = HashSet::new();
     let mut response_stream = response.into_inner();
-    let mut file_contents = std::collections::HashMap::new();
-    let mut downloaded_files = std::collections::HashSet::new();
-
     while let Some(response) = response_stream.next().await {
         let response =
             response.map_err(|e| anyhow::anyhow!("Failed to receive file chunk: {}", e))?;
         for content in response.entries {
-            file_contents.insert(content.filename.clone(), content.content);
+            let entry = file_contents
+                .entry(content.filename.clone())
+                .or_insert(bytes::BytesMut::new());
+            entry.extend_from_slice(&content.content);
             downloaded_files.insert(content.filename);
         }
     }
 
-    let time = start.elapsed().as_millis();
     log::debug!(
-        "Successfully retrieved {} files from {} in {}ms",
+        "[gRPC:Event] Successfully retrieved {} files from {} in {} ms",
         downloaded_files.len(),
         addr,
-        time
+        start.elapsed().as_millis()
     );
 
     // Cache the file contents
-    for (filekey, content) in file_contents {
-        let bytes = Bytes::from(content);
-        if let Err(e) =
-            infra::cache::file_data::set(TRACE_ID_FOR_CACHE_LATEST_FILE, &filekey, bytes).await
-        {
-            log::error!("Failed to cache file {}: {}", filekey, e);
-            downloaded_files.remove(&filekey);
-        } else {
-            log::info!("file:{} infra cache set successfully", filekey);
+    for (file, content) in file_contents {
+        if let Err(e) = infra::cache::file_data::set("", &file, content.freeze()).await {
+            log::error!("[gRPC:Event] Failed to cache file {}: {}", file, e);
+            downloaded_files.remove(&file);
         }
     }
 
     // Return list of failed files
-    let failed_files: Vec<_> = filekeys
+    let failed_files: Vec<_> = files
         .iter()
         .filter(|f| !downloaded_files.contains(*f))
         .cloned()
         .collect();
+
     log::debug!(
-        "Failed retrieved {} files from {} in {}ms",
+        "[gRPC:Event] Failed retrieved {} files from {} in {} ms",
         failed_files.len(),
         addr,
-        time
+        start.elapsed().as_millis()
     );
 
     Ok(failed_files)

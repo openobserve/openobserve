@@ -56,16 +56,6 @@ message IdxFileName {
     optional bytes segment_ids = 2;
 }
 
-
-message FileContentResponse {
-    repeated FileContent entries = 1;
-}
-
-message FileContent {
-    bytes content = 1;  // The actual parquet file content
-    string filename = 2;  // The name of the file
-}
-
 message SimpleFileList {
-    repeated string paths = 1;
+    repeated string files = 1;
 }
