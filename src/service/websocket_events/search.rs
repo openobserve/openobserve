@@ -1036,7 +1036,7 @@ pub async fn do_partitioned_search(
                 end_time,
                 modified_start_time,
                 modified_end_time,
-                &partition_order_by,
+                partition_order_by,
             );
             send_message(
                 req_id,
