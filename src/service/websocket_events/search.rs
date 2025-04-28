@@ -25,7 +25,7 @@ use config::{
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
     },
-    utils::json::{Map, Value},
+    utils::json::{Map, Value, get_string_value},
 };
 use infra::errors::Error;
 use tracing::Instrument;
@@ -1138,9 +1138,9 @@ pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<V
 
     let mut search_result_hits = Vec::new();
     for hit in hits {
-        let key = hit
+        let key: String = hit
             .get("zo_sql_key")
-            .and_then(|v| v.as_str().map(|s| s.to_string()))
+            .map(get_string_value)
             .unwrap_or_default();
         let num = hit
             .get("zo_sql_num")
