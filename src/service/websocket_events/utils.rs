@@ -291,7 +291,7 @@ pub enum WsClientEvents {
 }
 
 impl WsClientEvents {
-    pub fn event_type(self) -> &'static str {
+    pub fn event_type(&self) -> &'static str {
         match self {
             WsClientEvents::Search(req) => req.event_type(),
             WsClientEvents::Values(req) => req.event_type(),
@@ -490,6 +490,10 @@ pub fn calculate_progress_percentage(
     req_end_time: i64,
     partition_order_by: &OrderBy,
 ) -> usize {
+    if req_end_time <= req_start_time {
+        return 0;
+    }
+
     let percentage = if *partition_order_by == OrderBy::Desc {
         // For dashboards/histograms partitions processed newest to oldest
         (req_end_time - partition_start_time) as f32 / (req_end_time - req_start_time) as f32
