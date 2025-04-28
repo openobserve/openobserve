@@ -1,4 +1,4 @@
-// pipelineDestinations.js
+
 import { expect } from '@playwright/test';
 
 
@@ -9,10 +9,15 @@ export class PipelineDestinations {
     }
 
     async navigateToPipelineDestinations() {
+
+        // Wait for the settings menu link to be visible before clicking
         await this.page.locator('[data-test="menu-link-settings-item"]').waitFor({ state: 'visible' });
         await this.page.locator('[data-test="menu-link-settings-item"]').click();
-        await this.page.waitForTimeout(2000);
+        
+        // Wait for the pipeline destinations tab to be visible before clicking
+        await this.page.locator('[data-test="pipeline-destinations-tab"]').waitFor({ state: 'visible' });
         await this.page.locator('[data-test="pipeline-destinations-tab"]').click();
+        
     }
 
     async addDestination(name, url) {

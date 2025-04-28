@@ -165,6 +165,30 @@ export class PipelinesPage {
         
     }
 
+    async fillPipelineDetails(name, functionName1, functionName2) {
+        // Wait for the name input field to be visible and then click and fill it
+        await this.page.locator(this.pipelineImportNameInput).waitFor({ state: 'visible' });
+        await this.page.locator(this.pipelineImportNameInput).click();
+        await this.page.locator(this.pipelineImportNameInput).fill(name);
+        
+        // Wait for the first function name input field to be visible before clicking
+        await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput).waitFor({ state: 'visible' });
+        await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput).click();
+        
+        // Wait for the option to be visible and then click it
+        await this.page.getByRole('option', { name: functionName1 }).waitFor({ state: 'visible' });
+        await this.page.getByRole('option', { name: functionName1 }).locator('div').nth(2).click();
+        
+        // Wait for the second function name input field to be visible before clicking
+        await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput2).waitFor({ state: 'visible' });
+        await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput2).click();
+        
+        // Wait for the second option to be visible and then click it
+        await this.page.getByRole('option', { name: functionName2 }).waitFor({ state: 'visible' });
+        await this.page.getByRole('option', { name: functionName2 }).click();
+    }
+    
+
     async importJsonButtonPipeline() {
         await this.page.locator(this.importJsonButton).waitFor({ state: 'visible' });
         await this.page.locator(this.importJsonButton).click();

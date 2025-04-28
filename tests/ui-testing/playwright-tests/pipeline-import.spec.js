@@ -42,7 +42,7 @@ test.describe("Pipeline Import", () => {
         await pipelinesPage.importJsonButtonPipeline();
         await pipelinesPage.fillPipelineDetails(randomPipeline, randomFirstFunction, randomSecondFunction);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000);
         await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
         await page.waitForTimeout(5000);
         // Download Pipeline
@@ -87,16 +87,15 @@ test.describe("Pipeline Import", () => {
         await pipelinesPage.gotoPipelinesPage();
         await pipelinesPage.importPipeline();
          //file name to be used for import
-         const fileContentPathRealTimePipeline = "../test-data/pipelineRealTime.json";
+        const fileContentPathRealTimePipeline = "../test-data/pipelineRealTime.json";
          // Locate the file input field and set the JSON file
-         const inputFile = await page.locator('input[type="file"]');
-         await inputFile.setInputFiles(fileContentPathRealTimePipeline);
-
+        const inputFile = await page.locator('input[type="file"]');
+        await inputFile.setInputFiles(fileContentPathRealTimePipeline);
         await page.waitForTimeout(5000);
         await pipelinesPage.importJsonButtonPipeline();
         await pipelinesPage.fillPipelineDetails(randomPipeline, randomFirstFunction, randomSecondFunction);
         await pipelinesPage.importJsonButtonPipeline();
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000);
         await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
         await page.waitForTimeout(5000);
         // Download Pipeline
@@ -104,7 +103,7 @@ test.describe("Pipeline Import", () => {
         
         // Delete Pipeline
         await pipelinesPage.deletePipeline(randomPipeline); 
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000);
         await pipelinesPage.validateTextMessage('Pipeline deleted successfully');
 
     });
