@@ -86,13 +86,8 @@ impl QueryConditionExt for QueryCondition {
             return Ok(eval_results);
         }
         let conditions = self.conditions.as_ref().unwrap();
-        if conditions.is_empty() {
+        if !conditions.evaluate(row).await {
             return Ok(eval_results);
-        }
-        for condition in conditions.iter() {
-            if !condition.evaluate(row).await {
-                return Ok(eval_results);
-            }
         }
         eval_results.data = Some(vec![row.to_owned()]);
         return Ok(eval_results);
@@ -688,31 +683,18 @@ async fn build_sql(
     stream_name: &str,
     stream_type: StreamType,
     query_condition: &QueryCondition,
-    conditions: &[Condition],
+    conditions: &ConditionList,
 ) -> Result<String, anyhow::Error> {
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let mut wheres = Vec::with_capacity(conditions.len());
-    for cond in conditions.iter() {
-        let data_type = match schema.field_with_name(&cond.column) {
-            Ok(field) => field.data_type(),
-            Err(_) => {
-                return Err(anyhow::anyhow!(
-                    "Column {} not found on stream {}",
-                    &cond.column,
-                    stream_name
-                ));
-            }
-        };
-        let expr = build_expr(cond, "", data_type)?;
-        wheres.push(expr);
-    }
-    let where_sql = if !wheres.is_empty() {
-        format!("WHERE {}", wheres.join(" AND "))
-    } else {
-        String::new()
-    };
+    let where_sql = conditions
+        .to_sql(&schema)
+        .await
+        .map_err(|err| anyhow::anyhow!("Error building SQL on stream {}: {}", &stream_name, err))?;
     if query_condition.aggregation.is_none() {
-        return Ok(format!("SELECT * FROM \"{}\" {}", stream_name, where_sql));
+        return Ok(format!(
+            "SELECT * FROM \"{}\" WHERE {}",
+            stream_name, where_sql
+        ));
     }
 
     // handle aggregation

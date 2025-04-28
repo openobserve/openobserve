@@ -219,7 +219,7 @@ pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
     pub query_type: QueryType,
-    pub conditions: Option<Vec<Condition>>,
+    pub conditions: Option<ConditionList>,
     pub sql: Option<String>,
     pub promql: Option<String>,              // (cpu usage / cpu total)
     pub promql_condition: Option<Condition>, // value >= 80
