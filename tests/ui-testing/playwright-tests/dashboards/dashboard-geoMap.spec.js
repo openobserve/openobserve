@@ -428,18 +428,22 @@ test.describe("dashboard maps testcases", () => {
     const dashboardPageActions = new DashboardactionPage(page);
     const dashboardVariables = new Dashboardvariables(page);
 
+    // select dashboard
     await dashboardPage.menuItem("dashboards-item");
+
+    // Wait for dashboard page
     await waitForDashboardPage(page);
 
+    // Add new dashboard
     await dashboardCreate.createDashboard(randomDashboardName);
 
-    await page.waitForTimeout(4000);
-
+    await page.waitForTimeout(3000);
     // Wait for settings button and open settings
     const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
     await expect(settingsButton).toBeVisible();
     await settingsButton.click();
 
+    // Add variable
     await dashboardVariables.addDashboardVariable(
       "variablename1",
       "logs",
@@ -450,16 +454,19 @@ test.describe("dashboard maps testcases", () => {
     await dashboardCreate.addPanel();
 
     await chartTypeSelector.selectChartType("geomap");
-    await page.waitForTimeout(3000);
 
     // Add new dashboard
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("geojson");
 
+    // Set Latitude, Longitude, and Weight fields
+
     await chartTypeSelector.searchAndAddField("lat", "latitude");
     await chartTypeSelector.searchAndAddField("lon", "longitude");
     await chartTypeSelector.searchAndAddField("country", "weight");
     await chartTypeSelector.searchAndAddField("country", "filter");
+
+    // selct the variable and enter the value
 
     await chartTypeSelector.addFilterCondition(
       "country",
@@ -468,64 +475,124 @@ test.describe("dashboard maps testcases", () => {
       "$variablename"
     );
 
-    await page.waitForTimeout(4000);
+    await dashboardPageActions.applyDashboardBtn();
+
+    await dashboardPageActions.waitForChartToRender();
+
+    // selct the variable and enter the value
+    await dashboardVariables.selectValueFromVariableDropDown(
+      "variablename1",
+      "china"
+    );
+
+    // Apply filter conditions
+    await chartTypeSelector.addFilterCondition(
+      "country",
+      "country",
+      "=",
+      "$variablename"
+    );
 
     await dashboardPageActions.applyDashboardBtn();
 
-    // // Wait for response
-    // await page.waitForResponse(
-    //   (response) =>
-    //     response
-    //       .url()
-    //       .includes("/api/default/_search?type=logs&search_type=dashboards") &&
-    //     response.status() === 200
-    // );
-
-    // Apply variable to filter
-    await page
-      .locator('[data-test="dashboard-variable-query-value-selector"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-variable-query-value-selector"]')
-      .fill("china");
-    await page.getByRole("option", { name: "china" }).click();
-
-    // Apply filter conditions
-    await page
-      .locator('[data-test="dashboard-add-condition-label-0-country"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-add-condition-condition-0"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-add-condition-operator"]')
-      .click();
-    await page.getByText("=", { exact: true }).click();
-    await page.getByLabel("Value").fill("$variablename");
-    await page.locator('[data-test="dashboard-apply"]').click();
-
     // Wait for chart update
-    await page.waitForResponse(
-      (response) =>
-        response
-          .url()
-          .includes("/api/default/_search?type=logs&search_type=dashboards") &&
-        response.status() === 200
-    );
+
+    await dashboardPageActions.waitForChartToRender();
 
     // Click specific position on map
     await page.locator("#chart-map canvas").click({
       position: { x: 643, y: 69 },
     });
+    await page.waitForTimeout(4000);
 
     // Save panel
+
+    await dashboardPageActions.addPanelName(randomDashboardName);
+    await dashboardPageActions.savePanel();
+
+    // Delete Dashboard
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("1111Should display the correct location when manually entering latitude and longitude values", async ({
+    page,
+  }) => {
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardVariables = new Dashboardvariables(page);
+
+    // select dashboard
+    await dashboardPage.menuItem("dashboards-item");
+
+    // Wait for dashboard page
+    await waitForDashboardPage(page);
+
+    // Add new dashboard
+    await dashboardCreate.createDashboard(randomDashboardName);
+    await dashboardCreate.addPanel();
+
+    await chartTypeSelector.selectChartType("geomap");
+
+    // Add new dashboard
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("geojson");
+
+    await page.waitForTimeout(2000);
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-geojson-lat"] [data-test="dashboard-add-latitude-data"]'
+      )
+      .click();
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-geojson-lon"] [data-test="dashboard-add-longitude-data"]'
+      )
+      .click();
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-geojson-country"] [data-test="dashboard-add-weight-data"]'
+      )
+      .click();
+
+    await page.locator('[data-test="dashboard-apply"]').click();
+
+    await page.locator('[data-test="dashboard-sidebar"]').click();
+
+    await page.locator('[data-test="dashboard-config-latitude"]').click();
+    await page.locator('[data-test="dashboard-config-latitude"]').click();
+    await page
+      .locator('[data-test="dashboard-config-latitude"]')
+      .fill("26.1206");
+
+    await page.locator('[data-test="dashboard-config-longitude"]').click();
+    await page
+      .locator('[data-test="dashboard-config-longitude"]')
+      .fill("091.6523");
+
+    await page.locator('[data-test="dashboard-config-zoom"]').click();
+    await page.locator('[data-test="dashboard-config-zoom"]').fill("12");
+    await page.locator('[data-test="dashboard-apply"]').click();
+
+    // Click on the map at the given position
+    await page.locator("#chart-map canvas").click({
+      position: { x: 26.1206, y: 91.6523 }, // Ensure this translates correctly to pixels
+    });
+    await page.waitForTimeout(5000);
+    await page.locator('[data-test="dashboard-panel-name"]').click();
     await page
       .locator('[data-test="dashboard-panel-name"]')
       .fill("Dashboard_test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
-    // Delete Dashboard
+    // Delete dashbaord
     await page.locator('[data-test="dashboard-back-btn"]').click();
+
     await deleteDashboard(page, randomDashboardName);
   });
 });

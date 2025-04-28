@@ -55,4 +55,18 @@ export default class DashboardVariables {
       .click();
     console.log(`Dashboard variable "${name}" added successfully.`);
   }
+
+  // Dynamic function to fill input by label
+  // Usage: this function is used for slect the variable value from dropdown
+  // Dynamically fill input and select the same value from dropdown
+  async selectValueFromVariableDropDown(label, value) {
+    const input = this.page.getByLabel(label, { exact: true });
+    await input.waitFor({ state: "visible", timeout: 10000 });
+    await input.click();
+    await input.fill(value);
+
+    const option = this.page.getByRole("option", { name: value });
+    await option.waitFor({ state: "visible", timeout: 10000 });
+    await option.click();
+  }
 }
