@@ -379,9 +379,9 @@ pub enum WsServerEvents {
     End {
         trace_id: Option<String>,
     },
-    ProgressUpdate {
+    EventProgress {
         trace_id: String,
-        percentage: usize,
+        percent: usize,
         event_type: String,
     },
     Ping(Vec<u8>),
@@ -432,7 +432,7 @@ impl WsServerEvents {
             Self::CancelResponse { trace_id, .. } => trace_id.to_string(),
             Self::Error { trace_id, .. } => trace_id.clone().unwrap_or_default(),
             Self::End { trace_id } => trace_id.clone().unwrap_or_default(),
-            Self::ProgressUpdate { trace_id, .. } => trace_id.to_string(),
+            Self::EventProgress { trace_id, .. } => trace_id.to_string(),
             Self::Ping(_) => "".to_string(),
             Self::Pong(_) => "".to_string(),
         }
@@ -497,8 +497,6 @@ pub fn calculate_progress_percentage(
         // For regular searches partitions processed oldest to newest
         (partition_end_time - req_start_time) as f32 / (req_end_time - req_start_time) as f32
     };
-    // TODO: so here if value is between 0-50 ceil and if it 51-100 floor
-    // ((percentage * 100.0).ceil() as usize).min(100)
     if percentage < 0.5 {
         ((percentage * 100.0).ceil() as usize).min(100)
     } else {

@@ -198,9 +198,9 @@ pub async fn handle_search_request(
     // Send initial progress update
     send_message(
         req_id,
-        WsServerEvents::ProgressUpdate {
+        WsServerEvents::EventProgress {
             trace_id: trace_id.to_string(),
-            percentage: 0,
+            percent: 0,
             event_type: req.event_type().to_string(),
         }
         .to_json(),
@@ -723,7 +723,7 @@ async fn process_delta(
 
         // Send progress update
         {
-            let percentage = calculate_progress_percentage(
+            let percent = calculate_progress_percentage(
                 start_time,
                 end_time,
                 original_req_start_time,
@@ -732,9 +732,9 @@ async fn process_delta(
             );
             send_message(
                 req_id,
-                WsServerEvents::ProgressUpdate {
+                WsServerEvents::EventProgress {
                     trace_id: trace_id.to_string(),
-                    percentage,
+                    percent,
                     event_type: req.event_type().to_string(),
                 }
                 .to_json(),
@@ -865,7 +865,7 @@ async fn send_cached_responses(
 
     // Send progress update
     {
-        let percentage = calculate_progress_percentage(
+        let percent = calculate_progress_percentage(
             cached.response_start_time,
             cached.response_end_time,
             req.payload.query.start_time,
@@ -874,9 +874,9 @@ async fn send_cached_responses(
         );
         send_message(
             req_id,
-            WsServerEvents::ProgressUpdate {
+            WsServerEvents::EventProgress {
                 trace_id: trace_id.to_string(),
-                percentage,
+                percent,
                 event_type: req.event_type().to_string(),
             }
             .to_json(),
@@ -1031,7 +1031,7 @@ pub async fn do_partitioned_search(
 
         // Send progress update
         {
-            let percentage = calculate_progress_percentage(
+            let percent = calculate_progress_percentage(
                 start_time,
                 end_time,
                 modified_start_time,
@@ -1040,9 +1040,9 @@ pub async fn do_partitioned_search(
             );
             send_message(
                 req_id,
-                WsServerEvents::ProgressUpdate {
+                WsServerEvents::EventProgress {
                     trace_id: trace_id.to_string(),
-                    percentage,
+                    percent,
                     event_type: "search".to_string(),
                 }
                 .to_json(),
