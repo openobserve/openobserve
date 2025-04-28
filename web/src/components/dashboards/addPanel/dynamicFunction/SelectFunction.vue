@@ -61,7 +61,7 @@
             filled
             label="Select Type"
             data-test="dashboard-y-item-dropdown"
-            class="tw-w-40 tw-min-w-40"
+            :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
           />
 
           <!-- Render different input types based on validation -->
@@ -88,6 +88,7 @@
             <StreamFieldSelect
               :streams="getAllSelectedStreams()"
               v-model="fields.args[argIndex].value"
+              :data-test="`dashboard-function-dropdown-arg-field-selector-${argIndex}`"
             />
           </div>
 
@@ -99,6 +100,7 @@
             :required="isRequired(fields.functionName, argIndex)"
             class="tw-w-52"
             dense
+            :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
           />
 
           <q-input
@@ -109,12 +111,14 @@
             :required="isRequired(fields.functionName, argIndex)"
             class="tw-w-52"
             dense
+            :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
           />
 
           <SelectFunction
             v-if="fields.args[argIndex]?.type === 'function'"
             class="tw-ml-4"
             v-model="fields.args[argIndex].value"
+            :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
           />
 
           <!-- histogram interval for sql queries -->
@@ -127,6 +131,7 @@
               }
             "
             class="tw-w-52"
+            :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
           />
 
           <!-- Remove argument button -->
@@ -138,6 +143,7 @@
             round
             @click="removeArgument(argIndex)"
             class="tw-h-10 tw-w-10"
+            :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
           />
         </div>
       </div>
@@ -153,6 +159,7 @@
       class="tw-mt-3"
       no-caps
       dense
+      :data-test="`dashboard-function-dropdown-add-argument-button`"
     />
   </div>
 </template>
