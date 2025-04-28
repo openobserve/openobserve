@@ -34,6 +34,7 @@ use crate::errors::*;
 
 pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false));
 pub static CLIENT_RO: Lazy<Pool<Postgres>> = Lazy::new(|| connect(true));
+pub static CLIENT_DDL: Lazy<Pool<Postgres>> = Lazy::new(connect_ddl);
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 fn connect(readonly: bool) -> Pool<Postgres> {
@@ -55,6 +56,30 @@ fn connect(readonly: bool) -> Pool<Postgres> {
     PgPoolOptions::new()
         .min_connections(cfg.limit.sql_db_connections_min)
         .max_connections(cfg.limit.sql_db_connections_max)
+        .acquire_timeout(Duration::from_secs(acquire_timeout))
+        .idle_timeout(Some(Duration::from_secs(idle_timeout)))
+        .max_lifetime(Some(Duration::from_secs(max_lifetime)))
+        .connect_lazy_with(db_opts)
+}
+
+fn connect_ddl() -> Pool<Postgres> {
+    let cfg = config::get_config();
+    let dsn = if cfg.common.meta_ddl_dsn.is_empty() {
+        cfg.common.meta_postgres_dsn.clone()
+    } else {
+        cfg.common.meta_ddl_dsn.clone()
+    };
+    let db_opts = PgConnectOptions::from_str(&dsn).expect("postgres connect options create failed");
+
+    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
+    let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
+    let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
+
+    // because ddl is only supposed to run the ddl commands at very start and not
+    // used afterwards, we set the absolute min required connections.
+    PgPoolOptions::new()
+        .min_connections(1)
+        .max_connections(2)
         .acquire_timeout(Duration::from_secs(acquire_timeout))
         .idle_timeout(Some(Duration::from_secs(idle_timeout)))
         .max_lifetime(Some(Duration::from_secs(max_lifetime)))
