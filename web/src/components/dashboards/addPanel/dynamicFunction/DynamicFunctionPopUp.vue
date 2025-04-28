@@ -8,19 +8,20 @@
       active-color="primary"
       indicator-color="primary"
       narrow-indicator
+      data-test="dynamic-function-popup-tabs"
     >
-      <q-tab name="build" label="Build" />
-      <q-tab name="raw" label="Raw" />
+      <q-tab name="build" label="Build" data-test="dynamic-function-popup-tab-build" />
+      <q-tab name="raw" label="Raw" data-test="dynamic-function-popup-tab-raw" />
     </q-tabs>
 
     <q-separator />
 
     <q-tab-panels v-model="fields.type" animated>
       <q-tab-panel name="build">
-        <SelectFunction v-model="fields" />
+        <SelectFunction v-model="fields" data-test="dynamic-function-popup-select-function" />
       </q-tab-panel>
       <q-tab-panel name="raw">
-        <RawQueryBuilder v-model="fields" />
+        <RawQueryBuilder v-model="fields" data-test="dynamic-function-popup-raw-query-builder" />
       </q-tab-panel>
     </q-tab-panels>
   </div>

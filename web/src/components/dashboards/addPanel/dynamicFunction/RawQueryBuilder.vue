@@ -7,6 +7,7 @@
       filled
       autogrow
       class="showLabelOnTop"
+      data-test="dynamic-function-popup-raw-query-input"
     />
     <q-input
       v-model="fields.alias"
@@ -19,6 +20,7 @@
       filled
       dense
       label-slot
+      data-test="dynamic-function-popup-raw-query-alias-input"
     />
   </div>
 </template>
