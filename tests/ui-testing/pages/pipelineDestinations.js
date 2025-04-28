@@ -11,6 +11,7 @@ export class PipelineDestinations {
     async navigateToPipelineDestinations() {
         await this.page.locator('[data-test="menu-link-settings-item"]').waitFor({ state: 'visible' });
         await this.page.locator('[data-test="menu-link-settings-item"]').click();
+        await this.page.waitForTimeout(2000);
         await this.page.locator('[data-test="pipeline-destinations-tab"]').waitFor({ state: 'visible' });
         await this.page.locator('[data-test="pipeline-destinations-tab"]').click();
     }

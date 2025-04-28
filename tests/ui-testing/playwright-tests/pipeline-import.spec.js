@@ -24,8 +24,8 @@ test.describe("Pipeline Import", () => {
     test("Import RealTime Pipeline from URL, download and delete imported pipeline", async ({ page }) => {
 
         const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
-        const randomFirstFunction = `firstFunction${Math.floor(Math.random() * 100000)}`;
-        const randomSecondFunction = `secondFunction${Math.floor(Math.random() * 100000)}`;
+        const randomFirstFunction = `first${Math.floor(Math.random() * 100000)}`;
+        const randomSecondFunction = `second${Math.floor(Math.random() * 100000)}`;
 
 
         await pipelinesPage.gotoPipelinesPage();
@@ -42,13 +42,15 @@ test.describe("Pipeline Import", () => {
         await pipelinesPage.importJsonButtonPipeline();
         await pipelinesPage.fillPipelineDetails(randomPipeline, randomFirstFunction, randomSecondFunction);
         await pipelinesPage.importJsonButtonPipeline();
+        await page.waitForTimeout(2000);
         await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
         await page.waitForTimeout(5000);
         // Download Pipeline
         await pipelinesPage.downloadPipeline(randomPipeline);
         
         // Delete Pipeline
-        await pipelinesPage.deletePipeline(randomPipeline);  
+        await pipelinesPage.deletePipeline(randomPipeline); 
+        await page.waitForTimeout(2000);
         await pipelinesPage.validateTextMessage('Pipeline deleted successfully');
 
     });
@@ -65,14 +67,15 @@ test.describe("Pipeline Import", () => {
         await pipelinesPage.pipelinesURLValidation();
         await pipelinesPage.importPipeline();
         await pipelinesPage.importJsonButtonPipeline();
+        await page.waitForTimeout(1000);
         await pipelinesPage.validateTextMessage('JSON string is empty');
     });
 
     test("Import RealTime Pipeline from JSON file, download and delete imported pipeline", async ({ page }) => {
 
         const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
-        const randomFirstFunction = `firstFunction${Math.floor(Math.random() * 100000)}`;
-        const randomSecondFunction = `secondFunction${Math.floor(Math.random() * 100000)}`;
+        const randomFirstFunction = `first${Math.floor(Math.random() * 100000)}`;
+        const randomSecondFunction = `second${Math.floor(Math.random() * 100000)}`;
 
 
         await pipelinesPage.gotoPipelinesPage();
@@ -93,13 +96,15 @@ test.describe("Pipeline Import", () => {
         await pipelinesPage.importJsonButtonPipeline();
         await pipelinesPage.fillPipelineDetails(randomPipeline, randomFirstFunction, randomSecondFunction);
         await pipelinesPage.importJsonButtonPipeline();
+        await page.waitForTimeout(2000);
         await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
         await page.waitForTimeout(5000);
         // Download Pipeline
         await pipelinesPage.downloadPipeline(randomPipeline);
         
         // Delete Pipeline
-        await pipelinesPage.deletePipeline(randomPipeline);  
+        await pipelinesPage.deletePipeline(randomPipeline); 
+        await page.waitForTimeout(2000);
         await pipelinesPage.validateTextMessage('Pipeline deleted successfully');
 
     });
@@ -107,8 +112,8 @@ test.describe("Pipeline Import", () => {
     test("Import Scheduled Pipeline from URL, download and delete imported pipeline", async ({ page }) => {
 
         const randomPipeline = `pipeline${Math.floor(Math.random() * 100000)}`;
-        const randomFirstFunction = `firstFunction${Math.floor(Math.random() * 100000)}`;
-        const randomPipelineDestination = `pipelineDestination${Math.floor(Math.random() * 100000)}`;
+        const randomFirstFunction = `first${Math.floor(Math.random() * 100000)}`;
+        const randomPipelineDestination = `destination${Math.floor(Math.random() * 100000)}`;
 
         await pipelineDestinations.navigateToPipelineDestinations();    
         await pipelineDestinations.addDestination(randomPipelineDestination, 'https://example.com');
@@ -127,6 +132,7 @@ test.describe("Pipeline Import", () => {
 
         await pipelinesPage.fillScheduledPipelineDetails(randomPipeline, randomFirstFunction, randomPipelineDestination);
         await pipelinesPage.importJsonButtonPipeline();
+        await page.waitForTimeout(2000);
         await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
         await page.waitForTimeout(5000);
         // Download Pipeline
@@ -134,6 +140,7 @@ test.describe("Pipeline Import", () => {
         
         // Delete Pipeline
         await pipelinesPage.deletePipeline(randomPipeline);  
+        await page.waitForTimeout(2000);
         await pipelinesPage.validateTextMessage('Pipeline deleted successfully');
 
     });
@@ -163,6 +170,7 @@ test.describe("Pipeline Import", () => {
 
         await pipelinesPage.fillScheduledPipelineDetails(randomPipeline, randomFirstFunction, randomPipelineDestination);
         await pipelinesPage.importJsonButtonPipeline();
+        await page.waitForTimeout(2000);
         await pipelinesPage.validateTextMessage('Pipelines(s) imported successfully');
         await page.waitForTimeout(5000);
         // Download Pipeline
@@ -170,6 +178,7 @@ test.describe("Pipeline Import", () => {
         
         // Delete Pipeline
         await pipelinesPage.deletePipeline(randomPipeline);  
+        await page.waitForTimeout(2000);
         await pipelinesPage.validateTextMessage('Pipeline deleted successfully');
 
     });
