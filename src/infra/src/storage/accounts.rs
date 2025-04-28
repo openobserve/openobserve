@@ -45,7 +45,12 @@ impl Default for StorageClientFactory {
 /// It is used to manage multiple storage clients for different accounts.
 impl StorageClientFactory {
     pub fn new() -> Self {
-        let (stream_strategy, accounts) = parse_storage_config();
+        let config = get_config();
+        Self::new_with_config(&config.s3)
+    }
+
+    pub fn new_with_config(config: &config::S3) -> Self {
+        let (stream_strategy, accounts) = parse_storage_config(config);
         let mut storage = Self {
             accounts: HashMap::with_capacity(accounts.len()),
             only_default: accounts.len() == 1,
@@ -108,11 +113,11 @@ impl StorageClientFactory {
     }
 }
 
-pub fn parse_storage_config() -> (StreamStrategy, HashMap<String, StorageConfig>) {
-    let cfg = get_config();
+pub fn parse_storage_config(
+    config: &config::S3,
+) -> (StreamStrategy, HashMap<String, StorageConfig>) {
     // check account based on ZO_S3_ACCOUNTS
-    let account_names = cfg
-        .s3
+    let account_names = config
         .accounts
         .split(",")
         .map(|s| s.trim().to_string())
@@ -125,18 +130,18 @@ pub fn parse_storage_config() -> (StreamStrategy, HashMap<String, StorageConfig>
         DEFAULT_ACCOUNT.to_string(),
         StorageConfig {
             name: DEFAULT_ACCOUNT.to_string(),
-            provider: cfg.s3.provider.to_string(),
-            server_url: cfg.s3.server_url.to_string(),
-            region_name: cfg.s3.region_name.to_string(),
-            access_key: cfg.s3.access_key.to_string(),
-            secret_key: cfg.s3.secret_key.to_string(),
-            bucket_name: cfg.s3.bucket_name.to_string(),
-            bucket_prefix: cfg.s3.bucket_prefix.to_string(),
+            provider: config.provider.to_string(),
+            server_url: config.server_url.to_string(),
+            region_name: config.region_name.to_string(),
+            access_key: config.access_key.to_string(),
+            secret_key: config.secret_key.to_string(),
+            bucket_name: config.bucket_name.to_string(),
+            bucket_prefix: config.bucket_prefix.to_string(),
         },
     );
 
     // parse stream strategy
-    let stream_strategy = StreamStrategy::new(&cfg.s3.stream_strategy, account_names.clone());
+    let stream_strategy = StreamStrategy::new(&config.stream_strategy, account_names.clone());
 
     // only one account, use default
     if account_num <= 1 {
@@ -144,20 +149,20 @@ pub fn parse_storage_config() -> (StreamStrategy, HashMap<String, StorageConfig>
     }
 
     // check multi accounts config
-    let providers = cfg.s3.provider.split(",").collect::<Vec<&str>>();
-    let server_urls = cfg.s3.server_url.split(",").collect::<Vec<&str>>();
-    let region_names = cfg.s3.region_name.split(",").collect::<Vec<&str>>();
-    let access_keys = cfg.s3.access_key.split(",").collect::<Vec<&str>>();
-    let secret_keys = cfg.s3.secret_key.split(",").collect::<Vec<&str>>();
-    let bucket_names = cfg.s3.bucket_name.split(",").collect::<Vec<&str>>();
-    let bucket_prefixes = cfg.s3.bucket_prefix.split(",").collect::<Vec<&str>>();
-    if (!cfg.s3.provider.is_empty() && providers.len() != account_num)
-        || (!cfg.s3.server_url.is_empty() && server_urls.len() != account_num)
-        || (!cfg.s3.region_name.is_empty() && region_names.len() != account_num)
-        || (!cfg.s3.access_key.is_empty() && access_keys.len() != account_num)
-        || (!cfg.s3.secret_key.is_empty() && secret_keys.len() != account_num)
-        || (!cfg.s3.bucket_name.is_empty() && bucket_names.len() != account_num)
-        || (!cfg.s3.bucket_prefix.is_empty() && bucket_prefixes.len() != account_num)
+    let providers = config.provider.split(",").collect::<Vec<&str>>();
+    let server_urls = config.server_url.split(",").collect::<Vec<&str>>();
+    let region_names = config.region_name.split(",").collect::<Vec<&str>>();
+    let access_keys = config.access_key.split(",").collect::<Vec<&str>>();
+    let secret_keys = config.secret_key.split(",").collect::<Vec<&str>>();
+    let bucket_names = config.bucket_name.split(",").collect::<Vec<&str>>();
+    let bucket_prefixes = config.bucket_prefix.split(",").collect::<Vec<&str>>();
+    if (!config.provider.is_empty() && providers.len() != account_num)
+        || (!config.server_url.is_empty() && server_urls.len() != account_num)
+        || (!config.region_name.is_empty() && region_names.len() != account_num)
+        || (!config.access_key.is_empty() && access_keys.len() != account_num)
+        || (!config.secret_key.is_empty() && secret_keys.len() != account_num)
+        || (!config.bucket_name.is_empty() && bucket_names.len() != account_num)
+        || (!config.bucket_prefix.is_empty() && bucket_prefixes.len() != account_num)
     {
         panic!("Invalid multi object store accounts config");
     }
@@ -281,5 +286,106 @@ impl ObjectStore for StorageClientFactory {
 
     async fn copy_if_not_exists(&self, _from: &Path, _to: &Path) -> Result<()> {
         Err(Error::NotImplemented)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::S3;
+
+    use super::*;
+
+    fn base_s3_config() -> S3 {
+        S3 {
+            accounts: "default".to_string(),
+            provider: "aws".to_string(),
+            server_url: "https://s3.amazonaws.com".to_string(),
+            region_name: "us-east-1".to_string(),
+            access_key: "AKIA...".to_string(),
+            secret_key: "SECRET".to_string(),
+            bucket_name: "mybucket".to_string(),
+            bucket_prefix: "".to_string(),
+            stream_strategy: "".to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_storage_client_factory_single_account_default() {
+        let config = base_s3_config();
+        let factory = StorageClientFactory::new_with_config(&config);
+        assert!(factory.only_default);
+        assert_eq!(factory.accounts.len(), 1);
+        assert!(factory.accounts.contains_key("default"));
+        assert!(matches!(factory.stream_strategy, StreamStrategy::Default));
+    }
+
+    #[test]
+    fn test_storage_client_factory_multiple_accounts_hash_strategy() {
+        let mut config = base_s3_config();
+        config.accounts = "acc1,acc2".to_string();
+        config.provider = "aws,aws".to_string();
+        config.server_url = "url1,url2".to_string();
+        config.region_name = "r1,r2".to_string();
+        config.access_key = "k1,k2".to_string();
+        config.secret_key = "s1,s2".to_string();
+        config.bucket_name = "b1,b2".to_string();
+        config.bucket_prefix = "p1,p2".to_string();
+        config.stream_strategy = "hash".to_string();
+
+        let factory = StorageClientFactory::new_with_config(&config);
+        assert!(!factory.only_default);
+        assert_eq!(factory.accounts.len(), 3); // includes "default"
+        assert!(matches!(factory.stream_strategy, StreamStrategy::Hash(_)));
+    }
+
+    #[test]
+    fn test_storage_client_factory_multiple_accounts_stream_strategy() {
+        let mut config = base_s3_config();
+        config.accounts = "acc1,acc2".to_string();
+        config.provider = "aws,aws".to_string();
+        config.server_url = "url1,url2".to_string();
+        config.region_name = "r1,r2".to_string();
+        config.access_key = "k1,k2".to_string();
+        config.secret_key = "s1,s2".to_string();
+        config.bucket_name = "b1,b2".to_string();
+        config.bucket_prefix = "p1,p2".to_string();
+        config.stream_strategy = "stream1:acc1,stream2:acc2".to_string();
+
+        let factory = StorageClientFactory::new_with_config(&config);
+        assert!(!factory.only_default);
+        assert_eq!(factory.accounts.len(), 3); // includes "default"
+        match &factory.stream_strategy {
+            StreamStrategy::Stream(map) => {
+                assert_eq!(map.get("stream1").unwrap(), "acc1");
+                assert_eq!(map.get("stream2").unwrap(), "acc2");
+            }
+            _ => panic!("Expected StreamStrategy::Stream"),
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid multi object store accounts config")]
+    fn test_storage_client_factory_invalid_multi_account_config() {
+        let mut config = base_s3_config();
+        config.accounts = "acc1,acc2".to_string();
+        config.provider = "aws".to_string(); // Only one provider, should panic
+        StorageClientFactory::new_with_config(&config);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid value of ZO_S3_STREAM_STRATEGY")]
+    fn test_storage_client_factory_invalid_stream_strategy() {
+        let mut config = base_s3_config();
+        config.accounts = "acc1,acc2".to_string();
+        config.provider = "aws,aws".to_string();
+        config.server_url = "url1,url2".to_string();
+        config.region_name = "r1,r2".to_string();
+        config.access_key = "k1,k2".to_string();
+        config.secret_key = "s1,s2".to_string();
+        config.bucket_name = "b1,b2".to_string();
+        config.bucket_prefix = "p1,p2".to_string();
+        config.stream_strategy = "stream1:acc3".to_string(); // acc3 does not exist
+        StorageClientFactory::new_with_config(&config);
     }
 }

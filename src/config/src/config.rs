@@ -1663,7 +1663,7 @@ pub struct Nats {
     pub queue_max_age: u64,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, Default, EnvConfig)]
 pub struct S3 {
     #[env_config(
         name = "ZO_S3_ACCOUNTS",
