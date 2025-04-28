@@ -60,7 +60,6 @@
             dense
             filled
             label="Select Type"
-            data-test="dashboard-y-item-dropdown"
             :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
           />
 
