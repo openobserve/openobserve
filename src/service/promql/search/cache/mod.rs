@@ -333,7 +333,7 @@ pub async fn set(
 
     // store the series to disk cache
     let cache_key = get_cache_item_key(&key, org, start, new_end);
-    infra::cache::file_data::disk::set(trace_id, &cache_key, bytes_data.into())
+    infra::cache::file_data::disk::set(&cache_key, bytes_data.into())
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 

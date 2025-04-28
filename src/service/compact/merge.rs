@@ -1295,7 +1295,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download("", &file_name).await
+                file_data::disk::download(&file_name, Some(file_size as usize)).await
             } else {
                 Ok(0)
             };
@@ -1339,7 +1339,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                     } else {
                         log::error!("[COMPACT] download file to cache err: {}", e);
                         // remove downloaded file
-                        let _ = file_data::disk::remove("", &file_name).await;
+                        let _ = file_data::disk::remove(&file_name).await;
                         None
                     }
                 }
