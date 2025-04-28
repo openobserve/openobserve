@@ -71,7 +71,7 @@ impl StorageClientFactory {
         }
         self.accounts
             .get(DEFAULT_ACCOUNT)
-            .expect("default object store not found")
+            .expect("default object store account not found")
     }
 }
 
@@ -110,15 +110,15 @@ pub fn parse_storage_config() -> HashMap<String, StorageConfig> {
     let secret_keys = cfg.s3.secret_key.split(",").collect::<Vec<&str>>();
     let bucket_names = cfg.s3.bucket_name.split(",").collect::<Vec<&str>>();
     let bucket_prefixes = cfg.s3.bucket_prefix.split(",").collect::<Vec<&str>>();
-    if providers.len() != account_num
-        || (!server_urls.is_empty() && server_urls.len() != account_num)
-        || (!region_names.is_empty() && region_names.len() != account_num)
-        || (!access_keys.is_empty() && access_keys.len() != account_num)
-        || (!secret_keys.is_empty() && secret_keys.len() != account_num)
-        || (!bucket_names.is_empty() && bucket_names.len() != account_num)
-        || (!bucket_prefixes.is_empty() && bucket_prefixes.len() != account_num)
+    if (!cfg.s3.provider.is_empty() && providers.len() != account_num)
+        || (!cfg.s3.server_url.is_empty() && server_urls.len() != account_num)
+        || (!cfg.s3.region_name.is_empty() && region_names.len() != account_num)
+        || (!cfg.s3.access_key.is_empty() && access_keys.len() != account_num)
+        || (!cfg.s3.secret_key.is_empty() && secret_keys.len() != account_num)
+        || (!cfg.s3.bucket_name.is_empty() && bucket_names.len() != account_num)
+        || (!cfg.s3.bucket_prefix.is_empty() && bucket_prefixes.len() != account_num)
     {
-        panic!("Invalid multi accounts config");
+        panic!("Invalid multi object store accounts config");
     }
 
     // add accounts
