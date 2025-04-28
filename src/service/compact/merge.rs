@@ -41,7 +41,7 @@ use config::{
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
-    cache::file_data,
+    cache::{file_data, file_data::TRACE_ID_FOR_CACHE_LATEST_FILE},
     dist_lock, file_list as infra_file_list,
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
@@ -462,9 +462,10 @@ pub async fn merge_by_stream(
             offset_time.format("%Y/%m/%d/%H").to_string(),
         )
     };
-    let files = file_list::query_by_date(org_id, stream_name, stream_type, &date_start, &date_end)
-        .await
-        .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+    let files =
+        file_list::query_for_merge(org_id, stream_name, stream_type, &date_start, &date_end)
+            .await
+            .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",
@@ -971,6 +972,15 @@ pub async fn merge_files(
 
             // upload file to storage
             let buf = Bytes::from(buf);
+            if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
+                infra::cache::file_data::disk::set(
+                    TRACE_ID_FOR_CACHE_LATEST_FILE,
+                    &new_file_key,
+                    buf.clone(),
+                )
+                .await?;
+                log::debug!("merge_files {new_file_key} file_data::disk::set success");
+            }
             storage::put(&new_file_key, buf.clone()).await?;
 
             if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
@@ -1006,6 +1016,16 @@ pub async fn merge_files(
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
+                if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node
+                {
+                    infra::cache::file_data::disk::set(
+                        TRACE_ID_FOR_CACHE_LATEST_FILE,
+                        &new_file_key,
+                        buf.clone(),
+                    )
+                    .await?;
+                    log::debug!("merge_files {new_file_key} file_data::disk::set success");
+                }
                 storage::put(&new_file_key, buf.clone()).await?;
 
                 if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {

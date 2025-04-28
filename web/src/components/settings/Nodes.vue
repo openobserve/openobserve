@@ -693,6 +693,9 @@ export default defineComponent({
             percentageMemoryUsage: { value: 0 },
             cpuUsage: { value: 0 }
         };
+        //gloabal index is used to assign the id to the node
+        //the global index should continue from the last id of the previous node and previous cluster
+        let globalIndex = 1;
 
         for (const region in data) {
             uniqueValues.regions.add(region);
@@ -715,7 +718,6 @@ export default defineComponent({
                     // Extract unique statuses
                     uniqueValues.statuses.add(node.status);
 
-                    console.log(node)
                     // Update max values
                     maxValues.tcpConnsEstablished.value = Math.max(maxValues.tcpConnsEstablished.value, node.metrics.tcp_conns_established);
                     maxValues.tcpConnsCloseWait.value = Math.max(maxValues.tcpConnsCloseWait.value, node.metrics.tcp_conns_close_wait);
@@ -723,7 +725,9 @@ export default defineComponent({
                     maxValues.percentageMemoryUsage.value = Math.max(maxValues.percentageMemoryUsage.value, percentageMemoryUsage);
                     maxValues.cpuUsage.value = Math.max(maxValues.cpuUsage.value, cpuUsage);
                     //this is done because the id should be 2 digits to maintain consistency with other tables
-                    node.id = node.id < 10 ? `0${node.id}` : node.id;
+                    node.id = globalIndex < 10 ? `0${globalIndex}` : globalIndex;
+                    //increment the global index
+                    globalIndex++;
 
                     result.push({
                         region,
@@ -992,15 +996,15 @@ export default defineComponent({
 }
 
 .status-online {
-  border-left: 5px solid green !important;
+  border-left: #00A76F 5px solid  !important;
 }
 
 .status-offline {
-  border-left: 5px solid red;
+  border-left: 5px solid #CE2528 !important;
 }
 
 .status-prepare {
-  border-left: 5px solid warning;
+  border-left: 5px solid #FFAB00  !important;
 }
 
 .node-list-filter-table {
