@@ -23,7 +23,7 @@ use tokio::sync::{
     Mutex,
 };
 
-type FileInfo = (String, String, i64, file_data::CacheType);
+type FileInfo = (String, String, usize, file_data::CacheType);
 
 struct DownloadQueue {
     sender: Sender<FileInfo>,
@@ -56,9 +56,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((trace_id, file, file_size, cache)) => {
-                        match download_file(&trace_id, &file, cache).await {
+                        match download_file(&trace_id, &file, file_size, cache).await {
                             Ok(data_len) => {
-                                if data_len > 0 && data_len != file_size as usize {
+                                if data_len > 0 && data_len != file_size {
                                     log::warn!(
                                         "[trace_id {trace_id}] search->storage: download file {} found size mismatch, expected: {}, actual: {}, will update it",
                                         file,
@@ -102,6 +102,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn download_file(
     trace_id: &str,
     file_name: &str,
+    file_size: usize,
     cache_type: file_data::CacheType,
 ) -> Result<usize, anyhow::Error> {
     let cfg = get_config();
@@ -114,14 +115,14 @@ async fn download_file(
                 disk_exists = file_data::disk::exist(file_name).await;
             }
             if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
-                file_data::memory::download(trace_id, file_name).await
+                file_data::memory::download(trace_id, file_name, Some(file_size)).await
             } else {
                 Ok(0)
             }
         }
         file_data::CacheType::Disk => {
             if !file_data::disk::exist(file_name).await {
-                file_data::disk::download(trace_id, file_name).await
+                file_data::disk::download(trace_id, file_name, Some(file_size)).await
             } else {
                 Ok(0)
             }
@@ -144,7 +145,12 @@ pub async fn queue_background_download(
 ) -> Result<(), anyhow::Error> {
     FILE_DOWNLOAD_CHANNEL
         .sender
-        .send((trace_id.to_owned(), file.to_owned(), size, cache_type))
+        .send((
+            trace_id.to_owned(),
+            file.to_owned(),
+            size as usize,
+            cache_type,
+        ))
         .await?;
     Ok(())
 }

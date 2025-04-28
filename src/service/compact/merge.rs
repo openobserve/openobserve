@@ -1094,11 +1094,11 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
         let file_name = file.key.to_string();
-        let file_size = file.meta.compressed_size;
+        let file_size = file.meta.compressed_size as usize;
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download("", &file_name).await
+                file_data::disk::download("", &file_name, Some(file_size)).await
             } else {
                 Ok(0)
             };
@@ -1107,7 +1107,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
             // should remove the entry from file_list table.
             let file_name = match ret {
                 Ok(data_len) => {
-                    if data_len > 0 && data_len != file_size as usize {
+                    if data_len > 0 && data_len != file_size {
                         log::warn!(
                             "[COMPACTOR] download file {} found size mismatch, expected: {}, actual: {}, will update it",
                             file_name,
