@@ -57,21 +57,37 @@ impl StorageClientFactory {
         storage
     }
 
-    /// Get the client for the given path.
-    /// If the path is not a valid stream, return the default client.
-    pub fn get_client(&self, path: &Path) -> &dyn ObjectStore {
-        if !self.only_default {
-            let stream = get_stream_from_file(path);
-            // TODO: get account by strategy: stream name, stream name hash, etc.
-            if let Some(name) = stream {
-                if let Some(client) = self.accounts.get(&name) {
-                    return client;
-                }
+    /// Get the client name for the given path.
+    pub fn get_client_name(&self, path: Option<&Path>) -> Option<String> {
+        if !self.only_default && path.is_some() {
+            let stream = get_stream_from_file(path.unwrap());
+            if let Some(stream) = stream {
+                // TODO: get account by strategy: stream name, stream name hash, etc.
+                let name = stream;
+                return Some(name);
             }
+        }
+        None
+    }
+
+    /// Get the client for the given name.
+    /// If the name is not found, return the default client.
+    pub fn get_client_by_name(&self, name: &str) -> &dyn ObjectStore {
+        if let Some(client) = self.accounts.get(name) {
+            return client;
         }
         self.accounts
             .get(DEFAULT_ACCOUNT)
             .expect("default object store account not found")
+    }
+
+    /// Get the client for the given path.
+    /// If the path is not a valid stream, return the default client.
+    pub fn get_client(&self, path: Option<&Path>) -> &dyn ObjectStore {
+        if let Some(name) = self.get_client_name(path) {
+            return self.get_client_by_name(&name);
+        }
+        self.get_client_by_name(DEFAULT_ACCOUNT)
     }
 }
 
@@ -161,7 +177,7 @@ impl ObjectStore for StorageClientFactory {
         payload: PutPayload,
         opts: PutOptions,
     ) -> Result<PutResult> {
-        self.get_client(location)
+        self.get_client(Some(location))
             .put_opts(location, payload, opts)
             .await
     }
@@ -171,32 +187,29 @@ impl ObjectStore for StorageClientFactory {
         location: &Path,
         opts: PutMultipartOpts,
     ) -> Result<Box<dyn MultipartUpload>> {
-        self.get_client(location)
+        self.get_client(Some(location))
             .put_multipart_opts(location, opts)
             .await
     }
 
-    async fn get(&self, location: &Path) -> Result<GetResult> {
-        self.get_client(location).get(location).await
-    }
-
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
-        self.get_client(location).get_opts(location, options).await
+        self.get_client(Some(location))
+            .get_opts(location, options)
+            .await
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
-        self.get_client(location).get_range(location, range).await
+        self.get_client(Some(location))
+            .get_range(location, range)
+            .await
     }
 
     async fn delete(&self, location: &Path) -> Result<()> {
-        self.get_client(location).delete(location).await
+        self.get_client(Some(location)).delete(location).await
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
-        match prefix {
-            Some(prefix) => self.get_client(prefix).list(Some(prefix)),
-            None => self.get_client(&Path::from("")).list(None),
-        }
+        self.get_client(prefix).list(prefix)
     }
 
     async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
