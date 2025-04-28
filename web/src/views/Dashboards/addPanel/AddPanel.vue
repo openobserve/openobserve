@@ -820,13 +820,15 @@ export default defineComponent({
 
       registerAiContextHandler();
       // console.timeEnd("add panel loadDashboard");
-      
+
       // Call makeAutoSQLQuery after dashboard data is loaded
       // Only generate SQL if we're in auto query mode
-      if (!editMode.value && 
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery) {
+      if (
+        !editMode.value &&
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+      ) {
         await makeAutoSQLQuery();
       }
     });
@@ -942,8 +944,10 @@ export default defineComponent({
       if (isInitialDashboardPanelData() && !editMode.value) return false;
       //compare chartdata and dashboardpaneldata and variables data as well
       return (
-        !isEqual(chartData.value, dashboardPanelData.data) ||
-        !isEqual(variablesData, updatedVariablesData)
+        !isEqual(
+          JSON.parse(JSON.stringify(chartData.value ?? {})),
+          JSON.parse(JSON.stringify(dashboardPanelData.data ?? {})),
+        ) || !isEqual(variablesData, updatedVariablesData)
       );
     });
 
