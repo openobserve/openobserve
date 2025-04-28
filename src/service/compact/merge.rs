@@ -972,16 +972,14 @@ pub async fn merge_files(
 
             // upload file to storage
             let buf = Bytes::from(buf);
-            if cfg.cache_latest_files.cache_parquet
-                && cfg.cache_latest_files.download_from_node_enabled
-            {
+            if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
                 infra::cache::file_data::disk::set(
                     TRACE_ID_FOR_CACHE_LATEST_FILE,
                     &new_file_key,
                     buf.clone(),
                 )
                 .await?;
-                log::info!("merge_files {new_file_key} file_data::disk::set success");
+                log::debug!("merge_files {new_file_key} file_data::disk::set success");
             }
             storage::put(&new_file_key, buf.clone()).await?;
 
@@ -1018,8 +1016,7 @@ pub async fn merge_files(
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
-                if cfg.cache_latest_files.cache_parquet
-                    && cfg.cache_latest_files.download_from_node_enabled
+                if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node
                 {
                     infra::cache::file_data::disk::set(
                         TRACE_ID_FOR_CACHE_LATEST_FILE,
@@ -1027,7 +1024,7 @@ pub async fn merge_files(
                         buf.clone(),
                     )
                     .await?;
-                    log::info!("merge_files {new_file_key} file_data::disk::set success");
+                    log::debug!("merge_files {new_file_key} file_data::disk::set success");
                 }
                 storage::put(&new_file_key, buf.clone()).await?;
 

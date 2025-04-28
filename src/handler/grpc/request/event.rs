@@ -41,7 +41,6 @@ use crate::handler::grpc::MetadataMap;
 
 pub struct Eventer;
 
-const DOWNLOAD_FROM_NODE_NOT_ENABLED: &str = "download from node not enabled";
 const CHUNK_SIZE: usize = 5 * 1024 * 1024; // 4MB chunks
 
 #[tonic::async_trait]
@@ -70,42 +69,87 @@ impl Event for Eventer {
 
         // cache latest files for querier
         if cfg.cache_latest_files.enabled && LOCAL_NODE.is_querier() {
+            let mut files_to_download = Vec::new();
+            let mut index_files_to_download = Vec::new();
+
+            // Collect files to download
             for item in put_items.iter() {
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
-                    log::info!("get_files_from_notifier: {grpc_addr}");
-                    if let Err(e) = get_files_from_notifier(&grpc_addr, &item.key).await {
-                        if e.to_string() != *DOWNLOAD_FROM_NODE_NOT_ENABLED {
-                            log::error!("Failed to get files from notifier: {}", e);
-                        };
-
-                        if let Err(e) = infra::cache::file_data::download(
-                            TRACE_ID_FOR_CACHE_LATEST_FILE,
-                            &item.key,
-                        )
-                        .await
-                        {
-                            log::error!("Failed to cache file data: {}", e);
-                        }
-                    }
+                    files_to_download.push(item.key.clone());
                 }
+
                 // cache index for the parquet
                 if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
                     if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
                     {
-                        if let Err(e) = get_files_from_notifier(&grpc_addr, &ttv_file).await {
-                            if e.to_string() != *DOWNLOAD_FROM_NODE_NOT_ENABLED {
-                                log::error!("Failed to get files from notifier: {}", e);
-                            };
-                            if let Err(e) = infra::cache::file_data::download(
-                                TRACE_ID_FOR_CACHE_LATEST_FILE,
-                                &ttv_file,
-                            )
-                            .await
-                            {
-                                log::error!("Failed to cache file data: {}", e);
-                            }
+                        index_files_to_download.push(ttv_file);
+                    }
+                }
+            }
+
+            // Try batch download first
+            if get_config().cache_latest_files.download_from_node {
+                let mut failed_files = Vec::new();
+                let mut failed_index_files = Vec::new();
+
+                // Try batch download for parquet files
+                if !files_to_download.is_empty() {
+                    match get_files_from_notifier(&grpc_addr, &files_to_download).await {
+                        Ok(failed) => failed_files = failed,
+                        Err(e) => {
+                            log::error!("Failed to get files from notifier: {}", e);
+                            failed_files = files_to_download;
                         }
+                    }
+                }
+
+                // Try batch download for index files
+                if !index_files_to_download.is_empty() {
+                    match get_files_from_notifier(&grpc_addr, &index_files_to_download).await {
+                        Ok(failed) => failed_index_files = failed,
+                        Err(e) => {
+                            log::error!("Failed to get index files from notifier: {}", e);
+                            failed_index_files = index_files_to_download;
+                        }
+                    }
+                }
+
+                // Fallback to individual downloads for failed files
+                for file in failed_files {
+                    if let Err(e) =
+                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &file)
+                            .await
+                    {
+                        log::error!("Failed to cache file data: {}", e);
+                    }
+                }
+
+                for file in failed_index_files {
+                    if let Err(e) =
+                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &file)
+                            .await
+                    {
+                        log::error!("Failed to cache index file data: {}", e);
+                    }
+                }
+            } else {
+                // Direct download when download_from_node_enabled is false
+                for file in files_to_download {
+                    if let Err(e) =
+                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &file)
+                            .await
+                    {
+                        log::error!("Failed to cache file data: {}", e);
+                    }
+                }
+
+                for file in index_files_to_download {
+                    if let Err(e) =
+                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &file)
+                            .await
+                    {
+                        log::error!("Failed to cache index file data: {}", e);
                     }
                 }
             }
@@ -240,13 +284,9 @@ async fn handle_file_chunked(
     Ok(())
 }
 
-async fn get_files_from_notifier(addr: &str, filekey: &str) -> Result<()> {
-    if !get_config().cache_latest_files.download_from_node_enabled {
-        return Err(anyhow::anyhow!(DOWNLOAD_FROM_NODE_NOT_ENABLED));
-    }
-
+async fn get_files_from_notifier(addr: &str, filekeys: &[String]) -> Result<Vec<String>> {
     let start = std::time::Instant::now();
-    log::debug!("get_files_from_notifier start, file: {}", filekey);
+    log::debug!("get_files_from_notifier start, files: {:?}", filekeys);
     let token: MetadataValue<_> = get_internal_grpc_token()
         .parse()
         .map_err(|_| anyhow::anyhow!("Invalid token"))?;
@@ -258,7 +298,7 @@ async fn get_files_from_notifier(addr: &str, filekey: &str) -> Result<()> {
     });
 
     let mut request = Request::new(SimpleFileList {
-        paths: vec![filekey.to_string()],
+        paths: filekeys.to_vec(),
     });
     request.set_timeout(std::time::Duration::from_secs(
         get_config().limit.query_timeout,
@@ -267,46 +307,62 @@ async fn get_files_from_notifier(addr: &str, filekey: &str) -> Result<()> {
     let response = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(250 * 1024 * 1024)
-        .max_encoding_message_size(250 * 1024 * 1024)
+        .max_decoding_message_size(
+            get_config().cache_latest_files.download_from_node_max_size * 1024 * 1024,
+        )
+        .max_encoding_message_size(
+            get_config().cache_latest_files.download_from_node_max_size * 1024 * 1024,
+        )
         .get_files(request)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to get file: {filekey} from {addr}, {e}"))?;
+        .map_err(|e| anyhow::anyhow!("Failed to get files from {addr}, {e}"))?;
 
     let mut response_stream = response.into_inner();
-    let mut file_content = Vec::new();
+    let mut file_contents = std::collections::HashMap::new();
+    let mut downloaded_files = std::collections::HashSet::new();
 
     while let Some(response) = response_stream.next().await {
         let response =
             response.map_err(|e| anyhow::anyhow!("Failed to receive file chunk: {}", e))?;
-        if let Some(content) = response.entries.first() {
-            file_content.extend_from_slice(&content.content);
+        for content in response.entries {
+            file_contents.insert(content.filename.clone(), content.content);
+            downloaded_files.insert(content.filename);
         }
     }
 
-    if file_content.is_empty() {
-        return Err(anyhow::anyhow!(
-            "No file: {} content returned from {}",
-            filekey,
-            addr
-        ));
-    }
-
     let time = start.elapsed().as_millis();
-    log::info!(
-        "Successfully retrieved file:{} from {} in {}ms",
-        filekey,
+    log::debug!(
+        "Successfully retrieved {} files from {} in {}ms",
+        downloaded_files.len(),
         addr,
         time
     );
 
-    // Cache the file content
-    let bytes = Bytes::from(file_content);
-    match infra::cache::file_data::set(TRACE_ID_FOR_CACHE_LATEST_FILE, filekey, bytes).await {
-        Ok(res) => {
+    // Cache the file contents
+    for (filekey, content) in file_contents {
+        let bytes = Bytes::from(content);
+        if let Err(e) =
+            infra::cache::file_data::set(TRACE_ID_FOR_CACHE_LATEST_FILE, &filekey, bytes).await
+        {
+            log::error!("Failed to cache file {}: {}", filekey, e);
+            downloaded_files.remove(&filekey);
+        } else {
             log::info!("file:{} infra cache set successfully", filekey);
-            Ok(res)
         }
-        Err(e) => Err(e),
     }
+
+    // Return list of failed files
+    let failed_files: Vec<_> = filekeys
+        .iter()
+        .filter(|f| !downloaded_files.contains(*f))
+        .cloned()
+        .collect();
+    log::debug!(
+        "Failed retrieved {} files from {} in {}ms",
+        failed_files.len(),
+        addr,
+        time
+    );
+
+    Ok(failed_files)
 }
