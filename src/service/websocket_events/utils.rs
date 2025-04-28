@@ -16,7 +16,10 @@
 use actix_web::http::StatusCode;
 use config::{
     ider,
-    meta::websocket::{SearchEventReq, ValuesEventReq},
+    meta::{
+        sql::OrderBy,
+        websocket::{SearchEventReq, ValuesEventReq},
+    },
 };
 use infra::errors;
 use serde::{Deserialize, Serialize};
@@ -288,16 +291,15 @@ pub enum WsClientEvents {
 }
 
 impl WsClientEvents {
-    pub fn get_type(&self) -> String {
+    pub fn event_type(self) -> &'static str {
         match self {
-            WsClientEvents::Search(_) => "search",
-            WsClientEvents::Values(_) => "values",
+            WsClientEvents::Search(req) => req.event_type(),
+            WsClientEvents::Values(req) => req.event_type(),
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { .. } => "cancel",
             WsClientEvents::Benchmark { .. } => "benchmark",
             WsClientEvents::TestAbnormalClose { .. } => "test_abnormal_close",
         }
-        .to_string()
     }
 
     pub fn to_json(&self) -> String {
@@ -379,9 +381,7 @@ pub enum WsServerEvents {
     },
     ProgressUpdate {
         trace_id: String,
-        current: usize,
-        total: usize,
-        percentage: f32,
+        percentage: usize,
         event_type: String,
     },
     Ping(Vec<u8>),
@@ -479,5 +479,29 @@ impl TryFrom<serde_json::Value> for WsServerEvents {
             Some("end") => serde_json::from_value(value).map_err(|e| e.to_string()),
             _ => Err("Unknown message type".to_string()),
         }
+    }
+}
+
+/// Calculate the progress percentage based on the search type and current partition
+pub fn calculate_progress_percentage(
+    partition_start_time: i64,
+    partition_end_time: i64,
+    req_start_time: i64,
+    req_end_time: i64,
+    partition_order_by: &OrderBy,
+) -> usize {
+    let percentage = if *partition_order_by == OrderBy::Desc {
+        // For dashboards/histograms partitions processed newest to oldest
+        (req_end_time - partition_start_time) as f32 / (req_end_time - req_start_time) as f32
+    } else {
+        // For regular searches partitions processed oldest to newest
+        (partition_end_time - req_start_time) as f32 / (req_end_time - req_start_time) as f32
+    };
+    // TODO: so here if value is between 0-50 ceil and if it 51-100 floor
+    // ((percentage * 100.0).ceil() as usize).min(100)
+    if percentage < 0.5 {
+        ((percentage * 100.0).ceil() as usize).min(100)
+    } else {
+        ((percentage * 100.0).floor() as usize).min(100)
     }
 }
