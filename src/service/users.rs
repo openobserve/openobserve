@@ -789,25 +789,21 @@ pub async fn list_users(
     log::debug!("Listing users for org: {}", org_id);
 
     #[cfg(feature = "enterprise")]
-    if get_openfga_config().enabled && role.is_none() && permitted.is_some() {
-        let need_check_permission = !matches!(role, Some(UserRole::ServiceAccount));
-        let permitted = permitted.as_ref().unwrap();
+    if get_openfga_config().enabled && role.is_none() && permitted.is_none() {
         // This user does not have list users permission
         // Hence only return this specific user
-        if need_check_permission && permitted.is_empty() {
-            if let Some(user) = get_user(Some(org_id), _user_id).await {
-                user_list.push(UserResponse {
-                    email: user.email.clone(),
-                    role: user.role.to_string(),
-                    first_name: user.first_name.clone(),
-                    last_name: user.last_name.clone(),
-                    is_external: user.is_external,
-                    orgs: None,
-                    created_at: 0, // Not used
-                });
-            }
-            return Ok(HttpResponse::Ok().json(UserList { data: user_list }));
+        if let Some(user) = get_user(Some(org_id), _user_id).await {
+            user_list.push(UserResponse {
+                email: user.email.clone(),
+                role: user.role.to_string(),
+                first_name: user.first_name.clone(),
+                last_name: user.last_name.clone(),
+                is_external: user.is_external,
+                orgs: None,
+                created_at: 0, // Not used
+            });
         }
+        return Ok(HttpResponse::Ok().json(UserList { data: user_list }));
     }
 
     for org_user in ORG_USERS.iter() {
