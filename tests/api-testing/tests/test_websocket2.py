@@ -590,8 +590,23 @@ def handle_websocket_connection(message):
     """Simple WebSocket handler - just get results and return"""
   
     ws = None
-    cookie_header = f"auth_tokens=base64.b64encode({{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}})"
-    
+   # Prepare access token
+    access_token = "Basic " + base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()
+
+    # Prepare the full auth_tokens dictionary
+    auth_tokens = {
+        "access_token": access_token,
+        "refresh_token": ""
+    }
+
+    # Serialize to JSON
+    auth_tokens_json = json.dumps(auth_tokens)
+
+    # Base64 encode the JSON string
+    auth_tokens_b64 = base64.b64encode(auth_tokens_json.encode()).decode()
+
+    # Create the final cookie header
+    cookie_header = f"auth_tokens={auth_tokens_b64}"
     # Generate a dynamic UUID
     connection_uuid = str(uuid.uuid4())  # Renamed from uuid to connection_uuid
     
