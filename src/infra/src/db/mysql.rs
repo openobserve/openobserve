@@ -69,7 +69,6 @@ fn connect_ddl() -> Pool<MySql> {
     } else {
         cfg.common.meta_ddl_dsn.clone()
     };
-    let cfg = config::get_config();
     let db_opts = MySqlConnectOptions::from_str(&dsn).expect("mysql connect options create failed");
 
     let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
