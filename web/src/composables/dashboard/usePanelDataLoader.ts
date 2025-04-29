@@ -405,13 +405,11 @@ export const usePanelDataLoader = (
       // Set total steps: number of partitions + 1 for the initial partition API call
       const totalSteps = partitionArr.length + 1;
       state.totalPartitions = totalSteps;
-      console.log("total partitions", totalSteps);
 
       // We've completed the first step (partition API call)
       state.completedPartitions = 1;
       // Calculate progress in 0-100 format
       state.percent = Math.round((1 / totalSteps) * 100);
-      console.log("progress", state.percent);
 
       // always sort partitions in descending order
       partitionArr.sort((a: any, b: any) => a[0] - b[0]);
@@ -476,7 +474,6 @@ export const usePanelDataLoader = (
           state.percent = Math.round(
             (state.completedPartitions / state.totalPartitions) * 100,
           );
-          console.log("progress after each partition", state.percent);
 
           // remove past error detail
           state.errorDetail = {
@@ -652,7 +649,6 @@ export const usePanelDataLoader = (
         state.isOperationCancelled = false;
       }
       if (response.type === "event_progress") {
-        console.log("progress_update", response?.content?.percent);
         // The percent value is now in 0-100 format, no need to multiply
         state.percent = response?.content?.percent ?? 0;
       }

@@ -6,7 +6,6 @@
       'tw-opacity-100': loading || isFadingOut,
     }"
   >
-    {{ percent }}
     <div
       class="tw-w-full tw-h-[3px] tw-bg-gray-200 tw-relative tw-overflow-x-hidden"
     >
