@@ -1,4 +1,3 @@
-
 export default class DashboardTimeRefresh {
   constructor(page) {
     this.page = page;
@@ -49,7 +48,7 @@ export default class DashboardTimeRefresh {
     await this.page
       .locator(`[data-test="logs-search-bar-refresh-time-${time}"]`)
       .click();
-        await this.offBtn.click();
+    await this.offBtn.click();
   }
 
   //Refresh dashboard

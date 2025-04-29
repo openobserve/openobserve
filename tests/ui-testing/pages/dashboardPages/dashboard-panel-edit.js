@@ -2,9 +2,13 @@ export default class DashboardPanel {
   constructor(page) {
     this.page = page;
 
-    this.editArrow = page.locator('[data-test="dashboard-edit-panel-area-test-dropdown"]');
+    this.editArrow = page.locator(
+      '[data-test="dashboard-edit-panel-area-test-dropdown"]'
+    );
     this.duplicate = page.locator('[data-test="dashboard-duplicate-panel"]');
-    this.dashboardsMenuItem = page.locator( '[data-test="menu-link-/dashboards-item"]');
+    this.dashboardsMenuItem = page.locator(
+      '[data-test="menu-link-/dashboards-item"]'
+    );
     this.applyBtn = page.locator('[data-test="dashboard-apply"]');
     this.namepanel = page.locator('[data-test="dashboard-panel-name"]');
     this.saveBtn = page.locator('[data-test="dashboard-panel-save"]');
@@ -21,7 +25,7 @@ export default class DashboardPanel {
     );
     this.deleteconfrimBtn = page.locator('[data-test="confirm-button"]');
   }
-  
+
   // Duplicate panel
   async duplicatePanel(panelName) {
     await this.page
