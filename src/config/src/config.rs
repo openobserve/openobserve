@@ -1495,11 +1495,6 @@ pub struct CacheLatestFiles {
     pub delete_merge_files: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
     pub download_from_node: bool,
-    #[env_config(
-        name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE_MAX_SIZE",
-        default = 250
-    )]
-    pub download_from_node_max_size: usize,
 }
 
 #[derive(EnvConfig)]
