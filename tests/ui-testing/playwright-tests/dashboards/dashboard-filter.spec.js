@@ -570,14 +570,20 @@ test.describe("dashboard filter testcases", () => {
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
     await page.waitForTimeout(5000);
-    await page
-      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .first()
-      .click();
+    // await page
+    //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
+    //   .first()
+    //   .click();
+
+    await page.getByText("Filters on Fieldarrow_drop_down").click();
+
+    // await page
+    //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
+    //   .first()
+    //   .fill("kubernetes_container_image");
 
     await page
-      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .first()
+      .getByText("Filters on Fieldarrow_drop_down")
       .fill("kubernetes_container_image");
 
     // await page.waitForTimeout(4000);
