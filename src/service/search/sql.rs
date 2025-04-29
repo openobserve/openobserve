@@ -2521,4 +2521,39 @@ mod tests {
         // we support this type of query
         assert_eq!(result, sql.to_string());
     }
+
+    #[test]
+    fn test_re_where_with_cte_query() {
+        // Test the WHERE regex with a CTE query
+        let cte_sql = r#"WITH FilteredLogs AS (
+  SELECT * FROM "default22"
+  WHERE str_match_ignore_case(message, 'org')
+)
+SELECT _timestamp, message, kubernetes_pod_name
+FROM FilteredLogs"#;
+
+        // Verify the regex extracts the correct condition from the WHERE clause
+        let captures = RE_WHERE
+            .captures(cte_sql)
+            .expect("Failed to match WHERE clause");
+        let condition = captures
+            .get(1)
+            .expect("Failed to capture condition")
+            .as_str();
+
+        assert_eq!(condition, "str_match_ignore_case(message, 'org')");
+
+        let cte_sql = r#"WITH FilteredLogs AS (SELECT * FROM "default22" WHERE str_match_ignore_case(message, 'org')) SELECT _timestamp, message, kubernetes_pod_name FROM FilteredLogs"#;
+
+        // Verify the regex extracts the correct condition from the WHERE clause
+        let captures = RE_WHERE
+            .captures(cte_sql)
+            .expect("Failed to match WHERE clause");
+        let condition = captures
+            .get(1)
+            .expect("Failed to capture condition")
+            .as_str();
+
+        assert_eq!(condition, "str_match_ignore_case(message, 'org')");
+    }
 }
