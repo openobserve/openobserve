@@ -386,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :read-only="!editTable"
                     />
             </div>
-        <div v-if=" (activeTab == 'api-limits' || activeTab == 'role-limits') && loading && !apiLimitsRows.length" class="flex justify-center items-center">
+        <div v-if=" ((activeTab == 'api-limits' && !apiLimitsRows.length) || (activeTab == 'role-limits' && !rolesLimitRows.length)) && loading " class="flex justify-center items-center">
             <q-spinner-hourglass color="primary" size="lg" />
         </div>
         <div v-else-if=" ((activeTab == 'api-limits') && !loading && !selectedOrganization )">
@@ -762,8 +762,11 @@ export default defineComponent ({
 
         if(activeTab.value === "api-limits"){
             if(!store.state.allApiLimitsByOrgId[selectedOrganization.value.value]){
+                apiLimitsRows.value = [];
+                loading.value = true;
                 apiLimitsRows.value = await getApiLimitsByOrganization(selectedOrganization.value.value);
                 resultTotal.value = apiLimitsRows.value.length;
+                loading.value = false;
             }
             else{
                 apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
@@ -772,6 +775,7 @@ export default defineComponent ({
         }
         else if(activeTab.value === "role-limits"){
                 await getRolesByOrganization();
+
         }
     }
     const getOrganizations = async () => {
@@ -832,7 +836,6 @@ export default defineComponent ({
             //as we are not storing the roles in the store
             //so we need to get the roles from the api
             await getRolesByOrganization();
-
         }
         if (tab === "api-limits" ) {
             if(!store.state.allApiLimitsByOrgId[selectedOrganization.value.value]){
@@ -878,6 +881,8 @@ export default defineComponent ({
         //as we are not storing the roles in the store
         //so we need to get the roles from the api
         try{
+            rolesLimitRows.value = [];
+            loading.value = true;
             const response = await getRoles(selectedOrganization.value?.value);
             rolesLimitRows.value = response.data.map((role: any) => ({
                 role_name: role,
@@ -889,8 +894,10 @@ export default defineComponent ({
                 delete: 10
             }));
             resultTotal.value = rolesLimitRows.value.length;
+            loading.value = false;
         }
         catch(error){
+            loading.value = false;
             console.log(error);
         }
     }
