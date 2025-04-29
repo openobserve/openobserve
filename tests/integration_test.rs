@@ -128,8 +128,8 @@ mod tests {
         // init config
         config::init().await.unwrap();
         // init infra
-        infra::init().await.unwrap();
         service::init_db().await.unwrap();
+        infra::init().await.unwrap();
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
         openobserve::common::infra::init().await.unwrap();
