@@ -6,12 +6,14 @@
       'tw-opacity-100': loading || isFadingOut,
     }"
   >
-  {{ percent }}
-    <div class="tw-w-full tw-h-[3px] tw-bg-gray-200 tw-relative tw-overflow-x-hidden">
+    {{ percent }}
+    <div
+      class="tw-w-full tw-h-[3px] tw-bg-gray-200 tw-relative tw-overflow-x-hidden"
+    >
       <div
         class="tw-h-full tw-bg-blue-500 tw-relative"
         :style="{
-          width: `${displayPercentage * 100}%`,
+          width: `${displayPercentage}%`,
           transition: shouldAnimate
             ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             : 'none',
@@ -30,7 +32,7 @@
       <div
         class="tw-absolute tw-top-0 tw-w-[3px] tw-h-[2px] tw-rounded-full tw-bg-blue-500 tw-shadow-[0_0_10px_2px_rgba(59,130,246,0.5)] tw-transform tw-translate-x-[-50%]"
         :style="{
-          left: `${displayPercentage * 100}%`,
+          left: `${displayPercentage}%`,
           transition: shouldAnimate
             ? 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             : 'none',
@@ -94,7 +96,7 @@ export default defineComponent({
 
     const displayPercentage = computed(() => {
       if (isFadingOut.value) {
-        return 1; // Keep at 100% while fading out
+        return 100; // Keep at 100% while fading out
       }
       if (!props.loading) {
         return internalPercentage.value;
