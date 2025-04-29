@@ -569,7 +569,7 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
-    // await page.waitForTimeout(1000);
+    await page.waitForTimeout(5000);
     await page
       .locator('[data-test="dashboard-add-condition-column-0\\}"]')
       .first()
@@ -580,7 +580,7 @@ test.describe("dashboard filter testcases", () => {
       .first()
       .fill("kubernetes_container_image");
 
-    await page.waitForTimeout(4000);
+    // await page.waitForTimeout(4000);
 
     await page.getByText("kubernetes_container_image", { exact: true }).click();
 
