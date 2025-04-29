@@ -1,4 +1,3 @@
-import { expect } from "playwright/test";
 
 export default class DashboardPanelConfigs {
   constructor(page) {
@@ -12,15 +11,15 @@ export default class DashboardPanelConfigs {
     this.axisWidth = page.locator('[data-test="dashboard-config-axis-width"]');
     this.showSymbols = page.locator('[data-test="dashboard-config-show_symbol"]');
     this.lineInterpolation = page.locator('[data-test="dashboard-config-line_interpolation"]');
-    this.lineTickness = page.locator('[data-test="dashboard-config-line_thickness"]');
+    this.lineThickness = page.locator('[data-test="dashboard-config-line_thickness"]');
     this.axisBorder = page.locator('[data-test="dashboard-config-axis-border"]');
     this.yAxisMin = page.locator('[data-test="dashboard-config-y_axis_min"]');
     this.yAxisMax = page.locator('[data-test="dashboard-config-y_axis_max"]');
     this.valuePosition = page.locator('[data-test="dashboard-config-label-position"]');
     this.valueRotate = page.locator('[data-test="dashboard-config-label-rotate"]');
-    this.description = page.locator('[data-test="dashboard-config-description"]');
     this.noValueReplacement = page.locator('[data-test="dashboard-config-no-value-replacement"]');
     this.trellisLayout = page.locator('[data-test="dashboard-trellis-chart"]');
+    this.queryLimit = page.locator('[data-test="dashboard-config-limit"]');
     
     
     //GeoMap locators
@@ -50,14 +49,6 @@ export default class DashboardPanelConfigs {
 
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
-
-    //Gauge chart locators
-    this.gaugeMin = page.locator('[data-test="dashboard-config-gauge-min"]');
-    this.gaugeMax = page.locator('[data-test="dashboard-config-gauge-max"]');
-
-
-
-    
   }
 /// Open the config panel
   async openConfigPanel() {
@@ -90,14 +81,14 @@ export default class DashboardPanelConfigs {
   }
 
 //Query limit
-async queryLimit(limit) {
+async selectQueryLimit(limit) {
   await this.queryLimit.waitFor({ state: 'visible' });
   await this.queryLimit.click();
   await this.queryLimit.fill(limit);
 }
 
 //No value replacement
-async selectnoValeuReplace(replacement) {
+async selectNoValeuReplace(replacement) {
   await this.noValueReplacement.waitFor({ state: 'visible' });
   await this.noValueReplacement.click();
   await this.noValueReplacement.fill(replacement);
@@ -152,9 +143,9 @@ async selectLineInterpolation(interpolation) {
 
 // Line thickness
 async selectLineThickness(thickness) {
-  await this.lineTickness.waitFor({ state: 'visible' });
-  await this.lineTickness.click();
-  await this.lineTickness.fill(thickness);
+  await this.lineThickness.waitFor({ state: 'visible' });
+  await this.lineThickness.click();
+  await this.lineThickness.fill(thickness);
 }
 //Trellis Layout
 async selectTrellisLayout(layout) {

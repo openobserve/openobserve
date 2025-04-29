@@ -1,5 +1,3 @@
-import { expect } from "playwright/test";
-
 export default class DashboardPanel {
   constructor(page) {
     this.page = page;
@@ -15,13 +13,13 @@ export default class DashboardPanel {
     this.downloadJson = page.locator(
       '[data-test="dashboard-panel-download-as-json-btn"]'
     );
-    this.downlaodCsv = page.locator(
+    this.downloadCsv = page.locator(
       '[data-test="dashboard-panel-download-as-csv-btn"]'
     );
     this.moveTab = page.locator(
       '[data-test="dashboard-move-to-another-panel"]'
     );
-    this.deleteconfrimBtn = '[data-test="confirm-button"]';
+    this.deleteconfrimBtn = page.locator('[data-test="confirm-button"]');
   }
   
   // Duplicate panel
@@ -68,7 +66,7 @@ export default class DashboardPanel {
     await this.page
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .click();
-    await this.downlaodCsv.waitFor({ state: "visible" });
+    await this.downloadCsv.waitFor({ state: "visible" });
     await this.downloadCsv.click();
   }
 
