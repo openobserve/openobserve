@@ -60,6 +60,7 @@
             dense
             filled
             label="Select Type"
+            class="tw-w-40 tw-min-w-40"
             :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
           />
 
