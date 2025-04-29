@@ -78,6 +78,9 @@ export default defineComponent({
     loadingProgress: {
       type: Number,
       required: true,
+      validator: (value: number) => {
+        return value >= 0 && value <= 100;
+      },
     },
   },
 
@@ -93,7 +96,7 @@ export default defineComponent({
       (newValue, oldValue) => {
         if (oldValue && !newValue) {
           // When loading becomes false, quickly complete to 100% and start fade out
-          internalPercentage.value = 1;
+          internalPercentage.value = 100;
           isFadingOut.value = true;
 
           clearTimeout(fadeOutTimeout);
