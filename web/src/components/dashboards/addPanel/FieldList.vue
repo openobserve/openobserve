@@ -549,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="white"
               text-color="primary"
               :options="userDefinedSchemaBtnGroupOption"
-              >
+            >
               <!-- @update:model-value="toggleSchema" -->
               <template v-slot:user_defined_slot>
                 <q-icon name="person"></q-icon>
@@ -932,6 +932,25 @@ export default defineComponent({
 
     const flattenGroupedFields = computed(() => {
       const flattenedFields: any[] = [];
+
+      dashboardPanelData.meta.stream.customQueryFields.forEach((field: any) => {
+        flattenedFields.push({
+          name: field.name,
+          type: field.type,
+          isGroup: false,
+        });
+      });
+
+      dashboardPanelData.meta.stream.vrlFunctionFieldList.forEach(
+        (field: any) => {
+          flattenedFields.push({
+            name: field.name,
+            type: field.type,
+            isGroup: false,
+          });
+        },
+      );
+
       dashboardPanelData.meta.streamFields.groupedFields.forEach(
         (group: any) => {
           // Add a group header row
