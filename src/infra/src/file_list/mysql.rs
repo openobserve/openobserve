@@ -1474,7 +1474,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         let pool = CLIENT_RO.clone();
 
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list_jobs"])
+            .with_label_values(&["select", "file_list_jobs", ""])
             .inc();
         let ret = sqlx::query_as::<_, (i64,String, String, i64)>(
             r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = ? AND dumped = ? limit 1000"#,
@@ -1495,7 +1495,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["update", "file_list_jobs"])
+            .with_label_values(&["update", "file_list_jobs", ""])
             .inc();
         sqlx::query(r#"UPDATE file_list_jobs SET dumped = ? WHERE id = ?;"#)
             .bind(dumped)
