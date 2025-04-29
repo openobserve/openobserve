@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::Reverse, collections::BinaryHeap, time::Instant};
+use std::time::Instant;
 
 use config::{
     get_config,
@@ -25,7 +25,7 @@ use config::{
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
     },
-    utils::json::{Map, Value, get_string_value},
+    utils::json::get_string_value,
 };
 use infra::errors::Error;
 use tracing::Instrument;
@@ -671,17 +671,6 @@ async fn process_delta(
             // `result_cache_ratio` will be 0 for delta search
             let result_cache_ratio = search_res.result_cache_ratio;
 
-            if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
-                log::debug!("Getting top k values for partition {idx}");
-                let values_event_context = req.values_event_context.clone().unwrap();
-                let top_k_values = tokio::task::spawn_blocking(move || {
-                    get_top_k_values(&search_res.hits, &values_event_context)
-                })
-                .await
-                .unwrap();
-                search_res.hits = top_k_values?;
-            }
-
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
                 results: Box::new(search_res.clone()),
@@ -705,6 +694,28 @@ async fn process_delta(
                 accumulated_results.len()
             );
             send_message(req_id, ws_search_res.to_json()).await?;
+
+            if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
+                let field = req.values_event_context.as_ref().unwrap().field.clone();
+
+                search_res.hits.iter_mut().for_each(|hit| {
+                    if let Some(obj) = hit.as_object_mut() {
+                        let key = match obj.get_mut("zo_sql_key") {
+                            Some(v) => get_string_value(v),
+                            None => "".to_string(),
+                        };
+                        obj.insert("zo_sql_key".to_string(), serde_json::Value::String(key));
+                    }
+                });
+
+                // Wrap the hits in a new object structure
+                let values = std::mem::take(&mut search_res.hits);
+                let wrapped_obj = serde_json::json!({
+                    "field": field,
+                    "values": values
+                });
+                search_res.hits = vec![wrapped_obj];
+            }
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -979,6 +990,28 @@ pub async fn do_partitioned_search(
         let mut search_res = do_search(&req, user_id, false).await?;
         curr_res_size += search_res.hits.len() as i64;
 
+        if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
+            let field = req.values_event_context.as_ref().unwrap().field.clone();
+
+            search_res.hits.iter_mut().for_each(|hit| {
+                if let Some(obj) = hit.as_object_mut() {
+                    let key = match obj.get_mut("zo_sql_key") {
+                        Some(v) => get_string_value(v),
+                        None => "".to_string(),
+                    };
+                    obj.insert("zo_sql_key".to_string(), serde_json::Value::String(key));
+                }
+            });
+
+            // Wrap the hits in a new object structure
+            let values = std::mem::take(&mut search_res.hits);
+            let wrapped_obj = serde_json::json!({
+                "field": field,
+                "values": values
+            });
+            search_res.hits = vec![wrapped_obj];
+        }
+
         if !search_res.hits.is_empty() {
             search_res = order_search_results(search_res, req.fallback_order_by_col);
 
@@ -1009,24 +1042,6 @@ pub async fn do_partitioned_search(
             } else {
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
             }
-
-            if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
-                let ws_search_span = tracing::info_span!(
-                    "src::service::websocket_events::search::do_partitioned_search::get_top_k_values",
-                    org_id = %req.org_id,
-                );
-                let instant = Instant::now();
-                let top_k_values = tokio::task::spawn_blocking(move || {
-                    get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
-                })
-                .instrument(ws_search_span.clone())
-                .await
-                .unwrap();
-                search_res.hits = top_k_values?;
-                let duration = instant.elapsed();
-                log::debug!("Top k values for partition {idx} took {:?}", duration);
-            }
-
             // Send the cached response
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.to_string(),
@@ -1209,88 +1224,4 @@ pub async fn write_results_to_cache(
     }
 
     Ok(())
-}
-
-/// This function will compute top k values for values request
-#[tracing::instrument(name = "service:websocket_events:search::get_top_k_values", skip_all)]
-pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<Vec<Value>, Error> {
-    let mut top_k_values: Vec<Value> = Vec::new();
-
-    if ctx.field.is_empty() {
-        log::error!("Field is empty for values search");
-        return Err(Error::Message("field is empty".to_string()));
-    }
-
-    let k_limit = ctx.top_k.unwrap_or(10);
-    let no_count = ctx.no_count;
-
-    let mut search_result_hits = Vec::new();
-    for hit in hits {
-        let key: String = hit
-            .get("zo_sql_key")
-            .map(get_string_value)
-            .unwrap_or_default();
-        let num = hit
-            .get("zo_sql_num")
-            .and_then(|v| v.as_i64())
-            .unwrap_or_default();
-        search_result_hits.push((key, num));
-    }
-
-    if no_count {
-        // For alphabetical sorting, collect all entries first
-        let mut all_entries: Vec<_> = search_result_hits;
-        all_entries.sort_by(|a, b| a.0.cmp(&b.0));
-        all_entries.truncate(k_limit as usize);
-
-        let top_hits = all_entries
-            .into_iter()
-            .map(|(k, v)| {
-                let mut item = Map::new();
-                item.insert("zo_sql_key".to_string(), Value::String(k));
-                item.insert("zo_sql_num".to_string(), Value::Number(v.into()));
-                Value::Object(item)
-            })
-            .collect::<Vec<_>>();
-
-        let mut field_value: Map<String, Value> = Map::new();
-        field_value.insert("field".to_string(), Value::String(ctx.field.clone()));
-        field_value.insert("values".to_string(), Value::Array(top_hits));
-        top_k_values.push(Value::Object(field_value));
-    } else {
-        // For value-based sorting, use a min heap to get top k elements
-        let mut min_heap: BinaryHeap<Reverse<(i64, String)>> =
-            BinaryHeap::with_capacity(k_limit as usize);
-        for (k, v) in search_result_hits {
-            if min_heap.len() < k_limit as usize {
-                // If heap not full, just add
-                min_heap.push(Reverse((v, k)));
-            } else if !min_heap.is_empty() && v > min_heap.peek().unwrap().0.0 {
-                // If current value is larger than smallest in heap, replace it
-                min_heap.pop();
-                min_heap.push(Reverse((v, k)));
-            }
-        }
-
-        // Convert heap to vector and sort in descending order
-        let mut top_elements: Vec<_> = min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
-        top_elements.sort_by(|a, b| b.1.cmp(&a.1));
-
-        let top_hits = top_elements
-            .into_iter()
-            .map(|(k, v)| {
-                let mut item = Map::new();
-                item.insert("zo_sql_key".to_string(), Value::String(k));
-                item.insert("zo_sql_num".to_string(), Value::Number(v.into()));
-                Value::Object(item)
-            })
-            .collect::<Vec<_>>();
-
-        let mut field_value: Map<String, Value> = Map::new();
-        field_value.insert("field".to_string(), Value::String(ctx.field.clone()));
-        field_value.insert("values".to_string(), Value::Array(top_hits));
-        top_k_values.push(Value::Object(field_value));
-    }
-
-    Ok(top_k_values)
 }

@@ -709,7 +709,7 @@ pub async fn build_search_request_per_field(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-) -> Result<Vec<(config::meta::search::Request, StreamType, FieldName)>, Error> {
+) -> Result<(config::meta::search::Request, StreamType), Error> {
     let query_fn = req
         .vrl_fn
         .as_ref()
@@ -728,12 +728,15 @@ pub async fn build_search_request_per_field(
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap_or(Schema::empty());
-    let fields = req
-        .fields
-        .iter()
-        .filter(|field| schema.field_with_name(field).is_ok())
-        .cloned()
-        .collect::<Vec<_>>();
+
+    let field = if let Some(field) = req.fields.first().cloned() {
+        if schema.field_with_name(&field).is_err() {
+            return Err(Error::other("field not found"));
+        }
+        field
+    } else {
+        return Err(Error::other("no valid fields provided"));
+    };
 
     let no_count = req.no_count;
 
@@ -763,10 +766,11 @@ pub async fn build_search_request_per_field(
         (start_time, end_time)
     };
 
-    let decoded_sql = base64::decode_url(&req.sql).unwrap_or_default();
+    let top_k = req.size.unwrap_or(get_config().limit.query_default_limit);
 
     let mut query = config::meta::search::Query {
-        sql: decoded_sql.clone(), // Will be populated per field in the loop below
+        sql: base64::decode_url(&req.sql).unwrap_or_default(), /* Will be populated per field in
+                                                                * the loop below */
         from: 0,
         size: config::meta::sql::MAX_LIMIT,
         start_time,
@@ -777,26 +781,46 @@ pub async fn build_search_request_per_field(
 
     let (sql_where, can_use_distinct_stream) = match req.filter.as_ref() {
         None => {
-            if !decoded_sql.is_empty() {
+            if !req.sql.is_empty() {
                 query.uses_zo_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
-                    .any(|fn_name| decoded_sql.contains(&format!("{}(", fn_name)));
+                    .any(|fn_name| query.sql.contains(&format!("{}(", fn_name)));
 
-                // pick up where clause from sql
-                let sql_where_from_query =
-                    match SearchService::sql::pickup_where(&decoded_sql, None) {
+                let Ok(sql) = crate::service::search::sql::Sql::new(
+                    &(query.clone().into()),
+                    org_id,
+                    stream_type,
+                    None,
+                )
+                .await
+                else {
+                    return Err(Error::other("Failed to parse sql"));
+                };
+
+                let complex_query = sql.stream_names.len().eq(&2) && sql.aliases.len().eq(&2);
+
+                let sql_where_from_query = if !complex_query {
+                    // pick up where clause from sql
+                    match SearchService::sql::pickup_where(&query.sql, None) {
                         Ok(Some(v)) => format!("WHERE {}", v),
                         Ok(None) => "".to_string(),
                         Err(e) => {
                             return Err(Error::other(e));
                         }
-                    };
+                    }
+                } else {
+                    // we don't need to pick up where clause from sql for complex queries
+                    // this is the business logic for complex queries, since its hard to parse
+                    // the where clause from the sql and make a filter out of it
+                    "".to_string()
+                };
+
                 let can_use_distinct_stream = can_use_distinct_stream(
                     org_id,
                     stream_name,
                     stream_type,
-                    &fields,
+                    &[field.clone()],
                     &query,
                     start_time,
                 )
@@ -826,7 +850,7 @@ pub async fn build_search_request_per_field(
                     org_id,
                     stream_name,
                     stream_type,
-                    &fields,
+                    &[field.clone()],
                     &query,
                     start_time,
                 )
@@ -839,7 +863,7 @@ pub async fn build_search_request_per_field(
 
     let timeout = req.timeout.unwrap_or(0);
 
-    let req = config::meta::search::Request {
+    let mut req = config::meta::search::Request {
         query,
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
@@ -869,26 +893,20 @@ pub async fn build_search_request_per_field(
         stream_type
     };
 
-    let mut requests = Vec::new();
-    for field in fields {
-        let sql = if no_count {
+    let sql = if no_count {
             // we use min(0) as a hack to do streaming aggregation but actually return 0,
             // essentially we are not counting the values
-            format!(
-                "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
-            )
-        } else {
-            format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
-            )
-        };
+        format!(
+            "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {top_k}"
+        )
+    } else {
+        format!(
+            "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {top_k}"
+        )
+    };
 
-        let mut req = req.clone();
-        req.query.sql = sql;
-        requests.push((req, actual_stream_type, field));
-    }
-
-    Ok(requests)
+    req.query.sql = sql;
+    Ok((req, actual_stream_type))
 }
 
 // If all fields requested in the query AND fields from the

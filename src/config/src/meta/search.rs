@@ -930,8 +930,6 @@ impl TryFrom<&str> for SearchEventType {
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ValuesEventContext {
-    pub top_k: Option<i64>,
-    pub no_count: bool,
     pub field: String,
 }
 
