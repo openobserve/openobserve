@@ -153,7 +153,7 @@ impl super::FileList for PostgresFileList {
                 .join(",");
             let query_str = format!("delete FROM file_list WHERE id IN ({ids})");
             DB_QUERY_NUMS
-                .with_label_values(&["delete_by_ids", "file_list"])
+                .with_label_values(&["delete_by_ids", "file_list", ""])
                 .inc();
             let start = std::time::Instant::now();
             let res = sqlx::query(&query_str).execute(&mut *tx).await;
