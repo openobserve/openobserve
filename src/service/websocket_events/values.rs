@@ -221,6 +221,7 @@ pub async fn handle_values_request(
                 accumulated_results,
                 max_query_range,
                 &mut start_timer,
+                &order_by,
             )
             .instrument(ws_values_span.clone())
             .await?;

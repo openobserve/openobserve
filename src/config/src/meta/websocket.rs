@@ -65,6 +65,10 @@ impl ValuesEventReq {
         }
         true
     }
+
+    pub fn event_type(&self) -> &'static str {
+        "values"
+    }
 }
 
 impl SearchEventReq {
@@ -77,5 +81,9 @@ impl SearchEventReq {
             return false;
         }
         true
+    }
+
+    pub fn event_type(&self) -> &'static str {
+        "search"
     }
 }
