@@ -42,9 +42,6 @@
         ></div>
       </div>
     </div>
-    <div class="tw-absolute tw-top-2 tw-right-2 tw-text-xs tw-text-gray-600">
-      <!-- {{ Math.round(displayPercentage * 100) }}% -->
-    </div>
   </div>
 </template>
 
@@ -58,7 +55,7 @@ export default defineComponent({
       type: Boolean,
       required: true,
     },
-    percent: {
+    loadingProgress: {
       type: Number,
       required: true,
     },
@@ -66,7 +63,7 @@ export default defineComponent({
 
   setup(props) {
     const lastLoadingState = ref(props.loading);
-    const internalPercentage = ref(props.percent);
+    const internalPercentage = ref(props.loadingProgress);
     const isFadingOut = ref(false);
     let fadeOutTimeout: number;
 
@@ -100,7 +97,7 @@ export default defineComponent({
       if (!props.loading) {
         return internalPercentage.value;
       }
-      return props.percent;
+      return props.loadingProgress;
     });
 
     return {
