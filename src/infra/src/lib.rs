@@ -70,11 +70,6 @@ pub async fn db_init() -> Result<(), anyhow::Error> {
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    // for test, we do not go through main function,
-    // so we need to init the db unconditionally
-    #[cfg(test)]
-    db_init().await?;
-
     cache::init().await?;
     file_list::LOCAL_CACHE.create_table().await?;
     file_list::local_cache_gc().await?;
