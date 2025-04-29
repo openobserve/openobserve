@@ -1,5 +1,4 @@
-import { expect } from "@playwright/test";
-export default class dashboardSetting {
+export default class DashboardSetting {
   constructor(page) {
     this.page = page;
     this.setting = page.locator('[data-test="dashboard-setting-btn"]');
@@ -23,7 +22,7 @@ export default class dashboardSetting {
     this.editName = page.locator('[data-test="dashboard-tab-settings-tab-name-edit"]')
     this.fullScreen = page.locator('[data-test="dashboard-fullscreen-btn"]');
     this.tabName = page.locator('[data-test="dashboard-add-tab-name"]');
-    this.saveTab = page.locator('data-test="dashboard-add-tab-submit"]');
+    this.saveTab = page.locator('[data-test="dashboard-add-tab-submit"]');
 
   }
   generateUniqueDashboardnewName(prefix = "u") {
@@ -84,7 +83,7 @@ export default class dashboardSetting {
     await this.editBtn.waitFor({ state: "visible" });
     await this.editBtn.click();
     await this.editName.click();
-    await this.editName.fill(this.editTabnewName(newName));
+    await this.editName.fill(newName);
 
   }
 

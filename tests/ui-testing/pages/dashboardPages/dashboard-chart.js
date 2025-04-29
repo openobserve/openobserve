@@ -1,4 +1,3 @@
-import { expect } from "@playwright/test";
 
 // pages/chartTypeSelector.js
 // Methods : selectChartType, selectStreamType, searchAndAddField,  selectStream
