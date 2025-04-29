@@ -20,7 +20,7 @@ use std::{
 
 use config::meta::promql::NAME_LABEL;
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
+use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token::{self,TokenType}, BinModifier, LabelModifier, Expr, VectorSelector};
 use rayon::prelude::*;
 
 use crate::service::promql::{
@@ -292,7 +292,20 @@ fn vector_arithmetic_operators(
 
                 if let Some(modifier) = expr.modifier.as_ref() {
                     if modifier.card == VectorMatchCardinality::OneToOne {
-                        labels = labels_to_compare(&labels);
+                        // // keep only matching labels, then merge extra RHS filters
+                        // labels = labels_to_compare(&labels);
+                        // For OneToOne matching, preserve all LHS labels and merge additional RHS filters
+                        if let Some(m) = &modifier.matching {
+                            if m.is_include() {
+                                for arc in &rhs_instant.labels {
+                                    let ln = &arc.name;
+                                    // merge only if not matching label and not already in LHS labels
+                                    if !m.labels().labels.contains(ln) && labels.get_value(ln).is_empty() {
+                                        labels.set(ln, &arc.value);
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // group_labels from the `group_x` modifier are taken from the "one"-side.
@@ -350,5 +363,202 @@ pub fn vector_bin_op(
         token::T_LOR => vector_or(expr, left, right),
         token::T_LUNLESS => vector_unless(expr, left, right),
         _ => vector_arithmetic_operators(expr, left, right),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token::{self,TokenType}, BinModifier, LabelModifier, Expr, VectorSelector};
+
+
+    use std::sync::Arc;
+
+    fn create_instant_value(labels: Vec<(&str, &str)>, value: f64, timestamp: i64) -> InstantValue {
+        let labels = labels
+            .into_iter()
+            .map(|(k, v)| Arc::new(Label::new(k, v)))
+            .collect();
+        InstantValue {
+            labels,
+            sample: Sample { value, timestamp },
+        }
+    }
+
+    #[test]
+    fn test_vector_arithmetic_with_filters() -> Result<()> {
+        // Arrange: simulate PromQL 'disk_used{device="sda1"} / disk_total{device="sda1",state="used"}'
+        // Build left side instant vector (disk_used metric with device filter)
+        let left = vec![
+            create_instant_value(vec![("device", "sda1"), ("metric", "disk_used")], 100.0, 1000),
+        ];
+        
+        // Build right side instant vector (disk_total metric with device and state filters)
+        let right = vec![
+            create_instant_value(
+                vec![("device", "sda1"), ("state", "used"), ("metric", "disk_total")],
+                200.0,
+                1000,
+            ),
+        ];
+
+        // Setup matching modifier: on(device)
+        let matching = LabelModifier::include(vec!["device"]);
+
+        // Construct division expression with on(device) 1:1 cardinality
+        let expr = BinaryExpr {
+            op: TokenType::new(token::T_DIV),
+            lhs: Box::new(Expr::VectorSelector(VectorSelector::default())),
+            rhs: Box::new(Expr::VectorSelector(VectorSelector::default())),
+            modifier: Some(BinModifier {
+                card: VectorMatchCardinality::OneToOne,
+                matching: Some(matching),
+                return_bool: false,
+            }),
+        };
+
+        // Act: perform vector arithmetic operation
+        let result = vector_arithmetic_operators(&expr, left, right)?;
+        println!("Result: {:#?}", result);
+
+        // Assert: verify output vector and labels
+        if let Value::Vector(output) = result {
+            assert_eq!(output.len(), 1);
+            let result_instant = &output[0];
+            println!("Result Instant: {:#?}", result_instant);
+            // Check the value is correct (100/200 = 0.5)
+            assert!((result_instant.sample.value - 0.5).abs() < f64::EPSILON);
+            
+            // Verify that labels from both sides are preserved
+            assert_eq!(result_instant.labels.get_value("device"), "sda1");
+            // assert_eq!(result_instant.labels.get_value("state"), "used");
+        } else {
+            panic!("Expected Vector result");
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_vector_arithmetic_multiple_matches() -> Result<()> {
+        // Arrange: left vector with two instances in prod environment
+        let left = vec![
+            create_instant_value(vec![("env", "prod"), ("instance", "1")], 10.0, 1000),
+            create_instant_value(vec![("env", "prod"), ("instance", "2")], 20.0, 1000),
+        ];
+
+        // Arrange: right vector with matching labels and extra region label
+        let right = vec![
+            create_instant_value(vec![("env", "prod"), ("instance", "1"), ("region", "us")], 2.0, 1000),
+            create_instant_value(vec![("env", "prod"), ("instance", "2"), ("region", "eu")], 4.0, 1000),
+        ];
+
+        // Setup matching modifier: on(env, instance)
+        let matching = LabelModifier::include(vec!["env", "instance"]);
+
+        // Construct multiplication expression with on(env, instance) 1:1 cardinality
+        let expr = BinaryExpr {
+            op: TokenType::new(token::T_MUL),
+            lhs: Box::new(Expr::VectorSelector(VectorSelector::default())),
+            rhs: Box::new(Expr::VectorSelector(VectorSelector::default())),
+            modifier: Some(BinModifier {
+                card: VectorMatchCardinality::OneToOne,
+                matching: Some(matching.clone()),
+                return_bool: false,
+            }),
+        };
+
+        // Act: perform vector arithmetic operation
+        let result = vector_arithmetic_operators(&expr, left, right)?;
+        
+        // Assert: output vector has two elements sorted by instance, verify values and preserved region labels
+        if let Value::Vector(output) = result {
+            assert_eq!(output.len(), 2);
+            
+            // Sort by instance for consistent testing
+            let mut output = output;
+            output.sort_by(|a, b| {
+                a.labels.get_value("instance").cmp(&b.labels.get_value("instance"))
+            });
+
+            println!("Output: {:#?}", output);
+            // Check first result (instance 1)
+            assert!((output[0].sample.value - 20.0).abs() < f64::EPSILON);
+            assert_eq!(output[0].labels.get_value("env"), "prod");
+            assert_eq!(output[0].labels.get_value("instance"), "1");
+            assert_eq!(output[0].labels.get_value("region"), "us");
+
+            // Check second result (instance 2)
+            assert!((output[1].sample.value - 80.0).abs() < f64::EPSILON);
+            assert_eq!(output[1].labels.get_value("env"), "prod");
+            assert_eq!(output[1].labels.get_value("instance"), "2");
+            assert_eq!(output[1].labels.get_value("region"), "eu");
+        } else {
+            panic!("Expected Vector result");
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_free_space_share_multiple_filters() -> Result<()> {
+        // Arrange: free and used series with state filters, matching on device & host_name
+        let free = vec![
+            create_instant_value(
+                vec![("device", "sda1"), ("host_name", "h1"), ("state", "free")],
+                10.0,
+                1000,
+            ),
+        ];
+        let used = vec![
+            create_instant_value(
+                vec![("device", "sda1"), ("host_name", "h1"), ("state", "used")],
+                30.0,
+                1000,
+            )
+        ];
+        // Setup matching: on(device, host_name)
+        let matching = LabelModifier::include(vec!["device", "host_name"]);
+
+        // Compute sum: free + used
+        let add_expr = BinaryExpr {
+            op: TokenType::new(token::T_ADD),
+            lhs: Box::new(Expr::VectorSelector(VectorSelector::default())),
+            rhs: Box::new(Expr::VectorSelector(VectorSelector::default())),
+            modifier: Some(BinModifier {
+                card: VectorMatchCardinality::OneToOne,
+                matching: Some(matching.clone()),
+                return_bool: false,
+            }),
+        };
+        let sum_value = vector_arithmetic_operators(&add_expr, free.clone(), used.clone())?;
+        let sum_vec = if let Value::Vector(v) = sum_value { v } else { panic!("Expected Vector result from addition"); };
+
+        // Compute ratio: free / (free + used)
+        let div_expr = BinaryExpr {
+            op: TokenType::new(token::T_DIV),
+            lhs: Box::new(Expr::VectorSelector(VectorSelector::default())),
+            rhs: Box::new(Expr::VectorSelector(VectorSelector::default())),
+            modifier: Some(BinModifier {
+                card: VectorMatchCardinality::OneToOne,
+                matching: Some(matching),
+                return_bool: false,
+            }),
+        };
+        let result = vector_arithmetic_operators(&div_expr, free, sum_vec)?;
+        println!("Result: {:#?}", result);
+        // Assert: correct ratio and state label preserved as "free"
+        if let Value::Vector(output) = result {
+            assert_eq!(output.len(), 1);
+            let inst = &output[0];
+            assert!((inst.sample.value - 0.25).abs() < f64::EPSILON);
+            assert_eq!(inst.labels.get_value("device"), "sda1");
+            assert_eq!(inst.labels.get_value("host_name"), "h1");
+            assert_eq!(inst.labels.get_value("state"), "free");
+        } else {
+            panic!("Expected Vector result");
+        }
+
+        Ok(())
     }
 }
