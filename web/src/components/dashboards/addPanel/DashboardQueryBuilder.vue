@@ -109,11 +109,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     :label="xLabel[index]"
                     class="q-pl-sm"
-                    :data-test="`dashboard-x-item-${itemX?.column}`"
+                    :data-test="`dashboard-x-item-${itemX?.alias}`"
                   >
                     <q-menu
                       class="q-pa-md"
-                      :data-test="`dashboard-x-item-${itemX?.column}-menu`"
+                      :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
                     >
                       <div>
                         <div class="">
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: 100%"
                     size="xs"
                     dense
-                    :data-test="`dashboard-x-item-${itemX?.column}-remove`"
+                    :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                     @click="removeXAxisItemByIndex(index)"
                     icon="close"
                   />
@@ -368,11 +368,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     :label="bLabel[index]"
                     class="q-pl-sm"
-                    :data-test="`dashboard-b-item-${itemB?.column}`"
+                    :data-test="`dashboard-b-item-${itemB?.alias}`"
                   >
                     <q-menu
                       class="q-pa-md"
-                      :data-test="`dashboard-b-item-${itemB?.column}-menu`"
+                      :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
                     >
                       <div>
                         <div class="">
@@ -499,7 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: 100%"
                     size="xs"
                     dense
-                    :data-test="`dashboard-b-item-${itemB?.column}-remove`"
+                    :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                     @click="removeBreakdownItemByIndex(index)"
                     icon="close"
                   />
@@ -606,12 +606,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :no-wrap="true"
                 size="sm"
                 :label="yLabel[index]"
-                :data-test="`dashboard-y-item-${itemY?.column}`"
+                :data-test="`dashboard-y-item-${itemY?.alias}`"
                 class="q-pl-sm"
               >
                 <q-menu
                   class="q-pa-md tw-overflow-scroll"
-                  :data-test="`dashboard-y-item-${itemY?.column}-menu`"
+                  :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
                 >
                   <div>
                     <div class="row q-mb-sm" style="align-items: center">
@@ -806,7 +806,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="height: 100%"
                 size="xs"
                 dense
-                :data-test="`dashboard-y-item-${itemY?.column}-remove`"
+                :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
                 @click="removeYAxisItemByIndex(index)"
                 icon="close"
               />
@@ -908,12 +908,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="primary"
                   size="sm"
                   :label="zLabel[index]"
-                  :data-test="`dashboard-z-item-${itemZ?.column}`"
+                  :data-test="`dashboard-z-item-${itemZ?.alias}`"
                   class="q-pl-sm"
                 >
                   <q-menu
                     class="q-pa-md"
-                    :data-test="`dashboard-z-item-${itemZ?.column}-menu`"
+                    :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
                   >
                     <div>
                       <div class="row q-mb-sm" style="align-items: center">
@@ -1054,7 +1054,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="height: 100%"
                   size="xs"
                   dense
-                  :data-test="`dashboard-z-item-${itemZ?.column}-remove`"
+                  :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                   @click="removeZAxisItemByIndex(index)"
                   icon="close"
                 />
@@ -1292,8 +1292,8 @@ export default defineComponent({
           const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
           // find first arg which is of type field
-          const firstFieldTypeArg = dragElement.args.find(
-            (arg: any) => arg.type === "field",
+          const firstFieldTypeArg = dragElement?.args?.find(
+            (arg: any) => arg?.type === "field",
           )?.value;
 
           if (!firstFieldTypeArg) {
@@ -1539,7 +1539,7 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
-        return field?.column;
+        return field?.alias;
       }
       return buildSQLQueryFromInput(
         field,
