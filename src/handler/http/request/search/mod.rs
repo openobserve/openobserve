@@ -786,7 +786,7 @@ pub async fn build_search_request_per_field(
                     return Err(Error::other("Failed to parse sql"));
                 };
 
-                let complex_query = sql.stream_names.len().eq(&2) && sql.aliases.len().eq(&2);
+                let complex_query = sql.stream_names.len().eq(&2) || sql.aliases.len().eq(&2) || sql.ctes.len().gt(&0);
 
                 let sql_where_from_query = if !complex_query {
                     // pick up where clause from sql
@@ -866,7 +866,7 @@ pub async fn build_search_request_per_field(
     let distinct_prefix = if can_use_distinct_stream {
         format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
     } else {
-        "".to_string()
+        String::new()
     };
 
     let count_fn = if can_use_distinct_stream {

@@ -70,6 +70,12 @@ pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
 
 #[derive(Clone, Debug)]
+pub struct CteInfo {
+    pub alias: String,
+    pub query: String,
+}
+
+#[derive(Clone, Debug)]
 pub struct Sql {
     pub sql: String,
     pub org_id: String,
@@ -92,6 +98,7 @@ pub struct Sql {
     pub use_inverted_index: bool, // if can use inverted index
     pub index_condition: Option<IndexCondition>, // use for tantivy index
     pub index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+    pub ctes: Vec<CteInfo>,       // WITH clause CTEs
 }
 
 impl Sql {
@@ -136,6 +143,11 @@ impl Sql {
             .map_err(|e| Error::Message(e.to_string()))?
             .pop()
             .unwrap();
+
+        // Extract CTE information
+        let mut cte_visitor = CteVisitor::new();
+        statement.visit(&mut cte_visitor);
+        let ctes = cte_visitor.ctes;
 
         // 2. rewrite track_total_hits
         if query.track_total_hits {
@@ -306,6 +318,7 @@ impl Sql {
             use_inverted_index,
             index_condition,
             index_optimize_mode,
+            ctes,
         })
     }
 }
@@ -314,7 +327,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, ctes: {:?}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -332,6 +345,7 @@ impl std::fmt::Display for Sql {
             self.sorted_by_time,
             self.use_inverted_index,
             self.index_condition,
+            self.ctes,
         )
     }
 }
@@ -1886,6 +1900,43 @@ impl VisitorMut for AddNewFiltersWithAndOperatorVisitor {
     }
 }
 
+// Implement a visitor to extract CTE information
+struct CteVisitor {
+    pub ctes: Vec<CteInfo>,
+}
+
+impl CteVisitor {
+    fn new() -> Self {
+        Self { ctes: Vec::new() }
+    }
+}
+
+impl VisitorMut for CteVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let Some(with) = &query.with {
+            for cte in &with.cte_tables {
+                // Get the alias name safely
+                let alias = cte.alias.name.value.clone();
+                
+                // Convert the query to string 
+                let query_sql = cte.query.to_string();
+                
+                self.ctes.push(CteInfo {
+                    alias,
+                    query: query_sql,
+                });
+                
+                // We can't modify cte.query directly since it's behind a shared reference
+                // Just collect the info without recursively visiting
+                // Nested CTEs will be handled by the SQL parser anyway
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -2518,37 +2569,65 @@ mod tests {
     }
 
     #[test]
-    fn test_re_where_with_cte_query() {
-        // Test the WHERE regex with a CTE query
-        let cte_sql = r#"WITH FilteredLogs AS (
-  SELECT * FROM "default22"
-  WHERE str_match_ignore_case(message, 'org')
-)
-SELECT _timestamp, message, kubernetes_pod_name
-FROM FilteredLogs"#;
+    fn test_extract_cte_information() {
+        // Test simple WITH clause
+        let sql = "WITH cte1 AS (SELECT name FROM table1) SELECT * FROM cte1";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut cte_visitor = CteVisitor::new();
+        statement.visit(&mut cte_visitor);
+        
+        assert_eq!(cte_visitor.ctes.len(), 1);
+        assert_eq!(cte_visitor.ctes[0].alias, "cte1");
+        assert_eq!(cte_visitor.ctes[0].query, "SELECT name FROM table1");
+        
+        // Test multiple CTEs
+        let sql = "WITH cte1 AS (SELECT name FROM table1), cte2 AS (SELECT age FROM table2) SELECT * FROM cte1 JOIN cte2 ON cte1.name = cte2.name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut cte_visitor = CteVisitor::new();
+        statement.visit(&mut cte_visitor);
+        
+        assert_eq!(cte_visitor.ctes.len(), 2);
+        assert_eq!(cte_visitor.ctes[0].alias, "cte1");
+        assert_eq!(cte_visitor.ctes[0].query, "SELECT name FROM table1");
+        assert_eq!(cte_visitor.ctes[1].alias, "cte2");
+        assert_eq!(cte_visitor.ctes[1].query, "SELECT age FROM table2");
+        
+        // Test no WITH clause
+        let sql = "SELECT * FROM table1";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut cte_visitor = CteVisitor::new();
+        statement.visit(&mut cte_visitor);
+        
+        assert_eq!(cte_visitor.ctes.len(), 0);
+    }
 
-        // Verify the regex extracts the correct condition from the WHERE clause
-        let captures = RE_WHERE
-            .captures(cte_sql)
-            .expect("Failed to match WHERE clause");
-        let condition = captures
-            .get(1)
-            .expect("Failed to capture condition")
-            .as_str();
-
-        assert_eq!(condition, "str_match_ignore_case(message, 'org')");
-
-        let cte_sql = r#"WITH FilteredLogs AS (SELECT * FROM "default22" WHERE str_match_ignore_case(message, 'org')) SELECT _timestamp, message, kubernetes_pod_name FROM FilteredLogs"#;
-
-        // Verify the regex extracts the correct condition from the WHERE clause
-        let captures = RE_WHERE
-            .captures(cte_sql)
-            .expect("Failed to match WHERE clause");
-        let condition = captures
-            .get(1)
-            .expect("Failed to capture condition")
-            .as_str();
-
-        assert_eq!(condition, "str_match_ignore_case(message, 'org')");
+    #[test]
+    fn test_extract_cte_information_with_nested_ctes() {
+        // Test nested CTEs
+        let sql = "WITH outer_cte AS (WITH inner_cte AS (SELECT col1 FROM table1) SELECT * FROM inner_cte) SELECT * FROM outer_cte";
+        let mut statement = Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut cte_visitor = CteVisitor::new();
+        statement.visit(&mut cte_visitor);
+        
+        assert_eq!(cte_visitor.ctes.len(), 2);
+        
+        // The order of detected CTEs might vary based on traversal, so check for existence rather than specific order
+        let has_outer = cte_visitor.ctes.iter().any(|cte| cte.alias == "outer_cte");
+        let has_inner = cte_visitor.ctes.iter().any(|cte| cte.alias == "inner_cte");
+        
+        assert!(has_outer, "Outer CTE not detected");
+        assert!(has_inner, "Inner CTE not detected");
     }
 }
