@@ -125,29 +125,6 @@ pub fn parse_storage_config(
     let account_num = account_names.len();
     let mut accounts = HashMap::with_capacity(account_num);
 
-    // add default account
-    accounts.insert(
-        DEFAULT_ACCOUNT.to_string(),
-        StorageConfig {
-            name: DEFAULT_ACCOUNT.to_string(),
-            provider: config.provider.to_string(),
-            server_url: config.server_url.to_string(),
-            region_name: config.region_name.to_string(),
-            access_key: config.access_key.to_string(),
-            secret_key: config.secret_key.to_string(),
-            bucket_name: config.bucket_name.to_string(),
-            bucket_prefix: config.bucket_prefix.to_string(),
-        },
-    );
-
-    // parse stream strategy
-    let stream_strategy = StreamStrategy::new(&config.stream_strategy, account_names.clone());
-
-    // only one account, use default
-    if account_num <= 1 {
-        return (stream_strategy, accounts);
-    }
-
     // check multi accounts config
     let providers = config.provider.split(",").collect::<Vec<&str>>();
     let server_urls = config.server_url.split(",").collect::<Vec<&str>>();
@@ -168,11 +145,27 @@ pub fn parse_storage_config(
     }
 
     // add accounts
-    for (i, name) in account_names.into_iter().enumerate() {
+    for (i, name) in account_names.iter().enumerate() {
+        if i == 0 {
+            // the first we will use as default account
+            accounts.insert(
+                DEFAULT_ACCOUNT.to_string(),
+                StorageConfig {
+                    name: DEFAULT_ACCOUNT.to_string(),
+                    provider: providers[i].to_string(),
+                    server_url: server_urls[i].to_string(),
+                    region_name: region_names[i].to_string(),
+                    access_key: access_keys[i].to_string(),
+                    secret_key: secret_keys[i].to_string(),
+                    bucket_name: bucket_names[i].to_string(),
+                    bucket_prefix: bucket_prefixes[i].to_string(),
+                },
+            );
+        }
         accounts.insert(
-            name.clone(),
+            name.to_string(),
             StorageConfig {
-                name,
+                name: name.to_string(),
                 provider: providers[i].to_string(),
                 server_url: server_urls[i].to_string(),
                 region_name: region_names[i].to_string(),
@@ -183,6 +176,10 @@ pub fn parse_storage_config(
             },
         );
     }
+
+    // parse stream strategy
+    let stream_strategy = StreamStrategy::new(&config.stream_strategy, account_names);
+
     (stream_strategy, accounts)
 }
 
