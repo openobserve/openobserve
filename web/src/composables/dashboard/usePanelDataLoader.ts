@@ -139,7 +139,7 @@ export const usePanelDataLoader = (
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
     isOperationCancelled: false,
-    loadingtotal: 0,
+    loadingTotal: 0,
     loadingCompleted: 0,
     loadingProgress: 0,
   });
@@ -367,7 +367,7 @@ export const usePanelDataLoader = (
     const { traceparent, traceId } = generateTraceContext();
     addTraceId(traceId);
 
-    state.loadingtotal = 0;
+    state.loadingTotal = 0;
     state.loadingCompleted = 0;
     state.loadingProgress = 0;
 
@@ -406,7 +406,7 @@ export const usePanelDataLoader = (
 
       // Set total steps: number of partitions + 1 for the initial partition API call
       const totalSteps = partitionArr.length + 1;
-      state.loadingtotal = totalSteps;
+      state.loadingTotal = totalSteps;
 
       // We've completed the first step (partition API call)
       state.loadingCompleted = 1;
@@ -474,7 +474,7 @@ export const usePanelDataLoader = (
           state.loadingCompleted = state.loadingCompleted + 1;
           // Calculate progress in 0-100 format
           state.loadingProgress = Math.round(
-            (state.loadingCompleted / state.loadingtotal) * 100,
+            (state.loadingCompleted / state.loadingTotal) * 100,
           );
 
           // remove past error detail
@@ -639,7 +639,7 @@ export const usePanelDataLoader = (
       if (response.type === "error") {
         // set loading to false
         state.loading = false;
-        state.loadingtotal = 0;
+        state.loadingTotal = 0;
         state.loadingCompleted = 0;
         state.loadingProgress = 0;
         state.isOperationCancelled = false;
@@ -650,7 +650,7 @@ export const usePanelDataLoader = (
       if (response.type === "end") {
         // set loading to false
         state.loading = false;
-        state.loadingtotal = 0;
+        state.loadingTotal = 0;
         state.loadingCompleted = 0;
         state.loadingProgress = 0;
         state.isOperationCancelled = false;
@@ -663,7 +663,7 @@ export const usePanelDataLoader = (
       // set loading to false
       state.loading = false;
       state.isOperationCancelled = false;
-      state.loadingtotal = 0;
+      state.loadingTotal = 0;
       state.loadingCompleted = 0;
       state.loadingProgress = 0;
       state.errorDetail = {
@@ -746,7 +746,7 @@ export const usePanelDataLoader = (
 
     // set loading to false
     state.loading = false;
-    state.loadingtotal = 0;
+    state.loadingTotal = 0;
     state.loadingCompleted = 0;
     state.loadingProgress = 0;
     state.isOperationCancelled = false;
@@ -810,7 +810,7 @@ export const usePanelDataLoader = (
   const loadData = async () => {
     try {
       log("loadData: entering...");
-      state.loadingtotal = 0;
+      state.loadingTotal = 0;
       state.loadingCompleted = 0;
       state.loadingProgress = 0;
       // Check and abort the previous call if necessary
