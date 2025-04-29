@@ -264,20 +264,19 @@ pub async fn handle_values_request(
             values_event_context: Some(ValuesEventContext { field }),
         };
 
-            do_partitioned_search(
-                request_id,
-                &mut search_event_req,
-                &trace_id,
-                config::meta::sql::MAX_LIMIT,
-                user_id,
-                accumulated_results,
-                max_query_range,
-                &mut start_timer,
-                &order_by,
-            )
-            .instrument(ws_values_span.clone())
-            .await?;
-        }
+        do_partitioned_search(
+            request_id,
+            &mut search_event_req,
+            &trace_id,
+            config::meta::sql::MAX_LIMIT,
+            user_id,
+            accumulated_results,
+            max_query_range,
+            &mut start_timer,
+            &order_by,
+        )
+        .instrument(ws_values_span.clone())
+        .await?;
     }
 
     // Once all searches are complete, write the accumulated results to a file
