@@ -16,14 +16,19 @@ export default class DashboardSetting {
     this.saveSettingBtn = page.locator(
       '[data-test="dashboard-general-setting-save-btn"]'
     );
-    this.deletebtn =page.locator('[data-test="dashboard-tab-settings-tab-delete-btn"]');
-    this.editBtn = page.locator('[data-test="dashboard-tab-settings-tab-edit-btn"]');
-    this.deleteconfirmBtn = page.locator('[data-test="confirm-button"]')
-    this.editName = page.locator('[data-test="dashboard-tab-settings-tab-name-edit"]')
+    this.deletebtn = page.locator(
+      '[data-test="dashboard-tab-settings-tab-delete-btn"]'
+    );
+    this.editBtn = page.locator(
+      '[data-test="dashboard-tab-settings-tab-edit-btn"]'
+    );
+    this.deleteconfirmBtn = page.locator('[data-test="confirm-button"]');
+    this.editName = page.locator(
+      '[data-test="dashboard-tab-settings-tab-name-edit"]'
+    );
     this.fullScreen = page.locator('[data-test="dashboard-fullscreen-btn"]');
     this.tabName = page.locator('[data-test="dashboard-add-tab-name"]');
     this.saveTab = page.locator('[data-test="dashboard-add-tab-submit"]');
-
   }
   generateUniqueDashboardnewName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
@@ -53,7 +58,6 @@ export default class DashboardSetting {
     await this.addtab.click();
     await this.tabName.fill(tabnewName);
     await this.saveTab.click();
-
   }
 
   //Delete tab
@@ -82,7 +86,6 @@ export default class DashboardSetting {
     await this.editBtn.click();
     await this.editName.click();
     await this.editName.fill(newName);
-
   }
 
   //Full screen//

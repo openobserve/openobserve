@@ -1,4 +1,3 @@
-
 // pages/chartTypeSelector.js
 // Methods : selectChartType, selectStreamType, searchAndAddField,  selectStream
 
