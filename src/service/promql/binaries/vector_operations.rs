@@ -431,7 +431,6 @@ mod tests {
 
         // Act: perform vector arithmetic operation
         let result = vector_arithmetic_operators(&expr, left, right)?;
-        log::debug!("Result: {:#?}", result);
 
         // Assert: verify output vector and labels
         if let Value::Vector(output) = result {
@@ -503,7 +502,6 @@ mod tests {
                     .cmp(&b.labels.get_value("instance"))
             });
 
-            log::debug!("Output: {:#?}", output);
             // Check first result (instance 1)
             assert!((output[0].sample.value - 20.0).abs() < f64::EPSILON);
             assert_eq!(output[0].labels.get_value("env"), "prod");
@@ -568,7 +566,6 @@ mod tests {
             }),
         };
         let result = vector_arithmetic_operators(&div_expr, free, sum_vec)?;
-        log::debug!("Result: {:#?}", result);
         // Assert: correct ratio and state label preserved as "free"
         if let Value::Vector(output) = result {
             assert_eq!(output.len(), 1);
