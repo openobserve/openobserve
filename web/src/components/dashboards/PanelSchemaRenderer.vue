@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
-        <LoadingProgress :loading="loading" :loadingProgress="loadingProgress" />
+        <LoadingProgress :loading="loading" :loadingProgressPercentage="loadingProgressPercentage" />
       </div>
       <div
         v-if="allowAnnotationsAdd && isCursorOverPanel"
@@ -446,7 +446,7 @@ export default defineComponent({
       lastTriggeredAt,
       isCachedDataDifferWithCurrentTimeRange,
       searchRequestTraceIds,
-      loadingProgress,
+      loadingProgressPercentage,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -1886,7 +1886,7 @@ export default defineComponent({
       showPopupsAndOverlays,
       downloadDataAsCSV,
       downloadDataAsJSON,
-      loadingProgress,
+      loadingProgressPercentage,
     };
   },
 });

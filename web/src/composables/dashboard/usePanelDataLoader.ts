@@ -141,7 +141,7 @@ export const usePanelDataLoader = (
     isOperationCancelled: false,
     loadingTotal: 0,
     loadingCompleted: 0,
-    loadingProgress: 0,
+    loadingProgressPercentage: 0,
   });
 
   // observer for checking if panel is visible on the screen
@@ -369,7 +369,7 @@ export const usePanelDataLoader = (
 
     state.loadingTotal = 0;
     state.loadingCompleted = 0;
-    state.loadingProgress = 0;
+    state.loadingProgressPercentage = 0;
 
     try {
       // partition api call
@@ -404,14 +404,13 @@ export const usePanelDataLoader = (
       // partition array from api response
       const partitionArr = res?.data?.partitions ?? [];
 
-      // Set total steps: number of partitions + 1 for the initial partition API call
-      const totalSteps = partitionArr.length + 1;
+      // Set total steps: number of partitions only (excluding the initial partition API call)
+      const totalSteps = partitionArr.length;
       state.loadingTotal = totalSteps;
 
-      // We've completed the first step (partition API call)
-      state.loadingCompleted = 1;
-      // Calculate progress in 0-100 format
-      state.loadingProgress = Math.round((1 / totalSteps) * 100);
+      // Reset loading completed and progress since we're not counting the partition API call
+      state.loadingCompleted = 0;
+      state.loadingProgressPercentage = 0;
 
       // always sort partitions in descending order
       partitionArr.sort((a: any, b: any) => a[0] - b[0]);
@@ -473,8 +472,8 @@ export const usePanelDataLoader = (
           // Update the progress after each partition completes
           state.loadingCompleted = state.loadingCompleted + 1;
           // Calculate progress in 0-100 format
-          state.loadingProgress = Math.round(
-            (state.loadingCompleted / state.loadingTotal) * 100,
+          state.loadingProgressPercentage = Math.round(
+            (state.loadingCompleted / totalSteps) * 100,
           );
 
           // remove past error detail
@@ -641,7 +640,7 @@ export const usePanelDataLoader = (
         state.loading = false;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
-        state.loadingProgress = 0;
+        state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
 
         processApiError(response?.content, "sql");
@@ -652,12 +651,12 @@ export const usePanelDataLoader = (
         state.loading = false;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
-        state.loadingProgress = 0;
+        state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
       }
       if (response.type === "event_progress") {
-        // The loadingProgress value is now in 0-100 format, no need to multiply
-        state.loadingProgress = response?.content?.percent ?? 0;
+        // The loadingProgressPercentage value is now in 0-100 format, no need to multiply
+        state.loadingProgressPercentage = response?.content?.percent ?? 0;
       }
     } catch (error: any) {
       // set loading to false
@@ -665,7 +664,7 @@ export const usePanelDataLoader = (
       state.isOperationCancelled = false;
       state.loadingTotal = 0;
       state.loadingCompleted = 0;
-      state.loadingProgress = 0;
+      state.loadingProgressPercentage = 0;
       state.errorDetail = {
         message: error?.message || "Unknown error in search response",
         code: error?.code ?? "",
@@ -748,7 +747,7 @@ export const usePanelDataLoader = (
     state.loading = false;
     state.loadingTotal = 0;
     state.loadingCompleted = 0;
-    state.loadingProgress = 0;
+    state.loadingProgressPercentage = 0;
     state.isOperationCancelled = false;
 
     processApiError(response?.content, "sql");
@@ -812,7 +811,7 @@ export const usePanelDataLoader = (
       log("loadData: entering...");
       state.loadingTotal = 0;
       state.loadingCompleted = 0;
-      state.loadingProgress = 0;
+      state.loadingProgressPercentage = 0;
       // Check and abort the previous call if necessary
       if (abortController) {
         log("loadData: aborting previous function call (if any)");

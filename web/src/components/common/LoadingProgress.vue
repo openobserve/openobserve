@@ -75,7 +75,7 @@ export default defineComponent({
       type: Boolean,
       required: true,
     },
-    loadingProgress: {
+    loadingProgressPercentage: {
       type: Number,
       required: true,
       validator: (value: number) => {
@@ -87,7 +87,7 @@ export default defineComponent({
   setup(props) {
     const store = useStore();
     const lastLoadingState = ref(props.loading);
-    const internalPercentage = ref(props.loadingProgress);
+    const internalPercentage = ref(props.loadingProgressPercentage);
     const isFadingOut = ref(false);
     let fadeOutTimeout: number;
 
@@ -125,7 +125,7 @@ export default defineComponent({
       if (!props.loading) {
         return internalPercentage.value;
       }
-      return props.loadingProgress;
+      return props.loadingProgressPercentage;
     });
 
     return {
