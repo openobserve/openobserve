@@ -297,7 +297,7 @@ async fn handle_alert_triggers(
             // If delay is greater than the alert frequency, skip them and report the event
             // to the `triggers` usage stream.
             publish_triggers_usage(TriggerData {
-                _timestamp: timestamp,
+                _timestamp: now - 1,
                 org: trigger.org.clone(),
                 module: TriggerDataType::Alert,
                 key: format!("{}/{}", alert.name, trigger.module_key),
@@ -308,7 +308,7 @@ async fn handle_alert_triggers(
                 start_time,
                 end_time: timestamp,
                 retries: trigger.retries,
-                delay_in_secs: Some(Duration::microseconds(now - timestamp).num_seconds()),
+                delay_in_secs: Some(delay),
                 error: None,
                 success_response: None,
                 is_partial: None,
