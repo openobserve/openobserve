@@ -7,13 +7,13 @@
     }"
   >
     <div
-      class="tw-w-full tw-h-[3px] tw-relative tw-overflow-x-hidden"
+      class="tw-w-full tw-h-[2px] tw-relative tw-overflow-x-hidden"
       :class="
         store.state.theme === 'dark' ? 'tw-bg-gray-700' : 'tw-bg-gray-200'
       "
     >
       <div
-        class="tw-h-full tw-relative"
+        class="tw-h-full tw-relative tw-overflow-hidden"
         :class="
           store.state.theme === 'dark' ? 'tw-bg-[#5960B2]' : 'tw-bg-[#5960B2]'
         "
@@ -25,7 +25,7 @@
         }"
       >
         <div
-          class="tw-absolute tw-inset-0 tw-bg-gradient-to-r tw-from-transparent tw-to-transparent"
+          class="tw-absolute tw-inset-0 tw-bg-gradient-to-r tw-from-transparent tw-to-transparent "
           :class="
             store.state.theme === 'dark'
               ? 'tw-via-gray-300/40'
@@ -34,7 +34,7 @@
           :style="{
             animation: 'shimmer 1.5s infinite linear',
             width: '200%',
-            left: '-100%',
+            left: '-200%',
           }"
         ></div>
       </div>
@@ -141,10 +141,10 @@ export default defineComponent({
 <style>
 @keyframes shimmer {
   0% {
-    transform: translateX(0%);
+    transform: translateX(-200%);
   }
   100% {
-    transform: translateX(100%);
+    transform: translateX(200%);
   }
 }
 
