@@ -32,8 +32,6 @@ export default class DashboardSetting {
   async dashboardNameChange(name) {
     await this.setting.click();
     await this.general.waitFor({ state: "visible" });
-    await this.page.waitForTimeout(2000);
-
     await this.newName.click();
     await this.newName.fill(name);
     await this.saveSettingBtn.click();
