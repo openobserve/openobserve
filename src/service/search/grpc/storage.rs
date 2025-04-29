@@ -386,7 +386,7 @@ pub async fn search(
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
-async fn cache_files(
+pub async fn cache_files(
     trace_id: &str,
     files: &[(&str, i64)],
     scan_stats: &mut ScanStats,

@@ -52,9 +52,17 @@ impl Event for Eventer {
             for item in put_items.iter() {
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
-                    if let Err(e) =
-                        infra::cache::file_data::download(TRACE_ID_FOR_CACHE_LATEST_FILE, &item.key)
-                            .await
+                    let size = if item.meta.compressed_size > 0 {
+                        Some(item.meta.compressed_size as usize)
+                    } else {
+                        None
+                    };
+                    if let Err(e) = infra::cache::file_data::download(
+                        TRACE_ID_FOR_CACHE_LATEST_FILE,
+                        &item.key,
+                        size,
+                    )
+                    .await
                     {
                         log::error!("Failed to cache file data: {}", e);
                     }
@@ -66,6 +74,7 @@ impl Event for Eventer {
                         if let Err(e) = infra::cache::file_data::download(
                             TRACE_ID_FOR_CACHE_LATEST_FILE,
                             &ttv_file,
+                            Some(item.meta.index_size as usize),
                         )
                         .await
                         {

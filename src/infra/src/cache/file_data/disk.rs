@@ -453,7 +453,22 @@ pub async fn exist(file: &str) -> bool {
     } else {
         RESULT_FILES[idx].read().await
     };
-    files.exist(file).await
+    // file not exist, we can fast return
+    if !files.exist(file).await {
+        return false;
+    }
+    drop(files);
+
+    // check if the file is really exist
+    if get_size(file).await.is_some() {
+        return true;
+    }
+
+    // file is not exist, need remove it from cache index
+    _ = remove("", file).await;
+
+    // finally return false
+    false
 }
 
 #[inline]
@@ -699,13 +714,13 @@ pub async fn get_dir() -> String {
     FILES[0].read().await.root_dir.clone()
 }
 
-pub async fn download(trace_id: &str, file: &str) -> Result<usize, anyhow::Error> {
-    let data = storage::get(file).await?;
-    if data.is_empty() {
-        return Err(anyhow::anyhow!("file {} data size is zero", file));
-    }
-    let data_len = data.len();
-    if let Err(e) = set(trace_id, file, data).await {
+pub async fn download(
+    trace_id: &str,
+    file: &str,
+    size: Option<usize>,
+) -> Result<usize, anyhow::Error> {
+    let (data_len, data_bytes) = super::download_from_storage(file, size).await?;
+    if let Err(e) = set(trace_id, file, data_bytes).await {
         return Err(anyhow::anyhow!(
             "set file {} to disk cache failed: {}",
             file,

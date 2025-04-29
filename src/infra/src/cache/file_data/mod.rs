@@ -26,6 +26,7 @@ use config::utils::time::get_ymdh_from_micros;
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 
+const DOWNLOAD_RETRY_TIMES: usize = 3;
 const INITIAL_CACHE_SIZE: usize = 128;
 pub const TRACE_ID_FOR_CACHE_LATEST_FILE: &str = "cache_latest_file";
 
@@ -177,15 +178,58 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn download(trace_id: &str, file: &str) -> Result<usize, anyhow::Error> {
+pub async fn download(
+    trace_id: &str,
+    file: &str,
+    size: Option<usize>,
+) -> Result<usize, anyhow::Error> {
     let cfg = config::get_config();
     if cfg.memory_cache.enabled {
-        memory::download(trace_id, file).await
+        memory::download(trace_id, file, size).await
     } else if cfg.disk_cache.enabled {
-        disk::download(trace_id, file).await
+        disk::download(trace_id, file, size).await
     } else {
         Ok(0)
     }
+}
+
+async fn download_from_storage(
+    file: &str,
+    size: Option<usize>,
+) -> Result<(usize, bytes::Bytes), anyhow::Error> {
+    let mut data_len = 0;
+    let mut data_bytes = bytes::Bytes::new();
+    for i in 0..DOWNLOAD_RETRY_TIMES {
+        let data = crate::storage::get(file).await?;
+        if data.is_empty() {
+            return Err(anyhow::anyhow!("file {} data size is zero", file));
+        }
+        data_len = data.len();
+        data_bytes = data;
+        match size {
+            None => break,
+            Some(size) => {
+                if data_len == size {
+                    break;
+                } else {
+                    let msg = if i == DOWNLOAD_RETRY_TIMES - 1 {
+                        format!("after {} retries", DOWNLOAD_RETRY_TIMES)
+                    } else {
+                        "will retry".to_string()
+                    };
+                    log::warn!(
+                        "download file {} found size mismatch, expected: {}, actual: {}, {}",
+                        file,
+                        size,
+                        data_len,
+                        msg
+                    );
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+            }
+        }
+    }
+    Ok((data_len, data_bytes))
 }
 
 /// set the data to the cache

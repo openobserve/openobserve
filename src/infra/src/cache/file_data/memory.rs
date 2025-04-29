@@ -27,7 +27,6 @@ use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use super::CacheStrategy;
-use crate::storage;
 
 static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
@@ -348,13 +347,13 @@ pub async fn is_empty() -> bool {
     true
 }
 
-pub async fn download(trace_id: &str, file: &str) -> Result<usize, anyhow::Error> {
-    let data = storage::get(file).await?;
-    if data.is_empty() {
-        return Err(anyhow::anyhow!("file {} data size is zero", file));
-    }
-    let data_len = data.len();
-    if let Err(e) = set(trace_id, file, data).await {
+pub async fn download(
+    trace_id: &str,
+    file: &str,
+    size: Option<usize>,
+) -> Result<usize, anyhow::Error> {
+    let (data_len, data_bytes) = super::download_from_storage(file, size).await?;
+    if let Err(e) = set(trace_id, file, data_bytes).await {
         return Err(anyhow::anyhow!(
             "set file {} to memory cache failed: {}",
             file,
