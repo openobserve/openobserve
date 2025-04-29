@@ -7,10 +7,16 @@
     }"
   >
     <div
-      class="tw-w-full tw-h-[3px] tw-bg-gray-200 tw-relative tw-overflow-x-hidden"
+      class="tw-w-full tw-h-[3px] tw-relative tw-overflow-x-hidden"
+      :class="
+        store.state.theme === 'dark' ? 'tw-bg-gray-700' : 'tw-bg-gray-200'
+      "
     >
       <div
-        class="tw-h-full tw-bg-blue-500 tw-relative"
+        class="tw-h-full tw-relative"
+        :class="
+          store.state.theme === 'dark' ? 'tw-bg-[#5960B2]' : 'tw-bg-[#5960B2]'
+        "
         :style="{
           width: `${displayPercentage}%`,
           transition: shouldAnimate
@@ -19,7 +25,12 @@
         }"
       >
         <div
-          class="tw-absolute tw-inset-0 tw-bg-gradient-to-r tw-from-transparent tw-via-white/40 tw-to-transparent"
+          class="tw-absolute tw-inset-0 tw-bg-gradient-to-r tw-from-transparent tw-to-transparent"
+          :class="
+            store.state.theme === 'dark'
+              ? 'tw-via-gray-300/40'
+              : 'tw-via-white/40'
+          "
           :style="{
             animation: 'shimmer 1.5s infinite linear',
             width: '200%',
@@ -29,7 +40,10 @@
       </div>
       <!-- Moving circle indicator -->
       <div
-        class="tw-absolute tw-top-0 tw-w-[3px] tw-h-[2px] tw-rounded-full tw-bg-blue-500 tw-shadow-[0_0_10px_2px_rgba(59,130,246,0.5)] tw-transform tw-translate-x-[-50%]"
+        class="tw-absolute tw-top-0 tw-w-[3px] tw-h-[2px] tw-rounded-full tw-shadow-[0_0_10px_2px_rgba(89,96,178,0.5)] tw-transform tw-translate-x-[-50%]"
+        :class="
+          store.state.theme === 'dark' ? 'tw-bg-[#5960B2]' : 'tw-bg-[#5960B2]'
+        "
         :style="{
           left: `${displayPercentage}%`,
           transition: shouldAnimate
@@ -38,7 +52,12 @@
         }"
       >
         <div
-          class="tw-absolute tw-inset-0 tw-rounded-full tw-bg-white/20 tw-animate-pulse"
+          class="tw-absolute tw-inset-0 tw-rounded-full tw-animate-pulse"
+          :class="
+            store.state.theme === 'dark'
+              ? 'tw-bg-gray-300/20'
+              : 'tw-bg-white/20'
+          "
         ></div>
       </div>
     </div>
@@ -46,7 +65,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, watch } from "vue";
+import { defineComponent, computed, ref, watch, onUnmounted } from "vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "LoadingProgress",
@@ -62,6 +82,7 @@ export default defineComponent({
   },
 
   setup(props) {
+    const store = useStore();
     const lastLoadingState = ref(props.loading);
     const internalPercentage = ref(props.loadingProgress);
     const isFadingOut = ref(false);
@@ -84,6 +105,10 @@ export default defineComponent({
       },
     );
 
+    onUnmounted(() => {
+      clearTimeout(fadeOutTimeout);
+    });
+
     const shouldAnimate = computed(() => {
       const wasLoading = lastLoadingState.value;
       lastLoadingState.value = props.loading;
@@ -101,6 +126,7 @@ export default defineComponent({
     });
 
     return {
+      store,
       displayPercentage,
       shouldAnimate,
       isFadingOut,
