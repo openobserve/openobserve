@@ -266,7 +266,15 @@ async fn handle_alert_triggers(
 
         let skipped_timestamps_end_timestamp = get_skipped_timestamps(
             trigger.next_run_at,
-            alert.trigger_condition.cron.as_str(),
+            if alert
+                .trigger_condition
+                .frequency_type
+                .eq(&config::meta::alerts::FrequencyType::Cron)
+            {
+                alert.trigger_condition.cron.as_str()
+            } else {
+                ""
+            },
             alert.tz_offset,
             alert.trigger_condition.frequency,
             delay,
