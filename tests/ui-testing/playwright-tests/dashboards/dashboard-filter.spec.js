@@ -580,7 +580,14 @@ test.describe("dashboard filter testcases", () => {
       .first()
       .fill("kubernetes_container_image");
 
-    await page.getByText("kubernetes_container_image", { exact: true }).click();
+    // await page.getByText("kubernetes_container_image", { exact: true }).click();
+
+    // Wait for the option to appear, and click it
+    const option = page.getByText("kubernetes_container_image", {
+      exact: true,
+    });
+    await option.waitFor({ timeout: 15000 });
+    await option.click();
 
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
