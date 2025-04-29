@@ -2221,7 +2221,8 @@ export const convertSQLData = async (
 
     const timestampField = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
-        !it.functionName && it.args[0] == store.state.zoConfig.timestamp_column,
+        !it.functionName &&
+        it?.args?.[0]?.value?.field == store.state.zoConfig.timestamp_column,
     );
 
     //if x axis has time series
