@@ -1051,7 +1051,9 @@ export function buildSQLQueryFromInput(
       sqlArgs.push(
         argValue.streamAlias
           ? argValue.streamAlias + "." + argValue.field
-          : defaultStream + "." + argValue.field,
+          : defaultStream
+            ? defaultStream + "." + argValue.field
+            : argValue.field,
       );
     } else if (argType === "string" || argType === "histogramInterval") {
       // Wrap strings in quotes if they are not already wrapped
@@ -1146,11 +1148,15 @@ export function buildSQLJoinsFromInput(
 
       const leftFieldStr = leftField.streamAlias
         ? `${leftField.streamAlias}.${leftField.field}`
-        : `${defaultStream}.${leftField.field}`;
+        : defaultStream
+          ? `${defaultStream}.${leftField.field}`
+          : leftField.field;
 
       const rightFieldStr = rightField.streamAlias
         ? `${rightField.streamAlias}.${rightField.field}`
-        : `${defaultStream}.${rightField.field}`;
+        : defaultStream
+          ? `${defaultStream}.${rightField.field}`
+          : rightField.field;
 
       joinConditionStrings.push(
         `${leftFieldStr} ${operation} ${rightFieldStr}`,
