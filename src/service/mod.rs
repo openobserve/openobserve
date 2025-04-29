@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::stream::StreamParams, utils::schema::format_stream_name};
-use infra::errors::Result;
+use infra::{
+    db::{ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl},
+    errors::Result,
+};
 
 use crate::common::migration;
 pub mod alerts;
@@ -89,6 +92,9 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     );
 
     infra::db_init().await?;
+    // we initialize both clients here to avoid potential deadlock afterwards
+    ORM_CLIENT.get_or_init(connect_to_orm).await;
+    ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     // check version upgrade
     let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
     migration::check_upgrade(&old_version, config::VERSION).await?;
