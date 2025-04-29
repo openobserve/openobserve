@@ -72,7 +72,7 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     let db_schema_version = match infra::get_db_schema_version().await {
         Ok(v) => v,
         Err(e) => {
-            log::error!(
+            log::warn!(
                 "error in getting db schema version {e} ; assuming default of 0 and trying upgrade."
             );
             0
