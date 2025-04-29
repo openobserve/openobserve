@@ -637,6 +637,7 @@ export const usePanelDataLoader = (
       if (response.type === "error") {
         // set loading to false
         state.loading = false;
+        state.percent = 0;
         state.isOperationCancelled = false;
 
         processApiError(response?.content, "sql");
@@ -737,6 +738,7 @@ export const usePanelDataLoader = (
 
     // set loading to false
     state.loading = false;
+    state.percent = 0;
     state.isOperationCancelled = false;
 
     processApiError(response?.content, "sql");
