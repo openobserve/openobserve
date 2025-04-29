@@ -1318,7 +1318,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery && !it.isDerived
             ? "x_axis_" + (index + 1)
-            : it?.column),
+            : it?.alias),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
@@ -1329,7 +1329,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery && !it.isDerived
             ? "y_axis_" + (index + 1)
-            : it?.column),
+            : it?.alias),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
@@ -1340,7 +1340,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery && !it.isDerived
             ? "z_axis_" + (index + 1)
-            : it?.column),
+            : it?.alias),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
@@ -1351,7 +1351,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery && !it.isDerived
             ? "breakdown_" + (index + 1)
-            : it?.column),
+            : it?.alias),
     );
   };
 
