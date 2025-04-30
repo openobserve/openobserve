@@ -132,7 +132,7 @@ pub async fn create_connection(querier_name: &QuerierName) -> WsResult<Arc<Queri
     // Get querier info from cluster
     let node = cluster::get_cached_node_by_name(querier_name)
         .await
-        .ok_or_else(|| WsError::QuerierNotAvailable(querier_name.to_string()))?;
+        .ok_or_else(|| WsError::QuerierWsConnNotAvailable(querier_name.to_string()))?;
 
     let conn = QuerierConnection::connect(&node.name, &node.http_addr).await?;
     Ok(conn)

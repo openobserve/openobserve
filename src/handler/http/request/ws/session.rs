@@ -145,8 +145,9 @@ pub async fn run(
     );
 
     let mut ping_interval = tokio::time::interval(Duration::from_secs(
-        get_ping_interval_secs_with_jitter() as _,
+        get_ping_interval_secs_with_jitter() as u64,
     ));
+
     let mut close_reason: Option<CloseReason> = None;
 
     loop {
