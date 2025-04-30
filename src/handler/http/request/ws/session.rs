@@ -141,6 +141,7 @@ pub async fn health_check(req_id: String) {
     let mut ping_interval = tokio::time::interval(Duration::from_secs(
         get_ping_interval_secs_with_jitter() as u64,
     ));
+    ping_interval.tick().await;
     loop {
         ping_interval.tick().await;
         if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
