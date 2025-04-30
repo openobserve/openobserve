@@ -298,7 +298,7 @@ impl WsHandler {
                                                 }
                                             }
 
-                                            log::info!("[WS::Router::Handler] processed message for client_id: {}, trace_id: {}", client_id, trace_id);
+                                            log::info!("[WS::Router::Handler] processed message to querier: {}, for client_id: {}, trace_id: {}", querier_conn.get_name(), client_id, trace_id);
                                             count += 1;
                                         }
                                     }
