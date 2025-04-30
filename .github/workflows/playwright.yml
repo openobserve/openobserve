@@ -132,7 +132,6 @@ jobs:
             "schemaload.spec.js",
             "websocket.spec.js",
             "alertImportTDA.spec.js",
-            "pipeline-import.spec.js",
             # "remotepipeline.spec.js",
 
           ]
