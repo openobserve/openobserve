@@ -321,6 +321,7 @@ impl QuerierConnection {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
             get_ping_interval_secs_with_jitter() as _,
         ));
+        interval.tick().await;
 
         loop {
             interval.tick().await;
@@ -426,6 +427,7 @@ impl ResponseRouter {
     /// The only
     async fn spawn_cleanup_task(&self) {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+        interval.tick().await;
         loop {
             interval.tick().await;
             let mut write_guard = self.routes.write().await;
