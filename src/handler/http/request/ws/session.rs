@@ -665,82 +665,79 @@ async fn handle_search_event(
         // The task will also update the search state to completed
         // The task will also close the session
         // The task will also cleanup the search resources
-        tokio::select! {
-            search_result = handle_search_request(
-                &req_id,
-                &mut accumulated_results,
-                &org_id,
-                &user_id,
-                search_req.clone(),
-            ) => {
-                match search_result {
-                    Ok(_) => {
-                        // Add audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                            audit(AuditMessage {
-                                user_email: user_id,
-                                org_id,
-                                _timestamp: chrono::Utc::now().timestamp(),
-                                protocol: Protocol::Ws,
-                                response_meta: ResponseMeta {
-                                    http_method: "".to_string(),
-                                    http_path: path.clone(),
-                                    http_query_params: "".to_string(),
-                                    http_body: client_msg.to_json(),
-                                    http_response_code: 200,
-                                    error_msg: None,
-                                    trace_id: Some(trace_id.to_string()),
-                                },
-                            })
-                            .await;
-                        }
-                    }
-                    Err(e) => {
-                        let handle_err = async || {
-                            let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
+        let search_result = handle_search_request(
+            &req_id,
+            &mut accumulated_results,
+            &org_id,
+            &user_id,
+            search_req.clone(),
+        )
+        .await;
+        match search_result {
+            Ok(_) => {
+                // Add audit before closing
+                #[cfg(feature = "enterprise")]
+                if is_audit_enabled {
+                    audit(AuditMessage {
+                        user_email: user_id,
+                        org_id,
+                        _timestamp: chrono::Utc::now().timestamp(),
+                        protocol: Protocol::Ws,
+                        response_meta: ResponseMeta {
+                            http_method: "".to_string(),
+                            http_path: path.clone(),
+                            http_query_params: "".to_string(),
+                            http_body: client_msg.to_json(),
+                            http_response_code: 200,
+                            error_msg: None,
+                            trace_id: Some(trace_id.to_string()),
+                        },
+                    })
+                    .await;
+                }
+            }
+            Err(e) => {
+                let handle_err = async || {
+                    let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
 
-                            #[cfg(feature = "enterprise")]
-                            let http_response_code: u16;
-                            #[cfg(feature = "enterprise")]
-                            {
-                                let http_response = map_error_to_http_response(&e, trace_id.to_string());
-                                http_response_code = http_response.status().into();
-                            }
-                            // Add audit before closing
-                            #[cfg(feature = "enterprise")]
-                            if is_audit_enabled {
-                                audit(AuditMessage {
-                                    user_email: user_id,
-                                    org_id,
-                                    _timestamp: chrono::Utc::now().timestamp(),
-                                    protocol: Protocol::Ws,
-                                    response_meta: ResponseMeta {
-                                        http_method: "".to_string(),
-                                        http_path: path.clone(),
-                                        http_query_params: "".to_string(),
-                                        http_body: client_msg.to_json(),
-                                        http_response_code,
-                                        error_msg: Some(e.to_string()),
-                                        trace_id: Some(trace_id.to_string()),
-                                    },
-                                })
-                                .await;
-                            }
+                    #[cfg(feature = "enterprise")]
+                    let http_response_code: u16;
+                    #[cfg(feature = "enterprise")]
+                    {
+                        let http_response = map_error_to_http_response(&e, trace_id.to_string());
+                        http_response_code = http_response.status().into();
+                    }
+                    // Add audit before closing
+                    #[cfg(feature = "enterprise")]
+                    if is_audit_enabled {
+                        audit(AuditMessage {
+                            user_email: user_id,
+                            org_id,
+                            _timestamp: chrono::Utc::now().timestamp(),
+                            protocol: Protocol::Ws,
+                            response_meta: ResponseMeta {
+                                http_method: "".to_string(),
+                                http_path: path.clone(),
+                                http_query_params: "".to_string(),
+                                http_body: client_msg.to_json(),
+                                http_response_code,
+                                error_msg: Some(e.to_string()),
+                                trace_id: Some(trace_id.to_string()),
+                            },
+                        })
+                        .await;
+                    }
+                };
+                match &e {
+                    #[cfg(feature = "enterprise")]
+                    errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
+                        let cancel_res = WsServerEvents::CancelResponse {
+                            trace_id: trace_id.to_string(),
+                            is_success: true,
                         };
-                        match &e {
-                            #[cfg(feature = "enterprise")]
-                            errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
-                                let cancel_res = WsServerEvents::CancelResponse {
-                                        trace_id: trace_id.to_string(),
-                                        is_success: true,
-                                    };
-                                    let _ = send_message(&req_id, cancel_res.to_json()).await;
-                                }
-                            _ => handle_err().await
-                        }
-
+                        let _ = send_message(&req_id, cancel_res.to_json()).await;
                     }
+                    _ => handle_err().await,
                 }
             }
         }
@@ -806,81 +803,79 @@ async fn handle_values_event(
         // Otherwise, the task will complete and the results will be sent to the client
         // The task will also update the values state to completed
         // The task will also cleanup the values search resources
-        tokio::select! {
-            values_result = handle_values_request(
-                &org_id,
-                &user_id,
-                &req_id,
-                values_req.clone(),
-                &mut accumulated_results,
-            ) => {
-                match values_result {
-                    Ok(_) => {
-                        // Add audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                            audit(AuditMessage {
-                                user_email: user_id,
-                                org_id,
-                                _timestamp: chrono::Utc::now().timestamp(),
-                                protocol: Protocol::Ws,
-                                response_meta: ResponseMeta {
-                                    http_method: "".to_string(),
-                                    http_path: path.clone(),
-                                    http_query_params: "".to_string(),
-                                    http_body: client_msg.to_json(),
-                                    http_response_code: 200,
-                                    error_msg: None,
-                                    trace_id: Some(trace_id.to_string()),
-                                },
-                            })
-                            .await;
-                        }
-                    }
-                    Err(e) => {
-                        let handle_err = async || {
-                            let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
+        let values_result = handle_values_request(
+            &org_id,
+            &user_id,
+            &req_id,
+            values_req.clone(),
+            &mut accumulated_results,
+        )
+        .await;
+        match values_result {
+            Ok(_) => {
+                // Add audit before closing
+                #[cfg(feature = "enterprise")]
+                if is_audit_enabled {
+                    audit(AuditMessage {
+                        user_email: user_id,
+                        org_id,
+                        _timestamp: chrono::Utc::now().timestamp(),
+                        protocol: Protocol::Ws,
+                        response_meta: ResponseMeta {
+                            http_method: "".to_string(),
+                            http_path: path.clone(),
+                            http_query_params: "".to_string(),
+                            http_body: client_msg.to_json(),
+                            http_response_code: 200,
+                            error_msg: None,
+                            trace_id: Some(trace_id.to_string()),
+                        },
+                    })
+                    .await;
+                }
+            }
+            Err(e) => {
+                let handle_err = async || {
+                    let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
 
-                            #[cfg(feature = "enterprise")]
-                            let http_response_code: u16;
-                            #[cfg(feature = "enterprise")]
-                            {
-                                let http_response = map_error_to_http_response(&e, trace_id.to_string());
-                                http_response_code = http_response.status().into();
-                            }
-                            // Add audit before closing
-                            #[cfg(feature = "enterprise")]
-                            if is_audit_enabled {
-                                audit(AuditMessage {
-                                    user_email: user_id,
-                                    org_id,
-                                    _timestamp: chrono::Utc::now().timestamp(),
-                                    protocol: Protocol::Ws,
-                                    response_meta: ResponseMeta {
-                                        http_method: "".to_string(),
-                                        http_path: path.clone(),
-                                        http_query_params: "".to_string(),
-                                        http_body: client_msg.to_json(),
-                                        http_response_code,
-                                        error_msg: Some(e.to_string()),
-                                        trace_id: Some(trace_id.to_string()),
-                                    },
-                                })
-                                .await;
-                            }
-                        };
-                        match &e {
-                            #[cfg(feature = "enterprise")]
-                            errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
-                                let cancel_res = WsServerEvents::CancelResponse {
-                                        trace_id: trace_id.to_string(),
-                                        is_success: true,
-                                    };
-                                    let _ = send_message(&req_id, cancel_res.to_json()).await;
-                                }
-                            _ => handle_err().await
-                        }
+                    #[cfg(feature = "enterprise")]
+                    let http_response_code: u16;
+                    #[cfg(feature = "enterprise")]
+                    {
+                        let http_response = map_error_to_http_response(&e, trace_id.to_string());
+                        http_response_code = http_response.status().into();
                     }
+                    // Add audit before closing
+                    #[cfg(feature = "enterprise")]
+                    if is_audit_enabled {
+                        audit(AuditMessage {
+                            user_email: user_id,
+                            org_id,
+                            _timestamp: chrono::Utc::now().timestamp(),
+                            protocol: Protocol::Ws,
+                            response_meta: ResponseMeta {
+                                http_method: "".to_string(),
+                                http_path: path.clone(),
+                                http_query_params: "".to_string(),
+                                http_body: client_msg.to_json(),
+                                http_response_code,
+                                error_msg: Some(e.to_string()),
+                                trace_id: Some(trace_id.to_string()),
+                            },
+                        })
+                        .await;
+                    }
+                };
+                match &e {
+                    #[cfg(feature = "enterprise")]
+                    errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
+                        let cancel_res = WsServerEvents::CancelResponse {
+                            trace_id: trace_id.to_string(),
+                            is_success: true,
+                        };
+                        let _ = send_message(&req_id, cancel_res.to_json()).await;
+                    }
+                    _ => handle_err().await,
                 }
             }
         }
