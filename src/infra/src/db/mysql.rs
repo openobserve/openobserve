@@ -32,54 +32,46 @@ use tokio::sync::{OnceCell, mpsc};
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;
 
-pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(|| connect(false));
-pub static CLIENT_RO: Lazy<Pool<MySql>> = Lazy::new(|| connect(true));
-pub static CLIENT_DDL: Lazy<Pool<MySql>> = Lazy::new(connect_ddl);
+pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(|| connect(false, false));
+pub static CLIENT_RO: Lazy<Pool<MySql>> = Lazy::new(|| connect(true, false));
+pub static CLIENT_DDL: Lazy<Pool<MySql>> = Lazy::new(|| connect(false, true));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
-fn connect(readonly: bool) -> Pool<MySql> {
-    let mut dsn = if readonly {
-        config::get_config().common.meta_mysql_ro_dsn.clone()
-    } else {
-        config::get_config().common.meta_mysql_dsn.clone()
+fn connect(readonly: bool, ddl: bool) -> Pool<MySql> {
+    let cfg = config::get_config();
+    let mut dsn = match (readonly, ddl) {
+        // readonly non-ddl
+        (true, false) => cfg.common.meta_mysql_ro_dsn.clone(),
+        // read-write non-ddl
+        (false, false) => cfg.common.meta_mysql_dsn.clone(),
+        // ddl
+        (_, true) => cfg.common.meta_ddl_dsn.clone(),
     };
+    // the default fallback is original dsn, which is checked in config.rs to be non-empty
     if dsn.is_empty() {
-        dsn = config::get_config().common.meta_mysql_dsn.clone();
+        dsn = cfg.common.meta_mysql_dsn.clone();
     }
-    let cfg = config::get_config();
     let db_opts = MySqlConnectOptions::from_str(&dsn).expect("mysql connect options create failed");
 
     let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
     let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
 
-    MySqlPoolOptions::new()
-        .min_connections(cfg.limit.sql_db_connections_min)
-        .max_connections(cfg.limit.sql_db_connections_max)
-        .acquire_timeout(Duration::from_secs(acquire_timeout))
-        .idle_timeout(Some(Duration::from_secs(idle_timeout)))
-        .max_lifetime(Some(Duration::from_secs(max_lifetime)))
-        .connect_lazy_with(db_opts)
-}
-
-fn connect_ddl() -> Pool<MySql> {
-    let cfg = config::get_config();
-    let dsn = if cfg.common.meta_ddl_dsn.is_empty() {
-        cfg.common.meta_mysql_dsn.clone()
+    let (min_conn, max_conn) = if ddl {
+        // for ddl we use bare min connections, as it is used
+        // once at the very start, and usually does not do any concurrent queries
+        // to actually use more connections
+        (1, 2)
     } else {
-        cfg.common.meta_ddl_dsn.clone()
+        (
+            cfg.limit.sql_db_connections_min,
+            cfg.limit.sql_db_connections_max,
+        )
     };
-    let db_opts = MySqlConnectOptions::from_str(&dsn).expect("mysql connect options create failed");
 
-    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
-    let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
-    let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
-
-    // because ddl is only run at the very start and never again, we use absolute
-    // minimum connections required
     MySqlPoolOptions::new()
-        .min_connections(1)
-        .max_connections(2)
+        .min_connections(min_conn)
+        .max_connections(max_conn)
         .acquire_timeout(Duration::from_secs(acquire_timeout))
         .idle_timeout(Some(Duration::from_secs(idle_timeout)))
         .max_lifetime(Some(Duration::from_secs(max_lifetime)))
