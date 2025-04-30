@@ -972,6 +972,10 @@ pub async fn merge_files(
 
             // upload file to storage
             let buf = Bytes::from(buf);
+            if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
+                infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
+                log::debug!("merge_files {new_file_key} file_data::disk::set success");
+            }
             storage::put(&new_file_key, buf.clone()).await?;
 
             if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
@@ -1007,6 +1011,11 @@ pub async fn merge_files(
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
+                if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node
+                {
+                    infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
+                    log::debug!("merge_files {new_file_key} file_data::disk::set success");
+                }
                 storage::put(&new_file_key, buf.clone()).await?;
 
                 if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
@@ -1291,11 +1300,11 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
         let file_name = file.key.to_string();
-        let file_size = file.meta.compressed_size;
+        let file_size = file.meta.compressed_size as usize;
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download("", &file_name).await
+                file_data::disk::download(&file_name, Some(file_size)).await
             } else {
                 Ok(0)
             };
@@ -1304,7 +1313,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
             // should remove the entry from file_list table.
             let file_name = match ret {
                 Ok(data_len) => {
-                    if data_len > 0 && data_len != file_size as usize {
+                    if data_len > 0 && data_len != file_size {
                         log::warn!(
                             "[COMPACT] download file {} found size mismatch, expected: {}, actual: {}, will update it",
                             file_name,
@@ -1339,7 +1348,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                     } else {
                         log::error!("[COMPACT] download file to cache err: {}", e);
                         // remove downloaded file
-                        let _ = file_data::disk::remove("", &file_name).await;
+                        let _ = file_data::disk::remove(&file_name).await;
                         None
                     }
                 }

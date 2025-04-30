@@ -803,6 +803,10 @@ async fn merge_files(
 
     // upload file
     let buf = Bytes::from(buf);
+    if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
+        infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
+        log::debug!("merge_files {new_file_key} file_data::disk::set success");
+    }
     storage::put(&new_file_key, buf.clone()).await?;
 
     // skip index generation if not enabled or not basic type
@@ -1448,6 +1452,15 @@ pub(crate) async fn create_tantivy_index(
     else {
         return Ok(0);
     };
+
+    if get_config().cache_latest_files.cache_index
+        && get_config().cache_latest_files.download_from_node
+    {
+        infra::cache::file_data::disk::set(&idx_file_name, Bytes::from(puffin_bytes.clone()))
+            .await?;
+        log::info!("file: {idx_file_name} file_data::disk::set success");
+    }
+
     match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(

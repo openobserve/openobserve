@@ -47,7 +47,7 @@ pub async fn handle_values_request(
     request_id: &str,
     req: ValuesEventReq,
     accumulated_results: &mut Vec<SearchResultType>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), infra::errors::Error> {
     let mut start_timer = std::time::Instant::now();
 
     let cfg = get_config();
@@ -235,6 +235,7 @@ pub async fn handle_values_request(
                     accumulated_results,
                     max_query_range,
                     &mut start_timer,
+                    &order_by,
                 )
                 .instrument(ws_values_span.clone())
                 .await?;
@@ -255,7 +256,7 @@ pub async fn handle_values_request(
                             trace_id,
                             e
                         );
-                        anyhow::anyhow!("Error writing results to cache: {}", e)
+                        e
                     })?;
             }
         } else {
@@ -291,6 +292,7 @@ pub async fn handle_values_request(
                 accumulated_results,
                 max_query_range,
                 &mut start_timer,
+                &order_by,
             )
             .instrument(ws_values_span.clone())
             .await?;
