@@ -248,6 +248,7 @@ pub async fn search(
                             | search::SearchEventType::Other
                             // Alerts search now uses grpc cache::search which does report usage
                             | search::SearchEventType::Alerts
+                            | search::SearchEventType::DerivedStream
                     ) {
                         (false, None, None)
                     } else {
