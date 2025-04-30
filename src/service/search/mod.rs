@@ -246,6 +246,8 @@ pub async fn search(
                             | search::SearchEventType::Dashboards
                             | search::SearchEventType::Values
                             | search::SearchEventType::Other
+                            // Alerts search now uses grpc cache::search which does report usage
+                            | search::SearchEventType::Alerts
                     ) {
                         (false, None, None)
                     } else {
