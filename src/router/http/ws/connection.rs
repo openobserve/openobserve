@@ -305,7 +305,7 @@ impl QuerierConnection {
                 }
             } else {
                 log::warn!(
-                    "[WS::Router::QuerierConnection] Read error: could not read message from querier, Querier: {}, router: {}",
+                    "[WS::Router::QuerierConnection] Read error: received no message from querier, Querier: {}, router: {}",
                     self.querier_name,
                     cfg.common.instance_name
                 );
