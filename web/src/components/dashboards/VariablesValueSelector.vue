@@ -102,6 +102,7 @@ import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import { useVariablesManager } from "@/composables/useVariablesManager";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -120,6 +121,7 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const instance = getCurrentInstance();
     const store = useStore();
+    const variablesManager = useVariablesManager(store, props);
 
     // variables data derived from the variables config list
     const variablesData: any = reactive({
@@ -804,94 +806,12 @@ export default defineComponent({
         return;
       }
 
-      if (!isInitialLoad && skipAPILoad.value) {
-        return;
-      }
-
       isLoading = true;
-
-      if (
-        isInvalidDate(props.selectedTimeDate?.start_time) ||
-        isInvalidDate(props.selectedTimeDate?.end_time)
-      ) {
-        isLoading = false;
-        return;
-      }
-
-      // Set loading state for all variables
-      variablesData.values.forEach((variable: any) => {
-        variable.isVariableLoadingPending = true;
-      });
-
-      // Find all independent variables (variables with no dependencies)
-      const independentVariables = variablesData.values.filter(
-        (variable: any) =>
-          !variablesDependencyGraph[variable.name]?.parentVariables?.length,
-      );
-
-      // Find all dependent variables (variables with dependencies)
-      const dependentVariables = variablesData.values.filter(
-        (variable: any) =>
-          variablesDependencyGraph[variable.name]?.parentVariables?.length > 0,
-      );
-
       try {
-        // Load all independent variables
-        await Promise.all(
-          independentVariables.map((variable: any) =>
-            loadSingleVariableDataByName(variable),
-          ),
-        );
-      } catch (error) {
-        await Promise.all(
-          independentVariables.map((variable: any) =>
-            finalizeVariableLoading(variable, false),
-          ),
-        );
+        variablesManager.triggerLoading(variablesData.values);
+      } finally {
+        isLoading = false;
       }
-
-      const loadDependentVariables = async () => {
-        for (const variable of dependentVariables) {
-          // Find all parent variables of the current variable
-          const parentVariables =
-            variablesDependencyGraph[variable.name].parentVariables;
-          // Check if all parent variables are loaded
-          const areParentsLoaded = parentVariables.every(
-            (parentName: string) => {
-              const parentVariable = variablesData.values.find(
-                (v: any) => v.name === parentName,
-              );
-              return (
-                parentVariable &&
-                !parentVariable.isLoading &&
-                !parentVariable.isVariableLoadingPending &&
-                parentVariable.value !== null
-              );
-            },
-          );
-
-          // If all parent variables are loaded, load the current variable
-          if (areParentsLoaded) {
-            await loadSingleVariableDataByName(variable);
-          }
-        }
-      };
-
-      // Attempt to load dependent variables up to 3 times
-      for (let attempt = 0; attempt < 3; attempt++) {
-        await loadDependentVariables();
-
-        // Check if all variables are loaded
-        const allLoaded = variablesData.values.every(
-          (variable: any) =>
-            !variable.isLoading && !variable.isVariableLoadingPending,
-        );
-
-        // If all variables are loaded, break the loop
-        if (allLoaded) break;
-      }
-
-      isLoading = false;
     };
 
     /**
@@ -931,69 +851,11 @@ export default defineComponent({
       if (variableIndex < 0) return;
 
       const currentVariable = variablesData.values[variableIndex];
-      // if currentVariable is undefined, return
       if (!currentVariable) {
         return;
       }
 
-      // Check if the value actually changed
-      if (oldVariablesData[currentVariable.name] === currentVariable.value) {
-        return;
-      }
-
-      // Update the old variables data
-      oldVariablesData[currentVariable.name] = currentVariable.value;
-
-      // Get all affected variables recursively
-      const getAllAffectedVariables = (
-        varName: string,
-        visited = new Set<string>(),
-      ): string[] => {
-        if (visited.has(varName)) return []; // Prevent circular dependencies
-        visited.add(varName);
-
-        const immediateChildren =
-          variablesDependencyGraph[varName]?.childVariables || [];
-        const allChildren: string[] = [...immediateChildren];
-
-        for (const childName of immediateChildren) {
-          const childrenOfChild = getAllAffectedVariables(childName, visited);
-          allChildren.push(...childrenOfChild);
-        }
-
-        return Array.from(new Set(allChildren));
-      };
-
-      // Get all affected variables in dependency order
-      const affectedVariables = getAllAffectedVariables(currentVariable.name);
-
-      // Reset and mark all affected variables for update
-      const variablesToUpdate = variablesData.values.filter((v: any) =>
-        affectedVariables.includes(v.name),
-      );
-
-      // Reset all affected variables
-      variablesToUpdate.forEach((variable: any) => {
-        variable.isVariableLoadingPending = true;
-        variable.isLoading = true;
-        if (variable.multiSelect) {
-          variable.value = [];
-        } else {
-          variable.value = null;
-        }
-      });
-
-      // Load variables in dependency order
-      for (const varName of affectedVariables) {
-        const variable = variablesData.values.find(
-          (v: any) => v.name === varName,
-        );
-        if (variable) {
-          await loadSingleVariableDataByName(variable);
-        }
-      }
-
-      // Emit updated data
+      await variablesManager.onValueChange(currentVariable);
       emitVariablesData();
     };
 
