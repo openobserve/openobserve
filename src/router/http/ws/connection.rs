@@ -604,7 +604,12 @@ fn get_default_querier_request(http_url: &str) -> WsResult<tungstenite::http::Re
     }
 
     let instance_name = get_config().common.instance_name.clone();
-    let parsed_url = parsed_url.to_string() + "api/default/ws/v2/" + &instance_name;
+    let id = format!(
+        "{}-{}",
+        instance_name,
+        chrono::Utc::now().timestamp_micros()
+    );
+    let parsed_url = parsed_url.to_string() + "api/default/ws/v2/" + &id;
 
     let mut ws_req = parsed_url
         .into_client_request()
