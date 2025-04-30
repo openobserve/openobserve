@@ -2,6 +2,7 @@ import random
 import base64
 import io
 from pathlib import Path
+import json # For JSON parsing
 from requests.auth import HTTPBasicAuth
 
 root_dir = Path(__file__).parent.parent.parent  # Navigate up to the root directory
@@ -58,9 +59,29 @@ class EnrichmentPage:
             'Custom-Header': 'value'
         }
 
+        # Build auth_ext cookie
+        auth_ext_dict = {
+            "auth_ext": "",
+            "refresh_token": "",
+            "request_time": 0,
+            "expires_in": 0
+        }
+        auth_ext_json = json.dumps(auth_ext_dict)
+        auth_ext_b64 = base64.b64encode(auth_ext_json.encode()).decode()
+
+        # Build auth_tokens cookie
+        access_token = "Basic " + base64.b64encode((user_email + ":" + user_password).encode()).decode()
+        auth_tokens_dict = {
+            "access_token": access_token,
+            "refresh_token": ""
+        }
+        auth_tokens_json = json.dumps(auth_tokens_dict)
+        auth_tokens_b64 = base64.b64encode(auth_tokens_json.encode()).decode()
+
+        # Final cookies dictionary
         cookies = {
-            'auth_ext': '{"auth_ext":"","refresh_token":"","request_time":0,"expires_in":0}',
-            'auth_tokens': f'{{"access_token":"Basic {base64.b64encode((user_email + ":" + user_password).encode()).decode()}","refresh_token":""}}'
+            'auth_ext': auth_ext_b64,
+            'auth_tokens': auth_tokens_b64
         }
 
         # Create sample data directly instead of reading from file
