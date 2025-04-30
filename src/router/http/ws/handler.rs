@@ -44,6 +44,8 @@ pub type ClientId = String;
 pub type QuerierName = String;
 pub type TraceId = String;
 
+pub const SERVER_HEALTH_CHECK_PING_MSG: &[u8] = b"server_health_check";
+
 #[derive(Debug)]
 pub struct WsHandler {
     pub session_manager: Arc<SessionManager>,
@@ -131,7 +133,10 @@ impl WsHandler {
 
             loop {
                 ping_interval.tick().await;
-                if let Err(e) = response_tx_clone.send(WsServerEvents::Ping(vec![])).await {
+                if let Err(e) = response_tx_clone
+                    .send(WsServerEvents::Ping(SERVER_HEALTH_CHECK_PING_MSG.to_vec()))
+                    .await
+                {
                     log::error!(
                         "[WS::Router::Handler] error sending ping to outgoing thread via response channel for client_id: {}, error: {}",
                         client_id_clone1,
@@ -454,9 +459,23 @@ impl WsHandler {
                         Some(message) = response_rx.recv() => {
                             match message {
                                 WsServerEvents::Ping(ping) => {
-                                    log::debug!("[WS::Router::Handler]: pinging client_id: {}", client_id);
-                                    if let Err(e) = ws_session.ping(&ping).await {
-                                        log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
+                                    let mut close_conn = false;
+                                    if ping == SERVER_HEALTH_CHECK_PING_MSG {
+                                        log::debug!("[WS::Router::Handler]: pinging client_id: {}, msg: {:?}", client_id, String::from_utf8_lossy(&ping));
+                                        if let Err(e) = ws_session.ping(&ping).await {
+                                            close_conn = true;
+                                            log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
+                                        }
+                                    } else {
+                                        log::debug!("[WS::Router::Handler]: sending pong to client_id: {}, msg: {:?}", client_id, String::from_utf8_lossy(&ping));
+                                        if let Err(e) = ws_session.pong(&ping).await {
+                                            close_conn = true;
+                                            log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
+                                        }
+                                    }
+
+                                    if close_conn {
+                                        log::debug!("[WS::Router::Handler]: closing websocket session due to ping-pong failure client_id: {}", client_id);
                                         if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Normal))).await {
                                             log::error!("[WS::Router::Handler]: Error closing websocket session client_id: {}, error: {}", client_id, e);
                                         };

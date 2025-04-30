@@ -863,7 +863,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
         accumulated_results.len()
     );
-    send_message(req_id, ws_search_res.to_json(), &trace_id).await?;
+    send_message(req_id, ws_search_res.to_json(), trace_id).await?;
 
     // Send progress update
     {
@@ -882,7 +882,7 @@ async fn send_cached_responses(
                 event_type: req.event_type().to_string(),
             }
             .to_json(),
-            &trace_id,
+            trace_id,
         )
         .await?;
     }
@@ -1029,7 +1029,7 @@ pub async fn do_partitioned_search(
                 },
                 streaming_aggs: is_streaming_aggs,
             };
-            send_message(req_id, ws_search_res.to_json(), &trace_id).await?;
+            send_message(req_id, ws_search_res.to_json(), trace_id).await?;
         }
 
         // Send progress update
@@ -1049,7 +1049,7 @@ pub async fn do_partitioned_search(
                     event_type: "search".to_string(),
                 }
                 .to_json(),
-                &trace_id,
+                trace_id,
             )
             .await?;
         }
@@ -1109,7 +1109,7 @@ async fn send_partial_search_resp(
         trace_id
     );
 
-    send_message(req_id, ws_search_res.to_json(), &trace_id).await?;
+    send_message(req_id, ws_search_res.to_json(), trace_id).await?;
 
     Ok(())
 }
