@@ -97,6 +97,7 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: [
+            "alertsfolders.spec.js",
             "sanity.spec.js",
             "alerts.spec.js",
             "schema.spec.js",
@@ -130,6 +131,7 @@ jobs:
             "sanity2.spec.js",
             "schemaload.spec.js",
             "websocket.spec.js",
+            "alertImportTDA.spec.js",
             # "remotepipeline.spec.js",
 
           ]

@@ -227,7 +227,7 @@ async fn run_partition_job(
     }
     let mut result = res.unwrap();
     let took = start.elapsed().as_millis();
-    result.set_local_took(took as usize, 0);
+    result.set_took(took as usize);
 
     // 4. write the result to s3
     let hits = result.total;
@@ -398,15 +398,7 @@ pub async fn merge_response(
     let mut resp = response.remove(0);
     for r in response {
         resp.took += r.took;
-        resp.took_detail = match (resp.took_detail, r.took_detail.as_ref()) {
-            (Some(mut a), Some(b)) => {
-                a.add(b);
-                Some(a)
-            }
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b.clone()),
-            (None, None) => None,
-        };
+        resp.took_detail.add(&r.took_detail);
         resp.hits.extend(r.hits);
         resp.total += r.total;
         resp.file_count += r.file_count;
@@ -448,11 +440,12 @@ pub async fn get_result(
 
     // super cluster
     if get_o2_config().super_cluster.enabled {
+        let trace_id = config::ider::generate_trace_id();
         let node = get_cluster_node_by_name(cluster).await?;
         let path = path.to_string();
         let task = tokio::task::spawn(async move {
             let mut request = tonic::Request::new(proto::cluster_rpc::GetResultRequest { path });
-            let mut client = make_grpc_search_client(&mut request, &node).await?;
+            let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
             let response = match client.get_result(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -461,13 +454,8 @@ pub async fn get_result(
                         &node.get_grpc_addr(),
                         err
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        "search node error".to_string(),
-                    )));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)
@@ -492,7 +480,8 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
     storage::del(&local_paths).await?;
 
     if get_o2_config().super_cluster.enabled {
-        let nodes = get_cluster_nodes("delete_result", vec![], vec![]).await?;
+        let trace_id = config::ider::generate_trace_id();
+        let nodes = get_cluster_nodes("delete_result", vec![], vec![], None).await?;
         // delete result in all cluster,
         // because for retry job, we don't know partition in which cluster
         for node in nodes {
@@ -500,10 +489,11 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
                 continue;
             }
             let paths = paths.clone();
+            let trace_id = trace_id.clone();
             let task = tokio::task::spawn(async move {
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::DeleteResultRequest { paths });
-                let mut client = make_grpc_search_client(&mut request, &node).await?;
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
                 let response = match client.delete_result(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
@@ -512,13 +502,8 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
                             &node.get_grpc_addr(),
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                            "search node error".to_string(),
-                        )));
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
                     }
                 };
                 Ok(response)

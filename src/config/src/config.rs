@@ -33,7 +33,7 @@ use lettre::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    meta::{cluster, meta_store::MetaStore},
+    meta::cluster,
     utils::{file::get_file_meta, sysinfo},
 };
 
@@ -418,7 +418,6 @@ pub struct Config {
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
     pub encryption: Encryption,
-    pub ratelimit: RateLimit,
 }
 
 #[derive(EnvConfig)]
@@ -1074,6 +1073,14 @@ pub struct Common {
     pub min_auto_refresh_interval: u32,
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_ENABLED", default = false)]
+    pub file_list_dump_enabled: bool,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]
+    pub file_list_dump_dual_write: bool,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_MIN_HOUR", default = 2)]
+    pub file_list_dump_min_hour: usize,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
+    pub file_list_dump_debug_check: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1407,6 +1414,12 @@ pub struct Limit {
         help = "Duration of each mini search partition in seconds"
     )]
     pub search_mini_partition_duration_secs: u64,
+    #[env_config(
+        name = "ZO_HISTOGRAM_ENABLED",
+        help = "Show histogram for logs page",
+        default = true
+    )]
+    pub histogram_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1478,6 +1491,8 @@ pub struct CacheLatestFiles {
     pub cache_index: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DELETE_MERGE_FILES", default = false)]
     pub delete_merge_files: bool,
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
+    pub download_from_node: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1674,6 +1689,8 @@ pub struct S3 {
     pub feature_http1_only: bool,
     #[env_config(name = "ZO_S3_FEATURE_HTTP2_ONLY", default = false)]
     pub feature_http2_only: bool,
+    #[env_config(name = "ZO_S3_FEATURE_BULK_DELETE", default = false)]
+    pub feature_bulk_delete: bool,
     #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
     #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
@@ -1806,22 +1823,6 @@ pub struct HealthCheck {
     pub failed_times: usize,
 }
 
-#[derive(EnvConfig)]
-pub struct RateLimit {
-    #[env_config(
-        name = "ZO_RATELIMIT_ENABLED",
-        default = false,
-        help = "ratelimit enabled"
-    )]
-    pub ratelimit_enabled: bool,
-    #[env_config(
-        name = "ZO_RATELIMIT_RULE_REFRESH_INTERVAL",
-        default = 10,
-        help = "unit: seconds, refresh interval for rate limit rules"
-    )]
-    pub ratelimit_rule_refresh_interval: usize,
-}
-
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -1900,11 +1901,6 @@ pub fn init() -> Config {
     // check pipeline config
     if let Err(e) = check_pipeline_config(&mut cfg) {
         panic!("pipeline config error: {e}");
-    }
-
-    // check ratelimit config
-    if let Err(e) = check_ratelimit_config(&mut cfg) {
-        panic!("ratelimit config error: {e}");
     }
 
     cfg
@@ -2162,6 +2158,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     {
         cfg.common.feature_join_right_side_max_rows = 50_000;
     }
+
+    // debug check is useful only when dual write is enabled. Otherwise it will raise error
+    // incorrectly each time
+    cfg.common.file_list_dump_debug_check =
+        cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
 
     Ok(())
 }
@@ -2623,24 +2624,6 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     } else {
         cfg.pipeline.wal_size_limit *= 1024 * 1024;
-    }
-    Ok(())
-}
-
-fn check_ratelimit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.ratelimit.ratelimit_enabled {
-        let meta_store: MetaStore = cfg.common.queue_store.as_str().into();
-        if meta_store != MetaStore::Nats {
-            return Err(anyhow::anyhow!(
-                "ZO_QUEUE_STORE must be nats when ratelimit is enabled"
-            ));
-        }
-    }
-
-    if cfg.ratelimit.ratelimit_rule_refresh_interval < 2 {
-        return Err(anyhow::anyhow!(
-            "ratelimit rules refresh interval must be greater than or equal to 2 seconds"
-        ));
     }
     Ok(())
 }

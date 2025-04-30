@@ -419,6 +419,27 @@ impl std::ops::Sub<&StreamStats> for &StreamStats {
     }
 }
 
+impl std::ops::Add<&StreamStats> for &StreamStats {
+    type Output = StreamStats;
+
+    fn add(self, rhs: &StreamStats) -> Self::Output {
+        let mut ret = StreamStats {
+            created_at: self.created_at,
+            file_num: self.file_num + rhs.file_num,
+            doc_num: self.doc_num + rhs.doc_num,
+            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
+            doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
+            storage_size: self.storage_size + rhs.storage_size,
+            compressed_size: self.compressed_size + rhs.compressed_size,
+            index_size: self.index_size + rhs.index_size,
+        };
+        if ret.doc_time_min == 0 {
+            ret.doc_time_min = rhs.doc_time_min;
+        }
+        ret
+    }
+}
+
 impl From<&FileMeta> for cluster_rpc::FileMeta {
     fn from(req: &FileMeta) -> Self {
         cluster_rpc::FileMeta {
@@ -1097,6 +1118,13 @@ impl std::fmt::Display for Operator {
             Operator::NotContains => write!(f, "not contains"),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EnrichmentTableMetaStreamStats {
+    pub start_time: i64,
+    pub end_time: i64,
+    pub size: i64,
 }
 
 #[cfg(test)]

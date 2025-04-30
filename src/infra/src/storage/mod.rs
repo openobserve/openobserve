@@ -111,25 +111,44 @@ pub async fn del(files: &[&str]) -> object_store::Result<()> {
         .iter()
         .map(|file| file.to_string())
         .collect::<Vec<_>>();
-    let files_stream = futures::stream::iter(files);
-    files_stream
-        .for_each_concurrent(get_config().limit.cpu_num, |file| async move {
-            match DEFAULT.delete(&(file.as_str().into())).await {
-                Ok(_) => {
-                    log::debug!("Deleted object: {}", file);
-                }
-                Err(e) => {
-                    // TODO: need a better solution for identifying the error
-                    if file.ends_with(".result.json") {
-                        // ignore search job file deletion error
-                        log::debug!("Failed to delete object: {}, error: {:?}", file, e);
-                    } else if !is_local_disk_storage() {
-                        log::error!("Failed to delete object: {:?}", e);
+
+    if !is_local_disk_storage() && get_config().s3.feature_bulk_delete {
+        let files_stream = futures::stream::iter(files)
+            .map(|file| Ok(Path::from(file)))
+            .boxed();
+        match DEFAULT
+            .delete_stream(files_stream)
+            .try_collect::<Vec<Path>>()
+            .await
+        {
+            Ok(files) => {
+                log::debug!("Deleted objects: {:?}", files);
+            }
+            Err(e) => {
+                log::error!("Failed to delete objects: {:?}", e);
+            }
+        }
+    } else {
+        let files_stream = futures::stream::iter(files);
+        files_stream
+            .for_each_concurrent(get_config().limit.cpu_num, |file| async move {
+                match DEFAULT.delete(&(file.as_str().into())).await {
+                    Ok(_) => {
+                        log::debug!("Deleted object: {}", file);
+                    }
+                    Err(e) => {
+                        // TODO: need a better solution for identifying the error
+                        if file.ends_with(".result.json") {
+                            // ignore search job file deletion error
+                            log::debug!("Failed to delete object: {}, error: {:?}", file, e);
+                        } else if !is_local_disk_storage() {
+                            log::error!("Failed to delete object: {:?}", e);
+                        }
                     }
                 }
-            }
-        })
-        .await;
+            })
+            .await;
+    }
 
     if columns[0] == "files" {
         let time = start.elapsed().as_secs_f64();

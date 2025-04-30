@@ -462,9 +462,10 @@ pub async fn merge_by_stream(
             offset_time.format("%Y/%m/%d/%H").to_string(),
         )
     };
-    let files = file_list::query_by_date(org_id, stream_name, stream_type, &date_start, &date_end)
-        .await
-        .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+    let files =
+        file_list::query_for_merge(org_id, stream_name, stream_type, &date_start, &date_end)
+            .await
+            .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",
@@ -971,6 +972,10 @@ pub async fn merge_files(
 
             // upload file to storage
             let buf = Bytes::from(buf);
+            if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
+                infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
+                log::debug!("merge_files {new_file_key} file_data::disk::set success");
+            }
             storage::put(&new_file_key, buf.clone()).await?;
 
             if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
@@ -1006,6 +1011,11 @@ pub async fn merge_files(
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
+                if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node
+                {
+                    infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
+                    log::debug!("merge_files {new_file_key} file_data::disk::set success");
+                }
                 storage::put(&new_file_key, buf.clone()).await?;
 
                 if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
@@ -1147,11 +1157,6 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         return Ok(());
     }
 
-    let put_items = events
-        .iter()
-        .filter(|v| !v.deleted)
-        .map(|v| v.to_owned())
-        .collect::<Vec<_>>();
     let del_items = events
         .iter()
         .filter(|v| v.deleted)
@@ -1167,6 +1172,11 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
     let mut success = false;
     let created_at = config::utils::time::now_micros();
     for _ in 0..5 {
+        if let Err(e) = infra_file_list::batch_process(events).await {
+            log::error!("[COMPACTOR] batch_process to db failed, retrying: {}", e);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
         if !del_items.is_empty() {
             if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
             {
@@ -1178,34 +1188,22 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
                 continue;
             }
         }
-        if let Err(e) = infra_file_list::batch_add(&put_items).await {
-            log::error!("[COMPACTOR] batch_add to db failed, retrying: {}", e);
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        if !del_items.is_empty() {
-            let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
-            if let Err(e) = infra_file_list::batch_remove(&del_files).await {
-                log::error!("[COMPACTOR] batch_delete to db failed, retrying: {}", e);
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-        };
+        success = true;
+        break;
+    }
+
+    if success {
         // send broadcast to other nodes
         if get_config().cache_latest_files.enabled {
             if let Err(e) = db::file_list::broadcast::send(events, None).await {
                 log::error!("[COMPACTOR] send broadcast for file_list failed: {}", e);
             }
         }
-        // broadcast success
-        success = true;
-        break;
-    }
-    if !success {
-        Err(anyhow::anyhow!("batch_write to db failed"))
     } else {
-        Ok(())
+        return Err(anyhow::anyhow!("batch_write to db failed"));
     }
+
+    Ok(())
 }
 
 pub fn generate_inverted_idx_recordbatch(
@@ -1302,11 +1300,11 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
         let file_name = file.key.to_string();
-        let file_size = file.meta.compressed_size;
+        let file_size = file.meta.compressed_size as usize;
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download("", &file_name).await
+                file_data::disk::download(&file_name, Some(file_size)).await
             } else {
                 Ok(0)
             };
@@ -1315,7 +1313,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
             // should remove the entry from file_list table.
             let file_name = match ret {
                 Ok(data_len) => {
-                    if data_len > 0 && data_len != file_size as usize {
+                    if data_len > 0 && data_len != file_size {
                         log::warn!(
                             "[COMPACT] download file {} found size mismatch, expected: {}, actual: {}, will update it",
                             file_name,
@@ -1350,7 +1348,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                     } else {
                         log::error!("[COMPACT] download file to cache err: {}", e);
                         // remove downloaded file
-                        let _ = file_data::disk::remove("", &file_name).await;
+                        let _ = file_data::disk::remove(&file_name).await;
                         None
                     }
                 }

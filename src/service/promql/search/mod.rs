@@ -140,19 +140,13 @@ async fn search_in_cluster(
     let (start, cached_values) = if cache_disabled {
         (start, vec![])
     } else {
-        config::metrics::QUERY_METRICS_CACHE_REQUESTS
-            .with_label_values(&[&req.org_id])
-            .inc();
         let start_time = std::time::Instant::now();
         match cache::get(query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
                 config::metrics::QUERY_METRICS_CACHE_RATIO
                     .with_label_values(&[&req.org_id])
-                    .inc_by(min(
-                        100,
-                        (new_start - start) as u64 * 100 / (end - start) as u64,
-                    ));
+                    .observe((new_start - start) as f64 / (end - start) as f64);
                 log::info!(
                     "[trace_id {trace_id}] promql->search->cache: hit cache, took: {} ms",
                     took
@@ -257,11 +251,9 @@ async fn search_in_cluster(
                             &node.get_grpc_addr(),
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(server_internal_error("search node error"));
+                        let err = ErrorCodes::from_json(err.message())
+                            .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
+                        return Err(Error::ErrorCode(err));
                     }
                 };
                 let scan_stats = response.scan_stats.as_ref().unwrap();

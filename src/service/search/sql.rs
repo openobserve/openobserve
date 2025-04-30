@@ -215,13 +215,7 @@ impl Sql {
             );
         } else {
             for (stream, schema) in total_schemas.iter() {
-                let columns = match columns.get(stream) {
-                    Some(columns) => columns.clone(),
-                    None => {
-                        used_schemas.insert(stream.clone(), schema.clone());
-                        continue;
-                    }
-                };
+                let columns = columns.get(stream).cloned().unwrap_or(Default::default());
                 let fields =
                     generate_schema_fields(columns, schema, match_visitor.match_items.is_some());
                 let schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());
@@ -263,8 +257,11 @@ impl Sql {
             && cfg.common.inverted_index_enabled
             && use_inverted_index
         {
-            let is_remove_filter = cfg.common.feature_query_remove_filter_with_index;
-            let mut index_visitor = IndexVisitor::new(&used_schemas, is_remove_filter);
+            let mut index_visitor = IndexVisitor::new(
+                &used_schemas,
+                cfg.common.feature_query_remove_filter_with_index,
+                cfg.common.inverted_index_count_optimizer_enabled,
+            );
             statement.visit(&mut index_visitor);
             index_condition = index_visitor.index_condition;
             can_optimize = index_visitor.can_optimize;
@@ -284,10 +281,7 @@ impl Sql {
         }
 
         // 13. check `select count(*) from table where match_all` optimizer
-        if can_optimize
-            && is_simple_count_query(&mut statement)
-            && cfg.common.inverted_index_count_optimizer_enabled
-        {
+        if can_optimize && is_simple_count_query(&mut statement) {
             index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
         }
 
@@ -748,12 +742,17 @@ impl VisitorMut for ColumnVisitor<'_> {
 struct IndexVisitor {
     index_fields: HashSet<String>,
     is_remove_filter: bool,
+    count_optimizer_enabled: bool,
     index_condition: Option<IndexCondition>,
     pub can_optimize: bool,
 }
 
 impl IndexVisitor {
-    fn new(schemas: &HashMap<TableReference, Arc<SchemaCache>>, is_remove_filter: bool) -> Self {
+    fn new(
+        schemas: &HashMap<TableReference, Arc<SchemaCache>>,
+        is_remove_filter: bool,
+        count_optimizer_enabled: bool,
+    ) -> Self {
         let index_fields = if let Some((_, schema)) = schemas.iter().next() {
             let stream_settings = unwrap_stream_settings(schema.schema());
             let index_fields = get_stream_setting_index_fields(&stream_settings);
@@ -764,16 +763,22 @@ impl IndexVisitor {
         Self {
             index_fields,
             is_remove_filter,
+            count_optimizer_enabled,
             index_condition: None,
             can_optimize: false,
         }
     }
 
     #[allow(dead_code)]
-    fn new_from_index_fields(index_fields: HashSet<String>, is_remove_filter: bool) -> Self {
+    fn new_from_index_fields(
+        index_fields: HashSet<String>,
+        is_remove_filter: bool,
+        count_optimizer_enabled: bool,
+    ) -> Self {
         Self {
             index_fields,
             is_remove_filter,
+            count_optimizer_enabled,
             index_condition: None,
             can_optimize: false,
         }
@@ -794,10 +799,13 @@ impl VisitorMut for IndexVisitor {
                     .map(|v| v.can_remove_filter())
                     .unwrap_or(true);
                 // make sure all filter in where clause can be used in inverted index
-                if other_expr.is_none() && select.selection.is_some() && can_remove_filter {
+                if other_expr.is_none()
+                    && select.selection.is_some()
+                    && (self.count_optimizer_enabled || can_remove_filter)
+                {
                     self.can_optimize = true;
                 }
-                if self.is_remove_filter && can_remove_filter {
+                if self.is_remove_filter || can_remove_filter {
                     select.selection = other_expr;
                 }
             }
@@ -1894,7 +1902,7 @@ mod tests {
             .unwrap();
         let mut index_fields = HashSet::new();
         index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
         statement.visit(&mut index_visitor);
         let expected = "name=a AND (name=b OR (_all:good AND _all:bar))";
         let expected_sql = "SELECT * FROM t WHERE age = 1 AND (match_all('foo') OR age = 2)";
@@ -1914,7 +1922,7 @@ mod tests {
             .unwrap();
         let mut index_fields = HashSet::new();
         index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
         statement.visit(&mut index_visitor);
         let expected = "";
         let expected_sql = "SELECT * FROM t WHERE name IS NOT NULL AND age > 1 AND (match_all('foo') OR abs(age) = 2)";
@@ -1938,7 +1946,7 @@ mod tests {
             .unwrap();
         let mut index_fields = HashSet::new();
         index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
         statement.visit(&mut index_visitor);
         let expected = "";
         let expected_sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') OR age = 2)";
@@ -1962,7 +1970,7 @@ mod tests {
             .unwrap();
         let mut index_fields = HashSet::new();
         index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
         statement.visit(&mut index_visitor);
         let expected = "((name=b OR (_all:good AND _all:bar)) OR (_all:foo AND name=c))";
         let expected_sql = "SELECT * FROM t";
@@ -1982,7 +1990,7 @@ mod tests {
             .unwrap();
         let mut index_fields = HashSet::new();
         index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
         statement.visit(&mut index_visitor);
         let expected = "((_all:good AND _all:bar) OR (_all:foo AND name=c))";
         let expected_sql = "SELECT * FROM t WHERE (foo = 'b' OR foo = 'c') AND foo = 'd'";

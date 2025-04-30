@@ -23,7 +23,6 @@ use config::{
         sql::TableReferenceExt,
         stream::{FileKey, StreamType},
     },
-    utils::time::BASE_TIME,
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
@@ -39,25 +38,28 @@ use infra::{
 use proto::cluster_rpc::{KvItem, SearchQuery};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::search::{
-    cluster::flight::{
-        check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
-        partition_filt_list,
-    },
-    datafusion::{
-        distributed_plan::{
-            NewEmptyExecVisitor,
-            codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-            empty_exec::NewEmptyExec,
-            node::{RemoteScanNode, SearchInfos},
-            remote_scan::RemoteScanExec,
+use crate::service::{
+    db::enrichment_table,
+    search::{
+        cluster::flight::{
+            check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
+            partition_filt_list,
         },
-        exec::{prepare_datafusion_context, register_udf},
+        datafusion::{
+            distributed_plan::{
+                NewEmptyExecVisitor,
+                codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+                empty_exec::NewEmptyExec,
+                node::{RemoteScanNode, SearchInfos},
+                remote_scan::RemoteScanExec,
+            },
+            exec::{prepare_datafusion_context, register_udf},
+        },
+        generate_filter_from_equal_items,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        request::{FlightSearchRequest, Request},
+        utils::AsyncDefer,
     },
-    generate_filter_from_equal_items,
-    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    request::{FlightSearchRequest, Request},
-    utils::AsyncDefer,
 };
 
 /// in cluster search function only single stream take part in
@@ -127,7 +129,8 @@ pub async fn search(
     let stream_type = stream.get_stream_type(req.stream_type);
 
     // 1. get file id list
-    let file_id_list = get_file_id_lists(&req.org_id, stream_type, &stream, req.time_range).await?;
+    let file_id_list =
+        get_file_id_lists(&trace_id, &req.org_id, stream_type, &stream, req.time_range).await?;
 
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
@@ -153,6 +156,7 @@ pub async fn search(
     let mut scan_stats = ScanStats {
         files: file_id_list_vec.len() as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
+        file_list_took: file_id_list_took as i64,
         ..Default::default()
     };
 
@@ -171,7 +175,7 @@ pub async fn search(
 
     // get nodes
     let get_node_start = std::time::Instant::now();
-    let node_group = req
+    let role_group = req
         .search_event_type
         .as_ref()
         .map(|v| {
@@ -180,7 +184,7 @@ pub async fn search(
                 .map(RoleGroup::from)
         })
         .unwrap_or(None);
-    let mut nodes = get_online_querier_nodes(&trace_id, node_group).await?;
+    let mut nodes = get_online_querier_nodes(&trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
     if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
@@ -250,7 +254,7 @@ pub async fn search(
     });
 
     // partition file list
-    let partition_file_lists = partition_filt_list(file_id_list, &nodes, node_group).await?;
+    let partition_file_lists = partition_filt_list(file_id_list, &nodes, role_group).await?;
 
     // update search session scan stats
     super::super::SEARCH_SERVER
@@ -300,6 +304,7 @@ pub async fn search(
     skip_all
 )]
 pub async fn get_file_id_lists(
+    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream: &TableReference,
@@ -310,13 +315,19 @@ pub async fn get_file_id_lists(
     // if stream is enrich, rewrite the time_range
     if let Some(schema) = stream.schema() {
         if schema == "enrich" || schema == "enrichment_tables" {
-            let start = BASE_TIME.timestamp_micros();
+            let start = enrichment_table::get_start_time(org_id, &stream_name).await;
             let end = config::utils::time::now_micros();
             time_range = Some((start, end));
         }
     }
-    let file_id_list =
-        crate::service::file_list::query_ids(org_id, stream_type, &stream_name, time_range).await?;
+    let file_id_list = crate::service::file_list::query_ids(
+        trace_id,
+        org_id,
+        stream_type,
+        &stream_name,
+        time_range,
+    )
+    .await?;
     Ok(file_id_list)
 }
 

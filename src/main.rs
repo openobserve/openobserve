@@ -92,6 +92,8 @@ use tonic::{
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
+#[cfg(feature = "enterprise")]
+use {config::Config, o2_enterprise::enterprise::common::infra::config::O2Config};
 #[cfg(feature = "pyroscope")]
 use {
     pyroscope::PyroscopeAgent,
@@ -307,7 +309,7 @@ async fn main() -> Result<(), anyhow::Error> {
             // init websocket gc
             if cfg.websocket.enabled {
                 log::info!("Initializing WebSocket session garbage collector");
-                if let Err(e) = handler::http::request::ws_v2::init().await {
+                if let Err(e) = handler::http::request::ws::init().await {
                     job_init_tx.send(false).ok();
                     panic!("websocket gc init failed: {}", e);
                 }
@@ -1192,11 +1194,36 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         openobserve::super_cluster_queue::init().await?;
     }
 
+    // check ratelimit config
+    let cfg = config::get_config();
+    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
+    if let Err(e) = check_ratelimit_config(&cfg, &o2cfg) {
+        panic!("ratelimit config error: {e}");
+    }
+
     o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
-    if config::get_config().ratelimit.ratelimit_enabled && o2_openfga::config::get_config().enabled
-    {
+    if o2cfg.rate_limit.rate_limit_enabled && o2_openfga::config::get_config().enabled {
         o2_ratelimit::init(openobserve::handler::http::router::openapi::openapi_info().await)
             .await?;
+    }
+    Ok(())
+}
+#[cfg(feature = "enterprise")]
+fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::Error> {
+    if o2cfg.rate_limit.rate_limit_enabled {
+        let meta_store: config::meta::meta_store::MetaStore =
+            cfg.common.queue_store.as_str().into();
+        if meta_store != config::meta::meta_store::MetaStore::Nats {
+            return Err(anyhow::anyhow!(
+                "ZO_QUEUE_STORE must be nats when ratelimit is enabled"
+            ));
+        }
+    }
+
+    if o2cfg.rate_limit.rate_limit_rule_refresh_interval < 2 {
+        return Err(anyhow::anyhow!(
+            "ratelimit rules refresh interval must be greater than or equal to 2 seconds"
+        ));
     }
     Ok(())
 }
