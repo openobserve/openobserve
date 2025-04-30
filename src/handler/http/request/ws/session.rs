@@ -296,7 +296,7 @@ pub async fn run(
                 }
             }
         } else {
-            log::info!(
+            log::warn!(
                 "[WS_HANDLER]: No message received for req_id: {}, querier: {}",
                 req_id,
                 cfg.common.instance_name

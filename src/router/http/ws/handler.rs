@@ -162,7 +162,10 @@ impl WsHandler {
                     .reached_max_idle_time(&client_id_clone)
                     .await
                 {
-                    log::info!("[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown");
+                    log::info!(
+                        "[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown client_id: {}",
+                        client_id_clone
+                    );
                     if let Err(e) = disconnect_tx_clone2.send(None).await {
                         log::error!(
                             "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
