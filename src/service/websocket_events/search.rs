@@ -633,6 +633,11 @@ async fn process_delta(
             trace_id
         );
 
+        if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
+            let field = req.values_event_context.as_ref().unwrap().field.clone();
+            format_values_search_response(&mut search_res, &field);
+        }
+
         if !search_res.hits.is_empty() {
             search_res = order_search_results(search_res, req.fallback_order_by_col.clone());
             // for every partition, compute the queried range omitting the result cache ratio
@@ -695,27 +700,7 @@ async fn process_delta(
             );
             send_message(req_id, ws_search_res.to_json()).await?;
 
-            if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
-                let field = req.values_event_context.as_ref().unwrap().field.clone();
-
-                search_res.hits.iter_mut().for_each(|hit| {
-                    if let Some(obj) = hit.as_object_mut() {
-                        let key = match obj.get_mut("zo_sql_key") {
-                            Some(v) => get_string_value(v),
-                            None => "".to_string(),
-                        };
-                        obj.insert("zo_sql_key".to_string(), serde_json::Value::String(key));
-                    }
-                });
-
-                // Wrap the hits in a new object structure
-                let values = std::mem::take(&mut search_res.hits);
-                let wrapped_obj = serde_json::json!({
-                    "field": field,
-                    "values": values
-                });
-                search_res.hits = vec![wrapped_obj];
-            }
+            
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -992,24 +977,7 @@ pub async fn do_partitioned_search(
 
         if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
             let field = req.values_event_context.as_ref().unwrap().field.clone();
-
-            search_res.hits.iter_mut().for_each(|hit| {
-                if let Some(obj) = hit.as_object_mut() {
-                    let key = match obj.get_mut("zo_sql_key") {
-                        Some(v) => get_string_value(v),
-                        None => "".to_string(),
-                    };
-                    obj.insert("zo_sql_key".to_string(), serde_json::Value::String(key));
-                }
-            });
-
-            // Wrap the hits in a new object structure
-            let values = std::mem::take(&mut search_res.hits);
-            let wrapped_obj = serde_json::json!({
-                "field": field,
-                "values": values
-            });
-            search_res.hits = vec![wrapped_obj];
+            format_values_search_response(&mut search_res, &field);
         }
 
         if !search_res.hits.is_empty() {
@@ -1224,4 +1192,24 @@ pub async fn write_results_to_cache(
     }
 
     Ok(())
+}
+
+fn format_values_search_response(search_res: &mut config::meta::search::Response, field: &str) {
+    search_res.hits.iter_mut().for_each(|hit| {
+        if let Some(obj) = hit.as_object_mut() {
+            let key = match obj.get_mut("zo_sql_key") {
+                Some(v) => get_string_value(v),
+                None => "".to_string(),
+            };
+            obj.insert("zo_sql_key".to_string(), serde_json::Value::String(key));
+        }
+    });
+
+    // Wrap the hits in a new object structure
+    let values = std::mem::take(&mut search_res.hits);
+    let wrapped_obj = serde_json::json!({
+        "field": field,
+        "values": values
+    });
+    search_res.hits = vec![wrapped_obj];
 }
