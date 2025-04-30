@@ -2,11 +2,25 @@ import json
 import websocket
 import uuid
 from datetime import datetime, timezone, timedelta
+import os
+
 
 class WebSocketPage:
-    def __init__(self, ws_url, org_id, access_token: str, cookies: dict):
+    def __init__(self, org_id, access_token: str, cookies: dict, base_url: str = None):
+        # Get WebSocket URL from base_url or environment
+        if base_url:
+            # Convert http to ws
+            ws_url = base_url.replace('http://', 'ws://').replace('https://', 'wss://')
+        else:
+            ws_url = os.environ.get("WS_ZO_BASE_URL")
+            
+        if not ws_url:
+            raise ValueError("WebSocket URL is not set. Either provide base_url or set WS_ZO_BASE_URL environment variable")
+            
         # Generate a dynamic UUID
         connection_uuid = str(uuid.uuid4())
+        # Ensure ws_url ends with a slash
+        ws_url = ws_url.rstrip('/') + '/'
         # Construct the WebSocket URL
         self.url = f"{ws_url}api/{org_id}/ws/v2/{connection_uuid}"
         self.access_token = access_token
@@ -14,17 +28,21 @@ class WebSocketPage:
         self.ws = None
 
     def connect(self):
-        headers = [
-            "Upgrade: websocket",
-            "Cache-Control: no-cache",
-            "Accept-Language: en-US,en;q=0.9",
-            "Pragma: no-cache",
-            f"Cookie: auth_tokens={json.dumps(self.cookies['auth_tokens'])}; _oo_s={self.cookies['_oo_s']}",
-            "Connection: Upgrade",
-            "Sec-WebSocket-Key: str(uuid.uuid4())",
-            "Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits"
-        ]
-        self.ws = websocket.create_connection(self.url, header=headers)
+        cookie_str = "; ".join([f"{k}={v}" for k, v in self.cookies.items()])
+        headers = {
+            "Upgrade": "websocket",
+            "Cache-Control": "no-cache",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Pragma": "no-cache",
+            "Cookie": cookie_str,
+            "Connection": "Upgrade",
+            "Sec-WebSocket-Key": str(uuid.uuid4()),
+            "Sec-WebSocket-Version": "13",
+            "Authorization": self.access_token
+        }
+        print("WebSocket URL:", self.url)
+        print("WebSocket Headers:", headers)
+        self.ws = websocket.create_connection(self.url, header=headers, enable_multithread=True)
 
     def send_search(self, org_id: str, idTrace: str):
 
@@ -38,7 +56,7 @@ class WebSocketPage:
                 "trace_id": idTrace,
                 "payload": {
                     "query": {
-                        "sql": 'SELECT * FROM "default"',
+                        "sql": 'SELECT * FROM "stream_pytest_data"',
                         "start_time": ten_min_ago,
                         "end_time": end_time,
                         "from": 0,
