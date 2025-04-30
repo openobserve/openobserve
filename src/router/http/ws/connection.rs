@@ -512,19 +512,22 @@ impl Connection for QuerierConnection {
                 }
                 Err(e) => {
                     log::error!(
-                        "[WS::QuerierConnection] trace_id: {}, error sending messages via connection {}. Mark the connection disconnected",
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier connection:{}, error: {}",
                         trace_id,
+                        self.querier_name,
                         e
                     );
                     drop(write_guard);
+                    self.clean_up(true, Some(e.to_string())).await;
                     Err(WsError::ConnectionError(format!(
-                        "[WS::QuerierConnection] trace_id: {}, error sending messages via connection {}. Mark the connection disconnected",
-                        trace_id, e
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier connection: {}, error: {}",
+                        trace_id, self.querier_name, e
                     )))
                 }
             }
         } else {
             drop(write_guard);
+            self.clean_up(true, Some("Not connected".into())).await;
             Err(WsError::ConnectionError("Not connected".into()))
         }
     }

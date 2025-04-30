@@ -284,7 +284,7 @@ impl WsHandler {
                                             if let Err(e) = querier_conn.send_message(message).await
                                             {
                                                 log::error!(
-                                                    "[WS::Router::Handler] error forwarding client message via selected querier connection for client_id: {}, trace_id: {}, error: {}", client_id, trace_id, e
+                                                    "[WS::Router::Handler] error forwarding client message via selected querier connection: {}, for client_id: {}, trace_id: {}, error: {}", querier_conn.get_name(), client_id, trace_id, e
                                                 );
                                                 let err_msg = ErrorMessage::new(e, Some(trace_id.clone()), None);
                                                 let should_disconnect = err_msg.should_disconnect;
