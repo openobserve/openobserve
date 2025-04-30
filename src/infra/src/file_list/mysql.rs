@@ -149,7 +149,7 @@ impl super::FileList for MysqlFileList {
                 .join(",");
             let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
             DB_QUERY_NUMS
-                .with_label_values(&["delete_by_ids", "file_list"])
+                .with_label_values(&["delete_by_ids", "file_list", ""])
                 .inc();
             let start = std::time::Instant::now();
             let res = sqlx::query(&query_str).execute(&mut *tx).await;
@@ -1474,7 +1474,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         let pool = CLIENT_RO.clone();
 
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list_jobs"])
+            .with_label_values(&["select", "file_list_jobs", ""])
             .inc();
         let ret = sqlx::query_as::<_, (i64,String, String, i64)>(
             r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = ? AND dumped = ? limit 1000"#,
@@ -1495,7 +1495,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["update", "file_list_jobs"])
+            .with_label_values(&["update", "file_list_jobs", ""])
             .inc();
         sqlx::query(r#"UPDATE file_list_jobs SET dumped = ? WHERE id = ?;"#)
             .bind(dumped)
