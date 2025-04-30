@@ -192,6 +192,13 @@ pub async fn run(
 
     loop {
         if let Some(msg) = msg_stream.next().await {
+            log::info!(
+                "[WS_HANDLER]: Received message for req_id: {}, path: {}, querier: {}",
+                req_id,
+                path,
+                cfg.common.instance_name
+            );
+
             // Update activity and check cookie_expiry on any message
             if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
                 let mut session = session.write().await;
@@ -364,7 +371,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     None,
                     Default::default(),
                 );
-                let _ = send_message(req_id, err_res.to_json()).await;
+                let _ = send_message(req_id, err_res.to_json(), &client_msg.get_trace_id()).await;
                 return;
             }
 
@@ -401,7 +408,12 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                                         Some(search_req.trace_id.to_string()),
                                         Default::default(),
                                     );
-                                    let _ = send_message(req_id, err_res.to_json()).await;
+                                    let _ = send_message(
+                                        req_id,
+                                        err_res.to_json(),
+                                        &search_req.trace_id,
+                                    )
+                                    .await;
                                     return;
                                 }
                             };
@@ -439,7 +451,12 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                                         Some(values_req.trace_id.to_string()),
                                         Default::default(),
                                     );
-                                    let _ = send_message(req_id, err_res.to_json()).await;
+                                    let _ = send_message(
+                                        req_id,
+                                        err_res.to_json(),
+                                        &values_req.trace_id,
+                                    )
+                                    .await;
                                     return;
                                 }
                             };
@@ -470,7 +487,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     log::info!("[WS_HANDLER]: trace_id: {}, Cancelling search", trace_id,);
 
                     let res = handle_cancel(&trace_id, &org_id).await;
-                    let _ = send_message(req_id, res.to_json()).await;
+                    let _ = send_message(req_id, res.to_json(), &trace_id).await;
 
                     // Only used for audit
                     #[cfg(feature = "enterprise")]
@@ -521,7 +538,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         "id": id,
                         "took": delay,
                     });
-                    let _ = send_message(req_id, response.to_string()).await;
+                    let _ = send_message(req_id, response.to_string(), &id).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
                         description: None,
@@ -555,7 +572,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 None,
                 Default::default(),
             );
-            let _ = send_message(req_id, err_res.to_json()).await;
+            let _ = send_message(req_id, err_res.to_json(), "").await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
                 description: None,
@@ -573,22 +590,52 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
     }
 }
 
-pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
+pub async fn send_message(req_id: &str, msg: String, trace_id: &str) -> Result<(), Error> {
+    log::info!(
+        "[WS_HANDLER]: trace_id: {}, req_id: {}, attempt to send message",
+        trace_id,
+        req_id
+    );
     let session = if let Some(session) = sessions_cache_utils::get_session(req_id).await {
         session
     } else {
-        return Err(Error::Message(format!(
-            "[req_id {}] session not found",
+        log::error!(
+            "[WS_HANDLER]: trace_id: {}, req_id: {}, session not found",
+            trace_id,
             req_id
+        );
+        return Err(Error::Message(format!(
+            "[req_id {}, trace_id {}] session not found",
+            req_id, trace_id
         )));
     };
 
+    log::debug!(
+        "[WS_HANDLER]: trace_id: {}, req_id: {}, send message -> attempt to get write lock",
+        trace_id,
+        req_id
+    );
     let mut session = session.write().await;
+    log::debug!(
+        "[WS_HANDLER]: trace_id: {}, req_id: {}, send message -> got write lock",
+        trace_id,
+        req_id
+    );
     let _ = session.text(msg).await.map_err(|e| {
-        log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
+        log::error!(
+            "[WS_HANDLER]: trace_id: {}, req_id: {}, Failed to send message: {:?}",
+            trace_id,
+            req_id,
+            e
+        );
         Error::Message(e.to_string())
     });
     drop(session);
+    log::debug!(
+        "[WS_HANDLER]: trace_id: {}, req_id: {}, send message -> dropped write lock -> success",
+        trace_id,
+        req_id
+    );
     Ok(())
 }
 
@@ -698,6 +745,12 @@ async fn handle_search_event(
                 }
             }
             Err(e) => {
+                log::error!(
+                    "[WS_HANDLER]: trace_id: {}, req_id: {}, Search error: {}",
+                    trace_id,
+                    req_id,
+                    e
+                );
                 let handle_err = async || {
                     let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
 
@@ -736,7 +789,7 @@ async fn handle_search_event(
                             trace_id: trace_id.to_string(),
                             is_success: true,
                         };
-                        let _ = send_message(&req_id, cancel_res.to_json()).await;
+                        let _ = send_message(&req_id, cancel_res.to_json(), &trace_id).await;
                     }
                     _ => handle_err().await,
                 }
@@ -758,7 +811,7 @@ async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<
         Some(trace_id.to_string()),
         Default::default(),
     );
-    let _ = send_message(req_id, err_res.to_json()).await;
+    let _ = send_message(req_id, err_res.to_json(), trace_id).await;
 
     // Close with error
     let close_reason = CloseReason {
@@ -874,7 +927,7 @@ async fn handle_values_event(
                             trace_id: trace_id.to_string(),
                             is_success: true,
                         };
-                        let _ = send_message(&req_id, cancel_res.to_json()).await;
+                        let _ = send_message(&req_id, cancel_res.to_json(), &trace_id).await;
                     }
                     _ => handle_err().await,
                 }

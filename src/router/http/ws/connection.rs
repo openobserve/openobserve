@@ -534,6 +534,10 @@ impl Connection for QuerierConnection {
     }
 
     async fn send_message(&self, message: WsClientEvents) -> WsResult<()> {
+        log::info!(
+            "[WS::QuerierConnection] send_message -> attempt to send for trace_id: {}",
+            message.get_trace_id()
+        );
         let mut write_guard = self.write.write().await;
         if let Some(write) = write_guard.as_mut() {
             let trace_id = message.get_trace_id();
