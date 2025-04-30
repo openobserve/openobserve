@@ -108,6 +108,10 @@ impl WsHandler {
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
 
+        // Client ID clone
+        let client_id_clone = client_id.clone();
+        let client_id_clone1 = client_id.clone();
+
         // Before spawning the async task, clone the drain state
         let is_session_drain_state = session_manager.is_session_drain_state(&client_id).await;
 
@@ -116,38 +120,65 @@ impl WsHandler {
             client_id
         );
 
-        // Spawn message handling tasks between client and router
-        actix_web::rt::spawn(async move {
+        // Spawn a task to handle health check
+        let response_tx_clone = response_tx.clone();
+        let disconnect_tx_clone1 = disconnect_tx.clone();
+        tokio::spawn(async move {
             let mut ping_interval = tokio::time::interval(tokio::time::Duration::from_secs(
                 get_ping_interval_secs_with_jitter() as _,
             ));
-            ping_interval.tick().await; // first tick is immediate
+            ping_interval.tick().await;
 
+            loop {
+                ping_interval.tick().await;
+                if let Err(e) = response_tx_clone.send(WsServerEvents::Ping(vec![])).await {
+                    log::error!(
+                        "[WS::Router::Handler] error sending ping to outgoing thread via response channel for client_id: {}, error: {}",
+                        client_id_clone1,
+                        e
+                    );
+                    if let Err(e) = disconnect_tx_clone1.send(None).await {
+                        log::error!(
+                            "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
+                        );
+                    }
+                    break;
+                }
+            }
+        });
+
+        // Spawn task to handle idle timeout
+        let session_manager_clone = session_manager.clone();
+        let cfg_clone = cfg.clone();
+        let disconnect_tx_clone2 = disconnect_tx.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+                cfg_clone.websocket.session_idle_timeout_secs as _,
+            ));
+            interval.tick().await;
+            loop {
+                interval.tick().await;
+                if session_manager_clone
+                    .reached_max_idle_time(&client_id_clone)
+                    .await
+                {
+                    log::info!("[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown");
+                    if let Err(e) = disconnect_tx_clone2.send(None).await {
+                        log::error!(
+                            "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
+                        );
+                    }
+                    break;
+                }
+            }
+        });
+
+        // Spawn message handling tasks between client and router
+        actix_web::rt::spawn(async move {
             let mut count = 1;
             // Handle incoming messages from client
             let handle_incoming = async {
                 loop {
-                    // _ = tokio::time::sleep(tokio::time::Duration::from_secs(cfg.websocket.
-                    // session_idle_timeout_secs as _ )) => {     // check if
-                    // last_active time is updated by the outgoing thread     if
-                    // session_manager.reached_max_idle_time(&client_id).await {
-                    //         log::info!("[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal
-                    // shutdown");         if let Err(e) =
-                    // disconnect_tx.send(None).await {             log::error!(
-                    //                 "[WS::Router::Handler] Error informing handle_outgoing to
-                    // stop: {e}"             );
-                    //         };
-                    //         break;
-                    //     }
-                    // }
-                    // _ = ping_interval.tick() => {
-                    //     if let Err(e) = response_tx.send(WsServerEvents::Ping(vec![])).await {
-                    //         log::error!("[WS::Router::Handler] error sending ping to outgoing
-                    // thread via response channel for client_id: {}, error: {}", client_id, e);
-                    //         _ = disconnect_tx.send(None).await;
-                    //         break;
-                    //     }
-                    // }
                     if let Some(msg) = msg_stream.next().await {
                         match msg {
                             Err(e) => {
@@ -421,14 +452,8 @@ impl WsHandler {
                             match message {
                                 WsServerEvents::Ping(ping) => {
                                     log::debug!("[WS::Router::Handler]: pinging client_id: {}", client_id);
-                                    if let Err(e) = ws_session.pong(&ping).await {
+                                    if let Err(e) = ws_session.ping(&ping).await {
                                         log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
-                                         // cleanup
-                                        //  if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Close(Some(CloseReason::from(CloseCode::Normal))))).await {
-                                        //      log::error!(
-                                        //          "[WS::Router::Handler] Error informing handle_outgoing to stop for client_id: {}, error: {}", client_id, e
-                                        //      );
-                                        //  }
                                         if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Normal))).await {
                                             log::error!("[WS::Router::Handler]: Error closing websocket session client_id: {}, error: {}", client_id, e);
                                         };
