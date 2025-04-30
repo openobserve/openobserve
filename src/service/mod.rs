@@ -81,14 +81,14 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
             0
         }
     };
-    if db_schema_version == infra::DB_SCHEMA_VERSION {
+    if db_schema_version == config::DB_SCHEMA_VERSION {
         // if version matches, we do not need to run update commands
         log::info!("DB_SCHEMA_VERSION match, skipping db upgrade");
         return Ok(());
     }
     log::info!(
         "DB_SCHEMA_VERSION mismatch : expected {}, found {db_schema_version} ; running db upgrade",
-        infra::DB_SCHEMA_VERSION
+        config::DB_SCHEMA_VERSION
     );
 
     infra::db_init().await?;

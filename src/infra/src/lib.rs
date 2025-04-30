@@ -29,12 +29,9 @@ pub mod schema;
 pub mod storage;
 pub mod table;
 
-pub const DB_SCHEMA_VERSION: u64 = 1;
-const DB_SCHEMA_KEY: &str = "/db_schema_version/";
-
 pub async fn get_db_schema_version() -> Result<u64, anyhow::Error> {
     let db = db::get_db().await;
-    let b = db.get(DB_SCHEMA_KEY).await?;
+    let b = db.get(config::DB_SCHEMA_KEY).await?;
     let s = String::from_utf8_lossy(&b);
     let k = match s.parse::<u64>() {
         Ok(v) => v,
@@ -50,9 +47,9 @@ pub async fn get_db_schema_version() -> Result<u64, anyhow::Error> {
 
 pub async fn set_db_schema_version() -> Result<(), anyhow::Error> {
     let db = db::get_db().await;
-    let s = DB_SCHEMA_VERSION.to_string();
+    let s = config::DB_SCHEMA_VERSION.to_string();
     let b = bytes::Bytes::from_owner(s);
-    db.put(DB_SCHEMA_KEY, b, false, None).await?;
+    db.put(config::DB_SCHEMA_KEY, b, false, None).await?;
     Ok(())
 }
 
