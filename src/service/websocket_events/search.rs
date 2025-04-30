@@ -692,9 +692,9 @@ async fn process_delta(
                 streaming_aggs: is_streaming_aggs,
             };
             log::info!(
-                "[WS_SEARCH]: Processing deltas for trace_id: {}, hits: {:?}",
+                "[WS_SEARCH]: Processing deltas for trace_id: {}, hits len: {}",
                 trace_id,
-                search_res.hits
+                search_res.hits.len()
             );
             log::debug!(
                 "[WS_SEARCH]: Sending search response for trace_id: {}, delta: {:?}, hits len: {}, result_cache_ratio: {}, accumulated_results len: {}",
