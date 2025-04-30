@@ -434,7 +434,7 @@ async fn node_list(
 
     // Configure and populate the response based on environment
     #[cfg(feature = "enterprise")]
-    let response = if get_o2_config().super_cluster.enabled {
+    let mut response = if get_o2_config().super_cluster.enabled {
         // Super cluster is enabled, get nodes from super cluster
         match get_super_cluster_nodes(&_regions).await {
             Ok(response) => response,
@@ -446,7 +446,14 @@ async fn node_list(
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let response = get_local_nodes().await;
+    let mut response = get_local_nodes().await;
+
+    // Sort the nodes by id
+    for region in response.regions.values_mut() {
+        for cluster in region.clusters.values_mut() {
+            cluster.sort_by_key(|node| node.id);
+        }
+    }
 
     // Return the nested response
     Ok(HttpResponse::Ok().json(response))
