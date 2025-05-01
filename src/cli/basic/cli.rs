@@ -23,7 +23,8 @@ use crate::{
         cli::{Cli as dataCli, args as dataArgs},
         export, import,
     },
-    common::{infra::config::USERS, meta, migration},
+    common::{infra::config::USERS, meta},
+    migration,
     service::{compact, db, file_list, users},
 };
 

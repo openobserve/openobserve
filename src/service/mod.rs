@@ -19,7 +19,7 @@ use infra::{
     errors::Result,
 };
 
-use crate::common::migration;
+use crate::migration;
 pub mod alerts;
 pub mod circuit_breaker;
 pub mod cluster_info;
