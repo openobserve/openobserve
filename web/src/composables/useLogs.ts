@@ -1842,7 +1842,6 @@ const useLogs = () => {
             );
           }
           else{
-            console.log('here it is')
             resetHistogramWithError(
               "Histogram unavailable for CTEs, DISTINCT and LIMIT queries",
               -1
@@ -2098,7 +2097,6 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
 
-      console.log(parser.astify(filteredQuery))
       return parser.astify(filteredQuery);
 
       // return convertPostgreToMySql(parser.astify(filteredQuery));
@@ -4600,12 +4598,9 @@ const useLogs = () => {
       if (parsedSQL?.with) {
         let withObj = parsedSQL.with;
         withObj.forEach((obj: any) => {
-          console.log("inside withobj", obj)
           // Map through each "from" array in the _next object, as it can contain multiple tables
           if (obj?.stmt?.from) {
-            console.log(obj.stmt.from, "obj.stmt.from")
             obj?.stmt?.from.forEach((stream: { table: string }) => {
-              console.log(stream.table , "stream");
               newSelectedStreams.push(stream.table);
             }
             );
@@ -5115,12 +5110,13 @@ const useLogs = () => {
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
-    searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
+    if (response.type === "search_response") {
+      
+      searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
       ? searchPartitionMap[payload.traceId]
       : 0;
-    searchPartitionMap[payload.traceId]++;
+      searchPartitionMap[payload.traceId]++;
 
-    if (response.type === "search_response") {
       if (payload.type === "search") {
         handleLogsResponse(
           payload.queryReq,
@@ -5251,16 +5247,10 @@ const useLogs = () => {
             response.content.results.scan_size;
         } else {
           if (response.content?.streaming_aggs) {
-            if (!Object.keys(searchObj.data.queryResults)?.length) {
-              searchObj.data.queryResults = response.content.results;
-            } else {
-              searchObj.data.queryResults.hits = response.content.results.hits;
-              searchObj.data.queryResults.total =
-                response.content.results.total;
-
-              searchObj.data.queryResults.took += response.content.results.took;
-              searchObj.data.queryResults.scan_size +=
-                response.content.results.scan_size;
+            searchObj.data.queryResults = {
+              ...response.content.results,
+              took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
+              scan_size: (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
             }
           } else if (isPagination) {
             searchObj.data.queryResults.hits = response.content.results.hits;
@@ -5608,8 +5598,8 @@ const useLogs = () => {
       processHistogramRequest(payload.queryReq);
     }
 
-    if (payload.type === "search") searchObj.loading = false;
-    if (payload.type === "histogram" || payload.type === "pageCount")
+    if (payload.type === "search" && !response?.content?.should_client_retry) searchObj.loading = false;
+    if ((payload.type === "histogram" || payload.type === "pageCount") && !response?.content?.should_client_retry)
       searchObj.loadingHistogram = false;
 
     searchObj.data.isOperationCancelled = false;

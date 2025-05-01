@@ -35,9 +35,9 @@ pub async fn grpc_search(
     stream_type: StreamType,
     user_id: Option<String>,
     in_req: &search::Request,
-    node_group: Option<RoleGroup>,
+    role_group: Option<RoleGroup>,
 ) -> Result<search::Response, Error> {
-    let mut nodes = infra_cluster::get_cached_online_querier_nodes(node_group)
+    let mut nodes = infra_cluster::get_cached_online_querier_nodes(role_group)
         .await
         .unwrap_or_default();
     // sort nodes by node_id this will improve hit cache ratio
@@ -107,9 +107,9 @@ pub async fn grpc_search_multi(
     stream_type: StreamType,
     user_id: Option<String>,
     in_req: &search::MultiStreamRequest,
-    node_group: Option<RoleGroup>,
+    role_group: Option<RoleGroup>,
 ) -> Result<search::Response, Error> {
-    let mut nodes = infra_cluster::get_cached_online_querier_nodes(node_group)
+    let mut nodes = infra_cluster::get_cached_online_querier_nodes(role_group)
         .await
         .unwrap_or_default();
     // sort nodes by node_id this will improve hit cache ratio
@@ -178,10 +178,10 @@ pub async fn grpc_search_partition(
     org_id: &str,
     stream_type: StreamType,
     in_req: &search::SearchPartitionRequest,
-    node_group: Option<RoleGroup>,
+    role_group: Option<RoleGroup>,
     skip_max_query_range: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
-    let mut nodes = infra_cluster::get_cached_online_querier_nodes(node_group)
+    let mut nodes = infra_cluster::get_cached_online_querier_nodes(role_group)
         .await
         .unwrap_or_default();
     // sort nodes by node_id this will improve hit cache ratio

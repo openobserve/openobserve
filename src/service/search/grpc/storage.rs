@@ -386,7 +386,7 @@ pub async fn search(
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
-async fn cache_files(
+pub async fn cache_files(
     trace_id: &str,
     files: &[(&str, i64)],
     scan_stats: &mut ScanStats,
@@ -442,8 +442,7 @@ async fn cache_files(
     tokio::spawn(async move {
         let files_num = files.len();
         for (file, size) in files {
-            if let Err(e) = job::queue_background_download(&trace_id, &file, size, cache_type).await
-            {
+            if let Err(e) = job::queue_download(&file, size, cache_type).await {
                 log::error!(
                     "[trace_id {trace_id}] error in queuing file {file} for background download: {e}"
                 );

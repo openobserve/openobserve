@@ -246,6 +246,9 @@ pub async fn search(
                             | search::SearchEventType::Dashboards
                             | search::SearchEventType::Values
                             | search::SearchEventType::Other
+                            // Alerts search now uses grpc cache::search which does report usage
+                            | search::SearchEventType::Alerts
+                            | search::SearchEventType::DerivedStream
                     ) {
                         (false, None, None)
                     } else {
@@ -638,6 +641,7 @@ pub async fn search_partition(
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
+                trace_id,
                 &sql.org_id,
                 stream_type,
                 &stream_name,

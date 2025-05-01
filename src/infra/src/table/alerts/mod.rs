@@ -18,8 +18,7 @@ use std::str::FromStr;
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use config::meta::{
     alerts::{
-        ConditionList as MetaConditionList, QueryCondition as MetaQueryCondition,
-        TriggerCondition as MetaTriggerCondition,
+        QueryCondition as MetaQueryCondition, TriggerCondition as MetaTriggerCondition,
         alert::{Alert as MetaAlert, ListAlertsParams},
     },
     folder::{Folder as MetaFolder, FolderType},
@@ -74,7 +73,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .context_attributes
             .map(serde_json::from_value)
             .transpose()?;
-        let query_conditions: Option<MetaConditionList> = value
+        let query_conditions: Option<Vec<intermediate::QueryCondition>> = value
             .query_conditions
             .map(serde_json::from_value)
             .transpose()?;
@@ -116,7 +115,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.updated_at = updated_at_utc;
         alert.query_condition = MetaQueryCondition {
             query_type: query_type.into(),
-            conditions: query_conditions,
+            conditions: query_conditions.map(|cs| cs.into_iter().map(|c| c.into()).collect()),
             sql: value.query_sql,
             promql: value.query_promql,
             promql_condition: query_promql_condition.map(|c| c.into()),
@@ -594,6 +593,11 @@ fn update_mutable_fields(
     let query_conditions = alert
         .query_condition
         .conditions
+        .map(|cs| {
+            cs.into_iter()
+                .map(intermediate::QueryCondition::from)
+                .collect_vec()
+        })
         .map(serde_json::to_value)
         .transpose()?;
     let query_sql = alert.query_condition.sql.filter(|s| !s.is_empty());

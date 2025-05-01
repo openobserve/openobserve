@@ -21,16 +21,16 @@ use config::{
         websocket::{SearchResultType, ValuesEventReq},
     },
 };
+use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
 use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::utils::stream::get_max_query_range,
-    handler::http::request::{
-        search::build_search_request_per_field, ws_v2::session::send_message,
-    },
+    handler::http::request::{search::build_search_request_per_field, ws::session::send_message},
     service::{
         search::{cache, sql::Sql},
+        setup_tracing_with_trace_id,
         websocket_events::{
             WsServerEvents,
             search::{
@@ -46,7 +46,9 @@ pub async fn handle_values_request(
     request_id: &str,
     req: ValuesEventReq,
     accumulated_results: &mut Vec<SearchResultType>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), infra::errors::Error> {
+    let mut start_timer = std::time::Instant::now();
+
     let cfg = get_config();
     let trace_id = req.trace_id.clone();
     let stream_type = req.stream_type;
@@ -55,6 +57,13 @@ pub async fn handle_values_request(
     let end_time = payload.end_time;
     let stream_name = payload.stream_name.clone();
     let no_count = payload.no_count;
+
+    // Setup tracing
+    let ws_values_span = setup_tracing_with_trace_id(
+        &trace_id,
+        tracing::info_span!("service:websocket_events:values:handle_values_request"),
+    )
+    .await;
 
     log::info!(
         "[WS_VALUES] trace_id: {} Received values request, start_time: {}, end_time: {}",
@@ -87,7 +96,9 @@ pub async fn handle_values_request(
     let top_k = payload.size.or(Some(cfg.limit.query_default_limit));
 
     // get values req query
-    let reqs = build_search_request_per_field(&payload, org_id, stream_type, &stream_name).await?;
+    let reqs = build_search_request_per_field(&payload, org_id, stream_type, &stream_name)
+        .instrument(ws_values_span.clone())
+        .await?;
 
     for (search_req, stream_type, field) in reqs {
         // Convert the request query to SearchQuery type if needed
@@ -105,6 +116,7 @@ pub async fn handle_values_request(
                 &search_req,
                 search_req.use_cache.unwrap_or(false),
             )
+            .instrument(ws_values_span.clone())
             .await?;
             let local_c_resp = c_resp.clone();
             let cached_resp = local_c_resp.cached_response;
@@ -180,7 +192,9 @@ pub async fn handle_values_request(
                     max_query_range,
                     remaining_query_range,
                     &order_by,
+                    &mut start_timer,
                 )
+                .instrument(ws_values_span.clone())
                 .await?;
             } else {
                 // Step 2: Search without cache
@@ -219,7 +233,10 @@ pub async fn handle_values_request(
                     user_id,
                     accumulated_results,
                     max_query_range,
+                    &mut start_timer,
+                    &order_by,
                 )
+                .instrument(ws_values_span.clone())
                 .await?;
             }
             // Step 3: Write to results cache
@@ -230,6 +247,7 @@ pub async fn handle_values_request(
                 let safe_end_time = end_time.unwrap_or(0);
 
                 write_results_to_cache(c_resp, safe_start_time, safe_end_time, accumulated_results)
+                    .instrument(ws_values_span.clone())
                     .await
                     .map_err(|e| {
                         log::error!(
@@ -237,7 +255,7 @@ pub async fn handle_values_request(
                             trace_id,
                             e
                         );
-                        anyhow::anyhow!("Error writing results to cache: {}", e)
+                        e
                     })?;
             }
         } else {
@@ -272,7 +290,10 @@ pub async fn handle_values_request(
                 user_id,
                 accumulated_results,
                 max_query_range,
+                &mut start_timer,
+                &order_by,
             )
+            .instrument(ws_values_span.clone())
             .await?;
         }
     }

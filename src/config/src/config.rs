@@ -1073,6 +1073,14 @@ pub struct Common {
     pub min_auto_refresh_interval: u32,
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_ENABLED", default = false)]
+    pub file_list_dump_enabled: bool,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]
+    pub file_list_dump_dual_write: bool,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_MIN_HOUR", default = 2)]
+    pub file_list_dump_min_hour: usize,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
+    pub file_list_dump_debug_check: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1406,6 +1414,12 @@ pub struct Limit {
         help = "Duration of each mini search partition in seconds"
     )]
     pub search_mini_partition_duration_secs: u64,
+    #[env_config(
+        name = "ZO_HISTOGRAM_ENABLED",
+        help = "Show histogram for logs page",
+        default = true
+    )]
+    pub histogram_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1477,6 +1491,8 @@ pub struct CacheLatestFiles {
     pub cache_index: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DELETE_MERGE_FILES", default = false)]
     pub delete_merge_files: bool,
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
+    pub download_from_node: bool,
 }
 
 #[derive(EnvConfig)]
@@ -2142,6 +2158,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     {
         cfg.common.feature_join_right_side_max_rows = 50_000;
     }
+
+    // debug check is useful only when dual write is enabled. Otherwise it will raise error
+    // incorrectly each time
+    cfg.common.file_list_dump_debug_check =
+        cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
 
     Ok(())
 }

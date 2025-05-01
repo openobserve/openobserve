@@ -25,9 +25,9 @@ use config::{
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
     },
-    utils::json::{Map, Value},
+    utils::json::{Map, Value, get_string_value},
 };
-use infra::errors::{Error, ErrorCodes};
+use infra::errors::Error;
 use tracing::Instrument;
 
 use super::sort::order_search_results;
@@ -43,17 +43,19 @@ use crate::{
             },
         },
     },
-    handler::http::request::ws_v2::session::send_message,
+    handler::http::request::ws::session::send_message,
     service::{
         search::{
             self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
             sql::Sql,
         },
-        websocket_events::{TimeOffset, WsServerEvents, search_registry_utils},
+        setup_tracing_with_trace_id,
+        websocket_events::{TimeOffset, WsServerEvents, calculate_progress_percentage},
     },
 };
 
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "service:websocket_events:search::handle_cancel", skip_all)]
 pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     match crate::service::search::cancel_query(org_id, trace_id).await {
         Ok(ret) => {
@@ -88,6 +90,8 @@ pub async fn handle_search_request(
     user_id: &str,
     mut req: SearchEventReq,
 ) -> Result<(), Error> {
+    let mut start_timer = Instant::now();
+
     let cfg = get_config();
     let trace_id = req.trace_id.clone();
     let stream_type = req.stream_type;
@@ -100,6 +104,13 @@ pub async fn handle_search_request(
         start_time,
         end_time
     );
+
+    // Setup tracing
+    let ws_search_span = setup_tracing_with_trace_id(
+        &req.trace_id,
+        tracing::info_span!("service:websocket_events:search:handle_search_request"),
+    )
+    .await;
 
     // check and append search event type
     if req.payload.search_type.is_none() {
@@ -173,7 +184,7 @@ pub async fn handle_search_request(
             interval
         );
     }
-    let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
+    let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 
     // Search start
     log::info!(
@@ -181,10 +192,24 @@ pub async fn handle_search_request(
         req.trace_id,
         req_size
     );
+
+    // Send initial progress update
+    send_message(
+        req_id,
+        WsServerEvents::EventProgress {
+            trace_id: trace_id.to_string(),
+            percent: 0,
+            event_type: req.event_type().to_string(),
+        }
+        .to_json(),
+    )
+    .await?;
+
     // Step 1: Search result cache
     if req.payload.query.from == 0 {
         let c_resp =
             cache::check_cache_v2(&trace_id, org_id, stream_type, &req.payload, req.use_cache)
+                .instrument(ws_search_span.clone())
                 .await?;
         let local_c_resp = c_resp.clone();
         let cached_resp = local_c_resp.cached_response;
@@ -240,8 +265,10 @@ pub async fn handle_search_request(
                 user_id,
                 max_query_range,
                 remaining_query_range,
-                &order_by,
+                &req_order_by,
+                &mut start_timer,
             )
+            .instrument(ws_search_span.clone())
             .await?;
         } else {
             // Step 2: Search without cache
@@ -261,13 +288,17 @@ pub async fn handle_search_request(
                 user_id,
                 accumulated_results,
                 max_query_range,
+                &mut start_timer,
+                &req_order_by,
             )
+            .instrument(ws_search_span.clone())
             .await?;
         }
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
         if req.payload.query.from == 0 {
             write_results_to_cache(c_resp, start_time, end_time, accumulated_results)
+                .instrument(ws_search_span.clone())
                 .await
                 .map_err(|e| {
                     log::error!(
@@ -275,7 +306,7 @@ pub async fn handle_search_request(
                         trace_id,
                         e
                     );
-                    Error::Message(e.to_string())
+                    e
                 })?;
         }
     } else {
@@ -291,7 +322,10 @@ pub async fn handle_search_request(
             user_id,
             accumulated_results,
             max_query_range,
+            &mut start_timer,
+            &req_order_by,
         )
+        .instrument(ws_search_span)
         .await?;
     }
 
@@ -305,17 +339,12 @@ pub async fn handle_search_request(
     Ok(())
 }
 
+#[tracing::instrument(name = "service:search:websocket::do_search", skip_all)]
 async fn do_search(
     req: &SearchEventReq,
     user_id: &str,
     use_cache: bool,
 ) -> Result<Response, Error> {
-    let span = tracing::info_span!(
-        "src::handler::http::request::websocket::search::do_search",
-        trace_id = %req.trace_id,
-        org_id = %req.org_id,
-    );
-
     let mut req = req.clone();
     req.payload.use_cache = Some(use_cache);
     let res = SearchService::cache::search(
@@ -326,7 +355,6 @@ async fn do_search(
         &req.payload,
         "".to_string(),
     )
-    .instrument(span)
     .await;
 
     res.map(handle_partial_response)
@@ -345,6 +373,10 @@ fn handle_partial_response(mut res: Response) -> Response {
     res
 }
 
+#[tracing::instrument(
+    name = "service:search:websocket::handle_cache_responses_and_deltas",
+    skip_all
+)]
 #[allow(clippy::too_many_arguments)]
 pub async fn handle_cache_responses_and_deltas(
     req_id: &str,
@@ -357,16 +389,20 @@ pub async fn handle_cache_responses_and_deltas(
     user_id: &str,
     max_query_range: i64,
     remaining_query_range: i64,
-    mut order_by: &OrderBy,
+    req_order_by: &OrderBy,
+    start_timer: &mut Instant,
 ) -> Result<(), Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
-    if req.search_type == SearchEventType::Dashboards || req.payload.query.size == -1 {
-        order_by = &OrderBy::Desc;
-    }
+    let cache_order_by =
+        if req.search_type == SearchEventType::Dashboards || req.payload.query.size == -1 {
+            &OrderBy::Desc
+        } else {
+            req_order_by
+        };
 
     // sort both deltas and cache by order_by
-    match order_by {
+    match cache_order_by {
         OrderBy::Desc => {
             deltas.sort_by(|a, b| b.delta_start_time.cmp(&a.delta_start_time));
             cached_resp.sort_by(|a, b| b.response_start_time.cmp(&a.response_start_time));
@@ -395,7 +431,7 @@ pub async fn handle_cache_responses_and_deltas(
     let cached_search_duration = cache_duration + (max_query_range * 3600 * 1_000_000); // microseconds
 
     log::info!(
-        "[WS_SEARCH] trace_id: {}, Handling cache response and deltas, curr_res_size: {}, cached_search_duration: {}, remaining_query_duration: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}, deltas: {:?}",
+        "[WS_SEARCH] trace_id: {}, Handling cache response and deltas, curr_res_size: {}, cached_search_duration: {}, remaining_query_duration: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}",
         trace_id,
         curr_res_size,
         cached_search_duration,
@@ -403,7 +439,6 @@ pub async fn handle_cache_responses_and_deltas(
         deltas.len(),
         cache_start_time,
         cache_end_time,
-        deltas
     );
 
     // Process cached responses and deltas in sorted order
@@ -417,7 +452,7 @@ pub async fn handle_cache_responses_and_deltas(
                 cached.response_end_time,
             );
             // Compare delta and cached response based on the order
-            let process_delta_first = match order_by {
+            let process_delta_first = match cache_order_by {
                 OrderBy::Asc => delta.delta_end_time <= cached.response_start_time,
                 OrderBy::Desc => delta.delta_start_time >= cached.response_end_time,
             };
@@ -426,7 +461,7 @@ pub async fn handle_cache_responses_and_deltas(
                 log::info!(
                     "[WS_SEARCH] trace_id: {} Processing delta before cached response, order_by: {:#?}",
                     trace_id,
-                    order_by
+                    cache_order_by
                 );
                 process_delta(
                     req_id,
@@ -439,6 +474,8 @@ pub async fn handle_cache_responses_and_deltas(
                     user_id,
                     &mut remaining_query_range,
                     cached_search_duration,
+                    start_timer,
+                    cache_order_by,
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -446,12 +483,15 @@ pub async fn handle_cache_responses_and_deltas(
                 // Send cached response
                 send_cached_responses(
                     req_id,
+                    req,
                     &trace_id,
                     req_size,
                     cached,
                     accumulated_results,
                     &mut curr_res_size,
                     req.fallback_order_by_col.clone(),
+                    cache_order_by,
+                    start_timer,
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -473,6 +513,8 @@ pub async fn handle_cache_responses_and_deltas(
                 user_id,
                 &mut remaining_query_range,
                 cached_search_duration,
+                start_timer,
+                cache_order_by,
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -480,12 +522,15 @@ pub async fn handle_cache_responses_and_deltas(
             // Process remaining cached responses
             send_cached_responses(
                 req_id,
+                req,
                 &trace_id,
                 req_size,
                 cached,
                 accumulated_results,
                 &mut curr_res_size,
                 req.fallback_order_by_col.clone(),
+                cache_order_by,
+                start_timer,
             )
             .await?;
         }
@@ -517,6 +562,8 @@ async fn process_delta(
     user_id: &str,
     remaining_query_range: &mut f64,
     cache_req_duration: i64,
+    start_timer: &mut Instant,
+    cache_order_by: &OrderBy,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
@@ -524,7 +571,7 @@ async fn process_delta(
         delta
     );
     let mut req = req.clone();
-    let _original_req_start_time = req.payload.query.start_time;
+    let original_req_start_time = req.payload.query.start_time;
     let original_req_end_time = req.payload.query.end_time;
     req.payload.query.start_time = delta.delta_start_time;
     req.payload.query.end_time = delta.delta_end_time;
@@ -556,17 +603,6 @@ async fn process_delta(
     }
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
-        // Check if the cancellation flag is set
-        if let Some(is_cancelled) = search_registry_utils::is_cancelled(&trace_id).await {
-            if is_cancelled {
-                // Search is cancelled, stop processing
-                return Ok(());
-            }
-        } else {
-            // Search not found in registry, stop processing
-            return Ok(());
-        }
-
         let mut req = req.clone();
         req.payload.query.start_time = start_time;
         req.payload.query.end_time = end_time;
@@ -580,18 +616,22 @@ async fn process_delta(
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
-            "[WS_SEARCH]: Found {} hits, hits: {:#?}, for trace_id: {}",
+            "[WS_SEARCH]: Found {} hits, for trace_id: {}",
             search_res.hits.len(),
-            search_res.hits,
             trace_id
         );
 
         if !search_res.hits.is_empty() {
-            search_res = order_search_results(search_res, req.fallback_order_by_col);
+            search_res = order_search_results(search_res, req.fallback_order_by_col.clone());
             // for every partition, compute the queried range omitting the result cache ratio
             let queried_range =
                 calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
             *remaining_query_range -= queried_range;
+
+            // set took
+            search_res.set_took(start_timer.elapsed().as_millis() as usize);
+            // reset start timer
+            *start_timer = Instant::now();
 
             // when searching with limit queries
             // the limit in sql takes precedence over the requested size
@@ -621,8 +661,9 @@ async fn process_delta(
 
             if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
                 log::debug!("Getting top k values for partition {idx}");
+                let values_event_context = req.values_event_context.clone().unwrap();
                 let top_k_values = tokio::task::spawn_blocking(move || {
-                    get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
+                    get_top_k_values(&search_res.hits, &values_event_context)
                 })
                 .await
                 .unwrap();
@@ -678,6 +719,27 @@ async fn process_delta(
             break;
         }
 
+        // Send progress update
+        {
+            let percent = calculate_progress_percentage(
+                start_time,
+                end_time,
+                original_req_start_time,
+                original_req_end_time,
+                cache_order_by,
+            );
+            send_message(
+                req_id,
+                WsServerEvents::EventProgress {
+                    trace_id: trace_id.to_string(),
+                    percent,
+                    event_type: req.event_type().to_string(),
+                }
+                .to_json(),
+            )
+            .await?;
+        }
+
         // Stop if reached the request result size
         if req_size != -1 && *curr_res_size >= req_size {
             log::info!(
@@ -729,34 +791,19 @@ async fn get_partitions(
     Ok(res)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_cached_responses(
     req_id: &str,
+    req: &SearchEventReq,
     trace_id: &str,
     req_size: i64,
     cached: &CachedQueryResponse,
     accumulated_results: &mut Vec<SearchResultType>,
     curr_res_size: &mut i64,
     fallback_order_by_col: Option<String>,
+    cache_order_by: &OrderBy,
+    start_timer: &mut Instant,
 ) -> Result<(), Error> {
-    if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id).await {
-        if is_cancelled {
-            log::info!(
-                "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping cached response",
-                trace_id
-            );
-            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-                "Search cancel detected for trace_id: {}",
-                trace_id
-            ))));
-        };
-    } else {
-        // Search not found in registry, stop processing
-        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-            "Search cancel detected for trace_id: {}",
-            trace_id
-        ))));
-    }
-
     log::info!(
         "[WS_SEARCH]: Processing cached response for trace_id: {}",
         trace_id
@@ -788,6 +835,13 @@ async fn send_cached_responses(
     // `scan_size` is 0, as it is not used for cached responses
     cached.cached_response.scan_size = 0;
 
+    // set took
+    cached
+        .cached_response
+        .set_took(start_timer.elapsed().as_millis() as usize);
+    // reset start timer
+    *start_timer = Instant::now();
+
     // Send the cached response
     let ws_search_res = WsServerEvents::SearchResponse {
         trace_id: trace_id.to_string(),
@@ -807,10 +861,32 @@ async fn send_cached_responses(
     );
     send_message(req_id, ws_search_res.to_json()).await?;
 
+    // Send progress update
+    {
+        let percent = calculate_progress_percentage(
+            cached.response_start_time,
+            cached.response_end_time,
+            req.payload.query.start_time,
+            req.payload.query.end_time,
+            cache_order_by,
+        );
+        send_message(
+            req_id,
+            WsServerEvents::EventProgress {
+                trace_id: trace_id.to_string(),
+                percent,
+                event_type: req.event_type().to_string(),
+            }
+            .to_json(),
+        )
+        .await?;
+    }
+
     Ok(())
 }
 
 // Do partitioned search without cache
+#[tracing::instrument(name = "service:search:websocket::do_partitioned_search", skip_all)]
 #[allow(clippy::too_many_arguments)]
 pub async fn do_partitioned_search(
     req_id: &str,
@@ -820,6 +896,8 @@ pub async fn do_partitioned_search(
     user_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
     max_query_range: i64, // hours
+    start_timer: &mut Instant,
+    req_order_by: &OrderBy,
 ) -> Result<(), Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -857,9 +935,13 @@ pub async fn do_partitioned_search(
         req.payload.query.streaming_id = partition_resp.streaming_id.clone();
     }
 
+    // The order by for the partitions is the same as the order by in the query
+    // unless the query is a dashboard or histogram
+    let mut partition_order_by = req_order_by;
     // sort partitions in desc by _timestamp for dashboards & histograms
     if req.search_type == SearchEventType::Dashboards || req.payload.query.size == -1 {
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
+        partition_order_by = &OrderBy::Desc;
     }
 
     let mut curr_res_size = 0;
@@ -872,20 +954,6 @@ pub async fn do_partitioned_search(
     );
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
-        // Check if the cancellation flag is set
-        if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id).await {
-            if is_cancelled {
-                log::info!(
-                    "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping partitioned search",
-                    trace_id
-                );
-                return Ok(());
-            }
-        } else {
-            // Search not found in registry, stop processing
-            return Ok(());
-        }
-
         let mut req = req.clone();
         req.payload.query.start_time = start_time;
         req.payload.query.end_time = end_time;
@@ -900,6 +968,11 @@ pub async fn do_partitioned_search(
 
         if !search_res.hits.is_empty() {
             search_res = order_search_results(search_res, req.fallback_order_by_col);
+
+            // set took
+            search_res.set_took(start_timer.elapsed().as_millis() as usize);
+            // reset start time
+            *start_timer = Instant::now();
 
             // check range error
             if !range_error.is_empty() {
@@ -925,10 +998,15 @@ pub async fn do_partitioned_search(
             }
 
             if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
+                let ws_search_span = tracing::info_span!(
+                    "src::service::websocket_events::search::do_partitioned_search::get_top_k_values",
+                    org_id = %req.org_id,
+                );
                 let instant = Instant::now();
                 let top_k_values = tokio::task::spawn_blocking(move || {
                     get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
                 })
+                .instrument(ws_search_span.clone())
                 .await
                 .unwrap();
                 search_res.hits = top_k_values?;
@@ -949,33 +1027,35 @@ pub async fn do_partitioned_search(
             send_message(req_id, ws_search_res.to_json()).await?;
         }
 
-        // Stop if reached the requested result size
-        if req_size != -1 && curr_res_size >= req_size {
+        // Send progress update
+        {
+            let percent = calculate_progress_percentage(
+                start_time,
+                end_time,
+                modified_start_time,
+                modified_end_time,
+                partition_order_by,
+            );
+            send_message(
+                req_id,
+                WsServerEvents::EventProgress {
+                    trace_id: trace_id.to_string(),
+                    percent,
+                    event_type: "search".to_string(),
+                }
+                .to_json(),
+            )
+            .await?;
+        }
+
+        // Stop if reached the requested result size and it is not a streaming aggs query
+        if req_size != -1 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
                 "[WS_SEARCH]: Reached requested result size ({}), stopping search",
                 req_size
             );
             break;
         }
-    }
-
-    if curr_res_size == 0 {
-        log::info!(
-            "[WS_SEARCH]: No hits found for trace_id: {}, partitions: {:#?}",
-            trace_id,
-            &partitions
-        );
-        // send empty response
-        let ws_search_res = WsServerEvents::SearchResponse {
-            trace_id: trace_id.to_string(),
-            results: Box::new(Response::default()),
-            time_offset: TimeOffset {
-                start_time: req.payload.query.start_time,
-                end_time: req.payload.query.end_time,
-            },
-            streaming_aggs: is_streaming_aggs,
-        };
-        send_message(req_id, ws_search_res.to_json()).await?;
     }
 
     // Remove the streaming_aggs cache
@@ -1028,6 +1108,10 @@ async fn send_partial_search_resp(
     Ok(())
 }
 
+#[tracing::instrument(
+    name = "service:websocket_events:search::write_results_to_cache",
+    skip_all
+)]
 pub async fn write_results_to_cache(
     c_resp: MultiCachedQueryResponse,
     start_time: i64,
@@ -1115,7 +1199,7 @@ pub async fn write_results_to_cache(
 }
 
 /// This function will compute top k values for values request
-/// This is a com
+#[tracing::instrument(name = "service:websocket_events:search::get_top_k_values", skip_all)]
 pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<Vec<Value>, Error> {
     let mut top_k_values: Vec<Value> = Vec::new();
 
@@ -1129,9 +1213,9 @@ pub fn get_top_k_values(hits: &Vec<Value>, ctx: &ValuesEventContext) -> Result<V
 
     let mut search_result_hits = Vec::new();
     for hit in hits {
-        let key = hit
+        let key: String = hit
             .get("zo_sql_key")
-            .and_then(|v| v.as_str().map(|s| s.to_string()))
+            .map(get_string_value)
             .unwrap_or_default();
         let num = hit
             .get("zo_sql_num")

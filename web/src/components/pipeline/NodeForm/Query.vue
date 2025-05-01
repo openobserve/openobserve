@@ -42,7 +42,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
             v-model:promql="streamRoute.query_condition.promql"
-            v-model:promql_condition="streamRoute.query_condition.promql_condition"
+            v-model:delay="streamRoute.delay"
+            v-model:promql_condition="
+              streamRoute.query_condition.promql_condition
+            "
             v-model:query_type="streamRoute.query_condition.type"
             v-model:aggregation="streamRoute.query_condition.aggregation"
             v-model:stream_type="streamRoute.stream_type"
@@ -54,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:fullscreen="updateFullscreenMode"
             @update:stream_type="updateStreamType"
             @expandLog="toggleExpandLog"
+            @update:delay="updateDelay"
             class="q-mt-sm"
           />
         </div>
@@ -78,7 +82,7 @@ import {
   onActivated,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { getUUID } from "@/utils/zincutils";
+import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -125,6 +129,7 @@ interface StreamRoute {
     cron: string;
     timezone: any;
   };
+  delay: number;
   context_attributes: any;
   description: string;
   enabled: boolean;
@@ -238,6 +243,7 @@ const getDefaultStreamRoute: any = () => {
       frequency: frequency <= 15 ? 15 : frequency,
       timezone: "UTC",
     },
+    delay: 0,
     context_attributes: [
       {
         key: "",
@@ -251,7 +257,6 @@ const getDefaultStreamRoute: any = () => {
 };
 
 onMounted(() => {
-  
   if (pipelineObj.isEditNode) {
     streamRoute.value = pipelineObj.currentSelectedNodeData
       ?.data as StreamRoute;
@@ -379,6 +384,7 @@ const saveQueryData = async () => {
       formData.trigger_condition.period,
     );
   }
+
   let queryPayload: any = {
     node_type: "query", // required
     stream_type: formData.stream_type, // required
@@ -405,7 +411,14 @@ const saveQueryData = async () => {
       silence: 0,
       timezone: formData.trigger_condition.timezone,
     },
+    delay: formData.delay,
   };
+
+  if (formData.trigger_condition.frequency_type === "cron") {
+    queryPayload.tz_offset =
+      getTimezoneOffset(formData.trigger_condition.timezone) || 0;
+  }
+
   if (formData.query_condition.type == "promql") {
     if (queryPayload?.query_condition) {
       queryPayload.query_condition.sql = "";
@@ -479,8 +492,8 @@ const validateSqlQuery = () => {
 
   query.query.sql = streamRoute.value.query_condition.sql;
 
-  //removed the encoding as it is not required for the pipeline queries 
-  if(store.state.zoConfig.sql_base64_enabled && query?.encoding){
+  //removed the encoding as it is not required for the pipeline queries
+  if (store.state.zoConfig.sql_base64_enabled && query?.encoding) {
     delete query.encoding;
   }
 
@@ -527,6 +540,10 @@ const updateQueryType = (val: string) => {
 
 const toggleExpandLog = (index: number) => {
   expandedLogs.value = [];
+};
+
+const updateDelay = (val: any) => {
+  streamRoute.value.delay = parseInt(val);
 };
 </script>
 
