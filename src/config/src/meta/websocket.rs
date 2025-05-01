@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::meta::search::{Response, SearchEventContext, ValuesEventContext};
 
 pub const MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE: &str = "Reached Max query range limit.";
+pub const SERVER_HEALTH_CHECK_PING_MSG: &[u8] = b"server_health_check";
 
 pub enum SearchResultType {
     Cached(Response),

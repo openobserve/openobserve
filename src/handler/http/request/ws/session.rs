@@ -16,20 +16,17 @@
 use std::time::Duration;
 
 use actix_http::ws::{CloseCode, CloseReason};
-use actix_ws::{AggregatedMessageStream, Session};
 use config::{
     get_config,
     meta::websocket::{SearchEventReq, SearchResultType, ValuesEventReq},
-    utils::time::now_micros,
 };
-use futures::StreamExt;
 use infra::errors::{self, Error};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, ResponseMeta},
     infra::config::get_config as get_o2_config,
 };
-use rand::prelude::SliceRandom;
+use tokio::sync::mpsc::Sender;
 use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
@@ -42,95 +39,11 @@ use crate::{
     common::utils::websocket::get_ping_interval_secs_with_jitter,
     service::websocket_events::{
         WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
-        sessions_cache_utils, setup_tracing_with_trace_id,
+        setup_tracing_with_trace_id,
     },
 };
 
-// Do not clone the session, instead use a reference to the session
-pub struct WsSession {
-    inner: Option<Session>,
-    // Utc timestamp in microseconds
-    last_activity_ts: i64,
-    // Utc timestamp in microseconds
-    created_ts: i64,
-    // Utc timestamp in microseconds
-    cookie_expiry: Option<i64>,
-}
-
-impl WsSession {
-    pub fn new(inner: Session, cookie_expiry: Option<i64>) -> Self {
-        let now = now_micros();
-        Self {
-            inner: Some(inner),
-            last_activity_ts: now,
-            created_ts: now,
-            cookie_expiry,
-        }
-    }
-
-    pub fn update_activity(&mut self) {
-        self.last_activity_ts = now_micros();
-    }
-
-    pub fn is_expired(&self) -> bool {
-        let cfg = get_config();
-        let now = now_micros();
-        let idle_timeout_micros = cfg.websocket.session_idle_timeout_secs * 1_000_000;
-        let max_lifetime_micros = cfg.websocket.session_max_lifetime_secs * 1_000_000;
-
-        // 1. if the session has been idle for too long
-        // 2. if the session has exceeded the max lifetime
-        (now - self.last_activity_ts) > idle_timeout_micros
-            || (now - self.created_ts) > max_lifetime_micros
-    }
-
-    pub fn is_client_cookie_valid(&self) -> bool {
-        let now = now_micros();
-        self.cookie_expiry.is_none_or(|expiry| expiry > now)
-    }
-
-    /// Send a text message to the client
-    pub async fn text(&mut self, msg: String) -> Result<(), actix_ws::Closed> {
-        self.update_activity();
-        if let Some(ref mut session) = self.inner {
-            session.text(msg).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-
-    /// Close the session with a reason
-    pub async fn close(&mut self, reason: Option<CloseReason>) -> Result<(), actix_ws::Closed> {
-        self.update_activity();
-        if let Some(session) = self.inner.take() {
-            session.close(reason).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-
-    /// Send a pong response
-    pub async fn pong(&mut self, payload: &[u8]) -> Result<(), actix_ws::Closed> {
-        self.update_activity();
-        if let Some(ref mut session) = self.inner {
-            session.pong(payload).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-
-    /// Send a ping request
-    pub async fn ping(&mut self, payload: &[u8]) -> Result<(), actix_ws::Closed> {
-        self.update_activity();
-        if let Some(ref mut session) = self.inner {
-            session.ping(payload).await
-        } else {
-            Err(actix_ws::Closed)
-        }
-    }
-}
-
-pub async fn health_check(req_id: String) {
+pub async fn health_check(req_id: String, response_tx: Sender<WsServerEvents>) {
     let cfg = get_config();
     log::info!(
         "[WS_HANDLER]: Starting health check for req_id: {}, querier: {}",
@@ -144,173 +57,16 @@ pub async fn health_check(req_id: String) {
     ping_interval.tick().await;
     loop {
         ping_interval.tick().await;
-        if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
-            log::debug!(
-                "[WS_HANDLER]: Sending heartbeat ping to client for req_id: {}, querier: {}",
+        if let Err(e) = response_tx.send(WsServerEvents::Ping(vec![])).await {
+            log::error!(
+                "[WS_HANDLER]: Failed to send ping to client for req_id: {}, querier: {}, error: {}. Connection will be closed.",
                 req_id,
-                cfg.common.instance_name
-            );
-            let mut session = session.write().await;
-            if let Err(e) = session.ping(&[]).await {
-                log::error!(
-                    "[WS_HANDLER]: Failed to send ping to client for req_id: {}, querier: {}, error: {}. Connection will be closed.",
-                    req_id,
-                    cfg.common.instance_name,
-                    e
-                );
-                drop(session);
-                break;
-            }
-            drop(session);
-        } else {
-            log::warn!(
-                "[WS_HANDLER]: Session not found for req_id: {}, querier: {} during heartbeat. Connection will be closed.",
-                req_id,
-                cfg.common.instance_name
+                cfg.common.instance_name,
+                e
             );
             break;
         }
     }
-    cleanup_and_close_session(&req_id, None).await;
-}
-
-pub async fn run(
-    mut msg_stream: AggregatedMessageStream,
-    user_id: String,
-    req_id: String,
-    path: String,
-) {
-    let cfg = get_config();
-    log::info!(
-        "[WS_HANDLER]: Starting WebSocket session for req_id: {}, path: {}, querier: {}",
-        req_id,
-        path,
-        cfg.common.instance_name
-    );
-
-    let mut close_reason: Option<CloseReason> = None;
-
-    loop {
-        if let Some(msg) = msg_stream.next().await {
-            log::info!(
-                "[WS_HANDLER]: Received message for req_id: {}, path: {}, querier: {}",
-                req_id,
-                path,
-                cfg.common.instance_name
-            );
-
-            // Update activity and check cookie_expiry on any message
-            if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
-                let mut session = session.write().await;
-                session.update_activity();
-                if !session.is_client_cookie_valid() {
-                    log::error!(
-                        "[WS_HANDLER]: Session cookie expired for req_id: {}, querier: {}",
-                        req_id,
-                        cfg.common.instance_name
-                    );
-                    drop(session);
-                    break;
-                }
-                drop(session);
-            }
-
-            match msg {
-                Ok(actix_ws::AggregatedMessage::Ping(bytes)) => {
-                    log::debug!(
-                        "[WS_HANDLER]: Received ping from client for req_id: {}, querier: {}",
-                        req_id,
-                        cfg.common.instance_name
-                    );
-                    if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
-                        let mut session = session.write().await;
-                        if let Err(e) = session.pong(&bytes).await {
-                            log::error!(
-                                "[WS_HANDLER]: Failed to send pong to client for req_id: {}, querier: {}, error: {}",
-                                req_id,
-                                cfg.common.instance_name,
-                                e
-                            );
-                            drop(session);
-                            break;
-                        }
-                        drop(session);
-                    } else {
-                        log::error!(
-                            "[WS_HANDLER]: Session not found for ping response, req_id: {}, querier: {}",
-                            req_id,
-                            cfg.common.instance_name
-                        );
-                        break;
-                    }
-                }
-                Ok(actix_ws::AggregatedMessage::Pong(_)) => {
-                    log::debug!(
-                        "[WS_HANDLER]: Received pong from client for req_id: {}, querier: {}",
-                        req_id,
-                        cfg.common.instance_name
-                    );
-                }
-                Ok(actix_ws::AggregatedMessage::Text(msg)) => {
-                    log::info!(
-                        "[WS_HANDLER]: Received text message for req_id: {}, querier: {}",
-                        req_id,
-                        cfg.common.instance_name,
-                    );
-                    handle_text_message(&user_id, &req_id, msg.to_string(), path.clone()).await;
-                }
-                Ok(actix_ws::AggregatedMessage::Close(reason)) => {
-                    if let Some(reason) = reason.as_ref() {
-                        match reason.code {
-                            CloseCode::Normal | CloseCode::Error => {
-                                log::info!(
-                                    "[WS_HANDLER]: Request Id: {} Node Role: {} Closing connection with reason: {:?}",
-                                    req_id,
-                                    get_config().common.node_role,
-                                    reason
-                                );
-                            }
-                            _ => {
-                                log::error!(
-                                    "[WS_HANDLER]: Request Id: {} Node Role: {} Abnormal closure with reason: {:?}",
-                                    req_id,
-                                    get_config().common.node_role,
-                                    reason
-                                );
-                            }
-                        }
-                    }
-                    close_reason = reason;
-                    break;
-                }
-                Err(e) => {
-                    log::error!(
-                        "[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}",
-                        req_id,
-                        get_config().common.instance_name,
-                        e
-                    );
-                    break;
-                }
-                _ => {
-                    log::error!(
-                        "[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}",
-                        req_id,
-                        get_config().common.instance_name,
-                        "Unknown error"
-                    );
-                    break;
-                }
-            }
-        } else {
-            log::warn!(
-                "[WS_HANDLER]: No message received for req_id: {}, querier: {}",
-                req_id,
-                cfg.common.instance_name
-            );
-        }
-    }
-    cleanup_and_close_session(&req_id, close_reason).await;
 }
 
 /// Resolves user ID based on the execution mode and request data
@@ -353,7 +109,13 @@ async fn resolve_enterprise_user_id(
 /// Depending on each event type, audit must be done
 /// Currently audit is done only for the search event
 #[tracing::instrument(name = "service:search:websocket::handle_text_message", skip_all)]
-pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path: String) {
+pub async fn handle_text_message(
+    user_id: &str,
+    req_id: &str,
+    msg: String,
+    path: String,
+    response_tx: Sender<WsServerEvents>,
+) {
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             log::info!(
@@ -371,7 +133,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     None,
                     Default::default(),
                 );
-                let _ = send_message(req_id, err_res.to_json(), &client_msg.get_trace_id()).await;
+                let _ = send_message_2(req_id, err_res, response_tx.clone()).await;
                 return;
             }
 
@@ -408,12 +170,8 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                                         Some(search_req.trace_id.to_string()),
                                         Default::default(),
                                     );
-                                    let _ = send_message(
-                                        req_id,
-                                        err_res.to_json(),
-                                        &search_req.trace_id,
-                                    )
-                                    .await;
+                                    let _ =
+                                        send_message_2(req_id, err_res, response_tx.clone()).await;
                                     return;
                                 }
                             };
@@ -424,6 +182,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         &user_id,
                         req_id,
                         path.clone(),
+                        response_tx.clone(),
                     )
                     .instrument(ws_span)
                     .await;
@@ -451,12 +210,8 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                                         Some(values_req.trace_id.to_string()),
                                         Default::default(),
                                     );
-                                    let _ = send_message(
-                                        req_id,
-                                        err_res.to_json(),
-                                        &values_req.trace_id,
-                                    )
-                                    .await;
+                                    let _ =
+                                        send_message_2(req_id, err_res, response_tx.clone()).await;
                                     return;
                                 }
                             };
@@ -467,6 +222,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         &user_id,
                         req_id,
                         path.clone(),
+                        response_tx.clone(),
                     )
                     .instrument(ws_span.clone())
                     .await;
@@ -487,7 +243,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     log::info!("[WS_HANDLER]: trace_id: {}, Cancelling search", trace_id,);
 
                     let res = handle_cancel(&trace_id, &org_id).await;
-                    let _ = send_message(req_id, res.to_json(), &trace_id).await;
+                    let _ = send_message_2(req_id, res, response_tx.clone()).await;
 
                     // Only used for audit
                     #[cfg(feature = "enterprise")]
@@ -522,40 +278,40 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         .await;
                     }
                 }
-                WsClientEvents::Benchmark { id } => {
-                    // simulate random delay for benchmarking by sleep for 10/20/30/60/90
-                    // seconds
-                    let delay: Vec<u64> = vec![10, 20, 30, 60, 90];
-                    let delay = delay.choose(&mut rand::thread_rng()).unwrap();
-                    log::info!(
-                        "[WS_HANDLER]: Sleeping for benchmark, id: {}, delay: {}",
-                        id,
-                        delay
-                    );
-                    tokio::time::sleep(tokio::time::Duration::from_secs(*delay)).await;
+                WsClientEvents::Benchmark { .. } => {
+                    // // simulate random delay for benchmarking by sleep for 10/20/30/60/90
+                    // // seconds
+                    // let delay: Vec<u64> = vec![10, 20, 30, 60, 90];
+                    // let delay = delay.choose(&mut rand::thread_rng()).unwrap();
+                    // log::info!(
+                    //     "[WS_HANDLER]: Sleeping for benchmark, id: {}, delay: {}",
+                    //     id,
+                    //     delay
+                    // );
+                    // tokio::time::sleep(tokio::time::Duration::from_secs(*delay)).await;
 
-                    let response = serde_json::json!({
-                        "id": id,
-                        "took": delay,
-                    });
-                    let _ = send_message(req_id, response.to_string(), &id).await;
-                    let close_reason = Some(CloseReason {
-                        code: CloseCode::Normal,
-                        description: None,
-                    });
-                    cleanup_and_close_session(req_id, close_reason).await;
+                    // let response = serde_json::json!({
+                    //     "id": id,
+                    //     "took": delay,
+                    // });
+                    // let _ = send_message(req_id, response.to_string(), &id).await;
+                    // let close_reason = Some(CloseReason {
+                    //     code: CloseCode::Normal,
+                    //     description: None,
+                    // });
+                    // cleanup_and_close_session(req_id, close_reason).await;
                 }
-                WsClientEvents::TestAbnormalClose { req_id } => {
-                    log::info!(
-                        "[WS_HANDLER]: Request Id: {} Node Role: {} Test Abnormal Close",
-                        req_id,
-                        get_config().common.node_role
-                    );
-                    let close_reason = Some(CloseReason {
-                        code: CloseCode::Error,
-                        description: None,
-                    });
-                    cleanup_and_close_session(&req_id, close_reason).await;
+                WsClientEvents::TestAbnormalClose { .. } => {
+                    // log::info!(
+                    //     "[WS_HANDLER]: Request Id: {} Node Role: {} Test Abnormal Close",
+                    //     req_id,
+                    //     get_config().common.node_role
+                    // );
+                    // let close_reason = Some(CloseReason {
+                    //     code: CloseCode::Error,
+                    //     description: None,
+                    // });
+                    // cleanup_and_close_session(&req_id, close_reason).await;
                 }
             }
         }
@@ -572,113 +328,44 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 None,
                 Default::default(),
             );
-            let _ = send_message(req_id, err_res.to_json(), "").await;
-            let close_reason = Some(CloseReason {
-                code: CloseCode::Error,
-                description: None,
-            });
-            let session = if let Some(session) = sessions_cache_utils::get_session(req_id).await {
-                session
-            } else {
-                log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
-                return;
-            };
-            let mut session = session.write().await;
-            let _ = session.close(close_reason).await;
-            drop(session);
+            let _ = send_message_2(req_id, err_res, response_tx.clone()).await;
+            // let close_reason = Some(CloseReason {
+            //     code: CloseCode::Error,
+            //     description: None,
+            // });
+            // let session = if let Some(session) = sessions_cache_utils::get_session(req_id).await
+            // {     session
+            // } else {
+            //     log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
+            //     return;
+            // };
+            // let mut session = session.write().await;
+            // let _ = session.close(close_reason).await;
+            // drop(session);
         }
     }
 }
 
-pub async fn send_message(req_id: &str, msg: String, trace_id: &str) -> Result<(), Error> {
-    log::info!(
-        "[WS_HANDLER]: trace_id: {}, req_id: {}, attempt to send message",
-        trace_id,
-        req_id
-    );
-    let session = if let Some(session) = sessions_cache_utils::get_session(req_id).await {
-        session
-    } else {
-        log::error!(
-            "[WS_HANDLER]: trace_id: {}, req_id: {}, session not found",
-            trace_id,
-            req_id
-        );
-        return Err(Error::Message(format!(
-            "[req_id {}, trace_id {}] session not found",
-            req_id, trace_id
-        )));
-    };
-
+pub async fn send_message_2(
+    req_id: &str,
+    msg: WsServerEvents,
+    response_tx: Sender<WsServerEvents>,
+) -> Result<(), Error> {
+    let trace_id = msg.get_trace_id();
     log::debug!(
-        "[WS_HANDLER]: trace_id: {}, req_id: {}, send message -> attempt to get write lock",
+        "[WS::Querier::Channel] attempting sending response between incoming->outgoing threads for trace_id: {}, request_id: {}",
         trace_id,
-        req_id
+        req_id,
     );
-    let mut session = session.write().await;
-    log::debug!(
-        "[WS_HANDLER]: trace_id: {}, req_id: {}, send message -> got write lock",
-        trace_id,
-        req_id
-    );
-    let _ = session.text(msg).await.map_err(|e| {
+    if let Err(e) = response_tx.send(msg).await {
         log::error!(
-            "[WS_HANDLER]: trace_id: {}, req_id: {}, Failed to send message: {:?}",
+            "[WS::Querier::Channel] sending response between incoming->outgoing threads for trace_id: {} error: {}",
             trace_id,
-            req_id,
             e
         );
-        Error::Message(e.to_string())
-    });
-    drop(session);
-    log::debug!(
-        "[WS_HANDLER]: trace_id: {}, req_id: {}, send message -> dropped write lock -> success",
-        trace_id,
-        req_id
-    );
-    Ok(())
-}
-
-async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
-    let cfg = get_config();
-    log::info!(
-        "[WS_HANDLER]: Beginning cleanup for req_id: {}, close_reason: {:?}, querier: {}",
-        req_id,
-        close_reason,
-        cfg.common.instance_name
-    );
-
-    if let Some(session) = sessions_cache_utils::get_session(req_id).await {
-        if let Some(reason) = close_reason.as_ref() {
-            log::debug!(
-                "[WS_HANDLER]: req_id: {}, querier: {}, Closing session with reason: {:?}",
-                req_id,
-                cfg.common.instance_name,
-                reason
-            );
-        }
-
-        let mut session = session.write().await;
-        // Attempt to close the session
-        if let Err(e) = session.close(close_reason).await {
-            log::error!(
-                "[WS_HANDLER]: req_id: {}, querier: {}, Failed to close session gracefully: {:?}",
-                req_id,
-                cfg.common.instance_name,
-                e
-            );
-        }
-        drop(session);
+        return Err(Error::Message(e.to_string()));
     }
-
-    // Remove the session from the cache
-    sessions_cache_utils::remove_session(req_id).await;
-    log::info!(
-        "[WS_HANDLER]: req_id: {}, querier: {}, Session cleanup completed. Remaining sessions: {}",
-        req_id,
-        cfg.common.instance_name,
-        sessions_cache_utils::len_sessions().await
-    );
+    Ok(())
 }
 
 // Main search handler
@@ -689,6 +376,7 @@ async fn handle_search_event(
     user_id: &str,
     req_id: &str,
     #[allow(unused_variables)] path: String,
+    response_tx: Sender<WsServerEvents>,
 ) {
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
 
@@ -719,6 +407,7 @@ async fn handle_search_event(
             &org_id,
             &user_id,
             search_req.clone(),
+            response_tx.clone(),
         )
         .await;
         match search_result {
@@ -752,7 +441,9 @@ async fn handle_search_event(
                     e
                 );
                 let handle_err = async || {
-                    let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
+                    let _ =
+                        handle_search_error(&e, &req_id, &trace_id_for_task, response_tx.clone())
+                            .await;
 
                     #[cfg(feature = "enterprise")]
                     let http_response_code: u16;
@@ -789,7 +480,7 @@ async fn handle_search_event(
                             trace_id: trace_id.to_string(),
                             is_success: true,
                         };
-                        let _ = send_message(&req_id, cancel_res.to_json(), &trace_id).await;
+                        let _ = send_message_2(&req_id, cancel_res, response_tx.clone()).await;
                     }
                     _ => handle_err().await,
                 }
@@ -802,7 +493,12 @@ async fn handle_search_event(
     name = "service:websocket_events:search::handle_search_error",
     skip_all
 )]
-async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
+async fn handle_search_error(
+    e: &Error,
+    req_id: &str,
+    trace_id: &str,
+    response_tx: Sender<WsServerEvents>,
+) -> Option<CloseReason> {
     log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
     // Send error response
     let err_res = WsServerEvents::error_response(
@@ -811,7 +507,7 @@ async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<
         Some(trace_id.to_string()),
         Default::default(),
     );
-    let _ = send_message(req_id, err_res.to_json(), trace_id).await;
+    let _ = send_message_2(req_id, err_res, response_tx).await;
 
     // Close with error
     let close_reason = CloseReason {
@@ -833,6 +529,7 @@ async fn handle_values_event(
     user_id: &str,
     req_id: &str,
     #[allow(unused_variables)] path: String,
+    response_tx: Sender<WsServerEvents>,
 ) {
     let org_id = org_id.to_string();
     let user_id = user_id.to_string();
@@ -863,6 +560,7 @@ async fn handle_values_event(
             &req_id,
             values_req.clone(),
             &mut accumulated_results,
+            response_tx.clone(),
         )
         .await;
         match values_result {
@@ -890,7 +588,9 @@ async fn handle_values_event(
             }
             Err(e) => {
                 let handle_err = async || {
-                    let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
+                    let _ =
+                        handle_search_error(&e, &req_id, &trace_id_for_task, response_tx.clone())
+                            .await;
 
                     #[cfg(feature = "enterprise")]
                     let http_response_code: u16;
@@ -927,7 +627,7 @@ async fn handle_values_event(
                             trace_id: trace_id.to_string(),
                             is_success: true,
                         };
-                        let _ = send_message(&req_id, cancel_res.to_json(), &trace_id).await;
+                        let _ = send_message_2(&req_id, cancel_res, response_tx.clone()).await;
                     }
                     _ => handle_err().await,
                 }
