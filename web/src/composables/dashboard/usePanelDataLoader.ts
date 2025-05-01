@@ -335,8 +335,6 @@ export const usePanelDataLoader = (
     }
   };
 
-  // res is optional, it is used to pass the streaming_output and streaming_id
-  // from partition api response only not for ws search
   const getHistogramSearchRequest = async (
     query: string,
     it: any,
@@ -355,8 +353,6 @@ export const usePanelDataLoader = (
       start_time: startISOTimestamp,
       end_time: endISOTimestamp,
       size: -1,
-      streaming_output: res?.data?.streaming_output ?? false,
-      streaming_id: res?.data?.streaming_id ?? null,
     };
   };
 
@@ -390,8 +386,9 @@ export const usePanelDataLoader = (
               sql_mode: "full",
               start_time: startISOTimestamp,
               end_time: endISOTimestamp,
-              streaming_output: true,
               size: -1,
+              // pass always true for streaming_output
+              streaming_output: true,
             },
             page_type: pageType,
             traceparent,
@@ -457,14 +454,18 @@ export const usePanelDataLoader = (
                 {
                   org_identifier: store.state.selectedOrganization.identifier,
                   query: {
-                    query: await getHistogramSearchRequest(
-                      query,
-                      it,
-                      partition[0],
-                      partition[1],
-                      histogramInterval,
-                      res,
-                    ),
+                    query: {
+                      ...(await getHistogramSearchRequest(
+                        query,
+                        it,
+                        partition[0],
+                        partition[1],
+                        histogramInterval,
+                        res,
+                      )),
+                      streaming_output: res?.data?.streaming_aggs ?? false,
+                      streaming_id: res?.data?.streaming_id ?? null,
+                    },
                   },
                   page_type: pageType,
                   traceparent,
