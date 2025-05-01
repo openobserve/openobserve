@@ -67,7 +67,7 @@ impl FlightService for FlightServiceImpl {
     type ListActionsStream = BoxStream<'static, Result<ActionType, Status>>;
     type DoExchangeStream = BoxStream<'static, Result<FlightData, Status>>;
 
-    #[tracing::instrument(name = "service:search:flight::do_get", skip_all)]
+    #[tracing::instrument(name = "grpc:search:flight:do_get", skip_all)]
     async fn do_get(
         &self,
         request: Request<Ticket>,
