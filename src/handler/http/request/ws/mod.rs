@@ -17,7 +17,7 @@ pub mod session;
 
 use actix_web::{Error, HttpRequest, HttpResponse, get, web};
 use actix_ws::{CloseCode, CloseReason};
-use config::{get_config, meta::websocket::SERVER_HEALTH_CHECK_PING_MSG};
+use config::get_config;
 use futures::StreamExt;
 use session::handle_text_message;
 
@@ -77,7 +77,7 @@ pub async fn websocket(
         tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
 
     // Spawn the health check task
-    tokio::spawn(session::health_check(router_id, response_tx.clone()));
+    // tokio::spawn(session::health_check(router_id, response_tx.clone()));
 
     // Spawn message handling tasks between router and querier
     actix_web::rt::spawn(async move {
@@ -179,18 +179,10 @@ pub async fn websocket(
                         match message {
                             WsServerEvents::Ping(ping) => {
                                 let mut close_conn = false;
-                                if ping == SERVER_HEALTH_CHECK_PING_MSG {
-                                    log::debug!("[WS::Querier::Handler]: pinging request_id: {}, msg: {:?}", req_id, String::from_utf8_lossy(&ping));
-                                    if let Err(e) = ws_session.ping(&ping).await {
-                                        close_conn = true;
-                                        log::error!("[WS::Querier::Handler]: Error sending pong to client: {}, request_id: {}", e, req_id);
-                                    }
-                                } else {
-                                    log::debug!("[WS::Querier::Handler]: sending pong to request_id: {}, msg: {:?}", req_id, String::from_utf8_lossy(&ping));
-                                    if let Err(e) = ws_session.pong(&ping).await {
-                                        close_conn = true;
-                                        log::error!("[WS::Querier::Handler]: Error sending pong to client: {}, request_id: {}", e, req_id);
-                                    }
+                                log::debug!("[WS::Querier::Handler]: sending pong to request_id: {}, msg: {:?}", req_id, String::from_utf8_lossy(&ping));
+                                if let Err(e) = ws_session.pong(&ping).await {
+                                    close_conn = true;
+                                    log::error!("[WS::Querier::Handler]: Error sending pong to client: {}, request_id: {}", e, req_id);
                                 }
 
                                 if close_conn {
