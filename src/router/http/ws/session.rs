@@ -90,7 +90,7 @@ impl SessionManager {
         drop(session_write);
     }
 
-    pub async fn reached_max_idle_time(&self, client_id: &ClientId) -> bool {
+    pub async fn _reached_max_idle_time(&self, client_id: &ClientId) -> bool {
         let r = self.sessions.read().await;
         let session_info = r.get(client_id).cloned();
         drop(r);
