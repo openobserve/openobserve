@@ -1781,8 +1781,12 @@ export default defineComponent({
     async fullSQLMode(newVal) {
       if (newVal) {
         await nextTick();
-        this.setQuery(newVal);
-        this.updateUrlQueryParams();
+        if(this.searchObj.meta.sqlModeManualTrigger){
+          this.searchObj.meta.sqlModeManualTrigger = false;
+        } else {
+          this.setQuery(newVal);
+          this.updateUrlQueryParams();
+        }
       } else {
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";
