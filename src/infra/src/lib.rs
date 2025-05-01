@@ -29,20 +29,50 @@ pub mod schema;
 pub mod storage;
 pub mod table;
 
-pub async fn init() -> Result<(), anyhow::Error> {
+pub async fn get_db_schema_version() -> Result<u64, anyhow::Error> {
+    let db = db::get_db().await;
+    let b = db.get(config::DB_SCHEMA_KEY).await?;
+    let s = String::from_utf8_lossy(&b);
+    let k = match s.parse::<u64>() {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "invalid DB_SCHEMA_VERSION found in db : {e}"
+            ));
+        }
+    };
+
+    Ok(k)
+}
+
+pub async fn set_db_schema_version() -> Result<(), anyhow::Error> {
+    let db = db::get_db().await;
+    let s = config::DB_SCHEMA_VERSION.to_string();
+    let b = bytes::Bytes::from_owner(s);
+    db.put(config::DB_SCHEMA_KEY, b, false, None).await?;
+    Ok(())
+}
+
+pub async fn db_init() -> Result<(), anyhow::Error> {
+    // check db dir
+    std::fs::create_dir_all(&config::get_config().common.data_db_dir)?;
     db::init().await?;
-    cache::init().await?;
     file_list::create_table().await?;
-    file_list::LOCAL_CACHE.create_table().await?;
-    file_list::local_cache_gc().await?;
-    if !config::is_local_disk_storage() {
-        storage::remote::test_config().await?;
-    }
     pipeline::init().await?;
     queue::init().await?;
     scheduler::init().await?;
     schema::init().await?;
     table::init().await?;
+    Ok(())
+}
+
+pub async fn init() -> Result<(), anyhow::Error> {
+    cache::init().await?;
+    file_list::LOCAL_CACHE.create_table().await?;
+    file_list::local_cache_gc().await?;
+    if !config::is_local_disk_storage() {
+        storage::remote::test_config().await?;
+    }
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     Ok(())
