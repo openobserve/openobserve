@@ -67,6 +67,9 @@ pub async fn db_init() -> Result<(), anyhow::Error> {
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
+    // if we have skipped db migrations (because version is up-to-date), 
+    // for non-stateful set components this dir will be absent, so we create it anyways
+    std::fs::create_dir_all(&config::get_config().common.data_db_dir)?;
     cache::init().await?;
     file_list::LOCAL_CACHE.create_table().await?;
     file_list::local_cache_gc().await?;
