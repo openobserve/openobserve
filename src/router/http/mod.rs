@@ -165,7 +165,9 @@ async fn dispatch(
     }
 
     // check if the request need to be proxied by body
-    if cfg.common.metrics_cache_enabled && is_querier_route_by_body(&path) {
+    if (cfg.common.result_cache_enabled || cfg.common.metrics_cache_enabled)
+        && is_querier_route_by_body(&path)
+    {
         return proxy_querier_by_body(req, payload, client, new_url, start).await;
     }
 
