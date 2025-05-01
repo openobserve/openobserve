@@ -130,7 +130,7 @@ pub async fn handle_request(
                 } else {
                     service_att_map.insert(
                         format!("{}_{}", SERVICE, res_attr.key),
-                        get_val(&res_attr.value.as_ref()),
+                        get_val_with_type_retained(&res_attr.value.as_ref()),
                     );
                 }
             }
