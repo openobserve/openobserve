@@ -28,8 +28,9 @@ use proto::cluster_rpc::{
     search_server::Search,
 };
 use tonic::{Request, Response, Status};
+use tracing::Instrument;
 
-use crate::service::search as SearchService;
+use crate::service::{search as SearchService, websocket_events::setup_tracing_with_trace_id};
 
 #[derive(Clone, Debug)]
 #[cfg(feature = "enterprise")]
@@ -133,6 +134,12 @@ impl Search for Searcher {
     ) -> Result<Response<SearchResponse>, Status> {
         let start = std::time::Instant::now();
         let req = req.into_inner();
+        let search_span = setup_tracing_with_trace_id(
+            &req.trace_id,
+            tracing::info_span!("src::handler::grpc::request::search::search"),
+        )
+        .await;
+
         let request = json::from_slice::<search::Request>(&req.request)
             .map_err(|e| Status::internal(format!("failed to parse search request: {e}")))?;
         let stream_type = StreamType::from(req.stream_type.as_str());
@@ -144,6 +151,7 @@ impl Search for Searcher {
             &request,
             "".to_string(),
         )
+        .instrument(search_span)
         .await;
 
         match ret {
@@ -166,6 +174,11 @@ impl Search for Searcher {
         req: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
         let req = req.into_inner();
+        let search_span = setup_tracing_with_trace_id(
+            &req.trace_id,
+            tracing::info_span!("src::handler::grpc::request::search::search_multi"),
+        )
+        .await;
         let request =
             json::from_slice::<search::MultiStreamRequest>(&req.request).map_err(|e| {
                 Status::internal(format!("failed to parse multi-stream search request: {e}"))
@@ -173,6 +186,7 @@ impl Search for Searcher {
         let stream_type = StreamType::from(req.stream_type.as_str());
         let ret =
             SearchService::search_multi(&req.trace_id, &req.org_id, stream_type, None, &request)
+                .instrument(search_span)
                 .await;
 
         match ret {

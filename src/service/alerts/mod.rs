@@ -113,7 +113,7 @@ impl QueryConditionExt for QueryCondition {
         search_event_context: Option<SearchEventContext>,
         trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error> {
-        let trace_id = trace_id.unwrap_or_else(|| ider::generate_trace_id());
+        let trace_id = trace_id.unwrap_or_else(ider::generate_trace_id);
         // create context with trace_id
         let eval_span = setup_tracing_with_trace_id(
             &trace_id,
