@@ -25,7 +25,6 @@ use config::{
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
     },
-    utils::json::get_string_value,
 };
 use infra::errors::Error;
 use tracing::Instrument;
