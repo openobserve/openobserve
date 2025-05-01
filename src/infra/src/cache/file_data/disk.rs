@@ -702,8 +702,12 @@ pub async fn get_dir() -> String {
     FILES[0].read().await.root_dir.clone()
 }
 
-pub async fn download(file: &str, size: Option<usize>) -> Result<usize, anyhow::Error> {
-    let (data_len, data_bytes) = super::download_from_storage(file, size).await?;
+pub async fn download(
+    account: &str,
+    file: &str,
+    size: Option<usize>,
+) -> Result<usize, anyhow::Error> {
+    let (data_len, data_bytes) = super::download_from_storage(account, file, size).await?;
     if let Err(e) = set(file, data_bytes).await {
         return Err(anyhow::anyhow!(
             "set file {} to disk cache failed: {}",

@@ -75,14 +75,22 @@ impl Event for Eventer {
             for item in put_items.iter() {
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
-                    files_to_download.push((item.key.clone(), item.meta.compressed_size as usize));
+                    files_to_download.push((
+                        item.account.clone(),
+                        item.key.clone(),
+                        item.meta.compressed_size as usize,
+                    ));
                 }
 
                 // cache index for the parquet
                 if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
                     if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
                     {
-                        files_to_download.push((ttv_file, item.meta.index_size as usize));
+                        files_to_download.push((
+                            item.account.clone(),
+                            ttv_file,
+                            item.meta.index_size as usize,
+                        ));
                     }
                 }
             }
@@ -103,17 +111,17 @@ impl Event for Eventer {
                 }
 
                 // Fallback to individual downloads for failed files
-                for (file, size) in failed_files {
+                for (account, file, size) in failed_files {
                     let size = if size > 0 { Some(size) } else { None };
-                    if let Err(e) = infra::cache::file_data::download(&file, size).await {
+                    if let Err(e) = infra::cache::file_data::download(&account, &file, size).await {
                         log::error!("[gRPC:Event] Failed to cache file data: {}", e);
                     }
                 }
             } else {
                 // Direct download when download_from_node_enabled is false
-                for (file, size) in files_to_download {
+                for (account, file, size) in files_to_download {
                     let size = if size > 0 { Some(size) } else { None };
-                    if let Err(e) = infra::cache::file_data::download(&file, size).await {
+                    if let Err(e) = infra::cache::file_data::download(&account, &file, size).await {
                         log::error!("[gRPC:Event] Failed to cache file data: {}", e);
                     }
                 }
@@ -239,7 +247,10 @@ async fn handle_file_chunked(
     Ok(())
 }
 
-async fn download_from_node(addr: &str, files: &[(String, usize)]) -> Result<Vec<(String, usize)>> {
+async fn download_from_node(
+    addr: &str,
+    files: &[(String, String, usize)],
+) -> Result<Vec<(String, String, usize)>> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     log::debug!(
@@ -259,10 +270,10 @@ async fn download_from_node(addr: &str, files: &[(String, usize)]) -> Result<Vec
 
     let file_size_map = files
         .iter()
-        .map(|(f, s)| (f, *s))
+        .map(|(_, f, s)| (f, *s))
         .collect::<HashMap<_, _>>();
     let request = Request::new(SimpleFileList {
-        files: files.iter().map(|(f, _)| f.to_string()).collect(),
+        files: files.iter().map(|(_, f, _)| f.to_string()).collect(),
     });
 
     let resp = client
@@ -335,12 +346,12 @@ async fn download_from_node(addr: &str, files: &[(String, usize)]) -> Result<Vec
     // Return list of failed files
     let failed_files: Vec<_> = files
         .iter()
-        .filter(|(f, _)| !downloaded_files.contains(f))
+        .filter(|(_, f, _)| !downloaded_files.contains(f))
         .cloned()
         .collect();
 
     log::debug!(
-        "[gRPC:Event] Failed retrieved {} files from {} in {} ms",
+        "[gRPC:Event] Failed to retrieve {} files from {} in {} ms",
         failed_files.len(),
         addr,
         start.elapsed().as_millis()

@@ -467,7 +467,7 @@ pub async fn delete_parquet_file(account: &str, key: &str, file_list_only: bool)
 
     // delete the parquet whaterever the file is exists or not
     if !file_list_only {
-        _ = storage::del(&[key]).await;
+        _ = storage::del(&[(account, key)]).await;
     }
     Ok(())
 }

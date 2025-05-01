@@ -24,7 +24,7 @@ use object_store::{
     PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, limit::LimitStore, path::Path,
 };
 
-use crate::storage::{CONCURRENT_REQUESTS, ObjectStoreExt, format_key};
+use crate::storage::{CONCURRENT_REQUESTS, format_key};
 
 // test only
 const TEST_FILE: &str = "o2_test/check.txt";
@@ -62,12 +62,6 @@ impl std::fmt::Debug for Remote {
 impl std::fmt::Display for Remote {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("storage for remote")
-    }
-}
-
-impl ObjectStoreExt for Remote {
-    fn get_account(&self, _file: &str) -> Option<String> {
-        None
     }
 }
 
@@ -397,7 +391,7 @@ fn init_client(config: StorageConfig) -> Box<dyn object_store::ObjectStore> {
 
 pub async fn test_config() -> Result<(), anyhow::Error> {
     // Test download
-    if let Err(e) = super::get(TEST_FILE).await {
+    if let Err(e) = super::get("", TEST_FILE).await {
         if matches!(e, object_store::Error::NotFound { .. }) {
             let test_content = Bytes::from("Hello, S3!");
             // Test upload

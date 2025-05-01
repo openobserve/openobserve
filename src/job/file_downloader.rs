@@ -23,7 +23,8 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 
-type FileInfo = (String, usize, file_data::CacheType);
+/// (account, file, size, cache_type)
+type FileInfo = (String, String, usize, file_data::CacheType);
 
 struct DownloadQueue {
     sender: Sender<FileInfo>,
@@ -55,8 +56,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         log::debug!("[FILE_CACHE_DOWNLOAD:JOB] Receiving channel is closed");
                         break;
                     }
-                    Some((file, file_size, cache)) => {
-                        match download_file(&file, file_size, cache).await {
+                    Some((account, file, file_size, cache)) => {
+                        match download_file(&account, &file, file_size, cache).await {
                             Ok(data_len) => {
                                 if data_len > 0 && data_len != file_size {
                                     log::warn!(
@@ -99,6 +100,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn download_file(
+    account: &str,
     file_name: &str,
     file_size: usize,
     cache_type: file_data::CacheType,
@@ -112,14 +114,14 @@ async fn download_file(
                 disk_exists = file_data::disk::exist(file_name).await;
             }
             if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
-                file_data::memory::download(file_name, Some(file_size)).await
+                file_data::memory::download(account, file_name, Some(file_size)).await
             } else {
                 Ok(0)
             }
         }
         file_data::CacheType::Disk => {
             if !file_data::disk::exist(file_name).await {
-                file_data::disk::download(file_name, Some(file_size)).await
+                file_data::disk::download(account, file_name, Some(file_size)).await
             } else {
                 Ok(0)
             }
@@ -129,13 +131,14 @@ async fn download_file(
 }
 
 pub async fn queue_download(
-    file: &str,
+    account: String,
+    file: String,
     size: i64,
     cache_type: file_data::CacheType,
 ) -> Result<(), anyhow::Error> {
     FILE_DOWNLOAD_CHANNEL
         .sender
-        .send((file.to_owned(), size as usize, cache_type))
+        .send((account, file, size as usize, cache_type))
         .await?;
     Ok(())
 }

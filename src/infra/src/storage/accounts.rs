@@ -98,15 +98,6 @@ impl StorageClientFactory {
             .get(DEFAULT_ACCOUNT)
             .expect("default object store account not found")
     }
-
-    /// Get the client for the given path.
-    /// If the path is not a valid stream, return the default client.
-    pub fn get_client(&self, path: Option<&Path>) -> &dyn ObjectStore {
-        if let Some(name) = path.and_then(|p| self.get_name_by_path(p)) {
-            return self.get_client_by_name(&name);
-        }
-        self.get_client_by_name(DEFAULT_ACCOUNT)
-    }
 }
 
 pub fn parse_storage_config(
@@ -228,21 +219,139 @@ impl StreamStrategy {
     }
 }
 
+#[async_trait]
 impl ObjectStoreExt for StorageClientFactory {
     fn get_account(&self, file: &str) -> Option<String> {
         self.get_name_by_path(&file.into())
+    }
+
+    async fn get_by_account(&self, account: &str, location: &Path) -> Result<GetResult> {
+        self.get_client_by_name(account).get(location).await
+    }
+
+    async fn get_opts_by_account(
+        &self,
+        account: &str,
+        location: &Path,
+        options: GetOptions,
+    ) -> Result<GetResult> {
+        self.get_client_by_name(account)
+            .get_opts(location, options)
+            .await
+    }
+
+    async fn get_range_by_account(
+        &self,
+        account: &str,
+        location: &Path,
+        range: Range<usize>,
+    ) -> Result<Bytes> {
+        self.get_client_by_name(account)
+            .get_range(location, range)
+            .await
+    }
+
+    async fn get_ranges_by_account(
+        &self,
+        account: &str,
+        location: &Path,
+        ranges: &[Range<usize>],
+    ) -> Result<Vec<Bytes>> {
+        self.get_client_by_name(account)
+            .get_ranges(location, ranges)
+            .await
+    }
+
+    async fn head_by_account(&self, account: &str, location: &Path) -> Result<ObjectMeta> {
+        self.get_client_by_name(account).head(location).await
+    }
+
+    async fn delete_by_account(&self, account: &str, location: &Path) -> Result<()> {
+        self.get_client_by_name(account).delete(location).await
+    }
+
+    fn delete_stream_by_account<'a>(
+        &'a self,
+        account: &str,
+        locations: BoxStream<'a, Result<Path>>,
+    ) -> BoxStream<'a, Result<Path>> {
+        self.get_client_by_name(account).delete_stream(locations)
+    }
+
+    fn list_by_account(
+        &self,
+        account: &str,
+        prefix: Option<&Path>,
+    ) -> BoxStream<'_, Result<ObjectMeta>> {
+        self.get_client_by_name(account).list(prefix)
+    }
+
+    fn list_with_offset_by_account(
+        &self,
+        account: &str,
+        prefix: Option<&Path>,
+        offset: &Path,
+    ) -> BoxStream<'_, Result<ObjectMeta>> {
+        self.get_client_by_name(account)
+            .list_with_offset(prefix, offset)
+    }
+
+    async fn list_with_delimiter_by_account(
+        &self,
+        account: &str,
+        prefix: Option<&Path>,
+    ) -> Result<ListResult> {
+        self.get_client_by_name(account)
+            .list_with_delimiter(prefix)
+            .await
+    }
+
+    async fn copy_by_account(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
+        self.get_client_by_name(account).copy(from, to).await
+    }
+
+    async fn rename_by_account(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
+        self.get_client_by_name(account).rename(from, to).await
+    }
+
+    async fn copy_if_not_exists_by_account(
+        &self,
+        account: &str,
+        from: &Path,
+        to: &Path,
+    ) -> Result<()> {
+        self.get_client_by_name(account)
+            .copy_if_not_exists(from, to)
+            .await
+    }
+
+    async fn rename_if_not_exists_by_account(
+        &self,
+        account: &str,
+        from: &Path,
+        to: &Path,
+    ) -> Result<()> {
+        self.get_client_by_name(account)
+            .rename_if_not_exists(from, to)
+            .await
     }
 }
 
 #[async_trait]
 impl ObjectStore for StorageClientFactory {
+    async fn put(&self, location: &Path, payload: PutPayload) -> Result<PutResult> {
+        self.get_client_by_name(DEFAULT_ACCOUNT)
+            .put(location, payload)
+            .await
+    }
+
     async fn put_opts(
         &self,
         location: &Path,
         payload: PutPayload,
         opts: PutOptions,
     ) -> Result<PutResult> {
-        self.get_client(Some(location))
+        self.get_client_by_name(DEFAULT_ACCOUNT)
             .put_opts(location, payload, opts)
             .await
     }
@@ -252,29 +361,41 @@ impl ObjectStore for StorageClientFactory {
         location: &Path,
         opts: PutMultipartOpts,
     ) -> Result<Box<dyn MultipartUpload>> {
-        self.get_client(Some(location))
+        self.get_client_by_name(DEFAULT_ACCOUNT)
             .put_multipart_opts(location, opts)
             .await
     }
 
+    async fn get(&self, location: &Path) -> Result<GetResult> {
+        self.get_client_by_name(DEFAULT_ACCOUNT).get(location).await
+    }
+
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
-        self.get_client(Some(location))
+        self.get_client_by_name(DEFAULT_ACCOUNT)
             .get_opts(location, options)
             .await
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
-        self.get_client(Some(location))
+        self.get_client_by_name(DEFAULT_ACCOUNT)
             .get_range(location, range)
             .await
     }
 
+    async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
+        self.get_client_by_name(DEFAULT_ACCOUNT)
+            .get_ranges(location, ranges)
+            .await
+    }
+
     async fn delete(&self, location: &Path) -> Result<()> {
-        self.get_client(Some(location)).delete(location).await
+        self.get_client_by_name(DEFAULT_ACCOUNT)
+            .delete(location)
+            .await
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
-        self.get_client(prefix).list(prefix)
+        self.get_client_by_name(DEFAULT_ACCOUNT).list(prefix)
     }
 
     async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {

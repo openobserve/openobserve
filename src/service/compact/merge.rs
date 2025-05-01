@@ -830,7 +830,7 @@ pub async fn merge_files(
             "[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}",
             &file.key
         );
-        let buf = file_data::get(&file.key, None).await?;
+        let buf = file_data::get(&file.account, &file.key, None).await?;
         let schema = read_schema_from_bytes(&buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();
@@ -1311,7 +1311,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download(&file_name, Some(file_size)).await
+                file_data::disk::download(&file_account, &file_name, Some(file_size)).await
             } else {
                 Ok(0)
             };

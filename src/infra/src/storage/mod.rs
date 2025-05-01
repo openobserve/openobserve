@@ -15,11 +15,16 @@
 
 use std::{ops::Range, sync::Arc};
 
-use bytes::buf::Buf;
+use async_trait::async_trait;
+use bytes::{Bytes, buf::Buf};
 use config::{get_config, is_local_disk_storage, meta::stream::FileMeta, metrics};
 use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
-use futures::{StreamExt, TryStreamExt};
-use object_store::{GetRange, ObjectMeta, ObjectStore, Result, WriteMultipart, path::Path};
+use futures::{StreamExt, TryStreamExt, stream::BoxStream};
+use hashbrown::HashMap;
+use object_store::{
+    GetOptions, GetRange, GetResult, ListResult, ObjectMeta, ObjectStore, Result, WriteMultipart,
+    path::Path,
+};
 use once_cell::sync::Lazy;
 use parquet::file::metadata::ParquetMetaDataReader;
 
@@ -33,8 +38,65 @@ pub static DEFAULT: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(default);
 pub static LOCAL_WAL: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(local_wal);
 
 // Create a wrapper trait that extends ObjectStore
+#[async_trait]
 pub trait ObjectStoreExt: ObjectStore {
-    fn get_account(&self, _file: &str) -> Option<String>;
+    fn get_account(&self, file: &str) -> Option<String>;
+    async fn get_by_account(&self, account: &str, location: &Path) -> Result<GetResult>;
+    async fn get_opts_by_account(
+        &self,
+        account: &str,
+        location: &Path,
+        options: GetOptions,
+    ) -> Result<GetResult>;
+    async fn get_range_by_account(
+        &self,
+        account: &str,
+        location: &Path,
+        range: Range<usize>,
+    ) -> Result<Bytes>;
+    async fn get_ranges_by_account(
+        &self,
+        account: &str,
+        location: &Path,
+        ranges: &[Range<usize>],
+    ) -> Result<Vec<Bytes>>;
+    async fn head_by_account(&self, account: &str, location: &Path) -> Result<ObjectMeta>;
+    async fn delete_by_account(&self, account: &str, location: &Path) -> Result<()>;
+    fn delete_stream_by_account<'a>(
+        &'a self,
+        account: &str,
+        locations: BoxStream<'a, Result<Path>>,
+    ) -> BoxStream<'a, Result<Path>>;
+    fn list_by_account(
+        &self,
+        account: &str,
+        prefix: Option<&Path>,
+    ) -> BoxStream<'_, Result<ObjectMeta>>;
+    fn list_with_offset_by_account(
+        &self,
+        account: &str,
+        prefix: Option<&Path>,
+        offset: &Path,
+    ) -> BoxStream<'_, Result<ObjectMeta>>;
+    async fn list_with_delimiter_by_account(
+        &self,
+        account: &str,
+        prefix: Option<&Path>,
+    ) -> Result<ListResult>;
+    async fn copy_by_account(&self, account: &str, from: &Path, to: &Path) -> Result<()>;
+    async fn rename_by_account(&self, account: &str, from: &Path, to: &Path) -> Result<()>;
+    async fn copy_if_not_exists_by_account(
+        &self,
+        account: &str,
+        from: &Path,
+        to: &Path,
+    ) -> Result<()>;
+    async fn rename_if_not_exists_by_account(
+        &self,
+        account: &str,
+        from: &Path,
+        to: &Path,
+    ) -> Result<()>;
 }
 
 /// Returns the default object store based on the configuration.
@@ -78,17 +140,19 @@ pub fn get_account(file: &str) -> Option<String> {
     DEFAULT.get_account(file)
 }
 
-pub async fn get(file: &str) -> Result<bytes::Bytes> {
-    let data = DEFAULT.get(&file.into()).await?;
+pub async fn get(account: &str, file: &str) -> Result<bytes::Bytes> {
+    let data = DEFAULT.get_by_account(account, &file.into()).await?;
     data.bytes().await
 }
 
-pub async fn get_range(file: &str, range: Range<usize>) -> Result<bytes::Bytes> {
-    DEFAULT.get_range(&file.into(), range).await
+pub async fn get_range(account: &str, file: &str, range: Range<usize>) -> Result<bytes::Bytes> {
+    DEFAULT
+        .get_range_by_account(account, &file.into(), range)
+        .await
 }
 
-pub async fn head(file: &str) -> Result<ObjectMeta> {
-    DEFAULT.head(&file.into()).await
+pub async fn head(account: &str, file: &str) -> Result<ObjectMeta> {
+    DEFAULT.head_by_account(account, &file.into()).await
 }
 
 pub async fn put(file: &str, data: bytes::Bytes) -> Result<()> {
@@ -110,39 +174,54 @@ pub async fn put_multipart(file: &str, data: bytes::Bytes) -> Result<()> {
     Ok(())
 }
 
-pub async fn del(files: &[&str]) -> Result<()> {
+/// Delete files from the object store.
+/// account, file
+pub async fn del(files: &[(&str, &str)]) -> Result<()> {
     if files.is_empty() {
         return Ok(());
     }
 
     let start = std::time::Instant::now();
-    let columns = files[0].split('/').collect::<Vec<&str>>();
-    let files = files
-        .iter()
-        .map(|file| file.to_string())
-        .collect::<Vec<_>>();
+    let columns = files[0].1.split('/').collect::<Vec<&str>>();
 
     if !is_local_disk_storage() && get_config().s3.feature_bulk_delete {
-        let files_stream = futures::stream::iter(files)
-            .map(|file| Ok(Path::from(file)))
-            .boxed();
-        match DEFAULT
-            .delete_stream(files_stream)
-            .try_collect::<Vec<Path>>()
-            .await
-        {
-            Ok(files) => {
-                log::debug!("Deleted objects: {:?}", files);
-            }
-            Err(e) => {
-                log::error!("Failed to delete objects: {:?}", e);
+        // group the files by account
+        let mut files_by_account = HashMap::new();
+        for (account, file) in files {
+            files_by_account
+                .entry(account)
+                .or_insert_with(Vec::new)
+                .push(file);
+        }
+        for (account, files) in files_by_account {
+            let files_stream = futures::stream::iter(files)
+                .map(|file| Ok(Path::from(*file)))
+                .boxed();
+            match DEFAULT
+                .delete_stream_by_account(account, files_stream)
+                .try_collect::<Vec<Path>>()
+                .await
+            {
+                Ok(files) => {
+                    log::debug!("Deleted objects: {:?}", files);
+                }
+                Err(e) => {
+                    log::error!("Failed to delete objects: {:?}", e);
+                }
             }
         }
     } else {
+        let files = files
+            .iter()
+            .map(|(account, file)| (account.to_string(), file.to_string()))
+            .collect::<Vec<_>>();
         let files_stream = futures::stream::iter(files);
         files_stream
-            .for_each_concurrent(get_config().limit.cpu_num, |file| async move {
-                match DEFAULT.delete(&(file.as_str().into())).await {
+            .for_each_concurrent(get_config().limit.cpu_num, |(account, file)| async move {
+                match DEFAULT
+                    .delete_by_account(&account, &Path::from(file.as_str()))
+                    .await
+                {
                     Ok(_) => {
                         log::debug!("Deleted object: {}", file);
                     }
@@ -170,9 +249,9 @@ pub async fn del(files: &[&str]) -> Result<()> {
     Ok(())
 }
 
-pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
+pub async fn get_file_meta(account: &str, file: &str) -> Result<FileMeta, anyhow::Error> {
     let mut file_meta = FileMeta::default();
-    let (file_size, parquet_meta) = get_parquet_metadata(file).await?;
+    let (file_size, parquet_meta) = get_parquet_metadata(account, file).await?;
     if let Some(metadata) = parquet_meta.file_metadata().key_value_metadata() {
         file_meta = metadata.as_slice().into();
     }
@@ -180,19 +259,28 @@ pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
     Ok(file_meta)
 }
 
-async fn get_parquet_metadata(file: &str) -> Result<(usize, Arc<ParquetMetaData>), anyhow::Error> {
+async fn get_parquet_metadata(
+    account: &str,
+    file: &str,
+) -> Result<(usize, Arc<ParquetMetaData>), anyhow::Error> {
     // get file info
-    let info = head(file).await?;
+    let info = head(account, file).await?;
     let file_size = info.size;
 
     // read metadata len
-    let mut data = get_range(file, file_size - parquet::file::FOOTER_SIZE..file_size).await?;
+    let mut data = get_range(
+        account,
+        file,
+        file_size - parquet::file::FOOTER_SIZE..file_size,
+    )
+    .await?;
     let mut buf = [0_u8; parquet::file::FOOTER_SIZE];
     data.copy_to_slice(&mut buf);
     let metadata_len = ParquetMetaDataReader::decode_footer(&buf)?;
 
     // read metadata
     let data = get_range(
+        account,
         file,
         file_size - parquet::file::FOOTER_SIZE - metadata_len
             ..file_size - parquet::file::FOOTER_SIZE,
