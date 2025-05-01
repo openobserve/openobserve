@@ -20,12 +20,11 @@ use config::{
     meta::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
-            SearchPartitionResponse, TimeOffset, ValuesEventContext,
+            SearchPartitionResponse, TimeOffset, ValuesEventContext, format_values_search_response,
         },
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
     },
-    utils::json::get_string_value,
 };
 use infra::errors::Error;
 use tracing::Instrument;
@@ -1194,22 +1193,3 @@ pub async fn write_results_to_cache(
     Ok(())
 }
 
-fn format_values_search_response(search_res: &mut config::meta::search::Response, field: &str) {
-    search_res.hits.iter_mut().for_each(|hit| {
-        if let Some(obj) = hit.as_object_mut() {
-            let key = match obj.get_mut("zo_sql_key") {
-                Some(v) => get_string_value(v),
-                None => "".to_string(),
-            };
-            obj.insert("zo_sql_key".to_string(), serde_json::Value::String(key));
-        }
-    });
-
-    // Wrap the hits in a new object structure
-    let values = std::mem::take(&mut search_res.hits);
-    let wrapped_obj = serde_json::json!({
-        "field": field,
-        "values": values
-    });
-    search_res.hits = vec![wrapped_obj];
-}
