@@ -39,7 +39,9 @@ const QUERIER_ROUTES: [(&str, usize); 21] = [
                                                * {label_name}/
                                                * values */
 ];
-const QUERIER_ROUTES_BY_BODY: [&str; 2] = [
+const QUERIER_ROUTES_BY_BODY: [&str; 4] = [
+    "/_search",
+    "/_search_partition",
     "/prometheus/api/v1/query_range",
     "/prometheus/api/v1/query_exemplars",
 ];
