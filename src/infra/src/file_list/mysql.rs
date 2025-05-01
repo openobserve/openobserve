@@ -34,7 +34,7 @@ use sqlx::{Executor, MySql, QueryBuilder, Row};
 use crate::{
     db::{
         IndexStatement,
-        mysql::{CLIENT, CLIENT_RO, create_index},
+        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -149,7 +149,7 @@ impl super::FileList for MysqlFileList {
                 .join(",");
             let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
             DB_QUERY_NUMS
-                .with_label_values(&["delete_by_ids", "file_list"])
+                .with_label_values(&["delete_by_ids", "file_list", ""])
                 .inc();
             let start = std::time::Instant::now();
             let res = sqlx::query(&query_str).execute(&mut *tx).await;
@@ -1474,7 +1474,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         let pool = CLIENT_RO.clone();
 
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list_jobs"])
+            .with_label_values(&["select", "file_list_jobs", ""])
             .inc();
         let ret = sqlx::query_as::<_, (i64,String, String, i64)>(
             r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = ? AND dumped = ? limit 1000"#,
@@ -1495,7 +1495,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["update", "file_list_jobs"])
+            .with_label_values(&["update", "file_list_jobs", ""])
             .inc();
         sqlx::query(r#"UPDATE file_list_jobs SET dumped = ? WHERE id = ?;"#)
             .bind(dumped)
@@ -1669,7 +1669,7 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
 }
 
 pub async fn create_table() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list
@@ -1801,7 +1801,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
 }
 
 pub async fn create_table_index() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
 
     let indices: Vec<(&str, &str, &[&str])> = vec![
         ("file_list_org_idx", "file_list", &["org"]),
@@ -1921,7 +1921,7 @@ pub async fn create_table_index() -> Result<()> {
 }
 
 async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     let check_sql = format!(
         "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
     );

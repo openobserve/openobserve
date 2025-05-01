@@ -28,8 +28,9 @@ use proto::cluster_rpc::{
     search_server::Search,
 };
 use tonic::{Request, Response, Status};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::search as SearchService;
+use crate::{handler::grpc::MetadataMap, service::search as SearchService};
 
 #[derive(Clone, Debug)]
 #[cfg(feature = "enterprise")]
@@ -127,10 +128,16 @@ impl Default for Searcher {
 
 #[tonic::async_trait]
 impl Search for Searcher {
+    #[tracing::instrument(name = "grpc:search:search", skip_all)]
     async fn search(
         &self,
         req: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        tracing::Span::current().set_parent(parent_cx.clone());
+
         let start = std::time::Instant::now();
         let req = req.into_inner();
         let request = json::from_slice::<search::Request>(&req.request)
@@ -161,10 +168,16 @@ impl Search for Searcher {
         }
     }
 
+    #[tracing::instrument(name = "grpc:search:search_multi", skip_all)]
     async fn search_multi(
         &self,
         req: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        tracing::Span::current().set_parent(parent_cx.clone());
+
         let req = req.into_inner();
         let request =
             json::from_slice::<search::MultiStreamRequest>(&req.request).map_err(|e| {

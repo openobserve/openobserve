@@ -24,7 +24,10 @@ use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 use crate::{
-    db::{IndexStatement, ORM_CLIENT, connect_to_orm, mysql, postgres, sqlite},
+    db::{
+        IndexStatement, ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl, mysql,
+        postgres, sqlite,
+    },
     errors::{self, DbError, Error},
 };
 
@@ -84,7 +87,7 @@ pub async fn init() -> Result<(), errors::Error> {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -107,7 +110,7 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
         &["created_ts"],
     );
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     match client.get_database_backend() {
         DatabaseBackend::MySql => {
             mysql::create_index(index1).await?;
