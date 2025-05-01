@@ -237,46 +237,21 @@ fn vector_arithmetic_operators(
     let mut labels_to_exclude_set = vec![NAME_LABEL.to_string()];
 
     let is_matching_on = expr.modifier.is_some();
-    println!(
-        "vector_arithmetic_operators: is_matching_on 001 = {:?}",
-        is_matching_on
-    );
     if is_matching_on {
         let modifier = expr.modifier.as_ref().unwrap();
-        println!(
-            "vector_arithmetic_operators: is_matching_on -> modifier  = {:?}",
-            modifier
-        );
         if let Some(matching) = &modifier.matching {
             if matching.is_include() {
                 // For "on" modifier, keep only the specified labels
-                println!(
-                    "vector_arithmetic_operators: is_matching_on -> modifier -> matching (on) = {:?}",
-                    matching
-                );
                 labels_to_include_set = matching.labels().labels.clone();
                 labels_to_include_set.sort();
             } else {
                 // For "ignoring" modifier, add these labels to exclude list
                 let excluded_labels = matching.labels().labels.clone();
-                println!(
-                    "vector_arithmetic_operators: is_matching_on -> modifier -> matching (ignoring) = {:?}",
-                    excluded_labels
-                );
                 labels_to_exclude_set.extend(excluded_labels);
                 labels_to_exclude_set.sort();
             }
         }
     }
-
-    println!(
-        "vector_arithmetic_operators: labels_to_include_set = {:?}",
-        labels_to_include_set
-    );
-    println!(
-        "vector_arithmetic_operators: labels_to_exclude_set = {:?}",
-        labels_to_exclude_set
-    );
 
     // These labels should be used to compare values between lhs - rhs
     let labels_to_compare = |labels: &Vec<Arc<Label>>| {
@@ -289,43 +264,26 @@ fn vector_arithmetic_operators(
         }
     };
 
-    println!(
-        "vector_arithmetic_operators: is_matching_on after labels_to_compare = {:?}",
-        is_matching_on
-    );
-
     // Get the hash for the labels on the right
     let rhs_sig: HashMap<u64, InstantValue> = right
         .into_par_iter()
         .map(|instant| {
             let signature = labels_to_compare(&instant.labels).signature();
-            
-            let labels_forprintln = labels_to_compare(&instant.labels);
-            println!("vector_arithmetic_operators: rhs_sig -> into_par_iter -> map -> labels_forprintln = {:?}", labels_forprintln);
-            
             (signature, instant)
         })
         .collect();
-
-    println!("vector_arithmetic_operators: rhs_sig = {:?}", rhs_sig);
 
     // Iterate over left and pick up the corresponding instance from rhs
     let output: Vec<InstantValue> = left
         .into_par_iter()
         .flat_map(|instant| {
             let left_sig = labels_to_compare(&instant.labels).signature();
-            
-            let left_labels_forprintln = labels_to_compare(&instant.labels);
-            println!("vector_arithmetic_operators: left_sig -> into_par_iter -> left_labels_forprintln = {:?}", left_labels_forprintln);
-            println!("vector_arithmetic_operators: left_sig -> into_par_iter -> left_labels_forprintln signature = {:?}", left_sig);
-            
+
             rhs_sig
                 .get(&left_sig)
                 .map(|rhs_instant| (instant, rhs_instant))
         })
         .flat_map(|(mut lhs_instant, rhs_instant)| {
-            println!("vector_arithmetic_operators: into_par_iter -> flat_map -> lhs_instant = {:?}", lhs_instant);
-            println!("vector_arithmetic_operators: into_par_iter -> flat_map -> rhs_instant = {:?}", rhs_instant);
             scalar_binary_operations(
                 operator,
                 lhs_instant.sample.value,
@@ -340,26 +298,19 @@ fn vector_arithmetic_operators(
                 //     labels = labels.without_metric_name();
                 // }
 
-                println!("vector_arithmetic_operators: into_par_iter -> flat_map -> map -> labels before = {:?}", labels);
                 if let Some(modifier) = expr.modifier.as_ref() {
-                    println!("vector_arithmetic_operators: into_par_iter -> flat_map -> map -> modifier = {:?}", modifier);
-
                     // if modifier.card == VectorMatchCardinality::OneToOne {
                     //     labels = labels_to_compare(&labels);
                     // }
 
-                    // println!("vector_arithmetic_operators: into_par_iter -> flat_map -> map -> labels after modifier = {:?}", labels);
-
                     // group_labels from the `group_x` modifier are taken from the "one"-side.
                     if let Some(group_labels) = modifier.card.labels() {
-                        println!("vector_arithmetic_operators: into_par_iter -> flat_map -> map -> group_labels before = {:?}", group_labels);
                         for ln in group_labels.labels.iter() {
                             let value = rhs_instant.labels.get_value(ln);
                             if !value.is_empty() {
                                 labels.set(ln, &value);
                             }
                         }
-                        println!("vector_arithmetic_operators: into_par_iter -> flat_map -> map -> group_labels after = {:?}", group_labels);
                     }
                 }
                 InstantValue {
@@ -714,6 +665,7 @@ mod tests {
     /// PromQL Query: http_errors{code="500"} / ignoring(code) http_requests
     ///
     /// Example input:
+    ///
     /// http_errors{method="get", code="500"}  24
     /// http_errors{method="get", code="404"}  30
     /// http_errors{method="put", code="501"}  3
@@ -722,10 +674,12 @@ mod tests {
     /// http_requests{method="get"}  600
     /// http_requests{method="del"}  34
     /// http_requests{method="post"} 120
+    ///
     /// This returns a result vector containing the fraction of HTTP requests with status code of
     /// 500 for each method, as measured over the last 5 minutes. Without ignoring(code) there
     /// would have been no match as the metrics do not share the same set of labels. The entries
     /// with methods put and del have no match and will not show up in the result:
+    ///
     /// {method="get"}  0.04            //  24 / 600
     /// {method="post"} 0.05            //   6 / 120
     #[test]
@@ -899,6 +853,7 @@ mod tests {
     ///   )
     ///
     /// Sample Input Data:
+    ///
     /// Free space metrics:
     ///   system_filesystem_usage{device="sda1", host_name="server01", state="free"} 15.0
     ///   system_filesystem_usage{device="sda2", host_name="server01", state="free"} 25.0
