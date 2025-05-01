@@ -2436,13 +2436,20 @@ const useLogs = () => {
               searchObj.data.queryResults.took += res.data.took;
               searchObj.data.queryResults.hits.push(...res.data.hits);
             } else {
-              searchObj.data.queryResults.from = res.data.from;
-              searchObj.data.queryResults.scan_size = res.data.scan_size;
-              searchObj.data.queryResults.took = res.data.took;
-              searchObj.data.queryResults.hits = res.data.hits;
               if(queryReq.query?.streaming_output) {
                 searchObj.data.queryResults.total = searchObj.data.queryResults.hits.length;
+                searchObj.data.queryResults.from = res.data.from;
+                searchObj.data.queryResults.scan_size += res.data.scan_size;
+                searchObj.data.queryResults.took += res.data.took;
+                searchObj.data.queryResults.hits = res.data.hits;
+              } else {
+                searchObj.data.queryResults.from = res.data.from;
+                searchObj.data.queryResults.scan_size = res.data.scan_size;
+                searchObj.data.queryResults.took = res.data.took;
+                searchObj.data.queryResults.hits = res.data.hits;
               }
+              
+              
             }
           } else {
             resetFieldValues();
