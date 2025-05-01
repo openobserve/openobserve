@@ -104,6 +104,7 @@ impl WsHandler {
             tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
+        let client_id_clone = client_id.clone();
 
         // Before spawning the async task, clone the drain state
         let is_session_drain_state = session_manager.is_session_drain_state(&client_id).await;
@@ -114,33 +115,37 @@ impl WsHandler {
         );
 
         // Spawn task to handle idle timeout
-        let _session_manager_clone = session_manager.clone();
-        let _cfg_clone = cfg.clone();
-        let _disconnect_tx_clone2 = disconnect_tx.clone();
-        // tokio::spawn(async move {
-        //     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-        //         cfg_clone.websocket.session_idle_timeout_secs as _,
-        //     ));
-        //     interval.tick().await;
-        //     loop {
-        //         interval.tick().await;
-        //         if session_manager_clone
-        //             .reached_max_idle_time(&client_id_clone)
-        //             .await
-        //         {
-        //             log::info!(
-        //                 "[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown client_id:
-        // {}",                 client_id_clone
-        //             );
-        //             if let Err(e) = disconnect_tx_clone2.send(None).await {
-        //                 log::error!(
-        //                     "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
-        //                 );
-        //             }
-        //             break;
-        //         }
-        //     }
-        // });
+        let session_manager_clone = session_manager.clone();
+        let cfg_clone = cfg.clone();
+        let disconnect_tx_clone2 = disconnect_tx.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+                cfg_clone.websocket.session_idle_timeout_secs as _,
+            ));
+            interval.tick().await;
+            loop {
+                interval.tick().await;
+                log::info!(
+                    "[WS::Router::Handler] checking if MAX_IDLE_TIME reached for client_id: {}",
+                    client_id_clone
+                );
+                if session_manager_clone
+                    .reached_max_idle_time(&client_id_clone)
+                    .await
+                {
+                    log::info!(
+                        "[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown client_id: {}",
+                        client_id_clone
+                    );
+                    if let Err(e) = disconnect_tx_clone2.send(None).await {
+                        log::error!(
+                            "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
+                        );
+                    }
+                    break;
+                }
+            }
+        });
 
         // Spawn message handling tasks between client and router
         actix_web::rt::spawn(async move {
