@@ -222,7 +222,6 @@ fn vector_and(
 }
 
 fn vector_arithmetic_operators(
-    // fn original_code_vector_arithmetic_operators(
     expr: &BinaryExpr,
     left: Vec<InstantValue>,
     right: Vec<InstantValue>,
