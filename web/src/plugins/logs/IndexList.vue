@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @before-show="
                   (event: any) => openFilterCreator(event, props.row)
                 "
-                @before-hide="(event: any) => cancelTraceId(props.row.name)"
+                @before-hide="(event: any) => cancelFilterCreator(props.row)"
               >
                 <template v-slot:header>
                   <div
@@ -737,6 +737,7 @@ export default defineComponent({
     } = useSearchWebSocket();
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
+    const openedFilterFields = ref<string[]>([]);
 
     const userDefinedSchemaBtnGroupOption = [
       {
@@ -858,6 +859,8 @@ export default defineComponent({
         return;
       }
       try {
+        //maintaing  the opened fields
+        openedFilterFields.value.push(name);
         let timestamps: any =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
@@ -1040,6 +1043,11 @@ export default defineComponent({
 
             for (const partition of partitions) {
               try {
+                //check if the field is opened because sometimes 
+                // user might close the field before all the subsequent requests are completed
+                if(!openedFilterFields.value.includes(name)){
+                  return;
+                }
                 const res: any = await streamService.fieldValues({
                   org_identifier: store.state.selectedOrganization.identifier,
                   stream_name: selectedStream,
@@ -1093,12 +1101,13 @@ export default defineComponent({
                 }
               }
             }
+            openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== name);
 
           }
         }
       } catch (err) {
         fieldValues.value[name]["isLoading"] = false;
-
+        openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== name);
         console.log(err);
         $q.notify({
           type: "negative",
@@ -1456,6 +1465,18 @@ export default defineComponent({
       }
     };
 
+
+    const cancelFilterCreator = (row: any) => {
+      //if it is websocker based then cancel the trace id
+      //else cancel the further value api calls using the openedFilterFields
+      if(isWebSocketEnabled()){
+        cancelTraceId(row.name);
+      }
+      else{
+        cancelValueApi(row.name);
+      }
+    }
+
     const cancelTraceId = (field: string) => {
       const traceIds = traceIdMapper.value[field];
       if (traceIds) {
@@ -1467,6 +1488,10 @@ export default defineComponent({
         });
       }
     };
+    const cancelValueApi = (value: string) => {
+      //remove the field from the openedFilterFields
+      openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== value);
+    }
     const getValuesPartition = async (start: number, end: number,name:string,queryToBeSent:string) => {
       try{
           const queryReq = {
@@ -1562,6 +1587,7 @@ export default defineComponent({
       sortedStreamFields,
       placeHolderText,
       cancelTraceId,
+      cancelFilterCreator
     };
   },
 });
