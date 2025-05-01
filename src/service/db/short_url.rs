@@ -115,6 +115,7 @@ async fn run_gc_task(gc_interval_minutes: i64, retention_period_minutes: i64) {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
         gc_interval_minutes as u64 * 60,
     ));
+    interval.tick().await;
 
     loop {
         interval.tick().await;

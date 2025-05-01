@@ -86,7 +86,10 @@ pub async fn websocket(
     );
 
     // Spawn the handler
-    actix_web::rt::spawn(session::run(msg_stream, user_id, router_id, path));
+    actix_web::rt::spawn(session::run(msg_stream, user_id, router_id.clone(), path));
+
+    // Spawn the health check task
+    tokio::spawn(session::health_check(router_id));
 
     Ok(res)
 }
