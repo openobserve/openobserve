@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::{cluster::LOCAL_NODE, meta::cluster::NodeInfo};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -33,6 +34,10 @@ pub struct SearchInspectorFields {
     pub sql: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_range: Option<(String, String)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cluster: Option<String>,
 }
 
 impl SearchInspectorFields {
@@ -47,7 +52,10 @@ pub struct SearchInspectorFieldsBuilder {
 
 impl Default for SearchInspectorFieldsBuilder {
     fn default() -> Self {
-        Self::new()
+        let mut ret = Self::new();
+        ret.fields.cluster = Some(LOCAL_NODE.get_cluster_name());
+        ret.fields.region = Some(LOCAL_NODE.get_region());
+        ret
     }
 }
 
