@@ -49,9 +49,8 @@ use crate::{
             self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
             sql::Sql,
         },
-        websocket_events::{
-            TimeOffset, WsServerEvents, calculate_progress_percentage, setup_tracing_with_trace_id,
-        },
+        setup_tracing_with_trace_id,
+        websocket_events::{TimeOffset, WsServerEvents, calculate_progress_percentage},
     },
 };
 
@@ -84,7 +83,6 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     }
 }
 
-#[tracing::instrument(name = "service:search:websocket::handle_search_request", skip_all)]
 pub async fn handle_search_request(
     req_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
@@ -110,7 +108,7 @@ pub async fn handle_search_request(
     // Setup tracing
     let ws_search_span = setup_tracing_with_trace_id(
         &req.trace_id,
-        tracing::info_span!("src::service::websocket_events::search::handle_search_request"),
+        tracing::info_span!("service:websocket_events:search:handle_search_request"),
     )
     .await;
 

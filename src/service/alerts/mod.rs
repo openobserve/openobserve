@@ -38,8 +38,7 @@ use tracing::Instrument;
 
 use super::promql;
 use crate::service::{
-    search as SearchService, self_reporting::http_report_metrics,
-    websocket_events::setup_tracing_with_trace_id,
+    search as SearchService, self_reporting::http_report_metrics, setup_tracing_with_trace_id,
 };
 
 pub mod alert;
@@ -117,7 +116,7 @@ impl QueryConditionExt for QueryCondition {
         // create context with trace_id
         let eval_span = setup_tracing_with_trace_id(
             &trace_id,
-            tracing::info_span!("src::service::alerts::evaluate_scheduled"),
+            tracing::info_span!("service:alerts:evaluate_scheduled"),
         )
         .await;
 
