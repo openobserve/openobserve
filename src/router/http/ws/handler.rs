@@ -48,7 +48,6 @@ pub type ClientId = String;
 pub type QuerierName = String;
 pub type TraceId = String;
 
-
 #[derive(Debug)]
 pub struct WsHandler {
     pub session_manager: Arc<SessionManager>,
