@@ -16,12 +16,22 @@ export default class DashboardCreate {
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
     );
     this.applyQueryBtn = page.locator('[data-test="dashboard-apply"]');
+    this.backBtn = page.locator('[data-test="dashboard-back-btn"]');
   }
+    
   async createDashboard(dashboardName) {
+    await this.dashCreateBtn.waitFor({ state: "visible" });
     await this.dashCreateBtn.click();
+    await this.dashName.waitFor({ state: "visible" });
     await this.dashName.click();
     await this.dashName.fill(dashboardName);
     await this.submitBtn.click();
+  }
+
+  //back to dashboard list
+  async backToDashboardList() {
+    await this.backBtn.waitFor({ state: "visible" });
+    await this.backBtn.click();
   }
 
   //Search Folder
@@ -32,6 +42,16 @@ export default class DashboardCreate {
 
     await this.searchDash.click();
     await this.searchDash.fill(dashboardName);
+  }
+
+  
+    //Delete Dashboard
+  async deleteDashboard(dashboardName) {
+    await this.page
+      .locator('[data-test="dashboard-folder-tab-default"]')
+      .waitFor({ state: "visible" });
+    await this.deleteIcon.click();
+    await this.confirmDelete.click();
   }
 
   //Add Panel to dashboard

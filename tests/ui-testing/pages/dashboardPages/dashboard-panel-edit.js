@@ -24,6 +24,14 @@ export default class DashboardPanel {
       '[data-test="dashboard-move-to-another-panel"]'
     );
     this.deleteconfrimBtn = page.locator('[data-test="confirm-button"]');
+    this.fullscreen = page.locator('[data-test="dashboard-panel-fullscreen-btn"]');
+    this.refreshBtn = page.locator('[data-test="dashboard-panel-refresh-panel-btn"]');
+    this.editLayout = page.locator('[data-test="dashboard-edit-layout"]');
+    this.panelHeight = page.locator('[data-test="panel-layout-settings-height-input"]');
+    this.saveLayout = page.locator('[data-test="panel-layout-settings-save"]');
+    this.cancelLayout = page.locator('data-test="panel-layout-settings-cancel"]');
+    this.goToLogs = page.locator('[data-test="dashboard-move-to-logs-module"]');
+
   }
 
   // Duplicate panel
@@ -53,7 +61,7 @@ export default class DashboardPanel {
     await this.delete.waitFor({ state: "visible" });
     await this.delete.click();
     await this.deleteconfrimBtn.waitFor({ state: "visible" });
-    await this.page.locator(this.deleteconfrimBtn).click();
+    await this.deleteconfrimBtn.click();
   }
 
   //Download json
@@ -79,5 +87,47 @@ export default class DashboardPanel {
     await this.editArrow.click();
     await this.moveTab.waitFor({ state: "visible" });
     await this.moveTab.click();
+  }
+
+  //fullscreen panel
+  async fullscreenPanel() {
+    await this.fullscreen.hover();
+    await this.fullscreen.waitFor({ state: "visible" });
+    await this.fullscreen.click();
+  }
+
+  //refresh panel
+  async refreshPanel(panelName) {
+    await this.page
+      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .click();
+    await this.refreshBtn.waitFor({ state: "visible" });
+    await this.refreshBtn.click();
+  }
+
+  //edit layout
+  async editLayoutPanel(panelName, height) {
+    
+    await this.page
+      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .waitFor({ state: "visible" });
+    await this.page
+      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .click();
+    await this.editLayout.waitFor({ state: "visible" });
+    await this.editLayout.click();
+    await this.panelHeight.waitFor({ state: "visible" });
+    await this.panelHeight.click();
+    await this.panelHeight.fill(height);
+    await this.saveLayout.click();
+  }
+  
+  //Edit Panel: Go to logs
+  async goToLogsPanel(panelName) {
+    await this.page
+      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .click();
+    await this.goToLogs.waitFor({ state: "visible" });
+    await this.goToLogs.click();
   }
 }
