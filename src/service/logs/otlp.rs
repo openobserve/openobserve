@@ -268,7 +268,10 @@ pub async fn handle_request(
                         .is_some_and(|v| *v)
                         && original_data.is_some()
                     {
-                        local_val[ORIGINAL_DATA_COL_NAME] = original_data.clone().unwrap().into();
+                        local_val.insert(
+                            ORIGINAL_DATA_COL_NAME.to_string(),
+                            original_data.unwrap().into(),
+                        );
 
                         let record_id = crate::service::ingestion::generate_record_id(
                             org_id,
@@ -276,7 +279,7 @@ pub async fn handle_request(
                             &StreamType::Logs,
                         );
 
-                        local_val[ID_COL_NAME] = json::Value::String(record_id.to_string());
+                        local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
                     }
 
                     // add `_all_values` if required by StreamSettings
@@ -297,7 +300,8 @@ pub async fn handle_request(
                             })
                             .map(|(_, v)| v)
                             .join(" ");
-                        local_val[ALL_VALUES_COL_NAME] = json::Value::String(values);
+                        local_val
+                            .insert(ALL_VALUES_COL_NAME.to_string(), json::Value::String(values));
                     }
 
                     let (ts_data, fn_num) = json_data_by_stream
@@ -372,15 +376,17 @@ pub async fn handle_request(
                             .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
-                            local_val[ORIGINAL_DATA_COL_NAME] =
-                                original_options[idx].clone().unwrap().into();
+                            local_val.insert(
+                                ORIGINAL_DATA_COL_NAME.to_string(),
+                                original_options[idx].clone().unwrap().into(),
+                            );
 
                             let record_id = crate::service::ingestion::generate_record_id(
                                 org_id,
                                 &destination_stream,
                                 &StreamType::Logs,
                             );
-                            local_val[ID_COL_NAME] = record_id.to_string().into();
+                            local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
                         }
 
                         // add `_all_values` if required by StreamSettings
@@ -403,7 +409,7 @@ pub async fn handle_request(
                                 .map(|(_, v)| v)
                                 .join(" ");
 
-                            local_val[ALL_VALUES_COL_NAME] = values.into();
+                            local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
                         }
 
                         let (ts_data, fn_num) = json_data_by_stream
