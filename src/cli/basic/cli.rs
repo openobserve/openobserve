@@ -475,7 +475,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             println!("datetimes: {}", td);
         }
         "upgrade-db" => {
-            crate::service::init_db().await?;
+            crate::migration::init_db().await?;
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));

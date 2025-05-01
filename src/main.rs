@@ -59,10 +59,10 @@ use openobserve::{
         },
         http::router::*,
     },
-    job, router,
+    job, migration, router,
     service::{
-        self, cluster_info::ClusterInfoService, db, metadata, node::NodeService,
-        search::SEARCH_SERVER, self_reporting, tls::http_tls_config,
+        cluster_info::ClusterInfoService, db, metadata, node::NodeService, search::SEARCH_SERVER,
+        self_reporting, tls::http_tls_config,
     },
 };
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
@@ -249,7 +249,7 @@ async fn main() -> Result<(), anyhow::Error> {
             }
 
             // db related inits
-            if let Err(e) = service::init_db().await {
+            if let Err(e) = migration::init_db().await {
                 job_init_tx.send(false).ok();
                 panic!("db init failed: {}", e);
             }

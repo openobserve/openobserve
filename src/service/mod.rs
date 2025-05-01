@@ -14,12 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::stream::StreamParams, utils::schema::format_stream_name};
-use infra::{
-    db::{ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl},
-    errors::Result,
-};
+use infra::errors::Result;
 
-use crate::migration;
 pub mod alerts;
 pub mod circuit_breaker;
 pub mod cluster_info;
@@ -69,43 +65,4 @@ pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
     } else {
         stream_name
     })
-}
-
-pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
-    let db_schema_version = match infra::get_db_schema_version().await {
-        Ok(v) => v,
-        Err(e) => {
-            log::warn!(
-                "error in getting db schema version {e} ; assuming default of 0 and trying upgrade."
-            );
-            0
-        }
-    };
-    if db_schema_version == config::DB_SCHEMA_VERSION {
-        // if version matches, we do not need to run update commands
-        log::info!("DB_SCHEMA_VERSION match, skipping db upgrade");
-        return Ok(());
-    }
-    log::info!(
-        "DB_SCHEMA_VERSION mismatch : expected {}, found {db_schema_version} ; running db upgrade",
-        config::DB_SCHEMA_VERSION
-    );
-
-    infra::db_init().await?;
-    // we initialize both clients here to avoid potential deadlock afterwards
-    ORM_CLIENT.get_or_init(connect_to_orm).await;
-    ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
-    // check version upgrade
-    let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
-    migration::check_upgrade(&old_version, config::VERSION).await?;
-
-    #[allow(deprecated)]
-    migration::upgrade_resource_names().await?;
-    // migrate infra_sea_orm
-    infra::table::migrate().await?;
-    // migrate dashboards
-    migration::dashboards::run().await?;
-
-    infra::set_db_schema_version().await?;
-    Ok(())
 }
