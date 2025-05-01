@@ -341,7 +341,6 @@ export const usePanelDataLoader = (
     startISOTimestamp: string,
     endISOTimestamp: string,
     histogramInterval: string | null,
-    res?: any,
   ) => {
     return {
       sql: await changeHistogramInterval(query, histogramInterval ?? null),
@@ -461,7 +460,6 @@ export const usePanelDataLoader = (
                         partition[0],
                         partition[1],
                         histogramInterval,
-                        res,
                       )),
                       streaming_output: res?.data?.streaming_aggs ?? false,
                       streaming_id: res?.data?.streaming_id ?? null,
