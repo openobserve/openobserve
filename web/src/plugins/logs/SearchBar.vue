@@ -1721,6 +1721,9 @@ export default defineComponent({
           }
         }
       }
+      if(searchObj.meta.sqlMode === false && value.toLowerCase().includes('select') && value.toLowerCase().includes('from')){
+        searchObj.meta.sqlMode = true;
+      }
 
       if (value != "" && searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL();
