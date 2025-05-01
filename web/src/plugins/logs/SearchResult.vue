@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="q-pb-lg"
           style=" left: 45%; margin: 24px 0px;"
-          v-if="histogramLoader"
+          v-else-if="histogramLoader"
           
         >
           <q-spinner-hourglass
