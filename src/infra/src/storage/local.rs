@@ -25,7 +25,7 @@ use object_store::{
     local::LocalFileSystem, path::Path,
 };
 
-use crate::storage::{CONCURRENT_REQUESTS, format_key};
+use crate::storage::{CONCURRENT_REQUESTS, ObjectStoreExt, format_key};
 
 pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
@@ -56,6 +56,12 @@ impl std::fmt::Debug for Local {
 impl std::fmt::Display for Local {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("storage for local disk")
+    }
+}
+
+impl ObjectStoreExt for Local {
+    fn get_account(&self, _file: &str) -> Option<String> {
+        None
     }
 }
 

@@ -25,7 +25,7 @@ use object_store::{
     PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
-use super::{get_stream_from_file, remote::StorageConfig};
+use crate::storage::{ObjectStoreExt, get_stream_from_file, remote::StorageConfig};
 
 const DEFAULT_ACCOUNT: &str = "default";
 
@@ -64,32 +64,28 @@ impl StorageClientFactory {
         storage
     }
 
-    /// Get the account name for the given stream with the given strategy.
-    pub fn get_name_by_stream(&self, stream: &str) -> Option<String> {
+    /// Get the account name for the path by the given strategy.
+    pub fn get_name_by_path(&self, path: &Path) -> Option<String> {
         if self.only_default {
             return None;
         }
         match &self.stream_strategy {
             StreamStrategy::Default => None,
-            StreamStrategy::Hash(account_names) => {
+            StreamStrategy::FileHash(account_names) => {
+                let file = path.to_string();
                 let mut h = config::utils::hash::gxhash::new();
-                let v = h.sum64(stream);
+                let v = h.sum64(&file);
                 let account_name = account_names[v as usize % account_names.len()].clone();
                 Some(account_name)
             }
-            StreamStrategy::Stream(stream_map) => stream_map.get(stream).map(|s| s.to_string()),
+            StreamStrategy::StreamHash(account_names) => get_stream_from_file(path).map(|stream| {
+                let mut h = config::utils::hash::gxhash::new();
+                let v = h.sum64(&stream);
+                account_names[v as usize % account_names.len()].clone()
+            }),
+            StreamStrategy::Stream(stream_map) => get_stream_from_file(path)
+                .and_then(|stream| stream_map.get(&stream).map(|s| s.to_string())),
         }
-    }
-
-    /// Get the client name for the given path.
-    pub fn get_client_name(&self, path: Option<&Path>) -> Option<String> {
-        if !self.only_default && path.is_some() {
-            let stream = get_stream_from_file(path.unwrap());
-            if let Some(stream) = stream {
-                return self.get_name_by_stream(&stream);
-            }
-        }
-        None
     }
 
     /// Get the client for the given name.
@@ -106,7 +102,7 @@ impl StorageClientFactory {
     /// Get the client for the given path.
     /// If the path is not a valid stream, return the default client.
     pub fn get_client(&self, path: Option<&Path>) -> &dyn ObjectStore {
-        if let Some(name) = self.get_client_name(path) {
+        if let Some(name) = path.and_then(|p| self.get_name_by_path(p)) {
             return self.get_client_by_name(&name);
         }
         self.get_client_by_name(DEFAULT_ACCOUNT)
@@ -198,7 +194,8 @@ impl std::fmt::Display for StorageClientFactory {
 #[derive(Debug)]
 pub enum StreamStrategy {
     Default,
-    Hash(Vec<String>),               // account name list
+    FileHash(Vec<String>),           // account name list
+    StreamHash(Vec<String>),         // account name list
     Stream(HashMap<String, String>), // stream name -> account name
 }
 
@@ -206,7 +203,8 @@ impl StreamStrategy {
     pub fn new(strategy: &str, account_names: Vec<String>) -> Self {
         match strategy.to_lowercase().as_str() {
             "" => Self::Default,
-            "hash" | "hashing" => Self::Hash(account_names),
+            "file_hash" => Self::FileHash(account_names),
+            "stream_hash" => Self::StreamHash(account_names),
             _ => {
                 let account_set = account_names.iter().collect::<HashSet<&String>>();
                 let mut stream_map = HashMap::new();
@@ -227,6 +225,12 @@ impl StreamStrategy {
                 Self::Stream(stream_map)
             }
         }
+    }
+}
+
+impl ObjectStoreExt for StorageClientFactory {
+    fn get_account(&self, file: &str) -> Option<String> {
+        self.get_name_by_path(&file.into())
     }
 }
 
@@ -318,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_client_factory_multiple_accounts_hash_strategy() {
+    fn test_storage_client_factory_multiple_accounts_file_hash_strategy() {
         let mut config = base_s3_config();
         config.accounts = "acc1,acc2".to_string();
         config.provider = "aws,aws".to_string();
@@ -328,12 +332,37 @@ mod tests {
         config.secret_key = "s1,s2".to_string();
         config.bucket_name = "b1,b2".to_string();
         config.bucket_prefix = "p1,p2".to_string();
-        config.stream_strategy = "hash".to_string();
+        config.stream_strategy = "file_hash".to_string();
 
         let factory = StorageClientFactory::new_with_config(&config);
         assert!(!factory.only_default);
         assert_eq!(factory.accounts.len(), 3); // includes "default"
-        assert!(matches!(factory.stream_strategy, StreamStrategy::Hash(_)));
+        assert!(matches!(
+            factory.stream_strategy,
+            StreamStrategy::FileHash(_)
+        ));
+    }
+
+    #[test]
+    fn test_storage_client_factory_multiple_accounts_stream_hash_strategy() {
+        let mut config = base_s3_config();
+        config.accounts = "acc1,acc2".to_string();
+        config.provider = "aws,aws".to_string();
+        config.server_url = "url1,url2".to_string();
+        config.region_name = "r1,r2".to_string();
+        config.access_key = "k1,k2".to_string();
+        config.secret_key = "s1,s2".to_string();
+        config.bucket_name = "b1,b2".to_string();
+        config.bucket_prefix = "p1,p2".to_string();
+        config.stream_strategy = "stream_hash".to_string();
+
+        let factory = StorageClientFactory::new_with_config(&config);
+        assert!(!factory.only_default);
+        assert_eq!(factory.accounts.len(), 3); // includes "default"
+        assert!(matches!(
+            factory.stream_strategy,
+            StreamStrategy::StreamHash(_)
+        ));
     }
 
     #[test]

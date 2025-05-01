@@ -186,7 +186,10 @@ impl MergeWorker {
                                 Ok((file, meta, _)) => {
                                     let mut new_file_keys = Vec::with_capacity(file.len());
                                     for (file, meta) in file.into_iter().zip(meta.into_iter()) {
-                                        new_file_keys.push(FileKey::new(file, meta, false));
+                                        let account =
+                                            infra::storage::get_account(&file).unwrap_or_default();
+                                        new_file_keys
+                                            .push(FileKey::new(account, file, meta, false));
                                     }
                                     if let Err(e) = tx.send(Ok((msg.batch_id, new_file_keys))).await
                                     {

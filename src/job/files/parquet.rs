@@ -327,7 +327,12 @@ async fn prepare_files(
         columns.remove(4);
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(FileKey::new(file_key.clone(), parquet_meta, false));
+        partition.push(FileKey::new(
+            "".to_string(),
+            file_key.clone(),
+            parquet_meta,
+            false,
+        ));
         // mark the file as processing
         PROCESSING_FILES.write().await.insert(file_key);
     }
@@ -531,7 +536,8 @@ async fn move_files(
         }
 
         // write file list to storage
-        let ret = db::file_list::set(&new_file_name, Some(new_file_meta), false).await;
+        let account = storage::get_account(&new_file_name).unwrap_or_default();
+        let ret = db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await;
         if let Err(e) = ret {
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
@@ -553,7 +559,10 @@ async fn move_files(
                     file.key
                 );
                 // add to pending delete list
-                if let Err(e) = db::file_list::local::add_pending_delete(&org_id, &file.key).await {
+                if let Err(e) =
+                    db::file_list::local::add_pending_delete(&org_id, &file.account, &file.key)
+                        .await
+                {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
                         file.key,
@@ -569,8 +578,12 @@ async fn move_files(
                             e.to_string()
                         );
                         // add to pending delete list
-                        if let Err(e) =
-                            db::file_list::local::add_pending_delete(&org_id, &file.key).await
+                        if let Err(e) = db::file_list::local::add_pending_delete(
+                            &org_id,
+                            &file.account,
+                            &file.key,
+                        )
+                        .await
                         {
                             log::error!(
                                 "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",

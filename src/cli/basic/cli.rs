@@ -111,12 +111,18 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 ),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
-                .arg(
+                .args([
                     clap::Arg::new("file")
                         .short('f')
                         .long("file")
                         .value_name("file")
                         .help("the parquet file name"),
+                    clap::Arg::new("account")
+                        .short('a')
+                        .long("account")
+                        .required(false)
+                        .value_name("account")
+                        .help("the account name"),]
                 ),
             clap::Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
             clap::Command::new("seaorm-rollback").about("rollback SeaORM migration steps")
@@ -358,7 +364,11 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         }
         "delete-parquet" => {
             let file = command.get_one::<String>("file").unwrap();
-            match file_list::delete_parquet_file(file, true).await {
+            let account = command
+                .get_one::<String>("account")
+                .map(|s| s.to_string())
+                .unwrap_or_default();
+            match file_list::delete_parquet_file(&account, file, true).await {
                 Ok(_) => {
                     println!("delete parquet file {} successfully", file);
                 }

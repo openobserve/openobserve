@@ -19,7 +19,7 @@ use bytes::buf::Buf;
 use config::{get_config, is_local_disk_storage, meta::stream::FileMeta, metrics};
 use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt};
-use object_store::{GetRange, ObjectMeta, ObjectStore, WriteMultipart, path::Path};
+use object_store::{GetRange, ObjectMeta, ObjectStore, Result, WriteMultipart, path::Path};
 use once_cell::sync::Lazy;
 use parquet::file::metadata::ParquetMetaDataReader;
 
@@ -29,8 +29,13 @@ pub mod remote;
 
 pub const CONCURRENT_REQUESTS: usize = 1000;
 
-pub static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
-pub static LOCAL_WAL: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_wal);
+pub static DEFAULT: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(default);
+pub static LOCAL_WAL: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(local_wal);
+
+// Create a wrapper trait that extends ObjectStore
+pub trait ObjectStoreExt: ObjectStore {
+    fn get_account(&self, _file: &str) -> Option<String>;
+}
 
 /// Returns the default object store based on the configuration.
 /// If the local disk storage is enabled, it creates a local object store.
@@ -43,7 +48,7 @@ pub static LOCAL_WAL: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_wal);
 ///
 /// let object_store = default();
 /// ```
-fn default() -> Box<dyn ObjectStore> {
+fn default() -> Box<dyn ObjectStoreExt> {
     if is_local_disk_storage() {
         std::fs::create_dir_all(&get_config().common.data_stream_dir)
             .expect("create stream data dir success");
@@ -53,13 +58,13 @@ fn default() -> Box<dyn ObjectStore> {
     }
 }
 
-fn local_wal() -> Box<dyn ObjectStore> {
+fn local_wal() -> Box<dyn ObjectStoreExt> {
     let cfg = get_config();
     std::fs::create_dir_all(&cfg.common.data_wal_dir).expect("create wal dir success");
     Box::new(local::Local::new(&cfg.common.data_wal_dir, false))
 }
 
-pub async fn list(prefix: &str) -> object_store::Result<Vec<String>> {
+pub async fn list(prefix: &str) -> Result<Vec<String>> {
     let files = DEFAULT
         .list(Some(&prefix.into()))
         .map_ok(|meta| meta.location.to_string())
@@ -69,20 +74,24 @@ pub async fn list(prefix: &str) -> object_store::Result<Vec<String>> {
     Ok(files)
 }
 
-pub async fn get(file: &str) -> object_store::Result<bytes::Bytes> {
+pub fn get_account(file: &str) -> Option<String> {
+    DEFAULT.get_account(file)
+}
+
+pub async fn get(file: &str) -> Result<bytes::Bytes> {
     let data = DEFAULT.get(&file.into()).await?;
     data.bytes().await
 }
 
-pub async fn get_range(file: &str, range: Range<usize>) -> object_store::Result<bytes::Bytes> {
+pub async fn get_range(file: &str, range: Range<usize>) -> Result<bytes::Bytes> {
     DEFAULT.get_range(&file.into(), range).await
 }
 
-pub async fn head(file: &str) -> object_store::Result<ObjectMeta> {
+pub async fn head(file: &str) -> Result<ObjectMeta> {
     DEFAULT.head(&file.into()).await
 }
 
-pub async fn put(file: &str, data: bytes::Bytes) -> object_store::Result<()> {
+pub async fn put(file: &str, data: bytes::Bytes) -> Result<()> {
     let multi_part_upload_size = get_config().s3.multi_part_upload_size;
     if multi_part_upload_size > 0 && multi_part_upload_size < bytes_size_in_mb(&data) as usize {
         put_multipart(file, data).await?;
@@ -92,7 +101,7 @@ pub async fn put(file: &str, data: bytes::Bytes) -> object_store::Result<()> {
     Ok(())
 }
 
-pub async fn put_multipart(file: &str, data: bytes::Bytes) -> object_store::Result<()> {
+pub async fn put_multipart(file: &str, data: bytes::Bytes) -> Result<()> {
     let path = Path::from(file);
     let upload = DEFAULT.put_multipart(&path).await?;
     let mut write = WriteMultipart::new(upload);
@@ -101,7 +110,7 @@ pub async fn put_multipart(file: &str, data: bytes::Bytes) -> object_store::Resu
     Ok(())
 }
 
-pub async fn del(files: &[&str]) -> object_store::Result<()> {
+pub async fn del(files: &[&str]) -> Result<()> {
     if files.is_empty() {
         return Ok(());
     }

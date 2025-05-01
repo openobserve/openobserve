@@ -139,12 +139,13 @@ pub async fn generate_by_stream(
         start.elapsed().as_millis()
     );
 
-    for (file, meta) in files {
-        if PROCESSING_FILES.read().contains(&file) {
+    for (account, key, meta) in files {
+        if PROCESSING_FILES.read().contains(&key) {
             continue;
         }
         let file = FileKey {
-            key: file,
+            account,
+            key,
             meta,
             deleted: false,
             segment_ids: None,

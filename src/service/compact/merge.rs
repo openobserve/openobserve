@@ -640,7 +640,9 @@ pub async fn merge_by_stream(
                     if new_file.key.is_empty() {
                         continue;
                     }
+                    let account = storage::get_account(&new_file.key).unwrap_or_default();
                     events.push(FileKey {
+                        account,
                         key: new_file.key,
                         meta: new_file.meta,
                         deleted: false,
@@ -650,6 +652,7 @@ pub async fn merge_by_stream(
 
                 for file in delete_file_list {
                     events.push(FileKey {
+                        account: file.account.clone(),
                         key: file.key.clone(),
                         meta: file.meta.clone(),
                         deleted: true,
@@ -1104,10 +1107,12 @@ async fn generate_inverted_index(
                 "created parquet index file during compaction: {}",
                 file_name
             );
+            let account = storage::get_account(&file_name).unwrap_or_default();
             // Notify that we wrote the index file to the db.
             if let Err(e) = write_file_list(
                 org_id,
                 &[FileKey {
+                    account,
                     key: file_name.clone(),
                     meta: filemeta,
                     deleted: false,
@@ -1161,6 +1166,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         .iter()
         .filter(|v| v.deleted)
         .map(|v| FileListDeleted {
+            account: v.account.clone(),
             file: v.key.clone(),
             index_file: v.meta.index_size > 0,
             flattened: v.meta.flattened,
@@ -1299,6 +1305,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
+        let file_account = file.account.to_string();
         let file_name = file.key.to_string();
         let file_size = file.meta.compressed_size as usize;
         let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -1341,7 +1348,9 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                             "[COMPACT] found invalid file: {}, will delete it",
                             file_name
                         );
-                        if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
+                        if let Err(e) =
+                            file_list::delete_parquet_file(&file_account, &file_name, true).await
+                        {
                             log::error!("[COMPACT] delete from file_list err: {}", e);
                         }
                         Some(file_name)

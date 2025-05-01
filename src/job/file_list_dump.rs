@@ -429,6 +429,7 @@ async fn generate_dump(
     };
 
     let dump_file = FileKey {
+        account: "".to_string(),
         key: file_key.clone(),
         meta: meta.clone(),
         deleted: false,
