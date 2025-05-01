@@ -34,7 +34,7 @@ use sqlx::{Executor, Postgres, QueryBuilder, Row};
 use crate::{
     db::{
         IndexStatement,
-        postgres::{CLIENT, CLIENT_RO, create_index},
+        postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index},
     },
     errors::{Error, Result},
 };
@@ -1621,7 +1621,7 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
 }
 
 pub async fn create_table() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list
@@ -1753,7 +1753,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
 }
 
 pub async fn create_table_index() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
 
     let indices: Vec<(&str, &str, &[&str])> = vec![
         ("file_list_org_idx", "file_list", &["org"]),
@@ -1874,7 +1874,7 @@ pub async fn create_table_index() -> Result<()> {
 }
 
 async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     let check_sql = format!(
         "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
     );

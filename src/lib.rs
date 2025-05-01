@@ -23,6 +23,7 @@ pub mod cli;
 pub mod common;
 pub mod handler;
 pub mod job;
+pub mod migration;
 pub mod router;
 pub mod service;
 
