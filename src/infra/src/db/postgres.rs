@@ -56,21 +56,9 @@ fn connect(readonly: bool, ddl: bool) -> Pool<Postgres> {
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
     let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
 
-    let (min_conn, max_conn) = if ddl {
-        // for ddl we use bare min connections, as it is used
-        // once at the very start, and usually does not do any concurrent queries
-        // to actually use more connections
-        (1, 2)
-    } else {
-        (
-            cfg.limit.sql_db_connections_min,
-            cfg.limit.sql_db_connections_max,
-        )
-    };
-
     PgPoolOptions::new()
-        .min_connections(min_conn)
-        .max_connections(max_conn)
+        .min_connections(cfg.limit.sql_db_connections_min)
+        .max_connections(cfg.limit.sql_db_connections_max)
         .acquire_timeout(Duration::from_secs(acquire_timeout))
         .idle_timeout(Some(Duration::from_secs(idle_timeout)))
         .max_lifetime(Some(Duration::from_secs(max_lifetime)))
