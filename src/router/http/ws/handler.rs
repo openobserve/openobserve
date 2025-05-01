@@ -21,7 +21,11 @@ use std::sync::{
 use actix_http::StatusCode;
 use actix_web::{Error, HttpRequest, HttpResponse, web};
 use actix_ws::{CloseCode, CloseReason};
-use config::{get_config, meta::cluster::RoleGroup, utils::json};
+use config::{
+    get_config,
+    meta::{cluster::RoleGroup, websocket::SERVER_HEALTH_CHECK_PING_MSG},
+    utils::json,
+};
 use futures_util::StreamExt;
 #[cfg(feature = "enterprise")]
 use {
@@ -44,7 +48,6 @@ pub type ClientId = String;
 pub type QuerierName = String;
 pub type TraceId = String;
 
-pub const SERVER_HEALTH_CHECK_PING_MSG: &[u8] = b"server_health_check";
 
 #[derive(Debug)]
 pub struct WsHandler {
