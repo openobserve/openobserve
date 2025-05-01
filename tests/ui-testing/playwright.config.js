@@ -11,7 +11,7 @@ module.exports = defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: 50, // Set the number of workers to 50
+  workers: 100, // Set the number of workers to 50
   reporter: 'html',
   use: {
     baseURL: process.env["ZO_BASE_URL"],

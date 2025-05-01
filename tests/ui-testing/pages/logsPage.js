@@ -77,6 +77,22 @@ export class LogsPage {
 
   }
 
+  async logsPageOtlpOrg() {
+
+    await this.page.getByText('arrow_drop_down').click();
+    await this.page.getByText('otlp-production').click();
+
+    // await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    // await this.page.waitForTimeout(2000);
+    // await this.page.getByRole('option', { name: 'otlp-production' }).locator('div').nth(2).click();
+
+    // await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    // await this.page.waitForTimeout(2000);
+    // await this.page.getByRole('option', { name: 'otlp-production' }).locator('div').nth(2).click();
+
+
+
+  }
   async logsPageURLValidation() {
 
     await expect(this.page).toHaveURL(/defaulttestmulti/);
@@ -513,14 +529,15 @@ async selectQuery4DaysTime() {
   
 }
 
-async logsPageOtlpOrg() {
-
-  await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
-  await this.page.waitForTimeout(2000);
-  await this.page.getByRole('option', { name: 'otlp-production' }).locator('div').nth(2).click();
+// async logsPageOtlpOrg() {
 
 
+//   await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+//   await this.page.waitForTimeout(2000);
+//   await this.page.getByRole('option', { name: 'otlp-production' }).locator('div').nth(2).click();
 
-}
+
+
+// }
 
 }

@@ -9,7 +9,7 @@ import { DashboardPage } from '../pages/dashboardPage';
 // Create a function to set up the browser instances
 const createBrowserInstances = () => {
     const instances = [];
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <=100; i++) {
         instances.push({
             name: `chrome-${i}`,
             use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 } },
@@ -91,7 +91,7 @@ test.describe("Websocket for UI Load Testing", () => {
         await loginPage.loginAsInternalUser();
     });
 
-    for (let i = 1; i <= 2; i++) {
+    for (let i = 1; i <= 100; i++) {
         test(`Enable Websocket for running query after selecting stream, SQL Mode On and dashboard refresh: User ${i}`, async ({ page }) => {
             const randomEmail = `${generateRandomString(7)}admin${i}@gmail.com`; // Generate random email for login
             const randomPassword = `${generateRandomString(7)}12345678`;
@@ -103,7 +103,7 @@ test.describe("Websocket for UI Load Testing", () => {
             await loginPage.loginMultipleUsers(randomEmail, randomPassword);
             console.log(`Logged in user: ${randomEmail}`);
             await page.waitForTimeout(5000); // Wait for login to complete
-
+            // await logsPage.logsPageOtlpOrg();
             await logsPage.navigateToLogs();
             
             await managementPage.goToManagement();
@@ -122,7 +122,6 @@ test.describe("Websocket for UI Load Testing", () => {
 
             await dashboardPage.navigateToDashboards();
             await dashboardPage.navigateToDashboardFolder();
-            await page.locator('[data-test="dashboard-tab-69221-name"]').click();
             await dashboardPage.selectQuery4DayTime();
 
             await dashboardPage.refreshDashboard();
@@ -130,7 +129,7 @@ test.describe("Websocket for UI Load Testing", () => {
 
             await page.locator('[data-test="menu-link-\\/streams-item"]').click();
             await page.waitForTimeout(5000);
-            await page.getByRole('row', { name: '02 default logs' }).getByRole('button').first().click();
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
             await page.waitForTimeout(5000);
             await logsPage.navigateToLogs();
             await logsPage.selectStreamDefault();
@@ -140,12 +139,12 @@ test.describe("Websocket for UI Load Testing", () => {
             await logsPage.selectRunQuery();
             await dashboardPage.navigateToDashboards();
             await dashboardPage.navigateToDashboardFolder();
-            await page.locator('[data-test="dashboard-tab-69221-name"]').click();
+            
             await dashboardPage.selectQuery4DayTime();
             await dashboardPage.refreshDashboard();
             await page.locator('[data-test="menu-link-\\/streams-item"]').click();
             await page.waitForTimeout(5000);
-            await page.getByRole('row', { name: '02 default logs' }).getByRole('button').first().click();
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
             await page.waitForTimeout(5000);
 
             // 2nd times
@@ -162,7 +161,7 @@ test.describe("Websocket for UI Load Testing", () => {
 
             await dashboardPage.navigateToDashboards();
             await dashboardPage.navigateToDashboardFolder();
-            await page.locator('[data-test="dashboard-tab-69221-name"]').click();
+           
             await dashboardPage.selectQuery4DayTime();
 
             await dashboardPage.refreshDashboard();
@@ -170,7 +169,7 @@ test.describe("Websocket for UI Load Testing", () => {
 
             await page.locator('[data-test="menu-link-\\/streams-item"]').click();
             await page.waitForTimeout(5000);
-            await page.getByRole('row', { name: '02 default logs' }).getByRole('button').first().click();
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
             await page.waitForTimeout(5000);
             await logsPage.navigateToLogs();
             await logsPage.selectStreamDefault();
@@ -180,15 +179,334 @@ test.describe("Websocket for UI Load Testing", () => {
             await logsPage.selectRunQuery();
             await dashboardPage.navigateToDashboards();
             await dashboardPage.navigateToDashboardFolder();
-            await page.locator('[data-test="dashboard-tab-69221-name"]').click();
+          
             await dashboardPage.selectQuery4DayTime();
             await dashboardPage.refreshDashboard();
             await page.locator('[data-test="menu-link-\\/streams-item"]').click();
             await page.waitForTimeout(5000);
-            await page.getByRole('row', { name: '02 default logs' }).getByRole('button').first().click();
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
             await page.waitForTimeout(5000);
 
+            // 3rd times
 
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+
+            await logsPage.selectQuery4DaysTime();
+
+            await logsPage.selectRunQuery();
+            await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+           
+            await dashboardPage.selectQuery4DayTime();
+
+            await dashboardPage.refreshDashboard();
+            await expect(page.locator('[data-test="dashboard-refresh-btn"]')).toBeVisible();
+
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+            await logsPage.selectQuery4DaysTime();
+            await logsPage.selectRunQuery();
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+          
+            await dashboardPage.selectQuery4DayTime();
+            await dashboardPage.refreshDashboard();
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+
+            // 4th times
+
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+
+            await logsPage.selectQuery4DaysTime();
+
+            await logsPage.selectRunQuery();
+            await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+           
+            await dashboardPage.selectQuery4DayTime();
+
+            await dashboardPage.refreshDashboard();
+            await expect(page.locator('[data-test="dashboard-refresh-btn"]')).toBeVisible();
+
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+            await logsPage.selectQuery4DaysTime();
+            await logsPage.selectRunQuery();
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+          
+            await dashboardPage.selectQuery4DayTime();
+            await dashboardPage.refreshDashboard();
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+
+            // 5th times
+
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+
+            await logsPage.selectQuery4DaysTime();
+
+            await logsPage.selectRunQuery();
+            await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+           
+            await dashboardPage.selectQuery4DayTime();
+
+            await dashboardPage.refreshDashboard();
+            await expect(page.locator('[data-test="dashboard-refresh-btn"]')).toBeVisible();
+
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+            await logsPage.selectQuery4DaysTime();
+            await logsPage.selectRunQuery();
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+          
+            await dashboardPage.selectQuery4DayTime();
+            await dashboardPage.refreshDashboard();
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+
+            // 6th times
+
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+
+            await logsPage.selectQuery4DaysTime();
+
+            await logsPage.selectRunQuery();
+            await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+           
+            await dashboardPage.selectQuery4DayTime();
+
+            await dashboardPage.refreshDashboard();
+            await expect(page.locator('[data-test="dashboard-refresh-btn"]')).toBeVisible();
+
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+            await logsPage.selectQuery4DaysTime();
+            await logsPage.selectRunQuery();
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+          
+            await dashboardPage.selectQuery4DayTime();
+            await dashboardPage.refreshDashboard();
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+
+            // 7th times
+
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+
+            await logsPage.selectQuery4DaysTime();
+
+            await logsPage.selectRunQuery();
+            await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+           
+            await dashboardPage.selectQuery4DayTime();
+
+            await dashboardPage.refreshDashboard();
+            await expect(page.locator('[data-test="dashboard-refresh-btn"]')).toBeVisible();
+
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+            await logsPage.selectQuery4DaysTime();
+            await logsPage.selectRunQuery();
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+          
+            await dashboardPage.selectQuery4DayTime();
+            await dashboardPage.refreshDashboard();
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+
+            // 8th times
+
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+
+            await logsPage.selectQuery4DaysTime();
+
+            await logsPage.selectRunQuery();
+            await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+           
+            await dashboardPage.selectQuery4DayTime();
+
+            await dashboardPage.refreshDashboard();
+            await expect(page.locator('[data-test="dashboard-refresh-btn"]')).toBeVisible();
+
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+            await logsPage.selectQuery4DaysTime();
+            await logsPage.selectRunQuery();
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+          
+            await dashboardPage.selectQuery4DayTime();
+            await dashboardPage.refreshDashboard();
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+
+            // 9th times
+
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+
+            await logsPage.selectQuery4DaysTime();
+
+            await logsPage.selectRunQuery();
+            await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+           
+            await dashboardPage.selectQuery4DayTime();
+
+            await dashboardPage.refreshDashboard();
+            await expect(page.locator('[data-test="dashboard-refresh-btn"]')).toBeVisible();
+
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+            await logsPage.selectQuery4DaysTime();
+            await logsPage.selectRunQuery();
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+          
+            await dashboardPage.selectQuery4DayTime();
+            await dashboardPage.refreshDashboard();
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+
+            // 10th times
+
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+
+            await logsPage.selectQuery4DaysTime();
+
+            await logsPage.selectRunQuery();
+            await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+           
+            await dashboardPage.selectQuery4DayTime();
+
+            await dashboardPage.refreshDashboard();
+            await expect(page.locator('[data-test="dashboard-refresh-btn"]')).toBeVisible();
+
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+            await logsPage.navigateToLogs();
+            await logsPage.selectStreamDefault();
+            await logsPage.selectQueryDefault();
+            await logsPage.enableSQLMode();
+            await logsPage.selectQuery4DaysTime();
+            await logsPage.selectRunQuery();
+            await dashboardPage.navigateToDashboards();
+            await dashboardPage.navigateToDashboardFolder();
+          
+            await dashboardPage.selectQuery4DayTime();
+            await dashboardPage.refreshDashboard();
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(5000);
+            await page.getByRole('row', { name: '03 default logs' }).getByRole('button').first().click();
+            await page.waitForTimeout(5000);
+            
 
         });
     }
