@@ -569,7 +569,7 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(500);
     // await page
     //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
     //   .first()
