@@ -110,6 +110,7 @@ pub mod sessions_cache_utils {
 
         let mut interval =
             tokio::time::interval(std::time::Duration::from_secs(interval_secs as u64));
+        interval.tick().await;
 
         tokio::spawn(async move {
             loop {

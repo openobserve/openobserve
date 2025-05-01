@@ -136,10 +136,10 @@ pub async fn handle_search_request(
             let err_res = WsServerEvents::error_response(
                 &Error::Message(e.to_string()),
                 Some(req_id.to_string()),
-                Some(trace_id),
+                Some(trace_id.clone()),
                 Default::default(),
             );
-            send_message(req_id, err_res.to_json()).await?;
+            send_message(req_id, err_res.to_json(), &trace_id).await?;
             return Ok(());
         }
     };
@@ -153,10 +153,10 @@ pub async fn handle_search_request(
             let err_res = WsServerEvents::error_response(
                 &Error::Message(e),
                 Some(req_id.to_string()),
-                Some(trace_id),
+                Some(trace_id.clone()),
                 Default::default(),
             );
-            send_message(req_id, err_res.to_json()).await?;
+            send_message(req_id, err_res.to_json(), &trace_id).await?;
             return Ok(());
         }
     }
@@ -214,6 +214,7 @@ pub async fn handle_search_request(
             event_type: req.event_type().to_string(),
         }
         .to_json(),
+        &trace_id,
     )
     .await?;
 
@@ -346,7 +347,7 @@ pub async fn handle_search_request(
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
-    send_message(req_id, end_res.to_json()).await?;
+    send_message(req_id, end_res.to_json(), &trace_id).await?;
 
     Ok(())
 }
@@ -704,7 +705,7 @@ async fn process_delta(
                 result_cache_ratio,
                 accumulated_results.len()
             );
-            send_message(req_id, ws_search_res.to_json()).await?;
+            send_message(req_id, ws_search_res.to_json(), &trace_id).await?;
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -748,6 +749,7 @@ async fn process_delta(
                     event_type: req.event_type().to_string(),
                 }
                 .to_json(),
+                &trace_id,
             )
             .await?;
         }
@@ -871,7 +873,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
         accumulated_results.len()
     );
-    send_message(req_id, ws_search_res.to_json()).await?;
+    send_message(req_id, ws_search_res.to_json(), trace_id).await?;
 
     // Send progress update
     {
@@ -890,6 +892,7 @@ async fn send_cached_responses(
                 event_type: req.event_type().to_string(),
             }
             .to_json(),
+            trace_id,
         )
         .await?;
     }
@@ -1036,7 +1039,7 @@ pub async fn do_partitioned_search(
                 },
                 streaming_aggs: is_streaming_aggs,
             };
-            send_message(req_id, ws_search_res.to_json()).await?;
+            send_message(req_id, ws_search_res.to_json(), trace_id).await?;
         }
 
         // Send progress update
@@ -1056,6 +1059,7 @@ pub async fn do_partitioned_search(
                     event_type: "search".to_string(),
                 }
                 .to_json(),
+                trace_id,
             )
             .await?;
         }
@@ -1115,7 +1119,7 @@ async fn send_partial_search_resp(
         trace_id
     );
 
-    send_message(req_id, ws_search_res.to_json()).await?;
+    send_message(req_id, ws_search_res.to_json(), trace_id).await?;
 
     Ok(())
 }
