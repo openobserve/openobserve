@@ -63,6 +63,9 @@ use crate::{
 pub mod grpc;
 pub mod ingestion_service;
 
+pub const SERVICE_NAME: &str = "service.name";
+pub const SERVICE: &str = "service";
+
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
