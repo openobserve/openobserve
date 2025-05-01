@@ -335,12 +335,15 @@ export const usePanelDataLoader = (
     }
   };
 
+  // res is optional, it is used to pass the streaming_output and streaming_id
+  // from partition api response only not for ws search
   const getHistogramSearchRequest = async (
     query: string,
     it: any,
     startISOTimestamp: string,
     endISOTimestamp: string,
     histogramInterval: string | null,
+    res?: any,
   ) => {
     return {
       sql: await changeHistogramInterval(query, histogramInterval ?? null),
@@ -352,6 +355,8 @@ export const usePanelDataLoader = (
       start_time: startISOTimestamp,
       end_time: endISOTimestamp,
       size: -1,
+      streaming_output: res?.data?.streaming_output ?? false,
+      streaming_id: res?.data?.streaming_id ?? null,
     };
   };
 
@@ -385,6 +390,7 @@ export const usePanelDataLoader = (
               sql_mode: "full",
               start_time: startISOTimestamp,
               end_time: endISOTimestamp,
+              streaming_output: true,
               size: -1,
             },
             page_type: pageType,
@@ -457,6 +463,7 @@ export const usePanelDataLoader = (
                       partition[0],
                       partition[1],
                       histogramInterval,
+                      res,
                     ),
                   },
                   page_type: pageType,
@@ -503,8 +510,11 @@ export const usePanelDataLoader = (
             break;
           }
 
+          if (res?.data?.streaming_aggs) {
+            state.data[currentQueryIndex] = [...searchRes.data.hits];
+          }
           // if order by is desc, append new partition response at end
-          if (order_by.toLowerCase() === "desc") {
+          else if (order_by.toLowerCase() === "desc") {
             state.data[currentQueryIndex] = [
               ...(state.data[currentQueryIndex] ?? []),
               ...searchRes.data.hits,
