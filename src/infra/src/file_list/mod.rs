@@ -52,8 +52,8 @@ pub fn connect_local_cache() -> Box<dyn FileList> {
 pub trait FileList: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
-    async fn add(&self, file: &str, meta: &FileMeta) -> Result<()>;
-    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()>;
+    async fn add(&self, account: &str, file: &str, meta: &FileMeta) -> Result<()>;
+    async fn add_history(&self, account: &str, file: &str, meta: &FileMeta) -> Result<()>;
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()>;
@@ -71,7 +71,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()>;
-    async fn list(&self) -> Result<Vec<(String, FileMeta)>>;
+    async fn list(&self) -> Result<Vec<(String, String, FileMeta)>>;
     async fn query(
         &self,
         org_id: &str,
@@ -80,15 +80,15 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
-    ) -> Result<Vec<(String, FileMeta)>>;
+    ) -> Result<Vec<(String, String, FileMeta)>>;
     async fn query_for_merge(
         &self,
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
         date_range: Option<(String, String)>,
-    ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>>;
+    ) -> Result<Vec<(String, String, FileMeta)>>;
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, String, FileMeta)>>;
     async fn query_ids(
         &self,
         org_id: &str,
@@ -192,13 +192,13 @@ pub async fn create_table_index() -> Result<()> {
 }
 
 #[inline]
-pub async fn add(file: &str, meta: &FileMeta) -> Result<()> {
-    CLIENT.add(file, meta).await
+pub async fn add(account: &str, file: &str, meta: &FileMeta) -> Result<()> {
+    CLIENT.add(account, file, meta).await
 }
 
 #[inline]
-pub async fn add_history(file: &str, meta: &FileMeta) -> Result<()> {
-    CLIENT.add_history(file, meta).await
+pub async fn add_history(account: &str, file: &str, meta: &FileMeta) -> Result<()> {
+    CLIENT.add_history(account, file, meta).await
 }
 
 #[inline]
@@ -261,7 +261,7 @@ pub async fn update_compressed_size(file: &str, size: i64) -> Result<()> {
 }
 
 #[inline]
-pub async fn list() -> Result<Vec<(String, FileMeta)>> {
+pub async fn list() -> Result<Vec<(String, String, FileMeta)>> {
     CLIENT.list().await
 }
 
@@ -274,7 +274,7 @@ pub async fn query(
     time_level: PartitionTimeLevel,
     time_range: Option<(i64, i64)>,
     flattened: Option<bool>,
-) -> Result<Vec<(String, FileMeta)>> {
+) -> Result<Vec<(String, String, FileMeta)>> {
     validate_time_range(time_range)?;
     CLIENT
         .query(
@@ -295,7 +295,7 @@ pub async fn query_for_merge(
     stream_type: StreamType,
     stream_name: &str,
     date_range: Option<(String, String)>,
-) -> Result<Vec<(String, FileMeta)>> {
+) -> Result<Vec<(String, String, FileMeta)>> {
     CLIENT
         .query_for_merge(org_id, stream_type, stream_name, date_range)
         .await
@@ -303,7 +303,7 @@ pub async fn query_for_merge(
 
 #[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
-pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
+pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, String, FileMeta)>> {
     CLIENT.query_by_ids(ids).await
 }
 
@@ -552,6 +552,8 @@ pub struct FileRecord {
     #[sqlx(default)]
     pub id: i64,
     #[sqlx(default)]
+    pub account: String,
+    #[sqlx(default)]
     pub org: String,
     #[sqlx(default)]
     pub stream: String,
@@ -613,6 +615,8 @@ impl From<&StatsRecord> for StreamStats {
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileDeletedRecord {
+    #[sqlx(default)]
+    pub account: String,
     pub stream: String,
     pub date: String,
     pub file: String,

@@ -35,7 +35,7 @@ pub async fn load_file_list_from_s3(prefix: &str, insert: bool) -> Result<(), an
         let (org, stream) = stream_key.split_once('/').unwrap();
         let file_meta = infra::storage::get_file_meta(file).await?;
         if insert {
-            if let Err(e) = infra::file_list::add(file, &file_meta).await {
+            if let Err(e) = infra::file_list::add("", file, &file_meta).await {
                 println!("insert to db with file {} error: {}", file, e);
             }
         } else {
