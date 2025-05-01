@@ -1,12 +1,17 @@
+# websocket_page.py
 import json
 import websocket
 import uuid
 from datetime import datetime, timezone, timedelta
 import os
+import re
+import base64
 
+ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")
+ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")
 
 class WebSocketPage:
-    def __init__(self, org_id, access_token: str, cookies: dict, base_url: str = None):
+    def __init__(self, org_id, cookies, base_url: str = None):
         # Get WebSocket URL from base_url or environment
         if base_url:
             # Convert http to ws
@@ -23,26 +28,30 @@ class WebSocketPage:
         ws_url = ws_url.rstrip('/') + '/'
         # Construct the WebSocket URL
         self.url = f"{ws_url}api/{org_id}/ws/v2/{connection_uuid}"
-        self.access_token = access_token
         self.cookies = cookies
         self.ws = None
 
     def connect(self):
-        cookie_str = "; ".join([f"{k}={v}" for k, v in self.cookies.items()])
+        # Extract the Basic auth token from cookies
+        match = re.search(r'"access_token":"Basic ([^"]+)"', self.cookies)
+        if not match:
+            raise ValueError("Invalid cookie format - Basic auth token not found")
+        
+        basic_auth_token = match.group(1)
+        
         headers = {
             "Upgrade": "websocket",
             "Cache-Control": "no-cache",
             "Accept-Language": "en-US,en;q=0.9",
             "Pragma": "no-cache",
-            "Cookie": cookie_str,
             "Connection": "Upgrade",
             "Sec-WebSocket-Key": str(uuid.uuid4()),
             "Sec-WebSocket-Version": "13",
-            "Authorization": self.access_token
+            "Authorization": f"Basic {basic_auth_token}"
         }
         print("WebSocket URL:", self.url)
         print("WebSocket Headers:", headers)
-        self.ws = websocket.create_connection(self.url, header=headers, enable_multithread=True)
+        self.ws = websocket.create_connection(self.url, header=headers)
 
     def send_search(self, org_id: str, idTrace: str):
 
@@ -71,6 +80,8 @@ class WebSocketPage:
                 "org_id": org_id
             }
         }
+        if self.ws is None:
+            raise RuntimeError("WebSocket is not connected. Call connect() first.")
         self.ws.send(json.dumps(payload))
 
     def send_cancel(self, org_id: str, idTrace: str):
@@ -82,10 +93,13 @@ class WebSocketPage:
                 "org_id": org_id
             }
         }
+        if self.ws is None:
+            raise RuntimeError("WebSocket is not connected. Call connect() first.")
         self.ws.send(json.dumps(cancel_payload))
 
     def receive(self):
         return self.ws.recv()
 
     def close(self):
-        self.ws.close()
+        if self.ws is not None:
+            self.ws.close()
