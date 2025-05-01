@@ -18,6 +18,7 @@ export default class DashboardactionPage {
 
   // Save panel button
   async savePanel() {
+    await this.panelSaveBtn.waitFor({ state: "visible" });
     await this.panelSaveBtn.click();
   }
 
