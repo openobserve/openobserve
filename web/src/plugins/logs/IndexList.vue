@@ -1035,7 +1035,7 @@ export default defineComponent({
             //values api using partition based api
             let queryToBeSent = searchObj.meta.sqlMode ? searchObj.data.query : query_context.replace("[INDEX_NAME]", selectedStream);
             const response = await getValuesPartition(startISOTimestamp,endISOTimestamp,name,queryToBeSent);
-            const partitions = response.data.partitions;
+            const partitions: any = response?.data.partitions || [];
           
             partitions.forEach(async (partition: any) => {
               await streamService
