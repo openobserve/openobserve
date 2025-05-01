@@ -133,6 +133,7 @@ const defaultObject = {
       : false,
     histogramDirtyFlag: false,
     sqlMode: false,
+    sqlModeManualTrigger: false,
     quickMode: false,
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
