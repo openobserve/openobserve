@@ -1037,9 +1037,10 @@ export default defineComponent({
             const response = await getValuesPartition(startISOTimestamp,endISOTimestamp,name,queryToBeSent);
             const partitions: any = response?.data.partitions || [];
           
-            partitions.forEach(async (partition: any) => {
-              await streamService
-                .fieldValues({
+
+            for (const partition of partitions) {
+              try {
+                const res: any = await streamService.fieldValues({
                   org_identifier: store.state.selectedOrganization.identifier,
                   stream_name: selectedStream,
                   start_time: partition[0],
@@ -1058,56 +1059,41 @@ export default defineComponent({
                     searchObj.meta.clusters.length > 0
                       ? searchObj.meta.clusters.join(",")
                       : "",
-                })
-                .then((res: any) => {
-                  countTotal--;
-                  if (res.data.hits.length) {
-                    res.data.hits.forEach((item: any) => {
-
-                      item.values.forEach((subItem: any) => {
-                        if (fieldValues.value[name]["values"].length) {
-                          let index = fieldValues.value[name]["values"].findIndex(
-                            (value: any) => value.key == subItem.zo_sql_key,
-                          );
-                          if (index != -1) {
-                            fieldValues.value[name]["values"][index].count =
-                              parseInt(subItem.zo_sql_num) +
-                              fieldValues.value[name]["values"][index].count;
-                          } else {
-                            fieldValues.value[name]["values"].push({
-                              key: subItem.zo_sql_key,
-                              count: subItem.zo_sql_num,
-                            });
-                          }
-                        } else {
-                          fieldValues.value[name]["values"].push({
-                            key: subItem.zo_sql_key,
-                            count: subItem.zo_sql_num,
-                          });
-                        }
-                      });
-                    });
-                    if (fieldValues.value[name]["values"].length > 10) {
-                      fieldValues.value[name]["values"].sort(
-                        (a, b) => b.count - a.count,
-                      ); // Sort the array based on count in descending order
-                      fieldValues.value[name]["values"] = fieldValues.value[name][
-                        "values"
-                      ].slice(0, 10); // Return the first 10 elements
-                    }
-                  }
-                })
-                .catch((err: any) => {
-                  console.error("Failed to fetch field values:", err);
-                  fieldValues.value[name].errMsg = "Failed to fetch field values";
-                })
-                .finally(() => {
-                  countTotal--;
-                  if (countTotal <= 0) {
-                    fieldValues.value[name].isLoading = false;
-                  }
                 });
-            })
+
+                if (res.data.hits.length) {
+                  res.data.hits.forEach((item: any) => {
+                    item.values.forEach((subItem: any) => {
+                      const index = fieldValues.value[name]["values"].findIndex(
+                        (value: any) => value.key === subItem.zo_sql_key,
+                      );
+                      if (index !== -1) {
+                        fieldValues.value[name]["values"][index].count += parseInt(subItem.zo_sql_num);
+                      } else {
+                        fieldValues.value[name]["values"].push({
+                          key: subItem.zo_sql_key,
+                          count: parseInt(subItem.zo_sql_num),
+                        });
+                      }
+                    });
+                  });
+
+                  if (fieldValues.value[name]["values"].length > 10) {
+                    fieldValues.value[name]["values"].sort((a, b) => b.count - a.count);
+                    fieldValues.value[name]["values"] = fieldValues.value[name]["values"].slice(0, 10);
+                  }
+                }
+              } catch (err) {
+                console.error("Failed to fetch field values:", err);
+                fieldValues.value[name].errMsg = "Failed to fetch field values";
+              } finally {
+                countTotal--;
+                if (countTotal <= 0) {
+                  fieldValues.value[name].isLoading = false;
+                }
+              }
+            }
+
           }
         }
       } catch (err) {
