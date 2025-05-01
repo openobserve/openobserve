@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::Reverse, collections::BinaryHeap, io::Error};
+use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, post, web};
 use arrow_schema::Schema;
@@ -21,7 +21,7 @@ use chrono::Utc;
 use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        search::{SearchEventType, SearchHistoryHitResponse},
+        search::{SearchEventType, SearchHistoryHitResponse, format_values_search_response},
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -1117,11 +1117,11 @@ async fn values_v1(
 
         let sql = if no_count {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
             )
         } else {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
+                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC"
             )
         };
         let mut req = req.clone();
@@ -1151,7 +1151,7 @@ async fn values_v1(
         query_results.push((field.to_string(), resp_search));
     }
 
-    let mut resp = config::meta::search::Response::default();
+    let mut final_resp = config::meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();
     let mut work_group_set = Vec::with_capacity(query_results.len());
 
@@ -1160,105 +1160,35 @@ async fn values_v1(
         .get("size")
         .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
 
-    for (key, ret) in query_results {
-        let mut top_hits: HashMap<String, i64> = HashMap::default();
-        for row in ret.hits {
-            let key = row
-                .get("zo_sql_key")
-                .map(json::get_string_value)
-                .unwrap_or("".to_string());
-            let num = row
-                .get("zo_sql_num")
-                .map(|v| v.as_i64().unwrap_or(0))
-                .unwrap_or(0);
-            let key_num = top_hits.entry(key).or_insert(0);
-            *key_num += num;
-        }
-
-        // Use a min heap (BinaryHeap with Reverse) to find top k elements
-        let mut min_heap: BinaryHeap<Reverse<(i64, String)>> =
-            BinaryHeap::with_capacity(size as usize);
-
-        if no_count {
-            // For alphabetical sorting, collect all entries first
-            let mut all_entries: Vec<_> = top_hits.into_iter().collect();
-            all_entries.sort_by(|a, b| a.0.cmp(&b.0));
-            all_entries.truncate(size as usize);
-
-            let top_hits = all_entries
-                .into_iter()
-                .map(|(k, v)| {
-                    let mut item = json::Map::new();
-                    item.insert("zo_sql_key".to_string(), json::Value::String(k));
-                    item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
-                    json::Value::Object(item)
-                })
-                .collect::<Vec<_>>();
-
-            let mut field_value: json::Map<String, json::Value> = json::Map::new();
-            field_value.insert("field".to_string(), json::Value::String(key));
-            field_value.insert("values".to_string(), json::Value::Array(top_hits));
-            hit_values.push(json::Value::Object(field_value));
-        } else {
-            // For value-based sorting, use a min heap to get top k elements
-            for (k, v) in top_hits {
-                if min_heap.len() < size as usize {
-                    // If heap not full, just add
-                    min_heap.push(Reverse((v, k)));
-                } else if !min_heap.is_empty() && v > min_heap.peek().unwrap().0.0 {
-                    // If current value is larger than smallest in heap, replace it
-                    min_heap.pop();
-                    min_heap.push(Reverse((v, k)));
-                }
-            }
-
-            // Convert heap to vector and sort in descending order
-            let mut top_elements: Vec<_> =
-                min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
-            top_elements.sort_by(|a, b| b.1.cmp(&a.1));
-
-            let top_hits = top_elements
-                .into_iter()
-                .map(|(k, v)| {
-                    let mut item = json::Map::new();
-                    item.insert("zo_sql_key".to_string(), json::Value::String(k));
-                    item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
-                    json::Value::Object(item)
-                })
-                .collect::<Vec<_>>();
-
-            let mut field_value: json::Map<String, json::Value> = json::Map::new();
-            field_value.insert("field".to_string(), json::Value::String(key));
-            field_value.insert("values".to_string(), json::Value::Array(top_hits));
-            hit_values.push(json::Value::Object(field_value));
-        }
-
-        resp.scan_size = std::cmp::max(resp.scan_size, ret.scan_size);
-        resp.scan_records = std::cmp::max(resp.scan_records, ret.scan_records);
-        resp.cached_ratio = std::cmp::max(resp.cached_ratio, ret.cached_ratio);
-        resp.result_cache_ratio = std::cmp::max(resp.result_cache_ratio, ret.result_cache_ratio);
-        work_group_set.push(ret.work_group);
+    for (key, mut resp) in query_results {
+        format_values_search_response(&mut resp, &key);
+        final_resp.scan_size = std::cmp::max(final_resp.scan_size, resp.scan_size);
+        final_resp.scan_records = std::cmp::max(final_resp.scan_records, resp.scan_records);
+        final_resp.cached_ratio = std::cmp::max(final_resp.cached_ratio, resp.cached_ratio);
+        final_resp.result_cache_ratio = std::cmp::max(final_resp.result_cache_ratio, resp.result_cache_ratio);
+        work_group_set.push(resp.work_group);
+        hit_values.extend(resp.hits);
     }
-    resp.total = fields.len();
-    resp.hits = hit_values;
-    resp.size = size;
-    resp.took = start.elapsed().as_millis() as usize;
+    final_resp.total = fields.len();
+    final_resp.hits = hit_values;
+    final_resp.size = size;
+    final_resp.took = start.elapsed().as_millis() as usize;
 
     let time = start.elapsed().as_secs_f64();
     http_report_metrics(start, org_id, stream_type, "200", "_values/v1", "", "");
 
     let req_stats = RequestStats {
-        records: resp.hits.len() as i64,
+        records: final_resp.hits.len() as i64,
         response_time: time,
-        size: resp.scan_size as f64,
+        size: final_resp.scan_size as f64,
         request_body: Some(req.query.sql),
         user_email: Some(user_id.to_string()),
         min_ts: Some(start_time),
         max_ts: Some(end_time),
-        cached_ratio: Some(resp.cached_ratio),
+        cached_ratio: Some(final_resp.cached_ratio),
         search_type: Some(SearchEventType::Values),
         trace_id: Some(trace_id),
-        took_wait_in_queue: Some(resp.took_detail.wait_in_queue),
+        took_wait_in_queue: Some(final_resp.took_detail.wait_in_queue),
         work_group: get_work_group(work_group_set),
         ..Default::default()
     };
@@ -1274,7 +1204,7 @@ async fn values_v1(
     )
     .await;
 
-    Ok(HttpResponse::Ok().json(resp))
+    Ok(HttpResponse::Ok().json(final_resp))
 }
 
 /// SearchStreamPartition
