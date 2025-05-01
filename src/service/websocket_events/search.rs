@@ -1081,6 +1081,7 @@ pub async fn do_partitioned_search(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_partial_search_resp(
     req_id: &str,
     trace_id: &str,
