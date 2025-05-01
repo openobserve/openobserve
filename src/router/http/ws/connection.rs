@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use actix_http::StatusCode;
 use async_trait::async_trait;
-use config::{RwAHashMap, get_config, utils::json};
+use config::{RwAHashMap, get_config, meta::websocket::SERVER_HEALTH_CHECK_PING_MSG, utils::json};
 use futures_util::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
@@ -316,7 +316,7 @@ impl QuerierConnection {
         self.clean_up(false, querier_conn_error).await;
     }
 
-    async fn health_check(&self) {
+    async fn _health_check(&self) {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
             get_ping_interval_secs_with_jitter() as _,
         ));
@@ -331,7 +331,12 @@ impl QuerierConnection {
                     break;
                 }
                 Some(w) => {
-                    if w.send(WsMessage::Ping(vec![])).await.is_err() {
+                    if w.send(WsMessage::Ping(
+                        SERVER_HEALTH_CHECK_PING_MSG.as_bytes().to_vec(),
+                    ))
+                    .await
+                    .is_err()
+                    {
                         log::error!(
                             "[WS::QuerierConnection] failed to send ping message to querier {}, router: {}",
                             self.querier_name,
@@ -514,10 +519,10 @@ impl Connection for QuerierConnection {
         });
 
         // Spawn health check task
-        let conn_t2 = conn.clone();
-        tokio::spawn(async move {
-            let _ = conn_t2.health_check().await;
-        });
+        // let conn_t2 = conn.clone();
+        // tokio::spawn(async move {
+        //     let _ = conn_t2.health_check().await;
+        // });
 
         Ok(conn)
     }
