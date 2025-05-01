@@ -48,6 +48,7 @@ export default class ChartTypeSelector {
   // Search field and added for X, Y,Breakdown etc.
 
   async searchAndAddField(fieldName, target) {
+    console.log(`Adding field: ${fieldName} to: ${target}`);
     const searchInput = this.page.locator(
       '[data-test="index-field-search-input"]'
     );
@@ -74,16 +75,21 @@ export default class ChartTypeSelector {
       throw new Error(`Invalid target type: ${target}`);
     }
 
+    // call stream type function here to get streamType
+    const streamType = await this.selectStream("e2e_automate");
     // Locate the specific field item container that contains the field name
-    const fieldItem = this.page.locator(`[data-test^="field-list-item-"]`, {
-      hasText: fieldName,
-    });
+    const fieldItem = this.page.locator(`[data-test="field-list-item-${streamType}-${fieldName}"]`);
 
     // Now locate the button within that field item
     const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
 
     // Click the button
+    console.log(`Clicking button: ${buttonTestId}`);
+    console.log("before click button", button);
+    
     await button.click();
+    console.log("after click");
+    
   }
 
   // Add filter condition
