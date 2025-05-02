@@ -1489,7 +1489,7 @@ pub(crate) async fn create_tantivy_index(
     }
 
     // the index file is stored in the same account as the parquet file
-    let account = storage::get_account(&parquet_file_name).unwrap_or_default();
+    let account = storage::get_account(parquet_file_name).unwrap_or_default();
     match storage::put(&account, &idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(

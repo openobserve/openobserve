@@ -687,17 +687,17 @@ pub async fn merge_by_stream(
     Ok(())
 }
 
-/// merge small files into big file, upload to storage, returns the big file key and merged files
-/// params:
-/// - thread_id: the id of the thread
-/// - org_id: the id of the organization
-/// - stream_type: the type of the stream
-/// - stream_name: the name of the stream
-/// - prefix: the prefix of the files
-/// - files_with_size: the files to merge
-/// returns:
-/// - new_files: the files that are merged
-/// - retain_file_list: the files that are not merged
+// merge small files into big file, upload to storage, returns the big file key and merged files
+// params:
+// - thread_id: the id of the thread
+// - org_id: the id of the organization
+// - stream_type: the type of the stream
+// - stream_name: the name of the stream
+// - prefix: the prefix of the files
+// - files_with_size: the files to merge
+// returns:
+// - new_files: the files that are merged
+// - retain_file_list: the files that are not merged
 pub async fn merge_files(
     thread_id: usize,
     org_id: &str,
