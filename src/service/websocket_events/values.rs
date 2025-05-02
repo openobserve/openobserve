@@ -30,17 +30,16 @@ use crate::{
     handler::http::request::{search::build_search_request_per_field, ws::session::send_message},
     service::{
         search::{cache, sql::Sql},
+        setup_tracing_with_trace_id,
         websocket_events::{
             WsServerEvents,
             search::{
                 do_partitioned_search, handle_cache_responses_and_deltas, write_results_to_cache,
             },
-            setup_tracing_with_trace_id,
         },
     },
 };
 
-#[tracing::instrument(name = "service:search:websocket::handle_values_request", skip_all)]
 pub async fn handle_values_request(
     org_id: &str,
     user_id: &str,
@@ -62,7 +61,7 @@ pub async fn handle_values_request(
     // Setup tracing
     let ws_values_span = setup_tracing_with_trace_id(
         &trace_id,
-        tracing::info_span!("src::service::websocket_events::values::handle_values_request"),
+        tracing::info_span!("service:websocket_events:values:handle_values_request"),
     )
     .await;
 

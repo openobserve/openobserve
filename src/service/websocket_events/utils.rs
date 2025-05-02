@@ -14,17 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::{
-    ider,
-    meta::{
-        sql::OrderBy,
-        websocket::{SearchEventReq, ValuesEventReq},
-    },
+use config::meta::{
+    sql::OrderBy,
+    websocket::{SearchEventReq, ValuesEventReq},
 };
 use infra::errors;
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::tungstenite;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 
@@ -234,21 +230,6 @@ pub mod sessions_cache_utils {
         drop(r);
         res
     }
-}
-
-/// Setup tracing with a trace ID
-pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) -> tracing::Span {
-    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    let traceparent = format!(
-        "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be
-                        * recorded/exported */
-        trace_id,
-        ider::generate_span_id()
-    );
-    headers.insert("traceparent".to_string(), traceparent);
-    let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
-    span.set_parent(parent_ctx);
-    span
 }
 
 /// Represents the different types of WebSocket client messages that can be sent.

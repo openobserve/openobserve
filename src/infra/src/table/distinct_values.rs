@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl},
     errors::{self, DbError, Error},
 };
 
@@ -109,7 +109,7 @@ pub async fn init() -> Result<(), errors::Error> {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
