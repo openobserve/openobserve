@@ -13,7 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use object_store::path::Path;
+
 pub mod file_list;
 pub mod file_statistics_cache;
 pub mod memory;
 pub mod wal;
+
+fn format_location(location: &Path) -> (String, Path) {
+    let mut path = location.to_string();
+    if let Some(p) = path.find("/$$/") {
+        path = path[p + 4..].to_string();
+    }
+    let mut account = String::new();
+    if let Some(p) = path.find("/##/") {
+        account = path[..p].to_string();
+        path = path[p + 4..].to_string();
+    }
+    (account.to_string(), path.into())
+}
