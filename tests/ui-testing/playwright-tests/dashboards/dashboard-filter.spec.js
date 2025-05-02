@@ -586,16 +586,11 @@ test.describe("dashboard filter testcases", () => {
     //   .getByText("Filters on Fieldarrow_drop_down")
     //   .fill("kubernetes_container_image");
 
-    // Wait for the dropdown trigger to be visible instead of using timeout
-    await page.waitForSelector("text=Filters on Fieldarrow_drop_down", {
-      timeout: 15000,
-    });
-
-    const dropdown = page
-      .locator('[data-test="dashboard-filter-field-dropdown"]')
-      .first();
-    await dropdown.click();
-    await dropdown.fill("kubernetes_container_image");
+    const lastInput = page
+      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
+      .last();
+    await lastInput.click();
+    lastInput.fill("kubernetes_container_image");
 
     await page.getByText("kubernetes_container_image", { exact: true }).click();
 
