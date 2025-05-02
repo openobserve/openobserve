@@ -569,24 +569,31 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
-    await page.waitForTimeout(500);
+    // await page.waitForTimeout(500);
     // await page
     //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
     //   .first()
     //   .click();
 
-    await page.getByText("Filters on Fieldarrow_drop_down").click();
+    // await page.getByText("Filters on Fieldarrow_drop_down").click();
 
     // await page
     //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
     //   .first()
     //   .fill("kubernetes_container_image");
 
-    await page
-      .getByText("Filters on Fieldarrow_drop_down")
-      .fill("kubernetes_container_image");
+    // await page
+    //   .getByText("Filters on Fieldarrow_drop_down")
+    //   .fill("kubernetes_container_image");
 
-    // await page.waitForTimeout(4000);
+    // Wait for the dropdown trigger to be visible instead of using timeout
+    await page.waitForSelector("text=Filters on Fieldarrow_drop_down", {
+      timeout: 15000,
+    });
+
+    const dropdown = page.getByText("Filters on Fieldarrow_drop_down");
+    await dropdown.click();
+    await dropdown.fill("kubernetes_container_image");
 
     await page.getByText("kubernetes_container_image", { exact: true }).click();
 
