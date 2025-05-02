@@ -23,7 +23,8 @@ use crate::{
         cli::{Cli as dataCli, args as dataArgs},
         export, import,
     },
-    common::{infra::config::USERS, meta, migration},
+    common::{infra::config::USERS, meta},
+    migration,
     service::{compact, db, file_list, users},
 };
 
@@ -217,6 +218,8 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .required(true)
                     .help("snowflake id"),
             ]),
+            clap::Command::new("upgrade-db")
+                .about("upgrade db table schemas").args(dataArgs()),
         ])
         .get_matches();
 
@@ -470,6 +473,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let t = chrono::Utc.timestamp_nanos(ts * 1_000_000);
             let td = t.format("%Y-%m-%dT%H:%M:%SZ").to_string();
             println!("datetimes: {}", td);
+        }
+        "upgrade-db" => {
+            crate::migration::init_db().await?;
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));
