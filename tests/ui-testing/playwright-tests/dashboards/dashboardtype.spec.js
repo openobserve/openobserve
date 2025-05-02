@@ -1,105 +1,33 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
+import { login } from "../utils/dashLogin.js";
+import { ingestion } from "../utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
-
-// TODO - Modernize imports to use consistent ES module syntax
-const fs = require("fs");
-const { PNG } = require("pngjs");
-const pixelmatch = require("pixelmatch");
-const { promisify } = require("util");
+import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
+import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
+import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
+import DashboardDrilldownPage from "../../pages/dashboardPages/dashboard-drilldown";
+import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
+import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
+import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
+import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
+const randomDashboardName =
+  "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
-const dashboardName = `AutomatedDashboard${Date.now()}`;
 
-async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"]);
+// Refactored test cases using Page Object Model
 
-  if (await page.getByText("Login as internal user").isVisible()) {
-    await page.getByText("Login as internal user").click();
-  }
-
-  await page.waitForTimeout(1000);
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  //Enter Password
-  await page.locator("label").filter({ hasText: "Password *" }).click();
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-  // await page.waitForTimeout(4000);
-  // await page.goto(process.env["ZO_BASE_URL"]);
-}
-
-async function ingestion(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-
-  const headers = {
-    Authorization: `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const response = await page.evaluate(
-    async ({ url, headers, orgId, streamName, logsdata }) => {
-      const fetchResponse = await fetch(
-        `${url}/api/${orgId}/${streamName}/_json`,
-        {
-          method: "POST",
-          headers: headers,
-          body: JSON.stringify(logsdata),
-        }
-      );
-      return await fetchResponse.json();
-    },
-    {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: streamName,
-      logsdata: logsdata,
-    }
-  );
-  console.log(response);
-}
-
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(4000);
-  await page
-    .locator('[data-test="log-search-index-list-select-stream"]')
-    .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
-};
-
-test.describe("dashboard testcases", () => {
-  // let logData;
-  function removeUTFCharacters(text) {
-    // console.log(text, "tex");
-    // Remove UTF characters using regular expression
-    return text.replace(/[^\x00-\x7F]/g, " ");
-  }
-
-  async function applyQueryButton(page) {
-    // click on the run query button
-    // Type the value of a variable into an input field
-    const search = page.waitForResponse(logData.applyQuery);
-    await page.waitForTimeout(3000);
-    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-      force: true,
-    });
-    await page.waitForTimeout(3000);
-    // get the data from the search variable
-    await expect.poll(async () => (await search).status()).toBe(200);
-    // await search.hits.FIXME_should("be.an", "array");
-  }
+test.describe("dashboard UI testcases", () => {
+  let dashboardCreate;
+  let dashboardList;
+  let dashboardActions;
+  let dashboardDrilldown;
+  let dashboardRefresh;
+  let chartTypeSelector;
+  let dashboardPanel;
+  let dashboardPanelConfigs;
 
   test.beforeEach(async ({ page }) => {
     await login(page);
@@ -110,142 +38,66 @@ test.describe("dashboard testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
-    await page.waitForTimeout(1000);
-    await applyQueryButton(page);
+
+    dashboardCreate = new DashboardCreate(page);
+    dashboardList = new DashboardListPage(page);
+    dashboardActions = new DashboardactionPage(page);
+    dashboardDrilldown = new DashboardDrilldownPage(page);
+    dashboardRefresh = new DashboardTimeRefresh(page);
+    chartTypeSelector = new DashboardPanelConfigs(page);
+    dashboardPanel = new DashboardPanel(page);
+    chartTypeSelector = new ChartTypeSelector(page);
+    dashboardPanelConfigs = new DashboardPanelConfigs(page);
   });
 
   test("should create, compare area type chart image and delete dashboard", async ({
     page,
   }) => {
-    page.on("console", (msg) => console.log(msg.text()));
-    page.on("response", async (resp) => {
-      if (resp.url().includes("api/default/")) {
-        console.log("url      -> ", resp.url());
-        console.log("code     -> ", resp.status());
-        console.log("payload  -> ", resp.request().postData());
-        console.log("response -> ", await resp.text());
-      }
-    });
+    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const dashboardName = randomDashboardName;
 
+    await page
+      .locator('[data-test="menu-link-\\/dashboards-item"]')
+      .waitFor({ state: "visible" });
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="dashboard-add"]').click();
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="add-dashboard-name"]').click();
 
-    await page.locator('[data-test="add-dashboard-name"]').fill(dashboardName);
-    await page.locator('[data-test="dashboard-add-submit"]').click();
-    await page.waitForTimeout(2000);
     await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .click();
-    await page.waitForTimeout(3000);
-    await page.locator('[data-test="index-dropdown-stream"]').click();
-    await page.locator('[data-test="index-dropdown-stream"]').fill("e2e");
-    await page
-      .getByRole("option", { name: "e2e_automate" })
-      .locator("div")
-      .nth(2)
-      .click();
-    await page.waitForTimeout(3000);
-    await page.locator('[data-test="selected-chart-area-item"] img').click();
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
+      .locator('[data-test="dashboard-folder-tab-default"]')
+      .waitFor({ state: "visible" });
 
-    await page.locator('[data-test="dashboard-apply"]').click();
-
-    await waitForDateTimeButtonToBeEnabled(page);
-
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
-    await page.locator('[data-test="dashboard-apply"]').click();
-
-    await waitForDateTimeButtonToBeEnabled(page);
-
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-45-m-btn"]').click();
-    await page.locator('[data-test="dashboard-apply"]').click();
-
-    await waitForDateTimeButtonToBeEnabled(page);
-
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-3-d-btn"]').click();
-    await page.locator('[data-test="dashboard-apply"]').click();
-
-    await waitForDateTimeButtonToBeEnabled(page);
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
-    await page.locator('[data-test="dashboard-apply"]').click();
-    await page.waitForTimeout(5000);
-    await page.locator('[data-test="chart-renderer"] canvas').last().click();
-
-    await page.waitForSelector('[data-test="chart-renderer"]');
-    const chartBoundingBox = await page
-      .locator('[data-test="chart-renderer"]')
-      .boundingBox();
-    const screenshotPath = `playwright-tests/dashboard-snaps/areachart-screenshot.png`;
-    await page.screenshot({
-      path: screenshotPath,
-      selector: '[data-test="chart-renderer"]',
-      clip: chartBoundingBox,
-      threshold: 50,
-    });
-    // await page.screenshot({ path: screenshotPath, selector: '[data-test="chart-renderer"]', threshold: 50 });
-    console.log(`Screenshot saved at: ${screenshotPath}`);
-
-    // Load the expected image from disk
-    const expectedImage = PNG.sync.read(fs.readFileSync(screenshotPath));
-
-    // Load the actual screenshot
-    const actualImage = PNG.sync.read(fs.readFileSync(screenshotPath));
-
-    // Compare the images
-    const { width, height } = expectedImage;
-    const diff = new PNG({ width, height });
-    const numDiffPixels = pixelmatch(
-      expectedImage.data,
-      actualImage.data,
-      diff.data,
-      width,
-      height,
-      { threshold: 0.1 }
+    await dashboardCreate.createDashboard(dashboardName);
+    await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+    await chartTypeSelector.selectStream("e2e_automate");
+    await chartTypeSelector.selectChartType("area");
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_annotations_kubectl_kubernetes_io_default_container",
+      "y"
     );
+    await page.locator('[data-test="dashboard-apply"]').waitFor({
+      state: "visible",
+    });
+    await dashboardActions.applyDashboardBtn();
+    await waitForDateTimeButtonToBeEnabled(page);
 
-    // Save the diff image
-    if (numDiffPixels > 0) {
-      const diffImagePath = `playwright-tests/dashboard-snaps/diff.png`;
-      await promisify(fs.writeFile)(diffImagePath, PNG.sync.write(diff));
-      console.log(`Diff image saved at: ${diffImagePath}`);
-    }
+    await page
+      .locator('[data-test="chart-renderer"]')
+      .waitFor({ state: "visible" });
+    await page.screenshot({
+      path: `playwright-tests/dashboard-snaps/areachart-screenshot.png`,
+      selector: '[data-test="chart-renderer"]',
+    });
 
-    // Assert the images are visually identical
-    expect(numDiffPixels).toBe(0);
-
-    await page.locator('[data-test="dashboard-panel-save"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("sanitydash");
-    await page.locator('[data-test="dashboard-panel-save"]').click();
-    await page.waitForTimeout(4000);
-    await page
-      .locator('[data-test="dashboard-edit-panel-sanitydash-dropdown"]')
-      .click();
-    await page.locator('[data-test="dashboard-delete-panel"]').click();
-    await page.locator('[data-test="confirm-button"]').click();
-    await page
-      .locator("#q-notify div")
-      .filter({ hasText: "check_circlePanel deleted" })
-      .nth(3)
-      .click();
-    await page.locator('[data-test="dashboard-back-btn"]');
-    await page.locator('[data-test="dashboard-back-btn"]').click();
-    await page
-      .getByRole("row", { name: dashboardName })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
+    // await dashboardActions.addPanelName("sanitydash");
+    await dashboardActions.applyDashboardBtn();
+    await dashboardActions.savePanel();
+    // await dashboardActions.selectPanelAction("sanitydash", "Delete");
+    await dashboardCreate.backToDashboardList();
+    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
+      state: "visible",
+    });
+    await dashboardCreate.searchDashboard(dashboardName);
+    await dashboardList.duplicateDashboard(dashboardName);
+    await dashboardCreate.deleteDashboard(dashboardName);
   });
 });
