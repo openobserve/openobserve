@@ -414,39 +414,37 @@ impl QuerierConnection {
 
 impl ResponseRouter {
     pub fn new() -> Arc<Self> {
-        let response_router = Arc::new(Self {
+        Arc::new(Self {
             routes: Default::default(),
-        });
+        })
 
         // Spawn cleanup task
-        let response_router_cp = response_router.clone();
-        tokio::spawn(async move {
-            response_router_cp.spawn_cleanup_task().await;
-        });
-
-        response_router
+        // let response_router_cp = response_router.clone();
+        // tokio::spawn(async move {
+        //     response_router_cp.spawn_cleanup_task().await;
+        // });
     }
 
-    /// Ideally all the registered request should be removed from the routes after done
-    /// The only
-    async fn spawn_cleanup_task(&self) {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
-        interval.tick().await;
-        loop {
-            interval.tick().await;
-            let mut write_guard = self.routes.write().await;
-            write_guard.retain(|trace_id, response_tx| {
-                if response_tx.is_closed() {
-                    log::debug!("[WS::QuerierConnection] channel closed for trace_id {trace_id}. Removed from routes");
-                    false
-                } else {
-                    true
-                }
-            });
-            write_guard.shrink_to_fit();
-            drop(write_guard);
-        }
-    }
+    // Ideally all the registered request should be removed from the routes after done
+    // The only
+    // async fn spawn_cleanup_task(&self) {
+    //     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+    //     interval.tick().await;
+    //     loop {
+    //         interval.tick().await;
+    //         let mut write_guard = self.routes.write().await;
+    //         write_guard.retain(|trace_id, response_tx| {
+    //             if response_tx.is_closed() {
+    //                 log::debug!("[WS::QuerierConnection] channel closed for trace_id {trace_id}.
+    // Removed from routes");                 false
+    //             } else {
+    //                 true
+    //             }
+    //         });
+    //         write_guard.shrink_to_fit();
+    //         drop(write_guard);
+    //     }
+    // }
 
     pub async fn route_response(&self, message: WsServerEvents) -> WsResult<()> {
         let trace_id = message.get_trace_id();
