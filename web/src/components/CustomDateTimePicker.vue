@@ -1,12 +1,16 @@
 <template>
   <div>
     <q-btn
-      style="width: 180px"
+      :style="{
+        width: changeStyle ? '150px' : '180px',
+        height: changeStyle ? '40px' : '',
+      }"
       data-test="date-time-btn"
-      :label="getDisplayValue()"
-      icon="schedule"
+      :label="changeStyle ? getTrimmedDisplayValue() : getDisplayValue()"
+      :icon="changeStyle ? '' : 'schedule'"
       icon-right="arrow_drop_down"
       class="date-time-button"
+      :class="changeStyle ? computedClass : ''"
       outline
       no-caps
       :disable="isFirstEntry"
@@ -87,15 +91,23 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from "vue";
+import { ref, reactive, watch, computed } from "vue";
+import { useStore } from "vuex";
 
 // Define props to receive the value (offset) from parent
 const props = defineProps({
   modelValue: String, // modelValue will bind to the offSet from parent
   isFirstEntry: Boolean,
+  changeStyle: {
+    default: false,
+    required: false,
+    type: Boolean
+  }
 });
 
 const emit = defineEmits(["update:modelValue"]);
+
+const store = useStore();
 
 const picker = reactive({
   activeTab: "relative",
@@ -188,6 +200,10 @@ const getDisplayValue = () => {
   return `${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label} ago`;
 };
 
+const getTrimmedDisplayValue = () => {
+return `${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
+}
+
 // Check if the current selection matches the modelValue
 const isSelected = (value, period) => {
   return (
@@ -203,6 +219,10 @@ const getPeriodLabel = () => {
   );
   return selectedPeriod ? selectedPeriod.label : "Minutes";
 };
+
+const computedClass = computed(() => {
+  return props.changeStyle ? store.state.theme === 'dark' ? 'dark-mode-date-time-picker' : 'light-mode-date-time-picker' : ''
+})
 </script>
 
 <style scoped>
@@ -441,5 +461,12 @@ const getPeriodLabel = () => {
   text-transform: capitalize;
   background: #f2f2f2 !important;
   color: #000 !important;
+}
+.dark-mode-date-time-picker{
+  background-color: #2A2828 !important;
+  color: #ffffff !important;
+}
+.light-mode-date-time-picker{
+  background-color: #ffffff !important;
 }
 </style>

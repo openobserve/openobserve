@@ -16,240 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="scheduled-alerts q-pa-none q-ma-none">
-   <div class="  tw-w-full row alert-setup-container " style="width: calc(100vw - 600px); margin-left: 8px;">
+
+
+    <!-- first section -->
+
+   <div class=" tw-w-full row alert-setup-container " style=" margin-left: 8px;">
     <AlertsContainer 
-      name="query"
-      v-model:is-expanded="expandState.queryMode"
-      label="Query Mode - Quick / SQL"
-      subLabel="What should trigger the alert."
-      class="tw-mt-1 tw-w-full col-12"
-      @update:is-expanded="()=>emits('update:expandState', expandState)"
-    />
-    <!-- query mode section -->
-    <div v-if="expandState.queryMode" class="q-px-lg" style="width: calc(100vw - 600px);">
-      <div v-if="!disableQueryTypeSelection" class="scheduled-alert-tabs q-my-lg"
-      :style="{
-        width: alertData.stream_type === 'metrics' ? '400px' : '200px'
-      }"
-      
-      >
-      <q-tabs
-        data-test="scheduled-alert-tabs"
-        v-model="tab"
-        no-caps
-        outside-arrows
-        size="sm"
-        mobile-arrows
-        class="bg-white text-primary"
-        @update:model-value="updateTab"
-      >
-        <q-tab
-          data-test="scheduled-alert-custom-tab"
-          name="custom"
-          :label="t('alerts.quick')"
-        />
-        <q-tab
-          data-test="scheduled-alert-sql-tab"
-          name="sql"
-          :label="t('alerts.sql')"
-        />
-        <q-tab
-          data-test="scheduled-alert-metrics-tab"
-          v-if="alertData.stream_type === 'metrics'"
-          name="promql"
-          :label="t('alerts.promql')"
-        />
-      </q-tabs>
-      </div>
-      <template v-if="tab === 'custom'" class='q-pa-none q-ma-none' style="width: calc(100vw - 600px);">
-        <FieldsInputWithMulti
-          v-if="expandState.queryMode"
-          class="q-mt-md"
-          :stream-fields="columns"
-          :fields="testFields"
-          @add="addField"
-          @addConditionGroup="addConditionGroup"
-          @remove="removeField"
-          @input:update="(name, field) => emits('input:update', name, field)"
-        />
-      </template>
-      <template v-else>
-        <div style="width: calc(100% - 2px)" class="tw-flex tw-justify-between tw-items-center q-px-lg q-py-sm"
-
-        :class="store.state.theme === 'dark' ? 'border-input-box' : 'border-input-box-light'"
-        
-        >
-          <div class="  ">
-            <q-btn
-              class=" q-pa-none q-ma-none q-mr-sm rounded-border-btn"
-              :icon="false ? 'fullscreen_exit' : 'fullscreen'"
-              rounded
-              size="10px"
-              :class="[
-              store.state.theme === 'dark'
-                ? 'tw-text-gray-100 tw-bg-gray-600'
-                : 'tw-text-gray-900 tw-bg-gray-300',
-            ]"
-            v-model="isFullScreen"
-            @click="()=> isFullScreen = !isFullScreen"
-            >
-            </q-btn>
-            <span>            {{ tab === "promql" ? "Promql" : "SQL Editor" }}
-            </span>
-          </div>
-          <q-toggle
-            v-if="!disableVrlFunction"
-            data-test="logs-search-bar-show-query-toggle-btn"
-            v-model="isVrlFunctionEnabled"
-            :icon="'img:' + getImageURL('images/common/function.svg')"
-            title="Toggle Function Editor"
-            class="q-pl-xs"
-            size="30px"
-            @update:model-value="updateFunctionVisibility"
-            :disable="tab === 'promql'"
-          />
-        </div>
-
-        <div class="flex tw-w-full " style="width: 100%;">
-          <!-- sql editor -->
-          <template v-if="tab === 'sql'">
-            <div class="tw-w-full">
-              <query-editor
-                data-test="scheduled-alert-sql-editor"
-                ref="queryEditorRef"
-                editor-id="alerts-query-editor"
-                class="monaco-editor q-py-sm"
-                :debounceTime="300"
-                v-model:query="query"
-                :class="
-                  query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
-                "
-                @update:query="updateQueryValue"
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="onBlurQueryEditor"
-              />
-              <div class="text-negative q-py-sm invalid-sql-error">
-                <span v-show="!!sqlQueryErrorMsg">
-                  Error: {{ sqlQueryErrorMsg }}</span
-                >
-              </div>
-            </div>
-          </template>
-
-          <!-- promql editor -->
-
-          <template v-if="tab === 'promql'">
-            <query-editor
-              data-test="scheduled-alert-promql-editor"
-              ref="queryEditorRef"
-              editor-id="alerts-query-editor"
-              class="monaco-editor q-mb-md"
-              :debounceTime="300"
-              v-model:query="promqlQuery"
-              @update:query="updateQueryValue"
-            />
-          </template>
-
-          <!-- vrl function editor -->
-
-          <div
-            data-test="logs-vrl-function-editor"
-            class="tw-w-full"
-            v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'"
-          >
-            <div style="height: 40px; width: 100%">
-              <div style="display: flex; height: 40px">
-                <q-select
-                  v-model="selectedFunction"
-                  label="Use Saved function"
-                  :options="functionOptions"
-                  data-test="dashboard-use-saved-vrl-function"
-                  input-debounce="0"
-                  behavior="menu"
-                  use-input
-                  filled
-                  borderless
-                  dense
-                  hide-selected
-                  menu-anchor="top left"
-                  fill-input
-                  option-label="name"
-                  option-value="name"
-                  @filter="filterFunctionOptions"
-                  @update:modelValue="onFunctionSelect"
-                  style="width: 100%"
-                >
-                  <template #no-option>
-                    <q-item>
-                      <q-item-section> {{ t("search.noResult") }}</q-item-section>
-                    </q-item>
-                  </template>
-                </q-select>
-              </div>
-            </div>
-            <query-editor
-              data-test="logs-vrl-function-editor"
-              ref="fnEditorRef"
-              editor-id="fnEditor"
-              class="monaco-editor"
-              :debounceTime="300"
-              v-model:query="vrlFunctionContent"
-              :class="
-                vrlFunctionContent == '' && functionEditorPlaceholderFlag
-                  ? 'empty-function'
-                  : ''
-              "
-              language="ruby"
-              @focus="functionEditorPlaceholderFlag = false"
-              @blur="onBlurFunctionEditor"
-            />
-
-            <div
-              class="text-subtitle2 q-pb-sm"
-              style="min-height: 21px; width: 500px"
-            >
-              <div v-if="vrlFunctionError">
-                <div class="text-negative q-mb-xs flex items-center">
-                  <q-btn
-                    :icon="
-                      isFunctionErrorExpanded ? 'expand_more' : 'chevron_right'
-                    "
-                    dense
-                    size="xs"
-                    flat
-                    class="q-mr-xs"
-                    data-test="table-row-expand-menu"
-                    @click.stop="toggleExpandFunctionError"
-                  />
-                  <div>
-                    <span v-show="vrlFunctionError">Invalid VRL function</span>
-                  </div>
-                </div>
-                <div
-                  v-if="isFunctionErrorExpanded"
-                  class="q-px-sm q-pb-sm"
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
-                  "
-                >
-                  <pre class="q-my-none" style="white-space: pre-wrap">{{
-                    vrlFunctionError
-                  }}</pre>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-    </div>
-   </div>
-
-   <div class="  q-mt-md tw-w-full row alert-setup-container " style="width: calc(100vw - 600px); margin-left: 8px;">
-    <AlertsContainer 
-      name="thresholds"
+      name="Alert Settings"
       v-model:is-expanded="expandState.thresholds"
-      label="Thresholds"
-      subLabel="set the rythm for alerts."
+      label="Alert Settings"
+      subLabel=""
+      icon="tune"
       class="tw-mt-1 tw-w-full col-12"
       @update:is-expanded="()=>emits('update:expandState', expandState)"
     />
@@ -676,86 +453,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div v-if="tab == 'sql'">
-        <div class="flex items-center q-mr-sm">
-          <div
-            data-test="multi-time-range-alerts-title"
-            class="text-bold q-py-md flex items-center"
-            style="width: 190px"
-          >
-            Multi Window Selection
-            <q-btn
-              no-caps
-              padding="xs"
-              class=""
-              size="sm"
-              flat
-              icon="info_outline"
-              data-test="multi-time-range-alerts-info-btn"
-            >
-              <q-tooltip
-                anchor="bottom middle"
-                self="top middle"
-                style="font-size: 14px"
-                max-width="300px"
-              >
-                <span
-                  >Additional timeframe for query execution: <br />
-                  For example, selecting "past 10 hours" means that each time
-                  the query runs, it will retrieve data from 10 hours prior,
-                  using the last 10 minutes of that period. <br />
-                  If the query is scheduled from 4:00 PM to 4:10 PM,
-                  additionally it will pull data from 6:00 AM to 6:10 AM.
-                </span>
-              </q-tooltip>
-            </q-btn>
-          </div>
-        </div>
-        <div
-          v-for="(picker, index) in dateTimePicker"
-          :key="index"
-          class="q-mb-md"
-        >
-          <div class="flex">
-            <CustomDateTimePicker
-              v-model="picker.offSet"
-              :picker="picker"
-              :isFirstEntry="false"
-              @update:model-value="updateDateTimePicker"
-            />
-            <q-btn
-              data-test="multi-time-range-alerts-delete-btn"
-              :icon="outlinedDelete"
-              class="iconHoverBtn q-ml-xs q-mr-sm"
-              :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-              padding="xs"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alert_templates.delete')"
-              @click="removeTimeShift(index)"
-              style="min-width: auto"
-            />
-          </div>
-        </div>
-        <div>
-          <q-btn
-            data-test="multi-time-range-alerts-add-btn"
-            label="Add Time Shift"
-            size="sm"
-            class="text-bold add-variable"
-            icon="add"
-            style="
-              border-radius: 4px;
-              text-transform: capitalize;
-              background: #f2f2f2 !important;
-              color: #000 !important;
-            "
-            @click="addTimeShift"
-          />
-        </div>
-      </div>
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-cron-toggle-title"
@@ -1129,231 +826,886 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
      </div>
    </div>
-<q-dialog maximized v-model="isFullScreen" class="tw-w-full"  position="right"
-  style="height: 90%;
-  "
+
+   <!-- multi time range selection -->
+   <div class=" q-mt-md tw-w-full row alert-setup-container " style=" margin-left: 8px;">
+    <AlertsContainer 
+      name="Multi Window"
+      v-model:is-expanded="expandState.multiWindowSelection"
+      label="Multi Window"
+      subLabel="Set relative alerting system based on SQL query"
+      class="tw-mt-1 tw-w-full col-12"
+      :image="getImageURL('images/alerts/multi_window.svg')"
+      @update:is-expanded="()=>emits('update:expandState', expandState)"
+    >  
+  </AlertsContainer>
+  <div class="tw-w-full " 
+   v-if="expandState.multiWindowSelection"
+   :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div  class="tw-w-full flex scheduled-alerts" style="width: 100%; height: 100%">
 
+    <div class="  q-px-lg q-mt-sm tw-w-full">
 
-          <div class="flex justify-between tw-w-full" style="height: 90%;"
-          >
-    
-            <!-- sql editor -->
-            <div v-if="tab === 'sql'">
-              <div style="height: 60px;"  class=" tw-w-full tw-flex tw-justify-between tw-items-center q-px-lg border-input-box bg-grey-10 q-py-sm" >
-            <div class=" ">
-              <q-btn
-                class=" q-pa-none q-ma-none q-mr-sm rounded-border-btn"
-                :icon="isFullScreen ? 'fullscreen_exit' : 'fullscreen'"
-                rounded
-                size="10px"
-                :class="[
-                store.state.theme === 'dark'
-                  ? 'tw-text-gray-100 tw-bg-gray-600'
-                  : 'tw-text-gray-900 tw-bg-gray-300',
-              ]"
-              v-model="isFullScreen"
-              @click="()=> isFullScreen = !isFullScreen"
-              >
-              </q-btn>
-              <span class="dialog-title-each-tab">  {{ tab === "promql" ? "Promql" : "SQL Editor" }}
-              </span>
-            </div>
-            <q-toggle
-              v-if="!disableVrlFunction"
-              data-test="logs-search-bar-show-query-toggle-btn"
-              v-model="isVrlFunctionEnabled"
-              :icon="'img:' + getImageURL('images/common/function.svg')"
-              title="Toggle Function Editor"
-              class="q-pl-xs"
-              size="30px"
-              @update:model-value="updateFunctionVisibility"
-              :disable="tab === 'promql'"
-            />
+      <!-- current window -->
+      <div class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-md">
+          <span>Alert set for</span>
+          <div class=" tw-h-px border-line tw-flex-1"></div>
+        </div>
+        <div class="tw-flex tw-flex-col lg:tw-flex-row tw-justify-between tw-items-start multi-window-container  q-mx-sm q-px-md q-py-sm ">
+          <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
+            Current window 
           </div>
-              <div class=" tw-h-full scheduled-alerts-dialog">
+          <div class="tw-flex lg:tw-flex-col  tw-items-start tw-gap-2">
+            <div class="multi-window-text tw-w-full lg:tw-w-auto">
+              Cycle
+              <span><q-icon name="info" size="20px" /></span>
+            </div>
+            <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
+              <div class="tw-w-full lg:tw-w-[300px] running-text">
+                Runnig for 1 hour in the interval of every 30mins
+              </div>
+              <div>
+                <q-btn class="tw-rounded-full" flat dense icon="edit_outline" size="16px" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class=" q-px-lg q-mt-sm tw-w-full ">
+        <!-- current window -->
+          <div v-if="dateTimePicker.length > 0"  class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-md">
+            <span>Comparing with</span>
+            <div class=" tw-h-px border-line tw-flex-1"></div>
+          </div>
+          <div  v-for="(picker, index) in dateTimePicker" 
+            :key="index" 
+            class="tw-flex tw-justify-between tw-items-start reference-window-container q-my-md  q-mx-sm q-px-md q-py-sm lg:tw-flex-row tw-flex-col ">
+            <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
+              Reference Window {{ index + 1 }}
+            </div>
+            <div class="tw-flex lg:tw-flex-col tw-gap-2 lg:tw-gap-0 tw-items-center tw-justify-between tw-h-20">
+              <div >
+                Time Frame 
+                <span><q-icon name="info" size="20px" class="tw-text-gray-600" /></span>
+              </div>
+              <CustomDateTimePicker
+                    v-model="picker.offSet"
+                    :picker="picker"
+                    :isFirstEntry="false"
+                    @update:model-value="updateDateTimePicker"
+                    :changeStyle="true"
+                  />
+            </div>
+            <div class="tw-flex lg:tw-flex-col tw-items-start tw-gap-2">
+              <div class="tw-flex tw-gap-2 multi-window-text">
+                Cycle
+                <span><q-icon name="info" size="20px" /></span>
+              </div>
+              <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
+                <div class="tw-w-full lg:tw-w-[300px] reference-text">
+                  Comparing current window query result with query result from previous {{ getDisplayValue(picker.offSet) }}.
+                </div>
+                <div>
+                  <q-btn
+                    data-test="multi-time-range-alerts-delete-btn"
+                    :icon="outlinedDelete"
+                    class="iconHoverBtn q-ml-xs q-mr-sm"
+                    :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                    padding="xs"
+                    unelevated
+                    size="16px"
+                    round
+                    flat
+                    :title="t('alert_templates.delete')"
+                    @click="removeTimeShift(index)"
+                    style="min-width: auto"
+                  />
+                </div>
+              </div>
+            </div>
+      </div>
+
+  <!-- add comparision window -->
+  <div class="tw-w-full tw-flex tw-justify-center ">
+    <q-btn
+      data-test="multi-time-range-alerts-add-btn"
+      label="Add Comparision Window"
+      size="sm"
+      class="text-bold add-variable q-pa-sm multi-window-text  "
+      style="font-size: 16px;"
+      no-caps
+      @click="addTimeShift"
+    >
+      <q-icon :class="store.state.theme === 'dark' ? 'tw-text-white  tw-font-bold q-ml-sm' : 'tw-text-black tw-font-bold q-ml-sm'" name="add" size="20px" />
+    </q-btn>
+  </div>
+  </div>
+    </div>
+   </div>
+
+   <!-- second section -->
+
+
+   <div class=" q-mt-md  tw-w-full row alert-setup-container " style=" margin-left: 8px;">
+    <AlertsContainer 
+      name="query"
+      v-model:is-expanded="expandState.queryMode"
+      label="Conditions"
+      :image="getImageURL('images/alerts/conditions_image.svg')"
+      subLabel="What should trigger the alert."
+      class="tw-mt-1 tw-w-full col-12"
+      @update:is-expanded="()=>emits('update:expandState', expandState)"
+    />
+    <!-- query mode section -->
+    <div v-if="expandState.queryMode" class="q-px-lg tw-w-full" style="">
+      <div v-if="!disableQueryTypeSelection" class="scheduled-alert-tabs q-my-lg"
+      :style="{
+        width: alertData.stream_type === 'metrics' ? '400px' : '200px'
+      }"
+      :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+      >
+      <q-tabs
+        data-test="scheduled-alert-tabs"
+        v-model="tab"
+        no-caps
+        outside-arrows
+        size="sm"
+        mobile-arrows
+        class="bg-white text-primary"
+        @update:model-value="updateTab"
+      >
+        <q-tab
+          :disable="dateTimePicker.length > 0"
+          data-test="scheduled-alert-custom-tab"
+          name="custom"
+          :label="t('alerts.quick')"
+        />
+        <q-tab
+          data-test="scheduled-alert-sql-tab"
+          name="sql"
+          :label="t('alerts.sql')"
+        />
+        <q-tab
+          data-test="scheduled-alert-metrics-tab"
+          v-if="alertData.stream_type === 'metrics'"
+          name="promql"
+          :label="t('alerts.promql')"
+        />
+      </q-tabs>
+      </div>
+      <template v-if="tab === 'custom'" class='q-pa-none q-ma-none' ">
+
+        <fields-input
+        v-if="expandState.queryMode && false"
+        class="q-mt-md"
+        :stream-fields="columns"
+        :fields="conditions"
+        @add="addField"
+        @remove="removeField"
+        @input:update="(name, field) => emits('input:update', name, field)"
+      />
+        <FieldsInputWithMulti
+          v-if="expandState.queryMode "
+          class="q-mt-md"
+          :stream-fields="columns"
+          :fields="conditions"
+          @add="addField"
+          @addConditionGroup="addConditionGroup"
+          @remove="removeField"
+          @input:update="(name, field) => emits('input:update', name, field)"
+        />
+      </template>
+      <template v-else>
+        <!-- view section -->
+        <div class="tw-w-full tw-flex lg:tw-flex-row tw-flex-col tw-gap-2" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+          <div class="tw-flex tw-justify-between tw-items-center tw-w-full editor-container q-px-md q-py-sm tw-h-16">
+          <div class="tw-flex tw-items-center">
+            <q-btn
+              class=" q-pa-none q-ma-none q-mr-sm rounded-border-btn"
+              :icon="false ? 'fullscreen_exit' : 'fullscreen'"
+              rounded
+              size="10px"
+              :class="[
+              store.state.theme === 'dark'
+                ? 'tw-text-gray-100 tw-bg-gray-600'
+                : 'tw-text-gray-900 tw-bg-gray-300',
+            ]"
+            ></q-btn>
+            <span>Editor</span>
+          </div>
+          <div>
+            <q-btn
+              data-test="alert-variables-add-btn"
+              label="View Editor"
+              size="sm"
+              class="text-bold add-variable no-border q-py-sm xl:tw-w-[130px] tw-w-[100px]"
+              color="primary"
+              style="
+                border-radius: 4px;
+                text-transform: capitalize;
+                color: #fff !important;
+                font-size: 12px;
+              "
+              @click="viewSqlEditor = true"
+              />
+          </div>
+        </div>
+        <div class="tw-flex tw-justify-between tw-items-center tw-w-full editor-container q-px-md q-py-sm tw-h-16">
+          <div class="tw-flex tw-items-center">
+            <q-btn
+              class=" q-pa-none q-ma-none q-mr-sm rounded-border-btn"
+              :icon="false ? 'fullscreen_exit' : 'fullscreen'"
+              rounded
+              size="10px"
+              :class="[
+              store.state.theme === 'dark'
+                ? 'tw-text-gray-100 tw-bg-gray-600'
+                : 'tw-text-gray-900 tw-bg-gray-300',
+            ]"
+            ></q-btn>
+            <span>VRL Function</span>
+          </div>
+          <div>
+            <q-btn
+          data-test="alert-variables-add-btn"
+          label="View VRL"
+          size="sm"
+          class="text-bold add-variable no-border q-py-sm xl:tw-w-[130px] tw-w-[100px]"
+          color="primary"
+          style="
+            border-radius: 4px;
+            text-transform: capitalize;
+            color: #fff !important;
+            font-size: 12px;
+          "
+          @click="viewSqlEditor = true"
+          />
+          </div>
+        </div>
+        </div>
+
+      </template>
+    </div>
+   </div>
+  <q-dialog v-if="false"  maximized v-model="isFullScreen" class="tw-w-full"  position="right"
+    style="height: 90%;
+    "
+    >
+      <div  class="tw-w-full flex scheduled-alerts" style="width: 100%; height: 100%">
+
+
+            <div class="flex justify-between tw-w-full" style="height: 90%;"
+            >
+      
+              <!-- sql editor -->
+              <div v-if="tab === 'sql'">
+                <div style="height: 60px;"  class=" tw-w-full tw-flex tw-justify-between tw-items-center q-px-lg border-input-box bg-grey-10 q-py-sm" >
+              <div class=" ">
+                <q-btn
+                  class=" q-pa-none q-ma-none q-mr-sm rounded-border-btn"
+                  :icon="isFullScreen ? 'fullscreen_exit' : 'fullscreen'"
+                  rounded
+                  size="10px"
+                  :class="[
+                  store.state.theme === 'dark'
+                    ? 'tw-text-gray-100 tw-bg-gray-600'
+                    : 'tw-text-gray-900 tw-bg-gray-300',
+                ]"
+                v-model="isFullScreen"
+                @click="()=> isFullScreen = !isFullScreen"
+                >
+                </q-btn>
+                <span class="dialog-title-each-tab">  {{ tab === "promql" ? "Promql" : "SQL Editor" }}
+                </span>
+              </div>
+              <q-toggle
+                v-if="!disableVrlFunction"
+                data-test="logs-search-bar-show-query-toggle-btn"
+                v-model="isVrlFunctionEnabled"
+                :icon="'img:' + getImageURL('images/common/function.svg')"
+                title="Toggle Function Editor"
+                class="q-pl-xs"
+                size="30px"
+                @update:model-value="updateFunctionVisibility"
+                :disable="tab === 'promql'"
+              />
+            </div>
+                <div class=" tw-h-full scheduled-alerts-dialog">
+                  <query-editor
+                    data-test="scheduled-alert-sql-editor"
+                    ref="queryEditorRef"
+                    editor-id="alerts-query-editor-dialog"
+                    class=" tw-h-full tw-w-full"
+                    :debounceTime="300"
+                    v-model:query="query"
+                    :class="
+                      query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
+                    "
+                    @update:query="updateQueryValue"
+                    @focus="queryEditorPlaceholderFlag = false"
+                    @blur="onBlurQueryEditor"
+                    :style="{
+                      width: isVrlFunctionEnabled ? 'calc(47vw - 10px)' : '90vw',
+                      height: !!sqlQueryErrorMsg ? 'calc(100vh - 100px)' : 'calc(100vh - 50px)'
+                    }"
+
+                  />
+                  <div v-show="!!sqlQueryErrorMsg" class="text-negative q-py-sm invalid-sql-error">
+                    <span v-show="!!sqlQueryErrorMsg">
+                      Error: {{ sqlQueryErrorMsg }}</span
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <!-- promql editor -->
+
+              <div v-if="tab === 'promql'">
+                <div style="height: 60px;"  class=" tw-w-full tw-flex tw-justify-between tw-items-center q-px-lg border-input-box bg-grey-10 q-py-sm" >
+              <div class=" ">
+                <q-btn
+                  class=" q-pa-none q-ma-none q-mr-sm rounded-border-btn"
+                  :icon="isFullScreen ? 'fullscreen_exit' : 'fullscreen'"
+                  rounded
+                  size="10px"
+                  :class="[
+                  store.state.theme === 'dark'
+                    ? 'tw-text-gray-100 tw-bg-gray-600'
+                    : 'tw-text-gray-900 tw-bg-gray-300',
+                ]"
+                v-model="isFullScreen"
+                @click="() => isFullScreen = !isFullScreen"
+                >
+                </q-btn>
+                <span class="dialog-title-each-tab">  {{ tab === "promql" ? "Promql Editor" : "SQL Editor" }}
+                </span>
+              </div>
+              <q-toggle
+                v-if="!disableVrlFunction"
+                data-test="logs-search-bar-show-query-toggle-btn"
+                v-model="isVrlFunctionEnabled"
+                :icon="'img:' + getImageURL('images/common/function.svg')"
+                title="Toggle Function Editor"
+                class="q-pl-xs"
+                size="30px"
+                @update:model-value="updateFunctionVisibility"
+                :disable="tab === 'promql'"
+              />
+            </div>
+            <!-- come here -->
                 <query-editor
-                  data-test="scheduled-alert-sql-editor"
+                  data-test="scheduled-alert-promql-editor"
                   ref="queryEditorRef"
                   editor-id="alerts-query-editor-dialog"
-                  class=" tw-h-full tw-w-full"
+                  class=" q-mb-md flex items-start justify-start"
                   :debounceTime="300"
-                  v-model:query="query"
-                  :class="
-                    query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
-                  "
+                  v-model:query="promqlQuery"
                   @update:query="updateQueryValue"
-                  @focus="queryEditorPlaceholderFlag = false"
-                  @blur="onBlurQueryEditor"
+                  style="width: 90vw; height: 100%;"
+                />
+              </div>
+
+              <q-separator vertical class="tw-h-full tw-w-2  "  style="height: calc(100vh - 50px); background-color: #212121;" /> 
+
+              <!-- vrl function editor -->
+              <!-- function selector -->
+              <div v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'">
+                <div style=" width: 100%; height: 60px;" class="bg-grey-10 flex justify-between items-center q-py-sm q-px-lg">
+                  <span class="dialog-title-each-tab">
+                      VRL Function Editor
+                  </span>
+                  <div >
+
+                    <q-select
+                      v-model="selectedFunction"
+                      label="Saved functions"
+                      :options="functionOptions"
+                      data-test="dashboard-use-saved-vrl-function"
+                      input-debounce="0"
+                      behavior="menu"
+                      use-input
+                      filled
+                      borderless
+                      dense
+                      hide-selected
+                      menu-anchor="top left"
+                      fill-input
+                      option-label="name"
+                      option-value="name"
+                      @filter="filterFunctionOptions"
+                      @update:modelValue="onFunctionSelect"
+                      style="width: 100%"
+                    >
+                      <template #no-option>
+                        <q-item>
+                          <q-item-section> {{ t("search.noResult") }}</q-item-section>
+                        </q-item>
+                      </template>
+                    </q-select>
+                  </div>
+                </div>
+                <div
+                data-test="logs-vrl-function-editor"
+                class="tw-h-full"
+                v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'"
+              >
+                <query-editor
+                  data-test="logs-vrl-function-editor"
+                  ref="fnEditorRef"
+                  editor-id="fnEditor-dialog"
+                  class=""
+                  :debounceTime="300"
+                  v-model:query="vrlFunctionContent"
+                  :class="[
+                    vrlFunctionContent == '' && functionEditorPlaceholderFlag
+                      ? 'empty-function'
+                      : ''
+                      ,
+                      store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'
+                  ]"
+                  language="ruby"
+                  @focus="functionEditorPlaceholderFlag = false"
+                  @blur="onBlurFunctionEditor"
+                  style="width: calc(47vw - 10px) !important; "
                   :style="{
-                    width: isVrlFunctionEnabled ? 'calc(47vw - 10px)' : '90vw',
-                    height: !!sqlQueryErrorMsg ? 'calc(100vh - 100px)' : 'calc(100vh - 50px)'
-                  }"
+                      height: !!sqlQueryErrorMsg ? 'calc(100vh - 100px)' : 'calc(100vh - 50px)'
+                    }"
 
                 />
-                <div v-show="!!sqlQueryErrorMsg" class="text-negative q-py-sm invalid-sql-error">
-                  <span v-show="!!sqlQueryErrorMsg">
-                    Error: {{ sqlQueryErrorMsg }}</span
-                  >
-                </div>
-              </div>
-            </div>
 
-            <!-- promql editor -->
-
-            <div v-if="tab === 'promql'">
-              <div style="height: 60px;"  class=" tw-w-full tw-flex tw-justify-between tw-items-center q-px-lg border-input-box bg-grey-10 q-py-sm" >
-            <div class=" ">
-              <q-btn
-                class=" q-pa-none q-ma-none q-mr-sm rounded-border-btn"
-                :icon="isFullScreen ? 'fullscreen_exit' : 'fullscreen'"
-                rounded
-                size="10px"
-                :class="[
-                store.state.theme === 'dark'
-                  ? 'tw-text-gray-100 tw-bg-gray-600'
-                  : 'tw-text-gray-900 tw-bg-gray-300',
-              ]"
-              v-model="isFullScreen"
-              @click="()=> isFullScreen = !isFullScreen"
-              >
-              </q-btn>
-              <span class="dialog-title-each-tab">  {{ tab === "promql" ? "Promql Editor" : "SQL Editor" }}
-              </span>
-            </div>
-            <q-toggle
-              v-if="!disableVrlFunction"
-              data-test="logs-search-bar-show-query-toggle-btn"
-              v-model="isVrlFunctionEnabled"
-              :icon="'img:' + getImageURL('images/common/function.svg')"
-              title="Toggle Function Editor"
-              class="q-pl-xs"
-              size="30px"
-              @update:model-value="updateFunctionVisibility"
-              :disable="tab === 'promql'"
-            />
-          </div>
-              <query-editor
-                data-test="scheduled-alert-promql-editor"
-                ref="queryEditorRef"
-                editor-id="alerts-query-editor-dialog"
-                class=" q-mb-md flex items-start justify-start"
-                :debounceTime="300"
-                v-model:query="promqlQuery"
-                @update:query="updateQueryValue"
-                style="width: 90vw; height: 100%;"
-              />
-            </div>
-
-            <q-separator vertical class="tw-h-full tw-w-2  "  style="height: calc(100vh - 50px); background-color: #212121;" /> 
-
-            <!-- vrl function editor -->
-            <!-- function selector -->
-            <div v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'">
-              <div style=" width: 100%; height: 60px;" class="bg-grey-10 flex justify-between items-center q-py-sm q-px-lg">
-                <span class="dialog-title-each-tab">
-                    VRL Function Editor
-                </span>
-                <div >
-
-                  <q-select
-                    v-model="selectedFunction"
-                    label="Saved functions"
-                    :options="functionOptions"
-                    data-test="dashboard-use-saved-vrl-function"
-                    input-debounce="0"
-                    behavior="menu"
-                    use-input
-                    filled
-                    borderless
-                    dense
-                    hide-selected
-                    menu-anchor="top left"
-                    fill-input
-                    option-label="name"
-                    option-value="name"
-                    @filter="filterFunctionOptions"
-                    @update:modelValue="onFunctionSelect"
-                    style="width: 100%"
-                  >
-                    <template #no-option>
-                      <q-item>
-                        <q-item-section> {{ t("search.noResult") }}</q-item-section>
-                      </q-item>
-                    </template>
-                  </q-select>
-                </div>
-              </div>
-              <div
-              data-test="logs-vrl-function-editor"
-              class="tw-h-full"
-              v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'"
-            >
-              <query-editor
-                data-test="logs-vrl-function-editor"
-                ref="fnEditorRef"
-                editor-id="fnEditor-dialog"
-                class=""
-                :debounceTime="300"
-                v-model:query="vrlFunctionContent"
-                :class="
-                  vrlFunctionContent == '' && functionEditorPlaceholderFlag
-                    ? 'empty-function'
-                    : ''
-                "
-                language="ruby"
-                @focus="functionEditorPlaceholderFlag = false"
-                @blur="onBlurFunctionEditor"
-                style="width: calc(47vw - 10px) !important; "
-                :style="{
-                    height: !!sqlQueryErrorMsg ? 'calc(100vh - 100px)' : 'calc(100vh - 50px)'
-                  }"
-
-              />
-
-              <div
-                class="text-subtitle2 q-pb-sm"
-                style="min-height: 21px; width: 500px"
-                v-show="vrlFunctionError"
-              >
-                <div v-if="vrlFunctionError">
-                  <div class="text-negative q-mb-xs flex items-center">
-                    <q-btn
-                      :icon="
-                        isFunctionErrorExpanded ? 'expand_more' : 'chevron_right'
+                <div
+                  class="text-subtitle2 q-pb-sm"
+                  style="min-height: 21px; width: 500px"
+                  v-show="vrlFunctionError"
+                >
+                  <div v-if="vrlFunctionError">
+                    <div class="text-negative q-mb-xs flex items-center">
+                      <q-btn
+                        :icon="
+                          isFunctionErrorExpanded ? 'expand_more' : 'chevron_right'
+                        "
+                        dense
+                        size="xs"
+                        flat
+                        class="q-mr-xs"
+                        data-test="table-row-expand-menu"
+                        @click.stop="toggleExpandFunctionError"
+                      />
+                      <div>
+                        <span v-show="vrlFunctionError">Invalid VRL function</span>
+                      </div>
+                    </div>
+                    <div
+                      v-if="isFunctionErrorExpanded"
+                      class="q-px-sm q-pb-sm"
+                      :class="
+                        store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
                       "
-                      dense
-                      size="xs"
-                      flat
-                      class="q-mr-xs"
-                      data-test="table-row-expand-menu"
-                      @click.stop="toggleExpandFunctionError"
-                    />
-                    <div>
-                      <span v-show="vrlFunctionError">Invalid VRL function</span>
+                    >
+                      <pre class="q-my-none" style="white-space: pre-wrap">{{
+                        vrlFunctionError
+                      }}</pre>
                     </div>
                   </div>
-                  <div
-                    v-if="isFunctionErrorExpanded"
-                    class="q-px-sm q-pb-sm"
-                    :class="
-                      store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
-                    "
-                  >
-                    <pre class="q-my-none" style="white-space: pre-wrap">{{
-                      vrlFunctionError
-                    }}</pre>
+                </div>
+              </div>
+              </div>
+
+
+            </div>
+      </div>
+  </q-dialog>
+
+
+  <q-dialog
+    v-model="viewSqlEditor"
+    position="right"
+    full-height
+    maximized
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  >
+    <q-card  class="tw-h-full editor-dialog-card "
+    :style="{
+      width: isFullScreen ? '100vw' : '90vw'
+    }"
+    >
+      <div class="tw-h-full  tw-px-6 tw-py-2">
+      <div class="tw-h-16 tw-flex tw-items-center tw-justify-between" style="font-size: 20px ;">
+        <div class="tw-flex tw-items-center tw-gap-2">
+          <q-icon name="close" size="20px" class="tw-cursor-pointer" @click="viewSqlEditor = false" />
+          <span>Add Conditions</span>
+        </div>
+
+        <q-btn icon="fullscreen" size="16px"  dense class="tw-cursor-pointer" @click="() => isFullScreen = !isFullScreen" ></q-btn>
+
+      </div>
+      <div class="tw-h-[calc(100vh-100px)]">
+        <div class="row tw-gap-4 tw-h-[100%] ">
+                  <!-- first section -->
+        <div class=" tw-w-[60%]  tw-h-[100%]    ">
+          <div  class="tw-flex tw-flex-col tw-h-full scheduled-alerts">
+            <!-- first sub section -->
+            <div  class="tw-h-[100%] container-for-editors ">
+              <div class="tw-w-full tw-h-full " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+                <div  class="tw-flex tw-items-center tw-justify-between tw-h-12 q-py-sm q-px-md editor-title">
+  
+                    <span class="editor-text-title">{{  tab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
+                    <div class="tw-flex tw-gap-2 tw-items-center tw-h-6 ">
+                       <div class="tw-h-full tw-flex tw-justify-center tw-items-center">
+                        <q-select
+                          v-model="selectedColumn"
+                          label="Search for a field"
+                          :options="filteredFields"
+                          data-test="dashboard-use-saved-vrl-function"
+                          input-debounce="0"
+                          behavior="menu"
+                          use-input
+                          filled
+                          borderless
+                          dense
+                          hide-selected
+                          menu-anchor="top left"
+                          fill-input
+                          @filter="
+                              (val: string, update: any) => filterFields(val, update)
+                            "
+                          @update:modelValue="onColumnSelect"
+                          input-style="width: 200px;  "
+                          class="mini-select"
+                    >
+                        <template #no-option>
+                          <q-item>
+                            <q-item-section> {{ t("search.noResult") }}</q-item-section>
+                          </q-item>
+                        </template>
+                  </q-select>
+
+                       </div>
+   
+                      <div>
+                        <q-btn
+                          data-test="alert-variables-add-btn"
+                          label="Run Query"
+                          size="sm"
+                          class="text-bold add-variable no-border q-py-sm"
+                          color="primary"
+                          style="width: 120px;"
+                          @click="runSqlQuery"
+                          :disable="query == ''"
+                        />
+                      </div>
+                    </div>
                   </div>
+  
+                    <query-editor
+                      v-if="tab === 'sql'"
+                      data-test="scheduled-alert-sql-editor"
+                      ref="queryEditorRef"
+                      editor-id="alerts-query-editor"
+                      class="tw-w-full  "
+                      :debounceTime="300"
+                      v-model:query="query"
+                      :class="[
+                        query === '' && queryEditorPlaceholderFlag ? 'empty-query' : '',
+                        store.state.theme === 'dark' ? 'dark-mode dark-mode-editor' : 'light-mode light-mode-editor',
+                        !!sqlQueryErrorMsg ? 'tw-h-[calc(100%-90px)]' : 'tw-h-[calc(100%-70px)]'
+                      ]"
+                      @update:query="updateQueryValue"
+                      @focus="queryEditorPlaceholderFlag = false"
+                      @blur="onBlurQueryEditor"
+                      style="min-height: 10rem;"
+                    />
+
+                    <div v-show="!!sqlQueryErrorMsg" class="text-negative q-py-sm invalid-sql-error">
+                    <span v-show="!!sqlQueryErrorMsg">
+                      Error: {{ sqlQueryErrorMsg }}</span
+                    >
+                  </div>
+                    <!-- come here as well -->
+                    <query-editor
+                        v-if="tab === 'promql'"
+                        v data-test="scheduled-alert-promql-editor"
+                        ref="queryEditorRef"
+                        editor-id="alerts-query-editor-dialog"
+                        class=" q-mb-md flex items-start justify-start"
+                        :debounceTime="300"
+                        v-model:query="promqlQuery"
+                        @update:query="updateQueryValue"
+                      :class="[
+                        promqlQuery === '' ? 'empty-query' : '',
+                        store.state.theme === 'dark' ? 'dark-mode' : 'light-mode',
+                      ]"
+                      @blur="onBlurQueryEditor"
+                      style="min-height: 10rem;"
+                    />
+                  </div>
+                  
+            </div>
+            <div  class="tw-h-[40%] container-for-editors">
+              <div class="tw-w-full tw-h-full scheduled-alerts " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+                <div  class="tw-flex tw-items-center tw-justify-between tw-h-12 q-py-sm q-px-md editor-title">
+                      
+                      <span class="editor-text-title">VRL Editor</span>
+                      <div class="tw-flex tw-gap-2 tw-items-center">
+                        <div>
+                          <q-select
+                      v-model="selectedFunction"
+                      label="Saved functions"
+                      :options="functionOptions"
+                      data-test="dashboard-use-saved-vrl-function"
+                      input-debounce="0"
+                      behavior="menu"
+                      use-input
+                      filled
+                      borderless
+                      dense
+                      hide-selected
+                      menu-anchor="top left"
+                      fill-input
+                      option-label="name"
+                      option-value="name"
+                      @filter="filterFunctionOptions"
+                      @update:modelValue="onFunctionSelect"
+                      class="mini-select"
+                      input-style="height: 8px; min-height: 8px; margin: 0px; width: 200px;  "
+                                            >
+                      <template #no-option>
+                        <q-item>
+                          <q-item-section> {{ t("search.noResult") }}</q-item-section>
+                        </q-item>
+                      </template>
+                    </q-select>
+                        </div>
+                        <div>
+                          <q-btn
+                            data-test="alert-variables-add-btn"
+                            label="Test Function"
+                            size="sm"
+                            class="text-bold add-variable no-border q-py-sm"
+                            color="primary"
+                            style="width: 120px;"
+                            @click="runTestFunction"
+                            :disable="vrlFunctionContent == ''"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <query-editor
+                      data-test="scheduled-alert-vrl-function-editor"
+                      ref="fnEditorRef"
+                      editor-id="fnEditor-dialog"
+                      class="tw-w-full tw-h-[80%]  "
+                      :debounceTime="300"
+                      v-model:query="vrlFunctionContent"
+                      :class="[
+                        vrlFunctionContent == '' && functionEditorPlaceholderFlag
+                          ? 'empty-function'
+                          : ''
+                          ,
+                          store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode'
+                      ]"
+                      @focus="functionEditorPlaceholderFlag = false"
+                      @blur="onBlurFunctionEditor"
+                      style="min-height: 10rem;"
+                    />
+
+                  </div>
+                  
+            </div>
+          </div>
+        </div>
+        <!-- second section -->
+        <div class="  tw-flex tw-flex-col tw-h-[100%] tw-w-[38%] tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+          <div class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit q-py-sm q-px-md editor-title">
+            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-gap-2">
+              <span class="editor-text-title">SQL Output</span>
+              <q-btn :icon="expandSqlOutput ? 'expand_more' : 'expand_less'" size="16px"  dense flat border-less class="tw-cursor-pointer" @click="handleExpandSqlOutput"  ></q-btn>
+            </div>
+                    <!-- this is the time of trigger -->
+                <div v-if="expandSqlOutput" class="tw-flex tw-gap-2 tw-flex-wrap tw-w-full]">
+
+                <!-- this is for multi time range to select -->
+                <div class="tw-flex tw-flex-wrap tw-gap-2 q-py-sm">
+                    <div class="tw-text-sm tw-bg-white tw-text-black tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
+                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff]' : ''"
+                    >
+                  {{triggerData.period  }} minute(s) ago
+                </div>
+                  <div v-for="picker in dateTimePicker" :key="picker.uuid"> 
+                    <div class="tw-text-sm  tw-rounded-sm tw-px-2 tw-py-1 " 
+                    @click="handleMultiWindowOffsetClick(picker.uuid)" 
+                    :class="[
+                      checkIfMultiWindowOffsetIsSelected(picker.uuid) ? store.state.theme === 'dark' ? 'tw-bg-white tw-text-black tw-cursor-pointer' : 'tw-bg-[#e9eaff] tw-text-black tw-cursor-pointer' : '',
+                      'tw-border tw-border-gray-300'
+                    ]">
+                      {{getDisplayValue(picker.offSet)}}ago
+                      <span v-if="checkIfMultiWindowOffsetIsSelected(picker.uuid)" class="tw-text-xs tw-text-gray-500" @click.stop="handleRemoveMultiWindowOffset(picker.uuid)">
+                        <q-icon name="close" size="16px" />
+                      </span>
+                    </div>
+                  </div>
+                  </div>
+                </div>
+ 
+          </div>
+          <div v-if="expandSqlOutput" class="sql-output-section tw-h-[calc(100%-50px)] " >
+            <!-- no output before run query section -->
+            <div v-if="!tempRunQuery && outputEvents == ''"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[200px] q-mx-lg q-my-lg  no-output-before-run-query">
+              <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
+                <q-icon
+                  :name="outlinedLightbulb"
+                  size="40px"
+                  :class="store.state.theme === 'dark' ? 'tw-text-orange-400' : 'tw-text-sky-500'"
+                />
+                <div>
+                  <span>Please run the query to see the output</span>
                 </div>
               </div>
             </div>
+            <div v-else-if="(outputEvents == '') && !runQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[200px] q-mx-lg q-my-lg  no-output-before-run-query">
+              <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
+                <q-icon
+                  :name="outlinedWarning"
+                  size="40px"
+                  class="tw-text-orange-400"
+                />
+                <div>
+                  <span>No results found</span>
+                </div>
+              </div>
             </div>
+            <div v-else-if="runQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-full ">
+                <q-spinner-hourglass color="primary" size="40px" />
+                <div class="tw-text-sm tw-text-gray-500">
+                  Fetching Search Results...
+                </div>
+            </div>
+            <div v-else class=" tw-h-full tw-w-[100%] tw-h-full ">
 
-
+                  <query-editor
+                      data-test="sql-output-editor"
+                      ref="outputEventsEditorRef"
+                      editor-id="sql-output-editor"
+                      class="tw-w-full tw-h-full "
+                      :debounceTime="300"
+                      v-model:query="outputEvents"
+                      style="min-height: 10rem;"
+                      language="json"
+                      :read-only="true"
+                    />
+            </div>
           </div>
-    </div>
-</q-dialog>
+          <div class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit q-py-sm q-px-md editor-title">
+            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-gap-2">
+              <span class="editor-text-title">Combined Output (SQL and VRL)</span>
+              <q-btn :icon="expandCombinedOutput ? 'expand_more' : 'expand_less'" size="16px"  dense flat border-less class="tw-cursor-pointer" @click="handleExpandCombinedOutput"  ></q-btn>
+            </div>
+                    <!-- this is the time of trigger -->
+                <div v-if="expandCombinedOutput" class="tw-flex tw-gap-2 tw-flex-wrap tw-w-full]">
+
+                <!-- this is for multi time range to select -->
+                <div class="tw-flex tw-flex-wrap tw-gap-2 q-py-sm">
+                    <div class="tw-text-sm tw-bg-white tw-text-black tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
+                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff]' : ''"
+                    >
+                  {{triggerData.period  }} minute(s) ago
+                </div>
+                  <div v-for="picker in dateTimePicker" :key="picker.uuid"> 
+                    <div class="tw-text-sm  tw-rounded-sm tw-px-2 tw-py-1 " 
+                    @click="handleMultiWindowOffsetClick(picker.uuid)" 
+                    :class="[
+                      checkIfMultiWindowOffsetIsSelected(picker.uuid) ? store.state.theme === 'dark' ? 'tw-bg-white tw-text-black tw-cursor-pointer' : 'tw-bg-[#e9eaff] tw-text-black tw-cursor-pointer' : '',
+                      'tw-border tw-border-gray-300'
+                    ]">
+                      {{getDisplayValue(picker.offSet)}}ago
+                      <span v-if="checkIfMultiWindowOffsetIsSelected(picker.uuid)" class="tw-text-xs tw-text-gray-500" @click.stop="handleRemoveMultiWindowOffset(picker.uuid)">
+                        <q-icon name="close" size="16px" />
+                      </span>
+                    </div>
+                  </div>
+                  </div>
+                </div>
+ 
+          </div>
+          <div v-if="expandCombinedOutput" class="sql-output-section tw-h-[calc(100%-50px)] " >
+
+            <div v-if="!tempTestFunction && !runQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[200px] q-mx-lg q-my-lg  no-output-before-run-query">
+              <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
+                <q-icon
+                  :name="outlinedLightbulb"
+                  size="40px"
+                  :class="store.state.theme === 'dark' ? 'tw-text-orange-400' : 'tw-text-sky-500'"
+                />
+                <div>
+                  <span>Please test the function to see the output</span>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="(outputFnEvents == '') && !runQueryLoading && tempTestFunction"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[200px] q-mx-lg q-my-lg  no-output-before-run-query">
+              <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
+                <q-icon
+                  :name="outlinedWarning"
+                  size="40px"
+                  class="tw-text-orange-400"
+                />
+                <div>
+                  <span>No results found</span>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="runQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-full ">
+                <q-spinner-hourglass color="primary" size="40px" />
+                <div class="tw-text-sm tw-text-gray-500">
+                  Fetching Search Results...
+                </div>
+            </div>
+            <!-- expand and close component -->
+            <div v-else class=" tw-h-full tw-w-[100%] tw-h-full ">
+              <query-editor
+                  data-test="vrl-function-test-events-output-editor"
+                  ref="outputEventsEditorRef"
+                  editor-id="test-function-events-output-editor"
+                  class="tw-w-full tw-h-full "
+                  :debounceTime="300"
+                  v-model:query="outputFnEvents"
+                  style="min-height: 10rem;"
+                  language="json"
+                  :read-only="true"
+                />
+              </div>
+          </div>
+          </div>
+        </div>
+
+        </div>
+        <div v-if="false" class="flex justify-end items-center q-px-lg tw-w-full tw-h-16 " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: sticky;  bottom: 0 !important; top: 0; ">
+              <q-btn
+                data-test="add-alert-cancel-btn"
+                v-close-popup="true"
+                class=" text-bold"
+                :label="t('alerts.cancel')"
+                text-color="light-text"
+                padding="sm md"
+                no-caps
+              />
+              <q-btn
+                data-test="add-alert-submit-btn"
+                :label="t('alerts.save')"
+                class=" text-bold no-border q-ml-md"
+                padding="sm xl"
+                type="submit"
+                no-caps
+                :disable="true"
+                style="background-color: #4A4E4c; color: #ffffff;"
+
+              />
+            </div>
+      </div>
+    </q-card>
+  </q-dialog>
+
+
 
   </div>
 </template>
@@ -1366,6 +1718,7 @@ import { useRouter } from "vue-router";
 import {
   outlinedDelete,
   outlinedInfo,
+  outlinedLightbulb,
   outlinedWarning,
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
@@ -1374,12 +1727,19 @@ import {
   useLocalTimezone,
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
+  getUUID,
+  b64EncodeUnicode,
 } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import FieldsInputWithMulti from "./FieldsInputWithMulti.vue";
+import ConditionGroup from "./ConditionGroup.vue";
+
+import searchService from "@/services/search";
 
 import AlertsContainer from "./AlertsContainer.vue";
+import useQuery from "@/composables/useQuery";
+import { pick } from "lodash-es";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -1409,6 +1769,8 @@ const props = defineProps([
   "silence",
   "destinations",
   "formattedDestinations",
+  "selectedStream",
+  "selectedStreamType"
 ]);
 
 
@@ -1431,10 +1793,11 @@ const emits = defineEmits([
   "field:addConditionGroup",
   "update:silence",
   "refresh:destinations",
-  "update:destinations"
+  "update:destinations",
 ]);
 
 const { t } = useI18n();
+const { buildQueryPayload } = useQuery();
 
 const triggerData = ref(props.trigger);
 
@@ -1456,6 +1819,7 @@ const queryEditorPlaceholderFlag = ref(true);
 
 const isFunctionErrorExpanded = ref(false);
 
+const tempTestFunction = ref(false);
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
 const regularFunctions = ["avg", "max", "min", "sum", "count"];
 
@@ -1481,13 +1845,33 @@ const destinations = ref(props.destinations);
 
 const isFullScreen = ref(false);
 
+const viewSqlEditor = ref(false);
+
+const viewVrlFunction = ref(false);
+
+const expandSqlOutput = ref(true);
+
+const expandCombinedOutput = ref(false);
+
 const formattedDestinations = ref(props.formattedDestinations);
 
 const filteredFields = ref(props.columns);
 
+const selectedStream = ref(props.selectedStream);
+const selectedStreamType = ref(props.selectedStreamType);
 const fnEditorRef = ref<any>(null);
 
+const tempRunQuery = ref(false);
+
+const runQueryLoading = ref(false);
+
+const selectedColumn = ref("");
+
 const filteredTimezone: any = ref([]);
+
+const outputEvents = ref("");
+
+const outputFnEvents = ref("");
 
 const cronJobError = ref("");
 
@@ -1518,7 +1902,8 @@ const addConditionGroup = () => {
 
 const updateDateTimePicker = (data: any) => {
   emits("update:multi_time_range", dateTimePicker.value);
-  console.log("data", dateTimePicker.value);
+
+
 };
 
 const removeTimeShift = (index: any) => {
@@ -1526,6 +1911,15 @@ const removeTimeShift = (index: any) => {
 };
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
+let relativePeriods = [
+      { label: "Seconds", value: "s" },
+      { label: "Minutes", value: "m" },
+      { label: "Hours", value: "h" },
+      { label: "Days", value: "d" },
+      { label: "Weeks", value: "w" },
+      { label: "Months", value: "M" },
+    ];
+
 
 const selectedFunction = ref("");
 
@@ -1618,6 +2012,8 @@ const onFunctionSelect = (_function: any) => {
 const functionsList = computed(() => store.state.organizationData.functions);
 const dateTimePicker = ref(props.multi_time_range || []);
 
+const selectedMultiWindowOffset = ref([]);
+
 const functionOptions = ref<any[]>([]);
 
 watch(
@@ -1666,8 +2062,12 @@ const updateQuery = () => {
   if (tab.value === "sql") query.value = props.sql;
 };
 const addTimeShift = () => {
+  if(dateTimePicker.value.length == 0){
+    tab.value = 'sql'
+  }
   const newTimeShift = {
     offSet: "15m",
+    uuid: getUUID(),
     data: {
       selectedDate: {
         relative: {
@@ -1679,7 +2079,7 @@ const addTimeShift = () => {
     },
   };
 
-  dateTimePicker.value.push({ offSet: newTimeShift.offSet });
+  dateTimePicker.value.push({ offSet: newTimeShift.offSet , uuid: newTimeShift.uuid });
 };
 
 const updatePromqlCondition = () => {
@@ -1731,7 +2131,6 @@ const filterColumns = (options: string[], val: string, update: Function) => {
     });
   }
 
-  console.log("options", options);
 
   update(() => {
     const value = val.toLowerCase();
@@ -1889,9 +2288,194 @@ const routeToCreateDestination = () => {
       window.open(url, "_blank");
     };
 
-const updateDestinations = (destinations: any[]) => {
-  emits("update:destinations", destinations);
+  const updateDestinations = (destinations: any[]) => {
+    emits("update:destinations", destinations);
+  };
+
+  const getDisplayValue = (value: any) => {
+    const relativePeriods = [
+      { label: "Second(s)", value: "s" },
+      { label: "Minute(s)", value: "m" },
+      { label: "Hour(s)", value: "h" },
+      { label: "Day(s)", value: "d" },
+      { label: "Week(s)", value: "w" },
+      { label: "Month(s)", value: "M" },
+    ];
+
+  if (typeof value !== 'string') return value;
+
+  const match = value.match(/^(\d+)([smhdwM])$/);
+  if (!match) return value;
+
+  const [, numberPart, unitPart] = match;
+
+  const relativePeriod = relativePeriods.find(period => period.value === unitPart);
+  
+  if (!relativePeriod) return value;
+
+  return `${numberPart} ${relativePeriod.label}`;
 };
+
+  const handleExpandSqlOutput = () => {
+    expandSqlOutput.value = !expandSqlOutput.value;
+    if (expandSqlOutput.value) {
+      expandCombinedOutput.value = false;
+    }
+  };
+
+  const handleExpandCombinedOutput = () => {
+    expandCombinedOutput.value = !expandCombinedOutput.value;
+    if (expandCombinedOutput.value) {
+      expandSqlOutput.value = false;
+    }
+  };
+
+  const handleMultiWindowOffsetClick = (uuid: string) => {
+    if (selectedMultiWindowOffset.value && !selectedMultiWindowOffset.value.includes(uuid)) {
+      selectedMultiWindowOffset.value.push(uuid);
+    }
+  };
+
+  const handleRemoveMultiWindowOffset = (uuid: string) => {
+    selectedMultiWindowOffset.value = selectedMultiWindowOffset.value.filter((offset: string) => offset !== uuid);
+  };
+
+  const checkIfMultiWindowOffsetIsSelected = (uuid: string) => {
+    return selectedMultiWindowOffset.value && selectedMultiWindowOffset.value.includes(uuid);
+  };
+
+  const onColumnSelect = () => {
+  };
+  const buildMulitWindowQuery = (sql: any, fn: boolean = false) => {
+  const queryToSend: any = [
+
+  ];
+  const regex = /^(\d+)([smhdwM])$/;
+
+  const unitToMicroseconds: Record<string, number> = {
+    s: 1 * 1_000_000,           // seconds
+    m: 60 * 1_000_000,          // minutes
+    h: 60 * 60 * 1_000_000,     // hours
+    d: 24 * 60 * 60 * 1_000_000,// days
+    w: 7 * 24 * 60 * 60 * 1_000_000, // weeks
+    M: 30 * 24 * 60 * 60 * 1_000_000 // month
+  };
+
+  const now = Date.now() * 1000; // Current time in microseconds because we are using microseconds of unix timestamp 
+
+  dateTimePicker.value.forEach((date: any) => {
+    if(checkIfMultiWindowOffsetIsSelected(date.uuid)){
+    let individualQuery: any = {};
+    const match = date.offSet.match(regex);
+    if (match) {
+      const value = parseInt(match[1], 10);
+      const unit = match[2];
+      const offsetMicroseconds = value * unitToMicroseconds[unit];
+
+      const endTime = now;
+      const startTime = endTime - offsetMicroseconds;
+      individualQuery.start_time = startTime;
+      individualQuery.end_time = endTime;
+      individualQuery.sql = sql;
+      individualQuery.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
+      queryToSend.push(individualQuery);
+    } else {
+      console.warn("Invalid format:", date);
+    }
+  }
+  });
+  return queryToSend;
+  };
+
+  const triggerQuery = async (fn: boolean = false) => {
+    const queryReq = buildQueryPayload({
+        sqlMode: true,
+        streamName: selectedStream.value,
+      });
+      queryReq.query.sql = query.value;
+      queryReq.query.size = 10;
+      const periodInMicroseconds = triggerData.value.period * 60 * 1000000;
+      const endTime = new Date().getTime() * 1000; // ← Use 1000 to get microseconds
+      const startTime = endTime - periodInMicroseconds;
+      queryReq.query.query_fn = null;
+      
+      if(selectedMultiWindowOffset.value.length == 0){
+        queryReq.query.start_time = startTime;
+        queryReq.query.end_time = endTime;
+        runQueryLoading.value = true;
+        if(fn){
+          queryReq.query.query_fn = b64EncodeUnicode(vrlFunctionContent.value);
+          outputFnEvents.value = "";
+        }
+        else{
+          outputEvents.value = "";
+        }
+        try {
+          const res = await searchService.search({
+            org_identifier: store.state.selectedOrganization.identifier,
+            query: queryReq,
+            page_type: selectedStreamType.value,
+          })
+          if(res.data.hits.length > 0){
+            if(fn){
+              outputFnEvents.value = JSON.stringify(res.data.hits,null,2);
+            }
+            else{
+              outputEvents.value = JSON.stringify(res.data.hits,null,2);
+            }
+          }
+          runQueryLoading.value = false;
+        } catch (err) {
+          console.log(err,"err")
+          runQueryLoading.value = false;
+        }
+      }
+      else{
+        queryReq.query.sql_mode = true;
+        queryReq.query.per_query_response = true;
+        let queryTosend = [
+          {
+            start_time: startTime,
+            end_time: endTime,
+            sql: queryReq.query.sql,
+            query_fn: fn ? b64EncodeUnicode(vrlFunctionContent.value) : null
+          }
+        ];
+        queryTosend.push(...buildMulitWindowQuery(queryReq.query.sql, fn));
+        queryReq.query.sql = queryTosend;
+        const res = await searchService.search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: queryReq,
+          page_type: selectedStreamType.value,
+        })
+        if(res.data.hits.length > 0){
+          if(fn){
+            outputFnEvents.value = JSON.stringify(res.data.hits,null,2);
+          }
+          else{
+            outputEvents.value = JSON.stringify(res.data.hits,null,2);
+          }
+        }
+      }
+  }
+
+
+
+  const runSqlQuery = async () => {
+    tempRunQuery.value = true;
+    expandCombinedOutput.value = false;
+    expandSqlOutput.value = true;
+    await triggerQuery();
+  };
+
+  const runTestFunction = async () => {
+    tempTestFunction.value = true;
+    expandCombinedOutput.value = true;
+    expandSqlOutput.value = false;
+    await triggerQuery(true);
+  }
+
+
 
 defineExpose({
   tab,
@@ -1900,6 +2484,21 @@ defineExpose({
   validateFrequency,
   testFields,
   isFullScreen,
+  viewSqlEditor,
+  viewVrlFunction,
+  expandSqlOutput,
+  expandCombinedOutput,
+  outlinedLightbulb,
+  selectedMultiWindowOffset,
+  handleMultiWindowOffsetClick,
+  checkIfMultiWindowOffsetIsSelected,
+  tempTestFunction,
+  selectedColumn,
+  filteredFields,
+  onColumnSelect,
+  runSqlQuery,
+  runTestFunction,
+  handleRemoveMultiWindowOffset,
 });
 </script>
 
@@ -1926,15 +2525,22 @@ defineExpose({
     width: 50px !important;
     min-width: 50px;
   }
-  .q-tab--inactive{
+
+}
+.dark-mode .scheduled-alert-tabs .q-tab--inactive{
     background-color: #494A4A;
     color: $white
   }
-}
+  .light-mode .scheduled-alert-tabs .q-tab--inactive{
+    background-color: #ffffff;
+    color:  #3d3d3d
+  }
+  .light-mode .scheduled-alert-tabs {
+    border: 1px solid #cdcdcd;
+  }
 .scheduled-alerts {
   .monaco-editor {
     width: calc(100% - 2px ) !important;
-    height: 300px !important;
   }
   .border-input-box{
     border: 2px solid rgb(39, 39, 39) !important;
@@ -1943,6 +2549,7 @@ defineExpose({
   .border-input-box-light{
     border: 1px solid rgb(196, 194, 194) !important;
   }
+
 
 
   .q-btn {
@@ -1954,6 +2561,20 @@ defineExpose({
     border-radius: 50% !important;
     padding: 0px 4px !important;
   }
+  .dark-mode .monaco-editor-background{
+    background-color: #181a1b;
+  }
+  .light-mode .monaco-editor-background{
+    background-color: #ffffff !important;
+  }
+  .dark-mode .dark-mode-fn-editor{
+    background-color: #181a1b !important;
+  }
+
+  .dark-mode .monaco-editor-add-alert{
+    background-color: #18181A !important;
+  }
+
 
   .empty-query .monaco-editor-background {
     background-image: url("../../assets/images/common/query-editor.png");
@@ -1970,7 +2591,6 @@ defineExpose({
 .scheduled-alerts-dialog {
   .monaco-editor {
     width: calc(100% - 2px ) !important;
-    height: 300px !important;
   }
   .border-input-box{
     border: 2px solid rgb(39, 39, 39) !important;
@@ -1989,13 +2609,11 @@ defineExpose({
   .empty-query .monaco-editor-background {
     background-image: url("../../assets/images/common/query-editor.png");
     background-repeat: no-repeat;
-    background-size: 115px;
   }
 
   .empty-function .monaco-editor-background {
     background-image: url("../../assets/images/common/vrl-function.png");
     background-repeat: no-repeat;
-    background-size: 170px;
   }
 }
 
@@ -2006,4 +2624,182 @@ defineExpose({
   font-size: 18px;
   font-weight: 600;
 }
+.dark-mode .multi-window-text{
+  color: #FFFFFF;
+}
+.light-mode .multi-window-text{
+  color: #3d3d3d;
+}
+.multi-window-text{
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 24px;
+  vertical-align: middle;
+
+}
+.running-text{
+  font-weight: 400 !important;
+  line-height: 20px !important;
+  font-size: 16px;
+}
+.dark-mode .editor-dialog-card{
+  background-color: #181a1b;
+}
+.light-mode .editor-dialog-card{
+  background-color: #ffffff;
+}
+.reference-text{
+  font-size: 16px;
+  font-weight: 400;
+}
+.dark-mode .multi-window-container{
+  background-color: #111111;
+  border: 1px solid #343939;
+
+}
+.light-mode .multi-window-container{
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+}
+
+.multi-window-container{
+  min-height: 110px;
+  border-left: 6px solid #32CCCC !important;
+}
+.dark-mode .reference-window-container{
+  background-color: #111111;
+  border: 1px solid #343939;
+}
+.light-mode .reference-window-container{
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+}
+
+.reference-window-container{
+
+  min-height: 110px;
+  border-left: 6px solid #6832CC !important;
+}
+.dark-mode .editor-container{
+  border: 1px solid #3e3e3e;
+}
+.light-mode .editor-container{
+  border: 1px solid #e5e4e4;
+}
+
+.dark-mode .border-line{
+  background-color: #4f4f4f;
+}
+.light-mode .border-line{
+  background-color: #eeeeee;
+}
+
+.monaco-editor-dialog{
+  height: calc(100vh - 500px);
+}
+.vrl-editor-dialog{
+  height: calc(100vh - 500px);
+}
+.editor-title-container{
+  background-color: #212121;
+  border: 1px  solid #2a2929;
+}
+
+.dark-mode .container-for-editors{
+  border-top: 1px solid #343434;
+}
+
+.dark-mode .editor-title{
+  background-color: #212121;
+  border: 1px  solid #2a2929;
+}
+
+.light-mode .editor-title{
+  background-color: #fcfcfe;
+  border: 1px  solid #e9e9e9;
+}
+
+.dark-mode .editor-text-title{
+  font-size: 16px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+.light-mode .editor-text-title{
+  font-size: 16px;
+  font-weight: 600;
+  color: #3d3d3d;
+}
+
+.dark-mode .mini-select .q-field__control {
+  background-color: #181a1b !important;
+}
+.light-mode .mini-select .q-field__control {
+  background-color: #ffffff !important;
+  border: 1px solid #e0e0e0 !important;
+}
+
+.dark-mode .sql-output-section{
+  background-color: #181a1b;
+  border: 1px solid #212121;
+  min-height: 20rem;
+}
+.light-mode .sql-output-section{
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  min-height: 20rem;
+}
+
+.dark-mode .no-output-before-run-query{
+  background-color: #1e1e1e;
+  border: 1px solid #212121;
+  min-height: 10rem;
+  color: #7f8281;
+  font-size: 16px;
+}
+.light-mode .no-output-before-run-query{
+  background-color: #e1e1e1;
+  border: 1px solid #e9e9e9;
+  min-height: 10rem;
+  color: #a7abaa;
+  font-size: 16px;
+}
+
+.multi-window-offset-container{
+  border: 1px solid #ffffff;
+  cursor: pointer;
+}
+
+.monaco-editor-output {
+  min-height: 10rem;
+  border-radius: 5px;
+  height: 100%;
+}
+
+
+.dark-mode .monaco-editor-output, 
+.dark-mode .monaco-editor .margin, 
+.dark-mode .monaco-editor .monaco-editor-background,
+.dark-mode .monaco-editor .margin-view-overlays,
+.dark-mode .monaco-editor .line-numbers {
+  background-color: #181a1b !important; /* Use your desired background color */
+}
+
+.light-mode .monaco-editor-output, 
+.light-mode .monaco-editor .margin, 
+.light-mode .monaco-editor .monaco-editor-background,
+.light-mode .monaco-editor .margin-view-overlays,
+.light-mode .monaco-editor .line-numbers {
+  background-color: #ffffff !important; /* Use your desired background color */
+}
+
+.dark-mode-editor {
+  border: 1px solid #212121 !important;
+}
+
+.light-mode-editor {
+  border: 1px solid #e0e0e0 !important;
+}
+
+
+
 </style>
