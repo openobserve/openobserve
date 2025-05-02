@@ -673,7 +673,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted", ""])
             .inc();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT account,stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = ? AND created_at < ? LIMIT ?;"#,
+            r#"SELECT account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = ? AND created_at < ? LIMIT ?;"#,
         )
         .bind(org_id)
         .bind(time_max)

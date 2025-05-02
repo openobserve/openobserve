@@ -519,7 +519,7 @@ SELECT account, stream, date, file, deleted, min_ts, max_ts, records, original_s
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened FROM file_list WHERE id IN ({ids})"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
             );
             DB_QUERY_NUMS
                 .with_label_values(&["query_by_ids", "file_list", ""])
