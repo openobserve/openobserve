@@ -313,6 +313,12 @@ impl QuerierConnection {
             }
         }
 
+        log::info!(
+            "[WS::Router::QuerierConnection] listen_to_querier_response task stopped for querier: {}, router conn id: {}",
+            self.querier_name,
+            self.id
+        );
+
         // reaches here when connection is closed/error from the querier side
         self.clean_up(false, querier_conn_error).await;
     }
