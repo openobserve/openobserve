@@ -25,6 +25,7 @@ use config::{
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
+    metrics::QUERY_PARQUET_CACHE_RATIO_NODE,
     utils::{
         file::is_exists,
         inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
@@ -445,14 +446,17 @@ pub async fn filter_file_list_by_tantivy_index(
     )
     .await?;
 
+    let parquet_cached_ratio = (((scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files)
+        * 100) as f64
+        / scan_stats.querier_files as f64) as usize;
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!("downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {:?} in background,", cache_type)
     };
-
     log::info!(
-        "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
+        "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, cache ratio: {},{download_msg} took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -460,8 +464,15 @@ pub async fn filter_file_list_by_tantivy_index(
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
+        parquet_cached_ratio,
         start.elapsed().as_millis()
     );
+
+    if parquet_cached_ratio > 0 {
+        QUERY_PARQUET_CACHE_RATIO_NODE
+            .with_label_values(&[&query.org_id, &query.stream_type.to_string()])
+            .inc_by(parquet_cached_ratio as u64);
+    }
 
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
     let time_range = query.time_range.unwrap_or((0, 0));
