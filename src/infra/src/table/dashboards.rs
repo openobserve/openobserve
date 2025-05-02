@@ -17,7 +17,7 @@ use config::meta::{
     dashboards::{
         Dashboard, ListDashboardsParams, v1::Dashboard as DashboardV1,
         v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3, v4::Dashboard as DashboardV4,
-        v5::Dashboard as DashboardV5,
+        v5::Dashboard as DashboardV5, v6::Dashboard as DashboardV6,
     },
     folder::{Folder, FolderType},
 };
@@ -82,6 +82,11 @@ impl TryFrom<dashboards::Model> for Dashboard {
             }
             5 => {
                 let inner: DashboardV5 = serde_json::from_value(value.data)?;
+                let dash = inner.into();
+                Ok(dash)
+            }
+            6 => {
+                let inner: DashboardV6 = serde_json::from_value(value.data)?;
                 let dash = inner.into();
                 Ok(dash)
             }
@@ -466,6 +471,11 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
         Dashboard {
             version: 5,
             v5: Some(inner),
+            ..
+        } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
+        Dashboard {
+            version: 6,
+            v6: Some(inner),
             ..
         } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
         Dashboard { version: v, .. } => Err(errors::PutDashboardError::MissingInnerData(v).into()),

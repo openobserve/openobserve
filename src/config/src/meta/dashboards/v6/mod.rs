@@ -49,7 +49,7 @@ pub struct Dashboard {
 
 impl From<Dashboard> for super::Dashboard {
     fn from(value: Dashboard) -> Self {
-        let version: i32 = 5;
+        let version: i32 = 6;
 
         let mut hasher = std::hash::DefaultHasher::new();
         hasher.write_i32(version);
@@ -62,8 +62,8 @@ impl From<Dashboard> for super::Dashboard {
             v2: None,
             v3: None,
             v4: None,
-            v5: Some(value),
-            v6: None,
+            v5: None,
+            v6: Some(value),
             version,
             hash,
             updated_at,
@@ -118,6 +118,8 @@ pub struct Query {
     pub custom_query: bool,
     pub fields: PanelFields,
     pub config: QueryConfig,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub joins: Option<Vec<Join>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -150,14 +152,26 @@ pub struct PanelFields {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum AxisType {
+    Build,
+    Raw,
+    Custom,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AxisItem {
     pub label: String,
     pub alias: String,
-    pub column: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type")]
+    pub typ: Option<AxisType>,
     pub color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub aggregation_function: Option<AggregationFunc>,
+    pub function_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -176,24 +190,49 @@ pub struct HavingConditions {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct AxisArg {
-    value: Option<String>,
+    #[serde(rename = "type")]
+    pub typ: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<AxisArgValueWrapper>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum AggregationFunc {
-    Count,
-    CountDistinct,
-    Histogram,
-    Sum,
-    Min,
-    Max,
-    Avg,
-    Median,
-    P50,
-    P90,
-    P95,
-    P99,
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
+#[serde(untagged)]
+pub enum AxisArgValueWrapper {
+    Object(AxisArgValue),
+    String(String),
+    Number(OrdF64),
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AxisArgValue {
+    pub field: Option<String>,
+    pub stream_alias: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Join {
+    pub stream: String,
+    pub stream_alias: String,
+    pub join_type: String,
+    pub conditions: Vec<JoinCondition>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct JoinCondition {
+    pub left_field: SelectedField,
+    pub right_field: SelectedField,
+    pub operation: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectedField {
+    pub stream_alias: Option<String>,
+    pub field: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -542,8 +581,6 @@ pub struct MapView {
 pub struct Trellis {
     pub layout: Option<String>,
     pub num_of_columns: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub group_by_y_axis: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
