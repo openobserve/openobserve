@@ -139,10 +139,16 @@ pub async fn websocket(
                                 }
                                 close_reason = Some(reason.clone());
                             }
-                            disconnect_tx
+                            if let Err(e) = disconnect_tx
                                 .send(Some(DisconnectMessage::Close(close_reason)))
                                 .await
-                                .unwrap();
+                            {
+                                log::error!(
+                                    "[WS_HANDLER]: Error sending disconnect message for request_id: {}, error: {}",
+                                    req_id,
+                                    e
+                                );
+                            }
                             break;
                         }
                         Err(e) => {
@@ -152,7 +158,13 @@ pub async fn websocket(
                                 get_config().common.instance_name,
                                 e
                             );
-                            disconnect_tx.send(None).await.unwrap();
+                            if let Err(e) = disconnect_tx.send(None).await {
+                                log::error!(
+                                    "[WS_HANDLER]: Error sending disconnect message for request_id: {}, error: {}",
+                                    req_id,
+                                    e
+                                );
+                            }
                             break;
                         }
                         _ => {
@@ -162,7 +174,13 @@ pub async fn websocket(
                                 get_config().common.instance_name,
                                 "Unknown error"
                             );
-                            disconnect_tx.send(None).await.unwrap();
+                            if let Err(e) = disconnect_tx.send(None).await {
+                                log::error!(
+                                    "[WS_HANDLER]: Error sending disconnect message for request_id: {}, error: {}",
+                                    req_id,
+                                    e
+                                );
+                            }
                             break;
                         }
                     }
@@ -222,8 +240,11 @@ pub async fn websocket(
                             }
                             Some(DisconnectMessage::Error(err_msg)) => {
                                 // send error message to client first
-                                _ = ws_session.text(err_msg.ws_server_events.to_json()).await;
+                                if let Err(e) = ws_session.text(err_msg.ws_server_events.to_json()).await {
+                                    log::error!("[WS::Querier::Handler]: Failed to send error message to client: {}", e);
+                                }
                                 if err_msg.should_disconnect {
+                                    log::debug!("[WS::Querier::Handler]: disconnecting client for request_id: {}", req_id);
                                     break;
                                 }
                             }
@@ -238,9 +259,16 @@ pub async fn websocket(
                 }
             }
 
-            _ = ws_session
+            if let Err(e) = ws_session
                 .close(Some(CloseReason::from(CloseCode::Normal)))
-                .await;
+                .await
+            {
+                log::error!(
+                    "[WS::Querier::Handler]: Error closing websocket session request_id: {}, error: {}",
+                    req_id,
+                    e
+                );
+            }
             log::info!("[WS::Querier::Handler]: client ws closed: {}", req_id);
             Ok::<_, Error>(())
         };

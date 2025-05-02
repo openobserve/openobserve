@@ -309,7 +309,7 @@ pub async fn handle_values_request(
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
-    send_message_2(request_id, end_res, response_tx.clone()).await?;
+    send_message_2(request_id, end_res, response_tx).await?;
 
     Ok(())
 }
