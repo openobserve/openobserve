@@ -181,7 +181,7 @@ pub struct UserList {
 }
 
 #[cfg(feature = "cloud")]
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum InviteStatus {
     #[serde(rename = "pending")]
     Pending,

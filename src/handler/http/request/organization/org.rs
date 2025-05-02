@@ -434,11 +434,19 @@ async fn rename_org(
 )]
 #[get("/{org_id}/invites")]
 pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Error> {
+    use crate::common::meta::user::InviteStatus;
+
     let org = path.into_inner();
 
     let result = organization::get_invitations_for_org(&org).await;
     match result {
-        Ok(result) => Ok(HttpResponse::Ok().json(result)),
+        Ok(result) => {
+            let result: Vec<_> = result
+                .into_iter()
+                .filter(|invite| invite.status != InviteStatus::Accepted)
+                .collect();
+            Ok(HttpResponse::Ok().json(result))
+        }
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
             err.to_string(),

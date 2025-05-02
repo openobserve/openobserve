@@ -527,25 +527,40 @@ pub async fn is_add_user_allowed_for_org(org_id: Option<&str>, user_email: &str)
     use o2_enterprise::enterprise::cloud::billings as cloud_billings;
 
     if let Some(org) = org_id {
-        if cloud_billings::get_subscription(user_email, org)
+        let cb = cloud_billings::get_subscription(user_email, org)
             .await
-            .map(|cb| cb.subscription_type.is_free_sub())
-            .unwrap_or(true)
-        {
-            return false;
+            .unwrap_or_default();
+        if let Some(billing) = cb {
+            if !billing.subscription_type.is_free_sub() {
+                return true;
+            }
         }
     };
 
     let mut is_already_a_free_org = false;
     let member_orgs = list_orgs_by_user(user_email).await.unwrap_or_default();
     for member_org in member_orgs {
-        let org_sub_type = cloud_billings::get_subscription(user_email, &member_org.identifier)
+        // skip the org we are trying to add the user in
+        if let Some(org) = org_id {
+            if member_org.identifier == org {
+                continue;
+            }
+        }
+        let org_sub = cloud_billings::get_subscription(user_email, &member_org.identifier)
             .await
-            .map(|cb| cb.subscription_type)
             .unwrap_or_default();
-        if org_sub_type.is_free_sub() {
-            is_already_a_free_org = true;
-            break;
+        match org_sub {
+            Some(sub) => {
+                if sub.subscription_type.is_free_sub() {
+                    is_already_a_free_org = true;
+                    break;
+                }
+            }
+            None => {
+                // if there is no subscription record for that org, then that org is on free plan
+                is_already_a_free_org = true;
+                break;
+            }
         }
     }
 
