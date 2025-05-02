@@ -328,7 +328,7 @@ async fn prepare_files(
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(
-            "".to_string(),
+            "".to_string(), // here we don't need it
             file_key.clone(),
             parquet_meta,
             false,
