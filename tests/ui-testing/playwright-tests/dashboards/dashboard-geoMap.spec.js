@@ -465,7 +465,7 @@ test.describe("dashboard maps testcases", () => {
     await chartTypeSelector.searchAndAddField("lat", "latitude");
     await chartTypeSelector.searchAndAddField("lon", "longitude");
     await chartTypeSelector.searchAndAddField("country", "weight");
-    await chartTypeSelector.searchAndAddField("country", "filter");
+    await chartTypeSelector.searchAndAddField("country", "filter1");
 
     // selct the variable and enter the value
 
@@ -548,27 +548,6 @@ test.describe("dashboard maps testcases", () => {
     await chartTypeSelector.searchAndAddField("lat", "latitude");
     await chartTypeSelector.searchAndAddField("lon", "longitude");
     await chartTypeSelector.searchAndAddField("country", "weight");
-    //  await chartTypeSelector.searchAndAddField("country", "filter");
-    // await page.waitForTimeout(2000);
-    // await page
-    //   .locator(
-    //     '[data-test="field-list-item-logs-geojson-lat"] [data-test="dashboard-add-latitude-data"]'
-    //   )
-    //   .click();
-
-    // await page
-    //   .locator(
-    //     '[data-test="field-list-item-logs-geojson-lon"] [data-test="dashboard-add-longitude-data"]'
-    //   )
-    //   .click();
-
-    // await page
-    //   .locator(
-    //     '[data-test="field-list-item-logs-geojson-country"] [data-test="dashboard-add-weight-data"]'
-    //   )
-    //   .click();
-
-    // await page.locator('[data-test="dashboard-apply"]').click();
 
     await dashboardPageActions.applyDashboardBtn();
 
@@ -582,29 +561,11 @@ test.describe("dashboard maps testcases", () => {
     await dashboardPageActions.applyDashboardBtn();
     await dashboardPageActions.waitForChartToRender();
 
-    // await page.locator('[data-test="dashboard-sidebar"]').click();
-
-    // await page.locator('[data-test="dashboard-config-latitude"]').click();
-    // await page.locator('[data-test="dashboard-config-latitude"]').click();
-    // await page
-    //   .locator('[data-test="dashboard-config-latitude"]')
-    //   .fill("26.1206");
-
-    // await page.locator('[data-test="dashboard-config-longitude"]').click();
-    // await page
-    //   .locator('[data-test="dashboard-config-longitude"]')
-    //   .fill("091.6523");
-
-    // await page.locator('[data-test="dashboard-config-zoom"]').click();
-    // await page.locator('[data-test="dashboard-config-zoom"]').fill("12");
-    // await page.locator('[data-test="dashboard-apply"]').click();
-
     // Click on the map at the given position
     await page.locator("#chart-map canvas").click({
       position: { x: 26.1206, y: 91.6523 }, // Ensure this translates correctly to pixels
     });
 
-    // await page.waitForTimeout(5000);
     // Save panel
 
     await dashboardPageActions.addPanelName(randomDashboardName);
