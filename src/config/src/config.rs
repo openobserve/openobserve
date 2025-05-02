@@ -45,6 +45,10 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
+// for DDL commands and migrations
+pub const DB_SCHEMA_VERSION: u64 = 2;
+pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
+
 // global version variables
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -86,10 +90,6 @@ pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
 pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
-
-// for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 1;
-pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
