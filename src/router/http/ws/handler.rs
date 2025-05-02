@@ -132,8 +132,8 @@ impl WsHandler {
         //             .await
         //         {
         //             log::info!(
-        //                 "[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown client_id: {}",
-        //                 client_id_clone
+        //                 "[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown client_id:
+        // {}",                 client_id_clone
         //             );
         //             if let Err(e) = disconnect_tx_clone2.send(None).await {
         //                 log::error!(
@@ -418,15 +418,10 @@ impl WsHandler {
                         Some(message) = response_rx.recv() => {
                             match message {
                                 WsServerEvents::Ping(ping) => {
-                                    let mut close_conn = false;
                                     log::debug!("[WS::Router::Handler]: sending pong to client_id: {}, msg: {:?}", client_id, String::from_utf8_lossy(&ping));
                                     if let Err(e) = ws_session.pong(&ping).await {
-                                        close_conn = true;
                                         log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
-                                    }
-
-                                    if close_conn {
-                                        log::debug!("[WS::Router::Handler]: closing websocket session due to ping-pong failure client_id: {}", client_id);
+                                        log::debug!("[WS::Router::Handler]: closing websocket session for client_id: {}", client_id);
                                         if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Normal))).await {
                                             log::error!("[WS::Router::Handler]: Error closing websocket session client_id: {}, error: {}", client_id, e);
                                         };
