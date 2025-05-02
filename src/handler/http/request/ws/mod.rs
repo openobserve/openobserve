@@ -77,10 +77,9 @@ pub async fn websocket(
     let (disconnect_tx, mut disconnect_rx) =
         tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
 
-    // Spawn the health check task
-    // tokio::spawn(session::health_check(router_id, response_tx.clone()));
-
     // Spawn message handling tasks between router and querier
+    let response_tx_clone = response_tx.clone();
+    let disconnect_tx_clone = disconnect_tx.clone();
     actix_web::rt::spawn(async move {
         // Handle incoming messages from client
         let handle_incoming = async {
@@ -93,7 +92,10 @@ pub async fn websocket(
                                 req_id,
                                 cfg.common.instance_name
                             );
-                            let _ = response_tx.send(WsServerEvents::Ping(ping.to_vec())).await;
+                            let _ = response_tx_clone
+                                .clone()
+                                .send(WsServerEvents::Ping(ping.to_vec()))
+                                .await;
                         }
                         Ok(actix_ws::AggregatedMessage::Pong(_)) => {
                             log::debug!(
@@ -113,7 +115,7 @@ pub async fn websocket(
                                 &req_id,
                                 msg.to_string(),
                                 path.clone(),
-                                response_tx.clone(),
+                                response_tx_clone.clone(),
                             )
                             .await;
                         }
@@ -140,7 +142,7 @@ pub async fn websocket(
                                 }
                                 close_reason = Some(reason.clone());
                             }
-                            if let Err(e) = disconnect_tx
+                            if let Err(e) = disconnect_tx_clone
                                 .send(Some(DisconnectMessage::Close(close_reason)))
                                 .await
                             {
@@ -159,7 +161,7 @@ pub async fn websocket(
                                 get_config().common.instance_name,
                                 e
                             );
-                            if let Err(e) = disconnect_tx.send(None).await {
+                            if let Err(e) = disconnect_tx_clone.send(None).await {
                                 log::error!(
                                     "[WS_HANDLER]: Error sending disconnect message for request_id: {}, error: {}",
                                     req_id,
@@ -175,7 +177,7 @@ pub async fn websocket(
                                 get_config().common.instance_name,
                                 "Unknown error"
                             );
-                            if let Err(e) = disconnect_tx.send(None).await {
+                            if let Err(e) = disconnect_tx_clone.send(None).await {
                                 log::error!(
                                     "[WS_HANDLER]: Error sending disconnect message for request_id: {}, error: {}",
                                     req_id,
@@ -231,6 +233,7 @@ pub async fn websocket(
                         }
                     }
                     Some(msg) = disconnect_rx.recv() => {
+                        log::info!("[WS::Querier::Handler] disconnect signal received from request_id: {}, msg: {:?}", req_id, msg);
                         match msg {
                             None => {
                                 // proper disconnecting
