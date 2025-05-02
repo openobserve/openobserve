@@ -120,10 +120,11 @@ impl ErrorMessage {
 impl WsError {
     /// Disconnect the ws conn to client from router
     pub fn should_disconnect(&self) -> bool {
-        matches!(
-            self,
-            WsError::ProtocolError(_) | WsError::QuerierWsConnNotAvailable(_)
-        )
+        false
+        // matches!(
+        //     self,
+        //     WsError::ProtocolError(_) | WsError::QuerierWsConnNotAvailable(_)
+        // )
     }
 
     pub fn should_client_retry(&self) -> bool {

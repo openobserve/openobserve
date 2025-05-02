@@ -408,7 +408,7 @@ impl QuerierConnection {
         );
 
         // remove the connection from the pool
-        QuerierConnectionPool::clean_up(&self.querier_name).await;
+        QuerierConnectionPool::clean_up(&self.querier_name).await
     }
 }
 
@@ -458,7 +458,7 @@ impl ResponseRouter {
         match sender {
             None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
             Some(resp_sender) => {
-                if let Err(e) = resp_sender.send(message).await {
+                if let Err(e) = resp_sender.clone().send(message).await {
                     log::error!(
                         "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {} error: {}",
                         trace_id,
@@ -550,25 +550,25 @@ impl Connection for QuerierConnection {
             match write.send(message).await {
                 Ok(_) => {
                     log::info!(
-                        "[WS::QuerierConnection] request w/ trace_id {} successfully forwarded to querier {}",
+                        "[WS::QuerierConnection] request w/ trace_id {} successfully forwarded to querier conn id: {}",
                         trace_id,
-                        self.querier_name
+                        self.id,
                     );
                     drop(write_guard);
                     Ok(())
                 }
                 Err(e) => {
                     log::error!(
-                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier connection:{}, error: {}",
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier conn id: {}, error: {}",
                         trace_id,
-                        self.querier_name,
+                        self.id,
                         e
                     );
                     drop(write_guard);
                     self.clean_up(true, Some(e.to_string())).await;
                     Err(WsError::ConnectionError(format!(
-                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier connection: {}, error: {}",
-                        trace_id, self.querier_name, e
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier conn id: {}, error: {}",
+                        trace_id, self.id, e
                     )))
                 }
             }
