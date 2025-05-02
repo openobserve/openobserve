@@ -40,9 +40,12 @@ use crate::handler::http::request::search::error_utils::map_error_to_http_respon
 use crate::service::{self_reporting::audit, websocket_events::handle_cancel};
 use crate::{
     common::utils::websocket::get_ping_interval_secs_with_jitter,
-    service::websocket_events::{
-        WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
-        sessions_cache_utils, setup_tracing_with_trace_id,
+    service::{
+        setup_tracing_with_trace_id,
+        websocket_events::{
+            WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
+            sessions_cache_utils,
+        },
     },
 };
 
@@ -305,7 +308,6 @@ async fn resolve_enterprise_user_id(
 /// Text message is parsed into `WsClientEvents` and processed accordingly
 /// Depending on each event type, audit must be done
 /// Currently audit is done only for the search event
-#[tracing::instrument(name = "service:search:websocket::handle_text_message", skip_all)]
 pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path: String) {
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
@@ -331,9 +333,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
             // Setup tracing
             let ws_span = setup_tracing_with_trace_id(
                 &client_msg.get_trace_id(),
-                tracing::info_span!(
-                    "src::handler::http::request::websocket::ws::session::handle_text_message"
-                ),
+                tracing::info_span!("http:request:ws:session:handle_text_message"),
             )
             .await;
 

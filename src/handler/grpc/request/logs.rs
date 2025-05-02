@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::metrics;
+use config::{meta::otlp::OtlpRequestType, metrics};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
 };
@@ -57,13 +57,13 @@ impl LogsService for LogsServer {
             user_email = user_id.to_str().unwrap();
         };
 
-        match crate::service::logs::otlp_grpc::handle_grpc_request(
+        match crate::service::logs::otlp::handle_request(
             0,
             org_id.unwrap().to_str().unwrap(),
             in_req,
-            true,
             in_stream_name,
             user_email,
+            OtlpRequestType::Grpc,
         )
         .await
         {

@@ -26,7 +26,7 @@ use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_m
 use crate::{
     db::{
         self, IndexStatement,
-        postgres::{CLIENT, CLIENT_RO, create_index},
+        postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -49,7 +49,7 @@ impl Default for PostgresScheduler {
 impl super::Scheduler for PostgresScheduler {
     /// Creates the Scheduled Jobs table
     async fn create_table(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
         DB_QUERY_NUMS
             .with_label_values(&["create", "scheduled_jobs", ""])
             .inc();
@@ -626,7 +626,7 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
 
 async fn add_data_column() -> Result<()> {
     log::info!("[POSTGRES] Adding data column to scheduled_jobs table");
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     DB_QUERY_NUMS
         .with_label_values(&["alter", "scheduled_jobs", ""])
         .inc();
