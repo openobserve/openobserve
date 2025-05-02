@@ -799,9 +799,7 @@ pub async fn build_search_request_per_field(
                     return Err(Error::other("Failed to parse sql"));
                 };
 
-                let complex_query = sql.stream_names.len().eq(&2) && sql.aliases.len().eq(&2);
-
-                let sql_where_from_query = if !complex_query {
+                let sql_where_from_query = if !sql.is_complex_query {
                     // pick up where clause from sql
                     match SearchService::sql::pickup_where(&query.sql, None) {
                         Ok(Some(v)) => format!("WHERE {}", v),
@@ -859,6 +857,7 @@ pub async fn build_search_request_per_field(
                     org_id,
                     stream_name,
                     stream_type,
+                    &field,
                     &field,
                     &query,
                     start_time,
