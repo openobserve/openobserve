@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-12 q-py-sm variables-input "
   :class="{
-    'flex justify-between items-center tw-w-1/2': variables.length == 0,
+    'flex tw-gap-2 items-center tw-w-1/2': variables.length == 0,
   }"
   >
     <div class="q-pb-xs custom-input-label text-bold">Variable
