@@ -15,7 +15,7 @@
 
 use chrono::{DateTime, FixedOffset, Utc};
 use config::meta::{
-    dashboards::{Dashboard as MetaDashboard, v1, v2, v3, v4, v5},
+    dashboards::{Dashboard as MetaDashboard, v1, v2, v3, v4, v5, v6},
     folder::Folder as MetaFolder,
 };
 use serde::{Deserialize, Serialize};
@@ -87,6 +87,8 @@ pub struct ListDashboardsResponseBodyItem {
     pub v4: Option<v4::Dashboard>,
     #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
     pub v5: Option<v5::Dashboard>,
+    #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
+    pub v6: Option<v6::Dashboard>,
 
     pub version: i32,
     pub hash: String,
@@ -132,6 +134,7 @@ pub struct DashboardDetails {
     pub v3: Option<v3::Dashboard>,
     pub v4: Option<v4::Dashboard>,
     pub v5: Option<v5::Dashboard>,
+    pub v6: Option<v6::Dashboard>,
     pub version: i32,
     pub hash: String,
     pub updated_at: i64,
@@ -258,6 +261,7 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
             v3: dashboard.v3,
             v4: dashboard.v4,
             v5: dashboard.v5,
+            v6: dashboard.v6,
         }
     }
 }
@@ -271,6 +275,7 @@ impl From<MetaDashboard> for DashboardDetails {
             v3: value.v3,
             v4: value.v4,
             v5: value.v5,
+            v6: value.v6,
             hash: value.hash,
             updated_at: value.updated_at,
         }
@@ -304,8 +309,12 @@ fn parse_dashboard_request(value: JsonValue) -> Result<MetaDashboard, serde_json
             let inner: v4::Dashboard = serde_json::from_value(value)?;
             inner.into()
         }
-        _ => {
+        5 => {
             let inner: v5::Dashboard = serde_json::from_value(value)?;
+            inner.into()
+        }
+        _ => {
+            let inner: v6::Dashboard = serde_json::from_value(value)?;
             inner.into()
         }
     };
