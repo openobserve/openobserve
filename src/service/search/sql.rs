@@ -92,6 +92,7 @@ pub struct Sql {
     pub use_inverted_index: bool, // if can use inverted index
     pub index_condition: Option<IndexCondition>, // use for tantivy index
     pub index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+    pub is_complex_query: bool,
 }
 
 impl Sql {
@@ -236,9 +237,11 @@ impl Sql {
             HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
 
+        let is_complex_query = is_complex_query(&mut statement);
+
         // NOTE: only this place modify the sql
         // 10. add _timestamp and _o2_id if need
-        if !is_complex_query(&mut statement) {
+        if !is_complex_query {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             statement.visit(&mut add_timestamp_visitor);
             if o2_id_is_needed(&used_schemas, &search_event_type) {
@@ -269,7 +272,7 @@ impl Sql {
 
         // 12. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
-        if !is_complex_query(&mut statement)
+        if !is_complex_query
             && order_by.len() == 1
             && order_by[0].0 == TIMESTAMP_COL_NAME
             && can_optimize
@@ -306,6 +309,7 @@ impl Sql {
             use_inverted_index,
             index_condition,
             index_optimize_mode,
+            is_complex_query,
         })
     }
 }
@@ -332,6 +336,7 @@ impl std::fmt::Display for Sql {
             self.sorted_by_time,
             self.use_inverted_index,
             self.index_condition,
+            self.is_complex_query,
         )
     }
 }
