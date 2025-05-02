@@ -271,13 +271,14 @@ impl QuerierConnection {
                                 {
                                     // scenario 2 where the trace_id & sender are not cleaned up ->
                                     // left for clean job
-                                    log::error!(
+                                    log::warn!(
                                         "[WS::Router::QuerierConnection] Error routing response from querier back to client, trace_id: {}, socket: {}, router conn id: {}, querier: {}",
                                         svr_event.get_trace_id(),
                                         e,
                                         self.id,
                                         self.querier_name
                                     );
+                                    self.unregister_request(&svr_event.get_trace_id()).await;
                                 }
                                 if let Some(trace_id) = remove_trace_id {
                                     log::info!(
