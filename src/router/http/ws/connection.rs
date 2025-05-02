@@ -460,7 +460,7 @@ impl ResponseRouter {
             None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
             Some(resp_sender) => {
                 if let Err(e) = resp_sender.clone().send(message).await {
-                    log::error!(
+                    log::warn!(
                         "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {} error: {}",
                         trace_id,
                         e
