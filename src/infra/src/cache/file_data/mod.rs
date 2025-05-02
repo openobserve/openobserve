@@ -200,7 +200,7 @@ async fn download_from_storage(
     let mut data_len = 0;
     let mut data_bytes = bytes::Bytes::new();
     for i in 0..DOWNLOAD_RETRY_TIMES {
-        let data = crate::storage::get(account, file).await?;
+        let data = crate::storage::get_bytes(account, file).await?;
         if data.is_empty() {
             return Err(anyhow::anyhow!("file {} data size is zero", file));
         }
@@ -278,7 +278,7 @@ pub async fn get_opts(
     if remote {
         return match range {
             Some(r) => crate::storage::get_range(account, file, r).await,
-            None => crate::storage::get(account, file).await,
+            None => crate::storage::get_bytes(account, file).await,
         };
     }
 

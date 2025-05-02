@@ -25,7 +25,7 @@ use object_store::{
     local::LocalFileSystem, path::Path,
 };
 
-use crate::storage::{CONCURRENT_REQUESTS, ObjectStoreExt, format_key};
+use crate::storage::{CONCURRENT_REQUESTS, format_key};
 
 pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
@@ -56,111 +56,6 @@ impl std::fmt::Debug for Local {
 impl std::fmt::Display for Local {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("storage for local disk")
-    }
-}
-
-#[async_trait]
-impl ObjectStoreExt for Local {
-    fn get_account(&self, _file: &str) -> Option<String> {
-        None
-    }
-
-    async fn get_by_account(&self, _account: &str, location: &Path) -> Result<GetResult> {
-        self.get(location).await
-    }
-
-    async fn get_opts_by_account(
-        &self,
-        _account: &str,
-        location: &Path,
-        options: GetOptions,
-    ) -> Result<GetResult> {
-        self.get_opts(location, options).await
-    }
-
-    async fn get_range_by_account(
-        &self,
-        _account: &str,
-        location: &Path,
-        range: Range<usize>,
-    ) -> Result<Bytes> {
-        self.get_range(location, range).await
-    }
-
-    async fn get_ranges_by_account(
-        &self,
-        _account: &str,
-        location: &Path,
-        ranges: &[Range<usize>],
-    ) -> Result<Vec<Bytes>> {
-        self.get_ranges(location, ranges).await
-    }
-
-    async fn head_by_account(&self, _account: &str, location: &Path) -> Result<ObjectMeta> {
-        self.head(location).await
-    }
-
-    async fn delete_by_account(&self, _account: &str, location: &Path) -> Result<()> {
-        self.delete(location).await
-    }
-
-    fn delete_stream_by_account<'a>(
-        &'a self,
-        _account: &str,
-        locations: BoxStream<'a, Result<Path>>,
-    ) -> BoxStream<'a, Result<Path>> {
-        self.delete_stream(locations)
-    }
-
-    fn list_by_account(
-        &self,
-        _account: &str,
-        prefix: Option<&Path>,
-    ) -> BoxStream<'_, Result<ObjectMeta>> {
-        self.list(prefix)
-    }
-
-    fn list_with_offset_by_account(
-        &self,
-        _account: &str,
-        prefix: Option<&Path>,
-        offset: &Path,
-    ) -> BoxStream<'_, Result<ObjectMeta>> {
-        self.list_with_offset(prefix, offset)
-    }
-
-    async fn list_with_delimiter_by_account(
-        &self,
-        _account: &str,
-        prefix: Option<&Path>,
-    ) -> Result<ListResult> {
-        self.list_with_delimiter(prefix).await
-    }
-
-    async fn copy_by_account(&self, _account: &str, from: &Path, to: &Path) -> Result<()> {
-        self.copy(from, to).await
-    }
-
-    async fn rename_by_account(&self, _account: &str, from: &Path, to: &Path) -> Result<()> {
-        self.rename(from, to).await
-    }
-
-    async fn copy_if_not_exists_by_account(
-        &self,
-        _account: &str,
-        from: &Path,
-        to: &Path,
-    ) -> Result<()> {
-        self.copy_if_not_exists(from, to).await
-    }
-
-    async fn rename_if_not_exists_by_account(
-        &self,
-        _account: &str,
-        from: &Path,
-        to: &Path,
-    ) -> Result<()> {
-        self.rename_if_not_exists(from, to).await
     }
 }
 

@@ -395,7 +395,7 @@ pub async fn test_config() -> Result<(), anyhow::Error> {
         if matches!(e, object_store::Error::NotFound { .. }) {
             let test_content = Bytes::from("Hello, S3!");
             // Test upload
-            if let Err(e) = super::put(TEST_FILE, test_content).await {
+            if let Err(e) = super::put("", TEST_FILE, test_content).await {
                 return Err(anyhow::anyhow!("S3 upload test failed: {:?}", e));
             }
         } else {

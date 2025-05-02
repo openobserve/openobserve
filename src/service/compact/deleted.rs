@@ -34,7 +34,7 @@ pub async fn delete(
     // delete files from storage
     let local_mode = config::get_config().common.local_mode;
     if let Err(e) = storage::del(
-        &files
+        files
             .iter()
             .filter_map(|file| {
                 if !ingester::is_wal_file(local_mode, &file.file) {
@@ -68,7 +68,7 @@ pub async fn delete(
         .collect::<Vec<_>>();
     if !inverted_index_files.is_empty() {
         if let Err(e) = storage::del(
-            &inverted_index_files
+            inverted_index_files
                 .iter()
                 .map(|file| (file.0.as_str(), file.1.as_str()))
                 .collect::<Vec<_>>(),
@@ -104,7 +104,7 @@ pub async fn delete(
         .collect::<Vec<_>>();
     if !flattened_files.is_empty() {
         if let Err(e) = storage::del(
-            &flattened_files
+            flattened_files
                 .iter()
                 .map(|file| (file.0.as_str(), file.1.as_str()))
                 .collect::<Vec<_>>(),

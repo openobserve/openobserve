@@ -29,7 +29,6 @@ pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
 pub enum StorageType {
     Memory,
     Wal,
-    Tmpfs,
 }
 
 #[derive(Clone, Debug)]

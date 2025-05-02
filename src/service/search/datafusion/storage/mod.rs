@@ -16,5 +16,4 @@
 pub mod file_list;
 pub mod file_statistics_cache;
 pub mod memory;
-pub mod tmpfs;
 pub mod wal;

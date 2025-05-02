@@ -53,22 +53,22 @@ impl std::fmt::Display for FS {
 impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let location = &self.format_location(location);
-        storage::LOCAL_WAL.get(location).await
+        storage::wal::get(location).await
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         let location = &self.format_location(location);
-        storage::LOCAL_WAL.get_opts(location, options).await
+        storage::wal::get_opts(location, options).await
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
         let location = &self.format_location(location);
-        storage::LOCAL_WAL.get_range(location, range).await
+        storage::wal::get_range(location, range).await
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
         let location = &self.format_location(location);
-        storage::LOCAL_WAL.head(location).await
+        storage::wal::head(location).await
     }
 
     #[tracing::instrument(name = "datafusion::storage::local_wal::list", skip_all)]

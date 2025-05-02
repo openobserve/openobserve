@@ -21,8 +21,8 @@ use config::utils::time::BASE_TIME;
 use futures::{StreamExt, stream::BoxStream};
 use object_store::{
     Attributes, Error, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload,
-    OBJECT_STORE_COALESCE_DEFAULT, ObjectMeta, ObjectStore, PutMultipartOpts, PutOptions,
-    PutPayload, PutResult, Result, coalesce_ranges, path::Path,
+    OBJECT_STORE_COALESCE_DEFAULT, ObjectMeta, PutMultipartOpts, PutOptions, PutPayload, PutResult,
+    Result, coalesce_ranges, path::Path,
 };
 use once_cell::sync::Lazy;
 
@@ -35,7 +35,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct CacheFS {}
 
-pub static DEFAULT: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(CacheFS::new_store);
+static DEFAULT: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(CacheFS::new_store);
 
 impl std::fmt::Display for CacheFS {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -52,10 +52,46 @@ impl CacheFS {
 #[async_trait]
 impl ObjectStoreExt for CacheFS {
     fn get_account(&self, file: &str) -> Option<String> {
-        storage::DEFAULT.get_account(file)
+        storage::get_account(file)
     }
 
-    async fn get_by_account(&self, account: &str, location: &Path) -> Result<GetResult> {
+    async fn put(
+        &self,
+        _account: &str,
+        _location: &Path,
+        _payload: PutPayload,
+    ) -> Result<PutResult> {
+        Err(Error::NotImplemented)
+    }
+
+    async fn put_opts(
+        &self,
+        _account: &str,
+        _location: &Path,
+        _payload: PutPayload,
+        _opts: PutOptions,
+    ) -> Result<PutResult> {
+        Err(Error::NotImplemented)
+    }
+
+    async fn put_multipart(
+        &self,
+        _account: &str,
+        _location: &Path,
+    ) -> Result<Box<dyn MultipartUpload>> {
+        Err(Error::NotImplemented)
+    }
+
+    async fn put_multipart_opts(
+        &self,
+        _account: &str,
+        _location: &Path,
+        _opts: PutMultipartOpts,
+    ) -> Result<Box<dyn MultipartUpload>> {
+        Err(Error::NotImplemented)
+    }
+
+    async fn get(&self, account: &str, location: &Path) -> Result<GetResult> {
         let path = location.to_string();
         if let Ok(data) = file_data::get_opts(account, &path, None, false).await {
             let meta = ObjectMeta {
@@ -79,10 +115,10 @@ impl ObjectStoreExt for CacheFS {
             });
         }
         // default to storage
-        storage::DEFAULT.get_by_account(account, location).await
+        storage::get(account, &path).await
     }
 
-    async fn get_opts_by_account(
+    async fn get_opts(
         &self,
         account: &str,
         location: &Path,
@@ -117,12 +153,10 @@ impl ObjectStoreExt for CacheFS {
             });
         }
         // default to storage
-        storage::DEFAULT
-            .get_opts_by_account(account, location, options)
-            .await
+        storage::get_opts(account, &path, options).await
     }
 
-    async fn get_range_by_account(
+    async fn get_range(
         &self,
         account: &str,
         location: &Path,
@@ -136,7 +170,7 @@ impl ObjectStoreExt for CacheFS {
         Ok(data)
     }
 
-    async fn get_ranges_by_account(
+    async fn get_ranges(
         &self,
         account: &str,
         location: &Path,
@@ -144,13 +178,13 @@ impl ObjectStoreExt for CacheFS {
     ) -> Result<Vec<Bytes>> {
         coalesce_ranges(
             ranges,
-            |range| self.get_range_by_account(account, location, range),
+            |range| self.get_range(account, location, range),
             OBJECT_STORE_COALESCE_DEFAULT,
         )
         .await
     }
 
-    async fn head_by_account(&self, account: &str, location: &Path) -> Result<ObjectMeta> {
+    async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta> {
         let path = location.to_string();
         if let Ok(size) = file_data::get_size_opts(account, &path, false).await {
             return Ok(ObjectMeta {
@@ -162,14 +196,14 @@ impl ObjectStoreExt for CacheFS {
             });
         }
         // default
-        storage::DEFAULT.head_by_account(account, location).await
+        storage::head(account, &path).await
     }
 
-    async fn delete_by_account(&self, _account: &str, _location: &Path) -> Result<()> {
+    async fn delete(&self, _account: &str, _location: &Path) -> Result<()> {
         Err(Error::NotImplemented)
     }
 
-    fn delete_stream_by_account<'a>(
+    fn delete_stream<'a>(
         &'a self,
         _account: &str,
         _locations: BoxStream<'a, Result<Path>>,
@@ -177,15 +211,11 @@ impl ObjectStoreExt for CacheFS {
         futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
     }
 
-    fn list_by_account(
-        &self,
-        _account: &str,
-        _prefix: Option<&Path>,
-    ) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, _account: &str, _prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
         futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
     }
 
-    fn list_with_offset_by_account(
+    fn list_with_offset(
         &self,
         _account: &str,
         _prefix: Option<&Path>,
@@ -194,7 +224,7 @@ impl ObjectStoreExt for CacheFS {
         futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
     }
 
-    async fn list_with_delimiter_by_account(
+    async fn list_with_delimiter(
         &self,
         _account: &str,
         _prefix: Option<&Path>,
@@ -202,107 +232,39 @@ impl ObjectStoreExt for CacheFS {
         Err(Error::NotImplemented)
     }
 
-    async fn copy_by_account(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
+    async fn copy(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
         Err(Error::NotImplemented)
     }
 
-    async fn rename_by_account(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
+    async fn rename(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
         Err(Error::NotImplemented)
     }
 
-    async fn copy_if_not_exists_by_account(
-        &self,
-        _account: &str,
-        _from: &Path,
-        _to: &Path,
-    ) -> Result<()> {
+    async fn copy_if_not_exists(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
         Err(Error::NotImplemented)
     }
 
-    async fn rename_if_not_exists_by_account(
-        &self,
-        _account: &str,
-        _from: &Path,
-        _to: &Path,
-    ) -> Result<()> {
+    async fn rename_if_not_exists(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
         Err(Error::NotImplemented)
     }
 }
 
-#[async_trait]
-impl ObjectStore for CacheFS {
-    async fn get(&self, _location: &Path) -> Result<GetResult> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn get_opts(&self, _location: &Path, _options: GetOptions) -> Result<GetResult> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn get_range(&self, _location: &Path, _range: Range<usize>) -> Result<Bytes> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn head(&self, _location: &Path) -> Result<ObjectMeta> {
-        Err(Error::NotImplemented)
-    }
-
-    #[tracing::instrument(name = "datafusion::storage::memory::list", skip_all)]
-    fn list(&self, _prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
-        futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
-    }
-
-    async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn put_opts(
-        &self,
-        _location: &Path,
-        _payload: PutPayload,
-        _opts: PutOptions,
-    ) -> Result<PutResult> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn put_multipart(&self, _location: &Path) -> Result<Box<dyn MultipartUpload>> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn put_multipart_opts(
-        &self,
-        _location: &Path,
-        _opts: PutMultipartOpts,
-    ) -> Result<Box<dyn MultipartUpload>> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn delete(&self, _location: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn copy(&self, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn copy_if_not_exists(&self, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
-    }
+pub async fn get(account: &str, path: &Path) -> Result<GetResult> {
+    DEFAULT.get(account, path).await
 }
 
-pub async fn get(account: &str, location: &Path) -> object_store::Result<bytes::Bytes> {
-    let data = DEFAULT.get_by_account(account, location).await?;
-    let data = data.bytes().await?;
-    Ok(data)
+pub async fn get_opts(account: &str, path: &Path, options: GetOptions) -> Result<GetResult> {
+    DEFAULT.get_opts(account, path, options).await
 }
 
 pub async fn get_range(
     account: &str,
     location: &Path,
     range: Range<usize>,
-) -> object_store::Result<bytes::Bytes> {
-    let data = DEFAULT
-        .get_range_by_account(account, location, range)
-        .await?;
-    Ok(data)
+) -> Result<bytes::Bytes> {
+    DEFAULT.get_range(account, location, range).await
+}
+
+pub async fn head(account: &str, location: &Path) -> Result<ObjectMeta> {
+    DEFAULT.head(account, location).await
 }

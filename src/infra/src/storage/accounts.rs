@@ -17,12 +17,12 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{get_config, utils::hash::Sum64};
+use config::{get_config, is_local_disk_storage, utils::hash::Sum64};
 use futures::stream::BoxStream;
 use hashbrown::{HashMap, HashSet};
 use object_store::{
-    Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, path::Path,
+    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore, PutMultipartOpts,
+    PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
 use crate::storage::{ObjectStoreExt, get_stream_from_file, remote::StorageConfig};
@@ -41,6 +41,12 @@ impl Default for StorageClientFactory {
     }
 }
 
+/// Returns the default object store based on the configuration.
+/// It creates a remote object store with multiple accounts.
+pub(crate) fn default() -> Box<dyn ObjectStoreExt> {
+    Box::<StorageClientFactory>::default()
+}
+
 /// StorageClientFactory is a factory for creating storage clients.
 /// It is used to manage multiple storage clients for different accounts.
 impl StorageClientFactory {
@@ -56,10 +62,22 @@ impl StorageClientFactory {
             only_default: accounts.len() == 1,
             stream_strategy,
         };
-        for (name, config) in accounts {
-            storage
-                .accounts
-                .insert(name, Box::new(super::remote::Remote::new(config)));
+
+        if is_local_disk_storage() {
+            std::fs::create_dir_all(&get_config().common.data_stream_dir)
+                .expect("create stream data dir success");
+            storage.accounts.insert(
+                DEFAULT_ACCOUNT.to_string(),
+                Box::<super::local::Local>::default(),
+            );
+            // local storage only has one account
+            storage.only_default = true;
+        } else {
+            for (name, config) in accounts {
+                storage
+                    .accounts
+                    .insert(name, Box::new(super::remote::Remote::new(config)));
+            }
         }
         storage
     }
@@ -91,8 +109,10 @@ impl StorageClientFactory {
     /// Get the client for the given name.
     /// If the name is not found, return the default client.
     pub fn get_client_by_name(&self, name: &str) -> &dyn ObjectStore {
-        if let Some(client) = self.accounts.get(name) {
-            return client;
+        if !name.is_empty() {
+            if let Some(client) = self.accounts.get(name) {
+                return client;
+            }
         }
         self.accounts
             .get(DEFAULT_ACCOUNT)
@@ -225,11 +245,50 @@ impl ObjectStoreExt for StorageClientFactory {
         self.get_name_by_path(&file.into())
     }
 
-    async fn get_by_account(&self, account: &str, location: &Path) -> Result<GetResult> {
+    async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult> {
+        self.get_client_by_name(account)
+            .put(location, payload)
+            .await
+    }
+
+    async fn put_opts(
+        &self,
+        account: &str,
+        location: &Path,
+        payload: PutPayload,
+        opts: PutOptions,
+    ) -> Result<PutResult> {
+        self.get_client_by_name(account)
+            .put_opts(location, payload, opts)
+            .await
+    }
+
+    async fn put_multipart(
+        &self,
+        account: &str,
+        location: &Path,
+    ) -> Result<Box<dyn MultipartUpload>> {
+        self.get_client_by_name(account)
+            .put_multipart(location)
+            .await
+    }
+
+    async fn put_multipart_opts(
+        &self,
+        account: &str,
+        location: &Path,
+        opts: PutMultipartOpts,
+    ) -> Result<Box<dyn MultipartUpload>> {
+        self.get_client_by_name(account)
+            .put_multipart_opts(location, opts)
+            .await
+    }
+
+    async fn get(&self, account: &str, location: &Path) -> Result<GetResult> {
         self.get_client_by_name(account).get(location).await
     }
 
-    async fn get_opts_by_account(
+    async fn get_opts(
         &self,
         account: &str,
         location: &Path,
@@ -240,7 +299,7 @@ impl ObjectStoreExt for StorageClientFactory {
             .await
     }
 
-    async fn get_range_by_account(
+    async fn get_range(
         &self,
         account: &str,
         location: &Path,
@@ -251,7 +310,7 @@ impl ObjectStoreExt for StorageClientFactory {
             .await
     }
 
-    async fn get_ranges_by_account(
+    async fn get_ranges(
         &self,
         account: &str,
         location: &Path,
@@ -262,15 +321,15 @@ impl ObjectStoreExt for StorageClientFactory {
             .await
     }
 
-    async fn head_by_account(&self, account: &str, location: &Path) -> Result<ObjectMeta> {
+    async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta> {
         self.get_client_by_name(account).head(location).await
     }
 
-    async fn delete_by_account(&self, account: &str, location: &Path) -> Result<()> {
+    async fn delete(&self, account: &str, location: &Path) -> Result<()> {
         self.get_client_by_name(account).delete(location).await
     }
 
-    fn delete_stream_by_account<'a>(
+    fn delete_stream<'a>(
         &'a self,
         account: &str,
         locations: BoxStream<'a, Result<Path>>,
@@ -278,15 +337,11 @@ impl ObjectStoreExt for StorageClientFactory {
         self.get_client_by_name(account).delete_stream(locations)
     }
 
-    fn list_by_account(
-        &self,
-        account: &str,
-        prefix: Option<&Path>,
-    ) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
         self.get_client_by_name(account).list(prefix)
     }
 
-    fn list_with_offset_by_account(
+    fn list_with_offset(
         &self,
         account: &str,
         prefix: Option<&Path>,
@@ -296,7 +351,7 @@ impl ObjectStoreExt for StorageClientFactory {
             .list_with_offset(prefix, offset)
     }
 
-    async fn list_with_delimiter_by_account(
+    async fn list_with_delimiter(
         &self,
         account: &str,
         prefix: Option<&Path>,
@@ -306,108 +361,24 @@ impl ObjectStoreExt for StorageClientFactory {
             .await
     }
 
-    async fn copy_by_account(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
+    async fn copy(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
         self.get_client_by_name(account).copy(from, to).await
     }
 
-    async fn rename_by_account(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
+    async fn rename(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
         self.get_client_by_name(account).rename(from, to).await
     }
 
-    async fn copy_if_not_exists_by_account(
-        &self,
-        account: &str,
-        from: &Path,
-        to: &Path,
-    ) -> Result<()> {
+    async fn copy_if_not_exists(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
         self.get_client_by_name(account)
             .copy_if_not_exists(from, to)
             .await
     }
 
-    async fn rename_if_not_exists_by_account(
-        &self,
-        account: &str,
-        from: &Path,
-        to: &Path,
-    ) -> Result<()> {
+    async fn rename_if_not_exists(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
         self.get_client_by_name(account)
             .rename_if_not_exists(from, to)
             .await
-    }
-}
-
-#[async_trait]
-impl ObjectStore for StorageClientFactory {
-    async fn put(&self, location: &Path, payload: PutPayload) -> Result<PutResult> {
-        self.get_client_by_name(DEFAULT_ACCOUNT)
-            .put(location, payload)
-            .await
-    }
-
-    async fn put_opts(
-        &self,
-        location: &Path,
-        payload: PutPayload,
-        opts: PutOptions,
-    ) -> Result<PutResult> {
-        self.get_client_by_name(DEFAULT_ACCOUNT)
-            .put_opts(location, payload, opts)
-            .await
-    }
-
-    async fn put_multipart_opts(
-        &self,
-        location: &Path,
-        opts: PutMultipartOpts,
-    ) -> Result<Box<dyn MultipartUpload>> {
-        self.get_client_by_name(DEFAULT_ACCOUNT)
-            .put_multipart_opts(location, opts)
-            .await
-    }
-
-    async fn get(&self, location: &Path) -> Result<GetResult> {
-        self.get_client_by_name(DEFAULT_ACCOUNT).get(location).await
-    }
-
-    async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
-        self.get_client_by_name(DEFAULT_ACCOUNT)
-            .get_opts(location, options)
-            .await
-    }
-
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
-        self.get_client_by_name(DEFAULT_ACCOUNT)
-            .get_range(location, range)
-            .await
-    }
-
-    async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
-        self.get_client_by_name(DEFAULT_ACCOUNT)
-            .get_ranges(location, ranges)
-            .await
-    }
-
-    async fn delete(&self, location: &Path) -> Result<()> {
-        self.get_client_by_name(DEFAULT_ACCOUNT)
-            .delete(location)
-            .await
-    }
-
-    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
-        self.get_client_by_name(DEFAULT_ACCOUNT).list(prefix)
-    }
-
-    async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn copy(&self, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn copy_if_not_exists(&self, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
     }
 }
 

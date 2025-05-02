@@ -448,10 +448,6 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     let wal_url = url::Url::parse("wal:///").unwrap();
     object_store_registry.register_store(&wal_url, Arc::new(wal));
 
-    let tmpfs = super::storage::tmpfs::Tmpfs::new();
-    let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
-    object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
-
     let cfg = get_config();
     let mut builder =
         RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
@@ -658,8 +654,6 @@ pub async fn create_parquet_table(
     } else if session.storage_type == StorageType::Wal {
         file_list::set(&session.id, &schema_key, files).await;
         format!("wal:///{}/schema={}/", session.id, schema_key)
-    } else if session.storage_type == StorageType::Tmpfs {
-        format!("tmpfs:///{}/", session.id)
     } else {
         return Err(DataFusionError::Execution(format!(
             "Unsupported storage_type {:?}",
@@ -705,7 +699,7 @@ pub async fn create_parquet_table(
         fst_fields,
         need_optimize_partition,
     )?;
-    if session.storage_type != StorageType::Tmpfs && file_stat_cache.is_some() {
+    if file_stat_cache.is_some() {
         table = table.with_cache(file_stat_cache);
     }
     Ok(Arc::new(table))

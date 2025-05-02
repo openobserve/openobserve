@@ -54,32 +54,28 @@ impl ObjectStore for FS {
         // TODO: download by the account
         dbg!("get: {:?}", location);
         let location = self.format_location(location);
-        infra::cache::storage::DEFAULT.get(&location).await
+        infra::cache::storage::get("", &location).await
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         // TODO: download by the account
         dbg!("get_opts: {:?}", location);
         let location = self.format_location(location);
-        infra::cache::storage::DEFAULT
-            .get_opts(&location, options)
-            .await
+        infra::cache::storage::get_opts("", &location, options).await
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
         // TODO: download by the account
         dbg!("get_range: {:?}", location);
         let location = self.format_location(location);
-        infra::cache::storage::DEFAULT
-            .get_range(&location, range)
-            .await
+        infra::cache::storage::get_range("", &location, range).await
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
         // TODO: download by the account
         dbg!("head: {:?}", location);
         let location = self.format_location(location);
-        infra::cache::storage::DEFAULT.head(&location).await
+        infra::cache::storage::head("", &location).await
     }
 
     #[tracing::instrument(name = "datafusion::storage::memory::list", skip_all)]

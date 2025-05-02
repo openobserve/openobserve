@@ -28,7 +28,7 @@ use config::{
     utils::time::{now_micros, second_micros},
 };
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
-use infra::{cache::tmpfs, errors::Result};
+use infra::errors::Result;
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
@@ -234,8 +234,6 @@ pub async fn search_inner(
 
     // clear session
     search::datafusion::storage::file_list::clear(&trace_id);
-    // clear tmpfs
-    tmpfs::delete(&trace_id, true).unwrap();
 
     scan_stats.format_to_mb();
     Ok((value, result_type, scan_stats))
