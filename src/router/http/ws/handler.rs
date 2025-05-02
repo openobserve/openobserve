@@ -419,6 +419,10 @@ impl WsHandler {
                         }
                     }
                 }
+                log::info!(
+                    "[WS::Router::Handler] handle_incoming task stopped for client_id: {}",
+                    client_id
+                );
             };
 
             // Handle outgoing messages from router to client
@@ -603,6 +607,10 @@ impl WsHandler {
                         }
                     }
                 }
+                log::info!(
+                    "[WS::Router::Handler] handle_outgoing task stopped for client_id: {}",
+                    client_id
+                );
 
                 _ = ws_session
                     .close(Some(CloseReason::from(CloseCode::Normal)))

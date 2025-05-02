@@ -271,13 +271,14 @@ impl QuerierConnection {
                                 {
                                     // scenario 2 where the trace_id & sender are not cleaned up ->
                                     // left for clean job
-                                    log::error!(
+                                    log::warn!(
                                         "[WS::Router::QuerierConnection] Error routing response from querier back to client, trace_id: {}, socket: {}, router conn id: {}, querier: {}",
                                         svr_event.get_trace_id(),
                                         e,
                                         self.id,
                                         self.querier_name
                                     );
+                                    self.unregister_request(&svr_event.get_trace_id()).await;
                                 }
                                 if let Some(trace_id) = remove_trace_id {
                                     log::info!(
@@ -311,6 +312,12 @@ impl QuerierConnection {
                 );
             }
         }
+
+        log::info!(
+            "[WS::Router::QuerierConnection] listen_to_querier_response task stopped for querier: {}, router conn id: {}",
+            self.querier_name,
+            self.id
+        );
 
         // reaches here when connection is closed/error from the querier side
         self.clean_up(false, querier_conn_error).await;
@@ -408,7 +415,7 @@ impl QuerierConnection {
         );
 
         // remove the connection from the pool
-        QuerierConnectionPool::clean_up(&self.querier_name).await;
+        QuerierConnectionPool::clean_up(&self.querier_name).await
     }
 }
 
@@ -458,8 +465,8 @@ impl ResponseRouter {
         match sender {
             None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
             Some(resp_sender) => {
-                if let Err(e) = resp_sender.send(message).await {
-                    log::error!(
+                if let Err(e) = resp_sender.clone().send(message).await {
+                    log::warn!(
                         "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {} error: {}",
                         trace_id,
                         e
@@ -550,25 +557,25 @@ impl Connection for QuerierConnection {
             match write.send(message).await {
                 Ok(_) => {
                     log::info!(
-                        "[WS::QuerierConnection] request w/ trace_id {} successfully forwarded to querier {}",
+                        "[WS::QuerierConnection] request w/ trace_id {} successfully forwarded to querier conn id: {}",
                         trace_id,
-                        self.querier_name
+                        self.id,
                     );
                     drop(write_guard);
                     Ok(())
                 }
                 Err(e) => {
                     log::error!(
-                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier connection:{}, error: {}",
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier conn id: {}, error: {}",
                         trace_id,
-                        self.querier_name,
+                        self.id,
                         e
                     );
                     drop(write_guard);
                     self.clean_up(true, Some(e.to_string())).await;
                     Err(WsError::ConnectionError(format!(
-                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier connection: {}, error: {}",
-                        trace_id, self.querier_name, e
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier conn id: {}, error: {}",
+                        trace_id, self.id, e
                     )))
                 }
             }

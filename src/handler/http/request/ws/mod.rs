@@ -189,6 +189,10 @@ pub async fn websocket(
                     }
                 }
             }
+            log::info!(
+                "[WS::Querier::Handler] handle_incoming task stopped for request_id: {}",
+                req_id
+            );
         };
 
         // Handle outgoing messages from router to client
@@ -226,7 +230,7 @@ pub async fn websocket(
                                 };
                                 log::info!("[WS::Querier::Handler] received message from router-querier task for request_id: {}, trace_id: {}", req_id, message.get_trace_id());
                                 if let Err(e) = ws_session.text(message_str).await {
-                                    log::error!("[WS::Querier::Handler] Error sending message to request_id: {}, error: {}", req_id, e);
+                                    log::error!("[WS::Querier::Handler] Error sending message to request_id: {}, trace_id: {}, error: {}", req_id, message.get_trace_id(), e);
                                     break;
                                 }
                             }
@@ -263,6 +267,10 @@ pub async fn websocket(
                 }
             }
 
+            log::info!(
+                "[WS::Querier::Handler] handle_outgoing task stopped for request_id: {}",
+                req_id
+            );
             if let Err(e) = ws_session
                 .close(Some(CloseReason::from(CloseCode::Normal)))
                 .await
