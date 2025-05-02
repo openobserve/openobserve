@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="width: calc(100vw - 600px);">
+  <div style="">
     <template v-if="!fields.length">
       <q-btn
         data-test="alert-conditions-add-btn"
@@ -56,101 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
 
         </span>
-
-        <div v-if="field.children" class="q-mt-sm" style="background-color: #2B2B2B; width: calc(100vw - 600px);">
-          <FieldsInputWithMulti :fields="field.children" :streamFields="streamFields" :enableNewValueMode="enableNewValueMode" />
-        </div>
-
-        <div
-        v-if="!field.children"
-          data-test="alert-conditions-select-column"
-          class="q-ml-none o2-input"
-        >
-          <q-select
-            v-model="field.column"
-            :options="filteredFields"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm"
-            filled
-            emit-value
-            dense
-            use-input
-            hide-selected
-            fill-input
-            :input-debounce="400"
-            :placeholder="t('alerts.column')"
-            @filter="filterColumns"
-            behavior="menu"
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 220px"
-            v-bind="newValueMode"
-          />
-        </div>
-        <div
-        v-if="!field.children"
-          data-test="alert-conditions-operator-select"
-          class="q-ml-none o2-input"
-        >
-          <q-select
-            v-model="field.operator"
-            :options="triggerOperators"
-            :popup-content-style="{ textTransform: 'capitalize' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 220px"
-            @update:model-value="emits('input:update', 'conditions', field)"
-          />
-        </div>
-        <div
-        v-if="!field.children"
-          data-test="alert-conditions-value-input"
-          class="q-ml-none flex items-end o2-input"
-        >
-          <q-input
-            v-model="field.value"
-            :options="streamFields"
-            :popup-content-style="{ textTransform: 'capitalize' }"
-            :placeholder="t('common.value')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 220px"
-            @update:model-value="emits('input:update', 'conditions', field)"
-          />
-        </div>
-        <div
-        v-if="!field.children"
-          class="q-ml-none alerts-condition-action"
-          style="margin-bottom: 12px"
-        >
-          <q-btn
-            data-test="alert-conditions-delete-condition-btn"
-            icon="close"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            flat
-            :title="t('alert_templates.edit')"
-            @click="deleteApiHeader(field)"
-            style="min-width: auto"
-          />
-          
-        </div>
 
 
 
