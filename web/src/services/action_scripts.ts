@@ -16,7 +16,7 @@
 import http from "./http";
 
 const actions = {
-  create: (org_identifier: string, action_id: string = "", data: any) => {
+  create: (org_identifier: string, data: any) => {
     return http().post(`/api/${org_identifier}/actions/upload`, data);
   },
   update: (org_identifier: string, action_id: string, data: any) => {

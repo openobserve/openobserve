@@ -1149,7 +1149,7 @@
     "add": "Add Action",
     "deleteTitle": "Delete",
     "deleteText": "Are you sure you want to delete file ?",
-    "uploadCodeZip": "Upload Code ZIP File",
+    "uploadCode": "Upload Code",
     "update":"Update Action",
     "type":"Execution Type",
     "serviceAccount":"Service Account",
@@ -1157,7 +1157,12 @@
     "timezone": "Timezone",
     "zipFileRequired": "ZIP File is required!",
     "zipFile": "ZIP File",
-    "frequency": "Frequency"
+    "frequency": "Frequency",
+    "selectServiceAccount": "Select Service Account",
+    "envVariables": "Environment Variables",
+    "schedule": "Schedule",
+    "setupAction": "Setup Action",
+    "actionDetails": "Action Details"
   },
   "cipherKey": {
     "header": "Cipher Keys",
