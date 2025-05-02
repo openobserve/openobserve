@@ -39,7 +39,7 @@ use openobserve::{
     cli::basic::cli,
     common::{
         infra::{self as common_infra, cluster},
-        meta, migration,
+        meta,
         utils::zo_logger,
     },
     handler::{
@@ -59,7 +59,7 @@ use openobserve::{
         },
         http::router::*,
     },
-    job, router,
+    job, migration, router,
     service::{
         cluster_info::ClusterInfoService, db, metadata, node::NodeService, search::SEARCH_SERVER,
         self_reporting, tls::http_tls_config,
@@ -247,6 +247,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("config init failed: {}", e);
             }
+
+            // db related inits
+            if let Err(e) = migration::init_db().await {
+                job_init_tx.send(false).ok();
+                panic!("db init failed: {}", e);
+            }
+
             // init infra
             if let Err(e) = infra::init().await {
                 job_init_tx.send(false).ok();
@@ -262,30 +269,6 @@ async fn main() -> Result<(), anyhow::Error> {
             if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
                 panic!("enerprise init failed: {}", e);
-            }
-
-            // check version upgrade
-            let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
-            if let Err(e) = migration::check_upgrade(&old_version, config::VERSION).await {
-                job_init_tx.send(false).ok();
-                panic!("check upgrade failed: {}", e);
-            }
-
-            #[allow(deprecated)]
-            migration::upgrade_resource_names()
-                .await
-                .expect("migrate resource names into supported ofga format failed");
-
-            // migrate infra_sea_orm
-            if let Err(e) = infra::table::migrate().await {
-                job_init_tx.send(false).ok();
-                panic!("infra sea_orm migrate failed: {}", e);
-            }
-
-            // migrate dashboards
-            if let Err(e) = migration::dashboards::run().await {
-                job_init_tx.send(false).ok();
-                panic!("migrate dashboards failed: {}", e);
             }
 
             // ingester init
