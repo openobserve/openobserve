@@ -440,6 +440,12 @@ pub struct WebSocket {
         help = "Maximum allowed continuation size in MB"
     )]
     pub max_continuation_size: usize,
+    #[env_config(
+        name = "ZO_WEBSOCKET_CHANNEL_BUFFER_SIZE",
+        default = 100,
+        help = "Maximum allowed number of messages in buffer"
+    )]
+    pub max_channel_buffer_size: usize,
 }
 
 #[derive(EnvConfig)]

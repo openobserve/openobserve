@@ -1,8 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 
 async function login(page, user) {
-    //await page.goto(`https://main.dev.zinclabs.dev/web/logs?org_identifier=otlp-production`);
-    await page.goto("https://main.dev.zinclabs.dev");
+    await page.goto("");
     await page.waitForTimeout(2000);
     await page.getByText('Login as internal user').click();
     await page
@@ -10,18 +9,17 @@ async function login(page, user) {
         .fill(user);
     //Enter Password
     const pass = process.env["ZO_ROOT_USER_PASSWORD"];
-    console.log(pass);
     await page
         .locator('[data-cy="login-password"]')
-        .fill('a');
+        .fill(pass);
     await page.locator('[data-cy="login-sign-in"]').click();
     await page.waitForTimeout(2000);
-    await page.goto("https://main.dev.zinclabs.dev/web");
+    await page.goto("/web");
     await page.waitForTimeout(2000)
 }
 
 async function checkWebSocket(page) {
-    await page.goto('https://main.dev.zinclabs.dev/web/logs?org_identifier=otlp-production');
+    await page.goto('');
     await page.waitForTimeout(2000);
     await page.locator('[data-test="menu-link-settings-item"]').click();
     //await page.getByLabel("General Settings").click();
@@ -31,7 +29,7 @@ async function checkWebSocket(page) {
 async function dashBoardLoard(page) {
     await page.locator('[data-test="menu-link-/dashboards-item"]').click();
     await page.locator('[data-test="dashboard-search"]').type('default_stream');
-    await page.goto('https://main.dev.zinclabs.dev/web/dashboards/view?org_identifier=otlp-production&dashboard=7307881789123463472&folder=default&tab=default&refresh=5s&period=4w&var-Dynamic+filters=%255B%255D&print=false');
+    await page.goto('');
     await page.waitForTimeout(2000);
     await page.keyboard.press('PageDown');
     await page.waitForTimeout(20000);
@@ -90,24 +88,15 @@ test.describe("Sanity testcases", () => {
 
     for (let i = 1; i <= 50; i++) {
         test(`Go to stream page after dashboard - user ${i}`, async ({ page }) => {
-
+            const username = ``;
             await page.setDefaultTimeout(300000);
-            await login(page, `x_a${i}@a.com`);
+            await login(page, username);
             await checkWebSocket(page);
             await dashBoardLoard(page);
             // await loadQuery(page);
         });
 
-        // test(`Wait for Cancel button to disappear- user ${i}`, async ({ page }) => {
-
-        //     await page.setDefaultTimeout(300000);
-        //     await login(page, `svcloadtest${i}@openobserve.ai`);
-        //     await checkWebSocket(page);
-
-        //     await dashBoardLoard(page);
-        //     (await page.waitForSelector('[data-test="dashboard-refresh-btn"]')).isVisible();
-        //     await page.waitForTimeout(2000);
-        // });
+       
 
         test(`Go to streams after dashboard- user ${i}`, async ({ page }) => {
 

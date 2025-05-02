@@ -97,7 +97,8 @@ impl WsHandler {
 
         // Setup message channels
         // TODO: add env variable for this for channel size
-        let (response_tx, mut response_rx) = tokio::sync::mpsc::channel::<WsServerEvents>(100);
+        let (response_tx, mut response_rx) =
+            tokio::sync::mpsc::channel::<WsServerEvents>(cfg.websocket.max_channel_buffer_size);
         let (disconnect_tx, mut disconnect_rx) =
             tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
         let session_manager = self.session_manager.clone();
