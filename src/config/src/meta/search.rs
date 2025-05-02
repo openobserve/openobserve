@@ -1177,7 +1177,7 @@ pub struct PaginationQuery {
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ValuesRequest {
-    pub fields: Vec<String>,
+    pub field: String,
     #[serde(default)]
     pub size: Option<i64>,
     pub no_count: bool,
@@ -1202,6 +1202,8 @@ pub struct ValuesRequest {
     pub sql: String,
 }
 
+/// Mutates the search_res in place to add the field and values to the hits
+/// Values Response is a clone of the search response but with the hits wrapped in a new object structure
 pub fn format_values_search_response(search_res: &mut Response, field: &str) {
     search_res.hits.iter_mut().for_each(|hit| {
         if let Some(obj) = hit.as_object_mut() {

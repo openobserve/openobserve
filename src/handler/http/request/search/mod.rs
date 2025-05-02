@@ -71,7 +71,7 @@ async fn can_use_distinct_stream(
     org: &str,
     stream_name: &str,
     stream_type: StreamType,
-    fields: &[String],
+    field: &str,
     query: &config::meta::search::Query,
     start_time: i64,
 ) -> bool {
@@ -84,21 +84,19 @@ async fn can_use_distinct_stream(
         .unwrap_or_default();
 
     // all fields which are requested must be in the distinct stream
-    let all_fields_distinct = fields.iter().all(|f| {
-        if DISTINCT_FIELDS.contains(f) {
-            return true;
-        }
-        if f == "count" {
-            // count is reserved field from oo side, so if user has count field
-            // in original stream, it won't actually be in the distinct stream, so
-            // we need to fallback to normal search
-            return false;
-        }
+    let is_distinct_field = if DISTINCT_FIELDS.contains(&field.to_string()) {
+        true
+    } else if field == "count" {
+        // count is reserved field from oo side, so if user has count field
+        // in original stream, it won't actually be in the distinct stream, so
+        // we need to fallback to normal search
+        false
+    } else {
         stream_settings
             .distinct_value_fields
             .iter()
-            .any(|entry| entry.name == *f && entry.added_ts <= start_time)
-    });
+            .any(|entry| entry.name == field && entry.added_ts <= start_time)
+    };
 
     // all the fields used in the query sent must be in the distinct stream
     #[allow(deprecated)]
@@ -140,7 +138,7 @@ async fn can_use_distinct_stream(
             .any(|entry| entry.name == *f && entry.added_ts <= start_time)
     });
 
-    all_fields_distinct && all_query_fields_distinct
+    is_distinct_field && all_query_fields_distinct
 }
 
 /// SearchStreamData
@@ -606,7 +604,7 @@ pub async fn around_v2(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "stream_name name"),
-        ("fields" = String, Query, description = "fields, split by comma"),
+        ("field" = String, Query, description = "field"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b"),
         ("keyword" = Option<String>, Query, description = "keyword, eg: abc"),
         ("size" = i64, Query, description = "size"), // topN
@@ -729,14 +727,10 @@ pub async fn build_search_request_per_field(
         .await
         .unwrap_or(Schema::empty());
 
-    let field = if let Some(field) = req.fields.first().cloned() {
-        if schema.field_with_name(&field).is_err() {
-            return Err(Error::other("field not found"));
-        }
-        field
-    } else {
-        return Err(Error::other("no valid fields provided"));
-    };
+    let field = req.field.clone();
+    if schema.field_with_name(&field).is_err() {
+        return Err(Error::other("field not found"));
+    }
 
     let no_count = req.no_count;
 
@@ -798,9 +792,7 @@ pub async fn build_search_request_per_field(
                     return Err(Error::other("Failed to parse sql"));
                 };
 
-                let complex_query = sql.stream_names.len().eq(&2) && sql.aliases.len().eq(&2);
-
-                let sql_where_from_query = if !complex_query {
+                let sql_where_from_query = if !sql.is_complex_query {
                     // pick up where clause from sql
                     match SearchService::sql::pickup_where(&query.sql, None) {
                         Ok(Some(v)) => format!("WHERE {}", v),
@@ -820,7 +812,7 @@ pub async fn build_search_request_per_field(
                     org_id,
                     stream_name,
                     stream_type,
-                    &[field.clone()],
+                    &field,
                     &query,
                     start_time,
                 )
@@ -850,7 +842,7 @@ pub async fn build_search_request_per_field(
                     org_id,
                     stream_name,
                     stream_type,
-                    &[field.clone()],
+                    &field,
                     &query,
                     start_time,
                 )
@@ -927,9 +919,9 @@ async fn values_v1(
     let cfg = get_config();
 
     let mut uses_fn = false;
-    let fields = match query.get("fields") {
-        Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
-        None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
+    let field = match query.get("field") {
+        Some(v) => v.to_string(),
+        None => return Ok(MetaHttpResponse::bad_request("field is empty")),
     };
     let query_fn = query
         .get("query_fn")
@@ -1054,7 +1046,7 @@ async fn values_v1(
         org_id,
         stream_name,
         stream_type,
-        &fields,
+        &field,
         &req_query,
         start_time,
     )
@@ -1077,55 +1069,60 @@ async fn values_v1(
         .await
         .unwrap_or(Schema::empty());
 
-    let mut query_results = Vec::with_capacity(fields.len());
     let sql_where = if where_str.is_empty() {
         "".to_string()
     } else {
         format!("WHERE {}", where_str)
     };
-    for field in &fields {
-        let http_span = http_span.clone();
-        // skip values for field which aren't part of the schema
-        if schema.field_with_name(field).is_err() {
-            continue;
-        }
-        let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
-            format!("{sql_where} AND {field} ILIKE '%{keyword}%'")
-        } else if !keyword.is_empty() {
-            format!("WHERE {field} ILIKE '%{keyword}%'")
-        } else {
-            sql_where.clone()
-        };
 
-        let distinct_prefix;
-        let count_fn;
-        let actual_stream_type;
+    let http_span = http_span.clone();
+    // skip values for field which aren't part of the schema
+    if schema.field_with_name(&field).is_err() {
+        return Ok(MetaHttpResponse::bad_request("field is not part of the schema"));
+    }
+    
+    let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
+        format!("{sql_where} AND {field} ILIKE '%{keyword}%'")
+    } else if !keyword.is_empty() {
+        format!("WHERE {field} ILIKE '%{keyword}%'")
+    } else {
+        sql_where.clone()
+    };
 
-        if use_distinct_stream {
-            distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
-            // if we are using distinct stream, we have already partially aggregated
-            // the counts, so we need to sum over that field
-            count_fn = "SUM(count)";
-            // distinct_values_* stream is metadata
-            actual_stream_type = StreamType::Metadata;
-        } else {
-            distinct_prefix = "".to_owned();
-            // for non-distinct fields, we need the actual count
-            count_fn = "COUNT(*)";
-            actual_stream_type = stream_type;
-        }
+    let distinct_prefix;
+    let count_fn;
+    let actual_stream_type;
 
-        let sql = if no_count {
-            format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
-            )
-        } else {
-            format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC"
-            )
-        };
-        let mut req = req.clone();
-        req.query.sql = sql;
+    if use_distinct_stream {
+        distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
+        // if we are using distinct stream, we have already partially aggregated
+        // the counts, so we need to sum over that field
+        count_fn = "SUM(count)";
+        // distinct_values_* stream is metadata
+        actual_stream_type = StreamType::Metadata;
+    } else {
+        distinct_prefix = "".to_owned();
+        // for non-distinct fields, we need the actual count
+        count_fn = "COUNT(*)";
+        actual_stream_type = stream_type;
+    }
+
+    // Get the size from query parameter for limiting results
+    let top_k = query
+        .get("size")
+        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
+
+    let sql = if no_count {
+        format!(
+            "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {top_k}"
+        )
+    } else {
+        format!(
+            "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {top_k}"
+        )
+    };
+    let mut req = req.clone();
+    req.query.sql = sql;
 
         let search_res = SearchService::cache::search(
             &trace_id,
@@ -1178,17 +1175,17 @@ async fn values_v1(
     http_report_metrics(start, org_id, stream_type, "200", "_values/v1", "", "");
 
     let req_stats = RequestStats {
-        records: final_resp.hits.len() as i64,
+        records: resp_search.hits.len() as i64,
         response_time: time,
-        size: final_resp.scan_size as f64,
+        size: resp_search.scan_size as f64,
         request_body: Some(req.query.sql),
         user_email: Some(user_id.to_string()),
         min_ts: Some(start_time),
         max_ts: Some(end_time),
-        cached_ratio: Some(final_resp.cached_ratio),
+        cached_ratio: Some(resp_search.cached_ratio),
         search_type: Some(SearchEventType::Values),
         trace_id: Some(trace_id),
-        took_wait_in_queue: Some(final_resp.took_detail.wait_in_queue),
+        took_wait_in_queue: Some(resp_search.took_detail.wait_in_queue),
         work_group: get_work_group(work_group_set),
         ..Default::default()
     };
@@ -1204,7 +1201,7 @@ async fn values_v1(
     )
     .await;
 
-    Ok(HttpResponse::Ok().json(final_resp))
+    Ok(HttpResponse::Ok().json(resp_search))
 }
 
 /// SearchStreamPartition
