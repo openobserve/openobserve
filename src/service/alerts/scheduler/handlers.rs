@@ -1006,9 +1006,9 @@ async fn handle_derived_stream_triggers(
         })
         .unwrap_or_default();
     let supposed_to_be_run_at = trigger.next_run_at - user_defined_delay;
-    let delay = current_time - user_defined_delay - supposed_to_be_run_at; // delay is in microseconds
+    let delay = current_time - trigger.next_run_at; // delay is in microseconds
     let mut final_end_time = if !derived_stream.trigger_condition.align_time {
-        current_time
+        current_time - user_defined_delay
     } else {
         supposed_to_be_run_at
     };
