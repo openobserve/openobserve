@@ -39,7 +39,7 @@ pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
     let mut segment_data = HashMap::new();
     for file in files {
         let modified = Utc.timestamp_nanos(file.meta.max_ts * 1000);
-        let file_name = format!("/{}/$$/{}", key, file.key);
+        let file_name = format!("/{}/$$/{}/##/{}", key, file.account, file.key);
         values.push(ObjectMeta {
             location: file_name.into(),
             last_modified: modified,
