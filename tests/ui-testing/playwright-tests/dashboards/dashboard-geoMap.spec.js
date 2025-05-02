@@ -541,26 +541,36 @@ test.describe("dashboard maps testcases", () => {
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("geojson");
 
+    // Set Latitude, Longitude, and Weight fields
+
+    await chartTypeSelector.searchAndAddField("lat", "latitude");
+    await chartTypeSelector.searchAndAddField("lon", "longitude");
+    await chartTypeSelector.searchAndAddField("country", "weight");
+    //  await chartTypeSelector.searchAndAddField("country", "filter");
     await page.waitForTimeout(2000);
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-geojson-lat"] [data-test="dashboard-add-latitude-data"]'
-      )
-      .click();
+    // await page
+    //   .locator(
+    //     '[data-test="field-list-item-logs-geojson-lat"] [data-test="dashboard-add-latitude-data"]'
+    //   )
+    //   .click();
 
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-geojson-lon"] [data-test="dashboard-add-longitude-data"]'
-      )
-      .click();
+    // await page
+    //   .locator(
+    //     '[data-test="field-list-item-logs-geojson-lon"] [data-test="dashboard-add-longitude-data"]'
+    //   )
+    //   .click();
 
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-geojson-country"] [data-test="dashboard-add-weight-data"]'
-      )
-      .click();
+    // await page
+    //   .locator(
+    //     '[data-test="field-list-item-logs-geojson-country"] [data-test="dashboard-add-weight-data"]'
+    //   )
+    //   .click();
 
-    await page.locator('[data-test="dashboard-apply"]').click();
+    // await page.locator('[data-test="dashboard-apply"]').click();
+
+    await dashboardPageActions.applyDashboardBtn();
+
+    await dashboardPageActions.waitForChartToRender();
 
     await page.locator('[data-test="dashboard-sidebar"]').click();
 
