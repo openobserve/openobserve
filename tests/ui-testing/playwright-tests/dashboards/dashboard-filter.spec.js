@@ -591,7 +591,9 @@ test.describe("dashboard filter testcases", () => {
       timeout: 15000,
     });
 
-    const dropdown = page.getByText("Filters on Fieldarrow_drop_down");
+    const dropdown = page
+      .locator('[data-test="dashboard-filter-field-dropdown"]')
+      .first();
     await dropdown.click();
     await dropdown.fill("kubernetes_container_image");
 
