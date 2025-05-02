@@ -233,6 +233,7 @@ pub async fn websocket(
                         }
                     }
                     Some(msg) = disconnect_rx.recv() => {
+                        log::info!("[WS::Querier::Handler] disconnect signal received from request_id: {}, msg: {:?}", req_id, msg);
                         match msg {
                             None => {
                                 // proper disconnecting

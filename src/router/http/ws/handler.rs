@@ -469,6 +469,7 @@ impl WsHandler {
                         }
                         // interruption from handling_incoming thread
                         Some(msg) = disconnect_rx.recv() => {
+                            log::info!("[WS::Router::Handler] disconnect signal received from client_id: {}, msg: {:?}", client_id, msg);
                             match msg {
                                 None => {
                                     // proper disconnecting
