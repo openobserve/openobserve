@@ -1,6 +1,8 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
+import { login } from "../utils/dashLogin.js";
+import { ingestion } from "../utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
@@ -15,79 +17,6 @@ const randomDashboardName =
 
 test.describe.configure({ mode: "parallel" });
 
-async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "networkidle" });
-
-  if (await page.getByText("Login as internal user").isVisible()) {
-    await page.getByText("Login as internal user").click();
-  }
-
-  await page.waitForTimeout(1000);
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-
-  // wait for login api response
-  const waitForLogin = page.waitForResponse(
-    (response) =>
-      response.url().includes("/auth/login") && response.status() === 200
-  );
-
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-
-  await waitForLogin;
-
-  await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
-    waitUntil: "networkidle",
-  });
-  await page
-    .locator('[data-test="navbar-organizations-select"]')
-    .getByText("arrow_drop_down")
-    .click();
-  await page.getByRole("option", { name: "default", exact: true }).click();
-}
-
-async function ingestion(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-
-  const headers = {
-    Authorization: `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const fetchResponse = await fetch(
-    `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
-    {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(logsdata),
-    }
-  );
-  const response = await fetchResponse.json();
-  console.log(response);
-}
-
-async function waitForDashboardPage(page) {
-  const dashboardListApi = page.waitForResponse(
-    (response) =>
-      /\/api\/.+\/dashboards/.test(response.url()) && response.status() === 200
-  );
-
-  await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/dashboards**");
-
-  await page.waitForSelector(`text="Please wait while loading dashboards..."`, {
-    state: "hidden",
-  });
-  await dashboardListApi;
-  await page.waitForTimeout(500);
-}
-
 // Refactored test cases using Page Object Model
 
 test.describe("dashboard UI testcases", () => {
@@ -101,6 +30,15 @@ test.describe("dashboard UI testcases", () => {
   let dashboardPanelConfigs;
 
   test.beforeEach(async ({ page }) => {
+    await login(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page);
+    await page.waitForTimeout(2000);
+
+    await page.goto(
+      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+    );
+
     dashboardCreate = new DashboardCreate(page);
     dashboardList = new DashboardListPage(page);
     dashboardActions = new DashboardactionPage(page);
@@ -110,32 +48,19 @@ test.describe("dashboard UI testcases", () => {
     dashboardPanel = new DashboardPanel(page);
     chartTypeSelector = new ChartTypeSelector(page);
     dashboardPanelConfigs = new DashboardPanelConfigs(page);
-
-    await login(page);
-    await page.waitForTimeout(1000);
-    await ingestion(page);
-    await page.waitForTimeout(2000);
-
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
   });
-
   test("should add and delete the dashboard", async ({ page }) => {
     const randomDashboardName = `Dashboard_${Date.now()}`;
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
-
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.backToDashboardList();
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
-
     await dashboardCreate.searchDashboard(randomDashboardName);
-
     await dashboardCreate.deleteDashboard(randomDashboardName);
   });
 
@@ -202,7 +127,6 @@ test.describe("dashboard UI testcases", () => {
     );
 
     await dashboardRefresh.setRelative("3", "h");
-    // await dashboardRefresh.setAbsolute("7");
 
     await dashboardActions.applyDashboardBtn();
   });
@@ -211,6 +135,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const randomDashboardName = `Dashboard_${Date.now()}`;
+    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
@@ -218,10 +143,10 @@ test.describe("dashboard UI testcases", () => {
 
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+
     await page.locator('[data-test="dashboard-customSql"]').click();
 
-
-    // await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
       .locator('.inputarea')
@@ -229,12 +154,12 @@ test.describe("dashboard UI testcases", () => {
         'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
       );
 
-    // await dashboardActions.applyDashboardBtn();
-    await chartTypeSelector.searchAndAddField("x_axis_1", "x");
+    // await chartTypeSelector.searchAndAddField("x_axis_1", "x");
     await chartTypeSelector.searchAndAddField("y_axis_1", "y");
     await chartTypeSelector.searchAndAddField("breakdown_1", "b");
 
     await dashboardActions.applyDashboardBtn();
+    await dashboardActions.savePanel();
   });
 
   test("should display the correct and updated chart when changing the chart type", async ({
