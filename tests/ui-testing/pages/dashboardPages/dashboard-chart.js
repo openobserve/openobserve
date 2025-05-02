@@ -58,7 +58,9 @@ export default class ChartTypeSelector {
       x: "dashboard-add-x-data",
       y: "dashboard-add-y-data",
       b: "dashboard-add-b-data",
-      filter: "dashboard-add-filter-data",
+      // filter: "dashboard-add-filter-data",
+      filter: "dashboard-add-filter-geomap-data",
+
       latitude: "dashboard-add-latitude-data",
       longitude: "dashboard-add-longitude-data",
       weight: "dashboard-add-weight-data",
