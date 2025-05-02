@@ -233,7 +233,10 @@ pub async fn list_subscription(path: web::Path<String>, user_email: UserEmail) -
     let org_id = path.into_inner();
     let email = user_email.user_id.as_str();
     match o2_cloud_billings::get_subscription(email, &org_id).await {
-        Ok(cb) => MetaHttpResponse::json(ListSubscriptionResponseBody::from(cb)),
+        Ok(Some(cb)) => MetaHttpResponse::json(ListSubscriptionResponseBody::from(cb)),
+        Ok(None) => MetaHttpResponse::json(ListSubscriptionResponseBody::from(
+            o2_cloud_billings::CustomerBilling::new(email, &org_id),
+        )),
         Err(e) => e.into_http_response(),
     }
 }
