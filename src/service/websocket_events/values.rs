@@ -92,9 +92,6 @@ pub async fn handle_values_request(
             .instrument(ws_values_span.clone())
             .await?;
 
-    // request will have atleast one field
-    let field = payload.fields.first().unwrap().to_string();
-
     // Convert the request query to SearchQuery type if needed
     // Here we're converting from the search_req.query to the expected type
     let search_query = search_req.query.clone().into();
@@ -166,7 +163,7 @@ pub async fn handle_values_request(
                 payload: search_req.clone(),
                 user_id: Some(user_id.to_string()),
                 time_offset: None,
-                values_event_context: Some(ValuesEventContext { field }),
+                values_event_context: Some(ValuesEventContext { field: payload.field }),
             };
 
             // Step 1(a): handle cache responses & query the deltas
@@ -208,7 +205,7 @@ pub async fn handle_values_request(
                 payload: search_req.clone(),
                 user_id: Some(user_id.to_string()),
                 time_offset: None,
-                values_event_context: Some(ValuesEventContext { field }),
+                values_event_context: Some(ValuesEventContext { field: payload.field }),
             };
 
             do_partitioned_search(
@@ -261,7 +258,7 @@ pub async fn handle_values_request(
             payload: search_req.clone(),
             user_id: Some(user_id.to_string()),
             time_offset: None,
-            values_event_context: Some(ValuesEventContext { field }),
+            values_event_context: Some(ValuesEventContext { field: payload.field }),
         };
 
         do_partitioned_search(

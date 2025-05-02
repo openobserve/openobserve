@@ -70,12 +70,6 @@ pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
 
 #[derive(Clone, Debug)]
-pub struct CteInfo {
-    pub alias: String,
-    pub query: String,
-}
-
-#[derive(Clone, Debug)]
 pub struct Sql {
     pub sql: String,
     pub org_id: String,
@@ -98,7 +92,7 @@ pub struct Sql {
     pub use_inverted_index: bool, // if can use inverted index
     pub index_condition: Option<IndexCondition>, // use for tantivy index
     pub index_optimize_mode: Option<InvertedIndexOptimizeMode>,
-    pub ctes: Vec<CteInfo>,       // WITH clause CTEs
+    pub is_complex_query: bool,
 }
 
 impl Sql {
@@ -143,11 +137,6 @@ impl Sql {
             .map_err(|e| Error::Message(e.to_string()))?
             .pop()
             .unwrap();
-
-        // Extract CTE information
-        let mut cte_visitor = CteVisitor::new();
-        statement.visit(&mut cte_visitor);
-        let ctes = cte_visitor.ctes;
 
         // 2. rewrite track_total_hits
         if query.track_total_hits {
@@ -248,9 +237,11 @@ impl Sql {
             HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
 
+        let is_complex_query = is_complex_query(&mut statement);
+
         // NOTE: only this place modify the sql
         // 10. add _timestamp and _o2_id if need
-        if !is_complex_query(&mut statement) {
+        if !is_complex_query {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             statement.visit(&mut add_timestamp_visitor);
             if o2_id_is_needed(&used_schemas, &search_event_type) {
@@ -281,7 +272,7 @@ impl Sql {
 
         // 12. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
-        if !is_complex_query(&mut statement)
+        if !is_complex_query
             && order_by.len() == 1
             && order_by[0].0 == TIMESTAMP_COL_NAME
             && can_optimize
@@ -318,7 +309,7 @@ impl Sql {
             use_inverted_index,
             index_condition,
             index_optimize_mode,
-            ctes,
+            is_complex_query,
         })
     }
 }
@@ -345,7 +336,7 @@ impl std::fmt::Display for Sql {
             self.sorted_by_time,
             self.use_inverted_index,
             self.index_condition,
-            self.ctes,
+            self.is_complex_query,
         )
     }
 }
@@ -1896,43 +1887,6 @@ impl VisitorMut for AddNewFiltersWithAndOperatorVisitor {
                 return ControlFlow::Break(());
             }
         };
-        ControlFlow::Continue(())
-    }
-}
-
-// Implement a visitor to extract CTE information
-struct CteVisitor {
-    pub ctes: Vec<CteInfo>,
-}
-
-impl CteVisitor {
-    fn new() -> Self {
-        Self { ctes: Vec::new() }
-    }
-}
-
-impl VisitorMut for CteVisitor {
-    type Break = ();
-
-    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let Some(with) = &query.with {
-            for cte in &with.cte_tables {
-                // Get the alias name safely
-                let alias = cte.alias.name.value.clone();
-                
-                // Convert the query to string 
-                let query_sql = cte.query.to_string();
-                
-                self.ctes.push(CteInfo {
-                    alias,
-                    query: query_sql,
-                });
-                
-                // We can't modify cte.query directly since it's behind a shared reference
-                // Just collect the info without recursively visiting
-                // Nested CTEs will be handled by the SQL parser anyway
-            }
-        }
         ControlFlow::Continue(())
     }
 }
