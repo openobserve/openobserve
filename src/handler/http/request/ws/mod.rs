@@ -15,6 +15,11 @@
 
 pub mod session;
 
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
 use actix_web::{Error, HttpRequest, HttpResponse, get, web};
 use actix_ws::{CloseCode, CloseReason};
 use config::get_config;
@@ -76,15 +81,24 @@ pub async fn websocket(
         tokio::sync::mpsc::channel::<WsServerEvents>(cfg.websocket.max_channel_buffer_size);
     let (disconnect_tx, mut disconnect_rx) =
         tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
+    let outgoing_stopped = Arc::new(AtomicBool::new(false));
+    let outgoing_stopped_clone = outgoing_stopped.clone();
 
     // Spawn message handling tasks between router and querier
     let response_tx_clone = response_tx.clone();
     let disconnect_tx_clone = disconnect_tx.clone();
     actix_web::rt::spawn(async move {
         // Handle incoming messages from client
-        let handle_incoming = async {
+        let req_id_clone = req_id.clone();
+        let handle_incoming = async move {
             loop {
                 if let Some(msg) = msg_stream.next().await {
+                    if outgoing_stopped_clone.load(Ordering::SeqCst) {
+                        log::debug!(
+                            "[WS_HANDLER]: outgoing task closed. Stop incoming stake to accept new message for request_id: {req_id}",
+                        );
+                        break;
+                    }
                     match msg {
                         Ok(actix_ws::AggregatedMessage::Ping(ping)) => {
                             log::debug!(
@@ -196,7 +210,8 @@ pub async fn websocket(
         };
 
         // Handle outgoing messages from router to client
-        let handle_outgoing = async {
+        let req_id = req_id_clone.to_owned();
+        let handle_outgoing = async move {
             loop {
                 tokio::select! {
                     // response from querier
@@ -266,11 +281,16 @@ pub async fn websocket(
                     }
                 }
             }
-
             log::info!(
                 "[WS::Querier::Handler] handle_outgoing task stopped for request_id: {}",
                 req_id
             );
+
+            log::debug!(
+                "[WS::Querier::Handler] handle_outgoing task stopped for request_id: {}",
+                req_id
+            );
+            outgoing_stopped.store(true, Ordering::SeqCst);
             if let Err(e) = ws_session
                 .close(Some(CloseReason::from(CloseCode::Normal)))
                 .await

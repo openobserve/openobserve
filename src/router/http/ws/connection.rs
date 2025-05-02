@@ -454,6 +454,7 @@ impl ResponseRouter {
     // }
 
     pub async fn route_response(&self, message: WsServerEvents) -> WsResult<()> {
+        let start = std::time::Instant::now();
         let trace_id = message.get_trace_id();
         let sender = {
             let r = self.routes.read().await;
@@ -461,25 +462,33 @@ impl ResponseRouter {
             drop(r);
             sender
         };
+        let Some(resp_sender) = sender else {
+            log::warn!(
+                "[WS::Router::QuerierConnection] response_channel for trace_id {} not found.",
+                trace_id,
+            );
+            return Err(WsError::ResponseChannelNotFound(trace_id.clone()));
+        };
 
-        match sender {
-            None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
-            Some(resp_sender) => {
-                if let Err(e) = resp_sender.clone().send(message).await {
-                    log::warn!(
-                        "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {} error: {}",
-                        trace_id,
-                        e
-                    );
-                    let mut write_guard = self.routes.write().await;
-                    write_guard.remove(&trace_id);
-                    write_guard.shrink_to_fit();
-                    drop(write_guard);
-                    return Err(WsError::ResponseChannelClosed(trace_id.clone()));
-                }
-                Ok(())
-            }
+        log::debug!(
+            "[WS::Router::QuerierConnection] time took to find response channel for trace_id {}: {} secs",
+            trace_id,
+            start.elapsed().as_secs_f64()
+        );
+
+        if let Err(e) = resp_sender.clone().send(message).await {
+            log::warn!(
+                "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {} error: {}",
+                trace_id,
+                e
+            );
+            let mut write_guard = self.routes.write().await;
+            write_guard.remove(&trace_id);
+            write_guard.shrink_to_fit();
+            drop(write_guard);
+            return Err(WsError::ResponseChannelClosed(trace_id.clone()));
         }
+        Ok(())
     }
 }
 
