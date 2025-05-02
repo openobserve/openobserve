@@ -15,19 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="scheduled-alerts q-pa-none q-ma-none">
-   <div class="  tw-w-full row alert--container " style="width: calc(100vw - 600px); margin-left: 8px;">
-    <AlertsContainer 
-      name="query"
-      v-model:is-expanded="expandState.queryMode"
-      label="Query Mode - Quick / SQL"
-      subLabel="Set the stage for your alert."
-      class="tw-mt-1 tw-w-full col-12"
-      @update:is-expanded="()=>emits('update:expandState', expandState)"
-    />
-    <!-- query mode section -->
-    <div v-if="expandState.queryMode" class="q-mx-md">
-      <div v-if="!disableQueryTypeSelection" class="scheduled-alert-tabs q-my-lg">
+  <div class="scheduled-alerts">
+    <div v-if="!disableQueryTypeSelection" class="scheduled-alert-tabs q-mb-lg">
       <q-tabs
         data-test="scheduled-alert-tabs"
         v-model="tab"
@@ -55,174 +44,160 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('alerts.promql')"
         />
       </q-tabs>
-      </div>
-    <!-- this should be removed  -->
-      <template v-if="tab === 'custom' && false">
-        <fields-input
-          class="q-mt-md"
-          :stream-fields="columns"
-          :fields="conditions"
-          @add="addField"
-          @remove="removeField"
-          @input:update="(name, field) => emits('input:update', name, field)"
-        />
-      </template>
-      <template v-if="tab === 'custom'" class='q-pa-none q-ma-none'>
-        <FieldsInputWithMulti
-        v-if="expandState.queryMode"
-          class="q-mt-md"
-          :stream-fields="columns"
-          :fields="conditions"
-          @add="addField"
-          @remove="removeField"
-          @input:update="(name, field) => emits('input:update', name, field)"
-        />
-      </template>
-      <template v-else>
-        <div class="tw-flex tw-justify-start tw-items-center">
-          <div class="text-bold q-mr-sm q-my-sm">
-            {{ tab === "promql" ? "Promql" : "SQL" }}
-          </div>
-          <q-toggle
-            v-if="!disableVrlFunction"
-            data-test="logs-search-bar-show-query-toggle-btn"
-            v-model="isVrlFunctionEnabled"
-            :icon="'img:' + getImageURL('images/common/function.svg')"
-            title="Toggle Function Editor"
-            class="q-pl-xs"
-            size="30px"
-            @update:model-value="updateFunctionVisibility"
-            :disable="tab === 'promql'"
-          />
+    </div>
+    <template v-if="tab === 'custom'">
+      <fields-input
+        class="q-mt-md"
+        :stream-fields="columns"
+        :fields="conditions"
+        @add="addField"
+        @remove="removeField"
+        @input:update="(name, field) => emits('input:update', name, field)"
+      />
+    </template>
+    <template v-else>
+      <div class="tw-flex tw-justify-start tw-items-center">
+        <div class="text-bold q-mr-sm q-my-sm">
+          {{ tab === "promql" ? "Promql" : "SQL" }}
         </div>
+        <q-toggle
+          v-if="!disableVrlFunction"
+          data-test="logs-search-bar-show-query-toggle-btn"
+          v-model="isVrlFunctionEnabled"
+          :icon="'img:' + getImageURL('images/common/function.svg')"
+          title="Toggle Function Editor"
+          class="q-pl-xs"
+          size="30px"
+          @update:model-value="updateFunctionVisibility"
+          :disable="tab === 'promql'"
+        />
+      </div>
 
-        <div class="flex">
-          <template v-if="tab === 'sql'">
-            <div>
-              <query-editor
-                data-test="scheduled-alert-sql-editor"
-                ref="queryEditorRef"
-                editor-id="alerts-query-editor"
-                class="monaco-editor"
-                :debounceTime="300"
-                v-model:query="query"
-                :class="
-                  query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
-                "
-                @update:query="updateQueryValue"
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="onBlurQueryEditor"
-              />
-              <div class="text-negative q-mb-xs invalid-sql-error">
-                <span v-show="!!sqlQueryErrorMsg">
-                  Error: {{ sqlQueryErrorMsg }}</span
-                >
-              </div>
-            </div>
-          </template>
-          <template v-if="tab === 'promql'">
+      <div class="flex">
+        <template v-if="tab === 'sql'">
+          <div>
             <query-editor
-              data-test="scheduled-alert-promql-editor"
+              data-test="scheduled-alert-sql-editor"
               ref="queryEditorRef"
               editor-id="alerts-query-editor"
-              class="monaco-editor q-mb-md"
-              :debounceTime="300"
-              v-model:query="promqlQuery"
-              @update:query="updateQueryValue"
-            />
-          </template>
-
-          <div
-            data-test="logs-vrl-function-editor"
-            v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'"
-          >
-            <div style="height: 40px; width: 100%">
-              <div style="display: flex; height: 40px">
-                <q-select
-                  v-model="selectedFunction"
-                  label="Use Saved function"
-                  :options="functionOptions"
-                  data-test="dashboard-use-saved-vrl-function"
-                  input-debounce="0"
-                  behavior="menu"
-                  use-input
-                  filled
-                  borderless
-                  dense
-                  hide-selected
-                  menu-anchor="top left"
-                  fill-input
-                  option-label="name"
-                  option-value="name"
-                  @filter="filterFunctionOptions"
-                  @update:modelValue="onFunctionSelect"
-                  style="width: 100%"
-                >
-                  <template #no-option>
-                    <q-item>
-                      <q-item-section> {{ t("search.noResult") }}</q-item-section>
-                    </q-item>
-                  </template>
-                </q-select>
-              </div>
-            </div>
-            <query-editor
-              data-test="logs-vrl-function-editor"
-              ref="fnEditorRef"
-              editor-id="fnEditor"
               class="monaco-editor"
               :debounceTime="300"
-              v-model:query="vrlFunctionContent"
+              v-model:query="query"
               :class="
-                vrlFunctionContent == '' && functionEditorPlaceholderFlag
-                  ? 'empty-function'
-                  : ''
+                query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
               "
-              language="ruby"
-              @focus="functionEditorPlaceholderFlag = false"
-              @blur="onBlurFunctionEditor"
+              @update:query="updateQueryValue"
+              @focus="queryEditorPlaceholderFlag = false"
+              @blur="onBlurQueryEditor"
             />
+            <div class="text-negative q-mb-xs invalid-sql-error">
+              <span v-show="!!sqlQueryErrorMsg">
+                Error: {{ sqlQueryErrorMsg }}</span
+              >
+            </div>
+          </div>
+        </template>
+        <template v-if="tab === 'promql'">
+          <query-editor
+            data-test="scheduled-alert-promql-editor"
+            ref="queryEditorRef"
+            editor-id="alerts-query-editor"
+            class="monaco-editor q-mb-md"
+            :debounceTime="300"
+            v-model:query="promqlQuery"
+            @update:query="updateQueryValue"
+          />
+        </template>
 
-            <div
-              class="text-subtitle2 q-pb-sm"
-              style="min-height: 21px; width: 500px"
-            >
-              <div v-if="vrlFunctionError">
-                <div class="text-negative q-mb-xs flex items-center">
-                  <q-btn
-                    :icon="
-                      isFunctionErrorExpanded ? 'expand_more' : 'chevron_right'
-                    "
-                    dense
-                    size="xs"
-                    flat
-                    class="q-mr-xs"
-                    data-test="table-row-expand-menu"
-                    @click.stop="toggleExpandFunctionError"
-                  />
-                  <div>
-                    <span v-show="vrlFunctionError">Invalid VRL function</span>
-                  </div>
-                </div>
-                <div
-                  v-if="isFunctionErrorExpanded"
-                  class="q-px-sm q-pb-sm"
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+        <div
+          data-test="logs-vrl-function-editor"
+          v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'"
+        >
+          <div style="height: 40px; width: 100%">
+            <div style="display: flex; height: 40px">
+              <q-select
+                v-model="selectedFunction"
+                label="Use Saved function"
+                :options="functionOptions"
+                data-test="dashboard-use-saved-vrl-function"
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                filled
+                borderless
+                dense
+                hide-selected
+                menu-anchor="top left"
+                fill-input
+                option-label="name"
+                option-value="name"
+                @filter="filterFunctionOptions"
+                @update:modelValue="onFunctionSelect"
+                style="width: 100%"
+              >
+                <template #no-option>
+                  <q-item>
+                    <q-item-section> {{ t("search.noResult") }}</q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
+          </div>
+          <query-editor
+            data-test="logs-vrl-function-editor"
+            ref="fnEditorRef"
+            editor-id="fnEditor"
+            class="monaco-editor"
+            :debounceTime="300"
+            v-model:query="vrlFunctionContent"
+            :class="
+              vrlFunctionContent == '' && functionEditorPlaceholderFlag
+                ? 'empty-function'
+                : ''
+            "
+            language="ruby"
+            @focus="functionEditorPlaceholderFlag = false"
+            @blur="onBlurFunctionEditor"
+          />
+
+          <div
+            class="text-subtitle2 q-pb-sm"
+            style="min-height: 21px; width: 500px"
+          >
+            <div v-if="vrlFunctionError">
+              <div class="text-negative q-mb-xs flex items-center">
+                <q-btn
+                  :icon="
+                    isFunctionErrorExpanded ? 'expand_more' : 'chevron_right'
                   "
-                >
-                  <pre class="q-my-none" style="white-space: pre-wrap">{{
-                    vrlFunctionError
-                  }}</pre>
+                  dense
+                  size="xs"
+                  flat
+                  class="q-mr-xs"
+                  data-test="table-row-expand-menu"
+                  @click.stop="toggleExpandFunctionError"
+                />
+                <div>
+                  <span v-show="vrlFunctionError">Invalid VRL function</span>
                 </div>
+              </div>
+              <div
+                v-if="isFunctionErrorExpanded"
+                class="q-px-sm q-pb-sm"
+                :class="
+                  store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+                "
+              >
+                <pre class="q-my-none" style="white-space: pre-wrap">{{
+                  vrlFunctionError
+                }}</pre>
               </div>
             </div>
           </div>
         </div>
-      </template>
-    </div>
-   </div>
-    <!-- this is next section -->
+      </div>
+    </template>
+
     <div class="q-mt-sm">
       <div
         v-if="
@@ -931,7 +906,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ cronJobError || "Field is required!" }}
           </div>
         </div>
-        
       </div>
     </div>
   </div>
@@ -955,9 +929,6 @@ import {
 } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
-import FieldsInputWithMulti from "./FieldsInputWithMulti.vue";
-
-import AlertsContainer from "./AlertsContainer.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -983,7 +954,6 @@ const props = defineProps([
   "vrlFunctionError",
   "showTimezoneWarning",
   "multi_time_range",
-  "expandState",
 ]);
 
 const emits = defineEmits([
@@ -1001,7 +971,6 @@ const emits = defineEmits([
   "update:showVrlFunction",
   "validate-sql",
   "update:multi_time_range",
-  "update:expandState",
 ]);
 
 const { t } = useI18n();
@@ -1048,8 +1017,6 @@ const fnEditorRef = ref<any>(null);
 const filteredTimezone: any = ref([]);
 
 const cronJobError = ref("");
-
-const expandState = ref(props.expandState);
 
 const getNumericColumns = computed(() => {
   if (
@@ -1421,7 +1388,8 @@ defineExpose({
 
 <style lang="scss" scoped>
 .scheduled-alert-tabs {
-  width: 200px;
+  border: 1px solid $primary;
+  width: 300px;
   border-radius: 4px;
   overflow: hidden;
 }
@@ -1438,14 +1406,8 @@ defineExpose({
   }
 
   .q-tab {
-    height: 35px;
-    min-height: 35px;
-    width: 50px !important;
-    min-width: 50px;
-  }
-  .q-tab--inactive{
-    background-color: #494A4A;
-    color: $white
+    height: 28px;
+    min-height: 28px;
   }
 }
 .scheduled-alerts {

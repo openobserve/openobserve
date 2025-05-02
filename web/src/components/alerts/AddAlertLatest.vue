@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width q-mx-lg"  >
+  <div class="full-width q-mx-lg "  >
     <div class="row items-center no-wrap q-mx-md q-my-sm">
       <div class="flex items-center">
         <div
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="addAlertFormRef"
       class="q-px-lg q-my-md"
       style="
-        max-height: calc(100vh - 166px);
+        max-height: calc(100vh - 195px);
         overflow: auto;
         scroll-behavior: smooth;
       "
@@ -64,31 +64,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:is-expanded="expandState.alertSetup"
                 label="Alert Setup"
                 subLabel="Set the stage for your alert."
+                icon="edit"
                 class="tw-mt-1 tw-w-full col-12"
             />
              <div v-show="expandState.alertSetup" class="tw-w-full ">
-              <div class="q-gutter-sm q-px-lg q-py-sm">
-              <q-radio
-                data-test="add-alert-scheduled-alert-radio"
-                v-bind:readonly="beingUpdated"
-                v-bind:disable="beingUpdated"
-                v-model="formData.is_real_time"
-                :checked="formData.is_real_time"
-                val="false"
-                :label="t('alerts.scheduled')"
-                class="q-ml-none"
-              />
-              <q-radio
-                data-test="add-alert-realtime-alert-radio"
-                v-bind:readonly="beingUpdated"
-                v-bind:disable="beingUpdated"
-                v-model="formData.is_real_time"
-                :checked="!formData.is_real_time"
-                val="true"
-                :label="t('alerts.realTime')"
-                class="q-ml-none"
-              />
-            </div>
+
               <div
                 data-test="add-alert-name-input row"
                 class="alert-name-input o2-input flex justify-between items-center q-px-lg tw-gap-10"
@@ -188,14 +168,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
+              <div  v-if="expandState.alertSetup" class="q-gutter-sm q-px-lg q-py-sm">
+              <q-radio
+                data-test="add-alert-scheduled-alert-radio"
+                v-bind:readonly="beingUpdated"
+                v-bind:disable="beingUpdated"
+                v-model="formData.is_real_time"
+                :checked="formData.is_real_time"
+                val="false"
+                :label="t('alerts.scheduled')"
+                class="q-ml-none"
+              />
+              <q-radio
+                data-test="add-alert-realtime-alert-radio"
+                v-bind:readonly="beingUpdated"
+                v-bind:disable="beingUpdated"
+                v-model="formData.is_real_time"
+                :checked="!formData.is_real_time"
+                val="true"
+                :label="t('alerts.realTime')"
+                class="q-ml-none"
+              />
             </div>
+            </div>
+           
 
             </div>
             
 
             <div
               v-if="formData.is_real_time === 'true'"
-              class=""
+              class="q-pr-sm q-pa-none q-ma-none"
               data-test="add-alert-query-input-title"
             >
               <real-time-alert
@@ -213,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:destinations="updateDestinations"
               />
             </div>
-            <div v-else>
+            <div v-else class="q-pa-none q-ma-none q-pr-sm  ">
               <scheduled-alert
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
@@ -223,6 +226,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :sqlQueryErrorMsg="sqlQueryErrorMsg"
                 :vrlFunctionError="vrlFunctionError"
                 :showTimezoneWarning="showTimezoneWarning"
+                :selectedStream="formData.stream_name"
+                :selectedStreamType="formData.stream_type"
                 :destinations="formData.destinations"
                 :formattedDestinations="getFormattedDestinations"
                 v-model:trigger="formData.trigger_condition"
@@ -259,9 +264,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- additional setup starts here -->
             <div
-              class="flex q-mt-lg justify-start items-center q-pb-sm q-col-gutter-md flex-wrap "
+              class="flex q-mt-md justify-start items-center q-pb-sm q-col-gutter-md flex-wrap "
             >
-            <div class="  q-px-lg tw-w-full row alert-setup-container" style="width: calc(100vw - 600px);">
+            <div class="  q-px-lg tw-w-full row alert-setup-container" >
 
               <AlertsContainer 
                 name="advanced"
@@ -281,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-if="expandState.advancedSetup" class=" tw-w-full">
-              <div data-test="add-alert-description-input tw-w-full ">
+              <div data-test="add-alert-description-input tw-w-full " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
                 <div class="flex items-center q-mb-sm">
                   <span class="text-bold custom-input-label">Description</span>
                 </div>
@@ -323,7 +328,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="formData.row_template"
                   color="input-border"
                   bg-color="input-bg"
-                  class="q-text-area-input-row-template "
+                  class="row-template-input"
+                  :class="store.state.theme === 'dark' ? 'dark-mode-row-template' : 'light-mode-row-template'"
                   stack-label
                   outlined
                   filled
@@ -369,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
     </div>
-    <div class="flex justify-end items-center q-px-lg tw-w-full" style="position: sticky; background-color: #212121; bottom: 0 !important; top: 0; height: 60px !important;">
+    <div class="flex justify-end items-center q-px-lg tw-w-full " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: sticky;  bottom: 0 !important; top: 0; height: 70px !important;">
               <q-btn
                 data-test="add-alert-cancel-btn"
                 v-close-popup="true"
@@ -552,6 +558,7 @@ export default defineComponent({
       advancedSetup: true,
       realTimeMode: true,
       thresholds: true,
+      multiWindowSelection: true,
     });
     var triggerOperators: any = ref([
 
@@ -1295,6 +1302,7 @@ export default defineComponent({
       formData.value.destinations = destinations;
     }
 
+
     return {
       t,
       q,
@@ -1369,7 +1377,7 @@ export default defineComponent({
       updateExpandState,
       updateSilence,
       refreshDestinations,
-      updateDestinations
+      updateDestinations,
     };
   },
 
@@ -1684,7 +1692,7 @@ export default defineComponent({
   background-color:rgb(30, 31, 31) !important;
   border: 1px solid $input-border !important;
 }
-.q-text-area-input-row-template > div > div  { 
+.dark-mode-row-template  > div > div  { 
   background-color:rgb(30, 31, 31) !important;
   border: 1px solid $input-border !important;
 }
@@ -1694,38 +1702,53 @@ export default defineComponent({
 }
 .light-mode{
   .alert-setup-container{
-    background-color: rgb(231, 229, 229);
+    background-color: #ffffff;
     padding: 12px 12px 24px 0px;
     margin-left: 24px;
     border-radius: 4px;
-    border: 1px solid #CBCBCB;
+    border: 1px solid #e6e6e6;
   }
   .custom-input-label{
     color: #5C5C5C;
   }
   .q-field--labeled.showLabelOnTop.q-field .q-field__control{
-    border: 1px solid #444444;
+    border: 1px solid #d4d4d4;
   }
   .add-folder-btn{
-    border: 1px solid #444444;
+    border: 1px solid #d4d4d4;
   }
-  .q-text-area-input > div > div  { 
+  .dark-mode .q-text-area-input > div > div  { 
   background-color:rgb(211, 213, 213) !important;
   border: 1px solid black !important;
-
 }
-.q-text-area-input-row-template > div > div  { 
+
+.light-mode .q-text-area-input > div > div  { 
+  background-color:#ffffff !important;
+  border: 1px solid #e0e0e0 !important;
+}
+.dark-mode-row-template > div > div  { 
   background-color:rgb(211, 213, 213) !important;
   border: 1px solid black !important;
+}
+.light-mode-row-template > div > div  { 
+  background-color:#ffffff !important;
+  border: 1px solid #e0e0e0 !important;
 }
 }
 .q-text-area-input > div > div > div > textarea{  
     height: 80px !important;
     resize: none !important;
 }
-.q-text-area-input-row-template > div > div > div > textarea{
+.row-template-input > div > div > div > textarea{
   height: 160px !important;
   resize: none !important;
+}
+.bottom-sticky-dark{
+  background-color: #212121;
+}
+.bottom-sticky-light{
+  background-color: #ffffff;
+  border-top: 1px solid #d4d4d4
 }
 
 

@@ -16,35 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="  tw-w-full row alert-setup-container q-mt-sm " style="width: calc(100vw - 600px); margin-left: 8px;">
-    <AlertsContainer 
-      name="query"
-      v-model:is-expanded="expandState.realTimeMode"
-      label="Query Mode - Quick"
-      subLabel="What should trigger the alert."
-      class="tw-mt-1 tw-w-full col-12"
-      @update:is-expanded="()=>emits('update:expandState', expandState)"
-    />
-    <fields-input-with-multi
-    v-if="expandState.realTimeMode"
-      class="q-mt-md q-px-lg"
-      :stream-fields="columns"
-      :fields="conditions"
-      @add="addField"
-      @remove="removeField"
-      @input:update="
-        (name: string, field: any) => emits('input:update', name, field)
-      "
-      :enableNewValueMode="enableNewValueMode"
-    />
-    </div>
 
-    <div class="  q-mt-md tw-w-full row alert-setup-container " style="width: calc(100vw - 600px); margin-left: 8px;">
+
+    <!-- first section -->
+
+    <div class= " q-mt-sm tw-w-full row alert-setup-container " style=" margin-left: 8px;">
     <AlertsContainer 
-      name="thresholds"
+      name="Alert Settings"
       v-model:is-expanded="expandState.thresholds"
-      label="Thresholds"
-      subLabel="set the rythm for alerts."
+      label="Alert Settings"
+      subLabel=""
       class="tw-mt-1 tw-w-full col-12"
       @update:is-expanded="()=>emits('update:expandState', expandState)"
     />
@@ -210,6 +191,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
    </div>
 
+   <!-- second section -->
+
+   <div class=" q-mt-md tw-w-full row alert-setup-container " style=" margin-left: 8px;">
+    <AlertsContainer 
+      name="query"
+      v-model:is-expanded="expandState.realTimeMode"
+      label="Query Mode - Quick"
+      subLabel="What should trigger the alert."
+      class="tw-mt-1 tw-w-full col-12    "
+      @update:is-expanded="()=>emits('update:expandState', expandState)"
+    />
+    <fields-input-with-multi
+    v-if="expandState.realTimeMode"
+      class="q-mt-md q-px-lg"
+      :stream-fields="columns"
+      :fields="testFields"
+      @add="addField"
+      @remove="removeField"
+      @input:update="
+        (name: string, field: any) => emits('input:update', name, field)
+      "
+      :enableNewValueMode="enableNewValueMode"
+    />
+    </div>
+
   </div>
 </template>
 
@@ -239,6 +245,27 @@ const triggerData = ref(props.trigger);
 const destinations = ref(props.destinations);
 
 const formattedDestinations = ref(props.formattedDestinations);
+const testFields  = ref(
+ [
+    {
+      uuid: "1",
+      parent_id: "1",
+      column: "temperature",
+      operator: ">",
+      value: "30",
+      condition: "AND"
+
+    },
+    {
+      uuid: "3",
+      column: "temperature",
+      operator: ">",
+      value: "40",
+      condition: "AND"
+    }
+
+  ]
+);
 
 const updateTrigger = () => {
   emits("update:trigger", triggerData.value);
