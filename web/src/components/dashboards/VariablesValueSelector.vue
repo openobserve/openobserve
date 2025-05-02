@@ -100,8 +100,15 @@ import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
-import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  escapeSingleQuotes,
+  generateTraceContext,
+  isWebSocketEnabled,
+} from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import useNotifications from "@/composables/useNotifications";
+import useSearchWebSocket from "@/composables/useSearchWebSocket";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -121,11 +128,194 @@ export default defineComponent({
     const instance = getCurrentInstance();
     const store = useStore();
 
+    const {
+      fetchQueryDataWithWebSocket,
+      sendSearchMessageBasedOnRequestId,
+      cancelSearchQueryBasedOnRequestId,
+    } = useSearchWebSocket();
+
+    const traceIdMapper = ref<{ [key: string]: string[] }>({});
+
+    const fetchValuesWithWebSocket = (payload: any, callbacks: any) => {
+      if (!isWebSocketEnabled()) {
+        return null;
+      }
+
+      const wsPayload = {
+        queryReq: payload,
+        type: "values",
+        isPagination: false,
+        traceId: generateTraceContext().traceId,
+        org_id: store.state.selectedOrganization.identifier,
+      };
+
+      const requestId = initializeWebSocketConnection(wsPayload);
+      if (requestId) {
+        addTraceId(payload.fields[0], wsPayload.traceId);
+      }
+      return requestId;
+    };
+
+    const initializeWebSocketConnection = (payload: any): string => {
+      return fetchQueryDataWithWebSocket(payload, {
+        open: sendSearchMessage,
+        close: handleSearchClose,
+        error: handleSearchError,
+        message: handleSearchResponse,
+        reset: handleSearchReset,
+      }) as string;
+    };
+
+    const sendSearchMessage = (queryReq: any) => {
+      const payload = {
+        type: "values",
+        content: {
+          trace_id: queryReq.traceId,
+          payload: queryReq.queryReq,
+          stream_type: queryReq.queryReq.stream_type || "logs",
+          search_type: "ui",
+          use_cache: (window as any).use_cache ?? true,
+          org_id: store.state.selectedOrganization.identifier,
+        },
+      };
+
+      if (
+        Object.hasOwn(queryReq.queryReq, "regions") &&
+        Object.hasOwn(queryReq.queryReq, "clusters")
+      ) {
+        payload.content.payload["regions"] = queryReq.queryReq.regions;
+        payload.content.payload["clusters"] = queryReq.queryReq.clusters;
+      }
+
+      sendSearchMessageBasedOnRequestId(payload);
+    };
+
+    const handleSearchClose = (payload: any, response: any) => {
+      const variableObject = variablesData.values.find(
+        (v: any) => v.query_data?.field === payload.queryReq.fields[0],
+      );
+
+      if (variableObject) {
+        variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
+      }
+
+      //TODO Omkar: Remove the duplicate error codes, are present same in useSearchWebSocket.ts
+      const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
+
+      if (errorCodes.includes(response.code)) {
+        handleSearchError(payload, {
+          content: {
+            message:
+              "WebSocket connection terminated unexpectedly. Please check your network and try again",
+            trace_id: payload.traceId,
+            code: response.code,
+            error_detail: "",
+          },
+          type: "error",
+        });
+      }
+
+      removeTraceId(payload.queryReq.fields[0], payload.traceId);
+    };
+
+    const handleSearchError = (request: any, err: any) => {
+      const variableObject = variablesData.values.find(
+        (v: any) => v.query_data?.field === request.queryReq.fields[0],
+      );
+
+      if (variableObject) {
+        variableObject.isLoading = false;
+        variableObject.isVariable
+        LoadingPending = false;
+        handleValuesError(variableObject, err);
+      }
+
+      removeTraceId(request.queryReq.fields[0], request.content.trace_id);
+    };
+
+    const handleSearchResponse = (payload: any, response: any) => {
+      if (response.type === "cancel_response") {
+        removeTraceId(payload.queryReq.fields[0], response.content.trace_id);
+        return;
+      }
+
+      const variableObject = variablesData.values.find(
+        (v: any) => v.query_data?.field === payload.queryReq.fields[0],
+      );
+      console.log("variableObject", variableObject);
+      console.log("response", response);
+
+      if (variableObject && response.type === "search_response") {
+        updateVariableOptions(variableObject, response.content.results.hits);
+      }
+
+      removeTraceId(payload.queryReq.fields[0], response.content.trace_id);
+    };
+
+    const handleSearchReset = (data: any) => {
+      const variableObject = variablesData.values.find(
+        (v: any) => v.query_data?.field === data.payload.queryReq.fields[0],
+      );
+
+      if (variableObject) {
+        variableObject.isLoading = true;
+        fetchValuesWithWebSocket(data.payload.queryReq, {
+          onMessage: (payload: any, response: any) => {
+            if (response.type === "cancel_response") {
+              return;
+            }
+            updateVariableOptions(
+              variableObject,
+              response.content.results.hits,
+            );
+          },
+          onError: (request: any, error: any) => {
+            handleValuesError(variableObject, error);
+          },
+          onClose: () => {
+            variableObject.isLoading = false;
+            variableObject.isVariableLoadingPending = false;
+          },
+        });
+      }
+    };
+
+    const addTraceId = (field: string, traceId: string) => {
+      if (!traceIdMapper.value[field]) {
+        traceIdMapper.value[field] = [];
+      }
+      traceIdMapper.value[field].push(traceId);
+    };
+
+    const removeTraceId = (field: string, traceId: string) => {
+      if (traceIdMapper.value[field]) {
+        traceIdMapper.value[field] = traceIdMapper.value[field].filter(
+          (id) => id !== traceId,
+        );
+      }
+    };
+
+    const cancelTraceId = (field: string) => {
+      const traceIds = traceIdMapper.value[field];
+      if (traceIds) {
+        traceIds.forEach((traceId) => {
+          cancelSearchQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
+        });
+      }
+    };
+
     // variables data derived from the variables config list
     const variablesData: any = reactive({
       isVariablesLoading: false,
       values: [],
     });
+
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
 
     // variables dependency graph
     let variablesDependencyGraph: any = {};
@@ -385,6 +575,14 @@ export default defineComponent({
       }
     };
 
+    const handleValuesError = (variableObject: any, error: any) => {
+      variableObject.options = [];
+      variableObject.isLoading = false;
+      variableObject.isVariableLoadingPending = false;
+      showErrorNotification(
+        error?.content?.message || "Failed to fetch values",
+      );
+    };
     /**
      * Handle custom variables logic
      * @param {object} currentVariable - current variable
@@ -565,17 +763,117 @@ export default defineComponent({
      * @returns {Promise<boolean>} - true if the variable was handled successfully, false if it was not
      */
     const handleVariableType = async (variableObject: any) => {
+      console.log(
+        `Loading variable ${variableObject.name} with type ${variableObject.type}`,
+      );
+
       switch (variableObject.type) {
         case "query_values": {
           try {
             const queryContext: any = await buildQueryContext(variableObject);
-            const response = await fetchFieldValues(
-              variableObject,
-              queryContext,
-            );
-            updateVariableOptions(variableObject, response.data.hits);
-            return true;
-          } catch (error) {
+
+            if (isWebSocketEnabled()) {
+              const startTime = new Date(
+                props.selectedTimeDate?.start_time?.toISOString(),
+              ).getTime();
+              const endTime = new Date(
+                props.selectedTimeDate?.end_time?.toISOString(),
+              ).getTime();
+
+              const wsPayload = {
+                fields: [variableObject.query_data.field],
+                size: variableObject.query_data.max_record_size || 10,
+                no_count: false,
+                regions: [],
+                clusters: [],
+                vrl_fn: "",
+                start_time: startTime,
+                end_time: endTime,
+                timeout: 30000,
+                stream_name: variableObject.query_data.stream,
+                stream_type: variableObject.query_data.stream_type || "logs",
+                use_cache: (window as any).use_cache ?? true,
+                sql: queryContext || "",
+              };
+              console.log("Sending websocket payload", wsPayload);
+
+              fetchValuesWithWebSocket(wsPayload, {
+                onMessage: (payload: any, response: any) => {
+                  console.log(
+                    `Received message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
+                  );
+                  if (response.type === "cancel_response") {
+                    console.log(
+                      `Cancelled message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
+                    );
+                    return;
+                  }
+                  updateVariableOptions(
+                    variableObject,
+                    response.content.results.hits,
+                  );
+                },
+                onError: (request: any, error: any) => {
+                  console.log(
+                    `Error fetching values for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
+                  );
+                  handleValuesError(variableObject, error);
+                },
+                onClose: () => {
+                  console.log(
+                    `Closed message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
+                  );
+                  variableObject.isLoading = false;
+                  variableObject.isVariableLoadingPending = false;
+                },
+                onReset: (data: any) => {
+                  console.log(
+                    `Resetting values for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
+                  );
+                  variableObject.isLoading = true;
+                  fetchValuesWithWebSocket(data.payload.queryReq, {
+                    onMessage: (payload: any, response: any) => {
+                      console.log(
+                        `Received message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
+                      );
+                      if (response.type === "cancel_response") {
+                        console.log(
+                          `Cancelled message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
+                        );
+                        return;
+                      }
+                      updateVariableOptions(
+                        variableObject,
+                        response.content.results.hits,
+                      );
+                    },
+                    onError: (request: any, error: any) => {
+                      console.log(
+                        `Error fetching values for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
+                      );
+                      handleValuesError(variableObject, error);
+                    },
+                    onClose: () => {
+                      console.log(
+                        `Closed message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
+                      );
+                      variableObject.isLoading = false;
+                      variableObject.isVariableLoadingPending = false;
+                    },
+                  });
+                },
+              });
+              return true;
+            } else {
+              // If WebSocket is not enabled, use the stream service to fetch field values
+              const response = await fetchFieldValues(
+                variableObject,
+                queryContext,
+              );
+              updateVariableOptions(variableObject, response.data.hits);
+              return true;
+            }
+          } catch (error: any) {
             resetVariableState(variableObject);
             return false;
           }
@@ -683,6 +981,8 @@ export default defineComponent({
      * @param hits - The result from the stream service containing field values.
      */
     const updateVariableOptions = (variableObject: any, hits: any[]) => {
+      console.log("hits", hits);
+
       const fieldHit = hits.find(
         (field: any) => field.field === variableObject.query_data.field,
       );
