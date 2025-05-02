@@ -71,10 +71,10 @@ impl ObjectStore for Remote {
                 let columns = file.split('/').collect::<Vec<&str>>();
                 if columns[0] == "files" {
                     metrics::STORAGE_WRITE_BYTES
-                        .with_label_values(&[columns[1], columns[2]])
+                        .with_label_values(&[columns[1], columns[2], "remote"])
                         .inc_by(data_size as u64);
                     metrics::STORAGE_WRITE_REQUESTS
-                        .with_label_values(&[columns[1], columns[2]])
+                        .with_label_values(&[columns[1], columns[2], "remote"])
                         .inc();
                     let time = start.elapsed().as_secs_f64();
                     metrics::STORAGE_TIME
@@ -129,10 +129,10 @@ impl ObjectStore for Remote {
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get", "remote"])
                 .inc_by(data_len as u64);
             metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get", "remote"])
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
@@ -161,10 +161,10 @@ impl ObjectStore for Remote {
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "remote"])
                 .inc_by(data_len as u64);
             metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "remote"])
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
@@ -197,10 +197,10 @@ impl ObjectStore for Remote {
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
                 .inc_by(data_len as u64);
             metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
@@ -226,7 +226,7 @@ impl ObjectStore for Remote {
                 let file = location.to_string();
                 let columns = file.split('/').collect::<Vec<&str>>();
                 metrics::STORAGE_WRITE_REQUESTS
-                    .with_label_values(&[columns[1], columns[2]])
+                    .with_label_values(&[columns[1], columns[2], "remote"])
                     .inc();
                 break;
             }
