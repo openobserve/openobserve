@@ -133,6 +133,7 @@ const defaultObject = {
       : false,
     histogramDirtyFlag: false,
     sqlMode: false,
+    sqlModeManualTrigger: false,
     quickMode: false,
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
@@ -1191,35 +1192,37 @@ const useLogs = () => {
           }
         }
 
-        if (parsedSQL != undefined && hasAggregation(parsedSQL?.columns)) {
-          searchObj.data.queryResults.partitionDetail = {
-            partitions: [],
-            partitionTotal: [],
-            paginations: [],
-          };
-          let pageObject: any = [];
-          const partitions: any = [
-            [partitionQueryReq.start_time, partitionQueryReq.end_time],
-          ];
-          searchObj.data.queryResults.partitionDetail.partitions = partitions;
-          for (const [index, item] of partitions.entries()) {
-            pageObject = [
-              {
-                startTime: item[0],
-                endTime: item[1],
-                from: 0,
-                size: searchObj.meta.resultGrid.rowsPerPage,
-              },
-            ];
-            searchObj.data.queryResults.partitionDetail.paginations.push(
-              pageObject,
-            );
-            searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-          }
-        } else {
+        // if (parsedSQL != undefined) {
+        //   searchObj.data.queryResults.partitionDetail = {
+        //     partitions: [],
+        //     partitionTotal: [],
+        //     paginations: [],
+        //   };
+        //   let pageObject: any = [];
+        //   const partitions: any = [
+        //     [partitionQueryReq.start_time, partitionQueryReq.end_time],
+        //   ];
+        //   searchObj.data.queryResults.partitionDetail.partitions = partitions;
+        //   for (const [index, item] of partitions.entries()) {
+        //     pageObject = [
+        //       {
+        //         startTime: item[0],
+        //         endTime: item[1],
+        //         from: 0,
+        //         size: searchObj.meta.resultGrid.rowsPerPage,
+        //       },
+        //     ];
+        //     searchObj.data.queryResults.partitionDetail.paginations.push(
+        //       pageObject,
+        //     );
+        //     searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+        //   }
+        // } else {
           const { traceparent, traceId } = generateTraceContext();
 
           addTraceId(traceId);
+
+          partitionQueryReq["streaming_output"] = true;
 
           await searchService
             .partition({
@@ -1256,6 +1259,8 @@ const useLogs = () => {
                         endTime: item[1],
                         from: 0,
                         size: searchObj.meta.resultGrid.rowsPerPage,
+                        streaming_output: res.data?.streaming_aggs || false,
+                        streaming_id: res.data?.streaming_id || null,
                       },
                     ];
                     searchObj.data.queryResults.partitionDetail.paginations.push(
@@ -1284,6 +1289,8 @@ const useLogs = () => {
                       endTime: item[1],
                       from: 0,
                       size: searchObj.meta.resultGrid.rowsPerPage,
+                      streaming_output: res.data?.streaming_aggs || false,
+                      streaming_id: res.data?.streaming_id || null,
                     },
                   ];
                   searchObj.data.queryResults.partitionDetail.paginations.push(
@@ -1342,7 +1349,7 @@ const useLogs = () => {
             .finally(() => {
               removeTraceId(traceId);
             });
-        }
+        // }
       } else {
         searchObj.data.queryResults.partitionDetail = {
           partitions: [],
@@ -1693,6 +1700,12 @@ const useLogs = () => {
           searchObj.data.queryResults.partitionDetail.paginations[
             searchObj.data.resultGrid.currentPage - 1
           ][0].size;
+        queryReq.query.streaming_output = searchObj.data.queryResults.partitionDetail.paginations[
+          searchObj.data.resultGrid.currentPage - 1
+        ][0].streaming_output;
+        queryReq.query.streaming_id = searchObj.data.queryResults.partitionDetail.paginations[
+          searchObj.data.resultGrid.currentPage - 1
+        ][0].streaming_id;
 
         // setting subpage for pagination to handle below scenario
         // for one particular page, if we have to fetch data from multiple partitions in that case we need to set subpage
@@ -2418,16 +2431,26 @@ const useLogs = () => {
           // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
 
           if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
-            if (appendResult) {
+            if (appendResult && !queryReq.query?.streaming_output) {
               searchObj.data.queryResults.from += res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
               searchObj.data.queryResults.hits.push(...res.data.hits);
             } else {
-              searchObj.data.queryResults.from = res.data.from;
-              searchObj.data.queryResults.scan_size = res.data.scan_size;
-              searchObj.data.queryResults.took = res.data.took;
-              searchObj.data.queryResults.hits = res.data.hits;
+              if(queryReq.query?.streaming_output) {
+                searchObj.data.queryResults.total = searchObj.data.queryResults.hits.length;
+                searchObj.data.queryResults.from = res.data.from;
+                searchObj.data.queryResults.scan_size += res.data.scan_size;
+                searchObj.data.queryResults.took += res.data.took;
+                searchObj.data.queryResults.hits = res.data.hits;
+              } else {
+                searchObj.data.queryResults.from = res.data.from;
+                searchObj.data.queryResults.scan_size = res.data.scan_size;
+                searchObj.data.queryResults.took = res.data.took;
+                searchObj.data.queryResults.hits = res.data.hits;
+              }
+              
+              
             }
           } else {
             resetFieldValues();

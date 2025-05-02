@@ -182,6 +182,7 @@ pub async fn search(
     if let Some(v) = in_req.local_mode {
         request.set_local_mode(Some(v));
     }
+    let meta = Sql::new_from_req(&request, &query).await?;
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
         async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
@@ -236,6 +237,9 @@ pub async fn search(
     // do this because of clippy warning
     match res {
         Ok(mut res) => {
+            if in_req.query.streaming_output && meta.order_by.is_empty() {
+                res = crate::service::websocket_events::sort::order_search_results(res, None);
+            }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
             let (report_usage, search_type, search_event_context) = match in_req.search_type {

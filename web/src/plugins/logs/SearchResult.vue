@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-9 text-left q-pl-lg q-mt-xs warning flex items-center">
+        <div v-else class="col-6 text-left q-pl-lg q-mt-xs warning flex items-center">
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
@@ -52,14 +52,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
 
           </span>
-          <span v-else-if="searchObj.data.histogram.errorCode == -1 && !searchObj.loadingCounter && searchObj.meta.showHistogram" class="q-ml-md " 
+          <div v-else-if="searchObj.data.histogram.errorCode == -1 && !searchObj.loadingCounter && searchObj.meta.showHistogram" class="q-ml-md tw-cursor-pointer " 
           :class="store.state.theme == 'dark' ? 'histogram-unavailable-text' : 'histogram-unavailable-text-light'"
           >
-            {{ searchObj.data.histogram.errorMsg }}
-          </span>
+            <!-- {{ searchObj.data.histogram.errorMsg }} -->
+              <q-icon name="info" color="warning" size="sm" >
+    
+              </q-icon>
+              <q-tooltip position="top" class="tw-text-sm tw-font-semi-bold "  >
+                  {{ searchObj.data.histogram.errorMsg }}
+                </q-tooltip>
+              </div>
         </div>
 
-        <div class="col-3 text-right q-pr-md q-gutter-xs pagination-block">
+        <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
           
           <q-pagination
             v-if="searchObj.meta.resultGrid.showPagination"
@@ -127,10 +133,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="warning" color="warning" size="xs"></q-icon> No data found for histogram.
           </h3>
         </div>
+
+
+
         <div
           class="q-pb-lg"
-          style=" left: 45%; margin: 30px 0px"
-          v-if="histogramLoader"
+          style=" left: 45%; margin: 25px 0px;"
+          v-else-if="histogramLoader"
           
         >
           <q-spinner-hourglass

@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @before-show="
                   (event: any) => openFilterCreator(event, props.row)
                 "
-                @before-hide="(event: any) => cancelTraceId(props.row.name)"
+                @before-hide="(event: any) => cancelFilterCreator(props.row)"
               >
                 <template v-slot:header>
                   <div
@@ -689,6 +689,7 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import searchService from "@/services/search";
 
 interface Filter {
   fieldName: string;
@@ -736,6 +737,7 @@ export default defineComponent({
     } = useSearchWebSocket();
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
+    const openedFilterFields = ref<string[]>([]);
 
     const userDefinedSchemaBtnGroupOption = [
       {
@@ -857,6 +859,8 @@ export default defineComponent({
         return;
       }
       try {
+        //maintaing  the opened fields
+        openedFilterFields.value.push(name);
         let timestamps: any =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
@@ -1029,79 +1033,81 @@ export default defineComponent({
               continue;
             }
 
-            await streamService
-              .fieldValues({
-                org_identifier: store.state.selectedOrganization.identifier,
-                stream_name: selectedStream,
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-                fields: [name],
-                size: 10,
-                query_context:
-                  b64EncodeUnicode(
-                    query_context.replace("[INDEX_NAME]", selectedStream),
-                  ) || "",
-                query_fn: query_fn,
-                action_id,
-                type: searchObj.data.stream.streamType,
-                clusters:
-                  Object.hasOwn(searchObj.meta, "clusters") &&
-                  searchObj.meta.clusters.length > 0
-                    ? searchObj.meta.clusters.join(",")
-                    : "",
-              })
-              .then((res: any) => {
-                countTotal--;
+            //TODO : add comments for this in future 
+            //for future reference
+            //values api using partition based api
+            let queryToBeSent = searchObj.meta.sqlMode ? searchObj.data.query : query_context.replace("[INDEX_NAME]", selectedStream);
+            const response = await getValuesPartition(startISOTimestamp,endISOTimestamp,name,queryToBeSent);
+            const partitions: any = response?.data.partitions || [];
+          
+
+            for (const partition of partitions) {
+              try {
+                //check if the field is opened because sometimes 
+                // user might close the field before all the subsequent requests are completed
+                if(!openedFilterFields.value.includes(name)){
+                  return;
+                }
+                const res: any = await streamService.fieldValues({
+                  org_identifier: store.state.selectedOrganization.identifier,
+                  stream_name: selectedStream,
+                  start_time: partition[0],
+                  end_time: partition[1],
+                  fields: [name],
+                  size: 10,
+                  query_context:
+                    b64EncodeUnicode(
+                      query_context.replace("[INDEX_NAME]", selectedStream),
+                    ) || "",
+                  query_fn: query_fn,
+                  action_id,
+                  type: searchObj.data.stream.streamType,
+                  clusters:
+                    Object.hasOwn(searchObj.meta, "clusters") &&
+                    searchObj.meta.clusters.length > 0
+                      ? searchObj.meta.clusters.join(",")
+                      : "",
+                });
+
                 if (res.data.hits.length) {
                   res.data.hits.forEach((item: any) => {
                     item.values.forEach((subItem: any) => {
-                      if (fieldValues.value[name]["values"].length) {
-                        let index = fieldValues.value[name]["values"].findIndex(
-                          (value: any) => value.key == subItem.zo_sql_key,
-                        );
-                        if (index != -1) {
-                          fieldValues.value[name]["values"][index].count =
-                            parseInt(subItem.zo_sql_num) +
-                            fieldValues.value[name]["values"][index].count;
-                        } else {
-                          fieldValues.value[name]["values"].push({
-                            key: subItem.zo_sql_key,
-                            count: subItem.zo_sql_num,
-                          });
-                        }
+                      const index = fieldValues.value[name]["values"].findIndex(
+                        (value: any) => value.key === subItem.zo_sql_key,
+                      );
+                      if (index !== -1) {
+                        fieldValues.value[name]["values"][index].count += parseInt(subItem.zo_sql_num);
                       } else {
                         fieldValues.value[name]["values"].push({
                           key: subItem.zo_sql_key,
-                          count: subItem.zo_sql_num,
+                          count: parseInt(subItem.zo_sql_num),
                         });
                       }
                     });
                   });
+
                   if (fieldValues.value[name]["values"].length > 10) {
-                    fieldValues.value[name]["values"].sort(
-                      (a, b) => b.count - a.count,
-                    ); // Sort the array based on count in descending order
-                    fieldValues.value[name]["values"] = fieldValues.value[name][
-                      "values"
-                    ].slice(0, 10); // Return the first 10 elements
+                    fieldValues.value[name]["values"].sort((a, b) => b.count - a.count);
+                    fieldValues.value[name]["values"] = fieldValues.value[name]["values"].slice(0, 10);
                   }
                 }
-              })
-              .catch((err: any) => {
+              } catch (err) {
                 console.error("Failed to fetch field values:", err);
                 fieldValues.value[name].errMsg = "Failed to fetch field values";
-              })
-              .finally(() => {
+              } finally {
                 countTotal--;
                 if (countTotal <= 0) {
                   fieldValues.value[name].isLoading = false;
                 }
-              });
+              }
+            }
+            openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== name);
+
           }
         }
       } catch (err) {
         fieldValues.value[name]["isLoading"] = false;
-
+        openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== name);
         console.log(err);
         $q.notify({
           type: "negative",
@@ -1459,6 +1465,18 @@ export default defineComponent({
       }
     };
 
+
+    const cancelFilterCreator = (row: any) => {
+      //if it is websocker based then cancel the trace id
+      //else cancel the further value api calls using the openedFilterFields
+      if(isWebSocketEnabled()){
+        cancelTraceId(row.name);
+      }
+      else{
+        cancelValueApi(row.name);
+      }
+    }
+
     const cancelTraceId = (field: string) => {
       const traceIds = traceIdMapper.value[field];
       if (traceIds) {
@@ -1469,6 +1487,33 @@ export default defineComponent({
           });
         });
       }
+    };
+    const cancelValueApi = (value: string) => {
+      //remove the field from the openedFilterFields
+      openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== value);
+    }
+    const getValuesPartition = async (start: number, end: number,name:string,queryToBeSent:string) => {
+      try{
+          const queryReq = {
+            sql: queryToBeSent,
+            start_time: start,
+            end_time: end,
+            sql_mode: "context",
+            // streaming_output: true,
+          }
+          const res = await searchService.partition({
+            org_identifier: store.state.selectedOrganization.identifier,
+            query: queryReq,
+            page_type: searchObj.data.stream.streamType,
+            traceparent: generateTraceContext().traceId,
+          });
+        
+          return res;
+      } catch (err) {
+        console.error("Failed to fetch field values:", err);
+        fieldValues.value[name].errMsg = "Failed to fetch field values";
+      }
+
     };
 
     return {
@@ -1542,6 +1587,7 @@ export default defineComponent({
       sortedStreamFields,
       placeHolderText,
       cancelTraceId,
+      cancelFilterCreator
     };
   },
 });

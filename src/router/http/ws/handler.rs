@@ -35,22 +35,16 @@ use super::{
     pool::QuerierConnectionPool,
     session::SessionManager,
 };
-use crate::{
-    common::utils::websocket::get_ping_interval_secs_with_jitter,
-    service::websocket_events::{WsClientEvents, WsServerEvents},
-};
+use crate::service::websocket_events::{WsClientEvents, WsServerEvents};
 
 pub type ClientId = String;
 pub type QuerierName = String;
 pub type TraceId = String;
 
-pub const SERVER_HEALTH_CHECK_PING_MSG: &[u8] = b"server_health_check";
-
 #[derive(Debug)]
 pub struct WsHandler {
     pub session_manager: Arc<SessionManager>,
     pub connection_pool: Arc<QuerierConnectionPool>,
-    // pub request_timings: Arc<RwAHashMap<TraceId, Instant>>,
 }
 
 impl Drop for WsHandler {
@@ -67,7 +61,6 @@ impl WsHandler {
         Self {
             session_manager,
             connection_pool,
-            // request_timings: Arc::new(Default::default()),
         }
     }
 
@@ -109,10 +102,7 @@ impl WsHandler {
             tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
-
-        // Client ID clone
-        let client_id_clone = client_id.clone();
-        let client_id_clone1 = client_id.clone();
+        let _client_id_clone = client_id.clone();
 
         // Before spawning the async task, clone the drain state
         let is_session_drain_state = session_manager.is_session_drain_state(&client_id).await;
@@ -122,64 +112,38 @@ impl WsHandler {
             client_id
         );
 
-        // Spawn a task to handle health check
-        let response_tx_clone = response_tx.clone();
-        let disconnect_tx_clone1 = disconnect_tx.clone();
-        tokio::spawn(async move {
-            let mut ping_interval = tokio::time::interval(tokio::time::Duration::from_secs(
-                get_ping_interval_secs_with_jitter() as _,
-            ));
-            ping_interval.tick().await;
-
-            loop {
-                ping_interval.tick().await;
-                if let Err(e) = response_tx_clone
-                    .send(WsServerEvents::Ping(SERVER_HEALTH_CHECK_PING_MSG.to_vec()))
-                    .await
-                {
-                    log::error!(
-                        "[WS::Router::Handler] error sending ping to outgoing thread via response channel for client_id: {}, error: {}",
-                        client_id_clone1,
-                        e
-                    );
-                    if let Err(e) = disconnect_tx_clone1.send(None).await {
-                        log::error!(
-                            "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
-                        );
-                    }
-                    break;
-                }
-            }
-        });
-
         // Spawn task to handle idle timeout
-        let session_manager_clone = session_manager.clone();
-        let cfg_clone = cfg.clone();
-        let disconnect_tx_clone2 = disconnect_tx.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-                cfg_clone.websocket.session_idle_timeout_secs as _,
-            ));
-            interval.tick().await;
-            loop {
-                interval.tick().await;
-                if session_manager_clone
-                    .reached_max_idle_time(&client_id_clone)
-                    .await
-                {
-                    log::info!(
-                        "[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown client_id: {}",
-                        client_id_clone
-                    );
-                    if let Err(e) = disconnect_tx_clone2.send(None).await {
-                        log::error!(
-                            "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
-                        );
-                    }
-                    break;
-                }
-            }
-        });
+        let _session_manager_clone = session_manager.clone();
+        let _cfg_clone = cfg.clone();
+        let _disconnect_tx_clone2 = disconnect_tx.clone();
+        // tokio::spawn(async move {
+        //     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+        //         cfg_clone.websocket.session_idle_timeout_secs as _,
+        //     ));
+        //     interval.tick().await;
+        //     loop {
+        //         interval.tick().await;
+        //         log::info!(
+        //             "[WS::Router::Handler] checking if MAX_IDLE_TIME reached for client_id: {}",
+        //             client_id_clone
+        //         );
+        //         if session_manager_clone
+        //             .reached_max_idle_time(&client_id_clone)
+        //             .await
+        //         {
+        //             log::info!(
+        //                 "[WS::Router::Handler]: MAX_IDLE_TIME reached. Normal shutdown client_id:
+        // {}",                 client_id_clone
+        //             );
+        //             if let Err(e) = disconnect_tx_clone2.send(None).await {
+        //                 log::error!(
+        //                     "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
+        //                 );
+        //             }
+        //             break;
+        //         }
+        //     }
+        // });
 
         // Spawn message handling tasks between client and router
         actix_web::rt::spawn(async move {
@@ -366,11 +330,6 @@ impl WsHandler {
                                             .register_request(trace_id.clone(), response_tx.clone())
                                             .await;
 
-                                        // Record start time for this trace_id
-                                        // let mut write_guard = request_timings.write().await;
-                                        // write_guard.insert(trace_id.clone(), Instant::now());
-                                        // drop(write_guard);
-
                                         if let Err(e) = querier_conn.send_message(message).await {
                                             log::error!(
                                                 "[WS::Router::Handler] error forwarding client message via selected querier connection: {}, for client_id: {}, trace_id: {}, error: {}",
@@ -460,18 +419,10 @@ impl WsHandler {
                             match message {
                                 WsServerEvents::Ping(ping) => {
                                     let mut close_conn = false;
-                                    if ping == SERVER_HEALTH_CHECK_PING_MSG {
-                                        log::debug!("[WS::Router::Handler]: pinging client_id: {}, msg: {:?}", client_id, String::from_utf8_lossy(&ping));
-                                        if let Err(e) = ws_session.ping(&ping).await {
-                                            close_conn = true;
-                                            log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
-                                        }
-                                    } else {
-                                        log::debug!("[WS::Router::Handler]: sending pong to client_id: {}, msg: {:?}", client_id, String::from_utf8_lossy(&ping));
-                                        if let Err(e) = ws_session.pong(&ping).await {
-                                            close_conn = true;
-                                            log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
-                                        }
+                                    log::debug!("[WS::Router::Handler]: sending pong to client_id: {}, msg: {:?}", client_id, String::from_utf8_lossy(&ping));
+                                    if let Err(e) = ws_session.pong(&ping).await {
+                                        close_conn = true;
+                                        log::error!("[WS::Router::Handler]: Error sending pong to client: {}, client_id: {}", e, client_id);
                                     }
 
                                     if close_conn {
@@ -501,19 +452,6 @@ impl WsHandler {
                                         log::info!("[WS::Router::Handler] Unregistering trace_id: {}, message: {:?}", trace_id, message);
                                         session_manager.update_session_activity(&client_id).await;
                                         session_manager.remove_trace_id(&client_id, &trace_id).await;
-
-                                        // Track Search Request Duration
-                                        // let mut write_guard = request_timings.write().await;
-                                        // if let Some(start_time) = write_guard.remove(&trace_id) {
-                                        //     let duration = start_time.elapsed();
-                                        //     log::info!(
-                                        //         "[WS::Router::Handler] Request completed for client_id: {}, trace_id: {}, duration: {:?}",
-                                        //         client_id,
-                                        //         trace_id,
-                                        //         duration
-                                        //     );
-                                        // }
-                                        // drop(write_guard);
                                     }
                                 }
                             }
@@ -617,18 +555,6 @@ impl WsHandler {
                                                                 message
                                                             );
                                                             session_manager.remove_trace_id(&client_id, &trace_id).await;
-
-                                                            // Track Search Request Duration
-                                                            // let mut write_guard = request_timings.write().await;
-                                                            // if let Some(start_time) = write_guard.remove(&trace_id) {
-                                                            //     let duration = start_time.elapsed();
-                                                            //     log::info!(
-                                                            //         "[WS::Router::Handler] Request completed - trace_id: {}, duration: {:?}",
-                                                            //         trace_id,
-                                                            //         duration
-                                                            //     );
-                                                            // }
-                                                            // drop(write_guard);
 
                                                             // Check if this was the last trace_id
                                                             let remaining_trace_ids = session_manager.get_trace_ids(&client_id).await;

@@ -386,6 +386,8 @@ export const usePanelDataLoader = (
               start_time: startISOTimestamp,
               end_time: endISOTimestamp,
               size: -1,
+              // pass always true for streaming_output
+              streaming_output: true,
             },
             page_type: pageType,
             traceparent,
@@ -451,13 +453,17 @@ export const usePanelDataLoader = (
                 {
                   org_identifier: store.state.selectedOrganization.identifier,
                   query: {
-                    query: await getHistogramSearchRequest(
-                      query,
-                      it,
-                      partition[0],
-                      partition[1],
-                      histogramInterval,
-                    ),
+                    query: {
+                      ...(await getHistogramSearchRequest(
+                        query,
+                        it,
+                        partition[0],
+                        partition[1],
+                        histogramInterval,
+                      )),
+                      streaming_output: res?.data?.streaming_aggs ?? false,
+                      streaming_id: res?.data?.streaming_id ?? null,
+                    },
                   },
                   page_type: pageType,
                   traceparent,
@@ -503,8 +509,11 @@ export const usePanelDataLoader = (
             break;
           }
 
+          if (res?.data?.streaming_aggs) {
+            state.data[currentQueryIndex] = [...searchRes.data.hits];
+          }
           // if order by is desc, append new partition response at end
-          if (order_by.toLowerCase() === "desc") {
+          else if (order_by.toLowerCase() === "desc") {
             state.data[currentQueryIndex] = [
               ...(state.data[currentQueryIndex] ?? []),
               ...searchRes.data.hits,
