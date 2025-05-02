@@ -52,10 +52,10 @@ pub(crate) fn default() -> Box<dyn ObjectStoreExt> {
 impl StorageClientFactory {
     pub fn new() -> Self {
         let config = get_config();
-        Self::new_with_config(&config.s3)
+        Self::new_with_config(&config.s3, is_local_disk_storage())
     }
 
-    pub fn new_with_config(config: &config::S3) -> Self {
+    pub fn new_with_config(config: &config::S3, local_mode: bool) -> Self {
         let (stream_strategy, accounts) = parse_storage_config(config);
         let mut storage = Self {
             accounts: HashMap::with_capacity(accounts.len()),
@@ -63,7 +63,7 @@ impl StorageClientFactory {
             stream_strategy,
         };
 
-        if is_local_disk_storage() {
+        if local_mode {
             std::fs::create_dir_all(&get_config().common.data_stream_dir)
                 .expect("create stream data dir success");
             storage.accounts.insert(
@@ -404,9 +404,36 @@ mod tests {
     }
 
     #[test]
+    fn test_storage_client_factory_local_mode_default() {
+        let config = base_s3_config();
+        let factory = StorageClientFactory::new_with_config(&config, true);
+        assert!(factory.only_default);
+        assert_eq!(factory.accounts.len(), 1);
+        assert!(factory.accounts.contains_key("default"));
+        assert!(matches!(factory.stream_strategy, StreamStrategy::Default));
+    }
+
+    #[test]
+    fn test_storage_client_factory_multiple_account_local_mode_strategy() {
+        let mut config = base_s3_config();
+        config.accounts = "acc1,acc2".to_string();
+        config.provider = "aws,aws".to_string();
+        config.server_url = "url1,url2".to_string();
+        config.region_name = "r1,r2".to_string();
+        config.access_key = "k1,k2".to_string();
+        config.secret_key = "s1,s2".to_string();
+        config.bucket_name = "b1,b2".to_string();
+        config.bucket_prefix = "p1,p2".to_string();
+
+        let factory = StorageClientFactory::new_with_config(&config, true);
+        assert!(factory.only_default);
+        assert_eq!(factory.accounts.len(), 1); // includes "default" 
+    }
+
+    #[test]
     fn test_storage_client_factory_single_account_default() {
         let config = base_s3_config();
-        let factory = StorageClientFactory::new_with_config(&config);
+        let factory = StorageClientFactory::new_with_config(&config, false);
         assert!(factory.only_default);
         assert_eq!(factory.accounts.len(), 1);
         assert!(factory.accounts.contains_key("default"));
@@ -426,7 +453,7 @@ mod tests {
         config.bucket_prefix = "p1,p2".to_string();
         config.stream_strategy = "file_hash".to_string();
 
-        let factory = StorageClientFactory::new_with_config(&config);
+        let factory = StorageClientFactory::new_with_config(&config, false);
         assert!(!factory.only_default);
         assert_eq!(factory.accounts.len(), 3); // includes "default"
         assert!(matches!(
@@ -448,7 +475,7 @@ mod tests {
         config.bucket_prefix = "p1,p2".to_string();
         config.stream_strategy = "stream_hash".to_string();
 
-        let factory = StorageClientFactory::new_with_config(&config);
+        let factory = StorageClientFactory::new_with_config(&config, false);
         assert!(!factory.only_default);
         assert_eq!(factory.accounts.len(), 3); // includes "default"
         assert!(matches!(
@@ -470,7 +497,7 @@ mod tests {
         config.bucket_prefix = "p1,p2".to_string();
         config.stream_strategy = "stream1:acc1,stream2:acc2".to_string();
 
-        let factory = StorageClientFactory::new_with_config(&config);
+        let factory = StorageClientFactory::new_with_config(&config, false);
         assert!(!factory.only_default);
         assert_eq!(factory.accounts.len(), 3); // includes "default"
         match &factory.stream_strategy {
@@ -488,7 +515,7 @@ mod tests {
         let mut config = base_s3_config();
         config.accounts = "acc1,acc2".to_string();
         config.provider = "aws".to_string(); // Only one provider, should panic
-        StorageClientFactory::new_with_config(&config);
+        StorageClientFactory::new_with_config(&config, false);
     }
 
     #[test]
@@ -504,6 +531,6 @@ mod tests {
         config.bucket_name = "b1,b2".to_string();
         config.bucket_prefix = "p1,p2".to_string();
         config.stream_strategy = "stream1:acc3".to_string(); // acc3 does not exist
-        StorageClientFactory::new_with_config(&config);
+        StorageClientFactory::new_with_config(&config, false);
     }
 }
