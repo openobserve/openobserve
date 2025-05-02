@@ -147,6 +147,8 @@ impl WsHandler {
         // });
 
         // Spawn message handling tasks between client and router
+        let response_tx_clone = response_tx.clone();
+        let disconnect_tx_clone = disconnect_tx.clone();
         actix_web::rt::spawn(async move {
             let mut count = 1;
             // Handle incoming messages from client
@@ -162,7 +164,7 @@ impl WsHandler {
                                 );
                                 let err_msg = ErrorMessage::new(e.into(), None, None);
                                 let should_disconnect = err_msg.should_disconnect;
-                                if let Err(e) = disconnect_tx
+                                if let Err(e) = disconnect_tx_clone
                                     .send(Some(DisconnectMessage::Error(err_msg)))
                                     .await
                                 {
@@ -190,7 +192,7 @@ impl WsHandler {
                                             .map(|v| v.to_string());
                                         let err_msg = ErrorMessage::new(e.into(), trace_id, None);
                                         let should_disconnect = err_msg.should_disconnect;
-                                        if let Err(e) = disconnect_tx
+                                        if let Err(e) = disconnect_tx_clone
                                             .send(Some(DisconnectMessage::Error(err_msg)))
                                             .await
                                         {
@@ -219,7 +221,9 @@ impl WsHandler {
                                                     Some(message.get_trace_id()),
                                                     false,
                                                 );
-                                                if let Err(e) = response_tx.send(err_msg).await {
+                                                if let Err(e) =
+                                                    response_tx_clone.clone().send(err_msg).await
+                                                {
                                                     log::error!(
                                                         "[WS::Router::Handler] Error sending error message to client_id: {}, error: {}",
                                                         client_id,
@@ -243,7 +247,7 @@ impl WsHandler {
                                             let err_msg = ErrorMessage::new_unauthorized(Some(
                                                 message.get_trace_id(),
                                             ));
-                                            if let Err(e) = disconnect_tx
+                                            if let Err(e) = disconnect_tx_clone
                                                 .send(Some(DisconnectMessage::Error(err_msg)))
                                                 .await
                                             {
@@ -300,7 +304,7 @@ impl WsHandler {
                                                     None,
                                                 );
                                                 let should_disconnect = err_msg.should_disconnect;
-                                                if let Err(e) = disconnect_tx
+                                                if let Err(e) = disconnect_tx_clone
                                                     .send(Some(DisconnectMessage::Error(err_msg)))
                                                     .await
                                                 {
@@ -328,7 +332,10 @@ impl WsHandler {
                                             }
                                         };
                                         querier_conn
-                                            .register_request(trace_id.clone(), response_tx.clone())
+                                            .register_request(
+                                                trace_id.clone(),
+                                                response_tx_clone.clone(),
+                                            )
                                             .await;
 
                                         if let Err(e) = querier_conn.send_message(message).await {
@@ -342,7 +349,7 @@ impl WsHandler {
                                             let err_msg =
                                                 ErrorMessage::new(e, Some(trace_id.clone()), None);
                                             let should_disconnect = err_msg.should_disconnect;
-                                            if let Err(e) = disconnect_tx
+                                            if let Err(e) = disconnect_tx_clone
                                                 .send(Some(DisconnectMessage::Error(err_msg)))
                                                 .await
                                             {
@@ -374,7 +381,7 @@ impl WsHandler {
                                     client_id,
                                     close_reason
                                 );
-                                if let Err(e) = disconnect_tx
+                                if let Err(e) = disconnect_tx_clone
                                     .send(Some(DisconnectMessage::Close(close_reason)))
                                     .await
                                 {
@@ -396,7 +403,10 @@ impl WsHandler {
                                     client_id,
                                     ping
                                 );
-                                let _ = response_tx.send(WsServerEvents::Ping(ping.to_vec())).await;
+                                let _ = response_tx_clone
+                                    .clone()
+                                    .send(WsServerEvents::Ping(ping.to_vec()))
+                                    .await;
                             }
                             Ok(actix_ws::AggregatedMessage::Pong(pong)) => {
                                 log::info!(
@@ -562,7 +572,7 @@ impl WsHandler {
                                                             if remaining_trace_ids.is_empty() {
                                                                 is_session_drain_complete.store(true, Ordering::Relaxed);
                                                                 // close the session
-                                                                if let Err(e) = disconnect_tx.send(Some(DisconnectMessage::Close(Some(CloseReason::from(CloseCode::Normal))))).await {
+                                                                if let Err(e) = disconnect_tx_clone.clone().send(Some(DisconnectMessage::Close(Some(CloseReason::from(CloseCode::Normal))))).await {
                                                                     log::error!(
                                                                         "[WS::Router::Handler] Error informing handle_outgoing to stop: {e}"
                                                                     );

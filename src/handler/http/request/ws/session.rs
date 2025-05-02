@@ -43,7 +43,7 @@ use crate::{
     },
 };
 
-pub async fn health_check(req_id: String, response_tx: Sender<WsServerEvents>) {
+pub async fn _health_check(req_id: String, response_tx: Sender<WsServerEvents>) {
     let cfg = get_config();
     log::info!(
         "[WS_HANDLER]: Starting health check for req_id: {}, querier: {}",
@@ -394,6 +394,7 @@ async fn handle_search_event(
     let client_msg = WsClientEvents::Search(Box::new(search_req.clone()));
 
     // Spawn the search task
+    let response_tx_clone = response_tx.clone();
     tokio::spawn(async move {
         // Handle the search request
         // If search is cancelled, the taek will exit
@@ -407,7 +408,7 @@ async fn handle_search_event(
             &org_id,
             &user_id,
             search_req.clone(),
-            response_tx.clone(),
+            response_tx_clone.clone(),
         )
         .await;
         match search_result {
@@ -441,9 +442,13 @@ async fn handle_search_event(
                     e
                 );
                 let handle_err = async || {
-                    let _ =
-                        handle_search_error(&e, &req_id, &trace_id_for_task, response_tx.clone())
-                            .await;
+                    let _ = handle_search_error(
+                        &e,
+                        &req_id,
+                        &trace_id_for_task,
+                        response_tx_clone.clone(),
+                    )
+                    .await;
 
                     #[cfg(feature = "enterprise")]
                     let http_response_code: u16;
@@ -480,7 +485,8 @@ async fn handle_search_event(
                             trace_id: trace_id.to_string(),
                             is_success: true,
                         };
-                        let _ = send_message_2(&req_id, cancel_res, response_tx.clone()).await;
+                        let _ =
+                            send_message_2(&req_id, cancel_res, response_tx_clone.clone()).await;
                     }
                     _ => handle_err().await,
                 }
@@ -548,6 +554,7 @@ async fn handle_values_event(
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
 
     // Spawn the values task
+    let response_tx_clone = response_tx.clone();
     tokio::spawn(async move {
         // Handle the values request
         // If values search is cancelled, the task will exit
@@ -560,7 +567,7 @@ async fn handle_values_event(
             &req_id,
             values_req.clone(),
             &mut accumulated_results,
-            response_tx.clone(),
+            response_tx_clone.clone(),
         )
         .await;
         match values_result {
@@ -588,9 +595,13 @@ async fn handle_values_event(
             }
             Err(e) => {
                 let handle_err = async || {
-                    let _ =
-                        handle_search_error(&e, &req_id, &trace_id_for_task, response_tx.clone())
-                            .await;
+                    let _ = handle_search_error(
+                        &e,
+                        &req_id,
+                        &trace_id_for_task,
+                        response_tx_clone.clone(),
+                    )
+                    .await;
 
                     #[cfg(feature = "enterprise")]
                     let http_response_code: u16;
@@ -627,7 +638,8 @@ async fn handle_values_event(
                             trace_id: trace_id.to_string(),
                             is_success: true,
                         };
-                        let _ = send_message_2(&req_id, cancel_res, response_tx.clone()).await;
+                        let _ =
+                            send_message_2(&req_id, cancel_res, response_tx_clone.clone()).await;
                     }
                     _ => handle_err().await,
                 }
