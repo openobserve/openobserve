@@ -318,6 +318,7 @@ fn vector_arithmetic_operators(
 
     Ok(Value::Vector(output))
 }
+
 /// Implement binary operations between two vectors
 ///
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#comparison-binary-operators
