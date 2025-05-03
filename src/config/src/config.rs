@@ -88,7 +88,7 @@ pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 1;
+pub const DB_SCHEMA_VERSION: u64 = 2;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
