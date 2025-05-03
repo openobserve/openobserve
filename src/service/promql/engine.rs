@@ -48,8 +48,7 @@ use super::{
     utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros,
-    utils::VectorSelectorExt, value::*,
+    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros, value::*,
 };
 
 pub struct Engine {
@@ -355,7 +354,7 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let data_cache_key = &selector.make_cache_key();
+        let data_cache_key = &selector.to_string();
 
         let cache_exists = {
             self.ctx
@@ -451,7 +450,7 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let data_cache_key = &selector.make_cache_key();
+        let data_cache_key = &selector.to_string();
         let cache_exists = {
             self.ctx
                 .data_cache
@@ -525,7 +524,7 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
     ) -> Result<()> {
-        let data_cache_key = selector.make_cache_key();
+        let data_cache_key = selector.to_string();
         let mut data_loaded = self.ctx.data_loading.lock().await;
         if data_loaded.contains(&data_cache_key) {
             return Ok(()); // data is already loading
