@@ -537,7 +537,7 @@ impl Engine {
                     "[trace_id: {}] [PromQL] Failed to load data for stream: {data_cache_key}, error: {e:?}",
                     self.trace_id
                 );
-                data_loaded.insert(data_cache_key.to_string());
+                data_loaded.insert(data_cache_key);
                 return Err(e);
             }
         };
@@ -548,8 +548,8 @@ impl Engine {
                 .data_cache
                 .write()
                 .await
-                .insert(data_cache_key.to_string(), Value::None);
-            data_loaded.insert(data_cache_key.to_string());
+                .insert(data_cache_key.clone(), Value::None);
+            data_loaded.insert(data_cache_key);
             return Ok(());
         }
 
@@ -574,8 +574,8 @@ impl Engine {
             .data_cache
             .write()
             .await
-            .insert(data_cache_key.to_string(), values);
-        data_loaded.insert(data_cache_key.to_string());
+            .insert(data_cache_key.clone(), values);
+        data_loaded.insert(data_cache_key);
         Ok(())
     }
 
