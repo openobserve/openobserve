@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::Write};
 
 use config::{
     TIMESTAMP_COL_NAME,
@@ -24,7 +24,11 @@ use datafusion::{
     error::Result,
     prelude::{DataFrame, col, lit},
 };
-use promql_parser::label::{MatchOp, Matchers};
+use itertools::Itertools;
+use promql_parser::{
+    label::{MatchOp, Matchers},
+    parser::VectorSelector,
+};
 
 use crate::service::search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
 
@@ -104,4 +108,36 @@ pub fn apply_label_selector(
         }
     }
     Some(df)
+}
+
+/// Extension trait to add caching functionality to VectorSelector
+pub trait VectorSelectorExt {
+    /// Generate a cache key that uniquely identifies this selector's query
+    fn make_cache_key(&self) -> String;
+}
+
+impl VectorSelectorExt for VectorSelector {
+    fn make_cache_key(&self) -> String {
+        let mut key = String::new();
+
+        // Add name or marker for absence
+        match &self.name {
+            Some(name) => write!(key, "name:{}", name).unwrap(),
+            None => key.push_str("name:<none>"),
+        }
+
+        key.push_str("|matchers:");
+        // log::debug!("[make_cache_key] matchers: {:?}", self.matchers);
+        let mut all_matchers = self.matchers.matchers.clone();
+        // Add matchers in a sorted, deterministic way - First sort by name, then by value
+        all_matchers.sort_by(|a, b| a.name.cmp(&b.name).then(a.value.cmp(&b.value)));
+
+        let all_matchers = all_matchers
+            .iter()
+            .map(|m| format!("{}={}", m.name, m.value))
+            .join(";");
+
+        key.push_str(&all_matchers);
+        key
+    }
 }
