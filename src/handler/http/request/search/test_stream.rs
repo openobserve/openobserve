@@ -93,7 +93,7 @@ use crate::service::{
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/_test_http2_stream")]
+#[post("/{org_id}/_search_stream")]
 pub async fn test_http2_stream(
     org_id: web::Path<String>,
     in_req: HttpRequest,
