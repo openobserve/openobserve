@@ -194,7 +194,6 @@ pub async fn search_http2_stream(
             })
         };
         
-        let mut start_timer = Instant::now();
 
         let trace_id = trace_id.clone();
         let stream_type = stream_type.clone();
