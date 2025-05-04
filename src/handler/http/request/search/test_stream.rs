@@ -36,6 +36,7 @@ use config::{
     },
     utils::json,
 };
+use serde::{Deserialize, Serialize};
 use futures::{SinkExt, channel::mpsc, stream::StreamExt};
 use hashbrown::HashMap;
 use log;
@@ -64,10 +65,10 @@ use crate::{
     service::{
         search::{self as SearchService, cache, sql::Sql},
         self_reporting::http_report_metrics,
-        setup_tracing_with_trace_id,
         websocket_events::{
             sort::order_search_results,
-            utils::{TimeOffset, WsServerEvents},
+            search::write_results_to_cache,
+            utils::{TimeOffset, WsServerEvents, calculate_progress_percentage, setup_tracing_with_trace_id},
         },
     },
 };
@@ -112,6 +113,8 @@ pub async fn test_http2_stream(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+
+    let mut accumulated_results: Vec<SearchResultType> = Vec::new();
 
     let user_id = in_req
         .headers()
@@ -236,6 +239,8 @@ pub async fn test_http2_stream(
         req.search_type = Some(SearchEventType::Other);
     }
 
+    let start_time = req.query.start_time;
+    let end_time = req.query.end_time;
 
     // Create a channel for streaming results
     let (tx, rx) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
@@ -315,6 +320,7 @@ pub async fn test_http2_stream(
                     stream_type,
                     cached_resp,
                     deltas,
+                    &mut accumulated_results,
                     &user_id,
                     max_query_range,
                     remaining_query_range,
@@ -343,6 +349,7 @@ pub async fn test_http2_stream(
                     stream_type,
                     size,
                     &user_id,
+                    &mut accumulated_results,
                     max_query_range,
                     &mut start,
                     &req_order_by,
@@ -356,19 +363,22 @@ pub async fn test_http2_stream(
             }
             // Step 3: Write to results cache
             // TODO:cache only if from is 0 and is not an aggregate_query
-            // if req.query.from == 0 {
-            //     write_results_to_cache(c_resp, start_time, end_time, accumulated_results)
-            //         .instrument(search_span.clone())
-            //         .await
-            //         .map_err(|e| {
-            //             log::error!(
-            //                 "[WS_SEARCH] trace_id: {}, Error writing results to cache: {:?}",
-            //                 trace_id,
-            //                 e
-            //             );
-            //             e
-            //         })?;
-            // }
+            if req.query.from == 0 {
+                if let Err(e) = write_results_to_cache(c_resp, start_time, end_time, &mut accumulated_results)
+                    .instrument(search_span.clone())
+                    .await
+                    .map_err(|e| {
+                        log::error!(
+                            "[WS_SEARCH] trace_id: {}, Error writing results to cache: {:?}",
+                            trace_id,
+                            e
+                        );
+                        e
+                    }) {
+                    sender.send(Err(e)).await.unwrap();
+                    return;
+                }
+            }
         } else {
             // Step 4: Search without cache for req with from > 0
             let size = req.query.size;
@@ -379,6 +389,7 @@ pub async fn test_http2_stream(
                 stream_type,
                 size,
                 &user_id,
+                &mut accumulated_results,
                 max_query_range,
                 &mut start,
                 &req_order_by,
@@ -402,22 +413,13 @@ pub async fn test_http2_stream(
     // Return streaming response
     let stream = rx.map(|result| match result {
         Ok(v) => {
-            let mut responses = match v {
-                StreamResponses::SearchResponse { results, streaming_output } => {
-                    let res = serde_json::json!({
-                        "data": results,
-                        "streaming_output": streaming_output
-                    });
-                    json::to_vec(&res).expect("Failed to serialize search response")
-                }
-                StreamResponses::Error { code, message } => {
-                    let res = serde_json::json!({
-                        "code": code,
-                        "message": message
-                    });
-                    json::to_vec(&res).unwrap()
-                }
-            };
+            // let mut responses = match v {
+            //     StreamResponses::SearchResponse{results,streaming_aggs,time_offset}=>{let res=serde_json::json!({"results":results,"streaming_aggs":streaming_aggs,"time_offset":time_offset});json::to_vec(&res).expect("Failed to serialize search response")}
+            //     StreamResponses::Error{code,message}=>{let res=serde_json::json!({"code":code,"message":message});json::to_vec(&res).unwrap()}
+            //     StreamResponses::Progress { percent } => {let res=serde_json::json!({"percent":percent});json::to_vec(&res).unwrap()}
+            // };
+
+            let mut responses = serde_json::to_vec(&v).expect("Failed to serialize search response");
             // Add a newline to the end of the bytes
             responses.push(b'\n');
 
@@ -446,6 +448,7 @@ pub async fn do_partitioned_search(
     stream_type: StreamType,
     req_size: i64,
     user_id: &str,
+    accumulated_results: &mut Vec<SearchResultType>,
     max_query_range: i64, // hours
     start_timer: &mut Instant,
     req_order_by: &OrderBy,
@@ -553,15 +556,15 @@ pub async fn do_partitioned_search(
             }
 
             // TODO: accumulate the result for caching
-            // // Accumulate the result
-            // if is_streaming_aggs {
-            //     // Only accumulate the results of the last partition
-            //     if idx == partitions.len() - 1 {
-            //         accumulated_results.push(SearchResultType::Search(search_res.clone()));
-            //     }
-            // } else {
-            //     accumulated_results.push(SearchResultType::Search(search_res.clone()));
-            // }
+            // Accumulate the result
+            if is_streaming_aggs {
+                // Only accumulate the results of the last partition
+                if idx == partitions.len() - 1 {
+                    accumulated_results.push(SearchResultType::Search(search_res.clone()));
+                }
+            } else {
+                accumulated_results.push(SearchResultType::Search(search_res.clone()));
+            }
 
             // TODO: add top k values for values search
             // if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
@@ -584,7 +587,11 @@ pub async fn do_partitioned_search(
             // Send the cached response
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
-                streaming_output: is_streaming_aggs,
+                streaming_aggs: is_streaming_aggs,
+                time_offset: TimeOffset {
+                    start_time: start_time,
+                    end_time: end_time,
+                },
             };
 
             sender.send(Ok(response)).await.unwrap();
@@ -679,15 +686,20 @@ fn handle_partial_response(mut res: Response) -> Response {
     res
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub enum StreamResponses {
     SearchResponse {
         results: Response,
-        streaming_output: bool,
+        streaming_aggs: bool,
+        time_offset: TimeOffset,
     },
     Error {
         code: u16,
         message: String,
     },
+    Progress {
+        percent: usize,
+    }
 }
 
 #[tracing::instrument(
@@ -703,6 +715,7 @@ pub async fn handle_cache_responses_and_deltas(
     stream_type: StreamType,
     mut cached_resp: Vec<CachedQueryResponse>,
     mut deltas: Vec<QueryDelta>,
+    accumulated_results: &mut Vec<SearchResultType>,
     user_id: &str,
     max_query_range: i64,
     remaining_query_range: i64,
@@ -788,6 +801,7 @@ pub async fn handle_cache_responses_and_deltas(
                     stream_type,
                     delta,
                     req_size,
+                    accumulated_results,
                     &mut curr_res_size,
                     user_id,
                     &mut remaining_query_range,
@@ -806,6 +820,7 @@ pub async fn handle_cache_responses_and_deltas(
                     req_size,
                     cached,
                     &mut curr_res_size,
+                    accumulated_results,
                     // req.fallback_order_by_col.clone(),
                     cache_order_by,
                     start_timer,
@@ -827,6 +842,7 @@ pub async fn handle_cache_responses_and_deltas(
                 stream_type,
                 delta,
                 req_size,
+                accumulated_results,
                 &mut curr_res_size,
                 user_id,
                 &mut remaining_query_range,
@@ -845,6 +861,7 @@ pub async fn handle_cache_responses_and_deltas(
                 req_size,
                 cached,
                 &mut curr_res_size,
+                accumulated_results,
                 // req.fallback_order_by_col.clone(),
                 cache_order_by,
                 start_timer,
@@ -876,6 +893,7 @@ async fn process_delta(
     stream_type: StreamType,
     delta: &QueryDelta,
     req_size: i64,
+    accumulated_results: &mut Vec<SearchResultType>,
     curr_res_size: &mut i64,
     user_id: &str,
     remaining_query_range: &mut f64,
@@ -966,14 +984,14 @@ async fn process_delta(
             }
 
             // TODO: Fix(Accumulate the result)
-            // if is_streaming_aggs {
-            //     // Only accumulate the results of the last partition
-            //     if idx == partitions.len() - 1 {
-            //         accumulated_results.push(SearchResultType::Search(search_res.clone()));
-            //     }
-            // } else {
-            //     accumulated_results.push(SearchResultType::Search(search_res.clone()));
-            // }
+            if is_streaming_aggs {
+                // Only accumulate the results of the last partition
+                if idx == partitions.len() - 1 {
+                    accumulated_results.push(SearchResultType::Search(search_res.clone()));
+                }
+            } else {
+                accumulated_results.push(SearchResultType::Search(search_res.clone()));
+            }
 
             // `result_cache_ratio` will be 0 for delta search
             let result_cache_ratio = search_res.result_cache_ratio;
@@ -992,7 +1010,11 @@ async fn process_delta(
 
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
-                streaming_output: is_streaming_aggs,
+                streaming_aggs: is_streaming_aggs,
+                time_offset: TimeOffset {
+                    start_time: start_time,
+                    end_time: end_time,
+                },
             };
             log::info!(
                 "[HTTP2_STREAM]: Processing deltas for trace_id: {}, hits: {:?}",
@@ -1098,7 +1120,11 @@ async fn send_partial_search_resp(
 
     let response = StreamResponses::SearchResponse {
         results: s_resp,
-        streaming_output: is_streaming_aggs,
+        streaming_aggs: is_streaming_aggs,
+        time_offset: TimeOffset {
+            start_time: new_start_time,
+            end_time: new_end_time,
+        },
     };
     log::info!(
         "[HTTP2_STREAM]: trace_id: {} Sending partial search response",
@@ -1117,6 +1143,7 @@ async fn send_cached_responses(
     req_size: i64,
     cached: &CachedQueryResponse,
     curr_res_size: &mut i64,
+    accumulated_results: &mut Vec<SearchResultType>,
     // fallback_order_by_col: Option<String>,
     cache_order_by: &OrderBy,
     start_timer: &mut Instant,
@@ -1147,7 +1174,7 @@ async fn send_cached_responses(
     // cached.cached_response = order_search_results(cached.cached_response, fallback_order_by_col);
 
     // TODO: Accumulate the result
-    // accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
+    accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
 
     // `result_cache_ratio` for cached response is 100
     cached.cached_response.result_cache_ratio = 100;
@@ -1169,30 +1196,27 @@ async fn send_cached_responses(
     );
     let response = StreamResponses::SearchResponse { 
         results: cached.cached_response,
-        streaming_output: false,
+        streaming_aggs: false,
+        time_offset: TimeOffset {
+            start_time: cached.response_start_time,
+            end_time: cached.response_end_time,
+        },
     };
     sender.send(Ok(response)).await.unwrap();
 
     // TODO: Send progress update
-    // {
-    //     let percent = calculate_progress_percentage(
-    //         cached.response_start_time,
-    //         cached.response_end_time,
-    //         req.payload.query.start_time,
-    //         req.payload.query.end_time,
-    //         cache_order_by,
-    //     );
-    //     send_message(
-    //         req_id,
-    //         WsServerEvents::EventProgress {
-    //             trace_id: trace_id.to_string(),
-    //             percent,
-    //             event_type: req.event_type().to_string(),
-    //         }
-    //         .to_json(),
-    //     )
-    //     .await?;
-    // }
+    {
+        let percent = calculate_progress_percentage(
+            cached.response_start_time,
+            cached.response_end_time,
+            req.query.start_time,
+            req.query.end_time,
+            cache_order_by,
+        );
+        sender.send(Ok(StreamResponses::Progress {
+            percent,
+        })).await.unwrap();
+    }
 
     Ok(())
 }
