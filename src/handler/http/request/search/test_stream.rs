@@ -63,7 +63,7 @@ use crate::{
         },
     },
     service::{
-        search::{self as SearchService, cache, sql::Sql},
+        search::{self as SearchService, cache, sql::Sql, datafusion::distributed_plan::streaming_aggs_exec},
         self_reporting::http_report_metrics,
         websocket_events::{
             sort::order_search_results,
@@ -362,7 +362,7 @@ pub async fn test_http2_stream(
                 }
             }
             // Step 3: Write to results cache
-            // TODO:cache only if from is 0 and is not an aggregate_query
+            // cache only if from is 0 and is not an aggregate_query
             if req.query.from == 0 {
                 if let Err(e) = write_results_to_cache(c_resp, start_time, end_time, &mut accumulated_results)
                     .instrument(search_span.clone())
@@ -555,7 +555,6 @@ pub async fn do_partitioned_search(
                 search_res.new_end_time = Some(modified_end_time);
             }
 
-            // TODO: accumulate the result for caching
             // Accumulate the result
             if is_streaming_aggs {
                 // Only accumulate the results of the last partition
@@ -566,7 +565,7 @@ pub async fn do_partitioned_search(
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
             }
 
-            // TODO: add top k values for values search
+            // add top k values for values search
             // if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
             //     let SEARCH_STREAM_span = tracing::info_span!(
             //         "src::handler::http::request::search::test_stream::do_partitioned_search::get_top_k_values",
@@ -589,8 +588,8 @@ pub async fn do_partitioned_search(
                 results: search_res.clone(),
                 streaming_aggs: is_streaming_aggs,
                 time_offset: TimeOffset {
-                    start_time: start_time,
-                    end_time: end_time,
+                    start_time,
+                    end_time,
                 },
             };
 
@@ -607,10 +606,10 @@ pub async fn do_partitioned_search(
         }
     }
 
-    // TODO: Add (Remove the streaming_aggs cache)
-    // if is_streaming_aggs && partition_resp.streaming_id.is_some() {
-    //     streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
-    // }
+    // Remove the streaming_aggs cache
+    if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+        streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
+    }
     Ok(())
 }
 
@@ -983,7 +982,7 @@ async fn process_delta(
                 }
             }
 
-            // TODO: Fix(Accumulate the result)
+            // Accumulate the result
             if is_streaming_aggs {
                 // Only accumulate the results of the last partition
                 if idx == partitions.len() - 1 {
@@ -1055,26 +1054,19 @@ async fn process_delta(
             break;
         }
 
-        // TODO: Send progress update
-        // {
-        //     let percent = calculate_progress_percentage(
-        //         start_time,
-        //         end_time,
-        //         original_req_start_time,
-        //         original_req_end_time,
-        //         cache_order_by,
-        //     );
-        //     send_message(
-        //         req_id,
-        //         WsServerEvents::EventProgress {
-        //             trace_id: trace_id.to_string(),
-        //             percent,
-        //             event_type: req.event_type().to_string(),
-        //         }
-        //         .to_json(),
-        //     )
-        //     .await?;
-        // }
+        // Send progress update
+        {
+            let percent = calculate_progress_percentage(
+                start_time,
+                end_time,
+                original_req_start_time,
+                original_req_end_time,
+                cache_order_by,
+            );
+            sender.send(Ok(StreamResponses::Progress {
+                percent,
+            })).await.unwrap();
+        }
 
         // Stop if reached the request result size
         if req_size != -1 && *curr_res_size >= req_size {
@@ -1086,10 +1078,10 @@ async fn process_delta(
         }
     }
 
-    // TODO: Remove the streaming_aggs cache
-    // if is_streaming_aggs && partition_resp.streaming_id.is_some() {
-    //     streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
-    // }
+    // Remove the streaming_aggs cache
+    if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+        streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
+    }
 
     Ok(())
 }
@@ -1173,7 +1165,6 @@ async fn send_cached_responses(
     // TODO: order the cached response
     // cached.cached_response = order_search_results(cached.cached_response, fallback_order_by_col);
 
-    // TODO: Accumulate the result
     accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
 
     // `result_cache_ratio` for cached response is 100
@@ -1204,7 +1195,6 @@ async fn send_cached_responses(
     };
     sender.send(Ok(response)).await.unwrap();
 
-    // TODO: Send progress update
     {
         let percent = calculate_progress_percentage(
             cached.response_start_time,
