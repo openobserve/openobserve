@@ -193,7 +193,6 @@ const useHttpStreaming = () => {
         headers: {
           'Content-Type': 'application/json',
           'traceparent': '',
-          'Access-Control-Allow-Credentials': 'true',
         },
         body: JSON.stringify(queryReq),
         signal: abortController.signal,
