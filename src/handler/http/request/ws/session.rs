@@ -171,7 +171,7 @@ pub async fn handle_text_message(
                                         Default::default(),
                                     );
                                     let _ =
-                                        send_message_2(&req_id, err_res, response_tx.clone()).await;
+                                        send_message_2(req_id, err_res, response_tx.clone()).await;
                                     return;
                                 }
                             };
@@ -211,7 +211,7 @@ pub async fn handle_text_message(
                                         Default::default(),
                                     );
                                     let _ =
-                                        send_message_2(&req_id, err_res, response_tx.clone()).await;
+                                        send_message_2(req_id, err_res, response_tx.clone()).await;
                                     return;
                                 }
                             };
@@ -243,7 +243,7 @@ pub async fn handle_text_message(
                     log::info!("[WS_HANDLER]: trace_id: {}, Cancelling search", trace_id,);
 
                     let res = handle_cancel(&trace_id, &org_id).await;
-                    let _ = send_message_2(&req_id, res, response_tx.clone()).await;
+                    let _ = send_message_2(req_id, res, response_tx.clone()).await;
 
                     // Only used for audit
                     #[cfg(feature = "enterprise")]
