@@ -149,7 +149,7 @@ impl WsHandler {
         // Spawn message handling tasks between client and router
         let response_tx_clone = response_tx.clone();
         let disconnect_tx_clone = disconnect_tx.clone();
-        actix_web::rt::spawn(async move {
+        tokio::task::spawn_local(async move {
             let mut count = 1;
             // Handle incoming messages from client
             let handle_incoming = async {
