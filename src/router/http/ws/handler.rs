@@ -663,10 +663,18 @@ pub async fn get_querier_connection(
     role_group: Option<RoleGroup>,
 ) -> WsResult<Arc<QuerierConnection>> {
     let interval = tokio::time::Duration::from_secs(1);
+    let mut interval = tokio::time::interval(interval);
+    interval.tick().await;
     let mut consistent_hash_trace_id = trace_id.clone();
     // Retry max of 3 times to get a valid querier connection
     for try_num in 0..3 {
         // Get or assign querier for this trace_id included in message
+        log::debug!(
+            "[WS::Router::Handler] get_querier_for_trace_id client_id: {}, trace_id: {}, try number: {}",
+            client_id,
+            trace_id,
+            try_num
+        );
         let querier_name = match session_manager
             .get_querier_for_trace(client_id, trace_id)
             .await?
@@ -681,13 +689,25 @@ pub async fn get_querier_connection(
                 session_manager
                     .set_querier_for_trace(client_id, trace_id, &querier_name)
                     .await?;
+                log::debug!(
+                    "[WS::Router::Handler] selecting new querier for client_id: {}, trace_id: {}, querier_name: {}",
+                    client_id,
+                    trace_id,
+                    querier_name
+                );
                 querier_name
             }
         };
 
         // Get connection for selected querier
+        log::debug!(
+            "[WS::Router::Handler] getting or creating querier connection for client_id: {}, trace_id: {}, querier_name: {}",
+            client_id,
+            trace_id,
+            querier_name
+        );
         match connection_pool
-            .get_or_create_connection(&querier_name)
+            .get_or_create_connection(&querier_name, trace_id)
             .await
         {
             Ok(conn) => {
@@ -713,7 +733,7 @@ pub async fn get_querier_connection(
                     .await;
             }
         }
-        tokio::time::sleep(interval).await;
+        interval.tick().await;
     }
 
     Err(WsError::QuerierWsConnNotAvailable(

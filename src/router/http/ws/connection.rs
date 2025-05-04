@@ -53,7 +53,7 @@ type WsStreamType = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 #[async_trait]
 pub trait Connection: Send + Sync {
-    async fn connect(node_name: &str, http_url: &str) -> WsResult<Arc<Self>>;
+    async fn connect(node_name: &str, http_url: &str, trace_id: &TraceId) -> WsResult<Arc<Self>>;
     async fn disconnect(&self);
     async fn send_message(&self, message: WsClientEvents) -> WsResult<()>;
 }
@@ -127,13 +127,26 @@ impl ResponseRouter {
     }
 }
 
-pub async fn create_connection(querier_name: &QuerierName) -> WsResult<Arc<QuerierConnection>> {
+pub async fn create_connection(
+    querier_name: &QuerierName,
+    trace_id: &TraceId,
+) -> WsResult<Arc<QuerierConnection>> {
     // Get querier info from cluster
+    log::debug!(
+        "[WS::Router::Connection] get cached node by name {}, trace_id: {}",
+        querier_name,
+        trace_id
+    );
     let node = cluster::get_cached_node_by_name(querier_name)
         .await
         .ok_or_else(|| WsError::QuerierWsConnNotAvailable(querier_name.to_string()))?;
+    log::debug!(
+        "[WS::Router::Connection] got node from cached node for querier_name: {}, trace_id: {}",
+        querier_name,
+        trace_id
+    );
 
-    let conn = QuerierConnection::connect(&node.name, &node.http_addr).await?;
+    let conn = QuerierConnection::connect(&node.name, &node.http_addr, trace_id).await?;
     Ok(conn)
 }
 
@@ -528,7 +541,7 @@ impl ResponseRouter {
 
 #[async_trait]
 impl Connection for QuerierConnection {
-    async fn connect(node_name: &str, http_url: &str) -> WsResult<Arc<Self>> {
+    async fn connect(node_name: &str, http_url: &str, trace_id: &TraceId) -> WsResult<Arc<Self>> {
         let cfg = get_config();
         let (ws_req, id) = get_default_querier_request(http_url)?;
         let websocket_config = WebSocketConfig {
@@ -537,13 +550,22 @@ impl Connection for QuerierConnection {
             ..Default::default()
         };
 
+        log::info!(
+            "[WS::QuerierConnection] connecting to querier {} router conn id {} for trace_id {}",
+            node_name,
+            &id,
+            trace_id
+        );
+
         // Router -> Querier
         let (ws_stream, _) = connect_async_with_config(ws_req, Some(websocket_config), false)
             .await
             .map_err(|e| {
                 log::error!(
-                    "[WS::QuerierConnection] error connecting to querier {}: {}",
+                    "[WS::QuerierConnection] error connecting to querier {}, router conn id {}, trace_id {}, error: {}",
                     http_url,
+                    &id,
+                    trace_id,
                     e
                 );
                 WsError::ConnectionError(e.to_string())

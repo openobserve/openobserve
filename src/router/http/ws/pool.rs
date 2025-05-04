@@ -21,7 +21,7 @@ use super::{
     connection::{Connection, QuerierConnection},
     error::*,
     get_ws_handler,
-    handler::QuerierName,
+    handler::{QuerierName, TraceId},
 };
 
 #[derive(Debug)]
@@ -39,11 +39,14 @@ impl QuerierConnectionPool {
     pub async fn get_or_create_connection(
         &self,
         querier_name: &QuerierName,
+        trace_id: &TraceId,
     ) -> WsResult<Arc<QuerierConnection>> {
         let r = self.connections.read().await;
         if let Some(conn) = r.get(querier_name) {
             log::info!(
-                "[WS::ConnectionPool] returning existing connection to querier {querier_name}"
+                "[WS::ConnectionPool] returning existing connection to querier {} for trace_id {}",
+                querier_name,
+                trace_id
             );
             let conn = conn.clone();
             drop(r);
@@ -52,13 +55,42 @@ impl QuerierConnectionPool {
         drop(r);
 
         // Create new connection
-        let conn = super::connection::create_connection(querier_name).await?;
+        let start = std::time::Instant::now();
+        log::debug!(
+            "[WS::ConnectionPool] attempting to create new connection to querier {} for trace_id {}, took: {} secs",
+            querier_name,
+            trace_id,
+            start.elapsed().as_secs_f64()
+        );
+        let conn = super::connection::create_connection(querier_name, trace_id).await?;
+        log::debug!(
+            "[WS::ConnectionPool] created new connection to querier {} for trace_id {}, took: {} secs",
+            querier_name,
+            trace_id,
+            start.elapsed().as_secs_f64()
+        );
 
+        log::debug!(
+            "[WS::ConnectionPool] creating new connection to querier attemps to get write lock for {} for trace_id {}, took: {} secs",
+            querier_name,
+            trace_id,
+            start.elapsed().as_secs_f64()
+        );
         let mut w = self.connections.write().await;
+        log::debug!(
+            "[WS::ConnectionPool] write lock acquired to insert to connection pool {} for trace_id {}, took: {} secs",
+            querier_name,
+            trace_id,
+            start.elapsed().as_secs_f64()
+        );
         w.insert(querier_name.to_string(), conn.clone());
         drop(w);
 
-        log::info!("[WS::ConnectionPool] created new connection to querier {querier_name}");
+        log::info!(
+            "[WS::ConnectionPool] created new connection to querier {} for trace_id {}",
+            querier_name,
+            trace_id
+        );
         Ok(conn)
     }
 
