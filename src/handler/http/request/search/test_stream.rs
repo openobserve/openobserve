@@ -1,3 +1,8 @@
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(unused_assignments)]
+#![allow(unused_doc_comments)]
+
 // Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
@@ -210,7 +215,7 @@ pub async fn test_http2_stream(
             req.query.sql = updated_query;
         } else {
             log::error!(
-                "[SEARCH_STREAM] trace_id: {}; Failed to update query with histogram interval: {}",
+                "[HTTP2_STREAM] trace_id: {}; Failed to update query with histogram interval: {}",
                 trace_id,
                 interval
             );
@@ -220,7 +225,7 @@ pub async fn test_http2_stream(
             ));
         }
         log::info!(
-            "[SEARCH_STREAM] trace_id: {}; Updated query {}; with histogram interval: {}",
+            "[HTTP2_STREAM] trace_id: {}; Updated query {}; with histogram interval: {}",
             trace_id,
             req.query.sql,
             interval
@@ -369,7 +374,7 @@ pub async fn test_http2_stream(
     // Return streaming response
     let stream = rx.map(|result| match result {
         Ok(v) => {
-            let bytes_with_newline = match v {
+            let mut bytes_with_newline = match v {
                 StreamResponses::SearchResponse { results, streaming_output } => {
                     let res = serde_json::json!({
                         "data": results,
@@ -389,15 +394,14 @@ pub async fn test_http2_stream(
                 }
             };
 
-            Ok::<BytesImpl, Error>(BytesImpl::from(bytes_with_newline))
+            // Add a newline to the end of the bytes
+            bytes_with_newline.push(b'\n');
+
+            Ok(BytesImpl::from(bytes_with_newline))
         },
         Err(e) => {
             log::error!("[HTTP2_STREAM] Error in stream: {}", e);
-            let res = serde_json::json!({
-                "code": 500,
-                "message": e.to_string()
-            });
-            Ok::<BytesImpl, Error>(BytesImpl::from(json::to_vec(&res).unwrap()))
+            Err(e)
         }
     });
 
