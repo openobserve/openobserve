@@ -25,8 +25,9 @@ use config::{
         bitvec::BitVec,
         inverted_index::{InvertedIndexOptimizeMode, InvertedIndexTantivyMode},
         search::{ScanStats, StorageType},
-        stream::FileKey,
+        stream::{FileKey, StreamType},
     },
+    metrics::QUERY_PARQUET_CACHE_RATIO_NODE,
     utils::{
         file::is_exists,
         inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
@@ -269,17 +270,21 @@ pub async fn search(
 
     scan_stats.idx_took = idx_took as i64;
     scan_stats.querier_files = scan_stats.files;
+    let parquet_cached_ratio = (((scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files)
+        * 100) as f64
+        / scan_stats.querier_files as f64) as usize;
+
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!("downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {:?} in background,", cache_type)
     };
-
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
+                "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, cache ratio: {},{download_msg} took: {} ms",
                 query.trace_id,
                 query.org_id,
                 query.stream_type,
@@ -287,6 +292,7 @@ pub async fn search(
                 scan_stats.querier_files,
                 scan_stats.querier_memory_cached_files,
                 scan_stats.querier_disk_cached_files,
+                parquet_cached_ratio,
                 cache_start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
@@ -305,6 +311,12 @@ pub async fn search(
                 .build()
         )
     );
+
+    if parquet_cached_ratio > 0 {
+        QUERY_PARQUET_CACHE_RATIO_NODE
+            .with_label_values(&[&query.org_id, &query.stream_type.to_string()])
+            .inc_by(parquet_cached_ratio as u64);
+    }
 
     // set target partitions based on cache type
     let target_partitions = if cache_type == file_data::CacheType::None {
@@ -511,16 +523,21 @@ pub async fn filter_file_list_by_tantivy_index(
     )
     .await?;
 
+    let parquet_cached_ratio = (((scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files)
+        * 100) as f64
+        / scan_stats.querier_files as f64) as usize;
+
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!("downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {:?} in background,", cache_type)
     };
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
+                "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, cache ratio: {},{download_msg} took: {} ms",
                 query.trace_id,
                 query.org_id,
                 query.stream_type,
@@ -528,6 +545,7 @@ pub async fn filter_file_list_by_tantivy_index(
                 scan_stats.querier_files,
                 scan_stats.querier_memory_cached_files,
                 scan_stats.querier_disk_cached_files,
+                parquet_cached_ratio,
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
@@ -544,6 +562,12 @@ pub async fn filter_file_list_by_tantivy_index(
                 .build()
         )
     );
+
+    if parquet_cached_ratio > 0 {
+        QUERY_PARQUET_CACHE_RATIO_NODE
+            .with_label_values(&[&query.org_id, &StreamType::Index.to_string()])
+            .inc_by(parquet_cached_ratio as u64);
+    }
 
     // set target partitions based on cache type
     let target_partitions = if cache_type == file_data::CacheType::None {

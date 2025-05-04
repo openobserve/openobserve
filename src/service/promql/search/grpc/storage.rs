@@ -22,6 +22,7 @@ use config::{
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
+    metrics::QUERY_PARQUET_CACHE_RATIO_NODE,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -161,18 +162,31 @@ pub(crate) async fn create_context(
         DataFusionError::Execution(e.to_string())
     })?;
 
+    scan_stats.querier_files = scan_stats.files;
+    let parquet_cached_ratio = (((scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files)
+        * 100) as f64
+        / scan_stats.querier_files as f64) as usize;
+
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!("downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {:?} in background,", cache_type)
     };
     log::info!(
-        "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
-        scan_stats.files,
+        "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, cache ratio: {},{download_msg} took: {} ms",
+        scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
+        parquet_cached_ratio,
         cache_start.elapsed().as_millis()
     );
+
+    if parquet_cached_ratio > 0 {
+        QUERY_PARQUET_CACHE_RATIO_NODE
+            .with_label_values(&[org_id, &stream_type.to_string()])
+            .inc_by(parquet_cached_ratio as u64);
+    }
 
     // set target partitions based on cache type
     let cfg = get_config();
