@@ -366,9 +366,6 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"num":file_list_num,"max_id": file_list_max_id}),
     );
 
-    let tmpfs_mem_size = cache::tmpfs::stats().unwrap();
-    stats.insert("TMPFS", json::json!({ "mem_size": tmpfs_mem_size }));
-
     let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
     stats.insert(
         "COMPACT",

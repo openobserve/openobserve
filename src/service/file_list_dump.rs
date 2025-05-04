@@ -73,6 +73,7 @@ async fn get_dump_files_in_range(
 
 fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(id_col, "id", Int64Array, rb);
+    get_col!(account_col, "account", StringArray, rb);
     get_col!(org_col, "org", StringArray, rb);
     get_col!(stream_col, "stream", StringArray, rb);
     get_col!(date_col, "date", StringArray, rb);
@@ -89,6 +90,7 @@ fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     for idx in 0..rb.num_rows() {
         let t = FileRecord {
             id: id_col.value(idx),
+            account: account_col.value(idx).to_string(),
             org: org_col.value(idx).to_string(),
             stream: stream_col.value(idx).to_string(),
             date: date_col.value(idx).to_string(),
@@ -227,6 +229,7 @@ pub async fn query(
     let dump_files: Vec<_> = dump_files
         .into_iter()
         .map(|f| FileKey {
+            account: f.account.to_string(),
             key: format!("files/{}/{}/{}", stream_key, f.date, f.file),
             meta: (&f).into(),
             deleted: false,
@@ -279,6 +282,7 @@ pub async fn get_ids_in_range(
     let dump_files: Vec<_> = dump_files
         .into_iter()
         .map(|f| FileKey {
+            account: f.account.to_string(),
             key: format!("files/{}/{}/{}", stream_key, f.date, f.file),
             meta: (&f).into(),
             deleted: false,
@@ -332,6 +336,7 @@ async fn move_and_delete(
         .iter()
         .chain(dump_files.iter())
         .map(|f| FileListDeleted {
+            account: f.account.to_string(),
             file: format!("files/{}/{}/{}", stream_key, f.date, f.file),
             index_file: false,
             flattened: false,
@@ -359,6 +364,7 @@ async fn move_and_delete(
             .iter()
             .chain(dump_files.iter())
             .map(|f| FileKey {
+                account: f.account.to_string(),
                 key: format!("files/{}/{}/{}", f.stream, f.date, f.file),
                 meta: f.into(),
                 deleted: true,
@@ -454,6 +460,7 @@ pub async fn stats(
     let dump_files: Vec<_> = dump_files
         .into_iter()
         .map(|f| FileKey {
+            account: f.account.to_string(),
             key: format!("files/{}/{}/{}", f.stream, f.date, f.file),
             meta: (&f).into(),
             deleted: false,

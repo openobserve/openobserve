@@ -63,12 +63,13 @@ impl super::FileList for MysqlFileList {
         create_table_index().await
     }
 
-    async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
-        self.inner_add("file_list", file, meta).await
+    async fn add(&self, account: &str, file: &str, meta: &FileMeta) -> Result<()> {
+        self.inner_add("file_list", account, file, meta).await
     }
 
-    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()> {
-        self.inner_add("file_list_history", file, meta).await
+    async fn add_history(&self, account: &str, file: &str, meta: &FileMeta) -> Result<()> {
+        self.inner_add("file_list_history", account, file, meta)
+            .await
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
@@ -116,8 +117,9 @@ impl super::FileList for MysqlFileList {
         DB_QUERY_NUMS
             .with_label_values(&["insert", "file_list", ""])
             .inc();
-        if let Err(e) =  sqlx::query(r#"INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"#)
+        if let Err(e) =  sqlx::query(r#"INSERT IGNORE INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"#)
+        .bind(&dump_file.account)
         .bind(org_id)
         .bind(stream_key)
         .bind(date_key)
@@ -186,12 +188,13 @@ impl super::FileList for MysqlFileList {
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (org, stream, date, file, index_file, flattened, created_at)",
+                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
                     parse_file_key_columns(&item.file).expect("parse file key failed");
-                b.push_bind(org_id)
+                b.push_bind(&item.account)
+                    .push_bind(org_id)
                     .push_bind(stream_key)
                     .push_bind(date_key)
                     .push_bind(file_name)
@@ -279,7 +282,7 @@ impl super::FileList for MysqlFileList {
         let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list WHERE stream = ? AND date = ? AND file = ?;
             "#,
         )
@@ -358,7 +361,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(())
     }
 
-    async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
+    async fn list(&self) -> Result<Vec<(String, String, FileMeta)>> {
         return Ok(vec![]); // disallow list all data
     }
 
@@ -370,7 +373,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         _time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
-    ) -> Result<Vec<(String, FileMeta)>> {
+    ) -> Result<Vec<(String, String, FileMeta)>> {
         if let Some((start, end)) = time_range {
             if start == 0 && end == 0 {
                 return Ok(Vec::new());
@@ -387,7 +390,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = ? AND flattened = ? LIMIT 1000;
                 "#,
@@ -401,7 +404,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;
                 "#,
@@ -424,6 +427,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     None
                 } else {
                     Some((
+                        r.account.to_string(),
                         "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
                         r.into(),
                     ))
@@ -438,7 +442,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         stream_type: StreamType,
         stream_name: &str,
         date_range: Option<(String, String)>,
-    ) -> Result<Vec<(String, FileMeta)>> {
+    ) -> Result<Vec<(String, String, FileMeta)>> {
         if let Some((start, end)) = date_range.as_ref() {
             if start.is_empty() && end.is_empty() {
                 return Ok(Vec::new());
@@ -455,7 +459,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let (date_start, date_end) = date_range.unwrap_or(("".to_string(), "".to_string()));
         let ret = sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = ? AND date >= ? AND date <= ?;
                 "#,
@@ -476,6 +480,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     None
                 } else {
                     Some((
+                        r.account.to_string(),
                         "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
                         r.into(),
                     ))
@@ -484,7 +489,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, String, FileMeta)>> {
         if ids.is_empty() {
             return Ok(Vec::default());
         }
@@ -501,7 +506,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
             );
             DB_QUERY_NUMS
                 .with_label_values(&["query_by_ids", "file_list", ""])
@@ -522,6 +527,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .map(|r| {
                 (
                     r.id,
+                    r.account.to_string(),
                     "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
                     FileMeta::from(&r),
                 )
@@ -667,7 +673,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted", ""])
             .inc();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = ? AND created_at < ? LIMIT ?;"#,
+            r#"SELECT account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = ? AND created_at < ? LIMIT ?;"#,
         )
         .bind(org_id)
         .bind(time_max)
@@ -677,6 +683,7 @@ SELECT date
         Ok(ret
             .iter()
             .map(|r| FileListDeleted {
+                account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
                 flattened: r.flattened,
@@ -690,13 +697,14 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted", ""])
             .inc();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+            r#"SELECT account, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
         )
         .fetch_all(&pool)
         .await?;
         Ok(ret
             .iter()
             .map(|r| FileListDeleted {
+                account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
                 flattened: r.flattened,
@@ -1507,7 +1515,13 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
 }
 
 impl MysqlFileList {
-    async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<()> {
+    async fn inner_add(
+        &self,
+        table: &str,
+        account: &str,
+        file: &str,
+        meta: &FileMeta,
+    ) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
@@ -1517,10 +1531,11 @@ impl MysqlFileList {
             .inc();
         match  sqlx::query(
             format!(r#"
-INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             "#).as_str(),
         )
+        .bind(account)
         .bind(org_id)
         .bind(stream_key)
         .bind(date_key)
@@ -1558,13 +1573,14 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
             let chunks = add_items.chunks(100);
             for files in chunks {
                 let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
-                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str(),
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let (stream_key, date_key, file_name) =
                         parse_file_key_columns(&item.key).expect("parse file key failed");
                     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                    b.push_bind(org_id)
+                    b.push_bind(&item.account)
+                        .push_bind(org_id)
                         .push_bind(stream_key)
                         .push_bind(date_key)
                         .push_bind(file_name)
@@ -1675,6 +1691,7 @@ pub async fn create_table() -> Result<()> {
 CREATE TABLE IF NOT EXISTS file_list
 (
     id        BIGINT not null primary key AUTO_INCREMENT,
+    account   VARCHAR(32)  not null,
     org       VARCHAR(100) not null,
     stream    VARCHAR(256) not null,
     date      VARCHAR(16)  not null,
@@ -1698,6 +1715,7 @@ CREATE TABLE IF NOT EXISTS file_list
 CREATE TABLE IF NOT EXISTS file_list_history
 (
     id        BIGINT not null primary key AUTO_INCREMENT,
+    account   VARCHAR(32)  not null,
     org       VARCHAR(100) not null,
     stream    VARCHAR(256) not null,
     date      VARCHAR(16)  not null,
@@ -1721,6 +1739,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
     id         BIGINT not null primary key AUTO_INCREMENT,
+    account    VARCHAR(32)  not null,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
     date       VARCHAR(16)  not null,
@@ -1796,6 +1815,21 @@ CREATE TABLE IF NOT EXISTS stream_stats
 
     // create col dumped for file_list_jobs for version <=0.14.0
     add_column("file_list_jobs", "dumped", "BOOLEAN default false not null").await?;
+
+    // create col account for multiple object storage account support, version >= 0.14.6
+    add_column("file_list", "account", "VARCHAR(32) default '' not null").await?;
+    add_column(
+        "file_list_history",
+        "account",
+        "VARCHAR(32) default '' not null",
+    )
+    .await?;
+    add_column(
+        "file_list_deleted",
+        "account",
+        "VARCHAR(32) default '' not null",
+    )
+    .await?;
 
     Ok(())
 }

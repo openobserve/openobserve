@@ -428,18 +428,19 @@ async fn generate_dump(
         flattened: false,
     };
 
+    // first store the file in storage
+    // then update the entries in db,
+    // and if both pass only then set the job as dumped=true
+    let account = infra::storage::get_account(&file_key).unwrap_or_default();
+    infra::storage::put(&account, &file_key, buf.into()).await?;
+
     let dump_file = FileKey {
+        account: account.clone(),
         key: file_key.clone(),
         meta: meta.clone(),
         deleted: false,
         segment_ids: None,
     };
-
-    // first store the file in storage
-    // then update the entries in db,
-    // and if both pass only then set the job as dumped=true
-
-    infra::storage::put(&file_key, buf.into()).await?;
     infra::file_list::update_dump_records(&dump_file, &ids).await?;
     infra::file_list::set_job_dumped_status(job_id, true).await?;
     log::info!(
