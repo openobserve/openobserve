@@ -159,13 +159,13 @@ pub fn parse_storage_config(
                 DEFAULT_ACCOUNT.to_string(),
                 StorageConfig {
                     name: DEFAULT_ACCOUNT.to_string(),
-                    provider: providers[i].to_string(),
-                    server_url: server_urls[i].to_string(),
-                    region_name: region_names[i].to_string(),
-                    access_key: access_keys[i].to_string(),
-                    secret_key: secret_keys[i].to_string(),
-                    bucket_name: bucket_names[i].to_string(),
-                    bucket_prefix: bucket_prefixes[i].to_string(),
+                    provider: get_value_by_idx(&providers, i),
+                    server_url: get_value_by_idx(&server_urls, i),
+                    region_name: get_value_by_idx(&region_names, i),
+                    access_key: get_value_by_idx(&access_keys, i),
+                    secret_key: get_value_by_idx(&secret_keys, i),
+                    bucket_name: get_value_by_idx(&bucket_names, i),
+                    bucket_prefix: get_value_by_idx(&bucket_prefixes, i),
                 },
             );
         }
@@ -173,13 +173,13 @@ pub fn parse_storage_config(
             name.to_string(),
             StorageConfig {
                 name: name.to_string(),
-                provider: providers[i].to_string(),
-                server_url: server_urls[i].to_string(),
-                region_name: region_names[i].to_string(),
-                access_key: access_keys[i].to_string(),
-                secret_key: secret_keys[i].to_string(),
-                bucket_name: bucket_names[i].to_string(),
-                bucket_prefix: bucket_prefixes[i].to_string(),
+                provider: get_value_by_idx(&providers, i),
+                server_url: get_value_by_idx(&server_urls, i),
+                region_name: get_value_by_idx(&region_names, i),
+                access_key: get_value_by_idx(&access_keys, i),
+                secret_key: get_value_by_idx(&secret_keys, i),
+                bucket_name: get_value_by_idx(&bucket_names, i),
+                bucket_prefix: get_value_by_idx(&bucket_prefixes, i),
             },
         );
     }
@@ -199,6 +199,14 @@ impl std::fmt::Debug for StorageClientFactory {
 impl std::fmt::Display for StorageClientFactory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("storage for StorageClientFactory")
+    }
+}
+
+fn get_value_by_idx(values: &[&str], index: usize) -> String {
+    if values.is_empty() || index >= values.len() {
+        "".to_string()
+    } else {
+        values[index].to_string()
     }
 }
 
