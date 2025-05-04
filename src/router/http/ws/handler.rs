@@ -458,9 +458,15 @@ impl WsHandler {
                                         continue;
                                     };
                                     log::info!("[WS::Router::Handler] router received message to send to client from router-querier task for client_id: {}, trace_id: {}", client_id, message.get_trace_id());
-                                    if let Err(e) = ws_session.text(message_str).await {
-                                        log::error!("[WS::Router::Handler] Error sending message to client_id: {}, error: {}", client_id, e);
-                                        break;
+                                    let start = std::time::Instant::now();
+                                    match ws_session.text(message_str).await {
+                                        Ok(_) => {
+                                            log::info!("[WS::Router::Handler] successfully sent message to client_id: {}, took: {} secs", client_id, start.elapsed().as_secs_f64());
+                                        }
+                                        Err(e) => {
+                                            log::error!("[WS::Router::Handler] Error sending message to client_id: {}, error: {}, took: {} secs", client_id, e, start.elapsed().as_secs_f64());
+                                            break;
+                                        }
                                     }
                                     if let Some(trace_id) = message.should_clean_trace_id() {
                                         log::info!("[WS::Router::Handler] Unregistering trace_id: {}, message: {:?}", trace_id, message);
@@ -557,9 +563,15 @@ impl WsHandler {
                                                 if let Some(message) = response_rx.recv().await {
                                                     // Forward all messages to client during drain
                                                     if let Ok(message_str) = serde_json::to_string(&message) {
-                                                        if let Err(e) = ws_session.text(message_str).await {
-                                                            log::error!("[WS::Router::Handler]: Error sending message during drain: {}", e);
-                                                            break;
+                                                        let start = std::time::Instant::now();
+                                                        match ws_session.text(message_str).await {
+                                                            Ok(_) => {
+                                                                log::info!("[WS::Router::Handler] successfully sent message to client_id: {}, took: {} secs", client_id, start.elapsed().as_secs_f64());
+                                                            }
+                                                            Err(e) => {
+                                                                log::error!("[WS::Router::Handler]: Error sending message during drain: {}, took: {} secs", e, start.elapsed().as_secs_f64());
+                                                                break;
+                                                            }
                                                         }
 
                                                         // Important: Process End messages and clean up trace_ids

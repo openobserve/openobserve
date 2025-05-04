@@ -590,12 +590,17 @@ impl Connection for QuerierConnection {
     }
 
     async fn send_message(&self, message: WsClientEvents) -> WsResult<()> {
+        let start = std::time::Instant::now();
         log::info!(
             "[WS::QuerierConnection] send_message -> attempt to send to querier for trace_id: {}, req_id: {}",
             message.get_trace_id(),
             self.id
         );
         let mut write_guard = self.write.write().await;
+        log::debug!(
+            "[WS::QuerierConnection] time took to get write lock for sending message to querier: {} secs",
+            start.elapsed().as_secs_f64()
+        );
         if let Some(write) = write_guard.as_mut() {
             let trace_id = message.get_trace_id();
             // Convert `WsClientEvents` to `tungstenite::protocol::Message`
@@ -603,19 +608,21 @@ impl Connection for QuerierConnection {
             match write.send(message).await {
                 Ok(_) => {
                     log::info!(
-                        "[WS::QuerierConnection] request w/ trace_id {} successfully forwarded to querier conn id: {}",
+                        "[WS::QuerierConnection] request w/ trace_id {} successfully forwarded to querier conn id: {}, took: {} secs",
                         trace_id,
                         self.id,
+                        start.elapsed().as_secs_f64()
                     );
                     drop(write_guard);
                     Ok(())
                 }
                 Err(e) => {
                     log::error!(
-                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier conn id: {}, error: {}",
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier conn id: {}, error: {}, took: {} secs",
                         trace_id,
                         self.id,
-                        e
+                        e,
+                        start.elapsed().as_secs_f64()
                     );
                     drop(write_guard);
                     self.clean_up(true, Some(e.to_string())).await;

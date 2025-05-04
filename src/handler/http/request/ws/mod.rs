@@ -242,9 +242,15 @@ pub async fn websocket(
                                     continue;
                                 };
                                 log::info!("[WS::Querier::Handler] querier received message to send to router/client from response_rx for request_id: {}, trace_id: {}", req_id, message.get_trace_id());
-                                if let Err(e) = ws_session.text(message_str).await {
-                                    log::error!("[WS::Querier::Handler] Error sending message to request_id: {}, trace_id: {}, error: {}", req_id, message.get_trace_id(), e);
-                                    break;
+                                let start = std::time::Instant::now();
+                                match ws_session.text(message_str).await {
+                                    Ok(_) => {
+                                        log::info!("[WS::Querier::Handler] successfully sent message to request_id: {}, trace_id: {}, took: {} secs", req_id, message.get_trace_id(), start.elapsed().as_secs_f64());
+                                    }
+                                    Err(e) => {
+                                        log::error!("[WS::Querier::Handler] Error sending message to request_id: {}, trace_id: {}, error: {}, took: {} secs", req_id, message.get_trace_id(), e, start.elapsed().as_secs_f64());
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -261,8 +267,15 @@ pub async fn websocket(
                             }
                             Some(DisconnectMessage::Error(err_msg)) => {
                                 // send error message to client first
-                                if let Err(e) = ws_session.text(err_msg.ws_server_events.to_json()).await {
-                                    log::error!("[WS::Querier::Handler]: Failed to send error message to client: {}", e);
+                                let start = std::time::Instant::now();
+                                let trace_id = err_msg.ws_server_events.get_trace_id();
+                                match ws_session.text(err_msg.ws_server_events.to_json()).await {
+                                    Ok(_) => {
+                                        log::info!("[WS::Querier::Handler] successfully sent error message to request_id: {}, trace_id: {}, took: {} secs", req_id, trace_id, start.elapsed().as_secs_f64());
+                                    }
+                                    Err(e) => {
+                                        log::error!("[WS::Querier::Handler]: Failed to send error message to client: {}, took: {} secs", e, start.elapsed().as_secs_f64());
+                                    }
                                 }
                                 if err_msg.should_disconnect {
                                     log::debug!("[WS::Querier::Handler]: disconnecting client for request_id: {}", req_id);
