@@ -366,7 +366,7 @@ impl WsHandler {
                                         }
 
                                         log::info!(
-                                            "[WS::Router::Handler] processed message to querier: {}, for client_id: {}, trace_id: {}",
+                                            "[WS::Router::Handler] single ws event forwarded to querier: {}, for client_id: {}, trace_id: {}",
                                             querier_conn.get_name(),
                                             client_id,
                                             trace_id
@@ -457,7 +457,7 @@ impl WsHandler {
                                         );
                                         continue;
                                     };
-                                    log::info!("[WS::Router::Handler] received message from router-querier task for client_id: {}, trace_id: {}", client_id, message.get_trace_id());
+                                    log::info!("[WS::Router::Handler] router received message to send to client from router-querier task for client_id: {}, trace_id: {}", client_id, message.get_trace_id());
                                     if let Err(e) = ws_session.text(message_str).await {
                                         log::error!("[WS::Router::Handler] Error sending message to client_id: {}, error: {}", client_id, e);
                                         break;

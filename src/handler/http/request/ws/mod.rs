@@ -241,7 +241,7 @@ pub async fn websocket(
                                     );
                                     continue;
                                 };
-                                log::info!("[WS::Querier::Handler] received message from router-querier task for request_id: {}, trace_id: {}", req_id, message.get_trace_id());
+                                log::info!("[WS::Querier::Handler] querier received message to send to router/client from response_rx for request_id: {}, trace_id: {}", req_id, message.get_trace_id());
                                 if let Err(e) = ws_session.text(message_str).await {
                                     log::error!("[WS::Querier::Handler] Error sending message to request_id: {}, trace_id: {}, error: {}", req_id, message.get_trace_id(), e);
                                     break;
