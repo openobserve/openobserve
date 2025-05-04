@@ -49,7 +49,7 @@ use tracing::{Instrument, Span};
 
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse},
+        meta::{self, search::{MultiCachedQueryResponse, QueryDelta, CachedQueryResponse}, http::HttpResponse as MetaHttpResponse},
         utils::{
             functions,
             http::{
@@ -58,7 +58,7 @@ use crate::{
                 get_use_cache_from_request, get_work_group,
             },
             stream::get_max_query_range,
-            websocket::update_histogram_interval_in_query,
+            websocket::{update_histogram_interval_in_query, calc_queried_range},
         },
     },
     service::{
@@ -91,7 +91,7 @@ use crate::{
         "end_time": 1675185660872049i64
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/x-ndjson"),
+        (status = 200, description = "Success", content_type = "text/event-stream"),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
@@ -174,21 +174,14 @@ pub async fn test_http2_stream(
     };
 
     // Check permissions for each stream
-    // #[cfg(feature = "enterprise")]
-    // for stream_name in stream_names.iter() {
-    //     if let Err(e) =
-    //         o2_enterprise::enterprise::check::check_permissions(stream_name, stream_type,
-    // user_id, org_id).await     {
-    //         let err_res = WsServerEvents::error_response(
-    //             &Error::Message(e),
-    //             Some(req.trace_id.clone()),
-    //             Some(trace_id),
-    //             Default::default(),
-    //         );
-    //         send_message(req.trace_id.clone(), err_res.to_json()).await?;
-    //         return Ok(());
-    //     }
-    // }
+    #[cfg(feature = "enterprise")]
+    for stream_name in stream_names.iter() {
+        if let Err(e) =
+            o2_enterprise::enterprise::check::check_permissions(stream_name, stream_type,
+    user_id, org_id).await     {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    }
     // Clone required values for the async task
     let trace_id_clone = trace_id.clone();
     let org_id_clone = org_id.clone();
@@ -256,125 +249,160 @@ pub async fn test_http2_stream(
             org_id
         );
 
-        // if req.query.from == 0 {
-        //     let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req,
-        // use_cache)         .instrument(search_span.clone())
-        //         .await {
-        //             Ok(v) => v,
-        //             Err(e) => {
-        //                 log::error!("[SEARCH_STREAM] trace_id: {}; Failed to check cache: {}",
-        //                     trace_id,
-        //                     e.to_string()
-        //                 );
-        //                 // send error message to client
-        //                 send_message(&sender, "error", json!({
-        //                     "message": "Failed to check cache"
-        //                 })).await;
+        let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
-        //                 return;
-        //             }
-        //         };
-        //     let local_c_resp = c_resp.clone();
-        //     let cached_resp = local_c_resp.cached_response;
-        //     let mut deltas = local_c_resp.deltas;
-        //     deltas.sort();
-        //     deltas.dedup();
+        if req.query.from == 0 {
+            let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req,use_cache).instrument(search_span.clone()).await {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!("[SEARCH_STREAM] trace_id: {}; Failed to check cache: {}",
+                        trace_id,
+                        e.to_string()
+                    );
+                    // send error message to client
+                    sender.send(Err(e)).await.unwrap();
+                    return;
+                }
+            };
+            let local_c_resp = c_resp.clone();
+            let cached_resp = local_c_resp.cached_response;
+            let mut deltas = local_c_resp.deltas;
+            deltas.sort();
+            deltas.dedup();
 
-        //     let cached_hits = cached_resp
-        //         .iter()
-        //         .fold(0, |acc, c| acc + c.cached_response.hits.len());
+            let cached_hits = cached_resp
+                .iter()
+                .fold(0, |acc, c| acc + c.cached_response.hits.len());
 
-        //     let c_start_time = cached_resp
-        //         .first()
-        //         .map(|c| c.response_start_time)
-        //         .unwrap_or_default();
+            let c_start_time = cached_resp
+                .first()
+                .map(|c| c.response_start_time)
+                .unwrap_or_default();
 
-        //     let c_end_time = cached_resp
-        //         .last()
-        //         .map(|c| c.response_end_time)
-        //         .unwrap_or_default();
+            let c_end_time = cached_resp
+                .last()
+                .map(|c| c.response_end_time)
+                .unwrap_or_default();
 
-        //     log::info!(
-        //         "[SEARCH_STREAM] trace_id: {}, found cache responses len:{}, with hits: {},
-        // cache_start_time: {:#?}, cache_end_time: {:#?}",         trace_id,
-        //         cached_resp.len(),
-        //         cached_hits,
-        //         c_start_time,
-        //         c_end_time
-        //     );
+            log::info!(
+                "[SEARCH_STREAM] trace_id: {}, found cache responses len:{}, with hits: {},
+        cache_start_time: {:#?}, cache_end_time: {:#?}",         trace_id,
+                cached_resp.len(),
+                cached_hits,
+                c_start_time,
+                c_end_time
+            );
 
-        //     // handle cache responses and deltas
-        //     if !cached_resp.is_empty() && cached_hits > 0 {
-        //         // `max_query_range` is used initialize `remaining_query_range`
-        //         // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
-        //         // for cache only search
-        //         let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id,
-        // stream_type).await;         let remaining_query_range = if max_query_range == 0 {
-        //             i64::MAX
-        //         } else {
-        //             max_query_range
-        //         }; // hours
 
-        //         // Step 1(a): handle cache responses & query the deltas
-        //         handle_cache_responses_and_deltas(
-        //             &req,
-        //             trace_id.clone(),
-        //             req_size,
-        //             cached_resp,
-        //             deltas,
-        //             &user_id,
-        //             max_query_range,
-        //             remaining_query_range,
-        //             &req_order_by,
-        //             &mut start_timer,
-        //         )
-        //         .instrument(search_span.clone())
-        //         .await?;
-        //     } else {}
-        // } else {
+            // handle cache responses and deltas
+            if !cached_resp.is_empty() && cached_hits > 0 {
+                // `max_query_range` is used initialize `remaining_query_range`
+                // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
+                // for cache only search
+                let remaining_query_range = if max_query_range == 0 {
+                    i64::MAX
+                } else {
+                    max_query_range
+                }; // hours
 
-        // Step 4: Search without cache for req with from > 0
-        let max_query_range =
-            get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
+                let size = req.query.size;
+                // Step 1(a): handle cache responses & query the deltas
+                if let Err(e) = handle_cache_responses_and_deltas(
+                    &mut req,
+                    size,
+                    &trace_id,
+                    &org_id,
+                    stream_type,
+                    cached_resp,
+                    deltas,
+                    &user_id,
+                    max_query_range,
+                    remaining_query_range,
+                    &req_order_by,
+                    &mut start,
+                    sender.clone(),
+                )
+                .instrument(search_span.clone())
+                .await {
+                    sender.send(Err(e)).await.unwrap();
+                    return;
+                }
+            } else {
+                // Step 2: Search without cache
+                // no caches found process req directly
+                log::info!(
+                    "[WS_SEARCH] trace_id: {} No cache found, processing search request",
+                    trace_id
+                );
 
-        let size = req.query.size;
-        match do_partitioned_search(
-            &mut req,
-            &trace_id,
-            &org_id,
-            stream_type,
-            size,
-            &user_id,
-            max_query_range,
-            &mut start,
-            &req_order_by,
-            sender.clone(),
-        )
-        .instrument(search_span.clone())
-        .await
-        {
-            Ok(_) => (),
-            Err(e) => {
-                log::error!("[HTTP2_STREAM] Error in do_partitioned_search: {}", e);
+                let size = req.query.size;
+                if let Err(e) = do_partitioned_search(
+                    &mut req,
+                    &trace_id,
+                    &org_id,
+                    stream_type,
+                    size,
+                    &user_id,
+                    max_query_range,
+                    &mut start,
+                    &req_order_by,
+                    sender.clone(),
+                )
+                .instrument(search_span.clone())
+                .await {
+                    sender.send(Err(e)).await.unwrap();
+                    return;
+                }
+            }
+            // Step 3: Write to results cache
+            // TODO:cache only if from is 0 and is not an aggregate_query
+            // if req.query.from == 0 {
+            //     write_results_to_cache(c_resp, start_time, end_time, accumulated_results)
+            //         .instrument(search_span.clone())
+            //         .await
+            //         .map_err(|e| {
+            //             log::error!(
+            //                 "[WS_SEARCH] trace_id: {}, Error writing results to cache: {:?}",
+            //                 trace_id,
+            //                 e
+            //             );
+            //             e
+            //         })?;
+            // }
+        } else {
+            // Step 4: Search without cache for req with from > 0
+            let size = req.query.size;
+            if let Err(e) = do_partitioned_search(
+                &mut req,
+                &trace_id,
+                &org_id,
+                stream_type,
+                size,
+                &user_id,
+                max_query_range,
+                &mut start,
+                &req_order_by,
+                sender.clone(),
+            )
+            .instrument(search_span.clone())
+            .await
+            {
                 sender.send(Err(e)).await.unwrap();
                 return;
             }
-        };
-        // }
+        }
 
         // Once all searches are complete, write the accumulated results to a file
         log::info!(
             "[HTTP2_STREAM] trace_id {} all searches completed",
             trace_id
         );
-        let end_res = StreamResponses::End;
-        sender.send(Ok(end_res)).await.unwrap();
     });
 
     // Return streaming response
     let stream = rx.map(|result| match result {
         Ok(v) => {
-            let mut bytes_with_newline = match v {
+            let mut responses = match v {
                 StreamResponses::SearchResponse { results, streaming_output } => {
                     let res = serde_json::json!({
                         "data": results,
@@ -389,15 +417,11 @@ pub async fn test_http2_stream(
                     });
                     json::to_vec(&res).unwrap()
                 }
-                StreamResponses::End => {
-                    json::to_vec(&"end".to_string()).unwrap()
-                }
             };
-
             // Add a newline to the end of the bytes
-            bytes_with_newline.push(b'\n');
+            responses.push(b'\n');
 
-            Ok(BytesImpl::from(bytes_with_newline))
+            Ok(BytesImpl::from(responses))
         },
         Err(e) => {
             log::error!("[HTTP2_STREAM] Error in stream: {}", e);
@@ -488,12 +512,6 @@ pub async fn do_partitioned_search(
     );
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
-        if idx == 4 {
-            sender.send(Err(infra::errors::Error::Message(
-                "test".to_string(),
-            ))).await.unwrap();
-            return Ok(());
-        }
         let mut req = req.clone();
         req.query.start_time = start_time;
         req.query.end_time = end_time;
@@ -548,7 +566,7 @@ pub async fn do_partitioned_search(
             // TODO: add top k values for values search
             // if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
             //     let SEARCH_STREAM_span = tracing::info_span!(
-            //         "src::service::websocket_events::search::do_partitioned_search::get_top_k_values",
+            //         "src::handler::http::request::search::test_stream::do_partitioned_search::get_top_k_values",
             //         org_id = %req.org_id,
             //     );
             //     let instant = Instant::now();
@@ -670,5 +688,511 @@ pub enum StreamResponses {
         code: u16,
         message: String,
     },
-    End,
+}
+
+#[tracing::instrument(
+    name = "service:search:websocket::handle_cache_responses_and_deltas",
+    skip_all
+)]
+#[allow(clippy::too_many_arguments)]
+pub async fn handle_cache_responses_and_deltas(
+    req: &mut config::meta::search::Request,
+    req_size: i64,
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    mut cached_resp: Vec<CachedQueryResponse>,
+    mut deltas: Vec<QueryDelta>,
+    user_id: &str,
+    max_query_range: i64,
+    remaining_query_range: i64,
+    req_order_by: &OrderBy,
+    start_timer: &mut Instant,
+    sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+) -> Result<(), infra::errors::Error> {
+    // Force set order_by to desc for dashboards & histogram
+    // so that deltas are processed in the reverse order
+    let cache_order_by =
+        if req.search_type.expect("search_type is required") == SearchEventType::Dashboards || req.query.size == -1 {
+            &OrderBy::Desc
+        } else {
+            req_order_by
+        };
+
+    // sort both deltas and cache by order_by
+    match cache_order_by {
+        OrderBy::Desc => {
+            deltas.sort_by(|a, b| b.delta_start_time.cmp(&a.delta_start_time));
+            cached_resp.sort_by(|a, b| b.response_start_time.cmp(&a.response_start_time));
+        }
+        OrderBy::Asc => {
+            deltas.sort_by(|a, b| a.delta_start_time.cmp(&b.delta_start_time));
+            cached_resp.sort_by(|a, b| a.response_start_time.cmp(&b.response_start_time));
+        }
+    }
+
+    // Initialize iterators for deltas and cached responses
+    let mut delta_iter = deltas.iter().peekable();
+    let mut cached_resp_iter = cached_resp.iter().peekable();
+    let mut curr_res_size = 0; // number of records
+
+    let mut remaining_query_range = remaining_query_range as f64; // hours
+    let cache_start_time = cached_resp
+        .first()
+        .map(|c| c.response_start_time)
+        .unwrap_or_default();
+    let cache_end_time = cached_resp
+        .last()
+        .map(|c| c.response_end_time)
+        .unwrap_or_default();
+    let cache_duration = cache_end_time - cache_start_time; // microseconds
+    let cached_search_duration = cache_duration + (max_query_range * 3600 * 1_000_000); // microseconds
+
+    log::info!(
+        "[WS_SEARCH] trace_id: {}, Handling cache response and deltas, curr_res_size: {}, cached_search_duration: {}, remaining_query_duration: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}",
+        trace_id,
+        curr_res_size,
+        cached_search_duration,
+        remaining_query_range,
+        deltas.len(),
+        cache_start_time,
+        cache_end_time,
+    );
+
+    // Process cached responses and deltas in sorted order
+    while cached_resp_iter.peek().is_some() || delta_iter.peek().is_some() {
+        if let (Some(&delta), Some(cached)) = (delta_iter.peek(), cached_resp_iter.peek()) {
+            // If the delta is before the current cached response time, fetch partitions
+            log::info!(
+                "[WS_SEARCH] checking delta: {:?} with cached start_time: {:?}, end_time:{}",
+                delta,
+                cached.response_start_time,
+                cached.response_end_time,
+            );
+            // Compare delta and cached response based on the order
+            let process_delta_first = match cache_order_by {
+                OrderBy::Asc => delta.delta_end_time <= cached.response_start_time,
+                OrderBy::Desc => delta.delta_start_time >= cached.response_end_time,
+            };
+
+            if process_delta_first {
+                log::info!(
+                    "[WS_SEARCH] trace_id: {} Processing delta before cached response, order_by: {:#?}",
+                    trace_id,
+                    cache_order_by
+                );
+                process_delta(
+                    req,
+                    trace_id,
+                    org_id,
+                    stream_type,
+                    delta,
+                    req_size,
+                    &mut curr_res_size,
+                    user_id,
+                    &mut remaining_query_range,
+                    cached_search_duration,
+                    start_timer,
+                    cache_order_by,
+                    sender.clone(),
+                )
+                .await?;
+                delta_iter.next(); // Move to the next delta after processing
+            } else {
+                // Send cached response
+                send_cached_responses(
+                    req,
+                    trace_id,
+                    req_size,
+                    cached,
+                    &mut curr_res_size,
+                    // req.fallback_order_by_col.clone(),
+                    cache_order_by,
+                    start_timer,
+                    sender.clone(),
+                )
+                .await?;
+                cached_resp_iter.next();
+            }
+        } else if let Some(&delta) = delta_iter.peek() {
+            // Process remaining deltas
+            log::info!(
+                "[WS_SEARCH] trace_id: {} Processing remaining delta",
+                trace_id
+            );
+            process_delta(
+                req,
+                trace_id,
+                org_id,
+                stream_type,
+                delta,
+                req_size,
+                &mut curr_res_size,
+                user_id,
+                &mut remaining_query_range,
+                cached_search_duration,
+                start_timer,
+                cache_order_by,
+                sender.clone(),
+            )
+            .await?;
+            delta_iter.next(); // Move to the next delta after processing
+        } else if let Some(cached) = cached_resp_iter.next() {
+            // Process remaining cached responses
+            send_cached_responses(
+                req,
+                trace_id,
+                req_size,
+                cached,
+                &mut curr_res_size,
+                // req.fallback_order_by_col.clone(),
+                cache_order_by,
+                start_timer,
+                sender.clone(),
+            )
+            .await?;
+        }
+
+        // Stop if reached the requested result size
+        if req_size != -1 && curr_res_size >= req_size {
+            log::info!(
+                "[WS_SEARCH] trace_id: {} Reached requested result size: {}, stopping search",
+                trace_id,
+                req_size
+            );
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+// Process a single delta (time range not covered by cache)
+#[allow(clippy::too_many_arguments)]
+async fn process_delta(
+    req: &mut config::meta::search::Request,
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    delta: &QueryDelta,
+    req_size: i64,
+    curr_res_size: &mut i64,
+    user_id: &str,
+    remaining_query_range: &mut f64,
+    cache_req_duration: i64,
+    start_timer: &mut Instant,
+    cache_order_by: &OrderBy,
+    mut sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+) -> Result<(), infra::errors::Error> {
+    log::info!(
+        "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
+        trace_id,
+        delta
+    );
+    let mut req = req.clone();
+    let original_req_start_time = req.query.start_time;
+    let original_req_end_time = req.query.end_time;
+    req.query.start_time = delta.delta_start_time;
+    req.query.end_time = delta.delta_end_time;
+
+    let partition_resp = get_partitions(&trace_id, &org_id, stream_type, &req, user_id).await?;
+    let mut partitions = partition_resp.partitions;
+
+    if partitions.is_empty() {
+        return Ok(());
+    }
+
+    // check if `streaming_aggs` is supported
+    let is_streaming_aggs = partition_resp.streaming_aggs;
+    if is_streaming_aggs {
+        req.query.streaming_output = true;
+        req.query.streaming_id = partition_resp.streaming_id.clone();
+    }
+
+    log::info!(
+        "[WS_SEARCH] Found {} partitions for trace_id: {}",
+        partitions.len(),
+        trace_id
+    );
+
+    // for dashboards & histograms
+    if req.search_type.expect("search_type is required") == SearchEventType::Dashboards || req.query.size == -1 {
+        // sort partitions by timestamp in desc
+        partitions.sort_by(|a, b| b[0].cmp(&a[0]));
+    }
+
+    for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
+        let mut req = req.clone();
+        req.query.start_time = start_time;
+        req.query.end_time = end_time;
+
+        if req_size != -1 {
+            req.query.size -= *curr_res_size;
+        }
+
+        // use cache for delta search
+        let mut search_res = do_search(&trace_id, &org_id, stream_type, &req, user_id, true).await?;
+        *curr_res_size += search_res.hits.len() as i64;
+
+        log::info!(
+            "[WS_SEARCH]: Found {} hits, for trace_id: {}",
+            search_res.hits.len(),
+            trace_id
+        );
+
+        if !search_res.hits.is_empty() {
+            // search_res = order_search_results(search_res, req.fallback_order_by_col.clone());
+            // for every partition, compute the queried range omitting the result cache ratio
+            let queried_range =
+                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+            *remaining_query_range -= queried_range;
+
+            // set took
+            search_res.set_took(start_timer.elapsed().as_millis() as usize);
+            // reset start timer
+            *start_timer = Instant::now();
+
+            // when searching with limit queries
+            // the limit in sql takes precedence over the requested size
+            // hence, the search result needs to be trimmed when the req limit is reached
+            if *curr_res_size > req_size {
+                let excess_hits = *curr_res_size - req_size;
+                let total_hits = search_res.hits.len() as i64;
+                if total_hits > excess_hits {
+                    let cache_hits: usize = (total_hits - excess_hits) as usize;
+                    search_res.hits.truncate(cache_hits);
+                    search_res.total = cache_hits;
+                }
+            }
+
+            // TODO: Fix(Accumulate the result)
+            // if is_streaming_aggs {
+            //     // Only accumulate the results of the last partition
+            //     if idx == partitions.len() - 1 {
+            //         accumulated_results.push(SearchResultType::Search(search_res.clone()));
+            //     }
+            // } else {
+            //     accumulated_results.push(SearchResultType::Search(search_res.clone()));
+            // }
+
+            // `result_cache_ratio` will be 0 for delta search
+            let result_cache_ratio = search_res.result_cache_ratio;
+
+            // TODO: add top k values for values search
+            // if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
+            //     log::debug!("Getting top k values for partition {idx}");
+            //     let values_event_context = req.values_event_context.clone().unwrap();
+            //     let top_k_values = tokio::task::spawn_blocking(move || {
+            //         get_top_k_values(&search_res.hits, &values_event_context)
+            //     })
+            //     .await
+            //     .unwrap();
+            //     search_res.hits = top_k_values?;
+            // }
+
+            let response = StreamResponses::SearchResponse {
+                results: search_res.clone(),
+                streaming_output: is_streaming_aggs,
+            };
+            log::info!(
+                "[HTTP2_STREAM]: Processing deltas for trace_id: {}, hits: {:?}",
+                trace_id,
+                search_res.hits
+            );
+            log::debug!(
+                "[HTTP2_STREAM]: Sending search response for trace_id: {}, delta: {:?}, hits len: {}, result_cache_ratio: {}",
+                trace_id,
+                delta,
+                search_res.hits.len(),
+                result_cache_ratio,
+            );
+            sender.send(Ok(response)).await.unwrap();
+        }
+
+        // Stop if `remaining_query_range` is less than 0
+        if *remaining_query_range <= 0.00 {
+            log::info!(
+                "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
+                trace_id
+            );
+            let (new_start_time, new_end_time) = (
+                original_req_end_time - cache_req_duration,
+                original_req_end_time,
+            );
+            // passs original start_time and end_time partition end time
+            let _ = send_partial_search_resp(
+                &trace_id,
+                "reached max query range limit",
+                new_start_time,
+                new_end_time,
+                search_res.order_by,
+                is_streaming_aggs,
+                sender,
+            )
+            .await;
+            break;
+        }
+
+        // TODO: Send progress update
+        // {
+        //     let percent = calculate_progress_percentage(
+        //         start_time,
+        //         end_time,
+        //         original_req_start_time,
+        //         original_req_end_time,
+        //         cache_order_by,
+        //     );
+        //     send_message(
+        //         req_id,
+        //         WsServerEvents::EventProgress {
+        //             trace_id: trace_id.to_string(),
+        //             percent,
+        //             event_type: req.event_type().to_string(),
+        //         }
+        //         .to_json(),
+        //     )
+        //     .await?;
+        // }
+
+        // Stop if reached the request result size
+        if req_size != -1 && *curr_res_size >= req_size {
+            log::info!(
+                "[WS_SEARCH]: Reached requested result size ({}), stopping search",
+                req_size
+            );
+            break;
+        }
+    }
+
+    // TODO: Remove the streaming_aggs cache
+    // if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+    //     streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
+    // }
+
+    Ok(())
+}
+
+async fn send_partial_search_resp(
+    trace_id: &str,
+    error: &str,
+    new_start_time: i64,
+    new_end_time: i64,
+    order_by: Option<OrderBy>,
+    is_streaming_aggs: bool,
+    mut sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+) -> Result<(), Error> {
+    let error = if error.is_empty() {
+        PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
+    } else {
+        format!("{} \n {}", PARTIAL_ERROR_RESPONSE_MESSAGE, error)
+    };
+    let s_resp = Response {
+        is_partial: true,
+        function_error: vec![error],
+        new_start_time: Some(new_start_time),
+        new_end_time: Some(new_end_time),
+        order_by,
+        trace_id: trace_id.to_string(),
+        ..Default::default()
+    };
+
+    let response = StreamResponses::SearchResponse {
+        results: s_resp,
+        streaming_output: is_streaming_aggs,
+    };
+    log::info!(
+        "[HTTP2_STREAM]: trace_id: {} Sending partial search response",
+        trace_id
+    );
+
+    sender.send(Ok(response)).await.unwrap();
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn send_cached_responses(
+    req: &mut config::meta::search::Request,
+    trace_id: &str,
+    req_size: i64,
+    cached: &CachedQueryResponse,
+    curr_res_size: &mut i64,
+    // fallback_order_by_col: Option<String>,
+    cache_order_by: &OrderBy,
+    start_timer: &mut Instant,
+    mut sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+) -> Result<(), Error> {
+    log::info!(
+        "[WS_SEARCH]: Processing cached response for trace_id: {}",
+        trace_id
+    );
+
+    let mut cached = cached.clone();
+
+    // add cache hits to `curr_res_size`
+    *curr_res_size += cached.cached_response.hits.len() as i64;
+
+    // truncate hits if `curr_res_size` is greater than `req_size`
+    if req_size != -1 && *curr_res_size > req_size {
+        let excess_hits = *curr_res_size - req_size;
+        let total_hits = cached.cached_response.hits.len() as i64;
+        if total_hits > excess_hits {
+            let cache_hits: usize = (total_hits - excess_hits) as usize;
+            cached.cached_response.hits.truncate(cache_hits);
+            cached.cached_response.total = cache_hits;
+        }
+    }
+
+    // TODO: order the cached response
+    // cached.cached_response = order_search_results(cached.cached_response, fallback_order_by_col);
+
+    // TODO: Accumulate the result
+    // accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
+
+    // `result_cache_ratio` for cached response is 100
+    cached.cached_response.result_cache_ratio = 100;
+    // `scan_size` is 0, as it is not used for cached responses
+    cached.cached_response.scan_size = 0;
+
+    // set took
+    cached
+        .cached_response
+        .set_took(start_timer.elapsed().as_millis() as usize);
+    // reset start timer
+    *start_timer = Instant::now();
+
+    log::info!(
+        "[WS_SEARCH]: Sending cached search response for trace_id: {}, hits: {}, result_cache_ratio: {}",
+        trace_id,
+        cached.cached_response.hits.len(),
+        cached.cached_response.result_cache_ratio,
+    );
+    let response = StreamResponses::SearchResponse { 
+        results: cached.cached_response,
+        streaming_output: false,
+    };
+    sender.send(Ok(response)).await.unwrap();
+
+    // TODO: Send progress update
+    // {
+    //     let percent = calculate_progress_percentage(
+    //         cached.response_start_time,
+    //         cached.response_end_time,
+    //         req.payload.query.start_time,
+    //         req.payload.query.end_time,
+    //         cache_order_by,
+    //     );
+    //     send_message(
+    //         req_id,
+    //         WsServerEvents::EventProgress {
+    //             trace_id: trace_id.to_string(),
+    //             percent,
+    //             event_type: req.event_type().to_string(),
+    //         }
+    //         .to_json(),
+    //     )
+    //     .await?;
+    // }
+
+    Ok(())
 }
