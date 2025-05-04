@@ -41,10 +41,14 @@ pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
     let mut segment_data = HashMap::new();
     for file in files {
         let modified = Utc.timestamp_nanos(file.meta.max_ts * 1000);
-        let file_name = format!(
-            "/{}/{}/{}/{}/{}",
-            key, TRACE_ID_SEPARATOR, file.account, ACCOUNT_SEPARATOR, file.key
-        );
+        let file_name = if file.account.is_empty() {
+            format!("/{}/{}/{}", key, TRACE_ID_SEPARATOR, file.key)
+        } else {
+            format!(
+                "/{}/{}/{}/{}/{}",
+                key, TRACE_ID_SEPARATOR, file.account, ACCOUNT_SEPARATOR, file.key
+            )
+        };
         values.push(ObjectMeta {
             location: file_name.into(),
             last_modified: modified,
