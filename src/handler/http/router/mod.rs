@@ -438,6 +438,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(search::saved_view::get_view)
         .service(search::saved_view::get_views)
         .service(search::saved_view::delete_view)
+        .service(search::test_stream::test_http2_stream)
+        .service(search::streaming::search_http2_stream)
         .service(functions::save_function)
         .service(functions::list_functions)
         .service(functions::test_function)

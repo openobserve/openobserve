@@ -25,7 +25,7 @@ enum SortStrategy {
 }
 
 /// Determines and applies sorting to search results
-pub(crate) fn order_search_results(
+pub fn order_search_results(
     mut search_res: Response,
     fallback_order_by_col: Option<String>,
 ) -> Response {
@@ -40,7 +40,7 @@ pub(crate) fn order_search_results(
 }
 
 /// Applies the chosen sort strategy to results
-fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
+pub fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
     match strategy {
         SortStrategy::FallbackColumn(col, order) => {
             // Auto-detect column type from first hit
@@ -73,7 +73,7 @@ fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
 }
 
 /// Determines which sorting strategy to use
-fn determine_sort_strategy(
+pub fn determine_sort_strategy(
     search_res: &Response,
     fallback_order_by_col: Option<String>,
 ) -> SortStrategy {
