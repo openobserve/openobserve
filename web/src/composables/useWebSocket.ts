@@ -1,6 +1,7 @@
 // useWebSocket.ts
 
 import { onBeforeUnmount } from "vue";
+import pako from "pako";
 
 type MessageHandler = (event: MessageEvent, socketId: string) => void;
 type OpenHandler = (event: Event, socketId: string) => void;
@@ -55,7 +56,24 @@ const onOpen = (socketId: string, event: Event) => {
 };
 
 const onMessage = (socketId: string, event: MessageEvent) => {
-  const data = JSON.parse(event.data);
+  let data = JSON.parse(event.data);
+
+  if (data.type === "compressed") {
+    const compressed = new Uint8Array(data.content.message);
+    try {
+      // Check encoding type from the message if available
+      let decompressedData;
+        try {
+          decompressedData = pako.inflate(compressed, { to: 'string', raw: true });
+        } catch (error) {
+          decompressedData = pako.inflate(compressed, { to: 'string' });
+        }
+      
+      data = JSON.parse(decompressedData);
+    } catch (error) {
+      console.error("Error in decompressing message", error);
+    }
+  }
 
   if (data.type === "error") {
     errorHandlers[socketId]?.forEach((handler) => handler(data, socketId));

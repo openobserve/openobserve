@@ -27,7 +27,8 @@ use futures::StreamExt;
 use session::handle_text_message;
 
 use crate::{
-    router::http::ws::error::DisconnectMessage, service::websocket_events::WsServerEvents,
+    router::http::ws::error::DisconnectMessage,
+    service::websocket_events::{WsPayload, WsServerEvents},
 };
 
 #[get("{org_id}/ws/v2/{router_id}")]
@@ -77,7 +78,7 @@ pub async fn websocket(
 
     let req_id = router_id.clone();
     // channel between incoming_thread <----> outgoing thread
-    let (response_tx, mut response_rx) = tokio::sync::mpsc::unbounded_channel::<WsServerEvents>();
+    let (response_tx, mut response_rx) = tokio::sync::mpsc::unbounded_channel::<WsPayload>();
     let (disconnect_tx, mut disconnect_rx) =
         tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
     let outgoing_stopped = Arc::new(AtomicBool::new(false));
@@ -107,7 +108,7 @@ pub async fn websocket(
                             );
                             let _ = response_tx_clone
                                 .clone()
-                                .send(WsServerEvents::Ping(ping.to_vec()));
+                                .send(WsPayload::Server(WsServerEvents::Ping(ping.to_vec())));
                         }
                         Ok(actix_ws::AggregatedMessage::Pong(_)) => {
                             log::debug!(
@@ -215,7 +216,7 @@ pub async fn websocket(
                     // response from querier
                     Some(message) = response_rx.recv() => {
                         match message {
-                            WsServerEvents::Ping(ping) => {
+                            WsPayload::Server(WsServerEvents::Ping(ping)) => {
                                 let mut close_conn = false;
                                 log::debug!("[WS::Querier::Handler]: sending pong to request_id: {}, msg: {:?}", req_id, String::from_utf8_lossy(&ping));
                                 if let Err(e) = ws_session.pong(&ping).await {
@@ -231,24 +232,20 @@ pub async fn websocket(
                                     return Ok(());
                                 }
                             }
-                            WsServerEvents::Pong(pong) => {
+                            WsPayload::Server(WsServerEvents::Pong(pong)) => {
                                 log::debug!("[WS::Querier::Handler]: Pong received from client : {:?}", pong);
                             }
                             _ => {
-                                let Ok(message_str) = serde_json::to_string(&message) else {
-                                    log::error!(
-                                        "[WS::Querier::Handler]: error convert WsServerEvents to string before sending back to client for request_id: {}", req_id
-                                    );
-                                    continue;
-                                };
-                                log::info!("[WS::Querier::Handler] querier received message to send to router/client from response_rx for request_id: {}, trace_id: {}", req_id, message.get_trace_id());
+                                let trace_id = message.get_trace_id();
+                                log::debug!("[WS::Querier::Handler]: sending to client for request_id: {}, trace_id: {}", req_id, trace_id);
                                 let start = std::time::Instant::now();
-                                match ws_session.text(message_str).await {
+                                let json_str = message.to_json();
+                                match ws_session.text(json_str).await {
                                     Ok(_) => {
-                                        log::info!("[WS::Querier::Handler] successfully sent message to request_id: {}, trace_id: {}, took: {} secs", req_id, message.get_trace_id(), start.elapsed().as_secs_f64());
+                                        log::debug!("[WS::Querier::Handler]: successfully sent to client for request_id: {}, trace_id: {}, took: {} secs", req_id, trace_id, start.elapsed().as_secs_f64());
                                     }
                                     Err(e) => {
-                                        log::error!("[WS::Querier::Handler] Error sending message to request_id: {}, trace_id: {}, error: {}, took: {} secs", req_id, message.get_trace_id(), e, start.elapsed().as_secs_f64());
+                                        log::error!("[WS::Querier::Handler]: Failed to send message to client: {}, took: {} secs", e, start.elapsed().as_secs_f64());
                                         break;
                                     }
                                 }

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Write;
+
 use actix_web::http::StatusCode;
 use config::{
     get_config, ider,
@@ -202,6 +204,45 @@ impl WsClientEvents {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct WsPayloadTraceId {
+    #[serde(default)]
+    pub trace_id: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(
+    tag = "type",
+    content = "content",
+    rename_all(serialize = "snake_case", deserialize = "snake_case")
+)]
+pub enum WsPayload {
+    Compressed(WsServerEventsCompressed),
+    Client(WsClientEvents),
+    #[serde(untagged)]
+    Server(WsServerEvents),
+}
+
+impl WsPayload {
+    pub fn get_trace_id(&self) -> String {
+        match self {
+            Self::Server(event) => event.get_trace_id(),
+            Self::Compressed(event) => event.get_trace_id(),
+            Self::Client(event) => event.get_trace_id(),
+        }
+    }
+
+    pub fn to_json(&self) -> String {
+        match self {
+            Self::Server(event) => event.to_json(),
+            Self::Client(event) => event.to_json(),
+            Self::Compressed(_) => {
+                serde_json::to_string(self).expect("Failed to serialize WsPayload")
+            }
+        }
+    }
+}
+
 /// To represent the query start and end time based of partition or cache
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeOffset {
@@ -245,6 +286,25 @@ pub enum WsServerEvents {
     },
     Ping(Vec<u8>),
     Pong(Vec<u8>),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct WsServerEventsCompressed {
+    pub message: Vec<u8>,
+    pub encoding: String,
+    pub trace_id: String,
+}
+
+impl WsServerEventsCompressed {
+    pub fn get_trace_id(&self) -> String {
+        self.trace_id.clone()
+    }
+
+    pub fn should_clean_trace_id(&self) -> Option<String> {
+        // NOTE: if event is cancel, error or end only then we we clean
+        // NOTE: only the search response is compressed, hence this will always be none
+        None
+    }
 }
 
 impl WsServerEvents {
@@ -333,6 +393,23 @@ impl WsServerEvents {
             }
             _ => self.clone(),
         }
+    }
+
+    pub fn encode(&self) -> WsPayload {
+        let start = std::time::Instant::now();
+        log::info!("[WS::Querier::Channel] compressing data");
+        let msg_bytes = serde_json::to_vec(&self).unwrap();
+        let mut e = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+        e.write_all(&msg_bytes).unwrap();
+        let compressed_message = e.finish().unwrap();
+        let elapsed = start.elapsed();
+        log::info!("[WS::Querier::Channel] compressed data in {:?}", elapsed);
+        let compressed_payload = WsServerEventsCompressed {
+            message: compressed_message,
+            encoding: "deflate".to_string(),
+            trace_id: self.get_trace_id(),
+        };
+        WsPayload::Compressed(compressed_payload)
     }
 }
 

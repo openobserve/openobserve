@@ -38,7 +38,7 @@ use crate::service::{self_reporting::audit, websocket_events::handle_cancel};
 use crate::{
     common::utils::websocket::get_ping_interval_secs_with_jitter,
     service::websocket_events::{
-        WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
+        WsClientEvents, WsPayload, WsServerEvents, handle_search_request, handle_values_request,
         setup_tracing_with_trace_id,
     },
 };
@@ -114,7 +114,7 @@ pub async fn handle_text_message(
     req_id: &str,
     msg: String,
     path: String,
-    response_tx: UnboundedSender<WsServerEvents>,
+    response_tx: UnboundedSender<WsPayload>,
 ) {
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
@@ -349,7 +349,7 @@ pub async fn handle_text_message(
 pub async fn send_message_2(
     req_id: &str,
     msg: WsServerEvents,
-    response_tx: UnboundedSender<WsServerEvents>,
+    response_tx: UnboundedSender<WsPayload>,
 ) -> Result<(), Error> {
     let start = std::time::Instant::now();
     let trace_id = msg.get_trace_id();
@@ -366,7 +366,17 @@ pub async fn send_message_2(
     }
     // End OF BENCHMARK
 
-    match response_tx.send(msg) {
+    // encode only search_response
+    let payload: WsPayload = if get_config().websocket.use_payload_compression {
+        match msg {
+            WsServerEvents::SearchResponse { .. } => msg.encode(),
+            _ => WsPayload::Server(msg),
+        }
+    } else {
+        WsPayload::Server(msg)
+    };
+
+    match response_tx.send(payload) {
         Err(e) => {
             log::error!(
                 "[WS::Querier::Channel] failed to send response to handle_outgoing thread for trace_id: {} error: {}, after {} secs, req_id: {}",
@@ -398,7 +408,7 @@ async fn handle_search_event(
     user_id: &str,
     req_id: &str,
     #[allow(unused_variables)] path: String,
-    response_tx: UnboundedSender<WsServerEvents>,
+    response_tx: UnboundedSender<WsPayload>,
 ) {
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
 
@@ -525,7 +535,7 @@ async fn handle_search_error(
     e: &Error,
     req_id: &str,
     trace_id: &str,
-    response_tx: UnboundedSender<WsServerEvents>,
+    response_tx: UnboundedSender<WsPayload>,
 ) -> Option<CloseReason> {
     log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
     // Send error response
@@ -557,7 +567,7 @@ async fn handle_values_event(
     user_id: &str,
     req_id: &str,
     #[allow(unused_variables)] path: String,
-    response_tx: UnboundedSender<WsServerEvents>,
+    response_tx: UnboundedSender<WsPayload>,
 ) {
     let org_id = org_id.to_string();
     let user_id = user_id.to_string();

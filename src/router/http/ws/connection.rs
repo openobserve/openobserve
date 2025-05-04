@@ -46,7 +46,7 @@ use crate::{
         error::*,
         handler::{QuerierName, TraceId},
     },
-    service::websocket_events::{WsClientEvents, WsServerEvents},
+    service::websocket_events::{WsClientEvents, WsPayload, WsPayloadTraceId, WsServerEvents},
 };
 
 type WsStreamType = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -78,7 +78,7 @@ impl Drop for QuerierConnection {
 
 #[derive(Debug, Default)]
 pub struct ResponseRouter {
-    routes: RwAHashMap<TraceId, UnboundedSender<WsServerEvents>>,
+    routes: RwAHashMap<TraceId, UnboundedSender<WsPayload>>,
 }
 
 impl Drop for ResponseRouter {
@@ -100,7 +100,7 @@ impl ResponseRouter {
         drop(write_guard);
         for (trace_id, sender) in removed.into_iter() {
             // Send error response to client
-            let _ = sender.send(WsServerEvents::Error {
+            let _ = sender.send(WsPayload::Server(WsServerEvents::Error {
                 code: StatusCode::SERVICE_UNAVAILABLE.into(),
                 message: error
                     .clone()
@@ -110,7 +110,7 @@ impl ResponseRouter {
                 request_id: None,
                 should_client_retry: true, /* Indicate client should retry since the querier
                                             * connection is closed */
-            });
+            }));
             log::debug!(
                 "[WS::QuerierConnection::ResponseRouter] flushed for trace_id: {}, querier_name: {}, force_remove: {}",
                 trace_id,
@@ -158,7 +158,7 @@ impl QuerierConnection {
     pub async fn register_request(
         &self,
         trace_id: TraceId,
-        response_tx: UnboundedSender<WsServerEvents>,
+        response_tx: UnboundedSender<WsPayload>,
     ) {
         let mut write_guard = self.response_router.routes.write().await;
         write_guard.insert(trace_id.clone(), response_tx);
@@ -248,7 +248,8 @@ impl QuerierConnection {
                                 );
                             }
                             tungstenite::protocol::Message::Text(text) => {
-                                let svr_event = match json::from_str::<WsServerEvents>(&text) {
+                                let svr_event: WsPayload = match json::from_str::<WsPayload>(&text)
+                                {
                                     Ok(event) => {
                                         log::info!(
                                             "[WS::Router::QuerierConnection] router received message from querier for trace_id: {}, router conn id: {}, querier: {}",
@@ -265,8 +266,8 @@ impl QuerierConnection {
                                             self.id,
                                             self.querier_name
                                         );
-                                        match json::from_str::<json::Value>(&text)
-                                            .map(|val| val.get("trace_id").map(ToString::to_string))
+                                        match json::from_str::<WsPayloadTraceId>(&text)
+                                            .map(|val| val.trace_id)
                                         {
                                             Err(e) => {
                                                 log::error!(
@@ -279,20 +280,28 @@ impl QuerierConnection {
                                                 // cleaned up -> left for clean job
                                                 continue;
                                             }
-                                            Ok(trace_id) => WsServerEvents::Error {
-                                                code: StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                                message:
-                                                    "Failed to parse event received from querier"
+                                            Ok(trace_id) => {
+                                                WsPayload::Server(WsServerEvents::Error {
+                                                    code: StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                                    message:
+                                                        "Failed to parse event received from querier"
                                                         .to_string(),
-                                                error_detail: None,
-                                                trace_id,
-                                                request_id: None,
-                                                should_client_retry: true,
-                                            },
+                                                    error_detail: None,
+                                                    trace_id: Some(trace_id),
+                                                    request_id: None,
+                                                    should_client_retry: true,
+                                                })
+                                            }
                                         }
                                     }
                                 };
-                                let remove_trace_id = svr_event.should_clean_trace_id();
+
+                                let remove_trace_id = match &svr_event {
+                                    WsPayload::Server(event) => event.should_clean_trace_id(),
+                                    WsPayload::Compressed(event) => event.should_clean_trace_id(),
+                                    WsPayload::Client(_) => unreachable!(),
+                                };
+
                                 if let Err(e) =
                                     self.response_router.route_response(svr_event.clone()).await
                                 {
@@ -485,7 +494,7 @@ impl ResponseRouter {
     //     }
     // }
 
-    pub async fn route_response(&self, message: WsServerEvents) -> WsResult<()> {
+    pub async fn route_response(&self, message: WsPayload) -> WsResult<()> {
         let start = std::time::Instant::now();
         let trace_id = message.get_trace_id();
         let sender = {

@@ -67,7 +67,8 @@
     "vue-i18n": "^11.1.2",
     "vue-router": "^4.5.0",
     "vue3-grid-layout": "^1.0.0",
-    "vuex": "^4.1.0"
+    "vuex": "^4.1.0",
+    "pako": "2.1.0"
   },
   "devDependencies": {
     "@cypress/vue": "^6.0.2",

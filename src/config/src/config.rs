@@ -458,6 +458,12 @@ pub struct WebSocket {
         help = "Payload size for benchmark mode in MB"
     )]
     pub benchmark_payload_size: usize,
+    #[env_config(
+        name = "ZO_WEBSOCKET_USE_PAYLOAD_COMPRESSION",
+        default = false,
+        help = "Use payload compression"
+    )]
+    pub use_payload_compression: bool,
 }
 
 #[derive(EnvConfig)]

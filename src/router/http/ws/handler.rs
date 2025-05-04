@@ -35,7 +35,7 @@ use super::{
     pool::QuerierConnectionPool,
     session::SessionManager,
 };
-use crate::service::websocket_events::{WsClientEvents, WsServerEvents};
+use crate::service::websocket_events::{WsClientEvents, WsPayload, WsServerEvents};
 
 pub type ClientId = String;
 pub type QuerierName = String;
@@ -97,8 +97,7 @@ impl WsHandler {
 
         // Setup message channels
         // TODO: add env variable for this for channel size
-        let (response_tx, mut response_rx) =
-            tokio::sync::mpsc::unbounded_channel::<WsServerEvents>();
+        let (response_tx, mut response_rx) = tokio::sync::mpsc::unbounded_channel::<WsPayload>();
         let (disconnect_tx, mut disconnect_rx) =
             tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
         let session_manager = self.session_manager.clone();
@@ -215,11 +214,13 @@ impl WsHandler {
                                             if let Err(e) =
                                                 ratelimit_check(&message, auth_str).await
                                             {
-                                                let err_msg = WsServerEvents::error_response(
-                                                    &e,
-                                                    Some(client_id.clone()),
-                                                    Some(message.get_trace_id()),
-                                                    false,
+                                                let err_msg = WsPayload::Server(
+                                                    WsServerEvents::error_response(
+                                                        &e,
+                                                        Some(client_id.clone()),
+                                                        Some(message.get_trace_id()),
+                                                        false,
+                                                    ),
                                                 );
                                                 if let Err(e) =
                                                     response_tx_clone.clone().send(err_msg)
@@ -405,7 +406,7 @@ impl WsHandler {
                                 );
                                 let _ = response_tx_clone
                                     .clone()
-                                    .send(WsServerEvents::Ping(ping.to_vec()));
+                                    .send(WsPayload::Server(WsServerEvents::Ping(ping.to_vec())));
                             }
                             Ok(actix_ws::AggregatedMessage::Pong(pong)) => {
                                 log::info!(
@@ -431,7 +432,7 @@ impl WsHandler {
                         // response from querier
                         Some(message) = response_rx.recv() => {
                             match message {
-                                WsServerEvents::Ping(ping) => {
+                                WsPayload::Server(WsServerEvents::Ping(ping)) => {
                                     let mut close_conn = false;
                                     log::debug!("[WS::Router::Handler]: sending pong to client_id: {}, msg: {:?}", client_id, String::from_utf8_lossy(&ping));
                                     if let Err(e) = ws_session.pong(&ping).await {
@@ -447,7 +448,7 @@ impl WsHandler {
                                         return Ok(());
                                     }
                                 }
-                                WsServerEvents::Pong(pong) => {
+                                WsPayload::Server(WsServerEvents::Pong(pong)) => {
                                     log::debug!("[WS::Router::Handler]: Pong received from client : {:?}", pong);
                                 }
                                 _ => {
@@ -468,7 +469,14 @@ impl WsHandler {
                                             break;
                                         }
                                     }
-                                    if let Some(trace_id) = message.should_clean_trace_id() {
+
+                                    let remove_trace_id = match &message {
+                                        WsPayload::Server(event) => event.should_clean_trace_id(),
+                                        WsPayload::Compressed(event) => event.should_clean_trace_id(),
+                                        WsPayload::Client(_) => unreachable!(),
+                                    };
+
+                                    if let Some(trace_id) = remove_trace_id {
                                         log::info!("[WS::Router::Handler] Unregistering trace_id: {}, message: {:?}", trace_id, message);
                                         session_manager.update_session_activity(&client_id).await;
                                         session_manager.remove_trace_id(&client_id, &trace_id).await;
@@ -488,6 +496,10 @@ impl WsHandler {
                                     break;
                                 }
                                 Some(DisconnectMessage::Error(err_msg)) => {
+                                    let remove_trace_id = match &err_msg.ws_server_events {
+                                        WsServerEvents::Error { .. } => err_msg.ws_server_events.should_clean_trace_id(),
+                                        _ => unreachable!(),
+                                    };
                                     // send error message to client first
                                     _ = ws_session.text(err_msg.ws_server_events.to_json()).await;
                                     if err_msg.should_disconnect {
@@ -575,13 +587,13 @@ impl WsHandler {
                                                         }
 
                                                         // Important: Process End messages and clean up trace_ids
-                                                        if let Some(trace_id) = message.should_clean_trace_id() {
+                                                        if let Some(ref trace_id) = remove_trace_id {
                                                             log::info!(
                                                                 "[WS::Router::Handler] Cleaning up trace_id during drain: {}, message: {:?}",
                                                                 trace_id,
                                                                 message
                                                             );
-                                                            session_manager.remove_trace_id(&client_id, &trace_id).await;
+                                                            session_manager.remove_trace_id(&client_id, trace_id).await;
 
                                                             // Check if this was the last trace_id
                                                             let remaining_trace_ids = session_manager.get_trace_ids(&client_id).await;
