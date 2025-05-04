@@ -77,6 +77,7 @@ import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
+import useStreamingSearch from "./useStreamingSearch";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -308,6 +309,14 @@ const {
   cancelSearchQueryBasedOnRequestId,
   closeSocketBasedOnRequestId,
 } = useSearchWebSocket();
+
+const {
+  fetchQueryDataWithHttpStream,
+  cancelStreamQueryBasedOnRequestId,
+  closeStreamWithError,
+  closeStream,
+  resetAuthToken,
+} = useStreamingSearch();
 
 const searchPartitionMap = reactive<{ [key: string]: number }>({});
 
@@ -1568,18 +1577,30 @@ const useLogs = () => {
       // else use organization settings
       searchObj.meta.jobId = "";
       const shouldUseWebSocket = isWebSocketEnabled();
+      const shouldUseStreaming = (window as any).use_streaming === true;
 
       const isMultiStreamSearch =
         searchObj.data.stream.selectedStream.length > 1 &&
         !searchObj.meta.sqlMode;
 
-      searchObj.communicationMethod =
-        shouldUseWebSocket && !isMultiStreamSearch ? "ws" : "http";
+      // Determine communication method based on available options and constraints
+      if (shouldUseStreaming) {
+        searchObj.communicationMethod = "streaming";
+      } else if (shouldUseWebSocket && !isMultiStreamSearch) {
+        searchObj.communicationMethod = "ws";
+      } else {
+        searchObj.communicationMethod = "http";
+      }
 
+      // Use the appropriate method to fetch data
       if (searchObj.communicationMethod === "ws") {
         getDataThroughWebSocket(isPagination);
         return;
+      } else if (searchObj.communicationMethod === "streaming") {
+        getDataThroughStreaming(isPagination);
+        return;
       }
+
 
       // searchObj.data.histogram.chartParams.title = "";
       searchObjDebug["queryDataStartTime"] = performance.now();
@@ -4820,11 +4841,10 @@ const useLogs = () => {
     return node && node.type === "column_ref";
   }
 
-  const getDataThroughWebSocket = (isPagination: boolean) => {
-    try {
-      if (!isPagination) {
-        resetQueryData();
-        searchObj.data.queryResults = {};
+  const getQueryReq = (isPagination: boolean) => {
+    if (!isPagination) {
+      resetQueryData();
+      searchObj.data.queryResults = {};
       }
 
       // reset searchAggData
@@ -4947,8 +4967,15 @@ const useLogs = () => {
         }
       }
 
+      return queryReq;
+  };
+
+  const getDataThroughWebSocket = (isPagination: boolean) => {
+    try {
+      const queryReq = getQueryReq(isPagination) as SearchRequestPayload;
+
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
-      const requestId = initializeWebSocketConnection(payload);
+      const requestId = initializeSearchConnection(payload);
 
       if (!requestId) {
         throw new Error("Failed to initialize WebSocket connection");
@@ -4993,16 +5020,36 @@ const useLogs = () => {
     return payload;
   };
 
-  const initializeWebSocketConnection = (payload: any): string => {
-    return fetchQueryDataWithWebSocket(payload, {
-      open: sendSearchMessage,
-      close: handleSearchClose,
-      error: handleSearchError,
-      message: handleSearchResponse,
-      reset: handleSearchReset,
-    }) as string;
+  const initializeSearchConnection = (payload: any): string | Promise<void>  | null=> {
+    // Use the appropriate method to fetch data
+    if (searchObj.communicationMethod === "ws") {
+      return fetchQueryDataWithWebSocket(payload, {
+        open: sendSearchMessage,
+        close: handleSearchClose,
+        error: handleSearchError,
+        message: handleSearchResponse,
+        reset: handleSearchReset,
+      }) as string;
+    } else if (searchObj.communicationMethod === "streaming") {
+      return fetchQueryDataWithHttpStream(payload, {
+        data: handleSearchResponse,
+        error: handleSearchError,
+        complete: handleSearchClose,
+        reset: handleSearchReset,
+      }) as Promise<void>;
+    }
+
+    return null;
   };
 
+  const initializeStreamingConnection = (payload: any): Promise<void> => {
+    return fetchQueryDataWithHttpStream(payload, {
+      data: handleSearchResponse,
+      error: handleSearchError,
+      complete: handleSearchClose,
+      reset: handleSearchReset,
+    }) as Promise<void>;
+  };
 
   const handleSearchReset = async (data: any, traceId?: string) => {
     // reset query data
@@ -5041,7 +5088,7 @@ const useLogs = () => {
 
         const payload = buildWebSocketPayload(data.queryReq, data.isPagination, "search");
 
-        initializeWebSocketConnection(payload);
+        initializeSearchConnection(payload);
         addRequestId(payload.traceId);
       }
 
@@ -5062,6 +5109,8 @@ const useLogs = () => {
         
         resetHistogramError();
 
+        console.log('search reset Loading');
+
         searchObj.loadingHistogram = true;
 
         if(data.type === "histogram") await generateHistogramSkeleton();
@@ -5074,7 +5123,7 @@ const useLogs = () => {
           data.type,
         );
 
-        initializeWebSocketConnection(payload);
+        initializeSearchConnection(payload);
 
         addRequestId(payload.traceId);
       }
@@ -5133,6 +5182,11 @@ const useLogs = () => {
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
+    console.log('handleSearchResponse', response);
+    console.log('payload', payload);
+
+    console.log('Loading', searchObj.loading, searchObj.loadingHistogram);
+    
     if (response.type === "search_response") {
       
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
@@ -5426,6 +5480,7 @@ const useLogs = () => {
         if (!meta?.isHistogramOnly) refreshPagination(true);
       } catch (error) {
         console.error("Error processing histogram data:", error);
+
         searchObj.loadingHistogram = false;
       }
     })();
@@ -5485,6 +5540,7 @@ const useLogs = () => {
         searchObjDebug["histogramStartTime"] = performance.now();
         resetHistogramError();
 
+        console.log('Processing histogram');
         searchObj.loadingHistogram = true;
 
         await generateHistogramSkeleton();
@@ -5496,7 +5552,7 @@ const useLogs = () => {
           false,
           "histogram",
         );
-        const requestId = initializeWebSocketConnection(payload);
+        const requestId = initializeSearchConnection(payload);
 
         addRequestId(payload.traceId);
       }
@@ -5583,6 +5639,7 @@ const useLogs = () => {
 
     if (searchObj.data.isOperationCancelled) {
       searchObj.loading = false;
+      console.log('loading operation cancelled', searchObj.loading);
       searchObj.loadingHistogram = false;
       searchObj.data.isOperationCancelled = false;
 
@@ -5622,13 +5679,16 @@ const useLogs = () => {
     }
 
     if (payload.type === "search" && !response?.content?.should_client_retry) searchObj.loading = false;
-    if ((payload.type === "histogram" || payload.type === "pageCount") && !response?.content?.should_client_retry)
+    if ((payload.type === "histogram" || payload.type === "pageCount") && !response?.content?.should_client_retry){
+      console.log('loading histogram false');
       searchObj.loadingHistogram = false;
+    }
 
     searchObj.data.isOperationCancelled = false;
   };
 
   const handleSearchError = (request: any, err: WebSocketErrorResponse) => {
+    console.log('handleSearchError', err);
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
 
@@ -5784,9 +5844,11 @@ const useLogs = () => {
 
     const payload = buildWebSocketPayload(queryReq, false, "pageCount");
 
+      console.log('loading get page count', searchObj.loading);
+
     searchObj.loadingHistogram = true;
 
-    const requestId = initializeWebSocketConnection(payload);
+    const requestId = initializeSearchConnection(payload);
 
     addRequestId(payload.traceId);
   };
@@ -5877,6 +5939,30 @@ const useLogs = () => {
     return (config.isEnterprise == "true" || config.isCloud == "true") && store.state.zoConfig.actions_enabled;
   });
 
+
+  // HTTP2 Streaming Search
+  const getDataThroughStreaming = async (isPagination: boolean) => {
+    try {
+      const queryReq = getQueryReq(isPagination) as SearchRequestPayload;
+
+      const payload = buildWebSocketPayload(queryReq, isPagination, "search");
+      const requestId = initializeStreamingConnection(payload);
+
+      if (!requestId) {
+        throw new Error("Failed to initialize WebSocket connection");
+      }
+
+      addRequestId(payload.traceId);
+    } catch (e: any) {
+      console.error("Error while getting data through web socket", e);
+      searchObj.loading = false;
+      showErrorNotification(
+        notificationMsg.value || "Error occurred during the search operation.",
+      );
+      notificationMsg.value = "";
+    }
+  };
+  
   return {
     searchObj,
     searchAggData,
@@ -5928,7 +6014,7 @@ const useLogs = () => {
     refreshJobPagination,
     enableRefreshInterval,
     buildWebSocketPayload,
-    initializeWebSocketConnection,
+    initializeSearchConnection,
     addRequestId,
     routeToSearchSchedule,
     isActionsEnabled,
