@@ -13,38 +13,37 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-use std::time::Instant;
-use std::ops::ControlFlow;
+use std::{io::Error, ops::ControlFlow, time::Instant};
 
+use actix_web::{HttpRequest, HttpResponse, http::StatusCode, post, web};
+use bytes::Bytes as BytesImpl;
+use chrono::Utc;
 use config::{
     get_config,
     meta::{
-        search::{SearchEventContext, SearchEventType, SearchPartitionRequest, SearchPartitionResponse, PARTIAL_ERROR_RESPONSE_MESSAGE},
-        websocket::SearchResultType, sql::OrderBy,
+        search::{
+            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventContext, SearchEventType,
+            SearchPartitionRequest, SearchPartitionResponse,
+        },
+        sql::{OrderBy, resolve_stream_names},
+        stream::StreamType,
+        websocket::SearchResultType,
     },
+    utils::json,
 };
+use futures::{SinkExt, channel::mpsc, stream::StreamExt};
+use hashbrown::HashMap;
+use log;
 use rand::Rng;
 use sqlparser::{
     ast::{Expr, FunctionArguments, Statement, visit_statements_mut},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
-use actix_web::{HttpRequest, HttpResponse, post, web, http::StatusCode};
-use bytes::Bytes as BytesImpl;
-use chrono::Utc;
-use config::utils::json;
-use config::meta::stream::StreamType;
-use config::meta::sql::resolve_stream_names;
-use config::meta::search::Response;
-use futures::channel::mpsc;
-use futures::stream::StreamExt;
-use futures::SinkExt;
-use log;
 use tracing::{Instrument, Span};
-use hashbrown::HashMap;
 
-use crate::common::{
+use crate::{
+    common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::{
             functions,
@@ -56,17 +55,15 @@ use crate::common::{
             stream::get_max_query_range,
             websocket::update_histogram_interval_in_query,
         },
-    };
-use crate::service::{
-    search::{
-        cache,
-        self as SearchService, sql::Sql,
     },
-    self_reporting::http_report_metrics,
-    setup_tracing_with_trace_id,
-    websocket_events::{
-        utils::{WsServerEvents, TimeOffset},
-        sort::order_search_results,
+    service::{
+        search::{self as SearchService, cache, sql::Sql},
+        self_reporting::http_report_metrics,
+        setup_tracing_with_trace_id,
+        websocket_events::{
+            sort::order_search_results,
+            utils::{TimeOffset, WsServerEvents},
+        },
     },
 };
 
@@ -102,7 +99,7 @@ pub async fn test_http2_stream(
     let mut start = Instant::now();
     let cfg = config::get_config();
     let org_id = org_id.into_inner();
-    
+
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_stream", org_id = org_id.clone())
@@ -117,14 +114,18 @@ pub async fn test_http2_stream(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
-    
+
     // Log the request
-    log::info!("[trace_id: {}] Received test HTTP/2 stream request for org_id: {}", trace_id, org_id);
-    
+    log::info!(
+        "[trace_id: {}] Received test HTTP/2 stream request for org_id: {}",
+        trace_id,
+        org_id
+    );
+
     // Get query params
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    
+
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -133,11 +134,11 @@ pub async fn test_http2_stream(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
-    
+
     // Set use_cache from query params
     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     req.use_cache = Some(use_cache);
-    
+
     // Set search type if not set
     if req.search_type.is_none() {
         req.search_type = match get_search_type_from_request(&query) {
@@ -145,7 +146,7 @@ pub async fn test_http2_stream(
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
     }
-    
+
     // Set search event context if not set
     if req.search_event_context.is_none() {
         req.search_event_context = req
@@ -171,8 +172,8 @@ pub async fn test_http2_stream(
     // #[cfg(feature = "enterprise")]
     // for stream_name in stream_names.iter() {
     //     if let Err(e) =
-    //         o2_enterprise::enterprise::check::check_permissions(stream_name, stream_type, user_id, org_id).await
-    //     {
+    //         o2_enterprise::enterprise::check::check_permissions(stream_name, stream_type,
+    // user_id, org_id).await     {
     //         let err_res = WsServerEvents::error_response(
     //             &Error::Message(e),
     //             Some(req.trace_id.clone()),
@@ -183,18 +184,19 @@ pub async fn test_http2_stream(
     //         return Ok(());
     //     }
     // }
-
-
-    // Create a channel for streaming results
-    let (tx, rx) = mpsc::channel::<Result<BytesImpl, actix_web::Error>>(100);
-    let sender = tx.clone();
-    
     // Clone required values for the async task
     let trace_id_clone = trace_id.clone();
     let org_id_clone = org_id.clone();
 
     // create new sql query with histogram interval
-    let sql = match crate::service::search::sql::Sql::new(&req.query.clone().into(), &org_id, stream_type, req.search_type).await {
+    let sql = match crate::service::search::sql::Sql::new(
+        &req.query.clone().into(),
+        &org_id,
+        stream_type,
+        req.search_type,
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);
@@ -207,22 +209,14 @@ pub async fn test_http2_stream(
         if let Ok(updated_query) = update_histogram_interval_in_query(&req.query.sql, interval) {
             req.query.sql = updated_query;
         } else {
-            log::error!("[SEARCH_STREAM] trace_id: {}; Failed to update query with histogram interval: {}",
+            log::error!(
+                "[SEARCH_STREAM] trace_id: {}; Failed to update query with histogram interval: {}",
                 trace_id,
                 interval
             );
-            // send error message to client
-            send_message(&sender, WsServerEvents::Error {
-                code: 400,
-                message: "Failed to update query with histogram interval".to_string(),
-                error_detail: None,
-                trace_id: None,
-                request_id: None,
-                should_client_retry: false,
-            }).await;
 
             return Ok(MetaHttpResponse::bad_request(
-                "Failed to update query with histogram interval"
+                "Failed to update query with histogram interval",
             ));
         }
         log::info!(
@@ -243,7 +237,12 @@ pub async fn test_http2_stream(
     if req.search_type.is_none() {
         req.search_type = Some(SearchEventType::Other);
     }
-    
+
+
+    // Create a channel for streaming results
+    let (tx, rx) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
+    let mut sender = tx.clone();
+
     // Spawn the test data generation in a separate task
     actix_web::rt::spawn(async move {
         log::info!(
@@ -253,8 +252,8 @@ pub async fn test_http2_stream(
         );
 
         // if req.query.from == 0 {
-        //     let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
-        //         .instrument(search_span.clone())
+        //     let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req,
+        // use_cache)         .instrument(search_span.clone())
         //         .await {
         //             Ok(v) => v,
         //             Err(e) => {
@@ -275,7 +274,7 @@ pub async fn test_http2_stream(
         //     let mut deltas = local_c_resp.deltas;
         //     deltas.sort();
         //     deltas.dedup();
-            
+
         //     let cached_hits = cached_resp
         //         .iter()
         //         .fold(0, |acc, c| acc + c.cached_response.hits.len());
@@ -291,8 +290,8 @@ pub async fn test_http2_stream(
         //         .unwrap_or_default();
 
         //     log::info!(
-        //         "[SEARCH_STREAM] trace_id: {}, found cache responses len:{}, with hits: {}, cache_start_time: {:#?}, cache_end_time: {:#?}",
-        //         trace_id,
+        //         "[SEARCH_STREAM] trace_id: {}, found cache responses len:{}, with hits: {},
+        // cache_start_time: {:#?}, cache_end_time: {:#?}",         trace_id,
         //         cached_resp.len(),
         //         cached_hits,
         //         c_start_time,
@@ -304,8 +303,8 @@ pub async fn test_http2_stream(
         //         // `max_query_range` is used initialize `remaining_query_range`
         //         // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
         //         // for cache only search
-        //         let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await;
-        //         let remaining_query_range = if max_query_range == 0 {
+        //         let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id,
+        // stream_type).await;         let remaining_query_range = if max_query_range == 0 {
         //             i64::MAX
         //         } else {
         //             max_query_range
@@ -344,70 +343,70 @@ pub async fn test_http2_stream(
             max_query_range,
             &mut start,
             &req_order_by,
-            &sender,
+            sender.clone(),
         )
         .instrument(search_span.clone())
-        .await {
+        .await
+        {
             Ok(_) => (),
             Err(e) => {
-                log::error!("Error in do_partitioned_search: {}", e);
+                log::error!("[HTTP2_STREAM] Error in do_partitioned_search: {}", e);
+                sender.send(Err(e)).await.unwrap();
                 return;
             }
         };
         // }
 
         // Once all searches are complete, write the accumulated results to a file
-        log::info!("[HTTP2_STREAM] trace_id {} all searches completed", trace_id);
-        let end_res = WsServerEvents::End {
-            trace_id: Some(trace_id.clone()),
-        };
-        match send_message(&sender, end_res).await {
-            Ok(_) => (),
-            Err(e) => {
-                log::error!("Error in send_message: {}", e);
-                return;
-            }
-        };
+        log::info!(
+            "[HTTP2_STREAM] trace_id {} all searches completed",
+            trace_id
+        );
+        let end_res = StreamResponses::End;
+        sender.send(Ok(end_res)).await.unwrap();
     });
-    
+
     // Return streaming response
-    let stream = rx.map(|result| result);
-    
+    let stream = rx.map(|result| match result {
+        Ok(v) => {
+            let bytes_with_newline = match v {
+                StreamResponses::SearchResponse { results, streaming_output } => {
+                    let res = serde_json::json!({
+                        "data": results,
+                        "streaming_output": streaming_output
+                    });
+                    json::to_vec(&res).expect("Failed to serialize search response")
+                }
+                StreamResponses::Error { code, message } => {
+                    let res = serde_json::json!({
+                        "code": code,
+                        "message": message
+                    });
+                    json::to_vec(&res).unwrap()
+                }
+                StreamResponses::End => {
+                    json::to_vec(&"end".to_string()).unwrap()
+                }
+            };
+
+            Ok::<BytesImpl, Error>(BytesImpl::from(bytes_with_newline))
+        },
+        Err(e) => {
+            log::error!("[HTTP2_STREAM] Error in stream: {}", e);
+            let res = serde_json::json!({
+                "code": 500,
+                "message": e.to_string()
+            });
+            Ok::<BytesImpl, Error>(BytesImpl::from(json::to_vec(&res).unwrap()))
+        }
+    });
+
     Ok(HttpResponse::Ok()
         .content_type("text/event-stream")
-        .append_header(("Content-Type", "text/event-stream"))
         .append_header(("Connection", "keep-alive"))
         .streaming(stream))
 }
 
-// Helper function to send a message to the client
-async fn send_message(
-    sender: &mpsc::Sender<Result<BytesImpl, actix_web::Error>>, 
-    event: WsServerEvents
-) -> Result<(), Error> {
-    let mut sender = sender.clone();
-    
-    match json::to_vec(&event.to_json()) {
-        Ok(json_bytes) => {
-            // Add newline to each JSON message for ndjson format
-            let mut bytes_with_newline = json_bytes;
-            bytes_with_newline.push(b'\n');
-            
-            sender.send(Ok(BytesImpl::from(bytes_with_newline)))
-                .await
-                .map_err(|e| {
-                    log::error!("Failed to send message: {}", e);
-                    std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-                })?;
-            
-            Ok(())
-        },
-        Err(e) => {
-            log::error!("Failed to serialize message: {}", e);
-            Err(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-        }
-    }
-}
 
 // Do partitioned search without cache
 #[tracing::instrument(name = "service:search:websocket::do_partitioned_search", skip_all)]
@@ -422,16 +421,14 @@ pub async fn do_partitioned_search(
     max_query_range: i64, // hours
     start_timer: &mut Instant,
     req_order_by: &OrderBy,
-    sender: &mpsc::Sender<Result<BytesImpl, actix_web::Error>>,
+    mut sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
     if max_query_range > 0
-        && (req.query.end_time - req.query.start_time)
-            > max_query_range * 3600 * 1_000_000
+        && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
     {
-        req.query.start_time =
-            req.query.end_time - max_query_range * 3600 * 1_000_000;
+        req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
         log::info!(
             "[SEARCH_STREAM] Query duration is modified due to query range restriction of {} hours, new start_time: {}",
             max_query_range,
@@ -446,7 +443,13 @@ pub async fn do_partitioned_search(
     let modified_start_time = req.query.start_time;
     let modified_end_time = req.query.end_time;
 
-    let partition_resp = get_partitions(trace_id, org_id, stream_type, req, user_id).await?;
+    let partition_resp = match get_partitions(trace_id, org_id, stream_type, req, user_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            sender.send(Err(e)).await.unwrap();
+            return Ok(());
+        }
+    };
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
@@ -464,7 +467,9 @@ pub async fn do_partitioned_search(
     // unless the query is a dashboard or histogram
     let mut partition_order_by = req_order_by;
     // sort partitions in desc by _timestamp for dashboards & histograms
-    if req.search_type.expect("populate search_type") == SearchEventType::Dashboards || req.query.size == -1 {
+    if req.search_type.expect("populate search_type") == SearchEventType::Dashboards
+        || req.query.size == -1
+    {
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
         partition_order_by = &OrderBy::Desc;
     }
@@ -480,8 +485,10 @@ pub async fn do_partitioned_search(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         if idx == 4 {
-
-            send_message(sender, SEARCH_STREAM_res).await;
+            sender.send(Err(infra::errors::Error::Message(
+                "test".to_string(),
+            ))).await.unwrap();
+            return Ok(());
         }
         let mut req = req.clone();
         req.query.start_time = start_time;
@@ -492,7 +499,13 @@ pub async fn do_partitioned_search(
         }
 
         // do not use cache for partitioned search without cache
-        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
+        let mut search_res = match do_search(trace_id, org_id, stream_type, &req, user_id, false).await {
+            Ok(v) => v,
+            Err(e) => {
+                sender.send(Err(e)).await.unwrap();
+                return Ok(());
+            }
+        };
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
@@ -536,8 +549,8 @@ pub async fn do_partitioned_search(
             //     );
             //     let instant = Instant::now();
             //     let top_k_values = tokio::task::spawn_blocking(move || {
-            //         get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
-            //     })
+            //         get_top_k_values(&search_res.hits,
+            // &req.values_event_context.clone().unwrap())     })
             //     .instrument(SEARCH_STREAM_span.clone())
             //     .await
             //     .unwrap();
@@ -547,20 +560,12 @@ pub async fn do_partitioned_search(
             // }
 
             // Send the cached response
-            let SEARCH_STREAM_res = WsServerEvents::SearchResponse {
-                trace_id: trace_id.to_string(),
-                results: Box::new(search_res.clone()),
-                time_offset: TimeOffset {
-                    start_time,
-                    end_time,
-                },
-                streaming_aggs: is_streaming_aggs,
+            let response = StreamResponses::SearchResponse {
+                results: search_res.clone(),
+                streaming_output: is_streaming_aggs,
             };
-            
-            if let Err(e) = send_message(sender, SEARCH_STREAM_res).await {
-                log::error!("Failed to send search results: {}", e);
-            }
-            
+
+            sender.send(Ok(response)).await.unwrap();
         }
 
         // Stop if reached the requested result size and it is not a streaming aggs query
@@ -650,4 +655,16 @@ fn handle_partial_response(mut res: Response) -> Response {
         };
     }
     res
+}
+
+pub enum StreamResponses {
+    SearchResponse {
+        results: Response,
+        streaming_output: bool,
+    },
+    Error {
+        code: u16,
+        message: String,
+    },
+    End,
 }
