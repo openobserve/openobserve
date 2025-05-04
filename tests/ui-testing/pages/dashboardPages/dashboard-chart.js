@@ -1,5 +1,3 @@
-import { expect } from "@playwright/test";
-
 // pages/chartTypeSelector.js
 // Methods : selectChartType, selectStreamType, searchAndAddField,  selectStream
 
@@ -65,6 +63,10 @@ export default class ChartTypeSelector {
       longitude: "dashboard-add-longitude-data",
       weight: "dashboard-add-weight-data",
       z: "dashboard-add-z-data",
+      name: "dashboard-name-layout",
+      value: "dashboard-value_for_maps-layout",
+      firstcolumn: "dashboard-x-layout",
+      othercolumn: "dashboard-y-layout",
     };
 
     const buttonTestId = buttonSelectors[target];
