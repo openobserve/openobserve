@@ -207,7 +207,7 @@ pub async fn test_http2_stream(
         if let Ok(updated_query) = update_histogram_interval_in_query(&req.query.sql, interval) {
             req.query.sql = updated_query;
         } else {
-            log::error!("[WS_SEARCH] trace_id: {}; Failed to update query with histogram interval: {}",
+            log::error!("[SEARCH_STREAM] trace_id: {}; Failed to update query with histogram interval: {}",
                 trace_id,
                 interval
             );
@@ -226,7 +226,7 @@ pub async fn test_http2_stream(
             ));
         }
         log::info!(
-            "[WS_SEARCH] trace_id: {}; Updated query {}; with histogram interval: {}",
+            "[SEARCH_STREAM] trace_id: {}; Updated query {}; with histogram interval: {}",
             trace_id,
             req.query.sql,
             interval
@@ -258,7 +258,7 @@ pub async fn test_http2_stream(
         //         .await {
         //             Ok(v) => v,
         //             Err(e) => {
-        //                 log::error!("[WS_SEARCH] trace_id: {}; Failed to check cache: {}",
+        //                 log::error!("[SEARCH_STREAM] trace_id: {}; Failed to check cache: {}",
         //                     trace_id,
         //                     e.to_string()
         //                 );
@@ -291,7 +291,7 @@ pub async fn test_http2_stream(
         //         .unwrap_or_default();
 
         //     log::info!(
-        //         "[WS_SEARCH] trace_id: {}, found cache responses len:{}, with hits: {}, cache_start_time: {:#?}, cache_end_time: {:#?}",
+        //         "[SEARCH_STREAM] trace_id: {}, found cache responses len:{}, with hits: {}, cache_start_time: {:#?}, cache_end_time: {:#?}",
         //         trace_id,
         //         cached_resp.len(),
         //         cached_hits,
@@ -433,7 +433,7 @@ pub async fn do_partitioned_search(
         req.query.start_time =
             req.query.end_time - max_query_range * 3600 * 1_000_000;
         log::info!(
-            "[WS_SEARCH] Query duration is modified due to query range restriction of {} hours, new start_time: {}",
+            "[SEARCH_STREAM] Query duration is modified due to query range restriction of {} hours, new start_time: {}",
             max_query_range,
             req.query.start_time
         );
@@ -472,7 +472,7 @@ pub async fn do_partitioned_search(
     let mut curr_res_size = 0;
 
     log::info!(
-        "[WS_SEARCH] Found {} partitions for trace_id: {}, partitions: {:?}",
+        "[SEARCH_STREAM] Found {} partitions for trace_id: {}, partitions: {:?}",
         partitions.len(),
         trace_id,
         &partitions
@@ -481,7 +481,7 @@ pub async fn do_partitioned_search(
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         if idx == 4 {
 
-            send_message(sender, ws_search_res).await;
+            send_message(sender, SEARCH_STREAM_res).await;
         }
         let mut req = req.clone();
         req.query.start_time = start_time;
@@ -530,7 +530,7 @@ pub async fn do_partitioned_search(
 
             // TODO: add top k values for values search
             // if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
-            //     let ws_search_span = tracing::info_span!(
+            //     let SEARCH_STREAM_span = tracing::info_span!(
             //         "src::service::websocket_events::search::do_partitioned_search::get_top_k_values",
             //         org_id = %req.org_id,
             //     );
@@ -538,7 +538,7 @@ pub async fn do_partitioned_search(
             //     let top_k_values = tokio::task::spawn_blocking(move || {
             //         get_top_k_values(&search_res.hits, &req.values_event_context.clone().unwrap())
             //     })
-            //     .instrument(ws_search_span.clone())
+            //     .instrument(SEARCH_STREAM_span.clone())
             //     .await
             //     .unwrap();
             //     search_res.hits = top_k_values?;
@@ -547,7 +547,7 @@ pub async fn do_partitioned_search(
             // }
 
             // Send the cached response
-            let ws_search_res = WsServerEvents::SearchResponse {
+            let SEARCH_STREAM_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.to_string(),
                 results: Box::new(search_res.clone()),
                 time_offset: TimeOffset {
@@ -557,7 +557,7 @@ pub async fn do_partitioned_search(
                 streaming_aggs: is_streaming_aggs,
             };
             
-            if let Err(e) = send_message(sender, ws_search_res).await {
+            if let Err(e) = send_message(sender, SEARCH_STREAM_res).await {
                 log::error!("Failed to send search results: {}", e);
             }
             
@@ -566,7 +566,7 @@ pub async fn do_partitioned_search(
         // Stop if reached the requested result size and it is not a streaming aggs query
         if req_size != -1 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
-                "[WS_SEARCH]: Reached requested result size ({}), stopping search",
+                "[SEARCH_STREAM]: Reached requested result size ({}), stopping search",
                 req_size
             );
             break;
