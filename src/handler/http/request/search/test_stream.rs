@@ -36,11 +36,11 @@ use config::{
     },
     utils::json,
 };
-use serde::{Deserialize, Serialize};
 use futures::{SinkExt, channel::mpsc, stream::StreamExt};
 use hashbrown::HashMap;
 use log;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use sqlparser::{
     ast::{Expr, FunctionArguments, Statement, visit_statements_mut},
     dialect::PostgreSqlDialect,
@@ -50,7 +50,11 @@ use tracing::{Instrument, Span};
 
 use crate::{
     common::{
-        meta::{self, search::{MultiCachedQueryResponse, QueryDelta, CachedQueryResponse}, http::HttpResponse as MetaHttpResponse},
+        meta::{
+            self,
+            http::HttpResponse as MetaHttpResponse,
+            search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
+        },
         utils::{
             functions,
             http::{
@@ -58,17 +62,26 @@ use crate::{
                 get_search_type_from_request, get_stream_type_from_request,
                 get_use_cache_from_request, get_work_group,
             },
-            stream::get_max_query_range,
-            websocket::{update_histogram_interval_in_query, calc_queried_range},
+            stream::{get_max_query_range, get_settings_max_query_range},
+            websocket::{calc_queried_range, update_histogram_interval_in_query},
         },
     },
+    handler::http::request::search::{
+        error_utils::map_error_to_http_response, utils::check_stream_permissions,
+    },
     service::{
-        search::{self as SearchService, cache, sql::Sql, datafusion::distributed_plan::streaming_aggs_exec},
+        search::{
+            self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
+            sql::Sql,
+        },
         self_reporting::http_report_metrics,
         websocket_events::{
-            sort::order_search_results,
             search::write_results_to_cache,
-            utils::{TimeOffset, WsServerEvents, calculate_progress_percentage, setup_tracing_with_trace_id},
+            sort::order_search_results,
+            utils::{
+                TimeOffset, WsServerEvents, calculate_progress_percentage,
+                setup_tracing_with_trace_id,
+            },
         },
     },
 };
@@ -177,12 +190,32 @@ pub async fn test_http2_stream(
     };
 
     // Check permissions for each stream
+    let mut range_error = String::new();
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
-        if let Err(e) =
-            o2_enterprise::enterprise::check::check_permissions(stream_name, stream_type,
-    user_id, org_id).await     {
-            return Ok(MetaHttpResponse::bad_request(e));
+        if let Some(settings) =
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+        {
+            let max_query_range =
+                get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
+                    .await;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+            {
+                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+                range_error = format!(
+                    "Query duration is modified due to query range restriction of {} hours",
+                    max_query_range
+                );
+            }
+        }
+
+        // Check permissions on stream
+        #[cfg(feature = "enterprise")]
+        if let Some(res) =
+            check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+        {
+            return Ok(res);
         }
     }
     // Clone required values for the async task
@@ -254,21 +287,27 @@ pub async fn test_http2_stream(
             org_id
         );
 
-        let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
+        let max_query_range =
+            get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
         if req.query.from == 0 {
-            let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req,use_cache).instrument(search_span.clone()).await {
-                Ok(v) => v,
-                Err(e) => {
-                    log::error!("[HTTP2_STREAM] trace_id: {}; Failed to check cache: {}",
-                        trace_id,
-                        e.to_string()
-                    );
-                    // send error message to client
-                    sender.send(Err(e)).await.unwrap();
-                    return;
-                }
-            };
+            let c_resp =
+                match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
+                    .instrument(search_span.clone())
+                    .await
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!(
+                            "[HTTP2_STREAM] trace_id: {}; Failed to check cache: {}",
+                            trace_id,
+                            e.to_string()
+                        );
+                        // send error message to client
+                        sender.send(Err(e)).await.unwrap();
+                        return;
+                    }
+                };
             let local_c_resp = c_resp.clone();
             let cached_resp = local_c_resp.cached_response;
             let mut deltas = local_c_resp.deltas;
@@ -291,13 +330,13 @@ pub async fn test_http2_stream(
 
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, found cache responses len:{}, with hits: {},
-        cache_start_time: {:#?}, cache_end_time: {:#?}",         trace_id,
+        cache_start_time: {:#?}, cache_end_time: {:#?}",
+                trace_id,
                 cached_resp.len(),
                 cached_hits,
                 c_start_time,
                 c_end_time
             );
-
 
             // handle cache responses and deltas
             if !cached_resp.is_empty() && cached_hits > 0 {
@@ -329,7 +368,8 @@ pub async fn test_http2_stream(
                     sender.clone(),
                 )
                 .instrument(search_span.clone())
-                .await {
+                .await
+                {
                     sender.send(Err(e)).await.unwrap();
                     return;
                 }
@@ -356,7 +396,8 @@ pub async fn test_http2_stream(
                     sender.clone(),
                 )
                 .instrument(search_span.clone())
-                .await {
+                .await
+                {
                     sender.send(Err(e)).await.unwrap();
                     return;
                 }
@@ -420,6 +461,8 @@ pub async fn test_http2_stream(
         },
         Err(e) => {
             log::error!("[HTTP2_STREAM] Error in stream: {}", e);
+            // TODO: fix http response
+            // let err_res = map_error_to_http_response(&e, trace_id);
             Err(e)
         }
     });
@@ -429,7 +472,6 @@ pub async fn test_http2_stream(
         .append_header(("Connection", "keep-alive"))
         .streaming(stream))
 }
-
 
 // Do partitioned search without cache
 #[tracing::instrument(name = "service:search:websocket::do_partitioned_search", skip_all)]
@@ -468,7 +510,7 @@ pub async fn do_partitioned_search(
     let modified_end_time = req.query.end_time;
 
     let partition_resp = get_partitions(trace_id, org_id, stream_type, req, user_id).await?;
-        
+
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
@@ -588,9 +630,10 @@ pub async fn do_partitioned_search(
                 modified_end_time,
                 partition_order_by,
             );
-            sender.send(Ok(StreamResponses::Progress {
-                percent,
-            })).await.unwrap();
+            sender
+                .send(Ok(StreamResponses::Progress { percent }))
+                .await
+                .unwrap();
         }
         // Stop if reached the requested result size and it is not a streaming aggs query
         if req_size != -1 && curr_res_size >= req_size && !is_streaming_aggs {
@@ -690,7 +733,7 @@ pub enum StreamResponses {
     },
     Progress {
         percent: usize,
-    }
+    },
 }
 
 #[tracing::instrument(
@@ -716,12 +759,14 @@ pub async fn handle_cache_responses_and_deltas(
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
-    let cache_order_by =
-        if req.search_type.expect("search_type is required") == SearchEventType::Dashboards || req.query.size == -1 {
-            &OrderBy::Desc
-        } else {
-            req_order_by
-        };
+    let cache_order_by = if req.search_type.expect("search_type is required")
+        == SearchEventType::Dashboards
+        || req.query.size == -1
+    {
+        &OrderBy::Desc
+    } else {
+        req_order_by
+    };
 
     // sort both deltas and cache by order_by
     match cache_order_by {
@@ -925,7 +970,9 @@ async fn process_delta(
     );
 
     // for dashboards & histograms
-    if req.search_type.expect("search_type is required") == SearchEventType::Dashboards || req.query.size == -1 {
+    if req.search_type.expect("search_type is required") == SearchEventType::Dashboards
+        || req.query.size == -1
+    {
         // sort partitions by timestamp in desc
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
     }
@@ -940,7 +987,8 @@ async fn process_delta(
         }
 
         // use cache for delta search
-        let mut search_res = do_search(&trace_id, &org_id, stream_type, &req, user_id, true).await?;
+        let mut search_res =
+            do_search(&trace_id, &org_id, stream_type, &req, user_id, true).await?;
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
@@ -1003,8 +1051,8 @@ async fn process_delta(
                 results: search_res.clone(),
                 streaming_aggs: is_streaming_aggs,
                 time_offset: TimeOffset {
-                    start_time: start_time,
-                    end_time: end_time,
+                    start_time,
+                    end_time,
                 },
             };
             log::info!(
@@ -1055,9 +1103,10 @@ async fn process_delta(
                 original_req_end_time,
                 cache_order_by,
             );
-            sender.send(Ok(StreamResponses::Progress {
-                percent,
-            })).await.unwrap();
+            sender
+                .send(Ok(StreamResponses::Progress { percent }))
+                .await
+                .unwrap();
         }
 
         // Stop if reached the request result size
@@ -1177,7 +1226,7 @@ async fn send_cached_responses(
         cached.cached_response.hits.len(),
         cached.cached_response.result_cache_ratio,
     );
-    let response = StreamResponses::SearchResponse { 
+    let response = StreamResponses::SearchResponse {
         results: cached.cached_response,
         streaming_aggs: false,
         time_offset: TimeOffset {
@@ -1195,9 +1244,10 @@ async fn send_cached_responses(
             req.query.end_time,
             cache_order_by,
         );
-        sender.send(Ok(StreamResponses::Progress {
-            percent,
-        })).await.unwrap();
+        sender
+            .send(Ok(StreamResponses::Progress { percent }))
+            .await
+            .unwrap();
     }
 
     Ok(())
