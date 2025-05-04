@@ -446,6 +446,18 @@ pub struct WebSocket {
         help = "Maximum allowed number of messages in buffer"
     )]
     pub max_channel_buffer_size: usize,
+    #[env_config(
+        name = "ZO_WEBSOCKET_BENCHMARK_MODE",
+        default = false,
+        help = "Enable benchmark mode"
+    )]
+    pub benchmark_mode: bool,
+    #[env_config(
+        name = "ZO_WEBSOCKET_BENCHMARK_MODE_PAYLOAD_SIZE_IN_MB",
+        default = 10,
+        help = "Payload size for benchmark mode in MB"
+    )]
+    pub benchmark_payload_size: usize,
 }
 
 #[derive(EnvConfig)]

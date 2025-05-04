@@ -15,7 +15,7 @@
 
 use actix_web::http::StatusCode;
 use config::{
-    ider,
+    get_config, ider,
     meta::{
         sql::OrderBy,
         websocket::{SearchEventReq, ValuesEventReq},
@@ -307,6 +307,31 @@ impl WsServerEvents {
             Self::Error { trace_id, .. } => trace_id.to_owned(),
             Self::End { trace_id } => trace_id.to_owned(),
             _ => None,
+        }
+    }
+
+    pub fn increase_payload_size_for_benchmark(&self) -> Self {
+        match self {
+            Self::SearchResponse {
+                trace_id,
+                results,
+                time_offset,
+                streaming_aggs,
+            } => {
+                let mut results = results.clone();
+                let dummy_data = vec![
+                    "a".to_string();
+                    get_config().websocket.benchmark_payload_size * 1024 * 1024
+                ];
+                results.columns = dummy_data;
+                WsServerEvents::SearchResponse {
+                    trace_id: trace_id.to_owned(),
+                    results,
+                    time_offset: time_offset.to_owned(),
+                    streaming_aggs: *streaming_aggs,
+                }
+            }
+            _ => self.clone(),
         }
     }
 }

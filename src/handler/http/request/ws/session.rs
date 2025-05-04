@@ -358,6 +358,14 @@ pub async fn send_message_2(
         trace_id,
         req_id,
     );
+
+    // TODO: REMOVE BENCHMARK
+    let mut msg = msg;
+    if get_config().websocket.benchmark_mode {
+        msg = msg.increase_payload_size_for_benchmark();
+    }
+    // End OF BENCHMARK
+
     match response_tx.send(msg) {
         Err(e) => {
             log::error!(
