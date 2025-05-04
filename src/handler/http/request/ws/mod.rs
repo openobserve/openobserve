@@ -95,7 +95,7 @@ pub async fn websocket(
                 if let Some(msg) = msg_stream.next().await {
                     if outgoing_stopped_clone.load(Ordering::SeqCst) {
                         log::debug!(
-                            "[WS_HANDLER]: outgoing task closed. Stop incoming stake to accept new message for request_id: {req_id}",
+                            "[WS_HANDLER]: outgoing task closed. Stop incoming task to accept new message for request_id: {req_id}",
                         );
                         break;
                     }
@@ -272,6 +272,11 @@ pub async fn websocket(
                                 }
                             }
                             Some(DisconnectMessage::Close(close_reason)) => {
+                                outgoing_stopped.store(true, Ordering::SeqCst);
+                                log::debug!(
+                                    "[WS::Querier::Handler] handle_outgoing task stopped for request_id: {}",
+                                    req_id
+                                );
                                 if let Err(e) = ws_session.close(close_reason).await {
                                     log::error!("[WS::Querier::Handler]: Error closing websocket session request_id: {}, error: {}", req_id, e);
                                 };

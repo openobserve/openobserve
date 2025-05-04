@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use actix_http::StatusCode;
 use async_trait::async_trait;
@@ -61,6 +64,7 @@ pub struct QuerierConnection {
     write: Arc<RwLock<Option<SplitSink<WsStreamType, WsMessage>>>>,
     response_router: Arc<ResponseRouter>,
     id: String,
+    is_connected: Arc<AtomicBool>,
 }
 
 impl Drop for QuerierConnection {
@@ -169,6 +173,14 @@ impl QuerierConnection {
         loop {
             // Handle incoming messages from querier to router
             if let Some(msg) = read.next().await {
+                if !self.is_connected.load(Ordering::SeqCst) {
+                    log::debug!(
+                        "[WS::Router::QuerierConnection] connection is closed. Stopping the task listening to querier. router conn id: {}, querier: {}",
+                        self.id,
+                        self.querier_name
+                    );
+                    break;
+                }
                 match msg {
                     Ok(msg) => {
                         match msg {
@@ -414,6 +426,9 @@ impl QuerierConnection {
             force_remove
         );
 
+        // change the status to disconnected
+        self.is_connected.store(false, Ordering::SeqCst);
+
         // remove the connection from the pool
         QuerierConnectionPool::clean_up(&self.querier_name).await
     }
@@ -464,7 +479,7 @@ impl ResponseRouter {
         };
         let Some(resp_sender) = sender else {
             log::warn!(
-                "[WS::Router::QuerierConnection] response_channel for trace_id {} not found.",
+                "[WS::Router::QuerierConnection] response_channel not found, trace_id: {}.",
                 trace_id,
             );
             return Err(WsError::ResponseChannelNotFound(trace_id.clone()));
@@ -476,19 +491,29 @@ impl ResponseRouter {
             start.elapsed().as_secs_f64()
         );
 
-        if let Err(e) = resp_sender.clone().send(message).await {
-            log::warn!(
-                "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {} error: {}",
-                trace_id,
-                e
-            );
-            let mut write_guard = self.routes.write().await;
-            write_guard.remove(&trace_id);
-            write_guard.shrink_to_fit();
-            drop(write_guard);
-            return Err(WsError::ResponseChannelClosed(trace_id.clone()));
+        let start = std::time::Instant::now();
+        match resp_sender.send(message).await {
+            Err(e) => {
+                log::warn!(
+                    "[WS::Router::QuerierConnection] failed to route querier response to router ws handler for trace_id: {} error: {}",
+                    trace_id,
+                    e
+                );
+                let mut write_guard = self.routes.write().await;
+                write_guard.remove(&trace_id);
+                write_guard.shrink_to_fit();
+                drop(write_guard);
+                Err(WsError::ResponseChannelClosed(trace_id.clone()))
+            }
+            Ok(()) => {
+                log::debug!(
+                    "[WS::Router::QuerierConnection] time took to send message to response channel for trace_id {}: {} secs",
+                    trace_id,
+                    start.elapsed().as_secs_f64()
+                );
+                Ok(())
+            }
         }
-        Ok(())
     }
 }
 
@@ -525,6 +550,7 @@ impl Connection for QuerierConnection {
             write,
             response_router,
             id,
+            is_connected: Arc::new(AtomicBool::new(true)),
         });
 
         // Spawn task to listen to querier responses
@@ -551,6 +577,7 @@ impl Connection for QuerierConnection {
             *write_guard = None;
         }
         drop(write_guard);
+        self.is_connected.store(false, Ordering::SeqCst);
     }
 
     async fn send_message(&self, message: WsClientEvents) -> WsResult<()> {

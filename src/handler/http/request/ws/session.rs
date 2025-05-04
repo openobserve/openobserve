@@ -351,21 +351,32 @@ pub async fn send_message_2(
     msg: WsServerEvents,
     response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
+    let start = std::time::Instant::now();
     let trace_id = msg.get_trace_id();
     log::debug!(
         "[WS::Querier::Channel] attempting sending response between incoming->outgoing threads for trace_id: {}, request_id: {}",
         trace_id,
         req_id,
     );
-    if let Err(e) = response_tx.send(msg).await {
-        log::error!(
-            "[WS::Querier::Channel] sending response between incoming->outgoing threads for trace_id: {} error: {}",
-            trace_id,
-            e
-        );
-        return Err(Error::Message(e.to_string()));
+    match response_tx.send(msg).await {
+        Err(e) => {
+            log::error!(
+                "[WS::Querier::Channel] failed to send response to handle_outgoing thread for trace_id: {} error: {}",
+                trace_id,
+                e
+            );
+            Err(Error::Message(e.to_string()))
+        }
+        Ok(_) => {
+            log::debug!(
+                "[WS::Querier::Channel] successfully sent response to handle_outgoing thread for trace_id: {}, request_id: {}, took: {} secs",
+                trace_id,
+                req_id,
+                start.elapsed().as_secs_f64()
+            );
+            Ok(())
+        }
     }
-    Ok(())
 }
 
 // Main search handler
