@@ -1463,7 +1463,7 @@ pub struct Compact {
     pub data_retention_history: bool,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
-        default = 500,
+        default = 0,
         help = "Batch size for compact get pending jobs"
     )]
     pub batch_size: i64,
@@ -2547,7 +2547,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = 100;
+        cfg.compact.batch_size = cfg.limit.cpu_num as i64;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;

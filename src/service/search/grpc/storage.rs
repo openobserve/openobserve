@@ -622,24 +622,42 @@ pub async fn filter_file_list_by_tantivy_index(
             let idx_optimize_rule_clone = idx_optimize_rule.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let task = tokio::task::spawn(async move {
-                let ret = search_tantivy_index(
-                    &trace_id,
-                    time_range,
-                    index_condition_clone,
-                    idx_optimize_rule_clone,
-                    &file,
-                )
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, error: {:?}",
-                        file.key,
-                        e
-                    );
-                    e
-                });
-                drop(permit);
-                ret
+                // spawn a new task for catching the panic error
+                let inner_trace_id = trace_id.clone();
+                let parquet_file = file.clone();
+                let ret = tokio::task::spawn(async move {
+                    let ret = search_tantivy_index(
+                        &inner_trace_id,
+                        time_range,
+                        index_condition_clone,
+                        idx_optimize_rule_clone,
+                        &parquet_file,
+                    )
+                    .await;
+                    drop(permit);
+                    ret
+                })
+                .await;
+                match ret {
+                    Ok(Ok(ret)) => Ok(ret),
+                    Ok(Err(e)) => {
+                        log::error!(
+                            "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, error: {:?}",
+                            file.key,
+                            e
+                        );
+                        Err(e)
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, index_size: {}, error: {:?}",
+                            file.key,
+                            file.meta.index_size,
+                            e
+                        );
+                        Err(e.into())
+                    }
+                }
             });
             tasks.push(task)
         }
