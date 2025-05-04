@@ -28,7 +28,7 @@ use futures_util::{
 use reqwest::header::{HeaderName, HeaderValue};
 use tokio::{
     net::TcpStream,
-    sync::{RwLock, mpsc::Sender},
+    sync::{RwLock, mpsc::UnboundedSender},
 };
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream, connect_async_with_config,
@@ -78,7 +78,7 @@ impl Drop for QuerierConnection {
 
 #[derive(Debug, Default)]
 pub struct ResponseRouter {
-    routes: RwAHashMap<TraceId, Sender<WsServerEvents>>,
+    routes: RwAHashMap<TraceId, UnboundedSender<WsServerEvents>>,
 }
 
 impl Drop for ResponseRouter {
@@ -100,19 +100,17 @@ impl ResponseRouter {
         drop(write_guard);
         for (trace_id, sender) in removed.into_iter() {
             // Send error response to client
-            let _ = sender
-                .send(WsServerEvents::Error {
-                    code: StatusCode::SERVICE_UNAVAILABLE.into(),
-                    message: error
-                        .clone()
-                        .unwrap_or("Querier connection closed".to_string()),
-                    error_detail: None,
-                    trace_id: Some(trace_id.clone()),
-                    request_id: None,
-                    should_client_retry: true, /* Indicate client should retry since the querier
-                                                * connection is closed */
-                })
-                .await;
+            let _ = sender.send(WsServerEvents::Error {
+                code: StatusCode::SERVICE_UNAVAILABLE.into(),
+                message: error
+                    .clone()
+                    .unwrap_or("Querier connection closed".to_string()),
+                error_detail: None,
+                trace_id: Some(trace_id.clone()),
+                request_id: None,
+                should_client_retry: true, /* Indicate client should retry since the querier
+                                            * connection is closed */
+            });
             log::debug!(
                 "[WS::QuerierConnection::ResponseRouter] flushed for trace_id: {}, querier_name: {}, force_remove: {}",
                 trace_id,
@@ -144,7 +142,11 @@ impl QuerierConnection {
         &self.querier_name
     }
 
-    pub async fn register_request(&self, trace_id: TraceId, response_tx: Sender<WsServerEvents>) {
+    pub async fn register_request(
+        &self,
+        trace_id: TraceId,
+        response_tx: UnboundedSender<WsServerEvents>,
+    ) {
         let mut write_guard = self.response_router.routes.write().await;
         write_guard.insert(trace_id.clone(), response_tx);
         drop(write_guard);
@@ -412,8 +414,9 @@ impl QuerierConnection {
         if let Some(write) = write_guard.as_mut() {
             if let Err(e) = write.close().await {
                 log::warn!(
-                    "[WS::QuerierConnection] failed to send close frame to querier during cleanup: {}",
-                    e
+                    "[WS::QuerierConnection] failed to send close frame to querier during cleanup: {}, req_id: {}",
+                    e,
+                    self.id
                 );
             }
             *write_guard = None;
@@ -421,9 +424,10 @@ impl QuerierConnection {
         drop(write_guard);
 
         log::debug!(
-            "[WS::QuerierConnection] removing connection from the pool: {}, force_remove: {}",
+            "[WS::QuerierConnection] removing connection from the pool: {}, force_remove: {}, req_id: {}",
             self.querier_name,
-            force_remove
+            force_remove,
+            self.id
         );
 
         // change the status to disconnected
@@ -473,6 +477,10 @@ impl ResponseRouter {
         let trace_id = message.get_trace_id();
         let sender = {
             let r = self.routes.read().await;
+            log::debug!(
+                "[WS::Router::QuerierConnection] time took to get sender lock for routing response from connection->handler: {} secs",
+                start.elapsed().as_secs_f64()
+            );
             let sender = r.get(&trace_id).cloned();
             drop(r);
             sender
@@ -492,12 +500,13 @@ impl ResponseRouter {
         );
 
         let start = std::time::Instant::now();
-        match resp_sender.send(message).await {
+        match resp_sender.send(message) {
             Err(e) => {
                 log::warn!(
-                    "[WS::Router::QuerierConnection] failed to route querier response to router ws handler for trace_id: {} error: {}",
+                    "[WS::Router::QuerierConnection] failed to route querier response to router ws handler for trace_id: {} error: {} after {} secs",
                     trace_id,
-                    e
+                    e,
+                    start.elapsed().as_secs_f64()
                 );
                 let mut write_guard = self.routes.write().await;
                 write_guard.remove(&trace_id);
@@ -582,8 +591,9 @@ impl Connection for QuerierConnection {
 
     async fn send_message(&self, message: WsClientEvents) -> WsResult<()> {
         log::info!(
-            "[WS::QuerierConnection] send_message -> attempt to send for trace_id: {}",
-            message.get_trace_id()
+            "[WS::QuerierConnection] send_message -> attempt to send to querier for trace_id: {}, req_id: {}",
+            message.get_trace_id(),
+            self.id
         );
         let mut write_guard = self.write.write().await;
         if let Some(write) = write_guard.as_mut() {

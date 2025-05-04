@@ -21,7 +21,7 @@ use config::{
         websocket::{SearchResultType, ValuesEventReq},
     },
 };
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::UnboundedSender;
 use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
@@ -48,7 +48,7 @@ pub async fn handle_values_request(
     request_id: &str,
     req: ValuesEventReq,
     accumulated_results: &mut Vec<SearchResultType>,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsServerEvents>,
 ) -> Result<(), infra::errors::Error> {
     let mut start_timer = std::time::Instant::now();
 

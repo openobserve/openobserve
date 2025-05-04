@@ -98,7 +98,7 @@ impl WsHandler {
         // Setup message channels
         // TODO: add env variable for this for channel size
         let (response_tx, mut response_rx) =
-            tokio::sync::mpsc::channel::<WsServerEvents>(cfg.websocket.max_channel_buffer_size);
+            tokio::sync::mpsc::unbounded_channel::<WsServerEvents>();
         let (disconnect_tx, mut disconnect_rx) =
             tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
         let session_manager = self.session_manager.clone();
@@ -222,7 +222,7 @@ impl WsHandler {
                                                     false,
                                                 );
                                                 if let Err(e) =
-                                                    response_tx_clone.clone().send(err_msg).await
+                                                    response_tx_clone.clone().send(err_msg)
                                                 {
                                                     log::error!(
                                                         "[WS::Router::Handler] Error sending error message to client_id: {}, error: {}",
@@ -405,8 +405,7 @@ impl WsHandler {
                                 );
                                 let _ = response_tx_clone
                                     .clone()
-                                    .send(WsServerEvents::Ping(ping.to_vec()))
-                                    .await;
+                                    .send(WsServerEvents::Ping(ping.to_vec()));
                             }
                             Ok(actix_ws::AggregatedMessage::Pong(pong)) => {
                                 log::info!(

@@ -28,7 +28,7 @@ use config::{
     utils::json::{Map, Value, get_string_value},
 };
 use infra::errors::Error;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::UnboundedSender;
 use tracing::Instrument;
 
 use super::sort::order_search_results;
@@ -92,7 +92,7 @@ pub async fn handle_search_request(
     org_id: &str,
     user_id: &str,
     mut req: SearchEventReq,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsServerEvents>,
 ) -> Result<(), Error> {
     let mut start_timer = Instant::now();
 
@@ -398,7 +398,7 @@ pub async fn handle_cache_responses_and_deltas(
     remaining_query_range: i64,
     req_order_by: &OrderBy,
     start_timer: &mut Instant,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsServerEvents>,
 ) -> Result<(), Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -576,7 +576,7 @@ async fn process_delta(
     cache_req_duration: i64,
     start_timer: &mut Instant,
     cache_order_by: &OrderBy,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsServerEvents>,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
@@ -817,7 +817,7 @@ async fn send_cached_responses(
     fallback_order_by_col: Option<String>,
     cache_order_by: &OrderBy,
     start_timer: &mut Instant,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsServerEvents>,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing cached response for trace_id: {}",
@@ -913,7 +913,7 @@ pub async fn do_partitioned_search(
     max_query_range: i64, // hours
     start_timer: &mut Instant,
     req_order_by: &OrderBy,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsServerEvents>,
 ) -> Result<(), Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -1090,7 +1090,7 @@ async fn send_partial_search_resp(
     new_end_time: i64,
     order_by: Option<OrderBy>,
     is_streaming_aggs: bool,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsServerEvents>,
 ) -> Result<(), Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
