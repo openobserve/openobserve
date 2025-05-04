@@ -260,7 +260,7 @@ pub async fn test_http2_stream(
             let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req,use_cache).instrument(search_span.clone()).await {
                 Ok(v) => v,
                 Err(e) => {
-                    log::error!("[SEARCH_STREAM] trace_id: {}; Failed to check cache: {}",
+                    log::error!("[HTTP2_STREAM] trace_id: {}; Failed to check cache: {}",
                         trace_id,
                         e.to_string()
                     );
@@ -290,7 +290,7 @@ pub async fn test_http2_stream(
                 .unwrap_or_default();
 
             log::info!(
-                "[SEARCH_STREAM] trace_id: {}, found cache responses len:{}, with hits: {},
+                "[HTTP2_STREAM] trace_id: {}, found cache responses len:{}, with hits: {},
         cache_start_time: {:#?}, cache_end_time: {:#?}",         trace_id,
                 cached_resp.len(),
                 cached_hits,
@@ -337,7 +337,7 @@ pub async fn test_http2_stream(
                 // Step 2: Search without cache
                 // no caches found process req directly
                 log::info!(
-                    "[WS_SEARCH] trace_id: {} No cache found, processing search request",
+                    "[HTTP2_STREAM] trace_id: {} No cache found, processing search request",
                     trace_id
                 );
 
@@ -369,7 +369,7 @@ pub async fn test_http2_stream(
                     .await
                     .map_err(|e| {
                         log::error!(
-                            "[WS_SEARCH] trace_id: {}, Error writing results to cache: {:?}",
+                            "[HTTP2_STREAM] trace_id: {}, Error writing results to cache: {:?}",
                             trace_id,
                             e
                         );
@@ -412,18 +412,11 @@ pub async fn test_http2_stream(
 
     // Return streaming response
     let stream = rx.map(|result| match result {
-        Ok(v) => {
-            // let mut responses = match v {
-            //     StreamResponses::SearchResponse{results,streaming_aggs,time_offset}=>{let res=serde_json::json!({"results":results,"streaming_aggs":streaming_aggs,"time_offset":time_offset});json::to_vec(&res).expect("Failed to serialize search response")}
-            //     StreamResponses::Error{code,message}=>{let res=serde_json::json!({"code":code,"message":message});json::to_vec(&res).unwrap()}
-            //     StreamResponses::Progress { percent } => {let res=serde_json::json!({"percent":percent});json::to_vec(&res).unwrap()}
-            // };
-
-            let mut responses = serde_json::to_vec(&v).expect("Failed to serialize search response");
+        Ok(v) => {            
+            let responses = serde_json::to_string(&v).expect("Failed to serialize search response");
             // Add a newline to the end of the bytes
-            responses.push(b'\n');
-
-            Ok(BytesImpl::from(responses))
+            let response = format!("data: {}\n\n", responses);
+            Ok(BytesImpl::from(response))
         },
         Err(e) => {
             log::error!("[HTTP2_STREAM] Error in stream: {}", e);
@@ -461,7 +454,7 @@ pub async fn do_partitioned_search(
     {
         req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
         log::info!(
-            "[SEARCH_STREAM] Query duration is modified due to query range restriction of {} hours, new start_time: {}",
+            "[HTTP2_STREAM] Query duration is modified due to query range restriction of {} hours, new start_time: {}",
             max_query_range,
             req.query.start_time
         );
@@ -503,7 +496,7 @@ pub async fn do_partitioned_search(
     let mut curr_res_size = 0;
 
     log::info!(
-        "[SEARCH_STREAM] Found {} partitions for trace_id: {}, partitions: {:?}",
+        "[HTTP2_STREAM] Found {} partitions for trace_id: {}, partitions: {:?}",
         partitions.len(),
         trace_id,
         &partitions
@@ -602,7 +595,7 @@ pub async fn do_partitioned_search(
         // Stop if reached the requested result size and it is not a streaming aggs query
         if req_size != -1 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
-                "[SEARCH_STREAM]: Reached requested result size ({}), stopping search",
+                "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
                 req_size
             );
             break;
@@ -760,7 +753,7 @@ pub async fn handle_cache_responses_and_deltas(
     let cached_search_duration = cache_duration + (max_query_range * 3600 * 1_000_000); // microseconds
 
     log::info!(
-        "[WS_SEARCH] trace_id: {}, Handling cache response and deltas, curr_res_size: {}, cached_search_duration: {}, remaining_query_duration: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}",
+        "[HTTP2_STREAM] trace_id: {}, Handling cache response and deltas, curr_res_size: {}, cached_search_duration: {}, remaining_query_duration: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}",
         trace_id,
         curr_res_size,
         cached_search_duration,
@@ -775,7 +768,7 @@ pub async fn handle_cache_responses_and_deltas(
         if let (Some(&delta), Some(cached)) = (delta_iter.peek(), cached_resp_iter.peek()) {
             // If the delta is before the current cached response time, fetch partitions
             log::info!(
-                "[WS_SEARCH] checking delta: {:?} with cached start_time: {:?}, end_time:{}",
+                "[HTTP2_STREAM] checking delta: {:?} with cached start_time: {:?}, end_time:{}",
                 delta,
                 cached.response_start_time,
                 cached.response_end_time,
@@ -788,7 +781,7 @@ pub async fn handle_cache_responses_and_deltas(
 
             if process_delta_first {
                 log::info!(
-                    "[WS_SEARCH] trace_id: {} Processing delta before cached response, order_by: {:#?}",
+                    "[HTTP2_STREAM] trace_id: {} Processing delta before cached response, order_by: {:#?}",
                     trace_id,
                     cache_order_by
                 );
@@ -830,7 +823,7 @@ pub async fn handle_cache_responses_and_deltas(
         } else if let Some(&delta) = delta_iter.peek() {
             // Process remaining deltas
             log::info!(
-                "[WS_SEARCH] trace_id: {} Processing remaining delta",
+                "[HTTP2_STREAM] trace_id: {} Processing remaining delta",
                 trace_id
             );
             process_delta(
@@ -871,7 +864,7 @@ pub async fn handle_cache_responses_and_deltas(
         // Stop if reached the requested result size
         if req_size != -1 && curr_res_size >= req_size {
             log::info!(
-                "[WS_SEARCH] trace_id: {} Reached requested result size: {}, stopping search",
+                "[HTTP2_STREAM] trace_id: {} Reached requested result size: {}, stopping search",
                 trace_id,
                 req_size
             );
@@ -901,7 +894,7 @@ async fn process_delta(
     mut sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
-        "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
+        "[HTTP2_STREAM]: Processing delta for trace_id: {}, delta: {:?}",
         trace_id,
         delta
     );
@@ -926,7 +919,7 @@ async fn process_delta(
     }
 
     log::info!(
-        "[WS_SEARCH] Found {} partitions for trace_id: {}",
+        "[HTTP2_STREAM] Found {} partitions for trace_id: {}",
         partitions.len(),
         trace_id
     );
@@ -951,7 +944,7 @@ async fn process_delta(
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
-            "[WS_SEARCH]: Found {} hits, for trace_id: {}",
+            "[HTTP2_STREAM]: Found {} hits, for trace_id: {}",
             search_res.hits.len(),
             trace_id
         );
@@ -1032,7 +1025,7 @@ async fn process_delta(
         // Stop if `remaining_query_range` is less than 0
         if *remaining_query_range <= 0.00 {
             log::info!(
-                "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
+                "[HTTP2_STREAM]: trace_id: {} Remaining query range is less than 0, stopping search",
                 trace_id
             );
             let (new_start_time, new_end_time) = (
@@ -1070,7 +1063,7 @@ async fn process_delta(
         // Stop if reached the request result size
         if req_size != -1 && *curr_res_size >= req_size {
             log::info!(
-                "[WS_SEARCH]: Reached requested result size ({}), stopping search",
+                "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
                 req_size
             );
             break;
@@ -1141,7 +1134,7 @@ async fn send_cached_responses(
     mut sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) -> Result<(), Error> {
     log::info!(
-        "[WS_SEARCH]: Processing cached response for trace_id: {}",
+        "[HTTP2_STREAM]: Processing cached response for trace_id: {}",
         trace_id
     );
 
@@ -1179,7 +1172,7 @@ async fn send_cached_responses(
     *start_timer = Instant::now();
 
     log::info!(
-        "[WS_SEARCH]: Sending cached search response for trace_id: {}, hits: {}, result_cache_ratio: {}",
+        "[HTTP2_STREAM]: Sending cached search response for trace_id: {}, hits: {}, result_cache_ratio: {}",
         trace_id,
         cached.cached_response.hits.len(),
         cached.cached_response.result_cache_ratio,
