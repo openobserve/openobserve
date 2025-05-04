@@ -94,6 +94,8 @@ pub struct FileKey {
     pub deleted: bool,
     #[prost(bytes = "vec", optional, tag = "4")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+    #[prost(string, tag = "5")]
+    pub account: ::prost::alloc::string::String,
 }
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]

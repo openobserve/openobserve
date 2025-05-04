@@ -637,19 +637,14 @@ pub async fn merge_by_stream(
                 let delete_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
                 let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
                 for new_file in new_files {
-                    if new_file.key.is_empty() {
-                        continue;
+                    if !new_file.key.is_empty() {
+                        events.push(new_file);
                     }
-                    events.push(FileKey {
-                        key: new_file.key,
-                        meta: new_file.meta,
-                        deleted: false,
-                        segment_ids: None,
-                    });
                 }
 
                 for file in delete_file_list {
                     events.push(FileKey {
+                        account: file.account.clone(),
                         key: file.key.clone(),
                         meta: file.meta.clone(),
                         deleted: true,
@@ -692,7 +687,17 @@ pub async fn merge_by_stream(
     Ok(())
 }
 
-/// merge small files into big file, upload to storage, returns the big file key and merged files
+// merge small files into big file, upload to storage, returns the big file key and merged files
+// params:
+// - thread_id: the id of the thread
+// - org_id: the id of the organization
+// - stream_type: the type of the stream
+// - stream_name: the name of the stream
+// - prefix: the prefix of the files
+// - files_with_size: the files to merge
+// returns:
+// - new_files: the files that are merged
+// - retain_file_list: the files that are not merged
 pub async fn merge_files(
     thread_id: usize,
     org_id: &str,
@@ -700,7 +705,7 @@ pub async fn merge_files(
     stream_name: &str,
     prefix: &str,
     files_with_size: &[FileKey],
-) -> Result<(Vec<String>, Vec<FileMeta>, Vec<FileKey>), anyhow::Error> {
+) -> Result<(Vec<FileKey>, Vec<FileKey>), anyhow::Error> {
     let start = std::time::Instant::now();
     #[cfg(feature = "enterprise")]
     let is_match_downsampling_rule = get_largest_downsampling_rule(
@@ -713,7 +718,7 @@ pub async fn merge_files(
     let is_match_downsampling_rule = false;
 
     if files_with_size.len() <= 1 && !is_match_downsampling_rule {
-        return Ok((Vec::new(), Vec::new(), Vec::new()));
+        return Ok((Vec::new(), Vec::new()));
     }
 
     let mut new_file_size = 0;
@@ -741,7 +746,7 @@ pub async fn merge_files(
     }
     // no files need to merge
     if new_file_list.len() <= 1 && !is_match_downsampling_rule {
-        return Ok((Vec::new(), Vec::new(), Vec::new()));
+        return Ok((Vec::new(), Vec::new()));
     }
 
     let retain_file_list = new_file_list.clone();
@@ -757,7 +762,7 @@ pub async fn merge_files(
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
     if new_file_list.len() <= 1 && !is_match_downsampling_rule {
-        return Ok((Vec::new(), Vec::new(), retain_file_list));
+        return Ok((Vec::new(), retain_file_list));
     }
 
     // get time range and stats for these files in a single iteration
@@ -827,7 +832,7 @@ pub async fn merge_files(
             "[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}",
             &file.key
         );
-        let buf = file_data::get(&file.key, None).await?;
+        let buf = file_data::get(&file.account, &file.key, None).await?;
         let schema = read_schema_from_bytes(&buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();
@@ -948,8 +953,7 @@ pub async fn merge_files(
         );
     }
 
-    let mut new_file_keys = Vec::new();
-    let mut new_file_metas = Vec::new();
+    let mut new_files = Vec::new();
     match buf {
         MergeParquetResult::Single(buf) => {
             new_file_meta.compressed_size = buf.len() as i64;
@@ -976,7 +980,9 @@ pub async fn merge_files(
                 infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
                 log::debug!("merge_files {new_file_key} file_data::disk::set success");
             }
-            storage::put(&new_file_key, buf.clone()).await?;
+
+            let account = storage::get_account(&new_file_key).unwrap_or_default();
+            storage::put(&account, &new_file_key, buf.clone()).await?;
 
             if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
                 // generate inverted index
@@ -993,8 +999,7 @@ pub async fn merge_files(
                 )
                 .await?;
             }
-            new_file_keys.push(new_file_key);
-            new_file_metas.push(new_file_meta);
+            new_files.push(FileKey::new(account, new_file_key, new_file_meta, false));
         }
         MergeParquetResult::Multiple { bufs, file_metas } => {
             for (buf, file_meta) in bufs.into_iter().zip(file_metas.into_iter()) {
@@ -1016,7 +1021,9 @@ pub async fn merge_files(
                     infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
                     log::debug!("merge_files {new_file_key} file_data::disk::set success");
                 }
-                storage::put(&new_file_key, buf.clone()).await?;
+
+                let account = storage::get_account(&new_file_key).unwrap_or_default();
+                storage::put(&account, &new_file_key, buf.clone()).await?;
 
                 if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
                     // generate inverted index
@@ -1034,24 +1041,23 @@ pub async fn merge_files(
                     .await?;
                 }
 
-                new_file_keys.push(new_file_key);
-                new_file_metas.push(new_file_meta);
+                new_files.push(FileKey::new(account, new_file_key, new_file_meta, false));
             }
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
-                new_file_keys,
-                new_file_metas.iter().map(|m| m.original_size).sum::<i64>(),
-                new_file_metas
+                new_files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>(),
+                new_files.iter().map(|f| f.meta.original_size).sum::<i64>(),
+                new_files
                     .iter()
-                    .map(|m| m.compressed_size)
+                    .map(|f| f.meta.compressed_size)
                     .sum::<i64>(),
                 start.elapsed().as_millis(),
             );
         }
     };
 
-    Ok((new_file_keys, new_file_metas, retain_file_list))
+    Ok((new_files, retain_file_list))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1096,7 +1102,7 @@ async fn generate_inverted_index(
                 retain_file_list
             )
         })?;
-        for (file_name, filemeta) in files {
+        for (account, file_name, filemeta) in files {
             if file_name.is_empty() {
                 continue;
             }
@@ -1108,6 +1114,7 @@ async fn generate_inverted_index(
             if let Err(e) = write_file_list(
                 org_id,
                 &[FileKey {
+                    account,
                     key: file_name.clone(),
                     meta: filemeta,
                     deleted: false,
@@ -1161,6 +1168,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         .iter()
         .filter(|v| v.deleted)
         .map(|v| FileListDeleted {
+            account: v.account.clone(),
             file: v.key.clone(),
             index_file: v.meta.index_size > 0,
             flattened: v.meta.flattened,
@@ -1299,12 +1307,13 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
+        let file_account = file.account.to_string();
         let file_name = file.key.to_string();
         let file_size = file.meta.compressed_size as usize;
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download(&file_name, Some(file_size)).await
+                file_data::disk::download(&file_account, &file_name, Some(file_size)).await
             } else {
                 Ok(0)
             };
@@ -1341,7 +1350,9 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                             "[COMPACT] found invalid file: {}, will delete it",
                             file_name
                         );
-                        if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
+                        if let Err(e) =
+                            file_list::delete_parquet_file(&file_account, &file_name, true).await
+                        {
                             log::error!("[COMPACT] delete from file_list err: {}", e);
                         }
                         Some(file_name)

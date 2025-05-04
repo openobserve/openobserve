@@ -45,6 +45,10 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
+// for DDL commands and migrations
+pub const DB_SCHEMA_VERSION: u64 = 3;
+pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
+
 // global version variables
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -86,10 +90,6 @@ pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
 pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
-
-// for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 2;
-pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
@@ -1463,7 +1463,7 @@ pub struct Compact {
     pub data_retention_history: bool,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
-        default = 500,
+        default = 0,
         help = "Batch size for compact get pending jobs"
     )]
     pub batch_size: i64,
@@ -1669,8 +1669,20 @@ pub struct Nats {
     pub queue_max_age: u64,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, Default, EnvConfig)]
 pub struct S3 {
+    #[env_config(
+        name = "ZO_S3_ACCOUNTS",
+        default = "",
+        help = "comma separated list of accounts"
+    )]
+    pub accounts: String,
+    #[env_config(
+        name = "ZO_S3_STREAM_STRATEGY",
+        default = "",
+        help = "stream strategy, default is: empty, only use default account, other value is: file_hash, stream_hash, stream1:account1,stream2:account2"
+    )]
+    pub stream_strategy: String,
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
     pub provider: String,
     #[env_config(name = "ZO_S3_SERVER_URL", default = "")]
@@ -2535,7 +2547,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = 100;
+        cfg.compact.batch_size = cfg.limit.cpu_num as i64;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
