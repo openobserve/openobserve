@@ -474,13 +474,8 @@ pub async fn do_partitioned_search(
     let modified_start_time = req.query.start_time;
     let modified_end_time = req.query.end_time;
 
-    let partition_resp = match get_partitions(trace_id, org_id, stream_type, req, user_id).await {
-        Ok(v) => v,
-        Err(e) => {
-            sender.send(Err(e)).await.unwrap();
-            return Ok(());
-        }
-    };
+    let partition_resp = get_partitions(trace_id, org_id, stream_type, req, user_id).await?;
+        
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
@@ -524,13 +519,8 @@ pub async fn do_partitioned_search(
         }
 
         // do not use cache for partitioned search without cache
-        let mut search_res = match do_search(trace_id, org_id, stream_type, &req, user_id, false).await {
-            Ok(v) => v,
-            Err(e) => {
-                sender.send(Err(e)).await.unwrap();
-                return Ok(());
-            }
-        };
+        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
+
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
@@ -596,6 +586,19 @@ pub async fn do_partitioned_search(
             sender.send(Ok(response)).await.unwrap();
         }
 
+        // Send progress update
+        {
+            let percent = calculate_progress_percentage(
+                start_time,
+                end_time,
+                modified_start_time,
+                modified_end_time,
+                partition_order_by,
+            );
+            sender.send(Ok(StreamResponses::Progress {
+                percent,
+            })).await.unwrap();
+        }
         // Stop if reached the requested result size and it is not a streaming aggs query
         if req_size != -1 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
@@ -691,10 +694,6 @@ pub enum StreamResponses {
         results: Response,
         streaming_aggs: bool,
         time_offset: TimeOffset,
-    },
-    Error {
-        code: u16,
-        message: String,
     },
     Progress {
         percent: usize,
