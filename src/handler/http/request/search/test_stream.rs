@@ -48,6 +48,8 @@ use sqlparser::{
 };
 use tracing::{Instrument, Span};
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_stream_permissions;
 use crate::{
     common::{
         meta::{
@@ -66,9 +68,7 @@ use crate::{
             websocket::{calc_queried_range, update_histogram_interval_in_query},
         },
     },
-    handler::http::request::search::{
-        error_utils::map_error_to_http_response, utils::check_stream_permissions,
-    },
+    handler::http::request::search::error_utils::map_error_to_http_response,
     service::{
         search::{
             self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
