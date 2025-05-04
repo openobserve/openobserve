@@ -405,17 +405,19 @@ pub async fn test_http2_stream(
             // Step 3: Write to results cache
             // cache only if from is 0 and is not an aggregate_query
             if req.query.from == 0 {
-                if let Err(e) = write_results_to_cache(c_resp, start_time, end_time, &mut accumulated_results)
-                    .instrument(search_span.clone())
-                    .await
-                    .map_err(|e| {
-                        log::error!(
-                            "[HTTP2_STREAM] trace_id: {}, Error writing results to cache: {:?}",
-                            trace_id,
+                if let Err(e) =
+                    write_results_to_cache(c_resp, start_time, end_time, &mut accumulated_results)
+                        .instrument(search_span.clone())
+                        .await
+                        .map_err(|e| {
+                            log::error!(
+                                "[HTTP2_STREAM] trace_id: {}, Error writing results to cache: {:?}",
+                                trace_id,
+                                e
+                            );
                             e
-                        );
-                        e
-                    }) {
+                        })
+                {
                     sender.send(Err(e)).await.unwrap();
                     return;
                 }
@@ -453,12 +455,12 @@ pub async fn test_http2_stream(
 
     // Return streaming response
     let stream = rx.map(|result| match result {
-        Ok(v) => {            
+        Ok(v) => {
             let responses = serde_json::to_string(&v).expect("Failed to serialize search response");
             // Add a newline to the end of the bytes
             let response = format!("data: {}\n\n", responses);
             Ok(BytesImpl::from(response))
-        },
+        }
         Err(e) => {
             log::error!("[HTTP2_STREAM] Error in stream: {}", e);
             // TODO: fix http response
