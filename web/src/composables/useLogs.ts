@@ -1593,11 +1593,8 @@ const useLogs = () => {
       }
 
       // Use the appropriate method to fetch data
-      if (searchObj.communicationMethod === "ws") {
-        getDataThroughWebSocket(isPagination);
-        return;
-      } else if (searchObj.communicationMethod === "streaming") {
-        getDataThroughStreaming(isPagination);
+      if (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming") {
+        getDataThroughStream(isPagination);
         return;
       }
 
@@ -4970,7 +4967,7 @@ const useLogs = () => {
       return queryReq;
   };
 
-  const getDataThroughWebSocket = (isPagination: boolean) => {
+  const getDataThroughStream = (isPagination: boolean) => {
     try {
       const queryReq = getQueryReq(isPagination) as SearchRequestPayload;
 
@@ -4980,12 +4977,12 @@ const useLogs = () => {
       const requestId = initializeSearchConnection(payload);
 
       if (!requestId) {
-        throw new Error("Failed to initialize WebSocket connection");
+        throw new Error(`Failed to initialize ${searchObj.communicationMethod} connection`);
       }
 
       addRequestId(payload.traceId);
     } catch (e: any) {
-      console.error("Error while getting data through web socket", e);
+      console.error(`Error while getting data through ${searchObj.communicationMethod}`, e);
       searchObj.loading = false;
       showErrorNotification(
         notificationMsg.value || "Error occurred during the search operation.",
@@ -5941,32 +5938,6 @@ const useLogs = () => {
   const isActionsEnabled = computed(() => {
     return (config.isEnterprise == "true" || config.isCloud == "true") && store.state.zoConfig.actions_enabled;
   });
-
-
-  // HTTP2 Streaming Search
-  const getDataThroughStreaming = async (isPagination: boolean) => {
-    try {
-      const queryReq = getQueryReq(isPagination) as SearchRequestPayload;
-
-      if(!queryReq) return;
-
-      const payload = buildWebSocketPayload(queryReq, isPagination, "search");
-      const requestId = initializeStreamingConnection(payload);
-
-      if (!requestId) {
-        throw new Error("Failed to initialize WebSocket connection");
-      }
-
-      addRequestId(payload.traceId);
-    } catch (e: any) {
-      console.error("Error while getting data through web socket", e);
-      searchObj.loading = false;
-      showErrorNotification(
-        notificationMsg.value || "Error occurred during the search operation.",
-      );
-      notificationMsg.value = "";
-    }
-  };
   
   return {
     searchObj,
