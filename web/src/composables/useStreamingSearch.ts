@@ -45,7 +45,7 @@ const useHttpStreaming = () => {
 
   const onData = (traceId: string, type: 'search_response' | 'error', response: any) => {
     if (!traceMap.value[traceId]) return;
-
+    response = JSON.parse(response);
     const wsMapper = {
       'search_response': convertToWsResponse,
       'error': convertToWsError,
@@ -62,7 +62,7 @@ const useHttpStreaming = () => {
 
       return
     }
-    
+
     for (const handler of traceMap.value[traceId].data) {
       handler(wsResponse, traceId);
     }
@@ -70,7 +70,7 @@ const useHttpStreaming = () => {
 
   const onComplete = (traceId: string) => {
     if (!traceMap.value[traceId]) return;
-    
+
     for (const handler of traceMap.value[traceId].complete) {
       handler(traceId);
     }
@@ -78,11 +78,11 @@ const useHttpStreaming = () => {
 
   const onError = async (error: any, traceId: string) => {
     console.log('onError', error, traceId);
-    
+
     if (!traceMap.value[traceId]) return;
-    
+
     errorOccurred.value = true;
-    
+
     for (const handler of traceMap.value[traceId].error) {
       handler(error, traceId);
     }
@@ -90,7 +90,7 @@ const useHttpStreaming = () => {
 
   const onReset = (data: any, traceId: string) => {
     if (!traceMap.value[traceId]) return;
-    
+
     for (const handler of traceMap.value[traceId].reset) {
       handler(data, traceId);
     }
@@ -99,7 +99,7 @@ const useHttpStreaming = () => {
   // Creates an HTTP/2 streaming connection to the server
   const createStreamConnection = (org_id: string) => {
     const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-      return `${protocol}//localhost:5080/api/${org_id}`;
+    return `${protocol}//localhost:5080/api/${org_id}`;
   };
 
   const fetchQueryDataWithHttpStream = async (
@@ -209,23 +209,23 @@ const useHttpStreaming = () => {
       let messages: string[] = [];
 
       let error = '';
-  
+
       const reader = response.body?.getReader() as ReadableStreamDefaultReader<Uint8Array>;
       const decoder = new TextDecoder();
       streamConnections.value[traceId] = reader;
       activeStreamId.value = traceId;
-  
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-            console.log(`Stream ended for user ${traceId}`);
+          console.log(`Stream ended for user ${traceId}`);
           onData(traceId, 'search_response', 'end');
           break;
         }
-  
+
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n').filter(line => line.trim());
-  
+
         for (const line of lines) {
           try {
             // Try to parse as JSON first (error case)
@@ -262,7 +262,7 @@ const useHttpStreaming = () => {
 
       // while (true) {
       //   const { value, done } = await reader.read();
-        
+
       //   if (done) {
       //     // Process any remaining buffer data
       //     if (buffer.length > 0) {
@@ -286,7 +286,7 @@ const useHttpStreaming = () => {
       //   while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
       //     const jsonString = buffer.slice(0, newlineIndex);
       //     buffer = buffer.slice(newlineIndex + 1);
-          
+
       //     try {
       //       const jsonData = JSON.parse(jsonString);
       //       onData(jsonData, traceId);
@@ -315,7 +315,7 @@ const useHttpStreaming = () => {
     org_id: string;
   }) => {
     const { trace_id } = payload;
-    
+
     if (abortControllers.value[trace_id]) {
       abortControllers.value[trace_id].abort();
       delete abortControllers.value[trace_id];
@@ -339,15 +339,15 @@ const useHttpStreaming = () => {
       abortControllers.value[traceId].abort();
       delete abortControllers.value[traceId];
     });
-    
+
     Object.keys(streamConnections.value).forEach((traceId) => {
       delete streamConnections.value[traceId];
     });
-    
+
     Object.keys(traceMap.value).forEach((traceId) => {
       delete traceMap.value[traceId];
     });
-    
+
     activeStreamId.value = null;
   };
 
@@ -356,32 +356,34 @@ const useHttpStreaming = () => {
       abortControllers.value[traceId].abort();
       delete abortControllers.value[traceId];
     });
-    
+
     Object.keys(streamConnections.value).forEach((traceId) => {
       delete streamConnections.value[traceId];
     });
-    
+
     Object.keys(traceMap.value).forEach((traceId) => {
       delete traceMap.value[traceId];
     });
-    
+
     activeStreamId.value = null;
   };
 
   const resetAuthToken = async () => {
     await authService.refresh_token();
   };
-  
+
 
   const convertToWsResponse = (traceId: string, response: any) => {
-    return {
-      content : {
-        results: response.data,
-        streaming_aggs: response.streaming_aggs,
+
+    let resp = {
+      content: {
+        results: response.SearchResponse.results,
+        streaming_aggs: response.SearchResponse.streaming_aggs,
         trace_id: traceId,
       },
       type: "search_response",
-    }
+    };
+    return resp;
   }
 
   const convertToWsError = (traceId: string, response: any) => {
