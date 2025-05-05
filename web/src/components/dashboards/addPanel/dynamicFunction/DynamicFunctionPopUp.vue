@@ -18,7 +18,7 @@
 
     <q-tab-panels v-model="fields.type" animated>
       <q-tab-panel name="build">
-        <SelectFunction v-model="fields" data-test="dynamic-function-popup-select-function" />
+        <SelectFunction v-model="fields" data-test="dynamic-function-popup-select-function" :allowAggregation="allowAggregation" />
       </q-tab-panel>
       <q-tab-panel name="raw">
         <RawQueryBuilder v-model="fields" data-test="dynamic-function-popup-raw-query-builder" />
@@ -40,6 +40,11 @@ export default {
     modelValue: {
       type: Object,
       required: true,
+    },
+    allowAggregation: {
+      type: Boolean,
+      required: false,
+      default: false,
     },
   },
   emits: ["update:modelValue"],

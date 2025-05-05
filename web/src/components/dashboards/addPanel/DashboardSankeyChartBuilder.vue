@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.source
                     "
+                    :allowAggregation="false"
                   />
                   <q-input
                     dense
@@ -215,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.target
                     "
+                    :allowAggregation="false"
                   />
                   <q-input
                     dense
@@ -351,6 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].fields.value
                         "
+                        :allowAggregation="true"
                       />
                       <!-- <q-select
                         v-model="

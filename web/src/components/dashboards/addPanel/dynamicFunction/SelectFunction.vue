@@ -118,6 +118,7 @@
             v-if="fields.args[argIndex]?.type === 'function'"
             class="tw-ml-4"
             v-model="fields.args[argIndex].value"
+            :allowAggregation="allowAggregation"
             :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
           />
 
@@ -181,6 +182,11 @@ export default {
       type: Object,
       required: true,
     },
+    allowAggregation: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
@@ -211,7 +217,15 @@ export default {
 
     const filterFunctionsOptions = (val: string, update: any) => {
       update(() => {
-        filteredFunctions.value = functionValidation
+        let filteredFunctionsValidation = functionValidation;
+        // if allowAggregation is true, then filter the functions based on isAggregation
+        if (props.allowAggregation === false) {
+          filteredFunctionsValidation = filteredFunctionsValidation.filter(
+            (v) => !v.isAggregation,
+          );
+        }
+
+        filteredFunctions.value = filteredFunctionsValidation
           .map((v) => ({
             label: v.functionLabel,
             value: v.functionName,
