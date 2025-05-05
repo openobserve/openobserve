@@ -440,8 +440,14 @@ test.describe("dashboard maps testcases", () => {
 
     // await page.waitForTimeout(3000);
     // Wait for settings button and open settings
+    // const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
+    // await expect(settingsButton).toBeVisible();
+    // await settingsButton.click();
+    await page.waitForSelector('[data-test="dashboard-setting-btn"]', {
+      state: "visible",
+      timeout: 15000,
+    });
     const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
-    await expect(settingsButton).toBeVisible();
     await settingsButton.click();
 
     // Add variable
@@ -465,7 +471,7 @@ test.describe("dashboard maps testcases", () => {
     await chartTypeSelector.searchAndAddField("lat", "latitude");
     await chartTypeSelector.searchAndAddField("lon", "longitude");
     await chartTypeSelector.searchAndAddField("country", "weight");
-    await chartTypeSelector.searchAndAddField("country", "filter1");
+    await chartTypeSelector.searchAndAddField("country", "filter");
 
     // selct the variable and enter the value
 
@@ -486,7 +492,7 @@ test.describe("dashboard maps testcases", () => {
       "china"
     );
 
-    // Apply filter conditions
+    // Apply   conditions
     await chartTypeSelector.addFilterCondition(
       "country",
       "country",

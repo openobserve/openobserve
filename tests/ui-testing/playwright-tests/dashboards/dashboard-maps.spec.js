@@ -153,7 +153,7 @@ test.describe("dashboard maps testcases", () => {
 
     await chartTypeSelector.searchAndAddField("country", "x");
     await chartTypeSelector.searchAndAddField("ip", "y");
-    await chartTypeSelector.searchAndAddField("country", "filter2");
+    await chartTypeSelector.searchAndAddField("country", "filter");
 
     // Apply Country Filter
     const conditionLabel = page.locator(
