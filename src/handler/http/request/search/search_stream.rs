@@ -446,8 +446,8 @@ pub async fn search_http2_stream(
     // Return streaming response
     let stream = rx.map(|result| match result {
         Ok(v) => {
-            let response: String;
             // TEST: payload size
+            // let mut v = v;
             // {
             //     match v {
             //         StreamResponses::SearchResponse {
@@ -460,22 +460,20 @@ pub async fn search_http2_stream(
             //             //     "a": "b"
             //             // });
             //             let dummy_data = vec!["a"; 15 * 1024 * 1024];
-            //             results_clone.columns = dummy_data.iter().map(|v|
-            // v.to_string()).collect();             let modified_response =
-            // StreamResponses::SearchResponse {                 results: results_clone,
+            //             results_clone.columns = dummy_data.iter().map(|v| v.to_string()).collect();
+            //             let modified_response = StreamResponses::SearchResponse {
+            //                 results: results_clone,
             //                 streaming_aggs,
             //                 time_offset,
+            //             };
+            //             v = modified_response;
             //         }
-            //         _ => response = v.to_string(),
+            //         _ => {}
             //     }
             // }
 
-            // encode the response manually
             let encoded_response = v.encode();
-            let string_response = v.to_response();
-
-            // Add a newline to the end of the bytes
-            Ok(BytesImpl::from(string_response))
+            Ok(BytesImpl::from(encoded_response))
         }
         Err(e) => {
             log::error!("[HTTP2_STREAM] Error in stream: {}", e);
@@ -488,9 +486,11 @@ pub async fn search_http2_stream(
     Ok(HttpResponse::Ok()
         .content_type("text/event-stream")
         .append_header((header::CONNECTION, HeaderValue::from_static("keep-alive")))
-        // TODO: send header gzip for encoding
-        .insert_header(ContentEncoding::Identity)
-        .append_header((header::VARY, HeaderValue::from_static("accept-encoding")))
+        // .append_header((header::CACHE_CONTROL, HeaderValue::from_static("no-cache")))
+        .append_header((
+            header::TRANSFER_ENCODING,
+            HeaderValue::from_static("chunked"),
+        ))
         .streaming(stream))
 }
 
@@ -767,9 +767,13 @@ impl StreamResponses {
     }
 
     pub fn encode(&self) -> Vec<u8> {
-        let mut e = GzEncoder::new(Vec::new(), Compression::default());
-        e.write_all(self.to_response().as_bytes()).unwrap();
-        e.finish().unwrap()
+        // let mut e = GzEncoder::new(Vec::new(), Compression::default());
+        // e.write_all(self.to_response().as_bytes()).unwrap();
+        // e.finish().unwrap()
+
+        // Don't compress individual messages to ensure the browser can parse each chunk
+        // Server-sent events need to be readable by the browser
+        self.to_response().into_bytes()
     }
 }
 
