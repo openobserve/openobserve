@@ -48,9 +48,9 @@ use futures::{SinkExt, stream::StreamExt};
 use hashbrown::HashMap;
 use log;
 use serde::{Deserialize, Serialize};
-use tracing::{Instrument, Span};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+use tracing::{Instrument, Span};
 
 #[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::utils::check_stream_permissions;
@@ -462,9 +462,9 @@ pub async fn search_http2_stream(
             //             //     "a": "b"
             //             // });
             //             let dummy_data = vec!["a"; 15 * 1024 * 1024];
-            //             results_clone.columns = dummy_data.iter().map(|v| v.to_string()).collect();
-            //             let modified_response = StreamResponses::SearchResponse {
-            //                 results: results_clone,
+            //             results_clone.columns = dummy_data.iter().map(|v|
+            // v.to_string()).collect();             let modified_response =
+            // StreamResponses::SearchResponse {                 results: results_clone,
             //                 streaming_aggs,
             //                 time_offset,
             //             };
