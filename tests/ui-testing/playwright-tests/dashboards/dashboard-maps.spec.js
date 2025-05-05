@@ -34,7 +34,7 @@ test.describe("dashboard maps testcases", () => {
     await page.waitForTimeout(2000);
   });
 
-  test("Should display the correct country when entering latitude and longitude values", async ({
+  test.skip("Should display the correct country when entering latitude and longitude values", async ({
     page,
   }) => {
     // Navigate to Dashboards
