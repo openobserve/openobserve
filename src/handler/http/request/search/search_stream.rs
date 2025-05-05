@@ -18,9 +18,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Error, time::Instant};
+use std::{
+    io::{Error, Write},
+    time::Instant,
+};
 
-use actix_web::{HttpRequest, HttpResponse, http::StatusCode, post, web};
+use actix_http::{ContentEncoding, header};
+use actix_web::{
+    HttpRequest, HttpResponse,
+    http::{StatusCode, header::HeaderValue},
+    post, web,
+};
 use bytes::Bytes as BytesImpl;
 use config::{
     get_config,
@@ -35,6 +43,7 @@ use config::{
     },
     utils::json,
 };
+use flate2::{Compression, write::GzEncoder};
 use futures::{SinkExt, channel::mpsc, stream::StreamExt};
 use hashbrown::HashMap;
 use log;
@@ -437,10 +446,36 @@ pub async fn search_http2_stream(
     // Return streaming response
     let stream = rx.map(|result| match result {
         Ok(v) => {
-            let responses = serde_json::to_string(&v).expect("Failed to serialize search response");
+            let response: String;
+            // TEST: payload size
+            // {
+            //     match v {
+            //         StreamResponses::SearchResponse {
+            //             results,
+            //             streaming_aggs,
+            //             time_offset,
+            //         } => {
+            //             let mut results_clone = results.clone();
+            //             // let json = serde_json::json!({
+            //             //     "a": "b"
+            //             // });
+            //             let dummy_data = vec!["a"; 15 * 1024 * 1024];
+            //             results_clone.columns = dummy_data.iter().map(|v|
+            // v.to_string()).collect();             let modified_response =
+            // StreamResponses::SearchResponse {                 results: results_clone,
+            //                 streaming_aggs,
+            //                 time_offset,
+            //         }
+            //         _ => response = v.to_string(),
+            //     }
+            // }
+
+            // encode the response manually
+            let encoded_response = v.encode();
+            let string_response = v.to_response();
+
             // Add a newline to the end of the bytes
-            let response = format!("data: {}\n\n", responses);
-            Ok(BytesImpl::from(response))
+            Ok(BytesImpl::from(string_response))
         }
         Err(e) => {
             log::error!("[HTTP2_STREAM] Error in stream: {}", e);
@@ -452,7 +487,10 @@ pub async fn search_http2_stream(
 
     Ok(HttpResponse::Ok()
         .content_type("text/event-stream")
-        .append_header(("Connection", "keep-alive"))
+        .append_header((header::CONNECTION, HeaderValue::from_static("keep-alive")))
+        // TODO: send header gzip for encoding
+        .insert_header(ContentEncoding::Identity)
+        .append_header((header::VARY, HeaderValue::from_static("accept-encoding")))
         .streaming(stream))
 }
 
@@ -707,7 +745,7 @@ fn handle_partial_response(mut res: Response) -> Response {
     res
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StreamResponses {
     SearchResponse {
         results: Response,
@@ -717,6 +755,22 @@ pub enum StreamResponses {
     Progress {
         percent: usize,
     },
+}
+
+impl StreamResponses {
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).expect("Failed to serialize search response")
+    }
+
+    pub fn to_response(&self) -> String {
+        format!("data: {}\n\n", self.to_string())
+    }
+
+    pub fn encode(&self) -> Vec<u8> {
+        let mut e = GzEncoder::new(Vec::new(), Compression::default());
+        e.write_all(self.to_response().as_bytes()).unwrap();
+        e.finish().unwrap()
+    }
 }
 
 #[tracing::instrument(
@@ -1050,7 +1104,12 @@ async fn process_delta(
                 search_res.hits.len(),
                 result_cache_ratio,
             );
-            sender.send(Ok(response)).await.unwrap();
+            if let Err(e) = sender.send(Ok(response)).await {
+                log::error!("Error sending search response: {}", e);
+                return Err(infra::errors::Error::Message(
+                    "Failed to send search response".to_string(),
+                ));
+            }
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -1086,10 +1145,12 @@ async fn process_delta(
                 original_req_end_time,
                 cache_order_by,
             );
-            sender
-                .send(Ok(StreamResponses::Progress { percent }))
-                .await
-                .unwrap();
+            if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
+                log::error!("Error sending progress update: {}", e);
+                return Err(infra::errors::Error::Message(
+                    "Failed to send progress update".to_string(),
+                ));
+            }
         }
 
         // Stop if reached the request result size
