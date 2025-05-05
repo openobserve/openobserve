@@ -16,7 +16,8 @@
 import { ref } from "vue";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
-import { useStore } from "vuex";
+import store from "@/stores";
+
 
 // Type definitions similar to WebSocket but for HTTP/2 streaming
 type StreamHandler = (data: any, traceId: string) => void;
@@ -97,12 +98,6 @@ const useHttpStreaming = () => {
     }
   };
 
-  // Creates an HTTP/2 streaming connection to the server
-  const createStreamConnection = (org_id: string) => {
-    const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-    return `${protocol}//localhost:5080/api/${org_id}`;
-  };
-
   const fetchQueryDataWithHttpStream = async (
     data: {
       queryReq: SearchRequestPayload;
@@ -179,7 +174,6 @@ const useHttpStreaming = () => {
     }
   ) => {
     const { traceId, org_id, type, queryReq, searchType, dashboard_id, folder_id, fallback_order_by_col, pageType } = data;
-    const baseUrl = createStreamConnection(org_id);
     const abortController = new AbortController();
 
     // Store the abort controller for this trace
@@ -200,7 +194,7 @@ const useHttpStreaming = () => {
       url = `/_search_multi_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
     }
 
-    url = baseUrl + url;
+    url = `${store.state.API_ENDPOINT}/api/${org_id}` + url;
 
     try {
       // Make the HTTP/2 streaming request
@@ -223,10 +217,9 @@ const useHttpStreaming = () => {
         throw new Error('Failed to start stream');
       }
 
-      let messages: string[] = [];
-
-      let error = '';
-
+      let buffer = '';  // Add a buffer to accumulate partial messages
+      let error = '';   // Re-add error variable
+      
       const reader = response.body?.getReader() as ReadableStreamDefaultReader<Uint8Array>;
       const decoder = new TextDecoder();
       streamConnections.value[traceId] = reader;
@@ -234,15 +227,24 @@ const useHttpStreaming = () => {
 
       while (true) {
         const { done, value } = await reader.read();
+        
         if (done) {
           console.log(`Stream ended for user ${traceId}`);
           onData(traceId, 'search_response', 'end');
           break;
         }
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n\n').filter(line => line.trim());
-
+        const chunk = decoder.decode(value, { stream: true });  // Use streaming mode
+        buffer += chunk;  // Accumulate in buffer
+        
+        // Process complete messages from buffer
+        const messages = buffer.split('\n\n');
+        // Keep the last potentially incomplete message in the buffer
+        buffer = messages.pop() || '';
+        
+        const lines = messages.filter(line => line.trim());
+        console.log('Processing lines:', lines.length);
+        
         for (var line of lines) {
           try {
             // Try to parse as JSON first (error case)
@@ -269,55 +271,6 @@ const useHttpStreaming = () => {
           }
         }
       }
-
-      // if (!response.body) {
-      //   throw new Error('Response body is null');
-      // }
-
-      // // Get the readable stream from the response body
-      // const reader = response.body.getReader();
-      // streamConnections.value[traceId] = reader;
-      // activeStreamId.value = traceId;
-
-      // // Process the stream
-      // const decoder = new TextDecoder('utf-8');
-      // let buffer = '';
-
-      // while (true) {
-      //   const { value, done } = await reader.read();
-
-      //   if (done) {
-      //     // Process any remaining buffer data
-      //     if (buffer.length > 0) {
-      //       try {
-      //         const jsonData = JSON.parse(buffer);
-      //         onData(jsonData, traceId);
-      //       } catch (e) {
-      //         console.error('Error parsing JSON from stream buffer', e);
-      //       }
-      //     }
-      //     onComplete(traceId);
-      //     break;
-      //   }
-
-      //   // Decode the chunk and add to buffer
-      //   const chunk = decoder.decode(value, { stream: true });
-      //   buffer += chunk;
-
-      //   // Process complete JSON objects from the buffer
-      //   let newlineIndex;
-      //   while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-      //     const jsonString = buffer.slice(0, newlineIndex);
-      //     buffer = buffer.slice(newlineIndex + 1);
-
-      //     try {
-      //       const jsonData = JSON.parse(jsonString);
-      //       onData(jsonData, traceId);
-      //     } catch (e) {
-      //       console.error('Error parsing JSON from stream', e);
-      //     }
-      //   }
-      // }
     } catch (error) {
       if ((error as any).name === 'AbortError') {
         console.error('Stream was canceled');
