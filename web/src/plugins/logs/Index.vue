@@ -565,7 +565,7 @@ export default defineComponent({
       isLimitQuery,
       enableRefreshInterval,
       buildWebSocketPayload,
-      initializeWebSocketConnection,
+      initializeSearchConnection,
       addRequestId,
       sendCancelSearchMessage,
       isDistinctQuery,
@@ -1589,7 +1589,7 @@ export default defineComponent({
       fnParsedSQL,
       isLimitQuery,
       buildWebSocketPayload,
-      initializeWebSocketConnection,
+      initializeSearchConnection,
       addRequestId,
       isWebSocketEnabled,
       showJobScheduler,
@@ -1675,14 +1675,17 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",-1
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        } 
-        else if (this.searchObj.meta.sqlMode && (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))) {
+        } else if (
+          this.searchObj.meta.sqlMode &&
+          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
+        ) {
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
-            -1
+            -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (this.searchObj.data.stream.selectedStream.length > 1) {
@@ -1713,7 +1716,7 @@ export default defineComponent({
                 isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
               },
             );
-            const requestId = this.initializeWebSocketConnection(payload);
+            const requestId = this.initializeSearchConnection(payload);
 
             if (requestId) {
               this.addRequestId(requestId, payload.traceId);
@@ -1781,7 +1784,7 @@ export default defineComponent({
     async fullSQLMode(newVal) {
       if (newVal) {
         await nextTick();
-        if(this.searchObj.meta.sqlModeManualTrigger){
+        if (this.searchObj.meta.sqlModeManualTrigger) {
           this.searchObj.meta.sqlModeManualTrigger = false;
         } else {
           this.setQuery(newVal);
