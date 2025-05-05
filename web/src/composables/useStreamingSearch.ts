@@ -18,6 +18,14 @@ import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
 import store from "@/stores";
 
+// Create and manage stream workers
+let streamWorker: Worker | null = null;
+const createStreamWorker = () => {
+  if (!streamWorker && window.Worker) {
+    streamWorker = new Worker(new URL('../workers/streamWorker.js', import.meta.url), { type: 'module' });
+  }
+  return streamWorker;
+};
 
 // Type definitions similar to WebSocket but for HTTP/2 streaming
 type StreamHandler = (data: any, traceId: string) => void;
@@ -213,75 +221,59 @@ const useHttpStreaming = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      if (!response.ok) {
-        throw new Error('Failed to start stream');
-      }
-
-      let buffer = '';  // Add a buffer to accumulate partial messages
-      let error = '';   // Re-add error variable
+      // Set up worker for stream processing
+      const worker = createStreamWorker();
       
-      const reader = response.body?.getReader() as ReadableStreamDefaultReader<Uint8Array>;
-      const decoder = new TextDecoder();
-      streamConnections.value[traceId] = reader;
-      activeStreamId.value = traceId;
-
-      while (true) {
-        const { done, value } = await reader.read();
+      if(worker) {
+      // Set up worker message handling
+      worker.onmessage = (event) => {
+        const { type, traceId: eventTraceId, data } = event.data;
         
-        if (done) {
-          console.log(`Stream ended for user ${traceId}`);
-          onData(traceId, 'search_response', 'end');
-          break;
+        switch (type) {
+          case 'data':
+            onData(eventTraceId, 'search_response', data);
+            break;
+          case 'progress':
+            onData(eventTraceId, 'event_progress', data);
+            break;
+          case 'error':
+            onError(data, eventTraceId);
+            break;
+          case 'end':
+            onData(eventTraceId, 'search_response', 'end');
+            break;
         }
-
-        const chunk = decoder.decode(value, { stream: true });  // Use streaming mode
-        buffer += chunk;  // Accumulate in buffer
-        
-        // Process complete messages from buffer
-        const messages = buffer.split('\n\n');
-        // Keep the last potentially incomplete message in the buffer
-        buffer = messages.pop() || '';
-        
-        const lines = messages.filter(line => line.trim());
-        console.log('Processing lines:', lines.length);
-        
-        for (var line of lines) {
-          try {
-            // Try to parse as JSON first (error case)
-            if (line.startsWith('data: ')) {
-              line = line.slice(6);
-            }
-            const json = JSON.parse(line);
-            if (json.code > 200) {
-              error = json.message;
-              break;
-            } else {
-              if (json.Progress) {
-                onData(traceId, 'event_progress', json);
-              } else {
-                onData(traceId, 'search_response', json);
-              }
-            }
-          } catch (e) {
-            // If not JSON, check if it's an SSE message
-            console.error('error while parsing', e);
-            if (line.startsWith('data: ')) {
-              onData(traceId, 'search_response', line.slice(6));
-            }
-          }
-        }
+        };
+      } else {
+        throw new Error('Worker is not supported');
       }
+
+
+      // Get the ReadableStream
+      const readableStream = response.body;
+      if (!readableStream) {
+        throw new Error('Response body is null');
+      }
+      
+      // Start the stream in the worker
+      if(worker) {
+        worker.postMessage({
+          action: 'startStream',
+          traceId,
+          readableStream
+        }, [readableStream as any]);
+      } else {
+        throw new Error('Worker is not supported');
+      }
+      
+      // Store reference to abort controller for cancellation
+      activeStreamId.value = traceId;
+      
     } catch (error) {
       if ((error as any).name === 'AbortError') {
         console.error('Stream was canceled');
       } else {
         onError(error, traceId);
-      }
-    } finally {
-      delete streamConnections.value[traceId];
-      delete abortControllers.value[traceId];
-      if (activeStreamId.value === traceId) {
-        activeStreamId.value = null;
       }
     }
   };
@@ -297,8 +289,12 @@ const useHttpStreaming = () => {
       delete abortControllers.value[trace_id];
     }
 
-    if (streamConnections.value[trace_id]) {
-      delete streamConnections.value[trace_id];
+    // Also cancel in worker
+    if (streamWorker) {
+      streamWorker.postMessage({
+        action: 'cancelStream',
+        traceId: trace_id
+      });
     }
 
     cleanUpListeners(trace_id);
@@ -316,9 +312,12 @@ const useHttpStreaming = () => {
       delete abortControllers.value[traceId];
     });
 
-    Object.keys(streamConnections.value).forEach((traceId) => {
-      delete streamConnections.value[traceId];
-    });
+    // Close all streams in worker
+    if (streamWorker) {
+      streamWorker.postMessage({
+        action: 'closeAll'
+      });
+    }
 
     Object.keys(traceMap.value).forEach((traceId) => {
       delete traceMap.value[traceId];
@@ -333,9 +332,12 @@ const useHttpStreaming = () => {
       delete abortControllers.value[traceId];
     });
 
-    Object.keys(streamConnections.value).forEach((traceId) => {
-      delete streamConnections.value[traceId];
-    });
+    // Close all streams in worker
+    if (streamWorker) {
+      streamWorker.postMessage({
+        action: 'closeAll'
+      });
+    }
 
     Object.keys(traceMap.value).forEach((traceId) => {
       delete traceMap.value[traceId];
