@@ -45,6 +45,15 @@ const useHttpStreaming = () => {
 
   const onData = (traceId: string, type: 'search_response' | 'error' | 'event_progress', response: any) => {
     if (!traceMap.value[traceId]) return;
+
+    if (response === 'end') {
+      for (const handler of traceMap.value[traceId].complete) {
+        handler(traceId);
+      }
+
+      return
+    }
+
     if (typeof response === 'string') {
       response = JSON.parse(response);
     }
@@ -56,13 +65,6 @@ const useHttpStreaming = () => {
 
     const wsResponse = wsMapper[type](traceId, response);
 
-    if (response === 'end') {
-      for (const handler of traceMap.value[traceId].complete) {
-        handler(traceId);
-      }
-
-      return
-    }
 
     for (const handler of traceMap.value[traceId].data) {
       handler(wsResponse, traceId);
@@ -409,7 +411,7 @@ const useHttpStreaming = () => {
   const convertToWsEventProgress = (traceId: string, response: any) => {
     return {
       content: {
-        percent: response?.progress?.percent,
+        percent: response?.Progress?.percent,
       },
       type: "event_progress",
     }
