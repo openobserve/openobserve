@@ -179,6 +179,7 @@ pprof = { version = "0.14", features = [
     "flamegraph",
     "prost-codec",
 ], optional = true }
+tokio-stream.workspace = true
 
 [dev-dependencies]
 async-walkdir.workspace = true
