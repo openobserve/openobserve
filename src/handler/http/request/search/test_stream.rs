@@ -638,7 +638,7 @@ pub async fn do_partitioned_search(
                 .unwrap();
         }
         // Stop if reached the requested result size and it is not a streaming aggs query
-        if req_size != -1 && curr_res_size >= req_size && !is_streaming_aggs {
+        if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
                 "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
                 req_size
