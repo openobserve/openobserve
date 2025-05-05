@@ -239,7 +239,7 @@ const useHttpStreaming = () => {
               error = json.message;
               break;
             } else {
-              if (json.progress) {
+              if (json.Progress) {
                 onData(traceId, 'event_progress', json);
               } else {
                 onData(traceId, 'search_response', json);
