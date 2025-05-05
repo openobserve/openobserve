@@ -479,7 +479,6 @@ test.describe("dashboard filter testcases", () => {
 
     await page.waitForTimeout(1000);
     await button.click();
-    // await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="index-dropdown-stream"]')
