@@ -29,14 +29,26 @@ use crate::storage::{CONCURRENT_REQUESTS, format_key};
 // test only
 const TEST_FILE: &str = "o2_test/check.txt";
 
+#[derive(Debug)]
+pub struct StorageConfig {
+    pub name: String,          // ZO_S3_ACCOUNTS
+    pub provider: String,      // ZO_S3_PROVIDER
+    pub server_url: String,    // ZO_S3_SERVER_URL
+    pub region_name: String,   // ZO_S3_REGION_NAME
+    pub access_key: String,    // ZO_S3_ACCESS_KEY
+    pub secret_key: String,    // ZO_S3_SECRET_KEY
+    pub bucket_name: String,   // ZO_S3_BUCKET_NAME
+    pub bucket_prefix: String, // ZO_S3_BUCKET_PREFIX
+}
+
 pub struct Remote {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
 }
 
-impl Default for Remote {
-    fn default() -> Self {
+impl Remote {
+    pub fn new(config: StorageConfig) -> Self {
         Self {
-            client: LimitStore::new(init_client(), CONCURRENT_REQUESTS),
+            client: LimitStore::new(init_client(config), CONCURRENT_REQUESTS),
         }
     }
 }
@@ -74,10 +86,10 @@ impl ObjectStore for Remote {
                 let columns = file.split('/').collect::<Vec<&str>>();
                 if columns[0] == "files" {
                     metrics::STORAGE_WRITE_BYTES
-                        .with_label_values(&[columns[1], columns[2]])
+                        .with_label_values(&[columns[1], columns[2], "remote"])
                         .inc_by(data_size as u64);
                     metrics::STORAGE_WRITE_REQUESTS
-                        .with_label_values(&[columns[1], columns[2]])
+                        .with_label_values(&[columns[1], columns[2], "remote"])
                         .inc();
                     let time = start.elapsed().as_secs_f64();
                     metrics::STORAGE_TIME
@@ -138,10 +150,10 @@ impl ObjectStore for Remote {
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get", "remote"])
                 .inc_by(data_len as u64);
             metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get", "remote"])
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
@@ -170,10 +182,10 @@ impl ObjectStore for Remote {
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "remote"])
                 .inc_by(data_len as u64);
             metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "remote"])
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
@@ -206,10 +218,10 @@ impl ObjectStore for Remote {
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
                 .inc_by(data_len as u64);
             metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
@@ -231,7 +243,7 @@ impl ObjectStore for Remote {
                 let file = location.to_string();
                 let columns = file.split('/').collect::<Vec<&str>>();
                 metrics::STORAGE_WRITE_REQUESTS
-                    .with_label_values(&[columns[1], columns[2]])
+                    .with_label_values(&[columns[1], columns[2], "remote"])
                     .inc();
                 break;
             }
@@ -259,7 +271,7 @@ impl ObjectStore for Remote {
     }
 }
 
-fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
+fn init_aws_config(config: StorageConfig) -> object_store::Result<object_store::aws::AmazonS3> {
     let cfg = get_config();
     let mut opts = object_store::ClientOptions::default()
         .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
@@ -286,25 +298,27 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
     };
     let mut builder = object_store::aws::AmazonS3Builder::from_env()
         .with_client_options(opts)
-        .with_bucket_name(&cfg.s3.bucket_name)
+        .with_bucket_name(&config.bucket_name)
         .with_retry(retry_config)
         .with_virtual_hosted_style_request(force_hosted_style);
-    if !cfg.s3.server_url.is_empty() {
-        builder = builder.with_endpoint(&cfg.s3.server_url);
+    if !config.server_url.is_empty() {
+        builder = builder.with_endpoint(&config.server_url);
     }
-    if !cfg.s3.region_name.is_empty() {
-        builder = builder.with_region(&cfg.s3.region_name);
+    if !config.region_name.is_empty() {
+        builder = builder.with_region(&config.region_name);
     }
-    if !cfg.s3.access_key.is_empty() {
-        builder = builder.with_access_key_id(&cfg.s3.access_key);
+    if !config.access_key.is_empty() {
+        builder = builder.with_access_key_id(&config.access_key);
     }
-    if !cfg.s3.secret_key.is_empty() {
-        builder = builder.with_secret_access_key(&cfg.s3.secret_key);
+    if !config.secret_key.is_empty() {
+        builder = builder.with_secret_access_key(&config.secret_key);
     }
     builder.build()
 }
 
-fn init_azure_config() -> object_store::Result<object_store::azure::MicrosoftAzure> {
+fn init_azure_config(
+    config: StorageConfig,
+) -> object_store::Result<object_store::azure::MicrosoftAzure> {
     let cfg = get_config();
     let mut builder = object_store::azure::MicrosoftAzureBuilder::from_env()
         .with_client_options(
@@ -313,17 +327,19 @@ fn init_azure_config() -> object_store::Result<object_store::azure::MicrosoftAzu
                 .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
                 .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates),
         )
-        .with_container_name(&cfg.s3.bucket_name);
-    if !cfg.s3.access_key.is_empty() {
-        builder = builder.with_account(&cfg.s3.access_key);
+        .with_container_name(&config.bucket_name);
+    if !config.access_key.is_empty() {
+        builder = builder.with_account(&config.access_key);
     }
-    if !cfg.s3.secret_key.is_empty() {
-        builder = builder.with_access_key(&cfg.s3.secret_key);
+    if !config.secret_key.is_empty() {
+        builder = builder.with_access_key(&config.secret_key);
     }
     builder.build()
 }
 
-fn init_gcp_config() -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
+fn init_gcp_config(
+    config: StorageConfig,
+) -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
     let cfg = get_config();
     let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
         .with_client_options(
@@ -332,42 +348,42 @@ fn init_gcp_config() -> object_store::Result<object_store::gcp::GoogleCloudStora
                 .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
                 .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates),
         )
-        .with_bucket_name(&cfg.s3.bucket_name);
-    if !cfg.s3.access_key.is_empty() {
-        builder = builder.with_service_account_path(&cfg.s3.access_key);
+        .with_bucket_name(&config.bucket_name);
+    if !config.access_key.is_empty() {
+        builder = builder.with_service_account_path(&config.access_key);
     }
     builder.build()
 }
 
-fn init_client() -> Box<dyn object_store::ObjectStore> {
-    let cfg = get_config();
-    if cfg.common.print_key_config {
-        log::info!("s3 init config: {:?}", cfg.s3);
+fn init_client(config: StorageConfig) -> Box<dyn object_store::ObjectStore> {
+    if get_config().common.print_key_config {
+        log::info!("s3 init config: {:?}", config);
     }
 
-    match cfg.s3.provider.as_str() {
-        "aws" | "s3" => match init_aws_config() {
+    let provider = config.provider.to_string();
+    match provider.as_str() {
+        "aws" | "s3" => match init_aws_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
                 panic!("s3 init config error: {:?}", e);
             }
         },
-        "azure" => match init_azure_config() {
+        "azure" => match init_azure_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
                 panic!("azure init config error: {:?}", e);
             }
         },
-        "gcs" | "gcp" => match init_gcp_config() {
+        "gcs" | "gcp" => match init_gcp_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
                 panic!("gcp init config error: {:?}", e);
             }
         },
-        _ => match init_aws_config() {
+        _ => match init_aws_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("{} init config error: {:?}", cfg.s3.provider, e);
+                panic!("{} init config error: {:?}", provider, e);
             }
         },
     }
@@ -375,11 +391,11 @@ fn init_client() -> Box<dyn object_store::ObjectStore> {
 
 pub async fn test_config() -> Result<(), anyhow::Error> {
     // Test download
-    if let Err(e) = super::get(TEST_FILE).await {
+    if let Err(e) = super::get("", TEST_FILE).await {
         if matches!(e, object_store::Error::NotFound { .. }) {
             let test_content = Bytes::from("Hello, S3!");
             // Test upload
-            if let Err(e) = super::put(TEST_FILE, test_content).await {
+            if let Err(e) = super::put("", TEST_FILE, test_content).await {
                 return Err(anyhow::anyhow!("S3 upload test failed: {:?}", e));
             }
         } else {

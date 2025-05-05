@@ -112,13 +112,19 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 ),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
-                .arg(
+                .args([
+                    clap::Arg::new("account")
+                        .short('a')
+                        .long("account")
+                        .required(false)
+                        .value_name("account")
+                        .help("the account name"),
                     clap::Arg::new("file")
                         .short('f')
                         .long("file")
                         .value_name("file")
                         .help("the parquet file name"),
-                ),
+                ]),
             clap::Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
             clap::Command::new("seaorm-rollback").about("rollback SeaORM migration steps")
                 .subcommand(
@@ -130,21 +136,28 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .about("rollback last N SeaORM migration steps")
                     .arg(clap::Arg::new("N").help("number of migration steps to rollback (default is 1)").value_parser(clap::value_parser!(u32)))
                 ),
-            clap::Command::new("recover-file-list").about("recover file list from s3").args([
-                clap::Arg::new("prefix")
-                    .short('p')
-                    .long("prefix")
-                    .value_name("prefix")
-                    .required(true)
-                    .help("only migrate specified prefix"),
-                clap::Arg::new("insert")
-                    .short('i')
-                    .long("insert")
-                    .value_name("insert")
-                    .required(false)
-                    .action(clap::ArgAction::SetTrue)
-                    .help("insert file list into db"),
-            ]),
+            clap::Command::new("recover-file-list").about("recover file list from s3")
+                .args([
+                    clap::Arg::new("account")
+                        .short('a')
+                        .long("account")
+                        .value_name("account")
+                        .required(true)
+                        .help("the account name"),
+                    clap::Arg::new("prefix")
+                        .short('p')
+                        .long("prefix")
+                        .value_name("prefix")
+                        .required(true)
+                        .help("only migrate specified prefix"),
+                    clap::Arg::new("insert")
+                        .short('i')
+                        .long("insert")
+                        .value_name("insert")
+                        .required(false)
+                        .action(clap::ArgAction::SetTrue)
+                        .help("insert file list into db"),
+                ]),
             clap::Command::new("node").about("node command").subcommands([
                 clap::Command::new("offline").about("offline node"),
                 clap::Command::new("online").about("online node"),
@@ -360,8 +373,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             migration::pipeline_func::run(drop_table).await?;
         }
         "delete-parquet" => {
+            let account = command
+                .get_one::<String>("account")
+                .map(|s| s.to_string())
+                .unwrap_or_default();
             let file = command.get_one::<String>("file").unwrap();
-            match file_list::delete_parquet_file(file, true).await {
+            match file_list::delete_parquet_file(&account, file, true).await {
                 Ok(_) => {
                     println!("delete parquet file {} successfully", file);
                 }
@@ -406,9 +423,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         },
         "recover-file-list" => {
+            let account = command
+                .get_one::<String>("account")
+                .map(|s| s.to_string())
+                .unwrap_or_default();
             let prefix = command.get_one::<String>("prefix").unwrap();
             let insert = command.get_flag("insert");
-            super::load::load_file_list_from_s3(prefix, insert).await?;
+            super::load::load_file_list_from_s3(&account, prefix, insert).await?;
         }
         "node" => {
             let command = command.subcommand();
