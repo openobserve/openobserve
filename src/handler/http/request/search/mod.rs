@@ -26,10 +26,7 @@ use config::{
         sql::resolve_stream_names,
         stream::StreamType,
     },
-    utils::{
-        base64, json,
-        time::{BASE_TIME, now_micros},
-    },
+    utils::{base64, json, time::now_micros},
 };
 use hashbrown::HashMap;
 use tracing::{Instrument, Span};
@@ -52,6 +49,7 @@ use crate::{
         },
     },
     service::{
+        db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
         search as SearchService,
         self_reporting::{http_report_metrics, report_request_usage_stats},
@@ -72,7 +70,7 @@ async fn can_use_distinct_stream(
     stream_name: &str,
     stream_type: StreamType,
     fields: &[String],
-    query_sql: &str,
+    query: &config::meta::search::Query,
     start_time: i64,
 ) -> bool {
     if !matches!(stream_type, StreamType::Logs | StreamType::Traces) {
@@ -102,14 +100,26 @@ async fn can_use_distinct_stream(
 
     // all the fields used in the query sent must be in the distinct stream
     #[allow(deprecated)]
-    let query_fields: Vec<_> = match config::meta::sql::Sql::new(query_sql) {
+    let query_fields: Vec<String> = match crate::service::search::sql::Sql::new(
+        &(query.clone().into()),
+        org,
+        stream_type,
+        None,
+    )
+    .await
+    {
         // if sql is invalid, we let it follow the original search and fail
         Err(_) => return false,
-        Ok(sql) => sql
-            .fields
-            .into_iter()
-            .filter(|f| f != "_timestamp")// _timestamp is hardcoded in queries
-            .collect(),
+        Ok(sql) => {
+            // check if sql contains any filters from which field cannot be inferred.
+            // where clause can contain match_all and a valid field which is in distinct stream
+            // but since there is match_all, we cannot infer the field from the where clause
+            // so we need to return false
+            if sql.match_items.is_some() {
+                return false;
+            }
+            sql.columns.values().flatten().cloned().collect()
+        }
     };
 
     let all_query_fields_distinct = query_fields.iter().all(|f| {
@@ -716,7 +726,7 @@ pub async fn build_search_request_per_field(
     let no_count = req.no_count;
 
     let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
-        BASE_TIME.timestamp_micros()
+        enrichment_table::get_start_time(org_id, stream_name).await
     } else {
         req.start_time.unwrap_or(0)
     };
@@ -741,37 +751,45 @@ pub async fn build_search_request_per_field(
         (start_time, end_time)
     };
 
-    let mut uses_fn = false;
+    let decoded_sql = base64::decode_url(&req.sql).unwrap_or_default();
+
+    let mut query = config::meta::search::Query {
+        sql: decoded_sql.clone(), // Will be populated per field in the loop below
+        from: 0,
+        size: config::meta::sql::MAX_LIMIT,
+        start_time,
+        end_time,
+        query_fn: query_fn.clone(),
+        ..Default::default()
+    };
+
     let (sql_where, can_use_distinct_stream) = match req.filter.as_ref() {
         None => {
-            if !req.sql.is_empty() {
-                if let Ok(sql) = base64::decode_url(&req.sql) {
-                    uses_fn = functions::get_all_transform_keys(org_id)
-                        .await
-                        .iter()
-                        .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
+            if !decoded_sql.is_empty() {
+                query.uses_zo_fn = functions::get_all_transform_keys(org_id)
+                    .await
+                    .iter()
+                    .any(|fn_name| decoded_sql.contains(&format!("{}(", fn_name)));
 
-                    // pick up where clause from sql
-                    let sql_where_from_query = match SearchService::sql::pickup_where(&sql, None) {
+                // pick up where clause from sql
+                let sql_where_from_query =
+                    match SearchService::sql::pickup_where(&decoded_sql, None) {
                         Ok(Some(v)) => format!("WHERE {}", v),
                         Ok(None) => "".to_string(),
                         Err(e) => {
                             return Err(Error::other(e));
                         }
                     };
-                    let can_use_distinct_stream = can_use_distinct_stream(
-                        org_id,
-                        stream_name,
-                        stream_type,
-                        &fields,
-                        &sql,
-                        start_time,
-                    )
-                    .await;
-                    (sql_where_from_query, can_use_distinct_stream)
-                } else {
-                    ("".to_string(), false)
-                }
+                let can_use_distinct_stream = can_use_distinct_stream(
+                    org_id,
+                    stream_name,
+                    stream_type,
+                    &fields,
+                    &query,
+                    start_time,
+                )
+                .await;
+                (sql_where_from_query, can_use_distinct_stream)
             } else {
                 ("".to_string(), false)
             }
@@ -790,12 +808,14 @@ pub async fn build_search_request_per_field(
                 // Define the default_sql here
                 let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
 
+                query.sql = format!("{} {}", default_sql, sql_where);
+
                 let can_use_distinct_stream = can_use_distinct_stream(
                     org_id,
                     stream_name,
                     stream_type,
                     &fields,
-                    &format!("{} {}", default_sql, sql_where),
+                    &query,
                     start_time,
                 )
                 .await;
@@ -808,16 +828,7 @@ pub async fn build_search_request_per_field(
     let timeout = req.timeout.unwrap_or(0);
 
     let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql: String::new(), // Will be populated per field in the loop below
-            from: 0,
-            size: config::meta::sql::MAX_LIMIT,
-            start_time,
-            end_time,
-            uses_zo_fn: uses_fn,
-            query_fn: query_fn.clone(),
-            ..Default::default()
-        },
+        query,
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
         clusters,
@@ -948,7 +959,7 @@ async fn values_v1(
 
     // EnrichmentTable need query without time range
     let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
-        BASE_TIME.timestamp_micros()
+        enrichment_table::get_start_time(org_id, stream_name).await
     } else {
         query
             .get("start_time")
@@ -974,17 +985,6 @@ async fn values_v1(
         (start_time, end_time)
     };
 
-    // check if we can use the distinct stream for this query
-    let use_distinct_stream = can_use_distinct_stream(
-        org_id,
-        stream_name,
-        stream_type,
-        &fields,
-        &query_sql,
-        start_time,
-    )
-    .await;
-
     let regions = query.get("regions").map_or(vec![], |regions| {
         regions
             .split(',')
@@ -1004,19 +1004,32 @@ async fn values_v1(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    // search
     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
+
+    // search
+    let req_query = config::meta::search::Query {
+        sql: query_sql,
+        from: 0,
+        size: config::meta::sql::MAX_LIMIT,
+        start_time,
+        end_time,
+        uses_zo_fn: uses_fn,
+        query_fn: query_fn.clone(),
+        ..Default::default()
+    };
+    // check if we can use the distinct stream for this query
+    let use_distinct_stream = can_use_distinct_stream(
+        org_id,
+        stream_name,
+        stream_type,
+        &fields,
+        &req_query,
+        start_time,
+    )
+    .await;
+
     let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql: query_sql,
-            from: 0,
-            size: config::meta::sql::MAX_LIMIT,
-            start_time,
-            end_time,
-            uses_zo_fn: uses_fn,
-            query_fn: query_fn.clone(),
-            ..Default::default()
-        },
+        query: req_query,
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
         clusters,

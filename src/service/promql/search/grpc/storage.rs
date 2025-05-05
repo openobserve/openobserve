@@ -16,12 +16,13 @@
 use std::sync::Arc;
 
 use config::{
-    TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         promql::VALUE_LABEL,
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
+    metrics::QUERY_PARQUET_CACHE_RATIO_NODE,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -35,14 +36,18 @@ use infra::{
         get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
     },
 };
+use itertools::Itertools;
 use promql_parser::label::{MatchOp, Matchers};
-use tokio::sync::Semaphore;
+use tracing::Instrument;
 
 use crate::service::{
     db, file_list,
     search::{
         datafusion::exec::register_table,
-        grpc::{QueryParams, storage::filter_file_list_by_tantivy_index},
+        grpc::{
+            QueryParams,
+            storage::{cache_files, filter_file_list_by_tantivy_index},
+        },
         index::{Condition, IndexCondition},
         match_source,
     },
@@ -57,6 +62,8 @@ pub(crate) async fn create_context(
     matchers: Matchers,
     filters: &mut [(String, Vec<String>)],
 ) -> Result<Option<(SessionContext, Arc<Schema>, ScanStats)>> {
+    let enter_span = tracing::span::Span::current();
+
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(org_id, StreamType::Metrics, stream_name, None) {
         log::error!("stream [{}] is being deleted", stream_name);
@@ -105,6 +112,7 @@ pub(crate) async fn create_context(
     }
 
     // get file list
+    let file_list_start = std::time::Instant::now();
     let mut files = get_file_list(
         trace_id,
         org_id,
@@ -119,7 +127,7 @@ pub(crate) async fn create_context(
     }
 
     // calculate scan size
-    let scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
+    let mut scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
         Ok(size) => size,
         Err(err) => {
             log::error!("[trace_id {trace_id}] calculate files size error: {}", err);
@@ -129,23 +137,56 @@ pub(crate) async fn create_context(
         }
     };
     log::info!(
-        "[trace_id {trace_id}] promql->search->storage: load files {}, scan_size {}, compressed_size {}",
+        "[trace_id {trace_id}] promql->search->storage: load files {}, scan_size {}, compressed_size {}, took: {} ms",
         scan_stats.files,
         scan_stats.original_size,
-        scan_stats.compressed_size
+        scan_stats.compressed_size,
+        file_list_start.elapsed().as_millis()
     );
 
     // load files to local cache
-    let (cache_type, deleted_files) = cache_parquet_files(trace_id, &files, &scan_stats).await?;
-    if !deleted_files.is_empty() {
-        // remove deleted files
-        files.retain(|f| !deleted_files.contains(&f.key));
-    }
+    let cache_start = std::time::Instant::now();
+    let cache_type = cache_files(
+        trace_id,
+        &files
+            .iter()
+            .map(|f| (&f.account, &f.key, f.meta.compressed_size))
+            .collect_vec(),
+        &mut scan_stats,
+        "parquet",
+    )
+    .instrument(enter_span.clone())
+    .await
+    .map_err(|e| {
+        log::error!("[trace_id {trace_id}] promql->search->storage: cache files error: {e}");
+        DataFusionError::Execution(e.to_string())
+    })?;
+
+    scan_stats.querier_files = scan_stats.files;
+    let parquet_cached_ratio = (((scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files)
+        * 100) as f64
+        / scan_stats.querier_files as f64) as usize;
+
+    let download_msg = if cache_type == file_data::CacheType::None {
+        "".to_string()
+    } else {
+        format!(" downloading others into {:?} in background,", cache_type)
+    };
     log::info!(
-        "[trace_id {trace_id}] promql->search->storage: load files {}, into {:?} cache done",
-        scan_stats.files,
-        cache_type
+        "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, cache ratio: {},{download_msg} took: {} ms",
+        scan_stats.querier_files,
+        scan_stats.querier_memory_cached_files,
+        scan_stats.querier_disk_cached_files,
+        parquet_cached_ratio,
+        cache_start.elapsed().as_millis()
     );
+
+    if parquet_cached_ratio > 0 {
+        QUERY_PARQUET_CACHE_RATIO_NODE
+            .with_label_values(&[org_id, &stream_type.to_string()])
+            .inc_by(parquet_cached_ratio as u64);
+    }
 
     // set target partitions based on cache type
     let cfg = get_config();
@@ -219,6 +260,7 @@ async fn get_file_list(
 ) -> Result<Vec<FileKey>> {
     let (time_min, time_max) = time_range;
     let results = match file_list::query(
+        trace_id,
         org_id,
         stream_name,
         StreamType::Metrics,
@@ -245,94 +287,6 @@ async fn get_file_list(
         }
     }
     Ok(files)
-}
-
-// TODO: unify cache_parquet_files and cache_files
-#[tracing::instrument(name = "promql:search:grpc:storage:cache_parquet_files", skip_all)]
-async fn cache_parquet_files(
-    trace_id: &str,
-    files: &[FileKey],
-    scan_stats: &ScanStats,
-) -> Result<(file_data::CacheType, Vec<String>)> {
-    let cfg = config::get_config();
-    let cache_type = if cfg.memory_cache.enabled
-        && scan_stats.compressed_size < cfg.memory_cache.skip_size as i64
-    {
-        // if scan_compressed_size < ZO_MEMORY_CACHE_SKIP_SIZE, use memory cache
-        file_data::CacheType::Memory
-    } else if !is_local_disk_storage()
-        && cfg.disk_cache.enabled
-        && scan_stats.compressed_size < cfg.disk_cache.skip_size as i64
-    {
-        // if scan_compressed_size < ZO_DISK_CACHE_SKIP_SIZE, use disk cache
-        file_data::CacheType::Disk
-    } else {
-        // no cache
-        return Ok((file_data::CacheType::None, vec![]));
-    };
-
-    let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
-    for file in files.iter() {
-        let trace_id = "";
-        let file_name = file.key.clone();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
-            let ret = match cache_type {
-                file_data::CacheType::Memory => {
-                    if !file_data::memory::exist(&file_name).await
-                        && !file_data::disk::exist(&file_name).await
-                    {
-                        file_data::memory::download(trace_id, &file_name)
-                            .await
-                            .err()
-                    } else {
-                        None
-                    }
-                }
-                file_data::CacheType::Disk => {
-                    if !file_data::disk::exist(&file_name).await {
-                        file_data::disk::download(trace_id, &file_name).await.err()
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            };
-            let ret = if let Some(e) = ret {
-                log::warn!(
-                    "[trace_id {trace_id}] promql->search->storage: download file to cache err: {}, file: {}",
-                    e,
-                    file_name
-                );
-                Some(file_name)
-            } else {
-                None
-            };
-            drop(permit);
-            ret
-        });
-        tasks.push(task);
-    }
-
-    let mut delete_files = Vec::new();
-    for task in tasks {
-        match task.await {
-            Ok(ret) => {
-                if let Some(file) = ret {
-                    delete_files.push(file);
-                }
-            }
-            Err(e) => {
-                log::error!(
-                    "[trace_id {trace_id}] promql->search->storage: load file task err: {}",
-                    e
-                );
-            }
-        }
-    }
-
-    Ok((cache_type, delete_files))
 }
 
 fn convert_matchers_to_index_condition(

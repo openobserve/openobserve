@@ -15,10 +15,9 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use config::{
-    meta::stream::StreamType,
-    utils::{json, time::BASE_TIME},
+    meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
+    utils::{json, time::now_micros},
 };
 use infra::{cache::stats, db as infra_db};
 use vrl::prelude::NotNan;
@@ -28,21 +27,23 @@ use crate::{
     service::{db as db_service, enrichment::StreamTable, search as SearchService},
 };
 
+/// Will no longer be used as we are using the meta stream stats to store start, end time and size
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
+pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
-
-    let rec_num = if stats.doc_num == 0 {
-        100000
-    } else {
-        stats.doc_num
+    let (start_time, end_time) = match get_meta_table_stats(org_id, name).await {
+        Some(meta_stats) => (meta_stats.start_time, now_micros()),
+        None => {
+            let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
+            (stats.doc_time_min, now_micros())
+        }
     };
 
     let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\" limit {rec_num}"),
-        start_time: BASE_TIME.timestamp_micros(),
-        end_time: Utc::now().timestamp_micros(),
+        sql: format!("SELECT * FROM \"{name}\""),
+        start_time,
+        end_time,
         ..Default::default()
     };
 
@@ -98,21 +99,6 @@ fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
     }
 }
 
-/// Update the size of the enrichment table in bytes
-pub async fn update_table_size(
-    org_id: &str,
-    name: &str,
-    size: usize,
-) -> Result<(), infra::errors::Error> {
-    db_service::put(
-        &format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}"),
-        size.to_string().into(),
-        false,
-        None,
-    )
-    .await
-}
-
 /// Delete the size of the enrichment table in bytes
 pub async fn delete_table_size(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
     db_service::delete(
@@ -125,17 +111,78 @@ pub async fn delete_table_size(org_id: &str, name: &str) -> Result<(), infra::er
 }
 
 /// Get the size of the enrichment table in bytes
-pub async fn get_table_size(org_id: &str, name: &str) -> usize {
-    let size = match db_service::get(&format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}")).await
+pub async fn get_table_size(org_id: &str, name: &str) -> f64 {
+    match get_meta_table_stats(org_id, name).await {
+        Some(meta_stats) if meta_stats.size > 0 => meta_stats.size as f64,
+        _ => match db_service::get(&format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}")).await {
+            Ok(size) => {
+                let size = String::from_utf8_lossy(&size);
+                size.parse::<f64>().unwrap_or(0.0)
+            }
+            Err(e) => {
+                log::error!("get_table_size error: {:?}", e);
+                stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables).storage_size
+            }
+        },
+    }
+}
+
+/// Get the start time of the enrichment table
+pub async fn get_start_time(org_id: &str, name: &str) -> i64 {
+    match get_meta_table_stats(org_id, name).await {
+        Some(meta_stats) => meta_stats.start_time,
+        None => {
+            let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
+            stats.doc_time_min
+        }
+    }
+}
+
+pub async fn get_meta_table_stats(
+    org_id: &str,
+    name: &str,
+) -> Option<EnrichmentTableMetaStreamStats> {
+    let size = match db_service::get(&format!(
+        "{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"
+    ))
+    .await
     {
         Ok(size) => size,
         Err(e) => {
             log::error!("get_table_size error: {:?}", e);
-            return 0;
+            return None;
         }
     };
-    let size = String::from_utf8_lossy(&size);
-    size.parse::<usize>().unwrap_or(0)
+    let stream_meta_stats: EnrichmentTableMetaStreamStats = serde_json::from_slice(&size)
+        .map_err(|e| {
+            log::error!("Failed to parse meta stream stats: {}", e);
+        })
+        .ok()?;
+    Some(stream_meta_stats)
+}
+
+pub async fn update_meta_table_stats(
+    org_id: &str,
+    name: &str,
+    stats: EnrichmentTableMetaStreamStats,
+) -> Result<(), infra::errors::Error> {
+    db_service::put(
+        &format!("{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"),
+        serde_json::to_string(&stats).unwrap().into(),
+        false,
+        None,
+    )
+    .await
+}
+
+pub async fn delete_meta_table_stats(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
+    db_service::delete(
+        &format!("{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"),
+        false,
+        false,
+        None,
+    )
+    .await
 }
 
 pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {

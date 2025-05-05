@@ -396,7 +396,15 @@ async fn get_file_list_by_ids(
     idx_file_list: &[cluster_rpc::IdxFileName],
 ) -> Result<(Vec<FileKey>, usize), Error> {
     let start = std::time::Instant::now();
-    let file_list = crate::service::file_list::query_by_ids(trace_id, ids).await?;
+    let file_list = crate::service::file_list::query_by_ids(
+        trace_id,
+        ids,
+        org_id,
+        stream_type,
+        stream_name,
+        time_range,
+    )
+    .await?;
     // if there are any files in idx_files_list, use them to filter the files we got from ids,
     // otherwise use all the files we got from ids
     let file_list = if idx_file_list.is_empty() {

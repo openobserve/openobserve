@@ -80,10 +80,10 @@ impl ObjectStore for Local {
                 let columns = file.split('/').collect::<Vec<&str>>();
                 if columns[0] == "files" {
                     metrics::STORAGE_WRITE_BYTES
-                        .with_label_values(&[columns[1], columns[2]])
+                        .with_label_values(&[columns[1], columns[2], "local"])
                         .inc_by(data_size as u64);
                     metrics::STORAGE_WRITE_REQUESTS
-                        .with_label_values(&[columns[1], columns[2]])
+                        .with_label_values(&[columns[1], columns[2], "local"])
                         .inc();
                     let time = start.elapsed().as_secs_f64();
                     metrics::STORAGE_TIME
@@ -138,10 +138,10 @@ impl ObjectStore for Local {
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "local"])
+                .with_label_values(&[columns[1], columns[2], "get", "local"])
                 .inc_by(data_len as u64);
             metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "local"])
+                .with_label_values(&[columns[1], columns[2], "get", "local"])
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
@@ -169,10 +169,10 @@ impl ObjectStore for Local {
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "local"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "local"])
                 .inc_by(data_len as u64);
             metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "local"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "local"])
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
@@ -205,10 +205,10 @@ impl ObjectStore for Local {
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "local"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
                 .inc_by(data_len as u64);
             metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "local"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
@@ -234,7 +234,7 @@ impl ObjectStore for Local {
                 let file = location.to_string();
                 let columns = file.split('/').collect::<Vec<&str>>();
                 metrics::STORAGE_WRITE_REQUESTS
-                    .with_label_values(&[columns[1], columns[2]])
+                    .with_label_values(&[columns[1], columns[2], "local"])
                     .inc();
                 break;
             }

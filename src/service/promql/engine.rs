@@ -354,14 +354,20 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let metrics_name = selector.name.as_ref().expect("Missing selector name");
+        let data_cache_key = &selector.to_string();
 
-        let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
+        let cache_exists = {
+            self.ctx
+                .data_cache
+                .read()
+                .await
+                .contains_key(data_cache_key)
+        };
         if !cache_exists {
             self.selector_load_data(&selector, None).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(metrics_name) {
+        let metrics_cache = match metrics_cache.get(data_cache_key) {
             Some(v) => match v.get_ref_matrix_values() {
                 Some(v) => v,
                 None => return Ok(vec![]),
@@ -444,13 +450,19 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let metrics_name = selector.name.as_ref().expect("Missing selector name");
-        let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
+        let data_cache_key = &selector.to_string();
+        let cache_exists = {
+            self.ctx
+                .data_cache
+                .read()
+                .await
+                .contains_key(data_cache_key)
+        };
         if !cache_exists {
             self.selector_load_data(&selector, Some(range)).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(metrics_name) {
+        let metrics_cache = match metrics_cache.get(data_cache_key) {
             Some(v) => match v.get_ref_matrix_values() {
                 Some(v) => v,
                 None => return Ok(vec![]),
@@ -512,9 +524,9 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
     ) -> Result<()> {
-        let table_name = selector.name.as_ref().unwrap();
+        let data_cache_key = selector.to_string();
         let mut data_loaded = self.ctx.data_loading.lock().await;
-        if data_loaded.contains(table_name) {
+        if data_loaded.contains(&data_cache_key) {
             return Ok(()); // data is already loading
         }
 
@@ -522,10 +534,10 @@ impl Engine {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
-                    "[trace_id: {}] [PromQL] Failed to load data for stream: {table_name}, error: {e:?}",
+                    "[trace_id: {}] [PromQL] Failed to load data for stream: {data_cache_key}, error: {e:?}",
                     self.trace_id
                 );
-                data_loaded.insert(table_name.to_string());
+                data_loaded.insert(data_cache_key);
                 return Err(e);
             }
         };
@@ -536,8 +548,8 @@ impl Engine {
                 .data_cache
                 .write()
                 .await
-                .insert(table_name.to_string(), Value::None);
-            data_loaded.insert(table_name.to_string());
+                .insert(data_cache_key.clone(), Value::None);
+            data_loaded.insert(data_cache_key);
             return Ok(());
         }
 
@@ -562,8 +574,8 @@ impl Engine {
             .data_cache
             .write()
             .await
-            .insert(table_name.to_string(), values);
-        data_loaded.insert(table_name.to_string());
+            .insert(data_cache_key.clone(), values);
+        data_loaded.insert(data_cache_key);
         Ok(())
     }
 

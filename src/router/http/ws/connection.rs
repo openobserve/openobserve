@@ -31,8 +31,12 @@ use tokio::{
     },
 };
 use tokio_tungstenite::{
-    MaybeTlsStream, WebSocketStream, connect_async,
-    tungstenite::{self, client::IntoClientRequest, protocol::Message as WsMessage},
+    MaybeTlsStream, WebSocketStream, connect_async_with_config,
+    tungstenite::{
+        self,
+        client::IntoClientRequest,
+        protocol::{Message as WsMessage, WebSocketConfig},
+    },
 };
 
 use super::pool::QuerierConnectionPool;
@@ -83,7 +87,12 @@ impl Drop for ResponseRouter {
 }
 
 impl ResponseRouter {
-    pub async fn flush(&self, querier_name: &QuerierName, force_remove: bool) {
+    pub async fn flush(
+        &self,
+        querier_name: &QuerierName,
+        force_remove: bool,
+        error: Option<String>,
+    ) {
         let mut count = 0;
         let mut write_guard = self.routes.write().await;
         let removed = write_guard.drain().collect::<Vec<_>>();
@@ -93,7 +102,9 @@ impl ResponseRouter {
             let _ = sender
                 .send(WsServerEvents::Error {
                     code: StatusCode::SERVICE_UNAVAILABLE.into(),
-                    message: "Querier connection closed".to_string(),
+                    message: error
+                        .clone()
+                        .unwrap_or("Querier connection closed".to_string()),
                     error_detail: None,
                     trace_id: Some(trace_id.clone()),
                     request_id: None,
@@ -159,6 +170,7 @@ impl QuerierConnection {
         mut shutdown_rx: tokio::sync::mpsc::Receiver<()>,
     ) {
         let cfg = get_config();
+        let mut querier_conn_error: Option<String> = None;
         loop {
             // Handle incoming messages from querier to router
             tokio::select! {
@@ -230,10 +242,9 @@ impl QuerierConnection {
                                     if let Err(e) = self.response_router.route_response(svr_event.clone()).await {
                                         // scenario 2 where the trace_id & sender are not cleaned up -> left for clean job
                                         log::error!(
-                                            "[WS::Router::QuerierConnection] Error routing response from querier back to client, trace_id: {}, socket: {}, message: {}, router: {}, querier: {}",
+                                            "[WS::Router::QuerierConnection] Error routing response from querier back to client, trace_id: {}, socket: {}, router: {}, querier: {}",
                                             svr_event.get_trace_id(),
                                             e,
-                                            svr_event.to_json(),
                                             cfg.common.instance_name,
                                             self.querier_name
                                         );
@@ -247,6 +258,7 @@ impl QuerierConnection {
                         }
                         Err(e) => {
                             log::error!("[WS::Router::QuerierConnection] Read error: {}, Querier: {}, router: {}", e, self.querier_name, cfg.common.instance_name);
+                            querier_conn_error = Some(e.to_string());
                             break;
                         }
                     }
@@ -259,7 +271,7 @@ impl QuerierConnection {
         }
 
         // reaches here when connection is closed/error from the querier side
-        self.clean_up(false).await;
+        self.clean_up(false, querier_conn_error).await;
     }
 
     async fn health_check(&self) {
@@ -290,7 +302,11 @@ impl QuerierConnection {
             drop(write_guard);
         }
 
-        self.clean_up(true).await;
+        self.clean_up(
+            true,
+            Some("Router -> Querier health check failed".to_string()),
+        )
+        .await;
     }
 
     pub async fn is_active_trace_id(&self, trace_id: &TraceId) -> bool {
@@ -312,10 +328,10 @@ impl QuerierConnection {
         Ok(())
     }
 
-    async fn clean_up(&self, force_remove: bool) {
+    async fn clean_up(&self, force_remove: bool, error: Option<String>) {
         // flush in case of any remaining trace_ids
         self.response_router
-            .flush(&self.querier_name, force_remove)
+            .flush(&self.querier_name, force_remove, error)
             .await;
 
         log::info!(
@@ -416,17 +432,25 @@ impl ResponseRouter {
 #[async_trait]
 impl Connection for QuerierConnection {
     async fn connect(node_name: &str, http_url: &str) -> WsResult<Arc<Self>> {
+        let cfg = get_config();
         let ws_req = get_default_querier_request(http_url)?;
+        let websocket_config = WebSocketConfig {
+            max_message_size: Some(cfg.websocket.max_continuation_size * 1024 * 1024),
+            max_frame_size: Some(cfg.websocket.max_continuation_size * 1024 * 1024),
+            ..Default::default()
+        };
 
         // Router -> Querier
-        let (ws_stream, _) = connect_async(ws_req).await.map_err(|e| {
-            log::error!(
-                "[WS::QuerierConnection] error connecting to querier {}: {}",
-                http_url,
-                e
-            );
-            WsError::ConnectionError(e.to_string())
-        })?;
+        let (ws_stream, _) = connect_async_with_config(ws_req, Some(websocket_config), false)
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[WS::QuerierConnection] error connecting to querier {}: {}",
+                    http_url,
+                    e
+                );
+                WsError::ConnectionError(e.to_string())
+            })?;
         let (write, read) = ws_stream.split();
         let write = Arc::new(RwLock::new(Some(write)));
 

@@ -161,11 +161,11 @@ impl FileData {
         }
     }
 
-    async fn set(&mut self, trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+    async fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         let data_size = data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "[trace_id {trace_id}] File disk cache is full, can't cache extra {} bytes",
+                "File disk cache is full, can't cache extra {} bytes",
                 data_size
             );
             // cache is full, need release some space
@@ -173,7 +173,7 @@ impl FileData {
                 self.max_size,
                 max(get_config().disk_cache.release_size, data_size * 100),
             );
-            self.gc(trace_id, need_release_size).await?;
+            self.gc(need_release_size).await?;
         }
 
         self.cur_size += data_size;
@@ -203,10 +203,10 @@ impl FileData {
         Ok(())
     }
 
-    async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
+    async fn gc(&mut self, need_release_size: usize) -> Result<(), anyhow::Error> {
         let cfg = get_config();
         log::info!(
-            "[trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
+            "File disk cache start gc {}/{}, need to release {} bytes",
             self.cur_size,
             self.max_size,
             need_release_size
@@ -216,9 +216,7 @@ impl FileData {
         loop {
             let item = self.data.remove();
             if item.is_none() {
-                log::warn!(
-                    "[trace_id {trace_id}] File disk cache is corrupt, it shouldn't be none"
-                );
+                log::warn!("File disk cache is corrupt, it shouldn't be none");
                 break;
             }
             let (key, data_size) = item.unwrap();
@@ -229,13 +227,10 @@ impl FileData {
                 self.choose_multi_dir(key.as_str()),
                 key
             );
-            log::debug!(
-                "[trace_id {trace_id}] File disk cache gc remove file: {}",
-                key
-            );
+            log::debug!("File disk cache gc remove file: {}", key);
             if let Err(e) = fs::remove_file(&file_path) {
                 log::error!(
-                    "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                    "File disk cache gc remove file: {}, error: {}",
                     file_path,
                     e
                 );
@@ -248,7 +243,7 @@ impl FileData {
                 let file_path = file_path.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER);
                 if let Err(e) = fs::remove_dir_all(&file_path) {
                     log::error!(
-                        "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                        "File disk cache gc remove file: {}, error: {}",
                         file_path,
                         e
                     );
@@ -295,16 +290,13 @@ impl FileData {
             }
             drop(r);
         }
-        log::info!(
-            "[trace_id {trace_id}] File disk cache gc done, released {} bytes",
-            release_size
-        );
+        log::info!("File disk cache gc done, released {} bytes", release_size);
 
         Ok(())
     }
 
-    async fn remove(&mut self, trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
-        log::debug!("[trace_id {trace_id}] File disk cache remove file {}", file);
+    async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
+        log::debug!("File disk cache remove file {}", file);
 
         let Some((key, data_size)) = self.data.remove_key(file) else {
             return Ok(());
@@ -319,11 +311,7 @@ impl FileData {
             key
         );
         if let Err(e) = fs::remove_file(&file_path) {
-            log::error!(
-                "[trace_id {trace_id}] File disk cache remove file: {}, error: {}",
-                file_path,
-                e
-            );
+            log::error!("File disk cache remove file: {}, error: {}", file_path, e);
         }
 
         // metrics
@@ -453,11 +441,26 @@ pub async fn exist(file: &str) -> bool {
     } else {
         RESULT_FILES[idx].read().await
     };
-    files.exist(file).await
+    // file not exist, we can fast return
+    if !files.exist(file).await {
+        return false;
+    }
+    drop(files);
+
+    // check if the file is really exist
+    if get_size(file).await.is_some() {
+        return true;
+    }
+
+    // file is not exist, need remove it from cache index
+    _ = remove(file).await;
+
+    // finally return false
+    false
 }
 
 #[inline]
-pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     if !get_config().disk_cache.enabled {
         return Ok(());
     }
@@ -474,11 +477,11 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
     if files.exist(file).await {
         return Ok(());
     }
-    files.set(trace_id, file, data).await
+    files.set(file, data).await
 }
 
 #[inline]
-pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     if !get_config().disk_cache.enabled {
         return Ok(());
     }
@@ -488,7 +491,7 @@ pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
     } else {
         RESULT_FILES[idx].write().await
     };
-    files.remove(trace_id, file).await
+    files.remove(file).await
 }
 
 #[async_recursion]
@@ -630,7 +633,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc("global", cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
     }
     for file in RESULT_FILES.iter() {
@@ -641,7 +644,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc("global", cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
     }
     Ok(())
@@ -699,13 +702,13 @@ pub async fn get_dir() -> String {
     FILES[0].read().await.root_dir.clone()
 }
 
-pub async fn download(trace_id: &str, file: &str) -> Result<usize, anyhow::Error> {
-    let data = storage::get(file).await?;
-    if data.is_empty() {
-        return Err(anyhow::anyhow!("file {} data size is zero", file));
-    }
-    let data_len = data.len();
-    if let Err(e) = set(trace_id, file, data).await {
+pub async fn download(
+    account: &str,
+    file: &str,
+    size: Option<usize>,
+) -> Result<usize, anyhow::Error> {
+    let (data_len, data_bytes) = super::download_from_storage(account, file, size).await?;
+    if let Err(e) = set(file, data_bytes).await {
         return Err(anyhow::anyhow!(
             "set file {} to disk cache failed: {}",
             file,
@@ -760,7 +763,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_set_file() {
-        let trace_id = "session_1";
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
@@ -768,51 +770,37 @@ mod tests {
                 "files/default/logs/disk/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
-            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
+            let resp = file_data.set(&file_key, content.clone()).await;
             assert!(resp.is_ok());
         }
     }
 
     #[tokio::test]
     async fn test_lru_cache_get_file() {
-        let trace_id = "session_2";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
         assert!(file_data.size().0 > 0);
     }
 
     #[tokio::test]
     async fn test_lru_cache_miss() {
-        let trace_id = "session_3";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "lru");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
-        file_data
-            .set(trace_id, file_key1, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key1, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key1).await);
         // set another key, will release first key
-        file_data
-            .set(trace_id, file_key2, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key2, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key2).await);
         // get first key, should get error
         assert!(!file_data.exist(file_key1).await);
@@ -820,7 +808,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_set_file() {
-        let trace_id = "session_4";
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
@@ -828,7 +815,7 @@ mod tests {
                 "files/default/logs/disk/2022/10/03/10/6982652937134804993_4_{}.parquet",
                 i
             );
-            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
+            let resp = file_data.set(&file_key, content.clone()).await;
             if let Some(e) = resp.as_ref().err() {
                 println!("set file_key: {} error: {:?}", file_key, e);
             }
@@ -838,44 +825,30 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
-        let trace_id = "session_5";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "fifo");
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
         assert!(file_data.size().0 > 0);
     }
 
     #[tokio::test]
     async fn test_fifo_cache_miss() {
-        let trace_id = "session_6";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "fifo");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
-        file_data
-            .set(trace_id, file_key1, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key1, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key1).await);
         // set another key, will release first key
-        file_data
-            .set(trace_id, file_key2, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key2, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key2).await);
         // get first key, should get error
         assert!(!file_data.exist(file_key1).await);
@@ -889,23 +862,16 @@ mod tests {
             .map(|s| s.to_string())
             .collect();
 
-        let trace_id = "session_7";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
         file_data.multi_dir = multi_dir;
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_7_1.parquet";
         let content = Bytes::from("Some text");
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
         assert!(file_data.size().0 > 0);
 

@@ -277,6 +277,7 @@ pub async fn delete_all(
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
+    super::super::file_list_dump::delete_all_for_stream(org_id, stream_type, stream_name).await?;
     log::info!(
         "deleted file list for: {}/{}/{}/all",
         org_id,
@@ -372,6 +373,14 @@ pub async fn delete_by_date(
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, time_range).await?;
 
+    super::super::file_list_dump::delete_in_time_range(
+        org_id,
+        stream_type,
+        stream_name,
+        (date_start.timestamp_micros(), date_end.timestamp_micros()),
+    )
+    .await?;
+
     // archive old schema versions
     let mut schema_versions =
         infra::schema::get_versions(org_id, stream_name, stream_type, Some(time_range)).await?;
@@ -420,7 +429,15 @@ async fn delete_from_file_list(
     stream_name: &str,
     time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
+    let task_id = tokio::task::try_id()
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| rand::random::<u64>().to_string());
+    let fake_trace_id = format!(
+        "delete_from_file_list-{}-{}-{}",
+        task_id, time_range.0, time_range.1
+    );
     let files = file_list::query(
+        &fake_trace_id,
         org_id,
         stream_name,
         stream_type,
@@ -480,6 +497,7 @@ async fn write_file_list(
                 let del_items = events
                     .iter()
                     .map(|v| FileListDeleted {
+                        account: v.account.clone(),
                         file: v.key.clone(),
                         index_file: v.meta.index_size > 0,
                         flattened: v.meta.flattened,

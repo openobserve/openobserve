@@ -41,6 +41,7 @@ static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 pub const SQLITE_STORE: &str = "sqlite";
 
 pub static ORM_CLIENT: OnceCell<DatabaseConnection> = OnceCell::const_new();
+pub static ORM_CLIENT_DDL: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
 pub async fn connect_to_orm() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
@@ -53,6 +54,24 @@ pub async fn connect_to_orm() -> DatabaseConnection {
             SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
         }
         _ => {
+            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
+            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
+        }
+    }
+}
+
+pub async fn connect_to_orm_ddl() -> DatabaseConnection {
+    match get_config().common.meta_store.as_str().into() {
+        MetaStore::MySQL => {
+            let pool = mysql::CLIENT_DDL.clone();
+            SqlxMySqlConnector::from_sqlx_mysql_pool(pool)
+        }
+        MetaStore::PostgreSQL => {
+            let pool = postgres::CLIENT_DDL.clone();
+            SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
+        }
+        _ => {
+            // for sqlite, there is no separate ddl client, use the common one
             let pool = { sqlite::CLIENT_RW.lock().await.clone() };
             SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
         }

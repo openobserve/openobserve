@@ -5110,12 +5110,13 @@ const useLogs = () => {
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
-    searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
+    if (response.type === "search_response") {
+      
+      searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
       ? searchPartitionMap[payload.traceId]
       : 0;
-    searchPartitionMap[payload.traceId]++;
+      searchPartitionMap[payload.traceId]++;
 
-    if (response.type === "search_response") {
       if (payload.type === "search") {
         handleLogsResponse(
           payload.queryReq,
@@ -5597,8 +5598,8 @@ const useLogs = () => {
       processHistogramRequest(payload.queryReq);
     }
 
-    if (payload.type === "search") searchObj.loading = false;
-    if (payload.type === "histogram" || payload.type === "pageCount")
+    if (payload.type === "search" && !response?.content?.should_client_retry) searchObj.loading = false;
+    if ((payload.type === "histogram" || payload.type === "pageCount") && !response?.content?.should_client_retry)
       searchObj.loadingHistogram = false;
 
     searchObj.data.isOperationCancelled = false;

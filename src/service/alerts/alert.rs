@@ -279,10 +279,16 @@ async fn prepare_alert(
         alert.trigger_condition.cron = update_cron_expression(&alert.trigger_condition.cron, now);
         // Check the cron expression
         Schedule::from_str(&alert.trigger_condition.cron).map_err(AlertError::ParseCron)?;
-    } else if alert.trigger_condition.frequency == 0 {
-        // default frequency is 60 seconds
-        alert.trigger_condition.frequency =
-            std::cmp::max(60, get_config().limit.alert_schedule_interval);
+    } else {
+        // if cron is not empty, set it to empty string
+        if !alert.trigger_condition.cron.is_empty() {
+            alert.trigger_condition.cron = "".to_string();
+        }
+        if alert.trigger_condition.frequency == 0 {
+            // default frequency is 60 seconds
+            alert.trigger_condition.frequency =
+                std::cmp::max(60, get_config().limit.alert_schedule_interval);
+        }
     }
 
     if alert.name.is_empty() || alert.stream_name.is_empty() {
