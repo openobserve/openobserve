@@ -446,10 +446,9 @@ pub async fn filter_file_list_by_tantivy_index(
     )
     .await?;
 
-    let parquet_cached_ratio = (((scan_stats.querier_memory_cached_files
-        + scan_stats.querier_disk_cached_files)
-        * 100) as f64
-        / scan_stats.querier_files as f64) as usize;
+    let cached_ratio = (scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files) as f64
+        / scan_stats.querier_files as f64;
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
@@ -464,14 +463,14 @@ pub async fn filter_file_list_by_tantivy_index(
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
-        parquet_cached_ratio,
+        (cached_ratio * 100.0) as usize,
         start.elapsed().as_millis()
     );
 
-    if parquet_cached_ratio > 0 {
+    if scan_stats.querier_files > 0 {
         QUERY_PARQUET_CACHE_RATIO_NODE
             .with_label_values(&[&query.org_id, &query.stream_type.to_string()])
-            .inc_by(parquet_cached_ratio as u64);
+            .observe(cached_ratio);
     }
 
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();

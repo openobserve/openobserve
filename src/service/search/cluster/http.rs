@@ -18,7 +18,7 @@ use std::sync::Arc;
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
     meta::{function::VRLResultResolver, search, sql::TableReferenceExt},
-    metrics::{QUERY_PARQUET_CACHE_RATIO, QUERY_PARQUET_CACHE_REQUESTS},
+    metrics::QUERY_PARQUET_CACHE_RATIO,
     utils::{
         arrow::record_batches_to_json_rows,
         flatten,
@@ -235,17 +235,13 @@ pub async fn search(
     });
 
     if scan_stats.querier_files > 0 {
-        let parquet_cached_ratio = (((scan_stats.querier_memory_cached_files
-            + scan_stats.querier_disk_cached_files)
-            * 100) as f64
-            / scan_stats.querier_files as f64) as usize;
-        result.set_cached_ratio(parquet_cached_ratio);
+        let cached_ratio = (scan_stats.querier_memory_cached_files
+            + scan_stats.querier_disk_cached_files) as f64
+            / scan_stats.querier_files as f64;
+        result.set_cached_ratio((cached_ratio * 100.0) as usize);
         QUERY_PARQUET_CACHE_RATIO
             .with_label_values(&[&sql.org_id, &sql.stream_type.to_string()])
-            .inc_by(parquet_cached_ratio as u64);
-        QUERY_PARQUET_CACHE_REQUESTS
-            .with_label_values(&[&sql.org_id, &sql.stream_type.to_string()])
-            .inc();
+            .observe(cached_ratio);
     }
 
     if query_type == "table" {
