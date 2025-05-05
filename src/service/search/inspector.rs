@@ -54,7 +54,15 @@ impl Default for SearchInspectorFieldsBuilder {
     fn default() -> Self {
         let mut ret = Self::new();
         ret.fields.cluster = Some(LOCAL_NODE.get_cluster_name());
-        ret.fields.region = Some(LOCAL_NODE.get_region());
+        #[cfg(feature = "enterprise")]
+        {
+            ret.fields.region = Some(
+                o2_enterprise::enterprise::common::infra::config::get_config()
+                    .super_cluster
+                    .region
+                    .clone(),
+            );
+        }
         ret
     }
 }
@@ -65,7 +73,15 @@ impl SearchInspectorFieldsBuilder {
             fields: Default::default(),
         };
         ret.fields.cluster = Some(LOCAL_NODE.get_cluster_name());
-        ret.fields.region = Some(LOCAL_NODE.get_region());
+        #[cfg(feature = "enterprise")]
+        {
+            ret.fields.region = Some(
+                o2_enterprise::enterprise::common::infra::config::get_config()
+                    .super_cluster
+                    .region
+                    .clone(),
+            );
+        }
         ret
     }
 
