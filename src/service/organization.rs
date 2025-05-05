@@ -68,10 +68,10 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
 
     let alerts = super::alerts::alert::list_with_folders_db(ListAlertsParams::new(org_id))
         .await
-        .unwrap();
+        .unwrap_or_default();
     let alert_summary = AlertSummary {
-        num_realtime: alerts.iter().filter(|a| a.1.is_real_time).count() as i64,
-        num_scheduled: alerts.iter().filter(|a| !a.1.is_real_time).count() as i64,
+        num_realtime: alerts.iter().filter(|(_, a)| a.is_real_time).count() as i64,
+        num_scheduled: alerts.iter().filter(|(_, a)| !a.is_real_time).count() as i64,
     };
 
     let functions = db::functions::list(org_id).await.unwrap_or_default();
