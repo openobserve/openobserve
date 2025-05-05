@@ -335,8 +335,8 @@ pub static QUERY_PARQUET_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
 pub static QUERY_PARQUET_CACHE_RATIO_NODE: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
-            "query_parquet_cache_ratio",
-            "Querier parquet cache ratio.".to_owned() + HELP_SUFFIX,
+            "query_parquet_cache_ratio_node",
+            "Querier parquet cache ratio for local node.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .buckets(vec![
