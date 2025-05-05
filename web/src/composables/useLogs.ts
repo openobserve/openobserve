@@ -4974,6 +4974,8 @@ const useLogs = () => {
     try {
       const queryReq = getQueryReq(isPagination) as SearchRequestPayload;
 
+      if(!queryReq) return;
+
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       const requestId = initializeSearchConnection(payload);
 
@@ -5944,6 +5946,8 @@ const useLogs = () => {
   const getDataThroughStreaming = async (isPagination: boolean) => {
     try {
       const queryReq = getQueryReq(isPagination) as SearchRequestPayload;
+
+      if(!queryReq) return;
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       const requestId = initializeStreamingConnection(payload);
