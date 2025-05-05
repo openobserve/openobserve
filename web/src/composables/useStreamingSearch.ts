@@ -45,7 +45,9 @@ const useHttpStreaming = () => {
 
   const onData = (traceId: string, type: 'search_response' | 'error' | 'event_progress', response: any) => {
     if (!traceMap.value[traceId]) return;
-    response = JSON.parse(response);
+    if (typeof response === 'string') {
+      response = JSON.parse(response);
+    }
     const wsMapper = {
       'search_response': convertToWsResponse,
       'error': convertToWsError,
@@ -224,17 +226,20 @@ const useHttpStreaming = () => {
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n\n').filter(line => line.trim());
-        
-        for (const line of lines) {
+
+        for (var line of lines) {
           try {
             // Try to parse as JSON first (error case)
+            if (line.startsWith('data: ')) {
+              line = line.slice(6);
+            }
             const json = JSON.parse(line);
             console.log('json', json);
             if (json.code > 200) {
               error = json.message;
               break;
             } else {
-              if(json.progress) {
+              if (json.progress) {
                 onData(traceId, 'event_progress', json);
               } else {
                 onData(traceId, 'search_response', json);
