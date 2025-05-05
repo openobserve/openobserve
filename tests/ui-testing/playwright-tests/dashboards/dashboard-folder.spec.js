@@ -6,9 +6,14 @@ import { waitForDashboardPage } from "../utils/dashCreation.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardFolder from "../../pages/dashboardPages/dashboard-folder.js";
 
+// Refactored test cases using POM
+
 test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard folder testcases", () => {
+  let dashboardPage;
+  let dashboardFolders;
+
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
     await login(page);
@@ -20,18 +25,18 @@ test.describe("dashboard folder testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await orgNavigation;
+
+    dashboardPage = new DashboardListPage(page);
+    dashboardFolders = new DashboardFolder(page);
   });
 
   test("should create and delete a unique folder, and verify it's deleted", async ({
     page,
   }) => {
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardFolders = new DashboardFolder(page);
-
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
-    //  Define folderName first
+    // Define folderName first
     const folderName = dashboardFolders.generateUniqueFolderName("t");
 
     // Create the folder
@@ -39,24 +44,20 @@ test.describe("dashboard folder testcases", () => {
 
     // Search to confirm it exists
     await dashboardFolders.searchFolder(folderName);
-
     await expect(page.locator(`text=${folderName}`)).toBeVisible();
 
-    //  Delete folder
+    // Delete folder
     await dashboardFolders.deleteFolder(folderName);
     await expect(page.locator(`text=${folderName}`)).toHaveCount(0);
   });
 
-  test("should create and Edit folder name and verify it's updated", async ({
+  test("should create and edit folder name and verify it's updated", async ({
     page,
   }) => {
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardFolders = new DashboardFolder(page);
-
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
-    //  Define folderName first
+    // Define folderName first
     const folderName = dashboardFolders.generateUniqueFolderName("t");
 
     // Create the folder
