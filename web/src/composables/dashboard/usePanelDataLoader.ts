@@ -793,6 +793,7 @@ export const usePanelDataLoader = (
         traceId: string;
         org_id: string;
         pageType: string;
+        meta: any;
       } = {
         queryReq: {
           query,
@@ -806,6 +807,9 @@ export const usePanelDataLoader = (
         traceId,
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
+        meta: {
+          currentQueryIndex,
+        }
       };
 
       fetchQueryDataWithWebSocket(payload, {
