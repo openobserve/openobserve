@@ -68,7 +68,8 @@
                     ],
                     "required": true
                 }
-            ]
+            ],
+            "isAggregation": true
         },
         {
             "functionName": "count-distinct",
@@ -87,11 +88,12 @@
                     ],
                     "required": true
                 }
-            ]
+            ],
+            "isAggregation": true
         },
         {
             "functionName": "sum",
-            "functionLabel": "sum",
+            "functionLabel": "Sum",
             "args": [
                 {
                     "type": [
@@ -106,11 +108,12 @@
                     ],
                     "required": true
                 }
-            ]
+            ],
+            "isAggregation": true
         },
         {
             "functionName": "avg",
-            "functionLabel": "avg",
+            "functionLabel": "Avg",
             "args": [
                 {
                     "type": [
@@ -125,11 +128,12 @@
                     ],
                     "required": true
                 }
-            ]
+            ],
+            "isAggregation": true
         },
         {
             "functionName": "min",
-            "functionLabel": "min",
+            "functionLabel": "Min",
             "args": [
                 {
                     "type": [
@@ -144,11 +148,12 @@
                     ],
                     "required": true
                 }
-            ]
+            ],
+            "isAggregation": true
         },
         {
             "functionName": "max",
-            "functionLabel": "max",
+            "functionLabel": "Max",
             "args": [
                 {
                     "type": [
@@ -163,11 +168,12 @@
                     ],
                     "required": true
                 }
-            ]
+            ],
+            "isAggregation": true
         },
         {
             "functionName": "p50",
-            "functionLabel": "p50",
+            "functionLabel": "P50",
             "args": [
                 {
                     "type": [
@@ -182,11 +188,12 @@
                     ],
                     "required": true
                 }
-            ]
+            ],
+            "isAggregation": true
         },
         {
             "functionName": "p90",
-            "functionLabel": "p90",
+            "functionLabel": "P90",
             "args": [
                 {
                     "type": [
@@ -201,11 +208,12 @@
                     ],
                     "required": true
                 }
-            ]
+            ],
+            "isAggregation": true
         },
         {
             "functionName": "p95",
-            "functionLabel": "p95",
+            "functionLabel": "P95",
             "args": [
                 {
                     "type": [
@@ -220,11 +228,12 @@
                     ],
                     "required": true
                 }
-            ]
+            ],
+            "isAggregation": true
         },
         {
             "functionName": "p99",
-            "functionLabel": "p99",
+            "functionLabel": "P99",
             "args": [
                 {
                     "type": [
@@ -239,7 +248,8 @@
                     ],
                     "required": true
                 }
-            ]
+            ],
+            "isAggregation": true
         },
         {
             "functionName": "abs",
@@ -398,7 +408,7 @@
         },
         {
             "functionName": "cos",
-            "functionLabel": "cos",
+            "functionLabel": "Cos",
             "args": [
                 {
                     "type": [
@@ -421,7 +431,7 @@
         },
         {
             "functionName": "exp",
-            "functionLabel": "exp",
+            "functionLabel": "Exp",
             "args": [
                 {
                     "type": [
@@ -467,7 +477,7 @@
         },
         {
             "functionName": "log",
-            "functionLabel": "log",
+            "functionLabel": "Log",
             "args": [
                 {
                     "type": [
@@ -490,7 +500,7 @@
         },
         {
             "functionName": "log10",
-            "functionLabel": "log10",
+            "functionLabel": "Log10",
             "args": [
                 {
                     "type": [
@@ -513,7 +523,7 @@
         },
         {
             "functionName": "log2",
-            "functionLabel": "log2",
+            "functionLabel": "Log2",
             "args": [
                 {
                     "type": [
@@ -536,7 +546,7 @@
         },
         {
             "functionName": "pow",
-            "functionLabel": "pow",
+            "functionLabel": "Pow",
             "args": [
                 {
                     "type": [
@@ -576,7 +586,7 @@
         },
         {
             "functionName": "round",
-            "functionLabel": "round",
+            "functionLabel": "Round",
             "args": [
                 {
                     "type": [
@@ -608,7 +618,7 @@
         },
         {
             "functionName": "sin",
-            "functionLabel": "sin",
+            "functionLabel": "Sin",
             "args": [
                 {
                     "type": [
@@ -627,7 +637,7 @@
         },
         {
             "functionName": "sqrt",
-            "functionLabel": "sqrt",
+            "functionLabel": "Sqrt",
             "args": [
                 {
                     "type": [
@@ -646,7 +656,7 @@
         },
         {
             "functionName": "tan",
-            "functionLabel": "tan",
+            "functionLabel": "Tan",
             "args": [
                 {
                     "type": [
@@ -665,7 +675,7 @@
         },
         {
             "functionName": "string_length",
-            "functionLabel": "string_length",
+            "functionLabel": "String Length",
             "args": [
                 {
                     "type": [
@@ -684,7 +694,7 @@
         },
         {
             "functionName": "char_length",
-            "functionLabel": "char_length",
+            "functionLabel": "Char Length",
             "args": [
                 {
                     "type": [
@@ -703,7 +713,7 @@
         },
         {
             "functionName": "concat",
-            "functionLabel": "concat",
+            "functionLabel": "Concat",
             "args": [
                 {
                     "type": [
@@ -728,7 +738,7 @@
         },
         {
             "functionName": "lower",
-            "functionLabel": "lower",
+            "functionLabel": "Lower",
             "args": [
                 {
                     "type": [
@@ -747,7 +757,7 @@
         },
         {
             "functionName": "upper",
-            "functionLabel": "upper",
+            "functionLabel": "Upper",
             "args": [
                 {
                     "type": [
@@ -766,7 +776,7 @@
         },
         {
             "functionName": "substring",
-            "functionLabel": "substring",
+            "functionLabel": "Substring",
             "args": [
                 {
                     "type": [
@@ -811,7 +821,7 @@
         },
         {
             "functionName": "trim",
-            "functionLabel": "trim",
+            "functionLabel": "Trim",
             "args": [
                 {
                     "type": [
@@ -830,7 +840,7 @@
         },
         {
             "functionName": "ltrim",
-            "functionLabel": "ltrim",
+            "functionLabel": "LTrim",
             "args": [
                 {
                     "type": [
@@ -849,7 +859,7 @@
         },
         {
             "functionName": "rtrim",
-            "functionLabel": "rtrim",
+            "functionLabel": "RTrim",
             "args": [
                 {
                     "type": [
@@ -868,7 +878,7 @@
         },
         {
             "functionName": "date_add",
-            "functionLabel": "date_add",
+            "functionLabel": "Date Add",
             "args": [
                 {
                     "type": [
@@ -900,7 +910,7 @@
         },
         {
             "functionName": "date_sub",
-            "functionLabel": "date_sub",
+            "functionLabel": "Date Sub",
             "args": [
                 {
                     "type": [
@@ -932,7 +942,7 @@
         },
         {
             "functionName": "datediff",
-            "functionLabel": "datediff",
+            "functionLabel": "Date Diff",
             "args": [
                 {
                     "type": [
@@ -964,7 +974,7 @@
         },
         {
             "functionName": "from_unixtime",
-            "functionLabel": "from_unixtime",
+            "functionLabel": "From Unix Time",
             "args": [
                 {
                     "type": [
@@ -990,7 +1000,7 @@
         },
         {
             "functionName": "to_unixtime",
-            "functionLabel": "to_unixtime",
+            "functionLabel": "To Unix Time",
             "args": [
                 {
                     "type": [
@@ -1009,7 +1019,7 @@
         },
         {
             "functionName": "array_length",
-            "functionLabel": "array_length",
+            "functionLabel": "Array Length",
             "args": [
                 {
                     "type": [
@@ -1028,7 +1038,7 @@
         },
         {
             "functionName": "array_sort",
-            "functionLabel": "array_sort",
+            "functionLabel": "Array Sort",
             "args": [
                 {
                     "type": [
@@ -1047,7 +1057,7 @@
         },
         {
             "functionName": "array_append",
-            "functionLabel": "array_append",
+            "functionLabel": "Array Append",
             "args": [
                 {
                     "type": [
@@ -1083,7 +1093,7 @@
         },
         {
             "functionName": "array_contains",
-            "functionLabel": "array_contains",
+            "functionLabel": "Array Contains",
             "args": [
                 {
                     "type": [
