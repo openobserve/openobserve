@@ -226,8 +226,7 @@ export default defineComponent({
 
       if (variableObject) {
         variableObject.isLoading = false;
-        variableObject.isVariable
-        LoadingPending = false;
+        variableObject.isVariableLoadingPending = false;
         handleValuesError(variableObject, err);
       }
 
@@ -795,74 +794,65 @@ export default defineComponent({
                 use_cache: (window as any).use_cache ?? true,
                 sql: queryContext || "",
               };
-              console.log("Sending websocket payload", wsPayload);
 
-              fetchValuesWithWebSocket(wsPayload, {
-                onMessage: (payload: any, response: any) => {
-                  console.log(
-                    `Received message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
-                  );
-                  if (response.type === "cancel_response") {
-                    console.log(
-                      `Cancelled message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
-                    );
-                    return;
-                  }
-                  updateVariableOptions(
-                    variableObject,
-                    response.content.results.hits,
-                  );
-                },
-                onError: (request: any, error: any) => {
-                  console.log(
-                    `Error fetching values for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
-                  );
-                  handleValuesError(variableObject, error);
-                },
-                onClose: () => {
-                  console.log(
-                    `Closed message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
-                  );
-                  variableObject.isLoading = false;
-                  variableObject.isVariableLoadingPending = false;
-                },
-                onReset: (data: any) => {
-                  console.log(
-                    `Resetting values for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
-                  );
-                  variableObject.isLoading = true;
-                  fetchValuesWithWebSocket(data.payload.queryReq, {
-                    onMessage: (payload: any, response: any) => {
-                      console.log(
-                        `Received message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
-                      );
-                      if (response.type === "cancel_response") {
-                        console.log(
-                          `Cancelled message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
-                        );
-                        return;
-                      }
+              // Create a promise that resolves when values are loaded
+              const valuesLoadedPromise = new Promise((resolve) => {
+                fetchValuesWithWebSocket(wsPayload, {
+                  onMessage: (payload: any, response: any) => {
+                    if (response.type === "cancel_response") {
+                      return;
+                    }
+                    if (response.type === "search_response") {
                       updateVariableOptions(
                         variableObject,
                         response.content.results.hits,
                       );
-                    },
-                    onError: (request: any, error: any) => {
-                      console.log(
-                        `Error fetching values for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
-                      );
-                      handleValuesError(variableObject, error);
-                    },
-                    onClose: () => {
-                      console.log(
-                        `Closed message for variable ${variableObject.name} with query ${JSON.stringify(variableObject.query_data)}`,
-                      );
-                      variableObject.isLoading = false;
-                      variableObject.isVariableLoadingPending = false;
-                    },
-                  });
-                },
+                      // Resolve the promise after values are updated
+                      resolve(true);
+                    }
+                  },
+                  onError: (request: any, error: any) => {
+                    handleValuesError(variableObject, error);
+                    resolve(false);
+                  },
+                  onClose: () => {
+                    variableObject.isLoading = false;
+                    variableObject.isVariableLoadingPending = false;
+                  },
+                  onReset: async (data: any) => {
+                    variableObject.isLoading = true;
+                    // Create a new promise for reset scenario
+                    const resetPromise = new Promise((resetResolve) => {
+                      fetchValuesWithWebSocket(data.payload.queryReq, {
+                        onMessage: (payload: any, response: any) => {
+                          if (response.type === "cancel_response") {
+                            return;
+                          }
+                          if (response.type === "search_response") {
+                            updateVariableOptions(
+                              variableObject,
+                              response.content.results.hits,
+                            );
+                            resetResolve(true);
+                          }
+                        },
+                        onError: (request: any, error: any) => {
+                          handleValuesError(variableObject, error);
+                          resetResolve(false);
+                        },
+                        onClose: () => {
+                          variableObject.isLoading = false;
+                          variableObject.isVariableLoadingPending = false;
+                        },
+                      });
+                    });
+                    await resetPromise;
+                  },
+                });
               });
+
+              // Wait for values to be loaded before proceeding
+              await valuesLoadedPromise;
               return true;
             } else {
               // If WebSocket is not enabled, use the stream service to fetch field values
