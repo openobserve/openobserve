@@ -18,17 +18,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Error, ops::ControlFlow, time::Instant};
+use std::{io::Error, time::Instant};
 
 use actix_web::{HttpRequest, HttpResponse, http::StatusCode, post, web};
 use bytes::Bytes as BytesImpl;
-use chrono::Utc;
 use config::{
     get_config,
     meta::{
         search::{
-            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventContext, SearchEventType,
-            SearchPartitionRequest, SearchPartitionResponse,
+            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
+            SearchPartitionResponse,
         },
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
@@ -39,13 +38,7 @@ use config::{
 use futures::{SinkExt, channel::mpsc, stream::StreamExt};
 use hashbrown::HashMap;
 use log;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
-use sqlparser::{
-    ast::{Expr, FunctionArguments, Statement, visit_statements_mut},
-    dialect::PostgreSqlDialect,
-    parser::Parser,
-};
 use tracing::{Instrument, Span};
 
 #[cfg(feature = "enterprise")]
@@ -55,40 +48,28 @@ use crate::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
+            search::{CachedQueryResponse, QueryDelta},
         },
         utils::{
-            functions,
             http::{
                 get_or_create_trace_id, get_search_event_context_from_request,
                 get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_work_group,
+                get_use_cache_from_request,
             },
             stream::{get_max_query_range, get_settings_max_query_range},
             websocket::{calc_queried_range, update_histogram_interval_in_query},
         },
     },
-    handler::http::request::search::error_utils::map_error_to_http_response,
     service::{
-        search::{
-            self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
-            sql::Sql,
-        },
-        self_reporting::http_report_metrics,
+        search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
         websocket_events::{
             search::write_results_to_cache,
-            sort::order_search_results,
-            utils::{
-                TimeOffset, WsServerEvents, calculate_progress_percentage,
-                setup_tracing_with_trace_id,
-            },
+            utils::{TimeOffset, calculate_progress_percentage, setup_tracing_with_trace_id},
         },
     },
 };
 
-/// Test HTTP2 streaming endpoint
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+/// Search HTTP2 streaming endpoint
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -110,13 +91,13 @@ use crate::{
     )
 )]
 #[post("/{org_id}/_search_stream")]
-pub async fn test_http2_stream(
+pub async fn search_http2_stream(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let mut start = Instant::now();
-    let cfg = config::get_config();
+    let cfg = get_config();
     let org_id = org_id.into_inner();
 
     // Create a tracing span
@@ -561,7 +542,7 @@ pub async fn do_partitioned_search(
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
-            /// TODO: Streaming aggs we need special order
+            // TODO: Streaming aggs we need special order
             // search_res = order_search_results(search_res, req.fallback_order_by_col);
 
             // set took
