@@ -44,11 +44,13 @@ use config::{
     utils::json,
 };
 use flate2::{Compression, write::GzEncoder};
-use futures::{SinkExt, channel::mpsc, stream::StreamExt};
+use futures::{SinkExt, stream::StreamExt};
 use hashbrown::HashMap;
 use log;
 use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
 #[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::utils::check_stream_permissions;
@@ -267,7 +269,7 @@ pub async fn search_http2_stream(
 
     // Create a channel for streaming results
     let (tx, rx) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
-    let mut sender = tx.clone();
+    let sender = tx.clone();
 
     // Spawn the test data generation in a separate task
     actix_web::rt::spawn(async move {
@@ -444,7 +446,7 @@ pub async fn search_http2_stream(
     });
 
     // Return streaming response
-    let stream = rx.map(|result| match result {
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).map(|result| match result {
         Ok(v) => {
             // TEST: payload size
             // let mut v = v;
@@ -472,7 +474,7 @@ pub async fn search_http2_stream(
             //     }
             // }
 
-            let encoded_response = v.encode();
+            let encoded_response = v.to_response().into_bytes();
             Ok(BytesImpl::from(encoded_response))
         }
         Err(e) => {
@@ -508,7 +510,7 @@ pub async fn do_partitioned_search(
     max_query_range: i64, // hours
     start_timer: &mut Instant,
     req_order_by: &OrderBy,
-    mut sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -765,16 +767,6 @@ impl StreamResponses {
     pub fn to_response(&self) -> String {
         format!("data: {}\n\n", self.to_string())
     }
-
-    pub fn encode(&self) -> Vec<u8> {
-        // let mut e = GzEncoder::new(Vec::new(), Compression::default());
-        // e.write_all(self.to_response().as_bytes()).unwrap();
-        // e.finish().unwrap()
-
-        // Don't compress individual messages to ensure the browser can parse each chunk
-        // Server-sent events need to be readable by the browser
-        self.to_response().into_bytes()
-    }
 }
 
 #[tracing::instrument(
@@ -977,7 +969,7 @@ async fn process_delta(
     cache_req_duration: i64,
     start_timer: &mut Instant,
     cache_order_by: &OrderBy,
-    mut sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing delta for trace_id: {}, delta: {:?}",
@@ -1182,7 +1174,7 @@ async fn send_partial_search_resp(
     new_end_time: i64,
     order_by: Option<OrderBy>,
     is_streaming_aggs: bool,
-    mut sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) -> Result<(), Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -1228,7 +1220,7 @@ async fn send_cached_responses(
     // fallback_order_by_col: Option<String>,
     cache_order_by: &OrderBy,
     start_timer: &mut Instant,
-    mut sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) -> Result<(), Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing cached response for trace_id: {}",
