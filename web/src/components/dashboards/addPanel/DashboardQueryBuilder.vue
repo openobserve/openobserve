@@ -134,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   dashboardPanelData.layout.currentQueryIndex
                                 ].fields.x[index]
                               "
+                              :allowAggregation="false"
                             />
                             <!-- <q-select
                               v-model="
@@ -393,6 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   dashboardPanelData.layout.currentQueryIndex
                                 ].fields.breakdown[index]
                               "
+                              :allowAggregation="false"
                             />
                             <!-- <q-select
                               v-model="
@@ -667,6 +669,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.y[index]
                           "
+                          :allowAggregation="true"
                         />
                       </div>
                       <div
@@ -935,6 +938,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 dashboardPanelData.layout.currentQueryIndex
                               ].fields.z[index]
                             "
+                            :allowAggregation="true"
                           />
                           <!-- <q-select
                             v-model="
