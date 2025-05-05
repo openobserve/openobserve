@@ -114,6 +114,7 @@ const useHttpStreaming = () => {
       folder_id: string;
       fallback_order_by_col: string;
       pageType: string;
+      searchType: string;
     },
     handlers: {
       data: (data: any, response: any) => void;
