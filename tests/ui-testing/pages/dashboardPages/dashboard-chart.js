@@ -151,4 +151,41 @@ export default class ChartTypeSelector {
       await expect(errorMessageLocator).toBeVisible();
     }
   }
+
+  //remove fields
+
+  // Remove field by type (x, y, breakdown, etc.)
+  async removeField(fieldName, target) {
+    console.log(`Removing field: ${fieldName} from: ${target}`);
+
+    const removeSelectors = {
+      x: "dashboard-x-item",
+      y: "dashboard-y-item",
+      b: "dashboard-b-item",
+      filter: "dashboard-filter-item",
+      latitude: "dashboard-latitude-item",
+      longitude: "dashboard-longitude-item",
+      weight: "dashboard-weight-item",
+      z: "dashboard-z-item",
+      name: "dashboard-name-layout",
+      value: "dashboard-value_for_maps-layout",
+      firstcolumn: "dashboard-x-layout",
+      othercolumn: "dashboard-y-layout",
+    };
+
+    const baseTestId = removeSelectors[target];
+    if (!baseTestId) {
+      throw new Error(`Invalid target type: ${target}`);
+    }
+
+    const removeButton = this.page.locator(
+      `[data-test="${baseTestId}-${fieldName}-remove"]`
+    );
+
+    await removeButton.waitFor({ state: "visible", timeout: 5000 });
+    await removeButton.click();
+    console.log(`Removed field: ${fieldName} from ${target}`);
+  }
+
+  //drag and drop fields
 }
