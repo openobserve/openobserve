@@ -5686,6 +5686,10 @@ const useLogs = () => {
       searchObj.loadingHistogram = false;
     }
 
+    if(!searchObj.data.queryResults.hasOwnProperty('hits')){
+      searchObj.data.queryResults.hits = [];
+    }
+
     searchObj.data.isOperationCancelled = false;
   };
 
