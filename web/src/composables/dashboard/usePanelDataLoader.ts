@@ -623,32 +623,35 @@ export const usePanelDataLoader = (
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
-      state.data[payload?.queryReq?.currentQueryIndex] = [
+      state.data[payload?.meta?.currentQueryIndex] = [
         ...(searchRes?.content?.results?.hits ?? {}),
       ];
     }
     // if order by is desc, append new partition response at end
     else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
       // else append new partition response at start
-      state.data[payload?.queryReq?.currentQueryIndex] = [
+      state.data[payload?.meta?.currentQueryIndex] = [
         ...(searchRes?.content?.results?.hits ?? {}),
-        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
       ];
     } else {
-      state.data[payload?.queryReq?.currentQueryIndex] = [
-        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+      state.data[payload?.meta?.currentQueryIndex] = [
+        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
         ...(searchRes?.content?.results?.hits ?? {}),
       ];
     }
 
     // update result metadata
-    state.resultMetaData[payload?.queryReq?.currentQueryIndex] =
+    state.resultMetaData[payload?.meta?.currentQueryIndex] =
       searchRes?.content?.results ?? {};
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (payload: any, response: any) => {
     try {
+      console.log('response', response);
+      console.log('payload', payload);
+      
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
       }
@@ -847,6 +850,7 @@ export const usePanelDataLoader = (
         folder_id: string;
         fallback_order_by_col: string;
         searchType: string;
+        meta: any;
       } = {
         queryReq: {
           query: await getHistogramSearchRequest(
@@ -866,6 +870,9 @@ export const usePanelDataLoader = (
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
         fallback_order_by_col: getFallbackOrderByCol(),
+        meta: {
+          currentQueryIndex,
+        }
       };
 
       // type: "search",

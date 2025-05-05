@@ -115,6 +115,7 @@ const useHttpStreaming = () => {
       fallback_order_by_col: string;
       pageType: string;
       searchType: string;
+      meta: any;
     },
     handlers: {
       data: (data: any, response: any) => void;
@@ -168,6 +169,7 @@ const useHttpStreaming = () => {
       fallback_order_by_col: string;
       pageType: string;
       searchType: string;
+      meta: any;
     },
     handlers: {
       data: (data: any, response: any) => void;
