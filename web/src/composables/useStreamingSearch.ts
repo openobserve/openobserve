@@ -43,15 +43,14 @@ const errorOccurred = ref(false);
 
 const useHttpStreaming = () => {
 
-  const onData = (traceId: string, type: 'search_response' | 'error', response: any) => {
+  const onData = (traceId: string, type: 'search_response' | 'error' | 'event_progress', response: any) => {
     if (!traceMap.value[traceId]) return;
     response = JSON.parse(response);
     const wsMapper = {
       'search_response': convertToWsResponse,
       'error': convertToWsError,
+      'event_progress': convertToWsEventProgress,
     }
-
-    console.log('onData', traceId, type, response);
 
     const wsResponse = wsMapper[type](traceId, response);
 
@@ -224,20 +223,26 @@ const useHttpStreaming = () => {
         }
 
         const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.trim());
-
+        const lines = chunk.split('\n\n').filter(line => line.trim());
+        
         for (const line of lines) {
           try {
             // Try to parse as JSON first (error case)
             const json = JSON.parse(line);
+            console.log('json', json);
             if (json.code > 200) {
               error = json.message;
               break;
             } else {
-              onData(traceId, 'search_response', json);
+              if(json.progress) {
+                onData(traceId, 'event_progress', json);
+              } else {
+                onData(traceId, 'search_response', json);
+              }
             }
           } catch (e) {
             // If not JSON, check if it's an SSE message
+            console.log('error while parsing', e);
             if (line.startsWith('data: ')) {
               onData(traceId, 'search_response', line.slice(6));
             }
@@ -393,6 +398,15 @@ const useHttpStreaming = () => {
         trace_id: traceId,
       },
       type: "error",
+    }
+  }
+
+  const convertToWsEventProgress = (traceId: string, response: any) => {
+    return {
+      content: {
+        percent: response?.progress?.percent,
+      },
+      type: "event_progress",
     }
   }
 
