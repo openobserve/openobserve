@@ -23,7 +23,7 @@ use config::{
         bitvec::BitVec,
         inverted_index::{InvertedIndexOptimizeMode, InvertedIndexTantivyMode},
         search::{ScanStats, StorageType},
-        stream::FileKey,
+        stream::{FileKey, StreamType},
     },
     metrics::QUERY_PARQUET_CACHE_RATIO_NODE,
     utils::{
@@ -244,16 +244,18 @@ pub async fn search(
     .instrument(enter_span.clone())
     .await?;
 
+    scan_stats.idx_took = idx_took as i64;
+    scan_stats.querier_files = scan_stats.files;
+    let cached_ratio = (scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files) as f64
+        / scan_stats.querier_files as f64;
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!("downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {:?} in background,", cache_type)
     };
-
-    scan_stats.idx_took = idx_took as i64;
-    scan_stats.querier_files = scan_stats.files;
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, {download_msg}, took: {} ms",
+        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -261,8 +263,15 @@ pub async fn search(
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
+        (cached_ratio * 100.0) as usize,
         cache_start.elapsed().as_millis()
     );
+
+    if scan_stats.querier_files > 0 {
+        QUERY_PARQUET_CACHE_RATIO_NODE
+            .with_label_values(&[&query.org_id, &query.stream_type.to_string()])
+            .observe(cached_ratio);
+    }
 
     // set target partitions based on cache type
     let target_partitions = if cache_type == file_data::CacheType::None {
@@ -455,7 +464,7 @@ pub async fn filter_file_list_by_tantivy_index(
         format!(" downloading others into {:?} in background,", cache_type)
     };
     log::info!(
-        "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, cache ratio: {},{download_msg} took: {} ms",
+        "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -469,7 +478,7 @@ pub async fn filter_file_list_by_tantivy_index(
 
     if scan_stats.querier_files > 0 {
         QUERY_PARQUET_CACHE_RATIO_NODE
-            .with_label_values(&[&query.org_id, &query.stream_type.to_string()])
+            .with_label_values(&[&query.org_id, &StreamType::Index.to_string()])
             .observe(cached_ratio);
     }
 
