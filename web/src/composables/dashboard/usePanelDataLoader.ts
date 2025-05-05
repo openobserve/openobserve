@@ -45,6 +45,7 @@ import { isEqual, omit } from "lodash-es";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
+import useHttpStreamingSearch from "../useStreamingSearch";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -84,6 +85,14 @@ export const usePanelDataLoader = (
     cancelSearchQueryBasedOnRequestId,
     cleanUpListeners,
   } = useSearchWebSocket();
+
+  const {
+    fetchQueryDataWithHttpStream,
+    cancelStreamQueryBasedOnRequestId,
+    closeStreamWithError,
+    closeStream,
+    resetAuthToken,
+  } = useHttpStreamingSearch();
 
   const { refreshAnnotations } = useAnnotations(
     store.state.selectedOrganization.identifier,
@@ -815,6 +824,91 @@ export const usePanelDataLoader = (
     }
   };
 
+  const getDataThroughStreaming = async (
+    query: string,
+    it: any,
+    startISOTimestamp: string,
+    endISOTimestamp: string,
+    pageType: string,
+    currentQueryIndex: number,
+  ) => {
+    try {
+      const { traceId } = generateTraceContext();
+      addTraceId(traceId);
+
+      const payload: {
+        queryReq: any;
+        type: "search" | "histogram" | "pageCount";
+        isPagination: boolean;
+        traceId: string;
+        org_id: string;
+        pageType: string;
+        dashboard_id: string;
+        folder_id: string;
+        fallback_order_by_col: string;
+        searchType: string;
+      } = {
+        queryReq: {
+          query: await getHistogramSearchRequest(
+            query,
+            it,
+            startISOTimestamp,
+            endISOTimestamp,
+            null,
+          ),
+        },
+        type: "histogram",
+        isPagination: false,
+        traceId,
+        org_id: store?.state?.selectedOrganization?.identifier,
+        pageType,
+        searchType: searchType.value ?? "dashboards",
+        dashboard_id: dashboardId?.value,
+        folder_id: folderId?.value,
+        fallback_order_by_col: getFallbackOrderByCol(),
+      };
+
+      // type: "search",
+      // content: {
+      //   trace_id: payload.traceId,
+      //   payload: {
+      //     query: await getHistogramSearchRequest(
+      //       payload.queryReq.query,
+      //       payload.queryReq.it,
+      //       payload.queryReq.startISOTimestamp,
+      //       payload.queryReq.endISOTimestamp,
+      //       null,
+      //     ),
+      //   },
+      //   stream_type: payload.pageType,
+      //   search_type: searchType.value ?? "dashboards",
+      //   org_id: store?.state?.selectedOrganization?.identifier,
+      //   use_cache: (window as any).use_cache ?? true,
+      //   dashboard_id: dashboardId?.value,
+      //   folder_id: folderId?.value,
+      //   fallback_order_by_col: getFallbackOrderByCol(),
+      // },
+
+
+
+      fetchQueryDataWithHttpStream(payload, {
+        data: handleSearchResponse,
+        error: handleSearchError,
+        complete: handleSearchClose,
+        reset: handleSearchReset,
+      });
+
+      addTraceId(traceId);
+    } catch (e: any) {
+      state.errorDetail = {
+        message: e?.message || e,
+        code: e?.code ?? "",
+      };
+      state.loading = false;
+      state.isOperationCancelled = false;
+    }
+  };
+
   const loadData = async () => {
     try {
       log("loadData: entering...");
@@ -1232,8 +1326,20 @@ export const usePanelDataLoader = (
                 Number(startISOTimestamp),
                 Number(endISOTimestamp),
               );
+              
               state.annotations = annotations;
-              if (isWebSocketEnabled()) {
+
+              const shouldUseStreaming = (window as any).use_streaming === true;
+              if (shouldUseStreaming) {
+                await getDataThroughStreaming(
+                  query,
+                  it,
+                  startISOTimestamp,
+                  endISOTimestamp,
+                  pageType,
+                  panelQueryIndex,
+                );
+              } else if (isWebSocketEnabled()) {
                 await getDataThroughWebSocket(
                   query,
                   it,

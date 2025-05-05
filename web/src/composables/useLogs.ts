@@ -5030,6 +5030,8 @@ const useLogs = () => {
         reset: handleSearchReset,
       }) as string;
     } else if (searchObj.communicationMethod === "streaming") {
+      payload.searchType = "ui";
+      payload.pageType = searchObj.data.stream.streamType;
       return fetchQueryDataWithHttpStream(payload, {
         data: handleSearchResponse,
         error: handleSearchError,

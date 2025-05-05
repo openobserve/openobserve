@@ -80,8 +80,6 @@ const useHttpStreaming = () => {
   };
 
   const onError = async (error: any, traceId: string) => {
-    console.log('onError', error, traceId);
-
     if (!traceMap.value[traceId]) return;
 
     errorOccurred.value = true;
@@ -112,6 +110,10 @@ const useHttpStreaming = () => {
       isPagination: boolean;
       traceId: string;
       org_id: string;
+      dashboard_id: string;
+      folder_id: string;
+      fallback_order_by_col: string;
+      pageType: string;
     },
     handlers: {
       data: (data: any, response: any) => void;
@@ -160,6 +162,11 @@ const useHttpStreaming = () => {
       isPagination: boolean;
       traceId: string;
       org_id: string;
+      dashboard_id: string;
+      folder_id: string;
+      fallback_order_by_col: string;
+      pageType: string;
+      searchType: string;
     },
     handlers: {
       data: (data: any, response: any) => void;
@@ -168,9 +175,8 @@ const useHttpStreaming = () => {
       reset: (data: any, response: any) => void;
     }
   ) => {
-    const { traceId, org_id, type, queryReq } = data;
+    const { traceId, org_id, type, queryReq, searchType, dashboard_id, folder_id, fallback_order_by_col, pageType } = data;
     const baseUrl = createStreamConnection(org_id);
-    const searchType = type;
     const abortController = new AbortController();
 
     // Store the abort controller for this trace
@@ -182,11 +188,16 @@ const useHttpStreaming = () => {
     const use_cache = (window as any).use_cache !== undefined
       ? (window as any).use_cache
       : true;
-    if (searchType === 'search' || searchType === 'histogram' || searchType === 'pageCount') {
-      url = `${baseUrl}/_search_stream?type=logs&search_type=ui&use_cache=${use_cache}`;
-    } else if (searchType === 'values') {
-      url = `${baseUrl}/_search_values_stream?type=logs&search_type=ui`;
+     
+    url = `/_search_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
+    if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+    if (folder_id) url += `&folder_id=${folder_id}`;
+    if (fallback_order_by_col) url += `&fallback_order_by_col=${fallback_order_by_col}`;
+    if (typeof queryReq.query.sql != "string") {
+      url = `/_search_multi_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
     }
+
+    url = baseUrl + url;
 
     try {
       // Make the HTTP/2 streaming request
@@ -236,7 +247,6 @@ const useHttpStreaming = () => {
               line = line.slice(6);
             }
             const json = JSON.parse(line);
-            console.log('json', json);
             if (json.code > 200) {
               error = json.message;
               break;
@@ -249,15 +259,13 @@ const useHttpStreaming = () => {
             }
           } catch (e) {
             // If not JSON, check if it's an SSE message
-            console.log('error while parsing', e);
+            console.error('error while parsing', e);
             if (line.startsWith('data: ')) {
               onData(traceId, 'search_response', line.slice(6));
             }
           }
         }
       }
-
-      console.log('messages', messages);
 
       // if (!response.body) {
       //   throw new Error('Response body is null');
@@ -309,7 +317,7 @@ const useHttpStreaming = () => {
       // }
     } catch (error) {
       if ((error as any).name === 'AbortError') {
-        console.log('Stream was canceled');
+        console.error('Stream was canceled');
       } else {
         onError(error, traceId);
       }
