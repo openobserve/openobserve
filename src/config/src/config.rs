@@ -45,6 +45,10 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
+// for DDL commands and migrations
+pub const DB_SCHEMA_VERSION: u64 = 3;
+pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
+
 // global version variables
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -672,6 +676,8 @@ pub struct Common {
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
     #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
     pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
+    #[env_config(name = "ZO_META_DDL_DSN", default = "")]
+    pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
@@ -1663,8 +1669,20 @@ pub struct Nats {
     pub queue_max_age: u64,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, Default, EnvConfig)]
 pub struct S3 {
+    #[env_config(
+        name = "ZO_S3_ACCOUNTS",
+        default = "",
+        help = "comma separated list of accounts"
+    )]
+    pub accounts: String,
+    #[env_config(
+        name = "ZO_S3_STREAM_STRATEGY",
+        default = "",
+        help = "stream strategy, default is: empty, only use default account, other value is: file_hash, stream_hash, stream1:account1,stream2:account2"
+    )]
+    pub stream_strategy: String,
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
     pub provider: String,
     #[env_config(name = "ZO_S3_SERVER_URL", default = "")]

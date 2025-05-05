@@ -1937,7 +1937,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     // escape any single quotes in the value
     tempValue = escapeSingleQuotes(tempValue);
     // add double quotes around the value
-    tempValue = columnType == "Utf8" ? `'${tempValue}'` : `${tempValue}`;
+    tempValue =
+      columnType == "Utf8" || columnType === undefined
+        ? `'${tempValue}'`
+        : `${tempValue}`;
+
     return tempValue;
   };
 

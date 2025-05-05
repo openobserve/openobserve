@@ -126,6 +126,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
                 .map(|ds| ds.into_iter().map(|d| d.into()).collect()),
         };
         alert.trigger_condition = MetaTriggerCondition {
+            align_time: value.align_time,
             // DB model stores period in seconds, but service layer stores
             // minutes.
             period: value.trigger_period_seconds / 60,
@@ -649,7 +650,8 @@ fn update_mutable_fields(
     let trigger_tolerance_seconds = alert.trigger_condition.tolerance_in_secs;
     let owner = alert.owner.filter(|s| !s.is_empty());
     let last_edited_by = alert.last_edited_by.filter(|s| !s.is_empty());
-    let updated_at: i64 = chrono::Utc::now().timestamp();
+    let align_time = alert.trigger_condition.align_time;
+    let updated_at: i64 = chrono::Utc::now().timestamp_micros();
 
     alert_am.is_real_time = Set(is_real_time);
     alert_am.destinations = Set(destinations);
@@ -681,7 +683,7 @@ fn update_mutable_fields(
     alert_am.owner = Set(owner);
     alert_am.last_edited_by = Set(last_edited_by);
     alert_am.updated_at = Set(Some(updated_at));
-
+    alert_am.align_time = Set(align_time);
     Ok(())
 }
 
