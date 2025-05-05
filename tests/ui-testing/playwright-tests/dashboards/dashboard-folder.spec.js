@@ -7,7 +7,7 @@ import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardFolder from "../../pages/dashboardPages/dashboard-folder.js";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
 import { DashboardPage } from "../../pages/dashboardPage.js";
-import { AlertsPage } from '../../pages/alertsPages/alertsPage.js';
+import { AlertsPage } from "../../pages/alertsPages/alertsPage.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -26,6 +26,9 @@ export const test = base.extend({
 test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard folder testcases", () => {
+  let dashboardPage;
+  let dashboardFolders;
+
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
     await login(page);
@@ -37,9 +40,12 @@ test.describe("dashboard folder testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await orgNavigation;
+
+    dashboardPage = new DashboardListPage(page);
+    dashboardFolders = new DashboardFolder(page);
   });
 
-  test.skip("Should create and delete a unique folder, and verify it's deleted" ,async ({
+  test.skip("Should create and delete a unique folder, and verify it's deleted", async ({
     page,
   }) => {
     const dashboardPage = new DashboardListPage(page);
@@ -51,7 +57,7 @@ test.describe("dashboard folder testcases", () => {
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
-    //  Define folderName first
+    // Define folderName first
     const folderName = dashboardFolders.generateUniqueFolderName("t");
 
     // Create the folder
@@ -62,7 +68,6 @@ test.describe("dashboard folder testcases", () => {
     await alertsPage.navigateToFolder(folderName);
     await page.waitForTimeout(2000);
 
-
     await dashboardCreate.createDashboard(randomDashboardName);
     await page.waitForTimeout(1000);
     await dashboardPageActions.verifyShareDashboardLink(randomDashboardName);
@@ -72,21 +77,18 @@ test.describe("dashboard folder testcases", () => {
     await page.waitForTimeout(1000);
     await dashboardPageActions.deleteSearchedDashboard(randomDashboardName);
 
-    //  Delete folder
+    // Delete folder
     await dashboardFolders.deleteFolder(folderName);
     await expect(page.locator(`text=${folderName}`)).toHaveCount(0);
   });
 
-  test("should create and Edit folder name and verify it's updated", async ({
+  test("should create and edit folder name and verify it's updated", async ({
     page,
   }) => {
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardFolders = new DashboardFolder(page);
-
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
-    //  Define folderName first
+    // Define folderName first
     const folderName = dashboardFolders.generateUniqueFolderName("t");
 
     // Create the folder
