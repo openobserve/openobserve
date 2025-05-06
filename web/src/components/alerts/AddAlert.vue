@@ -890,7 +890,15 @@ export default defineComponent({
       return condition;
     };
 
+    //this method is used to generate the where clause
+    //for new format of conditions we need to iterate over the items and get the conditions
+    //and then we need to format the conditions
+    // then we need to return the where clause
+
     function generateWhereClause(group: any, streamFieldsMap: any) {
+      //this method is used to format the value
+      //if the value is a number or a string and the operator is contains or not contains then we need to return the value as it is
+      //else we need to return the value as a string and add single quotes to it
       function formatValue(column: any, operator: any, value: any) {
         return streamFieldsMap[column]?.type === "Int64" ||
           operator === "Contains" ||
@@ -899,10 +907,17 @@ export default defineComponent({
           : `'${value}'`;
       }
 
+      //this method is used to format the condition
+      //if the column and operator and value are present then we need to return the condition
+      //else we need to return an empty string
       function formatCondition(column: any, operator: any, value: any) {
         return `${column} ${operator} ${value}`;
       }
 
+      //this method is used to parse the group
+      //if the group is not present or the items are not present then we need to return an empty string
+      //else we need to iterate over the items and get the conditions
+      //and then we need to return the where clause
       function parseGroup(groupNode: any) {
         if (!groupNode || !Array.isArray(groupNode.items)) return "";
 
@@ -924,6 +939,8 @@ export default defineComponent({
         return parts.join(` ${groupNode.label.toUpperCase()} `);
       }
 
+      //this method is used to generate the where clause
+
       const clause = parseGroup(group);
       return clause.trim().length ? "WHERE " + clause : "";
   }
@@ -936,7 +953,9 @@ export default defineComponent({
       let query = `SELECT histogram(${
         store.state.zoConfig.timestamp_column || "_timestamp"
       }) AS zo_sql_key,`;
-
+      //this method is used to generate the where clause
+      //previously it was just iterating over the conditions and getting the where clause
+      //now we are using the new format of conditions and getting the where clause using generateWhereClause method
       let whereClause = generateWhereClause(formData.value.query_condition.conditions, streamFieldsMap);
 
       if (!isAggregationEnabled.value) {
@@ -1303,6 +1322,8 @@ export default defineComponent({
 
 
 // Method to handle the emitted changes and update the structure
+//this method is used to update the group
+//we need to update the group if it is changed 
   function updateGroup(updatedGroup:any) {
     formData.value.query_condition.conditions.items.forEach((element:any) => {
       if(element.groupId === updatedGroup.groupId){
@@ -1310,10 +1331,11 @@ export default defineComponent({
       }
     });
   }
-
+//this method is used to remove the condition group
+//we need to remove the condition group if it is empty because we cannot simply show empty group in the UI
   const removeConditionGroup = (targetGroupId: string, currentGroup: any = formData.value.query_condition.conditions) => {
     if (!currentGroup?.items || !Array.isArray(currentGroup.items)) return;
-
+    //here we are iterating over the items and removing the condition group
     currentGroup.items = currentGroup.items.filter((item: any) => {
       if (item.items && item.groupId === targetGroupId) {
         // Remove matching group
@@ -1331,19 +1353,31 @@ export default defineComponent({
 
 
   // Method to transform the form data to the backend format
+  //so in the FE we are constructing the data like 
+  //eg: 
+  // {
+  //   groupId: '123',
+  //   label: 'and',
+  //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
+  // }
+  // but in the BE we are expecting the data like 
+  // {
+  //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
+  // }
     function transformFEToBE(node:any) {
     if (!node || !node.items || !Array.isArray(node.items)) return {};
 
     const groupLabel = node.label?.toLowerCase(); // 'or' or 'and'
     if (!groupLabel || (groupLabel !== 'or' && groupLabel !== 'and')) return {};
 
-    const transformedItems = node.items.map(item => {
+    const transformedItems = node.items.map((item:any) => {
       // If the item has its own groupId and items, it's a nested group
+      //that means the item is a group and we need to iterate over that group to get further conditions
       if (item.groupId && item.items) {
         return transformFEToBE(item);
       }
 
-      // Otherwise, it's a condition/rule
+      //if not its a condition so we can simply return the condition
       return {
         column: item.column,
         operator: item.operator,
@@ -1352,12 +1386,24 @@ export default defineComponent({
       };
     });
 
+    //return the transformed items in the format of the backend
     return {
       [groupLabel]: transformedItems
     };
   }
 
   // Method to transform the backend data to the frontend format
+  //when we get response from the BE we need to transform it to the frontend format
+  //eg: 
+  // {
+  //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
+  // }
+  // to
+  // {
+  //   groupId: '123',  
+  //   label: 'and',
+  //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
+  // }
   function retransformBEToFE(data:any) {
     if(!data) return null;
     const keys = Object.keys(data);
@@ -1366,12 +1412,13 @@ export default defineComponent({
     const label = keys[0]; // 'and' or 'or'
     const itemsArray = data[label];
 
-    const items = itemsArray.map(item => {
+    const items = itemsArray.map((item: any) => {
       if (item.and || item.or) {
-        // Nested group
+          // Nested group
+          //so we need to iterate over the item and get the conditions and map that to one group
         return retransformBEToFE(item);
       } else {
-        // Simple condition
+        //if not its a condition so we can simply return the condition
         return {
           column: item.column,
           operator: item.operator,
@@ -1381,7 +1428,13 @@ export default defineComponent({
         };
       }
     });
-
+    //here we will return the group with the conditions
+    //the foramt looks like 
+    //{
+    //   groupId: '123',
+    //   label: 'and',
+    //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
+    // }
     return {
       groupId:  getUUID(),
       label,
