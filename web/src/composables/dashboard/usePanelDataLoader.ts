@@ -470,6 +470,11 @@ export const usePanelDataLoader = (
                       partition[1],
                       histogramInterval,
                     ),
+                    // pass encodig if enabled,
+                    // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+                    ...(store.state.zoConfig.sql_base64_enabled
+                      ? { encoding: "base64" }
+                      : {}),
                   },
                   page_type: pageType,
                   traceparent,
