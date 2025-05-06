@@ -318,7 +318,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, ctes: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, is_complex_query: {:?}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -2520,68 +2520,5 @@ mod tests {
 
         // we support this type of query
         assert_eq!(result, sql.to_string());
-    }
-
-    #[test]
-    fn test_extract_cte_information() {
-        // Test simple WITH clause
-        let sql = "WITH cte1 AS (SELECT name FROM table1) SELECT * FROM cte1";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut cte_visitor = CteVisitor::new();
-        statement.visit(&mut cte_visitor);
-        
-        assert_eq!(cte_visitor.ctes.len(), 1);
-        assert_eq!(cte_visitor.ctes[0].alias, "cte1");
-        assert_eq!(cte_visitor.ctes[0].query, "SELECT name FROM table1");
-        
-        // Test multiple CTEs
-        let sql = "WITH cte1 AS (SELECT name FROM table1), cte2 AS (SELECT age FROM table2) SELECT * FROM cte1 JOIN cte2 ON cte1.name = cte2.name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut cte_visitor = CteVisitor::new();
-        statement.visit(&mut cte_visitor);
-        
-        assert_eq!(cte_visitor.ctes.len(), 2);
-        assert_eq!(cte_visitor.ctes[0].alias, "cte1");
-        assert_eq!(cte_visitor.ctes[0].query, "SELECT name FROM table1");
-        assert_eq!(cte_visitor.ctes[1].alias, "cte2");
-        assert_eq!(cte_visitor.ctes[1].query, "SELECT age FROM table2");
-        
-        // Test no WITH clause
-        let sql = "SELECT * FROM table1";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut cte_visitor = CteVisitor::new();
-        statement.visit(&mut cte_visitor);
-        
-        assert_eq!(cte_visitor.ctes.len(), 0);
-    }
-
-    #[test]
-    fn test_extract_cte_information_with_nested_ctes() {
-        // Test nested CTEs
-        let sql = "WITH outer_cte AS (WITH inner_cte AS (SELECT col1 FROM table1) SELECT * FROM inner_cte) SELECT * FROM outer_cte";
-        let mut statement = Parser::parse_sql(&GenericDialect {}, &sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut cte_visitor = CteVisitor::new();
-        statement.visit(&mut cte_visitor);
-        
-        assert_eq!(cte_visitor.ctes.len(), 2);
-        
-        // The order of detected CTEs might vary based on traversal, so check for existence rather than specific order
-        let has_outer = cte_visitor.ctes.iter().any(|cte| cte.alias == "outer_cte");
-        let has_inner = cte_visitor.ctes.iter().any(|cte| cte.alias == "inner_cte");
-        
-        assert!(has_outer, "Outer CTE not detected");
-        assert!(has_inner, "Inner CTE not detected");
     }
 }
