@@ -40,17 +40,20 @@ use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::search::{
-    DATAFUSION_RUNTIME, SearchResult,
-    cluster::flight::{generate_context, register_table},
-    datafusion::distributed_plan::{
-        remote_scan::RemoteScanExec,
-        rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+use crate::service::{
+    grpc::make_grpc_search_client,
+    search::{
+        DATAFUSION_RUNTIME, SearchResult,
+        cluster::flight::{generate_context, register_table},
+        datafusion::distributed_plan::{
+            remote_scan::RemoteScanExec,
+            rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+        },
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        request::Request,
+        sql::Sql,
+        utils::ScanStatsVisitor,
     },
-    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    request::Request,
-    sql::Sql,
-    utils::ScanStatsVisitor,
 };
 
 #[async_recursion]
@@ -149,8 +152,9 @@ pub async fn search(
     );
 
     let trace_id_move = trace_id.to_string();
+    let follower_nodes = nodes.clone();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        run_datafusion(trace_id_move, req, sql, nodes)
+        run_datafusion(trace_id_move, req, sql, follower_nodes)
             .instrument(datafusion_span)
             .await
     });
@@ -195,7 +199,39 @@ pub async fn search(
         }
     };
 
+    log::info!(
+        "[trace_id {trace_id}] super cluster original scan stats : {:?}",
+        scan_stats
+    );
+
+    for node in nodes {
+        let mut scan_stats_request = tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
+            trace_id: trace_id.to_string(),
+        });
+        let mut client =
+            match make_grpc_search_client(trace_id, &mut scan_stats_request, &node).await {
+                Ok(c) => c,
+                Err(e) => {
+                    log::warn!("error in creating get scan stats client :{e}, skipping");
+                    continue;
+                }
+            };
+        let stats = match client.get_scan_stats(scan_stats_request).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("error in getting scan stats : {e}, skipping");
+                continue;
+            }
+        };
+        let stats = stats.into_inner().stats.unwrap_or_default();
+        scan_stats.add(&(&stats).into());
+    }
+
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
+    log::info!(
+        "[trace_id {trace_id}] super cluster final scan stats : {:?}",
+        scan_stats
+    );
 
     scan_stats.format_to_mb();
     Ok((data, scan_stats, 0, !partial_err.is_empty(), partial_err))
