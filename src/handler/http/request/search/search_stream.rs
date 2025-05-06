@@ -506,12 +506,12 @@ pub async fn search_http2_stream(
 
     HttpResponse::Ok()
         .content_type("text/event-stream")
-        // .append_header((header::CONNECTION, HeaderValue::from_static("keep-alive")))
-        // .append_header((
-        //     header::TRANSFER_ENCODING,
-        //     HeaderValue::from_static("chunked"),
-        // ))
-        .insert_header(ContentEncoding::Identity) // to disable encoding
+        .append_header((header::CONNECTION, HeaderValue::from_static("keep-alive")))
+        .append_header((
+            header::TRANSFER_ENCODING,
+            HeaderValue::from_static("chunked"),
+        ))
+        // .insert_header(ContentEncoding::Identity) // to disable encoding
         .streaming(stream)
 }
 
@@ -746,9 +746,6 @@ async fn do_search(
     use_cache: bool,
 ) -> Result<Response, infra::errors::Error> {
     let mut req = req.clone();
-
-    // add sleep to simulate the search time
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
     req.use_cache = Some(use_cache);
     let res = SearchService::cache::search(

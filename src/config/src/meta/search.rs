@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::VecDeque;
+
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
-use std::collections::VecDeque;
 
 use crate::{
     meta::{sql::OrderBy, stream::StreamType},
@@ -284,45 +285,45 @@ impl Iterator for ResponseChunkIterator {
         if !self.metadata_sent {
             self.metadata_sent = true;
             self.position += 1;
-            
+
             // Clone response but remove hits
             let mut metadata_response = self.response.clone();
             metadata_response.hits = vec![];
-            
+
             return Some(ResponseChunk::Metadata {
                 response: metadata_response,
             });
         }
-        
+
         // If we have no hits left, we're done
         if self.remaining_hits.is_empty() {
             return None;
         }
-        
+
         // Create the next chunk of hits
         let mut current_chunk: Vec<crate::utils::json::Value> = Vec::new();
         let mut current_chunk_size: usize = 0;
-        
+
         // Keep adding hits until we reach the target chunk size
         while !self.remaining_hits.is_empty() {
             // Peek at the front hit
             let hit = &self.remaining_hits[0];
             let hit_size = crate::utils::json::estimate_json_bytes(hit);
-            
+
             // If adding this hit would exceed target size, break
             if !current_chunk.is_empty() && current_chunk_size + hit_size > self.chunk_size {
                 break;
             }
-            
+
             // Add hit to current chunk - using pop_front() for O(1) complexity
             if let Some(hit) = self.remaining_hits.pop_front() {
                 current_chunk.push(hit);
                 current_chunk_size += hit_size;
             }
         }
-        
+
         self.position += 1;
-        
+
         // Return the hits chunk
         Some(ResponseChunk::Hits {
             hits: current_chunk,
