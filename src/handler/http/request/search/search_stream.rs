@@ -450,6 +450,7 @@ pub async fn search_http2_stream(
             "[HTTP2_STREAM] trace_id {} all searches completed",
             trace_id
         );
+        sender.send(Ok(StreamResponses::Done)).await.unwrap();
     });
 
     // Return streaming response
