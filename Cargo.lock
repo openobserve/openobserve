@@ -6151,7 +6151,6 @@ dependencies = [
  "arrow",
  "arrow-flight",
  "arrow-schema",
- "async-nats",
  "async-recursion",
  "async-trait",
  "async-walkdir",

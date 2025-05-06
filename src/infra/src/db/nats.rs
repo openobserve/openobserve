@@ -21,6 +21,7 @@ use std::{
     time::Duration,
 };
 
+pub use async_nats::Event as NatsEvent;
 use async_nats::{Client, ServerAddr, jetstream};
 use async_trait::async_trait;
 use bytes::Bytes;

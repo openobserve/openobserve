@@ -34,7 +34,7 @@ use crate::common::infra::config::update_cache;
 /// Register and keep alive the node to cluster
 pub(crate) async fn register_and_keep_alive() -> Result<()> {
     // first, init NATs client with channel communicating NATs events
-    let (nats_event_tx, nats_event_rx) = mpsc::channel::<async_nats::Event>(10);
+    let (nats_event_tx, nats_event_rx) = mpsc::channel::<nats::NatsEvent>(10);
     if let Err(e) = nats::init_nats_client(nats_event_tx).await {
         log::error!("[CLUSTER] NATs client init failed: {}", e);
         return Err(e);

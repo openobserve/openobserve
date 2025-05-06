@@ -64,7 +64,6 @@ actix-tls.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
-async-nats.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
 async-walkdir.workspace = true

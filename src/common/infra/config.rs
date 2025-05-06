@@ -106,9 +106,9 @@ pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
 ///
 /// We should add all in-memory caches listed above that a CacheMiss is not followed by
 /// reading from db, e.g. UserSession, Pipeline
-pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<async_nats::Event>) {
+pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::nats::NatsEvent>) {
     while let Some(event) = nats_event_rx.recv().await {
-        if let async_nats::Event::Connected = event {
+        if let infra::db::nats::NatsEvent::Connected = event {
             log::info!(
                 "[infra::config] received NATs event: {event}, refreshing in-memory cache for UserSessions and Pipelines"
             );
