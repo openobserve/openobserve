@@ -1009,7 +1009,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tabs>
       </div>
       <template v-if="tab === 'custom'" class='q-pa-none q-ma-none' ">
-        <FilterGroup :stream-fields="columns" :group="inputData" :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
+        <FilterGroup :stream-fields="columns" :group="inputData " :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
 
         
 
@@ -1448,7 +1448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, defineAsyncComponent } from "vue";
+import { ref, watch, computed, defineAsyncComponent, onMounted } from "vue";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -1617,6 +1617,13 @@ const outputFnEvents = ref("");
 const cronJobError = ref("");
 
 const expandState = ref(props.expandState);
+
+
+onMounted(()=>{
+  if(dateTimePicker.value.length > 0){
+    tab.value = 'sql'
+  }
+})
 
 const getNumericColumns = computed(() => {
   if (
@@ -1825,6 +1832,7 @@ const updateQuery = () => {
 const addTimeShift = () => {
   if(dateTimePicker.value.length == 0){
     tab.value = 'sql'
+    updateTab();
   }
   const newTimeShift = {
     offSet: "15m",
