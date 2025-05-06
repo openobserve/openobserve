@@ -25,7 +25,6 @@ use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
 use crate::service::db::alerts::alert;
 pub(crate) async fn process(msg: Message) -> Result<()> {
-    log::debug!("[SUPER_CLUSTER:sync] process_msg scheduler: {:?}", msg);
     match msg.message_type {
         MessageType::SchedulerPush => {
             push(msg).await?;

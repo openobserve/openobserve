@@ -23,7 +23,6 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
-    log::debug!("[SUPER_CLUSTER:sync] process_msg dashboard: {:?}", msg);
     match msg {
         DashboardMessage::Put {
             org_id,
