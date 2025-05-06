@@ -1,55 +1,13 @@
 import { test, expect } from "../baseFixtures";
 import path from "path";
 import fs from "fs";
-import logsdata from "../../../test-data/logs_data.json";
-import { DashboardPage } from '../../pages/dashboardPage';
+import { login } from "../utils/dashLogin";
+import { ingestion } from "../utils/dashIngestion";
+import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
+import { DashboardPage } from "../../pages/dashboardPage";
+import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
 
-// Function to handle login
-async function login(page) {
-
-  await page.goto(process.env["ZO_BASE_URL"]);
-  if (await page.getByText("Login as internal user").isVisible()) {
-    await page.getByText("Login as internal user").click();
-  }
-  console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
-  await page.waitForTimeout(1000);
-
-  await page.locator('[data-cy="login-user-id"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  await page.locator('[data-cy="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-  await page.waitForTimeout(4000);
-  await page.goto(process.env["ZO_BASE_URL"]);
-}
-
-async function ingestion(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(logsdata)
-    });
-    return await fetchResponse.json();
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: logsdata
-  });
-  console.log(response);
-}
-
-// Read JSON test files
+// Function to read JSON test files
 function readJsonFile(filename) {
   const filePath = path.join(__dirname, `../../../test-data/${filename}`);
   if (!fs.existsSync(filePath)) {
@@ -59,27 +17,23 @@ function readJsonFile(filename) {
   return fs.readFileSync(filePath, "utf8");
 }
 
-test.describe("Sanity Tests", () => { let dashboardPage
+test.describe("Custom Charts Tests", () => {
+  let dashboardPanel;
   let pictorialJSON, lineJSON;
-
-  test.beforeEach(async ({ page }) => {
-  
-    dashboardPage = new DashboardPage(page);
-    
-});
+  let dashboardPage;
+  let dashboardPageActions;
 
   test.beforeAll(() => {
-    
-    const jsonString = readJsonFile("pictorial.json");
-    pictorialJSON = jsonString
+    pictorialJSON = readJsonFile("pictorial.json");
     lineJSON = readJsonFile("line.json");
   });
 
   test.beforeEach(async ({ page }) => {
-  
+    dashboardPanel = new DashboardPanel(page);
+    dashboardPage = new DashboardPage(page);
+    dashboardPageActions = new DashboardactionPage(page);
+
     await login(page);
-   
-    
     await page.waitForTimeout(1000);
     await ingestion(page);
   });
@@ -89,38 +43,40 @@ test.describe("Sanity Tests", () => { let dashboardPage
       console.error("Skipping test: pictorial.json not found");
       return;
     }
+
     await dashboardPage.addCustomChart();
-  // Type the content with raw modifier to bypass autocomplete
-  await page.keyboard.insertText(pictorialJSON);
-  
-  await page.waitForTimeout(1000);
-  await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
-  await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.inputarea').fill('select * from "e2e_automate"');
-  await page.locator('[data-test="dashboard-apply"]').click();
-  await page.waitForTimeout(3000);
-  await expect(page.getByText("Unsafe code detected: Access to 'document' is not allowed")).toBeVisible();
 
-  
-});
+    // Type the content with raw modifier to bypass autocomplete
+    await page.keyboard.insertText(pictorialJSON);
 
-test("Add line JSON in Monaco Editor", async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
+    await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.inputarea').fill('select * from "e2e_automate"');
+    await dashboardPageActions.applyDashboardBtn();
+    await page.waitForTimeout(3000);
+    await expect(
+      page.getByText(
+        "Unsafe code detected: Access to 'document' is not allowed"
+      )
+    ).toBeVisible();
+  });
+
+  test("Add line JSON in Monaco Editor", async ({ page }) => {
     if (!lineJSON) {
-      console.error("Skipping test: pictorial.json not found");
+      console.error("Skipping test: line.json not found");
       return;
     }
+
     await dashboardPage.addCustomChart();
-  // Type the content with raw modifier to bypass autocomplete
-  await page.keyboard.insertText(lineJSON);
-  
-  await page.waitForTimeout(1000);
-  await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
-  await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.inputarea').fill('select * from "e2e_automate"');
-  await page.waitForTimeout(3000);
-  await page.locator('[data-test="dashboard-apply"]').click();
-  await page.waitForTimeout(3000);
-  // await expect(page.getByText("Unsafe code detected: Access to 'document' is not allowed")).toBeVisible();
 
-  
-});
+    // Type the content with raw modifier to bypass autocomplete
+    await page.keyboard.insertText(lineJSON);
 
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
+    await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.inputarea').fill('select * from "e2e_automate"');
+    await page.waitForTimeout(3000);
+    await dashboardPageActions.applyDashboardBtn();
+    await page.waitForTimeout(3000);
+  });
 });
