@@ -863,7 +863,7 @@ impl StreamResponses {
                 // Add a log message to show the chunk size being used
                 log::info!(
                     "[HTTP2_STREAM] Using chunk size of {}MB from configuration",
-                    cfg_clone.websocket.streaming_response_chunk_size
+                    get_config().websocket.streaming_response_chunk_size
                 );
 
                 // Capture needed values for the closure

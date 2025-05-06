@@ -253,7 +253,7 @@ impl ResponseChunkIterator {
             crate::get_config().websocket.streaming_response_chunk_size * mb
         });
         
-        let hits = response.hits.drain(..).collect();
+        let hits = response.hits.drain(..).collect::<Vec<_>>();
         
         Self {
             response,
