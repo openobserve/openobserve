@@ -214,7 +214,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import FieldsInput from "./FieldsInput.vue";
 import AlertsContainer from "./AlertsContainer.vue";
-import FieldsInputWithMulti from "./FieldsInputWithMulti.vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 
