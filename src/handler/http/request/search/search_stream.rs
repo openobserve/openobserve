@@ -583,11 +583,6 @@ pub async fn do_partitioned_search(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
 
-        if idx == 6 {
-            let err = infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchTimeout("test".to_string()));
-            sender.send(Err(err)).await.unwrap();
-            return Ok(());
-        }
         let mut req = req.clone();
         req.query.start_time = start_time;
         req.query.end_time = end_time;
