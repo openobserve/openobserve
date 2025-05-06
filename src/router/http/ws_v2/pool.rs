@@ -59,29 +59,31 @@ impl QuerierConnectionPool {
         drop(w);
 
         log::info!("[WS::ConnectionPool] created new connection to querier {querier_name}");
+        QuerierConnectionPool::print_all_connections(
+            format!("after create new {}", querier_name).as_str(),
+        )
+        .await;
         Ok(conn)
     }
 
     pub async fn remove_querier_connection(&self, querier_name: &str) {
         let mut w = self.connections.write().await;
-        let conn = w.remove(querier_name);
-        drop(w);
-        if let Some(conn) = conn {
+        if let Some(conn) = w.remove(querier_name) {
             log::warn!("[WS::ConnectionPool] removing connection to querier {querier_name}");
             conn.disconnect().await;
         }
+        drop(w);
     }
 
     pub async fn _shutdown(&self) {
         let mut writer_guard = self.connections.write().await;
-        let conns = writer_guard.drain().collect::<Vec<_>>();
-        drop(writer_guard);
-        for (querier_name, conn) in conns {
+        for (querier_name, conn) in writer_guard.drain() {
             log::warn!(
                 "[WS::ConnectionPool] error disconnect connection to querier {querier_name} as it's still in use. Force remove."
             );
             conn.disconnect().await;
         }
+        drop(writer_guard);
     }
 
     pub async fn get_active_connection(
@@ -96,23 +98,28 @@ impl QuerierConnectionPool {
 
     pub async fn clean_up(querier_name: &QuerierName) {
         let ws_handler = get_ws_handler().await;
+        QuerierConnectionPool::print_all_connections(
+            format!("before cleanup {}", querier_name).as_str(),
+        )
+        .await;
         ws_handler
             .connection_pool
             .remove_querier_connection(querier_name)
             .await;
+
+        QuerierConnectionPool::print_all_connections(
+            format!("after cleanup {}", querier_name).as_str(),
+        )
+        .await;
     }
 
-    pub async fn _print_all_connections(helper_txt: &str) {
+    pub async fn print_all_connections(helper_txt: &str) {
         let ws_handler = get_ws_handler().await;
         let ws_handler_clone = ws_handler.clone();
         let r = ws_handler_clone.connection_pool.connections.read().await;
-        let conns = r
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect::<Vec<_>>();
-        drop(r);
-        for (querier_name, _) in conns {
+        for (querier_name, _) in r.iter() {
             log::info!("[WS::ConnectionPool]   {helper_txt}: {querier_name}");
         }
+        drop(r);
     }
 }

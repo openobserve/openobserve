@@ -13,42 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::DateTime;
-use config::{
-    get_config,
-    meta::{
-        search::{SearchEventType, ValuesEventContext},
-        websocket::{SearchResultType, ValuesEventReq},
-    },
+use config::meta::{
+    search::{SearchEventType, ValuesEventContext},
+    websocket::{ValuesEventReq, SearchResultType},
 };
-use tracing::Instrument;
+use crate::handler::http::request::search::build_search_request_per_field;
+use config::get_config;
+use chrono::DateTime;
 
 #[cfg(feature = "enterprise")]
 use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::utils::stream::get_max_query_range,
-    handler::http::request::{search::build_search_request_per_field, ws::session::send_message},
+    handler::http::request::ws_v2::session::send_message,
     service::{
         search::{cache, sql::Sql},
-        setup_tracing_with_trace_id,
-        websocket_events::{
-            WsServerEvents,
-            search::{
-                do_partitioned_search, handle_cache_responses_and_deltas, write_results_to_cache,
-            },
-        },
+        websocket_events::{WsServerEvents, search::{
+            do_partitioned_search, write_results_to_cache, handle_cache_responses_and_deltas
+        }},
     },
 };
 
 pub async fn handle_values_request(
-    org_id: &str,
+    org_id: &str, 
     user_id: &str,
     request_id: &str,
     req: ValuesEventReq,
     accumulated_results: &mut Vec<SearchResultType>,
-) -> Result<(), infra::errors::Error> {
-    let mut start_timer = std::time::Instant::now();
-
+) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let trace_id = req.trace_id.clone();
     let stream_type = req.stream_type;
@@ -58,20 +50,11 @@ pub async fn handle_values_request(
     let stream_name = payload.stream_name.clone();
     let no_count = payload.no_count;
 
-    // Setup tracing
-    let ws_values_span = setup_tracing_with_trace_id(
-        &trace_id,
-        tracing::info_span!("service:websocket_events:values:handle_values_request"),
-    )
-    .await;
-
     log::info!(
         "[WS_VALUES] trace_id: {} Received values request, start_time: {}, end_time: {}",
         trace_id,
-        DateTime::from_timestamp_micros(start_time.unwrap_or(0) / 1_000)
-            .map_or("None".to_string(), |dt| dt.to_string()),
-        DateTime::from_timestamp_micros(end_time.unwrap_or(0) / 1_000)
-            .map_or("None".to_string(), |dt| dt.to_string())
+        DateTime::from_timestamp_micros(start_time.unwrap_or(0) / 1_000).map_or("None".to_string(), |dt| dt.to_string()),
+        DateTime::from_timestamp_micros(end_time.unwrap_or(0) / 1_000).map_or("None".to_string(), |dt| dt.to_string())
     );
 
     // Check permissions for each stream
@@ -81,7 +64,7 @@ pub async fn handle_values_request(
             enterprise_utils::check_permissions(&stream_name, stream_type, user_id, org_id).await
         {
             let err_res = WsServerEvents::error_response(
-                &infra::errors::Error::Message(e),
+                infra::errors::Error::Message(e),
                 Some(request_id.to_string()),
                 Some(trace_id),
                 Default::default(),
@@ -96,28 +79,20 @@ pub async fn handle_values_request(
     let top_k = payload.size.or(Some(cfg.limit.query_default_limit));
 
     // get values req query
-    let reqs = build_search_request_per_field(&payload, org_id, stream_type, &stream_name)
-        .instrument(ws_values_span.clone())
-        .await?;
+    let reqs = build_search_request_per_field(&payload, org_id, stream_type, &stream_name).await?;
 
     for (search_req, stream_type, field) in reqs {
         // Convert the request query to SearchQuery type if needed
         // Here we're converting from the search_req.query to the expected type
         let search_query = search_req.query.clone().into();
-
+        
         let sql = Sql::new(&search_query, org_id, stream_type, search_req.search_type).await?;
         let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
-
+        
         if search_req.query.from == 0 {
-            let c_resp = cache::check_cache_v2(
-                &trace_id,
-                org_id,
-                stream_type,
-                &search_req,
-                search_req.use_cache.unwrap_or(false),
-            )
-            .instrument(ws_values_span.clone())
-            .await?;
+            let c_resp =
+                cache::check_cache_v2(&trace_id, org_id, stream_type, &search_req, search_req.use_cache.unwrap_or(false))
+                .await?;
             let local_c_resp = c_resp.clone();
             let cached_resp = local_c_resp.cached_response;
             let mut deltas = local_c_resp.deltas;
@@ -192,9 +167,7 @@ pub async fn handle_values_request(
                     max_query_range,
                     remaining_query_range,
                     &order_by,
-                    &mut start_timer,
                 )
-                .instrument(ws_values_span.clone())
                 .await?;
             } else {
                 // Step 2: Search without cache
@@ -233,10 +206,7 @@ pub async fn handle_values_request(
                     user_id,
                     accumulated_results,
                     max_query_range,
-                    &mut start_timer,
-                    &order_by,
                 )
-                .instrument(ws_values_span.clone())
                 .await?;
             }
             // Step 3: Write to results cache
@@ -245,9 +215,8 @@ pub async fn handle_values_request(
                 // Safely unwrap Option<i64> values with defaults
                 let safe_start_time = start_time.unwrap_or(0);
                 let safe_end_time = end_time.unwrap_or(0);
-
+                
                 write_results_to_cache(c_resp, safe_start_time, safe_end_time, accumulated_results)
-                    .instrument(ws_values_span.clone())
                     .await
                     .map_err(|e| {
                         log::error!(
@@ -255,7 +224,7 @@ pub async fn handle_values_request(
                             trace_id,
                             e
                         );
-                        e
+                        anyhow::anyhow!("Error writing results to cache: {}", e)
                     })?;
             }
         } else {
@@ -290,10 +259,7 @@ pub async fn handle_values_request(
                 user_id,
                 accumulated_results,
                 max_query_range,
-                &mut start_timer,
-                &order_by,
             )
-            .instrument(ws_values_span.clone())
             .await?;
         }
     }

@@ -45,9 +45,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let exist_cluster_name =
             o2_enterprise::enterprise::super_cluster::kv::alert_manager::get_job_cluster().await?;
         if !exist_cluster_name.is_empty() && exist_cluster_name != local_cluster_name {
-            let clusters =
-                o2_enterprise::enterprise::super_cluster::kv::cluster::list_by_role_group(None)
-                    .await?;
+            let clusters = o2_enterprise::enterprise::super_cluster::kv::cluster::list().await?;
             if clusters.iter().any(|c| c.name == exist_cluster_name) {
                 log::info!(
                     "[ALERT MANAGER] is running in cluster: {}",

@@ -383,7 +383,7 @@ async fn get_remote_batch(
     }
 
     let node_name = match get_node_by_addr(&node.get_grpc_addr()).await {
-        None => node.get_grpc_addr(),
+        None => "".to_string(),
         Some(node) => node.name,
     };
 
@@ -395,7 +395,6 @@ async fn get_remote_batch(
         node.get_grpc_addr(),
         node_name,
         is_querier,
-        remote_scan_node.super_cluster_info.is_super_cluster,
         files,
         scan_size,
         partial_err,
@@ -445,7 +444,6 @@ struct FlightStream {
     stream: Streaming<FlightData>,
     node_addr: String,
     node_name: String,
-    is_super: bool,
     is_querier: bool,
     files: i64,
     scan_size: i64,
@@ -464,7 +462,6 @@ impl FlightStream {
         stream: Streaming<FlightData>,
         node_addr: String,
         node_name: String,
-        is_super: bool,
         is_querier: bool,
         files: i64,
         scan_size: i64,
@@ -479,7 +476,6 @@ impl FlightStream {
             stream,
             node_addr,
             node_name,
-            is_super,
             is_querier,
             files,
             scan_size,
@@ -517,11 +513,12 @@ impl FlightStream {
                     .start_with_context(&tracer, &self.parent_cx);
 
                 let span_context = span.span_context().clone();
-                let search_role = if self.is_super {
-                    "leader".to_string()
-                } else {
-                    "follower".to_string()
+                let role = match self.node_name.as_str() {
+                    name if name.contains("querier") => "Querier",
+                    name if name.contains("ingester") => "Ingester",
+                    _ => "Unknown",
                 };
+
                 let event = search_inspector_fields(
                     format!(
                         "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
@@ -536,7 +533,7 @@ impl FlightStream {
                     SearchInspectorFieldsBuilder::new()
                         .node_name(self.node_name.clone())
                         .component("remote scan streaming".to_string())
-                        .search_role(search_role)
+                        .search_role(role.to_string())
                         .duration(self.start.elapsed().as_millis() as usize)
                         .desc(format!(
                             "remote scan search files: {}, scan_size: {}, num_rows: {}",

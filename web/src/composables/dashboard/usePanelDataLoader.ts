@@ -139,9 +139,6 @@ export const usePanelDataLoader = (
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
     isOperationCancelled: false,
-    loadingTotal: 0,
-    loadingCompleted: 0,
-    loadingProgressPercentage: 0,
   });
 
   // observer for checking if panel is visible on the screen
@@ -366,11 +363,6 @@ export const usePanelDataLoader = (
   ) => {
     const { traceparent, traceId } = generateTraceContext();
     addTraceId(traceId);
-
-    state.loadingTotal = 0;
-    state.loadingCompleted = 0;
-    state.loadingProgressPercentage = 0;
-
     try {
       // partition api call
       const res: any = await callWithAbortController(
@@ -403,14 +395,6 @@ export const usePanelDataLoader = (
 
       // partition array from api response
       const partitionArr = res?.data?.partitions ?? [];
-
-      // Set total steps: number of partitions only (excluding the initial partition API call)
-      const totalSteps = partitionArr.length;
-      state.loadingTotal = totalSteps;
-
-      // Reset loading completed and progress since we're not counting the partition API call
-      state.loadingCompleted = 0;
-      state.loadingProgressPercentage = 0;
 
       // always sort partitions in descending order
       partitionArr.sort((a: any, b: any) => a[0] - b[0]);
@@ -468,14 +452,6 @@ export const usePanelDataLoader = (
               ),
             abortControllerRef.signal,
           );
-
-          // Update the progress after each partition completes
-          state.loadingCompleted = state.loadingCompleted + 1;
-          // Calculate progress in 0-100 format
-          state.loadingProgressPercentage = Math.round(
-            (state.loadingCompleted / totalSteps) * 100,
-          );
-
           // remove past error detail
           state.errorDetail = {
             message: "",
@@ -638,9 +614,6 @@ export const usePanelDataLoader = (
       if (response.type === "error") {
         // set loading to false
         state.loading = false;
-        state.loadingTotal = 0;
-        state.loadingCompleted = 0;
-        state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
 
         processApiError(response?.content, "sql");
@@ -649,22 +622,12 @@ export const usePanelDataLoader = (
       if (response.type === "end") {
         // set loading to false
         state.loading = false;
-        state.loadingTotal = 0;
-        state.loadingCompleted = 0;
-        state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
-      }
-      if (response.type === "event_progress") {
-        // The loadingProgressPercentage value is now in 0-100 format, no need to multiply
-        state.loadingProgressPercentage = response?.content?.percent ?? 0;
       }
     } catch (error: any) {
       // set loading to false
       state.loading = false;
       state.isOperationCancelled = false;
-      state.loadingTotal = 0;
-      state.loadingCompleted = 0;
-      state.loadingProgressPercentage = 0;
       state.errorDetail = {
         message: error?.message || "Unknown error in search response",
         code: error?.code ?? "",
@@ -745,9 +708,6 @@ export const usePanelDataLoader = (
 
     // set loading to false
     state.loading = false;
-    state.loadingTotal = 0;
-    state.loadingCompleted = 0;
-    state.loadingProgressPercentage = 0;
     state.isOperationCancelled = false;
 
     processApiError(response?.content, "sql");
@@ -809,9 +769,7 @@ export const usePanelDataLoader = (
   const loadData = async () => {
     try {
       log("loadData: entering...");
-      state.loadingTotal = 0;
-      state.loadingCompleted = 0;
-      state.loadingProgressPercentage = 0;
+
       // Check and abort the previous call if necessary
       if (abortController) {
         log("loadData: aborting previous function call (if any)");

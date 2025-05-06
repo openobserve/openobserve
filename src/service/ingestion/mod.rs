@@ -63,9 +63,6 @@ use crate::{
 pub mod grpc;
 pub mod ingestion_service;
 
-pub const SERVICE_NAME: &str = "service.name";
-pub const SERVICE: &str = "service";
-
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
@@ -261,7 +258,6 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             source_node: Some(LOCAL_NODE.name.clone()),
             query_took: None,
             scheduler_trace_id: None,
-            time_in_queue_ms: None,
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
@@ -518,7 +514,6 @@ pub async fn get_uds_and_original_data_streams(
     streams: &[StreamParams],
     user_defined_schema_map: &mut HashMap<String, Option<HashSet<String>>>,
     streams_need_original: &mut HashMap<String, bool>,
-    streams_need_all_values: &mut HashMap<String, bool>,
 ) {
     for stream in streams {
         if user_defined_schema_map.contains_key(stream.stream_name.as_str()) {
@@ -530,11 +525,7 @@ pub async fn get_uds_and_original_data_streams(
                 .unwrap_or_default();
         streams_need_original.insert(
             stream.stream_name.to_string(),
-            stream_settings.store_original_data || stream_settings.index_original_data,
-        );
-        streams_need_all_values.insert(
-            stream.stream_name.to_string(),
-            stream_settings.index_all_values,
+            stream_settings.store_original_data,
         );
         if let Some(fields) = &stream_settings.defined_schema_fields {
             if !fields.is_empty() {

@@ -30,7 +30,7 @@ use config::{
         self_reporting::usage::UsageType,
         stream::{PartitionTimeLevel, StreamType},
     },
-    utils::{flatten::format_key, json, schema_ext::SchemaExt, time::now_micros},
+    utils::{flatten::format_key, json, schema_ext::SchemaExt},
 };
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashSet;
@@ -111,7 +111,12 @@ pub async fn save_enrichment_data(
     }
 
     let current_size_in_bytes = if append_data {
-        enrichment_table::get_table_size(org_id, stream_name).await
+        let size = enrichment_table::get_table_size(org_id, stream_name).await;
+        if size > 0 {
+            size as f64
+        } else {
+            stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables).storage_size
+        }
     } else {
         // If we are not appending data, we do not need to check the current size
         // we will simply use the payload size to check if it exceeds the max size
@@ -282,18 +287,14 @@ pub async fn save_enrichment_data(
     )
     .await;
 
-    let mut enrich_meta_stats = enrichment_table::get_meta_table_stats(org_id, stream_name)
-        .await
-        .unwrap_or_default();
-
-    if !append_data {
-        enrich_meta_stats.start_time = started_at;
-    }
-    enrich_meta_stats.end_time = now_micros();
-    enrich_meta_stats.size = total_expected_size_in_bytes as i64;
     // The stream_stats table takes some time to update, so we need to update the enrichment table
     // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
-    let _ = enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
+    let _ = enrichment_table::update_table_size(
+        org_id,
+        stream_name,
+        total_expected_size_in_bytes as usize,
+    )
+    .await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
         StatusCode::OK.into(),

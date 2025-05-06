@@ -134,13 +134,7 @@ pub async fn delete(
         // Enrichment table size is not deleted by schema delete
         // Since we are storing the current size of the table in bytes in the meta table,
         // when we delete enrichment table, we need to delete the size from the db as well.
-        if let Err(e) = super::enrichment_table::delete_table_size(org_id, stream_name).await {
-            log::error!("Failed to delete table size: {}", e);
-        }
-        if let Err(e) = super::enrichment_table::delete_meta_table_stats(org_id, stream_name).await
-        {
-            log::error!("Failed to delete meta table stats: {}", e);
-        }
+        let _ = super::enrichment_table::delete_table_size(org_id, stream_name).await;
     }
 
     // super cluster
@@ -349,7 +343,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let latest_schema = latest_schema.pop().unwrap();
                 let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
-                if settings.store_original_data || settings.index_original_data {
+                if settings.store_original_data {
                     if let dashmap::Entry::Vacant(entry) =
                         STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
                     {
@@ -499,7 +493,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let latest_schema = latest_schema.last().unwrap();
         let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
-        if settings.store_original_data || settings.index_original_data {
+        if settings.store_original_data {
             if let dashmap::Entry::Vacant(entry) =
                 STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
             {

@@ -61,23 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-select>
     </div>
-    <div
-      v-if="
-        (!searchObj.data.stream.selectedStreamFields ||
-          searchObj.data.stream.selectedStreamFields.length == 0) &&
-        searchObj.loading == false
-      "
-      class="index-table q-mt-xs"
-    >
-      <h3
-        data-test="logs-search-no-field-found-text"
-        class="text-center col-10 q-mx-none"
-      >
-        <q-icon name="info" color="primary" size="xs" /> No field found in
-        selected stream.
-      </h3>
-    </div>
-    <div v-else class="index-table q-mt-xs">
+    <div class="index-table q-mt-xs">
       <q-table
         data-test="log-search-index-list-fields-table"
         v-model="sortedStreamFields"
@@ -1347,7 +1331,7 @@ export default defineComponent({
           "Failed to fetch field values";
       }
 
-      removeTraceId(request.queryReq.fields[0], request.traceId);
+      removeTraceId(request.queryReq.fields[0], request.content.trace_id);
     };
 
     const handleSearchResponse = (payload: any, response: any) => {

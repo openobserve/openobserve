@@ -20,8 +20,6 @@ use datafusion::{common::Statistics, execution::cache::CacheAccessor};
 use object_store::{ObjectMeta, path::Path};
 use once_cell::sync::Lazy;
 
-use super::TRACE_ID_SEPARATOR;
-
 pub static GLOBAL_CACHE: Lazy<Arc<FileStatisticsCache>> =
     Lazy::new(|| Arc::new(FileStatisticsCache::default()));
 
@@ -47,7 +45,7 @@ impl FileStatisticsCache {
     }
 
     fn format_key(&self, k: &Path) -> String {
-        if let Some(mut p) = k.as_ref().find(TRACE_ID_SEPARATOR) {
+        if let Some(mut p) = k.as_ref().find("/$$/") {
             if let Some(pp) = k.as_ref()[..p].find("/schema=") {
                 p = pp;
             }

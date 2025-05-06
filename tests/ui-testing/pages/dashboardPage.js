@@ -195,6 +195,31 @@ async addCustomChart(page, pictorialJSON) {
   await this.page.keyboard.press('Delete');
 }
 
+async navigateToDashboardFolder() {
+  await this.page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=otlp-production&folder=default");
+  await this.page.waitForTimeout(5000);
+  await this.page.getByRole('cell', { name: '7307881789123463472' }).click();
+  await this.page.waitForTimeout(5000);
+}
+
+async refreshDashboard() {
+  await this.page.waitForSelector('[data-test="dashboard-refresh-btn"]');
+  await this.page.locator('[data-test="dashboard-refresh-btn"]').click();
+  await this.page.waitForTimeout(10000);
+}
+
+async selectQuery4DayTime() {
+  await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+  await this.page.locator(this.dateTimeButton).click();
+  await this.page.waitForSelector('[data-test="date-time-relative-4-d-btn"]');
+  await this.page.locator('[data-test="date-time-relative-4-d-btn"]').click();
+  await this.page.waitForSelector('[data-test="date-time-apply-btn"]');
+  await this.page.locator('[data-test="date-time-apply-btn"]').click();
+  
+  
+
+}
+
 
 }
 

@@ -33,7 +33,7 @@ use lettre::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    meta::cluster,
+    meta::{cluster, meta_store::MetaStore},
     utils::{file::get_file_meta, sysinfo},
 };
 
@@ -44,10 +44,6 @@ pub type RwHashSet<K> = dashmap::DashSet<K, ahash::RandomState>;
 pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
-
-// for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 3;
-pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
 pub static VERSION: &str = env!("GIT_VERSION");
@@ -85,11 +81,10 @@ pub const MINIMUM_DB_CONNECTIONS: u32 = 2;
 pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
 
 // Columns added to ingested records for _INTERNAL_ use only.
-pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
 // Used for storing and querying unflattened original data
-pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
-pub const ALL_VALUES_COL_NAME: &str = "_all_values";
+pub const ID_COL_NAME: &str = "_o2_id";
+pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
@@ -422,6 +417,7 @@ pub struct Config {
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
     pub encryption: Encryption,
+    pub ratelimit: RateLimit,
 }
 
 #[derive(EnvConfig)]
@@ -676,8 +672,6 @@ pub struct Common {
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
     #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
     pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
-    #[env_config(name = "ZO_META_DDL_DSN", default = "")]
-    pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
@@ -1079,14 +1073,6 @@ pub struct Common {
     pub min_auto_refresh_interval: u32,
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_ENABLED", default = false)]
-    pub file_list_dump_enabled: bool,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]
-    pub file_list_dump_dual_write: bool,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_MIN_HOUR", default = 2)]
-    pub file_list_dump_min_hour: usize,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
-    pub file_list_dump_debug_check: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1420,12 +1406,6 @@ pub struct Limit {
         help = "Duration of each mini search partition in seconds"
     )]
     pub search_mini_partition_duration_secs: u64,
-    #[env_config(
-        name = "ZO_HISTOGRAM_ENABLED",
-        help = "Show histogram for logs page",
-        default = true
-    )]
-    pub histogram_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1463,7 +1443,7 @@ pub struct Compact {
     pub data_retention_history: bool,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
-        default = 0,
+        default = 500,
         help = "Batch size for compact get pending jobs"
     )]
     pub batch_size: i64,
@@ -1497,8 +1477,6 @@ pub struct CacheLatestFiles {
     pub cache_index: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DELETE_MERGE_FILES", default = false)]
     pub delete_merge_files: bool,
-    #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
-    pub download_from_node: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1669,20 +1647,8 @@ pub struct Nats {
     pub queue_max_age: u64,
 }
 
-#[derive(Debug, Default, EnvConfig)]
+#[derive(Debug, EnvConfig)]
 pub struct S3 {
-    #[env_config(
-        name = "ZO_S3_ACCOUNTS",
-        default = "",
-        help = "comma separated list of accounts"
-    )]
-    pub accounts: String,
-    #[env_config(
-        name = "ZO_S3_STREAM_STRATEGY",
-        default = "",
-        help = "stream strategy, default is: empty, only use default account, other value is: file_hash, stream_hash, stream1:account1,stream2:account2"
-    )]
-    pub stream_strategy: String,
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
     pub provider: String,
     #[env_config(name = "ZO_S3_SERVER_URL", default = "")]
@@ -1707,8 +1673,6 @@ pub struct S3 {
     pub feature_http1_only: bool,
     #[env_config(name = "ZO_S3_FEATURE_HTTP2_ONLY", default = false)]
     pub feature_http2_only: bool,
-    #[env_config(name = "ZO_S3_FEATURE_BULK_DELETE", default = false)]
-    pub feature_bulk_delete: bool,
     #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
     #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
@@ -1841,6 +1805,22 @@ pub struct HealthCheck {
     pub failed_times: usize,
 }
 
+#[derive(EnvConfig)]
+pub struct RateLimit {
+    #[env_config(
+        name = "ZO_RATELIMIT_ENABLED",
+        default = false,
+        help = "ratelimit enabled"
+    )]
+    pub ratelimit_enabled: bool,
+    #[env_config(
+        name = "ZO_RATELIMIT_RULE_REFRESH_INTERVAL",
+        default = 10,
+        help = "unit: seconds, refresh interval for rate limit rules"
+    )]
+    pub ratelimit_rule_refresh_interval: usize,
+}
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -1919,6 +1899,11 @@ pub fn init() -> Config {
     // check pipeline config
     if let Err(e) = check_pipeline_config(&mut cfg) {
         panic!("pipeline config error: {e}");
+    }
+
+    // check ratelimit config
+    if let Err(e) = check_ratelimit_config(&mut cfg) {
+        panic!("ratelimit config error: {e}");
     }
 
     cfg
@@ -2176,11 +2161,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     {
         cfg.common.feature_join_right_side_max_rows = 50_000;
     }
-
-    // debug check is useful only when dual write is enabled. Otherwise it will raise error
-    // incorrectly each time
-    cfg.common.file_list_dump_debug_check =
-        cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
 
     Ok(())
 }
@@ -2547,7 +2527,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = cfg.limit.cpu_num as i64;
+        cfg.compact.batch_size = 100;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
@@ -2642,6 +2622,24 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     } else {
         cfg.pipeline.wal_size_limit *= 1024 * 1024;
+    }
+    Ok(())
+}
+
+fn check_ratelimit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.ratelimit.ratelimit_enabled {
+        let meta_store: MetaStore = cfg.common.queue_store.as_str().into();
+        if meta_store != MetaStore::Nats {
+            return Err(anyhow::anyhow!(
+                "ZO_QUEUE_STORE must be nats when ratelimit is enabled"
+            ));
+        }
+    }
+
+    if cfg.ratelimit.ratelimit_rule_refresh_interval < 2 {
+        return Err(anyhow::anyhow!(
+            "ratelimit rules refresh interval must be greater than or equal to 2 seconds"
+        ));
     }
     Ok(())
 }

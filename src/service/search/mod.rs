@@ -15,7 +15,6 @@
 
 use std::{cmp::max, sync::Arc};
 
-use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
@@ -51,6 +50,8 @@ use proto::cluster_rpc::{self, SearchQuery};
 use regex::Regex;
 use sql::Sql;
 use tokio::runtime::Runtime;
+#[cfg(not(feature = "enterprise"))]
+use tokio::sync::Mutex;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
@@ -87,12 +88,12 @@ pub(crate) mod utils;
 pub static RESULT_ARRAY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
 
-/// The result of search in cluster
-/// data, scan_stats, wait_in_queue, is_partial, partial_err
-type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
-
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
+
+#[cfg(not(feature = "enterprise"))]
+pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
+    Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
 pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
@@ -193,13 +194,14 @@ pub async fn search(
         Err(e) => Err(Error::Message(e.to_string())),
     };
 
-    #[allow(unused_mut)]
-    let mut search_role = "leader".to_string();
+    let search_role = "leader".to_string();
 
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        search_role = "super".to_string();
-    }
+    let search_role = if get_o2_config().super_cluster.enabled {
+        "super".to_string()
+    } else {
+        search_role
+    };
 
     log::info!(
         "{}",
@@ -246,9 +248,6 @@ pub async fn search(
                             | search::SearchEventType::Dashboards
                             | search::SearchEventType::Values
                             | search::SearchEventType::Other
-                            // Alerts search now uses grpc cache::search which does report usage
-                            | search::SearchEventType::Alerts
-                            | search::SearchEventType::DerivedStream
                     ) {
                         (false, None, None)
                     } else {
@@ -287,7 +286,13 @@ pub async fn search(
                     search_type,
                     search_event_context,
                     trace_id: Some(trace_id),
-                    took_wait_in_queue: Some(res.took_detail.wait_in_queue),
+                    took_wait_in_queue: if res.took_detail.is_some() {
+                        let resp_took = res.took_detail.as_ref().unwrap();
+                        // Consider only the cluster wait queue duration
+                        Some(resp_took.cluster_wait_queue)
+                    } else {
+                        None
+                    },
                     work_group: _work_group,
                     result_cache_ratio: Some(res.result_cache_ratio),
                     ..Default::default()
@@ -641,7 +646,6 @@ pub async fn search_partition(
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
-                trace_id,
                 &sql.org_id,
                 stream_type,
                 &stream_name,
@@ -692,11 +696,7 @@ pub async fn search_partition(
             });
         }
     }
-    log::info!(
-        "[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}",
-        max_query_range,
-        max_query_range_in_hour
-    );
+    log::info!("[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}", max_query_range, max_query_range_in_hour);
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
@@ -807,14 +807,7 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    log::debug!(
-        "[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}",
-        total_secs,
-        part_num,
-        step,
-        min_step,
-        is_histogram
-    );
+    log::debug!("[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}", total_secs, part_num, step, min_step, is_histogram);
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
         min_step,
@@ -845,7 +838,6 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     let nodes = nodes;
 
     // make cluster request
-    let trace_id = config::ider::generate_trace_id();
     let mut tasks = Vec::new();
     for node in nodes.iter().cloned() {
         let node_addr = node.grpc_addr.clone();
@@ -855,22 +847,24 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             node_addr = node_addr.as_str(),
         );
 
-        let trace_id = trace_id.clone();
         let task = tokio::task::spawn(
             async move {
                 let mut request = tonic::Request::new(proto::cluster_rpc::QueryStatusRequest {});
                 let node = Arc::new(node) as _;
-                let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
+                let mut client = make_grpc_search_client(&mut request, &node).await?;
                 let response = match client.query_status(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "[trace_id {trace_id}] search->grpc: node: {}, search err: {:?}",
+                            "search->grpc: node: {}, search err: {:?}",
                             &node.get_grpc_addr(),
                             err
                         );
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
+                        if err.code() == tonic::Code::Internal {
+                            let err = ErrorCodes::from_json(err.message())?;
+                            return Err(Error::ErrorCode(err));
+                        }
+                        return Err(server_internal_error("search node error"));
                     }
                 };
                 Ok(response)
@@ -923,7 +917,6 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 querier_disk_cached_files: scan_stats.querier_disk_cached_files,
                 idx_scan_size: scan_stats.idx_scan_size / 1024 / 1024, // change to MB
                 idx_took: scan_stats.idx_took,
-                file_list_took: scan_stats.file_list_took,
             });
         let query_status = if result.is_queue {
             "waiting"
@@ -989,26 +982,26 @@ pub async fn cancel_query(
         let trace_id = trace_id.to_string();
         let task = tokio::task::spawn(
             async move {
-                let mut request = tonic::Request::new(proto::cluster_rpc::CancelQueryRequest {
-                    trace_id: trace_id.clone(),
-                });
+                let mut request =
+                    tonic::Request::new(proto::cluster_rpc::CancelQueryRequest { trace_id });
                 let node = Arc::new(node) as _;
-                let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
-                let response: cluster_rpc::CancelQueryResponse = match client
-                    .cancel_query(request)
-                    .await
-                {
-                    Ok(res) => res.into_inner(),
-                    Err(err) => {
-                        log::error!(
-                            "[trace_id {trace_id}] grpc_cancel_query: node: {}, search err: {:?}",
-                            &node.get_grpc_addr(),
-                            err
-                        );
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                };
+                let mut client = make_grpc_search_client(&mut request, &node).await?;
+                let response: cluster_rpc::CancelQueryResponse =
+                    match client.cancel_query(request).await {
+                        Ok(res) => res.into_inner(),
+                        Err(err) => {
+                            log::error!(
+                                "grpc_cancel_query: node: {}, search err: {:?}",
+                                &node.get_grpc_addr(),
+                                err
+                            );
+                            if err.code() == tonic::Code::Internal {
+                                let err = ErrorCodes::from_json(err.message())?;
+                                return Err(Error::ErrorCode(err));
+                            }
+                            return Err(server_internal_error("search node error"));
+                        }
+                    };
                 Ok(response)
             }
             .instrument(grpc_span),
