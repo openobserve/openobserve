@@ -38,7 +38,6 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
-    log::debug!("[SUPER_CLUSTER:sync] process_msg alert: {:?}", alert);
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match msg {
         AlertMessage::Create {

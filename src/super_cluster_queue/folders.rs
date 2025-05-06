@@ -24,7 +24,6 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 pub(crate) async fn process_msg(msg: FolderMessage) -> Result<()> {
-    log::debug!("[SUPER_CLUSTER:sync] process_msg folder: {:?}", msg);
     match msg {
         FolderMessage::Create {
             org_id,
