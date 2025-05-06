@@ -3607,7 +3607,7 @@ const useLogs = () => {
         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
         if (
           currentPage >=
-          (searchObj.communicationMethod === "ws" || searchObj.meta.jobId != ""
+          (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming" || searchObj.meta.jobId != ""
             ? searchObj.data.queryResults?.pagination?.length
             : searchObj.data.queryResults.partitionDetail?.paginations
                 ?.length || 0) -
@@ -3643,7 +3643,7 @@ const useLogs = () => {
       }
 
       if (
-        searchObj.communicationMethod === "ws" &&
+        (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming") &&
         endCount < totalCount &&
         !searchObj.meta.showHistogram
       ) {
@@ -5553,6 +5553,11 @@ const useLogs = () => {
           false,
           "histogram",
         );
+
+        payload.meta = {
+          isHistogramOnly: searchObj.meta.histogramDirtyFlag,
+        }
+
         const requestId = initializeSearchConnection(payload);
 
         addRequestId(payload.traceId);
