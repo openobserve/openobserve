@@ -211,7 +211,6 @@ const useHttpStreaming = () => {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'traceparent': '',
         },
         body: JSON.stringify(queryReq),
         signal: abortController.signal,
