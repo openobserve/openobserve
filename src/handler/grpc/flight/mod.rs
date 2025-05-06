@@ -169,6 +169,7 @@ impl FlightService for FlightServiceImpl {
         schema = add_scan_stats_to_schema(schema, scan_stats.clone());
         #[cfg(feature = "enterprise")]
         {
+            log::info!("setting scan stat trace_id {} {}", trace_id, scan_stats);
             SEARCH_SERVER
                 .set_scan_stats(&trace_id, (&scan_stats).into())
                 .await;
