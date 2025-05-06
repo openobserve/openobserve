@@ -995,7 +995,7 @@ export default defineComponent({
         updateDateTime(selectedDate.value);
         // console.timeEnd("runQuery");
       } catch (err) {
-        console.log(err);
+        console.error("Error in runQuery", err);
       }
     };
 

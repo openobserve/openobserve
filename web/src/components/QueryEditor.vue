@@ -303,7 +303,7 @@ export default defineComponent({
     });
 
     const enableCodeFolding = computed(() => {
-      return ["json", "html","javascript"].includes(props.language);
+      return ["json", "html", "javascript"].includes(props.language);
     });
 
     // update readonly when prop value changes
@@ -455,10 +455,7 @@ export default defineComponent({
         };
       });
 
-      console.log("decorations", decorations);
-
       const decorationIds = editorObj.deltaDecorations([], decorations);
-      console.log("decorationIds", decorationIds);
     };
 
     function addErrorDiagnostics(ranges: any) {

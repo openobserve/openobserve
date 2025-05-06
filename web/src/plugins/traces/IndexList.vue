@@ -193,17 +193,17 @@ export default defineComponent({
                   searchKeyword: "",
                 };
               }
-            }
+            },
           );
         }
       },
       {
         deep: true,
-      }
+      },
     );
 
     const selectedStreamName = computed(
-      () => searchObj.data.stream.selectedStream.value
+      () => searchObj.data.stream.selectedStream.value,
     );
 
     const expandedFilters: Ref<string[]> = ref([]);
@@ -224,7 +224,7 @@ export default defineComponent({
     });
 
     const getSpecialFieldsValues = (
-      name: "operation_name" | "service_name"
+      name: "operation_name" | "service_name",
     ) => {
       let filter = "";
 
@@ -330,7 +330,7 @@ export default defineComponent({
         streamOptions.value = searchObj.data.stream.streamLists;
         const needle = val.toLowerCase();
         streamOptions.value = streamOptions.value.filter(
-          (v: any) => v.label.toLowerCase().indexOf(needle) > -1
+          (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
         );
       });
     };
@@ -356,7 +356,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedFields.includes(row.name)) {
         searchObj.data.stream.selectedFields =
           searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== row.name
+            (v: any) => v !== row.name,
           );
       } else {
         searchObj.data.stream.selectedFields.push(row.name);
@@ -388,7 +388,7 @@ export default defineComponent({
     const updateQueryFilter = (
       column: string,
       values: string[],
-      prevValues: string[]
+      prevValues: string[],
     ) => {
       try {
         const valuesString = values
@@ -432,14 +432,15 @@ export default defineComponent({
 
         filterExpandedFieldValues();
       } catch (e) {
-        console.log("Error while creating query from filters");
+        console.error("Error while creating query from filters", e);
       }
     };
 
     const filterExpandedFieldValues = () => {
-      const fields = expandedFilters.value?.filter(
-        (_value) => !["operation_name", "service_name"].includes(_value)
-      ) || [];
+      const fields =
+        expandedFilters.value?.filter(
+          (_value) => !["operation_name", "service_name"].includes(_value),
+        ) || [];
 
       if (expandedFilters.value.includes("operation_name")) {
         getSpecialFieldsValues("operation_name");
@@ -529,7 +530,7 @@ export default defineComponent({
     const modifyWhereClause = (
       node: any,
       fieldName: string,
-      newValue: any[]
+      newValue: any[],
     ) => {
       if (!node) return;
 
@@ -571,7 +572,7 @@ export default defineComponent({
         getFieldValues(columnName);
       } else {
         expandedFilters.value = expandedFilters.value.filter(
-          (_column) => _column !== columnName
+          (_column) => _column !== columnName,
         );
       }
     };
@@ -599,7 +600,7 @@ export default defineComponent({
                 key: value?.toString() || "null",
                 count: "0",
               });
-          }
+          },
         );
       });
     };

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('billing.manageCards')"
           @click="
             onChangePaymentDetail(
-              listSubscriptionResponse.card.gateway_account_id
+              listSubscriptionResponse.card.gateway_account_id,
             )
           "
         />
@@ -194,7 +194,7 @@ export default defineComponent({
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
         BillingService.resume_subscription(
-          this.store.state.selectedOrganization.identifier
+          this.store.state.selectedOrganization.identifier,
         )
           .then((res) => {
             this.loadSubscription(true);
@@ -210,10 +210,9 @@ export default defineComponent({
       } else {
         BillingService.get_hosted_url(
           this.store.state.selectedOrganization.identifier,
-          convertToTitleCase(planType)
+          convertToTitleCase(planType),
         )
           .then((res) => {
-            console.log(res);
             // alert(res.data.data.url)
             window.location.href = res.data.data.url;
             // this.isActiveSubscription = false;
@@ -234,7 +233,7 @@ export default defineComponent({
     onUnsubscribe() {
       this.freeLoading = true;
       BillingService.unsubscribe(
-        this.store.state.selectedOrganization.identifier
+        this.store.state.selectedOrganization.identifier,
       )
         .then((res) => {
           this.loadSubscription();
@@ -253,7 +252,7 @@ export default defineComponent({
       this.changePayment = true;
       BillingService.change_payment_detail(
         this.store.state.selectedOrganization.identifier,
-        gatewayId
+        gatewayId,
       )
         .then((res) => {
           this.updatePaymentResponse = res.data.data.hosted_page;
@@ -269,7 +268,7 @@ export default defineComponent({
     },
     loadSubscription(fromPro = false) {
       BillingService.list_subscription(
-        this.store.state.selectedOrganization.identifier
+        this.store.state.selectedOrganization.identifier,
       )
         .then((res) => {
           this.currentPlanDetail = res.data.data;
@@ -423,7 +422,7 @@ export default defineComponent({
     const retrieveHostedPage = () => {
       BillingService.retrieve_hosted_page(
         store.state.selectedOrganization.identifier,
-        hostedResponse.value.id
+        hostedResponse.value.id,
       ).then((res) => {
         if (res.data.data.hosted_page.state == "succeeded") {
           window.location.reload();

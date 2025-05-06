@@ -22,12 +22,12 @@ export function useWorker() {
         j += i;
       }
 
-      console.log("newFn", j);
+      logger.log("newFn", j);
       return j;
     };
 
     runWorker(999999, newFn).then((res) => {
-      console.log("1st Worker done", res);
+      logger.log("1st Worker done", res);
     });
    *
    * @param data - any data to be passed to the worker

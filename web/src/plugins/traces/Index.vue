@@ -277,7 +277,7 @@ function getQueryTransform() {
           }
         });
       })
-      .catch((err) => console.log(err));
+      .catch((err) => console.error("Error while getting functions", err));
 
     return;
   } catch (e) {
@@ -532,7 +532,7 @@ function buildSearch() {
     );
     // const parsedSQL = parser.astify(req.query.sql);
     // const unparsedSQL = parser.sqlify(parsedSQL);
-    // console.log(unparsedSQL);
+    // logger.log(unparsedSQL);
 
     req.query.sql = b64EncodeUnicode(req.query.sql);
 

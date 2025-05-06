@@ -15,13 +15,14 @@
 
 import * as rudderanalytics from "rudder-sdk-js";
 import config from "../aws-exports";
+import { logger } from "@/utils/zincutils";
 
 const writeKey = "ziox-cloud-browser";
 const dataPlaneUrl = "https://e1.zinclabs.dev";
 
 if (config.enableAnalytics == "true") {
   rudderanalytics.ready(() => {
-    console.log("we are all set!!!");
+    logger.log("we are all set!!!");
   });
 
   // opt = rudderanalytics.

@@ -177,7 +177,7 @@ const updateTable = () => {
     rolesState.roles.map((role: { role_name: string }, index) => ({
       ...role,
       "#": index + 1,
-    }))
+    })),
   );
 };
 
@@ -203,7 +203,7 @@ const setupRoles = async () => {
       updateTable();
     })
     .catch((err) => {
-      console.log(err);
+      console.error("Error in setupRoles", err);
     });
 };
 

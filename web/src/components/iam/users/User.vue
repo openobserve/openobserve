@@ -336,7 +336,7 @@ export default defineComponent({
             "email",
             false,
             "",
-            store.state.selectedOrganization.identifier
+            store.state.selectedOrganization.identifier,
           )
           .then((res) => {
             resultTotal.value = res.data.data.length;
@@ -360,11 +360,11 @@ export default defineComponent({
                 role: data.role,
                 member_created: date.formatDate(
                   parseInt(data.member_created),
-                  "YYYY-MM-DDTHH:mm:ssZ"
+                  "YYYY-MM-DDTHH:mm:ssZ",
                 ),
                 member_updated: date.formatDate(
                   parseInt(data.member_updated),
-                  "YYYY-MM-DDTHH:mm:ssZ"
+                  "YYYY-MM-DDTHH:mm:ssZ",
                 ),
                 org_member_id: data.org_member_id,
                 isLoggedinUser: store.state.userInfo.email == data.email,
@@ -532,7 +532,7 @@ export default defineComponent({
           {
             row: props.row,
           },
-          true
+          true,
         );
       } else {
         addUser({}, false);
@@ -608,7 +608,7 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             $q.notify({
               color: "negative",
               message: "Error while deleting user.",
@@ -632,7 +632,7 @@ export default defineComponent({
             email: row.email,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
@@ -653,7 +653,7 @@ export default defineComponent({
         })
         .catch((error) => {
           dismiss();
-          console.log(error);
+          console.error("Error in updateUserRole", error);
         });
 
       segment.track("Button Click", {

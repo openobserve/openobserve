@@ -33,8 +33,6 @@ const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
 const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
 
-
-
 const props = defineProps({
   id: {
     type: String,
@@ -48,17 +46,13 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["delete:node"]);
-const { pipelineObj, deletePipelineNode,onDragStart,onDrop } = useDragAndDrop();
-const menu = ref(false)
+const { pipelineObj, deletePipelineNode, onDragStart, onDrop } =
+  useDragAndDrop();
+const menu = ref(false);
 
-const hanldeMouseOver = () => {
-  console.log("mouse over")
-}
-
-
-const onFunctionClick = (data,event,id) =>{
+const onFunctionClick = (data, event, id) => {
   pipelineObj.userSelectedNode = data;
-  const dataToOpen  =   {
+  const dataToOpen = {
     label: "Function",
     subtype: "function",
     io_type: "default",
@@ -67,83 +61,78 @@ const onFunctionClick = (data,event,id) =>{
     isSectionHeader: false,
   };
   pipelineObj.userClickedNode = id;
-  onDragStart(event,dataToOpen)
-  onDrop(event,{x:100,y:100});
-  menu.value = false
-}
+  onDragStart(event, dataToOpen);
+  onDrop(event, { x: 100, y: 100 });
+  menu.value = false;
+};
 
-const onConditionClick = (data,event,id) =>{
+const onConditionClick = (data, event, id) => {
   data.label = id;
   pipelineObj.userSelectedNode = data;
 
-  const dataToOpen  =   {
+  const dataToOpen = {
     label: "Condition",
     subtype: "condition",
     io_type: "default",
     icon: "img:" + conditionImage,
     tooltip: "Condition Node",
     isSectionHeader: false,
-  }
-  pipelineObj.userClickedNode = id
-  onDragStart(event,dataToOpen)
-  onDrop(event,{x:100,y:100});
-  menu.value = false
-}
+  };
+  pipelineObj.userClickedNode = id;
+  onDragStart(event, dataToOpen);
+  onDrop(event, { x: 100, y: 100 });
+  menu.value = false;
+};
 
-const onStreamOutputClick = (data,event,id) =>{
+const onStreamOutputClick = (data, event, id) => {
   pipelineObj.userSelectedNode = data;
 
-  if(!id){
+  if (!id) {
     pipelineObj.userClickedNode = data.label;
-  }
-  else{
+  } else {
     pipelineObj.userClickedNode = id;
   }
-  const dataToOpen  =    
-  {
+  const dataToOpen = {
     label: "Stream",
     subtype: "stream",
     io_type: "output",
     icon: "img:" + streamOutputImage,
     tooltip: "Destination: Stream Node",
     isSectionHeader: false,
-  }
+  };
   // pipelineObj.userClickedNode = id
-  onDragStart(event,dataToOpen)
-  onDrop(event,{x:100,y:100});
-  menu.value = false
-}
-const onExternalDestinationClick = (data,event,id) =>{
+  onDragStart(event, dataToOpen);
+  onDrop(event, { x: 100, y: 100 });
+  menu.value = false;
+};
+const onExternalDestinationClick = (data, event, id) => {
   pipelineObj.userSelectedNode = data;
 
-  if(!id){
+  if (!id) {
     pipelineObj.userClickedNode = data.label;
-  }
-  else{
+  } else {
     pipelineObj.userClickedNode = id;
   }
-  const dataToOpen  =    
-  {
+  const dataToOpen = {
     label: "Remote",
     subtype: "remote_stream",
     io_type: "output",
     icon: "img:" + externalOutputImage,
     tooltip: "Destination: Remote Node",
     isSectionHeader: false,
-  }
+  };
   // pipelineObj.userClickedNode = id
-  onDragStart(event,dataToOpen)
-  onDrop(event,{x:100,y:100});
-  menu.value = false
-}
+  onDragStart(event, dataToOpen);
+  onDrop(event, { x: 100, y: 100 });
+  menu.value = false;
+};
 
 const { t } = useI18n();
-
 
 const editNode = (id) => {
   //from id find the node from pipelineObj.currentSelectedPipelineData.nodes
   const fullNode = pipelineObj.currentSelectedPipeline.nodes.find(
-    (node) => node.id === id
+    (node) => node.id === id,
   );
   pipelineObj.isEditNode = true;
   pipelineObj.currentSelectedNodeData = fullNode;
@@ -155,10 +144,9 @@ const editNode = (id) => {
 const deleteNode = (id) => {
   openCancelDialog(id);
 };
-const  functionInfo = (data) =>  {
-
-      return pipelineObj.functions[data.name] || null;
-  }
+const functionInfo = (data) => {
+  return pipelineObj.functions[data.name] || null;
+};
 
 const confirmDialogMeta = ref({
   show: false,
@@ -202,7 +190,6 @@ function getIcon(data, ioType) {
       type="target"
       :position="'top'"
       class="node_handle_custom"
-     
     />
 
     <div
@@ -210,7 +197,7 @@ function getIcon(data, ioType) {
       :class="`o2vf_node_${io_type}`"
       class="custom-btn q-pa-none btn-fixed-width"
       style="
-      padding: 5px 2px;
+        padding: 5px 2px;
         width: fit-content;
         display: flex;
         align-items: center;
@@ -220,63 +207,100 @@ function getIcon(data, ioType) {
       @mouseover="menu = true"
       @mouseleave="menu = false"
     >
-      <q-menu      @mouseover="menu = true" @mouseleave="menu = false"  v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
-    <q-list >
-    
-      <q-item clickable @click="(event) => onFunctionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
-          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
-
-        </q-item-section>
-
-      </q-item>
-      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item clickable @click="(event) => onStreamOutputClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
-
-        </q-item-section>
-      </q-item>
+      <q-menu
+        @mouseover="menu = true"
+        @mouseleave="menu = false"
+        v-model="menu"
+        name="myMenu"
+        class="menu-list"
+        anchor="top right"
+        self="top left"
+      >
+        <q-list>
           <q-item
-              v-if="config.isEnterprise == 'true'"
+            clickable
+            @click="(event) => onFunctionClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="functionImage"
+                alt="Function"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Function</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            clickable
+            @click="(event) => onConditionClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="conditionImage"
+                alt="Stream"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Condition</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            clickable
+            @click="(event) => onStreamOutputClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="streamOutputImage"
+                alt="Output Stream"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Output</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            v-if="config.isEnterprise == 'true'"
             clickable
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
-        <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
+            <q-item-section avatar>
+              <img
+                :src="externalOutputImage"
+                alt="Remote Destination"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Remote</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <!-- Add more items similarly for other images -->
+        </q-list>
+      </q-menu>
 
-        </q-item-section>
-      </q-item>
-      <!-- Add more items similarly for other images -->
-    </q-list>
-  </q-menu>
+      <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
+        <div>
+          <strong>Name:</strong> {{ functionInfo(data).name }}<br />
+          <strong>Definition:</strong><br />
+          <div
+            style="
+              border: 1px solid lightgray;
+              padding: 4px;
+              border-radius: 1px;
+            "
+          >
+            {{ functionInfo(data).function }}
+          </div>
+        </div>
+      </q-tooltip>
 
-    <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
-  <div>
-    <strong>Name:</strong> {{ functionInfo(data).name }}<br />
-    <strong>Definition:</strong><br />
-    <div style="border: 1px solid lightgray; padding: 4px; border-radius: 1px ;">
-      {{ functionInfo(data).function }}
-    </div>
-  </div>
-</q-tooltip>
-
-      <div class="icon-container " style="display: flex; align-items: center">
+      <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
-        />
+        <q-icon :name="getIcon(data, io_type)" size="1em" class="q-ma-sm" />
       </div>
 
       <!-- Separator -->
@@ -299,9 +323,7 @@ function getIcon(data, ioType) {
         <div class="row">
           <div style="text-transform: capitalize">
             Run
-            {{
-              data.after_flatten ? "After Flattening" : "Before Flattening"
-            }}
+            {{ data.after_flatten ? "After Flattening" : "Before Flattening" }}
           </div>
         </div>
       </div>
@@ -336,60 +358,89 @@ function getIcon(data, ioType) {
         border: none;
         cursor: pointer;
         padding: 5px 2px;
-
       "
-       @mouseover="menu = true"
+      @mouseover="menu = true"
       @mouseleave="menu = false"
     >
-
-       <q-menu v-if="io_type == 'input'" @mouseover="menu = true" @mouseleave="menu = false"   v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
-    <q-list >
-      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
-          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
-        </q-item-section>
-      
-
-      </q-item>
-      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item
+      <q-menu
+        v-if="io_type == 'input'"
+        @mouseover="menu = true"
+        @mouseleave="menu = false"
+        v-model="menu"
+        name="myMenu"
+        class="menu-list"
+        anchor="top right"
+        self="top left"
+      >
+        <q-list>
+          <q-item
+            clickable
+            @click="(event) => onFunctionClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="functionImage"
+                alt="Function"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Function</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            clickable
+            @click="(event) => onConditionClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="conditionImage"
+                alt="Stream"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Condition</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            clickable
+            @click="(event) => onStreamOutputClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="streamOutputImage"
+                alt="Output Stream"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Output</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
             v-if="config.isEnterprise == 'true'"
             clickable
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
-        <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <!-- Add more items similarly for other images -->
-    </q-list>
-  </q-menu>
-
-  
+            <q-item-section avatar>
+              <img
+                :src="externalOutputImage"
+                alt="Remote Destination"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Remote</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <!-- Add more items similarly for other images -->
+        </q-list>
+      </q-menu>
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
-        />
+        <q-icon :name="getIcon(data, io_type)" size="1em" class="q-ma-sm" />
       </div>
 
       <!-- Separator -->
@@ -398,7 +449,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-        v-if=" data.stream_name &&  data.stream_name.hasOwnProperty('label')"
+          v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
           class="row"
           style="
             text-align: left;
@@ -407,10 +458,10 @@ function getIcon(data, ioType) {
             text-overflow: ellipsis;
           "
         >
-          {{ data.stream_type }} - {{   data.stream_name.label }}
+          {{ data.stream_type }} - {{ data.stream_name.label }}
         </div>
         <div
-        v-else
+          v-else
           class="row"
           style="
             text-align: left;
@@ -419,7 +470,7 @@ function getIcon(data, ioType) {
             text-overflow: ellipsis;
           "
         >
-          {{ data.stream_type }} - {{    data.stream_name }}
+          {{ data.stream_type }} - {{ data.stream_name }}
         </div>
       </div>
       <div class="float-right tw-pl-2">
@@ -452,60 +503,89 @@ function getIcon(data, ioType) {
         border: none;
         cursor: pointer;
         padding: 5px 2px;
-
       "
-       @mouseover="menu = true"
+      @mouseover="menu = true"
       @mouseleave="menu = false"
     >
-
-       <q-menu v-if="io_type == 'input'" @mouseover="menu = true" @mouseleave="menu = false"   v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
-    <q-list >
-      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
-          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
-        </q-item-section>
-      
-
-      </q-item>
-      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item
+      <q-menu
+        v-if="io_type == 'input'"
+        @mouseover="menu = true"
+        @mouseleave="menu = false"
+        v-model="menu"
+        name="myMenu"
+        class="menu-list"
+        anchor="top right"
+        self="top left"
+      >
+        <q-list>
+          <q-item
+            clickable
+            @click="(event) => onFunctionClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="functionImage"
+                alt="Function"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Function</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            clickable
+            @click="(event) => onConditionClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="conditionImage"
+                alt="Stream"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Condition</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            clickable
+            @click="(event) => onStreamOutputClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="streamOutputImage"
+                alt="Output Stream"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Output</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
             v-if="config.isEnterprise == 'true'"
             clickable
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
-        <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <!-- Add more items similarly for other images -->
-    </q-list>
-  </q-menu>
-
-  
+            <q-item-section avatar>
+              <img
+                :src="externalOutputImage"
+                alt="Remote Destination"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Remote</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <!-- Add more items similarly for other images -->
+        </q-list>
+      </q-menu>
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
-        />
+        <q-icon :name="getIcon(data, io_type)" size="1em" class="q-ma-sm" />
       </div>
 
       <!-- Separator -->
@@ -556,69 +636,113 @@ function getIcon(data, ioType) {
         border: none;
         cursor: pointer;
         padding: 5px 2px;
-
       "
-       @mouseover="menu = true"
+      @mouseover="menu = true"
       @mouseleave="menu = false"
     >
-    <q-menu  v-model="menu" @mouseover="menu = true" @mouseleave="menu = false"  name="myMenu" class="menu-list" anchor="top right" self="top left">
-    <q-list >
-      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
-          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
-
-        </q-item-section>
-
-      </q-item>
-      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item 
+      <q-menu
+        v-model="menu"
+        @mouseover="menu = true"
+        @mouseleave="menu = false"
+        name="myMenu"
+        class="menu-list"
+        anchor="top right"
+        self="top left"
+      >
+        <q-list>
+          <q-item
+            clickable
+            @click="(event) => onFunctionClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="functionImage"
+                alt="Function"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Function</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            clickable
+            @click="(event) => onConditionClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="conditionImage"
+                alt="Stream"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Condition</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            clickable
+            @click="(event) => onStreamOutputClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="streamOutputImage"
+                alt="Output Stream"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Output</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
             v-if="config.isEnterprise == 'true'"
             clickable
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
-        <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
+            <q-item-section avatar>
+              <img
+                :src="externalOutputImage"
+                alt="Remote Destination"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Remote</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <!-- Add more items similarly for other images -->
+        </q-list>
+      </q-menu>
 
-        </q-item-section>
-      </q-item>
-      <!-- Add more items similarly for other images -->
-    </q-list>
-  </q-menu>
-
-    <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
-  <div>
-    <strong>{{  data.query_condition.type == 'sql' ? 'SQL' : 'PromQL' }}:</strong> <pre style="max-width: 200px ; text-wrap: wrap;">{{  data.query_condition.type == 'sql' ? data.query_condition.sql : data.query_condition.promql }}</pre><br />
-    <strong>Period:</strong> {{ data.trigger_condition.period }}<br />
-    <strong>Frequency:</strong> {{ data.trigger_condition.frequency }} {{ data.trigger_condition.frequency_type }}<br />
-    <strong>Operator:</strong> {{ data.trigger_condition.operator }}<br />
-    <strong>Threshold:</strong> {{ data.trigger_condition.threshold }}<br />
-    <strong>Cron:</strong> {{ data.trigger_condition.cron || 'None' }}<br />
-    <strong>Silence:</strong> {{ data.trigger_condition.silence }}
-  </div>
-</q-tooltip>
+      <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
+        <div>
+          <strong
+            >{{
+              data.query_condition.type == "sql" ? "SQL" : "PromQL"
+            }}:</strong
+          >
+          <pre style="max-width: 200px; text-wrap: wrap">{{
+            data.query_condition.type == "sql"
+              ? data.query_condition.sql
+              : data.query_condition.promql
+          }}</pre>
+          <br />
+          <strong>Period:</strong> {{ data.trigger_condition.period }}<br />
+          <strong>Frequency:</strong> {{ data.trigger_condition.frequency }}
+          {{ data.trigger_condition.frequency_type }}<br />
+          <strong>Operator:</strong> {{ data.trigger_condition.operator }}<br />
+          <strong>Threshold:</strong> {{ data.trigger_condition.threshold
+          }}<br />
+          <strong>Cron:</strong> {{ data.trigger_condition.cron || "None"
+          }}<br />
+          <strong>Silence:</strong> {{ data.trigger_condition.silence }}
+        </div>
+      </q-tooltip>
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
-        />
+        <q-icon :name="getIcon(data, io_type)" size="1em" class="q-ma-sm" />
       </div>
 
       <!-- Separator -->
@@ -671,54 +795,88 @@ function getIcon(data, ioType) {
         border: none;
         cursor: pointer;
       "
-       @mouseover="menu = true"
+      @mouseover="menu = true"
       @mouseleave="menu = false"
     >
-    <q-menu   v-model="menu" @mouseover="menu = true" @mouseleave="menu = false"  name="myMenu" class="menu-list" anchor="top right" self="top left">
-    <q-list >
-
-      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
-          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
-        </q-item-section>
-      </q-item>
-      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item class="q-item-output" clickable  @click="(event) => onStreamOutputClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item 
+      <q-menu
+        v-model="menu"
+        @mouseover="menu = true"
+        @mouseleave="menu = false"
+        name="myMenu"
+        class="menu-list"
+        anchor="top right"
+        self="top left"
+      >
+        <q-list>
+          <q-item
+            clickable
+            @click="(event) => onFunctionClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="functionImage"
+                alt="Function"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Function</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            clickable
+            @click="(event) => onConditionClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="conditionImage"
+                alt="Stream"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Condition</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
+            class="q-item-output"
+            clickable
+            @click="(event) => onStreamOutputClick(data, event, id)"
+          >
+            <q-item-section avatar>
+              <img
+                :src="streamOutputImage"
+                alt="Output Stream"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Output</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <q-item
             v-if="config.isEnterprise == 'true'"
             clickable
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
-        <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <!-- Add more items similarly for other images -->
-    </q-list>
-  </q-menu>
+            <q-item-section avatar>
+              <img
+                :src="externalOutputImage"
+                alt="Remote Destination"
+                style="width: 30px; height: 30px"
+              />
+              <q-tooltip anchor="top middle" self="bottom right"
+                >Remote</q-tooltip
+              >
+            </q-item-section>
+          </q-item>
+          <!-- Add more items similarly for other images -->
+        </q-list>
+      </q-menu>
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
-        />
+        <q-icon :name="getIcon(data, io_type)" size="1em" class="q-ma-sm" />
       </div>
 
       <!-- Separator -->
@@ -727,17 +885,23 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-    style="
-      text-align: left;
-      text-wrap: wrap;
-      width: auto;
-      text-overflow: ellipsis;
-    "
-  >
-    <div class="column" v-for="(condition, index) in data.conditions" :key="index" style="margin-bottom: 1px;">
-      {{ condition.column }} {{ condition.operator }} {{ condition.value }}
-    </div>
-  </div>
+          style="
+            text-align: left;
+            text-wrap: wrap;
+            width: auto;
+            text-overflow: ellipsis;
+          "
+        >
+          <div
+            class="column"
+            v-for="(condition, index) in data.conditions"
+            :key="index"
+            style="margin-bottom: 1px"
+          >
+            {{ condition.column }} {{ condition.operator }}
+            {{ condition.value }}
+          </div>
+        </div>
       </div>
 
       <div class="float-right">
@@ -766,7 +930,6 @@ function getIcon(data, ioType) {
       type="source"
       :position="'bottom'"
       class="node_handle_custom"
-      
     />
   </div>
 
@@ -780,11 +943,11 @@ function getIcon(data, ioType) {
 </template>
 
 <style lang="scss">
-.node_handle_custom{
-  background-color:#9a9698;
-    height:10px;
-    width:30px;
-    border-radius:4px;
+.node_handle_custom {
+  background-color: #9a9698;
+  height: 10px;
+  width: 30px;
+  border-radius: 4px;
   filter: invert(100%);
 }
 .vue-flow__node-custom {
@@ -799,9 +962,8 @@ function getIcon(data, ioType) {
   background-color: var(--vf-node-bg);
   border-color: var(--vf-node-color);
 }
-.menu-list{
+.menu-list {
   margin: 0px 10px;
   background-color: white;
 }
-
 </style>

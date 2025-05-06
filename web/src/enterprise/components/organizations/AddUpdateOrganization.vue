@@ -189,10 +189,9 @@ export default defineComponent({
       });
     },
     completeSubscriptionProcess() {
-      console.log(this.store.state);
       // this.store.state.dispatch("setSelectedOrganization",)
       this.router.push(
-        `/billings/plans?org_identifier=${this.newOrgIdentifier}`
+        `/billings/plans?org_identifier=${this.newOrgIdentifier}`,
       );
     },
     onSubmit() {
@@ -261,7 +260,7 @@ export default defineComponent({
             this.$q.notify({
               type: "negative",
               message: JSON.stringify(
-                err.response.data["error"] || "Organization creation failed."
+                err.response.data["error"] || "Organization creation failed.",
               ),
             });
             dismiss();

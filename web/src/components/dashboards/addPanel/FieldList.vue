@@ -1070,7 +1070,7 @@ export default defineComponent({
         }
         return;
       } catch (e: any) {
-        console.log("Error while loading stream fields");
+        console.error("Error while loading stream fields", e);
       }
     }
 
@@ -1156,7 +1156,7 @@ export default defineComponent({
           }
         }
       } catch (e: any) {
-        console.log("Error while extracting fields");
+        console.error("Error while extracting fields", e);
       }
     }
 

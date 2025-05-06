@@ -641,7 +641,7 @@ const useStreams = () => {
         delete streams[streamType];
       }
     } catch (e) {
-      console.log("Error while clearing local cache for stream type.", e);
+      console.error("Error while clearing local cache for stream type.", e);
     }
   };
 

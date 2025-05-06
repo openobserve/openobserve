@@ -200,7 +200,7 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
 
       query_context = query_context.replace(
         "[WHERE_CLAUSE]",
-        " WHERE " + whereClause
+        " WHERE " + whereClause,
       );
     } else {
       query_context = query_context.replace("[WHERE_CLAUSE]", "");
@@ -246,7 +246,7 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
       });
   } catch (e) {
     fieldValues.value[name]["isLoading"] = false;
-    console.log("Error while fetching field values");
+    console.error("Error while fetching field values", e);
   }
 };
 </script>

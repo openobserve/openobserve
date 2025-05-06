@@ -93,7 +93,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, logger } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -109,7 +109,7 @@ const isSubmitting = ref(false);
 const showLoginInput = ref(false);
 
 const onSignIn = () => {
-  console.log("onSignIn");
+  logger.log("onSignIn");
 };
 </script>
 

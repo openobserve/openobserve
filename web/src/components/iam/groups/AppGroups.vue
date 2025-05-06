@@ -182,7 +182,7 @@ const updateTable = () => {
     groupsState.groups.map((group: { group_name: string }, index: number) => ({
       ...group,
       "#": index + 1,
-    }))
+    })),
   );
 };
 
@@ -208,7 +208,7 @@ const setupGroups = async () => {
       updateTable();
     })
     .catch((err) => {
-      console.log(err);
+      console.error("Error in setupGroups", err);
     });
 };
 

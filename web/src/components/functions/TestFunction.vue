@@ -648,8 +648,6 @@ function getLineRanges(object: any) {
     const serializedObject = JSON.stringify(object.event, null, 4);
     const serializedLines = serializedObject.split("\n");
 
-    console.log("Serialized Lines:", serializedLines);
-
     let startLine = -1;
 
     // Iterate over the editor content lines
@@ -693,7 +691,7 @@ function getLineRanges(object: any) {
 
     return ranges;
   } catch (e) {
-    console.log("Error in getLineRanges", e);
+    console.error("Error in getLineRanges", e);
   }
 }
 
@@ -717,7 +715,7 @@ function highlightSpecificEvent() {
     if (outputEventsEditorRef.value)
       outputEventsEditorRef.value.addErrorDiagnostics(errorEventRanges);
   } catch (e) {
-    console.log("Error in highlightSpecificEvent", e);
+    console.error("Error in highlightSpecificEvent", e);
   }
 }
 

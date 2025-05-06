@@ -178,7 +178,11 @@ import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
-import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
+import {
+  formatSizeFromMB,
+  getImageURL,
+  verifyOrganizationStatus,
+} from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
@@ -186,7 +190,13 @@ import EnrichmentSchema from "./EnrichmentSchema.vue";
 
 export default defineComponent({
   name: "EnrichmentTableList",
-  components: { QTablePagination, AddEnrichmentTable, NoData, ConfirmDialog, EnrichmentSchema },
+  components: {
+    QTablePagination,
+    AddEnrichmentTable,
+    NoData,
+    ConfirmDialog,
+    EnrichmentSchema,
+  },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -236,7 +246,7 @@ export default defineComponent({
         align: "left",
         sortable: true,
         sort: (a, b, rowA, rowB) => {
-          return rowA.original_storage_size- rowB.original_storage_size
+          return rowA.original_storage_size - rowB.original_storage_size;
         },
       },
       {
@@ -246,7 +256,7 @@ export default defineComponent({
         align: "left",
         sortable: false,
         sort: (a, b, rowA, rowB) =>
-          rowA.original_compressed_size- rowB.original_compressed_size,
+          rowA.original_compressed_size - rowB.original_compressed_size,
       },
       {
         name: "actions",
@@ -270,7 +280,6 @@ export default defineComponent({
 
       getStreams("enrichment_tables", false)
         .then((res: any) => {
-
           let counter = 1;
           resultTotal.value = res.list.length;
           jsTransforms.value = res.list.map((data: any) => {
@@ -303,7 +312,7 @@ export default defineComponent({
           dismiss();
         })
         .catch((err) => {
-          console.log("--", err);
+          console.error("Error in getLookupTables", err);
           dismiss();
           if (err.response.status != 403) {
             $q.notify({

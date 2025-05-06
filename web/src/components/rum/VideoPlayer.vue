@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div
-          v-for="event in (events as any[])"
+          v-for="event in events as any[]"
           :key="event.id"
           class="progressTime bg-secondary absolute cursor-pointer"
           :style="{
@@ -255,7 +255,7 @@ watch(
   (value) => {
     if (value.length) setupSession();
   },
-  { deep: true, immediate: true }
+  { deep: true, immediate: true },
 );
 
 onBeforeMount(async () => {
@@ -317,7 +317,7 @@ const setupSession = async () => {
                       workerProcessId.value++;
                       processCss(
                         __child.attributes._cssText,
-                        workerProcessId.value
+                        workerProcessId.value,
                       ).then((res: any) => {
                         __child.attributes._cssText = res.updatedCssString;
                       });
@@ -329,7 +329,7 @@ const setupSession = async () => {
           });
         }
       } catch (e) {
-        console.log(e);
+        console.error("Error in setupSession", e);
       }
       session.value.push(segCopy);
     });
@@ -341,7 +341,7 @@ const setupSession = async () => {
   // session.value.forEach((event) => {
   //   const currentTime = event.timestamp;
   //   if (currentTime - lastEventTime > inactivityThreshold) {
-  //     console.log(
+  //     logger.log(
   //       `Inactivity detected between timestamps ${lastEventTime} and ${currentTime} is of ${formatTimeDifference(
   //         currentTime - lastEventTime
   //       )} ms.`
@@ -417,7 +417,7 @@ const setupSession = async () => {
   });
 
   // player.value.addEventListener("event-cast", (e) => {
-  //   // console.log("event casted:", e);
+  //   // logger.log("event casted:", e);
   // });
 
   if (!player.value) return;
@@ -426,7 +426,7 @@ const setupSession = async () => {
   playerState.value.endTime = playerMeta.endTime;
   playerState.value.totalTime = playerMeta.totalTime;
   playerState.value.duration = formatTimeDifference(
-    playerState.value.totalTime
+    playerState.value.totalTime,
   );
 
   const playbackBarWidth = playbackBarRef.value?.clientWidth || 0;
@@ -440,10 +440,10 @@ function formatTimeDifference(milliSeconds: number) {
   // Calculate hours, minutes, and seconds
   let hours: string | number = Math.floor(milliSeconds / (1000 * 60 * 60));
   let minutes: string | number = Math.floor(
-    (milliSeconds % (1000 * 60 * 60)) / (1000 * 60)
+    (milliSeconds % (1000 * 60 * 60)) / (1000 * 60),
   );
   let seconds: string | number = Math.floor(
-    (milliSeconds % (1000 * 60)) / 1000
+    (milliSeconds % (1000 * 60)) / 1000,
   );
 
   // Add leading zeros if needed
@@ -523,10 +523,8 @@ const initializeWorker = () => {
     // Creating the Web Worker
     worker.value = new Worker(
       new URL("../../workers/rumcssworker.js", import.meta.url),
-      { type: "module" }
+      { type: "module" },
     );
-
-    console.log("Worker created successfully.");
   } else {
     console.error("Web Workers are not supported in this browser.");
   }

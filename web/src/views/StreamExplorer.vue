@@ -95,7 +95,7 @@ export default defineComponent({
         .schema(
           store.state.selectedOrganization.identifier,
           params.stream_name as string,
-          params.stream_type as string
+          params.stream_type as string,
         )
         .then((res) => {
           queryData.value.streamType = res.data?.stream_type;
@@ -110,7 +110,7 @@ export default defineComponent({
           }));
           getQueryData();
         })
-        .catch((err) => console.log(err));
+        .catch((err) => console.error("Error in onBeforeMount", err));
     });
 
     onMounted(() => {
@@ -171,11 +171,14 @@ export default defineComponent({
 
         queryData.value.errorCode = 0;
         search
-          .search({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query: queryReq,
-            page_type: streamData.value?.stream_type || "logs",
-          }, "ui")
+          .search(
+            {
+              org_identifier: store.state.selectedOrganization.identifier,
+              query: queryReq,
+              page_type: streamData.value?.stream_type || "logs",
+            },
+            "ui",
+          )
           .then((res) => {
             isLoading.value.pop();
             if (res.data.from > 0) {
@@ -227,7 +230,7 @@ export default defineComponent({
               queryData.value.pagination.rowsPerPage,
             size: parseInt(
               queryData.value.pagination.rowsPerPage.toString(),
-              10
+              10,
             ),
             sql_mode: "full",
           },
@@ -239,7 +242,7 @@ export default defineComponent({
         } | null =
           queryData.value.dateTime.type === "relative"
             ? getConsumableRelativeTime(
-                queryData.value.dateTime.relativeTimePeriod
+                queryData.value.dateTime.relativeTimePeriod,
               ) || null
             : cloneDeep(queryData.value.dateTime);
 

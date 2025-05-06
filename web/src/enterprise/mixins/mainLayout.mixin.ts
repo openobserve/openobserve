@@ -82,7 +82,7 @@ const MainLayoutCloudMixin = {
             },
           );
         })
-        .catch((error) => console.log(error));
+        .catch((error: any) => console.error("Error while getting default organization", error));
     };
 
     /**
@@ -165,7 +165,7 @@ const MainLayoutCloudMixin = {
             // quotaThresholdMsg.value = usageMessage;
             store.dispatch("setQuotaThresholdMsg", usageMessage);
           })
-          .catch((error) => console.log(error));
+          .catch((error: any) => console.error("Error while getting organization threshold", error));
       }
     };
 
@@ -190,8 +190,8 @@ const MainLayoutCloudMixin = {
             store.dispatch("setUserInfo", userInfo);
           }
         })
-        .catch((e) => {
-          console.log("Error while fetching refresh token:", e);
+        .catch((e: any) => {
+          console.error("Error while fetching refresh token:", e);
         });
     };
 

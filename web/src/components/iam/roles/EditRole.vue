@@ -820,7 +820,7 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         await getResourceEntities(resourceMapper[resource]);
       }
     } catch (err) {
-      console.log(err);
+      console.error("Error in updateRolePermissions", err);
     }
   }
 
@@ -1323,7 +1323,7 @@ const expandPermission = async (resource: any) => {
     try {
       await getResourceEntities(resource);
     } catch (err) {
-      console.log(err);
+      console.error("Error in expandPermission", err);
     }
   }
 };
@@ -1574,7 +1574,13 @@ const getPipelines = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-  updateResourceEntities("pipeline", ["pipeline_id"], [...pipelines.data.list],false,"name");
+  updateResourceEntities(
+    "pipeline",
+    ["pipeline_id"],
+    [...pipelines.data.list],
+    false,
+    "name",
+  );
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1661,8 +1667,13 @@ const getActionScripts = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-
-  updateResourceEntities("action_scripts", ["id"], [...actionScripts.data],false,"name");
+  updateResourceEntities(
+    "action_scripts",
+    ["id"],
+    [...actionScripts.data],
+    false,
+    "name",
+  );
 
   return new Promise((resolve) => {
     resolve(true);
@@ -2103,7 +2114,7 @@ const saveRole = () => {
           timeout: 3000,
         });
       }
-      console.log(err);
+      console.error("Error in saveRole", err);
     });
 };
 

@@ -243,8 +243,7 @@ export default defineComponent({
     const confirmDelete = ref<boolean>(false);
     const confirmForceDelete = ref<boolean>(false);
     const { searchObj } = useLogs();
-    const pipelineList = ref([
-    ]);
+    const pipelineList = ref([]);
     const selectedPipeline = ref("");
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -329,8 +328,7 @@ export default defineComponent({
           dismiss();
         })
         .catch((err) => {
-          console.log("--", err);
-
+          console.error("Error in getJSTransforms", err);
           dismiss();
           if (err.response.status != 403) {
             $q.notify({
@@ -518,7 +516,7 @@ export default defineComponent({
           confirmForceDelete.value = true;
         })
         .catch((err) => {
-          console.log(err);
+          console.error("Error in getAssociatedPipelines", err);
         });
     };
 

@@ -250,7 +250,7 @@ export const convertUnixToQuasarFormat = (unixMicroseconds: any) => {
     const formattedDate = dateToFormat.toISOString();
     return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
   } catch (error) {
-    console.log("Error converting unix to quasar format");
+    console.error("Error converting unix to quasar format", error);
     return "";
   }
 };
@@ -292,7 +292,7 @@ export const convertDateToTimestamp = (
 
     return { timestamp: unixTimestampMillis * 1000, offset: dateTime.offset }; // timestamp in microseconds
   } catch (error) {
-    console.log("Error converting date to timestamp");
+    console.error("Error converting date to timestamp", error);
     return { timestamp: 0, offset: 0 };
   }
 };

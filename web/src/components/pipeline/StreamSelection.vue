@@ -165,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import useStreams from "@/composables/useStreams";
+import { logger } from "@/utils/zincutils";
 import { ref, computed, type Ref, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -212,11 +213,11 @@ const isValidName = computed(() => {
 
 const updateStreams = (resetStream = true) => {
   if (resetStream) formData.value.stream_name = "";
-console.log(formData.value.stream_type,"type in res");
+  logger.log(formData.value.stream_type, "type in res");
   if (!formData.value.stream_type) return Promise.resolve();
 
   isFetchingStreams.value = true;
-  
+
   return getStreams(formData.value.stream_type, false)
     .then((res: any) => {
       indexOptions.value = res.list.map((data: any) => {
@@ -244,7 +245,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1
+      (column: any) => column.toLowerCase().indexOf(value) > -1,
     );
   });
   return filteredOptions;

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { logger } from "@/utils/zincutils";
 import { defineComponent, ref } from "vue";
 
 export default defineComponent({
@@ -58,8 +59,7 @@ export default defineComponent({
       });
       documentList.value[0].fileBean.push(formData);
 
-      for (var pair of formData.entries())
-        console.log(pair[0] + ", " + pair[1]);
+      for (var pair of formData.entries()) logger.log(pair[0] + ", " + pair[1]);
 
       // Axios POST request here...
     };

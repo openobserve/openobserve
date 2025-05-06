@@ -1345,7 +1345,7 @@ const saveReport = async () => {
     const isValidForm = await addReportFormRef.value.validate();
     if (!isValidForm) return;
   } catch (err) {
-    console.log(err);
+    console.error("Error in saveReport", err);
   }
 
   // This is unitil we support multiple dashboards and tabs

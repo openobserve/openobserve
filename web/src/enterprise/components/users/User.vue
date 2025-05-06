@@ -242,7 +242,7 @@ export default defineComponent({
           "email",
           false,
           "",
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res) => {
           resultTotal.value = res.data.data.length;
@@ -261,11 +261,11 @@ export default defineComponent({
               role: data.role,
               member_created: date.formatDate(
                 parseInt(data.member_created),
-                "YYYY-MM-DDTHH:mm:ssZ"
+                "YYYY-MM-DDTHH:mm:ssZ",
               ),
               member_updated: date.formatDate(
                 parseInt(data.member_updated),
-                "YYYY-MM-DDTHH:mm:ssZ"
+                "YYYY-MM-DDTHH:mm:ssZ",
               ),
               org_member_id: data.org_member_id,
               isLoggedinUser: store.state.userInfo.email == data.email,
@@ -314,7 +314,7 @@ export default defineComponent({
         .filter((email: any) => email.trim().length > 0)
         .map((email: any) => email.trim().toLowerCase());
       const validationArray = emailArray.map((email: any) =>
-        validateEmail(email)
+        validateEmail(email),
       );
 
       if (!validationArray.includes(false)) {
@@ -327,7 +327,7 @@ export default defineComponent({
         organizationsService
           .add_members(
             { member_lists: emailArray, role: selectedRole.value },
-            store.state.selectedOrganization.identifier
+            store.state.selectedOrganization.identifier,
           )
           .then((res: { data: any }) => {
             const data = res.data;
@@ -390,7 +390,7 @@ export default defineComponent({
             email: row.email,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
@@ -411,7 +411,7 @@ export default defineComponent({
         })
         .catch((error) => {
           dismiss();
-          console.log(error);
+          console.error("Error while updating organization member", error);
         });
 
       segment.track("Button Click", {

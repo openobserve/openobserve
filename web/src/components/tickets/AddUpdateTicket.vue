@@ -270,7 +270,7 @@ export default defineComponent({
         if (!valid) {
           return false;
         }
-        // console.log("Form is valid");
+        // logger.log("Form is valid");
         this.ticketData.user_id = this.store.state.userInfo.user_id;
 
         delete this.ticketData.created_at;

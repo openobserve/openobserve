@@ -87,7 +87,7 @@ const useSearchWebSocket = () => {
     if(shouldRetry) socketFailureCount.value++;
 
     if (shouldRetry && socketFailureCount.value < maxSearchRetries) {
-      // console.log("shouldRetry", JSON.parse(JSON.stringify(traces)));
+      // logger.log("shouldRetry", JSON.parse(JSON.stringify(traces)));
       setTimeout(() => {
         Object.keys(traces).forEach((traceId) => {
           if(((traces[traceId].socketId === _socketId) && traces[traceId].isInitiated) || !traces[traceId].socketId) {
@@ -132,7 +132,7 @@ const useSearchWebSocket = () => {
 
       if(response.content.code === 401) {
         // Store the current socketId as inactive and clear it
-        // console.log("socketMeta ----------",traces[response.content.trace_id].socketId, socketMeta.value[traces[response.content.trace_id].socketId as string].isReadOnly);
+        // logger.log("socketMeta ----------",traces[response.content.trace_id].socketId, socketMeta.value[traces[response.content.trace_id].socketId as string].isReadOnly);
 
         const currentSocketId = traces[response.content.trace_id]?.socketId;
         if (!currentSocketId) return;
@@ -140,7 +140,7 @@ const useSearchWebSocket = () => {
         const isReadOnly = socketMeta.value[traces[response.content.trace_id]?.socketId as string]?.isReadOnly;
                 
         if (!isReadOnly) {
-          // console.log("rest socket");
+          // logger.log("rest socket");
           inactiveSocketId.value = socketId.value;
           socketId.value = null;        
           isInDrainMode.value = true;
@@ -261,7 +261,7 @@ const useSearchWebSocket = () => {
     error: (data: any, response: any) => void;
     reset: (data: any, response: any) => void;
   }) => {
-    // console.log("initiateSocketConnection", socketId.value, isCreatingSocket.value, data.traceId, JSON.parse(JSON.stringify(traces[data.traceId])));
+    // logger.log("initiateSocketConnection", socketId.value, isCreatingSocket.value, data.traceId, JSON.parse(JSON.stringify(traces[data.traceId])));
     if (!socketId.value) {
       createSocketConnection(data.org_id);
     } else if (!isCreatingSocket.value) {
@@ -364,7 +364,7 @@ const useSearchWebSocket = () => {
   }
 
   const resetAuthToken = async () => {
-    // console.log("reset auth token");
+    // logger.log("reset auth token");
     isInDrainMode.value = true;
     return new Promise(async (resolve, reject) => {
       authService.refresh_token().then((res: any) => {
