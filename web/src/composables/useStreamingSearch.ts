@@ -55,7 +55,7 @@ const useHttpStreaming = () => {
   const onData = (traceId: string, type: 'search_response' | 'error' | 'event_progress', response: any) => {
     if (!traceMap.value[traceId]) return;
 
-    if (response === 'end') {
+    if (response === 'end' || response === '[[DONE]]') {
       for (const handler of traceMap.value[traceId].complete) {
         handler(traceId);
       }
