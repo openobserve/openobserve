@@ -28,7 +28,10 @@ use arrow_flight::{
 };
 use arrow_schema::{Schema, SchemaRef};
 use config::{
-    meta::search::{ScanStats, SearchEventType},
+    meta::{
+        cluster::NodeInfo,
+        search::{ScanStats, SearchEventType},
+    },
     utils::{rand::generate_random_string, size::bytes_to_human_readable},
 };
 use datafusion::{
@@ -57,14 +60,11 @@ use super::{
     codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
     node::RemoteScanNode,
 };
-use crate::{
-    common::infra::cluster::get_node_by_addr,
-    service::{
-        grpc::get_cached_channel,
-        search::{
-            MetadataMap,
-            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        },
+use crate::service::{
+    grpc::get_cached_channel,
+    search::{
+        MetadataMap,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
 };
 
@@ -382,18 +382,12 @@ async fn get_remote_batch(
         scan_stats.lock().add(&stats);
     }
 
-    let node_name = match get_node_by_addr(&node.get_grpc_addr()).await {
-        None => node.get_grpc_addr(),
-        Some(node) => node.name,
-    };
-
     Ok(Box::pin(FlightStream::new(
         trace_id,
         context,
         schema,
         stream,
-        node.get_grpc_addr(),
-        node_name,
+        Box::new(node),
         is_querier,
         remote_scan_node.super_cluster_info.is_super_cluster,
         files,
@@ -443,8 +437,7 @@ struct FlightStream {
     parent_cx: opentelemetry::Context,
     schema: SchemaRef,
     stream: Streaming<FlightData>,
-    node_addr: String,
-    node_name: String,
+    node: Box<Arc<dyn NodeInfo>>,
     is_super: bool,
     is_querier: bool,
     files: i64,
@@ -462,8 +455,7 @@ impl FlightStream {
         parent_cx: opentelemetry::Context,
         schema: SchemaRef,
         stream: Streaming<FlightData>,
-        node_addr: String,
-        node_name: String,
+        node: Box<Arc<dyn NodeInfo>>,
         is_super: bool,
         is_querier: bool,
         files: i64,
@@ -477,8 +469,7 @@ impl FlightStream {
             parent_cx,
             schema,
             stream,
-            node_addr,
-            node_name,
+            node,
             is_super,
             is_querier,
             files,
@@ -526,7 +517,7 @@ impl FlightStream {
                     format!(
                         "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
                         self.trace_id,
-                        self.node_addr,
+                        self.node.get_grpc_addr(),
                         self.is_querier,
                         self.files,
                         self.scan_size / 1024 / 1024,
@@ -534,7 +525,9 @@ impl FlightStream {
                         self.start.elapsed().as_millis(),
                     ),
                     SearchInspectorFieldsBuilder::new()
-                        .node_name(self.node_name.clone())
+                        .node_name(self.node.get_name())
+                        .region(self.node.get_region())
+                        .cluster(self.node.get_cluster())
                         .component("remote scan streaming".to_string())
                         .search_role(search_role)
                         .duration(self.start.elapsed().as_millis() as usize)
@@ -571,7 +564,7 @@ impl Stream for FlightStream {
             log::error!(
                 "[trace_id {}] flight->search: response node: {}, is_querier: {}, took: {} ms, err: {}",
                 self.trace_id,
-                self.node_addr,
+                self.node.get_grpc_addr(),
                 self.is_querier,
                 self.start.elapsed().as_millis(),
                 e.to_string()
@@ -597,7 +590,7 @@ impl Stream for FlightStream {
                 log::error!(
                     "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {}, took: {} ms",
                     self.trace_id,
-                    self.node_addr,
+                    self.node.get_grpc_addr(),
                     self.is_querier,
                     e.to_string(),
                     self.start.elapsed().as_millis(),
@@ -620,7 +613,7 @@ impl Drop for FlightStream {
         log::info!(
             "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
             self.trace_id,
-            self.node_addr,
+            self.node.get_grpc_addr(),
             self.is_querier,
             self.files,
             self.scan_size / 1024 / 1024,

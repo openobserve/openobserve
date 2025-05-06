@@ -1324,22 +1324,26 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                 Ok(data_len) => {
                     if data_len > 0 && data_len != file_size {
                         log::warn!(
-                            "[COMPACT] download file {} found size mismatch, expected: {}, actual: {}, will update it",
+                            "[COMPACT] download file {} found size mismatch, expected: {}, actual: {}, will skip it",
                             file_name,
                             file_size,
                             data_len,
                         );
-                        if let Err(e) =
-                            file_list::update_compressed_size(&file_name, data_len as i64).await
-                        {
-                            log::error!(
-                                "[COMPACT] update file size for file {} err: {}",
-                                file_name,
-                                e
-                            );
-                        }
+                        // update database
+                        // if let Err(e) =
+                        //     file_list::update_compressed_size(&file_name, data_len as i64).await
+                        // {
+                        //     log::error!(
+                        //         "[COMPACT] update file size for file {} err: {}",
+                        //         file_name,
+                        //         e
+                        //     );
+                        // }
+                        // skip this file for compact
+                        Some(file_name)
+                    } else {
+                        None
                     }
-                    None
                 }
                 Err(e) => {
                     if e.to_string().to_lowercase().contains("not found")

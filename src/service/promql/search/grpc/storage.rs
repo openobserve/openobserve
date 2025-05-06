@@ -163,10 +163,9 @@ pub(crate) async fn create_context(
     })?;
 
     scan_stats.querier_files = scan_stats.files;
-    let parquet_cached_ratio = (((scan_stats.querier_memory_cached_files
-        + scan_stats.querier_disk_cached_files)
-        * 100) as f64
-        / scan_stats.querier_files as f64) as usize;
+    let cached_ratio = (scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files) as f64
+        / scan_stats.querier_files as f64;
 
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
@@ -174,18 +173,18 @@ pub(crate) async fn create_context(
         format!(" downloading others into {:?} in background,", cache_type)
     };
     log::info!(
-        "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, cache ratio: {},{download_msg} took: {} ms",
+        "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
-        parquet_cached_ratio,
+        (cached_ratio * 100.0) as usize,
         cache_start.elapsed().as_millis()
     );
 
-    if parquet_cached_ratio > 0 {
+    if scan_stats.querier_files > 0 {
         QUERY_PARQUET_CACHE_RATIO_NODE
-            .with_label_values(&[org_id, &stream_type.to_string()])
-            .inc_by(parquet_cached_ratio as u64);
+            .with_label_values(&[org_id, &StreamType::Metrics.to_string()])
+            .observe(cached_ratio);
     }
 
     // set target partitions based on cache type
