@@ -682,6 +682,15 @@ pub async fn list(
     }
 }
 
+/// Gets a list of alerts from the database `ORM_CLIENT`.
+pub async fn list_with_folders_db(
+    params: ListAlertsParams,
+) -> Result<Vec<(Folder, Alert)>, AlertError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    db::alerts::alert::list_with_folders(conn, params)
+        .await
+        .map_err(|e| e.into())
+}
 /// Gets a list of alerts.
 pub async fn list_v2<C: ConnectionTrait>(
     conn: &C,
