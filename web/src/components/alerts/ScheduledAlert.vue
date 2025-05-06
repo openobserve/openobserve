@@ -1469,7 +1469,6 @@ import {
 } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
-import FieldsInputWithMulti from "./FieldsInputWithMulti.vue";
   import FilterGroup from "./FilterGroup.vue";
 
 import searchService from "@/services/search";
@@ -1780,7 +1779,7 @@ const onFunctionSelect = (_function: any) => {
 const functionsList = computed(() => store.state.organizationData.functions);
 const dateTimePicker = ref(props.multi_time_range || []);
 
-const selectedMultiWindowOffset = ref([]);
+const selectedMultiWindowOffset = ref<any[]>([]);
 
 const functionOptions = ref<any[]>([]);
 
