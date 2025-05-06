@@ -48,6 +48,7 @@
             @add-group="emit('add-group', $event)"
             @remove-group="emit('remove-group', $event)"
             :stream-fields="props.streamFields"
+            @input:update="(name, field) => inputUpdate(name, field)"
           />
           <div
             v-else
@@ -115,7 +116,9 @@
     const props = defineProps({
     group: {
         type: Object,
-        default: () => {},
+        default: () => {
+          
+        },
         required: true,
     },
     streamFields: {
@@ -182,6 +185,7 @@
   const toggleLabel = () => {
     groups.value.label = groups.value.label === 'and' ? 'or' : 'and';
     emit('add-group', groups.value); // optional, sync with parent
+    emit('input:update', 'conditions', groups.value);
   };
 
   const removeCondition = (id: string) => {
@@ -336,9 +340,18 @@ const computedOpacity = computed(() => {
 
     .light-mode-group-tabs {
       border: 1px solid #cdcdcd;
+      .q-tab--inactive{
+        background-color: #ffffff !important;
+        color: black;
+      }
+
     }
     .dark-mode-group-tabs{
       border: 1px solid #464646;
+        .q-tab--inactive{
+        background-color: #494A4A !important;
+        color: $white;
+      }      
     }
     .group-tabs{
       .q-tab--active {
@@ -351,10 +364,6 @@ const computedOpacity = computed(() => {
 
       .q-tab__indicator {
         display: none;
-      }
-      .q-tab--inactive{
-        background-color: #ffffff !important;
-        color: black;
       }
     }
 

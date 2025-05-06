@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <real-time-alert
                 :columns="filteredColumns"
-                :conditions="formData.query_condition.conditions"
+                :conditions="formData.query_condition?.conditions || {}"
                 @field:add="addField"
                 @field:remove="removeField"
                 @input:update="onInputUpdate"
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <scheduled-alert
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
-                :conditions="formData.query_condition.conditions"
+                :conditions="formData.query_condition?.conditions || {}"
                 :expandState = expandState
                 :alertData="formData"
                 :sqlQueryErrorMsg="sqlQueryErrorMsg"
@@ -500,7 +500,7 @@ const defaultValue: any = () => {
       timezone: "UTC",
     },
     destinations: [],
-    context_attributes: {},
+    context_attributes: [],
     enabled: true,
     description: "",
     lastTriggeredAt: 0,
@@ -890,6 +890,45 @@ export default defineComponent({
       return condition;
     };
 
+    function generateWhereClause(group: any, streamFieldsMap: any) {
+      function formatValue(column: any, operator: any, value: any) {
+        return streamFieldsMap[column]?.type === "Int64" ||
+          operator === "Contains" ||
+          operator === "NotContains"
+          ? value
+          : `'${value}'`;
+      }
+
+      function formatCondition(column: any, operator: any, value: any) {
+        return `${column} ${operator} ${value}`;
+      }
+
+      function parseGroup(groupNode: any) {
+        if (!groupNode || !Array.isArray(groupNode.items)) return "";
+
+        const parts = groupNode.items.map(item => {
+          // Nested group
+          if (item.items && Array.isArray(item.items)) {
+            return `(${parseGroup(item)})`;
+          }
+
+          // Single condition
+          if (item.column && item.operator && item.value !== undefined) {
+            const formattedValue = formatValue(item.column, item.operator, item.value);
+            return formatCondition(item.column, item.operator, formattedValue);
+          }
+
+          return "";
+        }).filter(Boolean);
+
+        return parts.join(` ${groupNode.label.toUpperCase()} `);
+      }
+
+      const clause = parseGroup(group);
+      return clause.trim().length ? "WHERE " + clause : "";
+  }
+
+
     const generateSqlQuery = () => {
       // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, COUNT(*) as zo_sql_val FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC
 
@@ -898,28 +937,7 @@ export default defineComponent({
         store.state.zoConfig.timestamp_column || "_timestamp"
       }) AS zo_sql_key,`;
 
-      let whereClause = formData.value.query_condition.conditions 
-        .map((condition: any) => {
-          if (condition.column && condition.operator && condition.value) {
-            // If value is string then add single quotes
-            const value =
-              streamFieldsMap.value[condition.column].type === "Int64" ||
-              condition.operator === "Contains" ||
-              condition.operator === "NotContains"
-                ? condition.value
-                : `'${condition.value}'`;
-
-            return getFormattedCondition(
-              condition.column,
-              condition.operator,
-              value,
-            );
-          }
-        })
-        .filter((condition: any) => condition && condition?.trim()?.length)
-        .join(" AND ");
-
-      whereClause = whereClause?.trim().length ? " WHERE " + whereClause : "";
+      let whereClause = generateWhereClause(formData.value.query_condition.conditions, streamFieldsMap);
 
       if (!isAggregationEnabled.value) {
         query +=
@@ -1515,14 +1533,20 @@ export default defineComponent({
         id: getUUID(),
       };
     });
-    // this.formData.query_condition.conditions =
-    //   this.formData.query_condition.conditions.map((condition: any) => {
-    //     return {
-    //       ...condition,
-    //       id: getUUID(),
-    //     };
-    //   });
-    this.formData.query_condition.conditions = this.retransformBEToFE(this.formData.query_condition.conditions);
+    //this is done because 
+    //if we are getting the conditions as null or undefined then we need to create a new group 
+    //if we are getting the conditions as an object then we need to transform it to the frontend format
+    if(this.formData.query_condition.conditions && ( !Array.isArray(this.formData.query_condition.conditions) && Object.keys(this.formData.query_condition.conditions).length != 0)){
+      this.formData.query_condition.conditions = this.retransformBEToFE(this.formData.query_condition.conditions);
+    }
+    else if (this.formData.query_condition.conditions == null || this.formData.query_condition.conditions == undefined || this.formData.query_condition.conditions.length == 0 || Object.keys(this.formData.query_condition.conditions).length == 0){
+
+      this.formData.query_condition.conditions = {
+        groupId: getUUID(),
+        label: 'and',
+        items: []
+      }
+    }
   },
 
   computed: {
@@ -1544,6 +1568,7 @@ export default defineComponent({
       // Delaying submission by 500ms to allow the form to validate, as query is validated in validateSqlQuery method
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
+
 
       if (
         this.formData.is_real_time == "false" &&
@@ -1628,11 +1653,8 @@ export default defineComponent({
           }
         }
 
-        console.log("this.formData.query_condition", this.formData.query_condition.conditions);
-
         // Transform the form data to the backend format
-        payload.query_condition = this.transformFEToBE(this.formData.query_condition.conditions);
-        console.log("payload.query_condition", payload.query_condition);
+        payload.query_condition.conditions = this.transformFEToBE(this.formData.query_condition.conditions);
 
         if (this.beingUpdated) {
           payload.folder_id = this.router.currentRoute.value.query.folder || "default";
@@ -1675,7 +1697,7 @@ export default defineComponent({
 
           callAlert
             .then((res: { data: any }) => {
-              this.formData = { ...defaultValue };
+              this.formData = defaultValue();
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();

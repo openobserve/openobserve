@@ -28,7 +28,7 @@
             behavior="menu"
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="min-width:200px;"
-            
+            @update:model-value="emits('input:update', 'conditions', condition)"
           />
         </div>
         <div
