@@ -107,17 +107,40 @@ pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
 /// We should add all in-memory caches listed above that a CacheMiss is not followed by
 /// reading from db, e.g. UserSession, Pipeline
 pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::nats::NatsEvent>) {
+    let mut first_conenction = true;
     while let Some(event) = nats_event_rx.recv().await {
         if let infra::db::nats::NatsEvent::Connected = event {
+            // Skip refreshing if it's the first time connecting to the client
+            if first_conenction {
+                first_conenction = false;
+                continue;
+            }
             log::info!(
-                "[infra::config] received NATs event: {event}, refreshing in-memory cache for UserSessions and Pipelines"
+                "[infra::config] received NATs event: {event}, refreshing in-memory cache for Alerts, Pipelines, RealtimeTriggers, Schema, Users, and UserSessions"
             );
-            if let Err(e) = crate::service::db::session::cache().await {
-                log::error!("Error refreshing in-memory cache \"UserSessions\": {}", e);
+            if let Err(e) = crate::service::db::alerts::alert::cache().await {
+                log::error!("Error refreshing in-memory cache \"Alerts\": {}", e);
             }
             if let Err(e) = crate::service::db::pipeline::cache().await {
                 log::error!("Error refreshing in-memory cache \"Pipelines\": {}", e);
             }
+            if let Err(e) = crate::service::db::alerts::realtime_triggers::cache().await {
+                log::error!(
+                    "Error refreshing in-memory cache \"RealtimeTriggers\": {}",
+                    e
+                );
+            }
+            if let Err(e) = crate::service::db::schema::cache().await {
+                log::error!("Error refreshing in-memory cache \"Schema\": {}", e);
+            }
+            if let Err(e) = crate::service::db::session::cache().await {
+                log::error!("Error refreshing in-memory cache \"UserSessions\": {}", e);
+            }
+            if let Err(e) = crate::service::db::user::cache().await {
+                log::error!("Error refreshing in-memory cache \"Users\": {}", e);
+            }
         }
     }
+
+    log::info!("[infra::config] stops to listen to NATs event to refresh in-memory caches");
 }
