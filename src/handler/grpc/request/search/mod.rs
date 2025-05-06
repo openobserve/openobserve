@@ -23,9 +23,9 @@ use config::{
 use o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup};
 use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetResultRequest, GetResultResponse, QueryStatusRequest, QueryStatusResponse,
-    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
-    search_server::Search,
+    GetResultRequest, GetResultResponse, GetScanStatsRequest, QueryStatusRequest,
+    QueryStatusResponse, ScanStats, ScanStatsResponse, SearchPartitionRequest,
+    SearchPartitionResponse, SearchRequest, SearchResponse, search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -106,6 +106,16 @@ impl Searcher {
         self.query_manager
             .add_work_group(trace_id, work_group)
             .await;
+    }
+
+    pub async fn set_scan_stats(&self, trace_id: &str, stats: ScanStats) {
+        self.query_manager
+            .set_stats(trace_id, (&stats).into())
+            .await;
+    }
+
+    pub async fn get_scan_stats(&self, trace_id: &str) -> ScanStats {
+        (&self.query_manager.get_stats(trace_id).await).into()
     }
 }
 
@@ -347,6 +357,25 @@ impl Search for Searcher {
         &self,
         _req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn get_scan_stats(
+        &self,
+        req: Request<GetScanStatsRequest>,
+    ) -> Result<Response<ScanStatsResponse>, Status> {
+        let trace_id = req.into_inner().trace_id;
+        let stats = self.get_scan_stats(&trace_id).await;
+
+        Ok(Response::new(ScanStatsResponse { stats: Some(stats) }))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn get_scan_stats(
+        &self,
+        _req: Request<GetScanStatsRequest>,
+    ) -> Result<Response<ScanStatsResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
     }
 }

@@ -972,6 +972,18 @@ pub struct GetResultResponse {
     #[prost(bytes = "vec", tag = "1")]
     pub response: ::prost::alloc::vec::Vec<u8>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetScanStatsRequest {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ScanStatsResponse {
+    #[prost(message, optional, tag = "1")]
+    pub stats: ::core::option::Option<ScanStats>,
+}
 /// Search request query
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1337,6 +1349,31 @@ pub mod search_client {
                 .insert(GrpcMethod::new("cluster.Search", "DeleteResult"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn get_scan_stats(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetScanStatsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::ScanStatsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/GetScanStats",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Search", "GetScanStats"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -1394,6 +1431,13 @@ pub mod search_server {
             request: tonic::Request<super::DeleteResultRequest>,
         ) -> std::result::Result<
             tonic::Response<super::DeleteResultResponse>,
+            tonic::Status,
+        >;
+        async fn get_scan_stats(
+            &self,
+            request: tonic::Request<super::GetScanStatsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::ScanStatsResponse>,
             tonic::Status,
         >;
     }
@@ -1823,6 +1867,52 @@ pub mod search_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = DeleteResultSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/GetScanStats" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetScanStatsSvc<T: Search>(pub Arc<T>);
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::GetScanStatsRequest>
+                    for GetScanStatsSvc<T> {
+                        type Response = super::ScanStatsResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetScanStatsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::get_scan_stats(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetScanStatsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

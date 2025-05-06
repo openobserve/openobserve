@@ -166,7 +166,13 @@ impl FlightService for FlightServiceImpl {
             println!("{}", plan);
         }
 
-        schema = add_scan_stats_to_schema(schema, scan_stats);
+        schema = add_scan_stats_to_schema(schema, scan_stats.clone());
+        #[cfg(feature = "enterprise")]
+        if is_super_cluster {
+            SEARCH_SERVER
+                .set_scan_stats(&trace_id, (&scan_stats).into())
+                .await;
+        }
 
         let start = std::time::Instant::now();
         let write_options: IpcWriteOptions = IpcWriteOptions::default()
