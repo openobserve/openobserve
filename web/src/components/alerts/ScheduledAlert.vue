@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="scheduled-alerts q-pa-none q-ma-none">
 
-
     <!-- first section -->
 
    <div class=" tw-w-full row alert-setup-container " style=" margin-left: 8px;">
@@ -30,8 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw-mt-1 tw-w-full col-12"
       @update:is-expanded="()=>emits('update:expandState', expandState)"
     />
-
-    <!-- this is next section -->
      <div v-if="expandState.thresholds" class="q-px-lg">
       <div class="q-mt-sm">
       <div
@@ -840,7 +837,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      </div>
    </div>
 
-   <!-- multi time range selection -->
+   <!-- second section multi window selection -->
    <div class=" q-mt-md tw-w-full row alert-setup-container " style=" margin-left: 8px;">
     <AlertsContainer 
       name="Multi Window"
@@ -886,7 +883,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class=" q-px-lg q-mt-sm tw-w-full ">
-        <!-- current window -->
+        <!-- current multi time range comparision window -->
           <div v-if="dateTimePicker.length > 0"  class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-sm">
             <span>Comparing with</span>
             <div class=" tw-h-px border-line tw-flex-1"></div>
@@ -940,28 +937,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
       </div>
 
-  <!-- add comparision window -->
-   <div class="tw-w-full tw-flex tw-justify-center q-mt-sm ">
-    <div class="tw-w-fit tw-flex tw-justify-center tw-border tw-border-gray-200 ">
-    <q-btn
-      data-test="multi-time-range-alerts-add-btn"
-      label="Add Comparision Window"
-      size="sm"
-      class="text-semibold add-variable q-pa-sm multi-window-text no-border  "
-      style="font-size: 14px;"
-      no-caps
-      @click="addTimeShift"
-    >
-      <q-icon :class="store.state.theme === 'dark' ? 'tw-text-white  tw-font-bold q-ml-sm' : 'tw-text-black tw-font-bold q-ml-sm'" name="add" size="20px" />
-    </q-btn>
-  </div>
-   </div>
+  <!-- add comparision window button -->
+    <div class="tw-w-full tw-flex tw-justify-center q-mt-sm ">
+      <div class="tw-w-fit tw-flex tw-justify-center tw-border tw-border-gray-200 ">
+      <q-btn
+        data-test="multi-time-range-alerts-add-btn"
+        label="Add Comparision Window"
+        size="sm"
+        class="text-semibold add-variable q-pa-sm multi-window-text no-border  "
+        style="font-size: 14px;"
+        no-caps
+        @click="addTimeShift"
+      >
+        <q-icon :class="store.state.theme === 'dark' ? 'tw-text-white  tw-font-bold q-ml-sm' : 'tw-text-black tw-font-bold q-ml-sm'" name="add" size="20px" />
+      </q-btn>
+    </div>
+    </div>
 
   </div>
     </div>
    </div>
 
-   <!-- second section -->
+   <!-- third section -->
 
 
    <div class=" q-mt-md  tw-w-full row alert-setup-container " style=" margin-left: 8px;">
@@ -1056,236 +1053,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </div>
    </div>
-  <q-dialog v-if="false"  maximized v-model="isFullScreen" class="tw-w-full"  position="right"
-    style="height: 90%;
-    "
-    >
-      <div  class="tw-w-full flex scheduled-alerts" style="width: 100%; height: 100%">
-
-
-            <div class="flex justify-between tw-w-full" style="height: 90%;"
-            >
-      
-              <!-- sql editor -->
-              <div v-if="tab === 'sql'">
-                <div style="height: 60px;"  class=" tw-w-full tw-flex tw-justify-between tw-items-center q-px-lg border-input-box bg-grey-10 q-py-sm" >
-              <div class=" ">
-                <q-btn
-                  class=" q-pa-none q-ma-none q-mr-sm rounded-border-btn"
-                  :icon="isFullScreen ? 'fullscreen_exit' : 'fullscreen'"
-                  rounded
-                  size="10px"
-                  :class="[
-                  store.state.theme === 'dark'
-                    ? 'tw-text-gray-100 tw-bg-gray-600'
-                    : 'tw-text-gray-900 tw-bg-gray-300',
-                ]"
-                v-model="isFullScreen"
-                @click="()=> isFullScreen = !isFullScreen"
-                >
-                </q-btn>
-                <span class="dialog-title-each-tab">  {{ tab === "promql" ? "Promql" : "SQL Editor" }}
-                </span>
-              </div>
-              <q-toggle
-                v-if="!disableVrlFunction"
-                data-test="logs-search-bar-show-query-toggle-btn"
-                v-model="isVrlFunctionEnabled"
-                :icon="'img:' + getImageURL('images/common/function.svg')"
-                title="Toggle Function Editor"
-                class="q-pl-xs"
-                size="30px"
-                @update:model-value="updateFunctionVisibility"
-                :disable="tab === 'promql'"
-              />
-            </div>
-                <div class=" tw-h-full scheduled-alerts-dialog">
-                  <query-editor
-                    data-test="scheduled-alert-sql-editor"
-                    ref="queryEditorRef"
-                    editor-id="alerts-query-editor-dialog"
-                    class=" tw-h-full tw-w-full"
-                    :debounceTime="300"
-                    v-model:query="query"
-                    :class="
-                      query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
-                    "
-                    @update:query="updateQueryValue"
-                    @focus="queryEditorPlaceholderFlag = false"
-                    @blur="onBlurQueryEditor"
-                    :style="{
-                      width: isVrlFunctionEnabled ? 'calc(47vw - 10px)' : '90vw',
-                      height: !!sqlQueryErrorMsg ? 'calc(100vh - 100px)' : 'calc(100vh - 50px)'
-                    }"
-
-                  />
-                  <div v-show="!!sqlQueryErrorMsg" class="text-negative q-py-sm invalid-sql-error">
-                    <span v-show="!!sqlQueryErrorMsg">
-                      Error: {{ sqlQueryErrorMsg }}</span
-                    >
-                  </div>
-                </div>
-              </div>
-
-              <!-- promql editor -->
-
-              <div v-if="tab === 'promql'">
-                <div style="height: 60px;"  class=" tw-w-full tw-flex tw-justify-between tw-items-center q-px-lg border-input-box bg-grey-10 q-py-sm" >
-              <div class=" ">
-                <q-btn
-                  class=" q-pa-none q-ma-none q-mr-sm rounded-border-btn"
-                  :icon="isFullScreen ? 'fullscreen_exit' : 'fullscreen'"
-                  rounded
-                  size="10px"
-                  :class="[
-                  store.state.theme === 'dark'
-                    ? 'tw-text-gray-100 tw-bg-gray-600'
-                    : 'tw-text-gray-900 tw-bg-gray-300',
-                ]"
-                v-model="isFullScreen"
-                @click="() => isFullScreen = !isFullScreen"
-                >
-                </q-btn>
-                <span class="dialog-title-each-tab">  {{ tab === "promql" ? "Promql Editor" : "SQL Editor" }}
-                </span>
-              </div>
-              <q-toggle
-                v-if="!disableVrlFunction"
-                data-test="logs-search-bar-show-query-toggle-btn"
-                v-model="isVrlFunctionEnabled"
-                :icon="'img:' + getImageURL('images/common/function.svg')"
-                title="Toggle Function Editor"
-                class="q-pl-xs"
-                size="30px"
-                @update:model-value="updateFunctionVisibility"
-                :disable="tab === 'promql'"
-              />
-            </div>
-            <!-- come here -->
-                <query-editor
-                  data-test="scheduled-alert-promql-editor"
-                  ref="queryEditorRef"
-                  editor-id="alerts-query-editor-dialog"
-                  class=" q-mb-md flex items-start justify-start"
-                  :debounceTime="300"
-                  v-model:query="promqlQuery"
-                  @update:query="updateQueryValue"
-                  style="width: 90vw; height: 100%;"
-                />
-              </div>
-
-              <q-separator vertical class="tw-h-full tw-w-2  "  style="height: calc(100vh - 50px); background-color: #212121;" /> 
-
-              <!-- vrl function editor -->
-              <!-- function selector -->
-              <div v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'">
-                <div style=" width: 100%; height: 60px;" class="bg-grey-10 flex justify-between items-center q-py-sm q-px-lg">
-                  <span class="dialog-title-each-tab">
-                      VRL Function Editor
-                  </span>
-                  <div >
-
-                    <q-select
-                      v-model="selectedFunction"
-                      label="Saved functions"
-                      :options="functionOptions"
-                      data-test="dashboard-use-saved-vrl-function"
-                      input-debounce="0"
-                      behavior="menu"
-                      use-input
-                      filled
-                      borderless
-                      dense
-                      hide-selected
-                      menu-anchor="top left"
-                      fill-input
-                      option-label="name"
-                      option-value="name"
-                      @filter="filterFunctionOptions"
-                      @update:modelValue="onFunctionSelect"
-                      style="width: 100%"
-                    >
-                      <template #no-option>
-                        <q-item>
-                          <q-item-section> {{ t("search.noResult") }}</q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
-                  </div>
-                </div>
-                <div
-                data-test="logs-vrl-function-editor"
-                class="tw-h-full"
-                v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'"
-              >
-                <query-editor
-                  data-test="logs-vrl-function-editor"
-                  ref="fnEditorRef"
-                  editor-id="fnEditor-dialog"
-                  class=""
-                  :debounceTime="300"
-                  v-model:query="vrlFunctionContent"
-                  :class="[
-                    vrlFunctionContent == '' && functionEditorPlaceholderFlag
-                      ? 'empty-function'
-                      : ''
-                      ,
-                      store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'
-                  ]"
-                  language="ruby"
-                  @focus="functionEditorPlaceholderFlag = false"
-                  @blur="onBlurFunctionEditor"
-                  style="width: calc(47vw - 10px) !important; "
-                  :style="{
-                      height: !!sqlQueryErrorMsg ? 'calc(100vh - 100px)' : 'calc(100vh - 50px)'
-                    }"
-
-                />
-
-                <div
-                  class="text-subtitle2 q-pb-sm"
-                  style="min-height: 21px; width: 500px"
-                  v-show="vrlFunctionError"
-                >
-                  <div v-if="vrlFunctionError">
-                    <div class="text-negative q-mb-xs flex items-center">
-                      <q-btn
-                        :icon="
-                          isFunctionErrorExpanded ? 'expand_more' : 'chevron_right'
-                        "
-                        dense
-                        size="xs"
-                        flat
-                        class="q-mr-xs"
-                        data-test="table-row-expand-menu"
-                        @click.stop="toggleExpandFunctionError"
-                      />
-                      <div>
-                        <span v-show="vrlFunctionError">Invalid VRL function</span>
-                      </div>
-                    </div>
-                    <div
-                      v-if="isFunctionErrorExpanded"
-                      class="q-px-sm q-pb-sm"
-                      :class="
-                        store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
-                      "
-                    >
-                      <pre class="q-my-none" style="white-space: pre-wrap">{{
-                        vrlFunctionError
-                      }}</pre>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              </div>
-
-
-            </div>
-      </div>
-  </q-dialog>
-
-
+   <!-- used for showing sql editor and vrl editor in modal -->
   <q-dialog
     v-model="viewSqlEditor"
     position="right"
@@ -2470,20 +2238,6 @@ const routeToCreateDestination = () => {
     await triggerQuery(true);
   }
 
-//   const inputData = ref({
-//     groupId: getUUID(),
-//     label: "or",
-//     items: [
-//       {
-//         column: "",
-//         operator: "=",
-//         value: "",
-//         ignore_case: false,
-//         id: getUUID()
-//       }
-//     ],
-// });
-
 
 // Method to handle the emitted changes and update the structure
   function updateGroup(updatedGroup:any) {
@@ -2495,32 +2249,32 @@ const routeToCreateDestination = () => {
 
     // No emit here — you’re handling data directly in parent
   };
-    const multiWindowImage = computed(() => {
+  const multiWindowImage = computed(() => {
+  if(store.state.theme === 'dark'){
+    return getImageURL('images/alerts/multi_window.svg')
+  }
+  else{
+    return getImageURL('images/alerts/multi_window_light.svg')
+  }
+  })
+
+  const conditionsImage = computed(() => {
     if(store.state.theme === 'dark'){
-      return getImageURL('images/alerts/multi_window.svg')
+      return getImageURL('images/alerts/conditions_image.svg')
     }
     else{
-      return getImageURL('images/alerts/multi_window_light.svg')
+      return getImageURL('images/alerts/conditions_image_light.svg')
     }
-    })
+  })
 
-    const conditionsImage = computed(() => {
-      if(store.state.theme === 'dark'){
-        return getImageURL('images/alerts/conditions_image.svg')
-      }
-      else{
-        return getImageURL('images/alerts/conditions_image_light.svg')
-      }
-    })
-
-    const sqlEditorImage = computed(() => {
-      if(store.state.theme === 'light'){
-        return getImageURL('images/alerts/sql_editor_light.svg')
-      }
-      else{ 
-        return getImageURL('images/alerts/sql_editor_dark.svg')
-      }
-    })
+  const sqlEditorImage = computed(() => {
+    if(store.state.theme === 'light'){
+      return getImageURL('images/alerts/sql_editor_light.svg')
+    }
+    else{ 
+      return getImageURL('images/alerts/sql_editor_dark.svg')
+    }
+  })
 
 
 
