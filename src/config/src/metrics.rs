@@ -359,14 +359,16 @@ pub static QUERY_PARQUET_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-
-pub static QUERY_PARQUET_CACHE_RATIO_NODE: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
+pub static QUERY_PARQUET_CACHE_RATIO_NODE: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
             "query_parquet_cache_ratio_node",
             "Querier parquet cache ratio for local node.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
+        .buckets(vec![
+            0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.0,
+        ])
         .const_labels(create_const_labels()),
         &["organization", "stream_type"],
     )

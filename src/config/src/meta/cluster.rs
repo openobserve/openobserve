@@ -29,10 +29,11 @@ pub trait NodeInfo: Debug + Send + Sync {
     }
     fn get_grpc_addr(&self) -> String;
     fn get_auth_token(&self) -> String;
+    fn get_name(&self) -> String;
     fn get_region(&self) -> String {
         "openobserve".to_string()
     }
-    fn get_cluster_name(&self) -> String {
+    fn get_cluster(&self) -> String {
         crate::config::get_cluster_name()
     }
 }
@@ -154,6 +155,10 @@ impl NodeInfo for Node {
 
     fn get_grpc_addr(&self) -> String {
         self.grpc_addr.clone()
+    }
+
+    fn get_name(&self) -> String {
+        self.name.clone()
     }
 }
 
