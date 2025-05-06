@@ -365,8 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <div
-          style="width: 440px; height: 300px; position: sticky; top: 0 
-          "
+          style="width: 440px; height: 300px; position: sticky; top: 0 "
           class=" col-2"
         >
           <preview-alert
@@ -384,27 +383,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     </div>
     <div class="flex justify-end items-center q-px-lg tw-w-full " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: sticky;  bottom: 0 !important; top: 0; height: 70px !important;">
-              <q-btn
-                data-test="add-alert-cancel-btn"
-                v-close-popup="true"
-                class=" text-bold"
-                :label="t('alerts.cancel')"
-                text-color="light-text"
-                padding="sm md"
-                no-caps
-                @click="$emit('cancel:hideform')"
-              />
-              <q-btn
-                data-test="add-alert-submit-btn"
-                :label="t('alerts.save')"
-                class=" text-bold no-border q-ml-md"
-                color="secondary"
-                padding="sm xl"
-                type="submit"
-                @click="onSubmit"
-                no-caps
-              />
-            </div>
+      <q-btn
+        data-test="add-alert-cancel-btn"
+        v-close-popup="true"
+        class=" text-bold"
+        :label="t('alerts.cancel')"
+        text-color="light-text"
+        padding="sm md"
+        no-caps
+        @click="$emit('cancel:hideform')"
+      />
+      <q-btn
+        data-test="add-alert-submit-btn"
+        :label="t('alerts.save')"
+        class=" text-bold no-border q-ml-md"
+        color="secondary"
+        padding="sm xl"
+        type="submit"
+        @click="onSubmit"
+        no-caps
+      />
+    </div>
 
   </div>
 

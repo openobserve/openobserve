@@ -317,46 +317,46 @@ const computedOpacity = computed(() => {
   border-radius: 4px;
 }
 
-.group-tabs {
-  .q-tab--active {
-    background-color: $primary;
-    color: $white;
-  }
+    .group-tabs {
+      .q-tab--active {
+        background-color: $primary;
+        color: $white;
+      }
 
-  .q-tab__indicator {
-    display: none;
-  }
+      .q-tab__indicator {
+        display: none;
+      }
 
-}
-.dark-mode-group-tabs  .q-tab--inactive{
-    background-color: #494A4A !important;
-    color: $white
-  }
+    }
+    .dark-mode-group-tabs  .q-tab--inactive{
+        background-color: #494A4A !important;
+        color: $white
+    }
 
 
-  .light-mode-group-tabs {
-    border: 1px solid #cdcdcd;
-  }
-  .dark-mode-group-tabs{
-    border: 1px solid #464646;
-  }
-.group-tabs{
-  .q-tab--active {
-    background-color: $primary;
-    color: $white;
-  }
-  .q-tab{
-    border: none;
-  }
+    .light-mode-group-tabs {
+      border: 1px solid #cdcdcd;
+    }
+    .dark-mode-group-tabs{
+      border: 1px solid #464646;
+    }
+    .group-tabs{
+      .q-tab--active {
+        background-color: $primary;
+        color: $white;
+      }
+      .q-tab{
+        border: none;
+      }
 
-  .q-tab__indicator {
-    display: none;
-  }
-  .q-tab--inactive{
-    background-color: #ffffff !important;
-    color: black;
-  }
-}
+      .q-tab__indicator {
+        display: none;
+      }
+      .q-tab--inactive{
+        background-color: #ffffff !important;
+        color: black;
+      }
+    }
 
 
   </style>
