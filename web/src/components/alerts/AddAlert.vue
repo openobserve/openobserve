@@ -921,7 +921,7 @@ export default defineComponent({
       function parseGroup(groupNode: any) {
         if (!groupNode || !Array.isArray(groupNode.items)) return "";
 
-        const parts = groupNode.items.map(item => {
+        const parts = groupNode.items.map((item: any) => {
           // Nested group
           if (item.items && Array.isArray(item.items)) {
             return `(${parseGroup(item)})`;
