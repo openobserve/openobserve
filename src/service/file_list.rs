@@ -66,7 +66,7 @@ pub async fn query(
         None,
     )
     .await?;
-    if cfg.common.file_list_dump_debug_check {
+    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
         let dumped_file_names = dumped_files
             .iter()
             .map(|f| "files/".to_string() + &f.stream + "/" + &f.date + "/" + &f.file)
@@ -83,7 +83,7 @@ pub async fn query(
             .sum();
         if missing_files > 0 {
             log::info!(
-                "[trace_id : {trace_id}] dump was missing {missing_files} files present in db"
+                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
             );
         }
     }
@@ -313,7 +313,7 @@ pub async fn query_by_ids(
         })
         .collect();
 
-    if cfg.common.file_list_dump_debug_check {
+    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
         let dump_ids = dumped_files
             .iter()
             .map(|entry| entry.0)
@@ -325,7 +325,7 @@ pub async fn query_by_ids(
             .sum();
         if missing_files > 0 {
             log::info!(
-                "[trace_id : {trace_id}] dump was missing {missing_files} files present in db"
+                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
             );
         }
     }
@@ -407,7 +407,7 @@ pub async fn query_ids(
     )
     .await
     .unwrap();
-    if cfg.common.file_list_dump_debug_check {
+    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
         let dump_ids = dumped_files.iter().map(|f| f.id).collect::<HashSet<_>>();
         let db_ids = files.iter().map(|f| f.id).collect::<Vec<_>>();
         let missing_files: usize = db_ids
@@ -416,7 +416,7 @@ pub async fn query_ids(
             .sum();
         if missing_files > 0 {
             log::info!(
-                "[trace_id : {trace_id}] dump was missing {missing_files} files present in db"
+                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
             );
         }
     }

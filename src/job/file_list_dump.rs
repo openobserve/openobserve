@@ -150,8 +150,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
-    let config = get_config();
 
+    let config = get_config();
     if !config.common.file_list_dump_enabled {
         return Ok(());
     }
