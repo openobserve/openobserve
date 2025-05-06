@@ -97,6 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? 'bg-grey-10'
                           : 'bg-grey-2'
                       "
+                      :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
+
                       class="flex justify-center items-center"
                     >
                       {{ t("alerts.minutes") }}
@@ -126,8 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="destinations"
                   :options="formattedDestinations"
                   color="input-border"
-                  bg-color="input-bg "
                   class="no-case"
+                  :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+
                   stack-label
                   outlined
                   filled
@@ -202,18 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw-mt-1 tw-w-full col-12    "
       @update:is-expanded="()=>emits('update:expandState', expandState)"
     />
-    <fields-input-with-multi
-    v-if="expandState.realTimeMode"
-      class="q-mt-md q-px-lg"
-      :stream-fields="columns"
-      :fields="testFields"
-      @add="addField"
-      @remove="removeField"
-      @input:update="
-        (name: string, field: any) => emits('input:update', name, field)
-      "
-      :enableNewValueMode="enableNewValueMode"
-    />
+    <FilterGroup v-if="expandState.realTimeMode" :stream-fields="columns" :group="inputData" :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
     </div>
 
   </div>
@@ -229,6 +221,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { useRouter } from "vue-router";
+import FilterGroup from "./FilterGroup.vue";
 
 const { t } = useI18n();
 
@@ -238,34 +231,15 @@ const router = useRouter();
 
 const props = defineProps(["columns", "conditions","enableNewValueMode", "expandState", "trigger", "destinations", "formattedDestinations"]);
 
-const emits = defineEmits(["field:add", "field:remove", "input:update", "update:expandState", "update:trigger", "refresh:destinations", "update:destinations"]);
+const emits = defineEmits(["field:add", "field:remove", "input:update", "update:expandState", "update:trigger", "refresh:destinations", "update:destinations", "update:group", "remove:group"]);
 
 const triggerData = ref(props.trigger);
 
 const destinations = ref(props.destinations);
 
 const formattedDestinations = ref(props.formattedDestinations);
-const testFields  = ref(
- [
-    {
-      uuid: "1",
-      parent_id: "1",
-      column: "temperature",
-      operator: ">",
-      value: "30",
-      condition: "AND"
+const inputData = ref(props.conditions);
 
-    },
-    {
-      uuid: "3",
-      column: "temperature",
-      operator: ">",
-      value: "40",
-      condition: "AND"
-    }
-
-  ]
-);
 
 const updateTrigger = () => {
   emits("update:trigger", triggerData.value);
@@ -294,6 +268,16 @@ const routeToCreateDestination = () => {
 const updateDestinations = (destinations: any[]) => {
   emits("update:destinations", destinations);
 };
+
+
+// Method to handle the emitted changes and update the structure
+function updateGroup(updatedGroup:any) {
+    emits('update:group', updatedGroup)
+  }
+
+  const removeConditionGroup = (targetGroupId: string, currentGroup: any = inputData.value) => {
+    emits('remove:group', targetGroupId)
+  };
 </script>
 
 <style lang="scss" scoped></style>
