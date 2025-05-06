@@ -17,6 +17,7 @@ use infra::errors::Result;
 use o2_enterprise::enterprise::super_cluster::queue::{DestinationMessage, Message};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
+    log::debug!("[SUPER_CLUSTER:sync] process_msg destination: {:?}", msg);
     let event_key = msg.key.to_owned();
     let dest_msg: DestinationMessage = msg.try_into()?;
     match dest_msg {

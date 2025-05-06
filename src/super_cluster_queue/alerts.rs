@@ -38,6 +38,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
+    log::debug!("[SUPER_CLUSTER:sync] process_msg alert: {:?}", alert);
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match msg {
         AlertMessage::Create {
@@ -45,7 +46,6 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
             folder_id,
             alert,
         } => {
-            log::debug!("Creating alert: {:?}", alert);
             if table::alerts::get_by_id(conn, &org_id, alert.id.expect("alert id cannot be none"))
                 .await?
                 .is_some()

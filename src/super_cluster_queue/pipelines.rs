@@ -18,6 +18,7 @@ use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
+    log::debug!("[SUPER_CLUSTER:sync] process_msg pipeline: {:?}", msg);
     match msg.message_type {
         MessageType::PipelinePut => {
             let bytes = msg
