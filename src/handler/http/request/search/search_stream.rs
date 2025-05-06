@@ -71,6 +71,7 @@ use crate::{
             websocket::{calc_queried_range, update_histogram_interval_in_query},
         },
     },
+    handler::http::request::search::error_utils::map_error_to_http_response,
     service::{
         search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
         websocket_events::{
@@ -106,7 +107,7 @@ pub async fn search_http2_stream(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
-) -> Result<HttpResponse, Error> {
+) -> HttpResponse {
     let mut start = Instant::now();
     let cfg = get_config();
     let org_id = org_id.into_inner();
@@ -142,10 +143,10 @@ pub async fn search_http2_stream(
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => return MetaHttpResponse::bad_request(e),
     };
     if let Err(e) = req.decode() {
-        return Ok(MetaHttpResponse::bad_request(e));
+        return MetaHttpResponse::bad_request(e);
     }
 
     // Set use_cache from query params
@@ -156,7 +157,7 @@ pub async fn search_http2_stream(
     if req.search_type.is_none() {
         req.search_type = match get_search_type_from_request(&query) {
             Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+            Err(e) => return MetaHttpResponse::bad_request(e),
         };
     }
 
@@ -172,12 +173,10 @@ pub async fn search_http2_stream(
     let stream_names = match resolve_stream_names(&req.query.sql) {
         Ok(v) => v.clone(),
         Err(e) => {
-            return Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            );
+            return HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                e.to_string(),
+            ));
         }
     };
 
@@ -207,7 +206,7 @@ pub async fn search_http2_stream(
         if let Some(res) =
             check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
         {
-            return Ok(res);
+            return res;
         }
     }
     // Clone required values for the async task
@@ -226,7 +225,7 @@ pub async fn search_http2_stream(
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);
-            return Ok(MetaHttpResponse::bad_request(e));
+            return MetaHttpResponse::bad_request(e);
         }
     };
 
@@ -241,9 +240,7 @@ pub async fn search_http2_stream(
                 interval
             );
 
-            return Ok(MetaHttpResponse::bad_request(
-                "Failed to update query with histogram interval",
-            ));
+            return MetaHttpResponse::bad_request("Failed to update query with histogram interval");
         }
         log::info!(
             "[HTTP2_STREAM] trace_id: {}; Updated query {}; with histogram interval: {}",
@@ -296,7 +293,9 @@ pub async fn search_http2_stream(
                             e.to_string()
                         );
                         // send error message to client
-                        sender.send(Err(e)).await.unwrap();
+                        if let Err(e) = sender.send(Err(e)).await {
+                            log::error!("Error sending error message to client: {}", e);
+                        }
                         return;
                     }
                 };
@@ -362,7 +361,9 @@ pub async fn search_http2_stream(
                 .instrument(search_span.clone())
                 .await
                 {
-                    sender.send(Err(e)).await.unwrap();
+                    if let Err(e) = sender.send(Err(e)).await {
+                        log::error!("Error sending error message to client: {}", e);
+                    }
                     return;
                 }
             } else {
@@ -390,7 +391,9 @@ pub async fn search_http2_stream(
                 .instrument(search_span.clone())
                 .await
                 {
-                    sender.send(Err(e)).await.unwrap();
+                    if let Err(e) = sender.send(Err(e)).await {
+                        log::error!("Error sending error message to client: {}", e);
+                    }
                     return;
                 }
             }
@@ -410,7 +413,9 @@ pub async fn search_http2_stream(
                             e
                         })
                 {
-                    sender.send(Err(e)).await.unwrap();
+                    if let Err(e) = sender.send(Err(e)).await {
+                        log::error!("Error sending error message to client: {}", e);
+                    }
                     return;
                 }
             }
@@ -433,7 +438,9 @@ pub async fn search_http2_stream(
             .instrument(search_span.clone())
             .await
             {
-                sender.send(Err(e)).await.unwrap();
+                if let Err(e) = sender.send(Err(e)).await {
+                    log::error!("Error sending error message to client: {}", e);
+                }
                 return;
             }
         }
@@ -446,54 +453,62 @@ pub async fn search_http2_stream(
     });
 
     // Return streaming response
-    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).map(|result| match result {
+    let cfg_clone = cfg.clone();
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).map(move |result| match result {
         Ok(v) => {
             // TEST: payload size
-            // let mut v = v;
-            // {
-            //     match v {
-            //         StreamResponses::SearchResponse {
-            //             results,
-            //             streaming_aggs,
-            //             time_offset,
-            //         } => {
-            //             let mut results_clone = results.clone();
-            //             // let json = serde_json::json!({
-            //             //     "a": "b"
-            //             // });
-            //             let dummy_data = vec!["a"; 15 * 1024 * 1024];
-            //             results_clone.columns = dummy_data.iter().map(|v|
-            // v.to_string()).collect();             let modified_response =
-            // StreamResponses::SearchResponse {                 results: results_clone,
-            //                 streaming_aggs,
-            //                 time_offset,
-            //             };
-            //             v = modified_response;
-            //         }
-            //         _ => {}
-            //     }
-            // }
+            let mut v = v;
+            {
+                if cfg_clone.websocket.streaming_benchmark_enabled {
+                    match v {
+                        StreamResponses::SearchResponse {
+                            results,
+                            streaming_aggs,
+                            time_offset,
+                        } => {
+                            let mut results_clone = results.clone();
+                            let dummy_data =
+                                vec![
+                                    "a";
+                                    cfg_clone.websocket.streaming_benchmark_dummy_data_size
+                                        * 1024
+                                        * 1024
+                                ];
+                            results_clone.columns =
+                                dummy_data.iter().map(|v| v.to_string()).collect();
+                            let modified_response = StreamResponses::SearchResponse {
+                                results: results_clone,
+                                streaming_aggs,
+                                time_offset,
+                            };
+                            v = modified_response;
+                        }
+                        _ => {}
+                    }
+                }
+            }
 
             let encoded_response = v.to_response().into_bytes();
             Ok(BytesImpl::from(encoded_response))
         }
         Err(e) => {
             log::error!("[HTTP2_STREAM] Error in stream: {}", e);
-            // TODO: fix http response
+            // TODO: fix error map
             // let err_res = map_error_to_http_response(&e, trace_id);
-            Err(e)
+            let error_bytes = format!("event: error\ndata: {}\n\n", e);
+            Err(std::io::Error::new(std::io::ErrorKind::Other, error_bytes))
         }
     });
 
-    Ok(HttpResponse::Ok()
+    HttpResponse::Ok()
         .content_type("text/event-stream")
         .append_header((header::CONNECTION, HeaderValue::from_static("keep-alive")))
-        // .append_header((header::CACHE_CONTROL, HeaderValue::from_static("no-cache")))
         .append_header((
             header::TRANSFER_ENCODING,
             HeaderValue::from_static("chunked"),
         ))
-        .streaming(stream))
+        // .insert_header(ContentEncoding::Identity) // to disable encoding
+        .streaming(stream)
 }
 
 // Do partitioned search without cache
@@ -641,7 +656,12 @@ pub async fn do_partitioned_search(
                 },
             };
 
-            sender.send(Ok(response)).await.unwrap();
+            if let Err(e) = sender.send(Ok(response)).await {
+                log::error!("Error sending response: {}", e);
+                return Err(infra::errors::Error::Message(
+                    "Error sending response".to_string(),
+                ));
+            }
         }
 
         // Send progress update
@@ -653,10 +673,12 @@ pub async fn do_partitioned_search(
                 modified_end_time,
                 partition_order_by,
             );
-            sender
-                .send(Ok(StreamResponses::Progress { percent }))
-                .await
-                .unwrap();
+            if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
+                log::error!("Error sending progress: {}", e);
+                return Err(infra::errors::Error::Message(
+                    "Error sending progress".to_string(),
+                ));
+            }
         }
         // Stop if reached the requested result size and it is not a streaming aggs query
         if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
@@ -1175,7 +1197,7 @@ async fn send_partial_search_resp(
     order_by: Option<OrderBy>,
     is_streaming_aggs: bool,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
-) -> Result<(), Error> {
+) -> Result<(), infra::errors::Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
     } else {
@@ -1204,7 +1226,12 @@ async fn send_partial_search_resp(
         trace_id
     );
 
-    sender.send(Ok(response)).await.unwrap();
+    if let Err(e) = sender.send(Ok(response)).await {
+        log::error!("Error sending partial search response: {}", e);
+        return Err(infra::errors::Error::Message(
+            "Error sending partial search response".to_string(),
+        ));
+    }
 
     Ok(())
 }
@@ -1221,7 +1248,7 @@ async fn send_cached_responses(
     cache_order_by: &OrderBy,
     start_timer: &mut Instant,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
-) -> Result<(), Error> {
+) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing cached response for trace_id: {}",
         trace_id
@@ -1274,7 +1301,12 @@ async fn send_cached_responses(
             end_time: cached.response_end_time,
         },
     };
-    sender.send(Ok(response)).await.unwrap();
+    if let Err(e) = sender.send(Ok(response)).await {
+        log::error!("Error sending cached search response: {}", e);
+        return Err(infra::errors::Error::Message(
+            "Error sending cached search response".to_string(),
+        ));
+    }
 
     {
         let percent = calculate_progress_percentage(

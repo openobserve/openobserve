@@ -446,6 +446,18 @@ pub struct WebSocket {
         help = "Maximum allowed number of messages in buffer"
     )]
     pub max_channel_buffer_size: usize,
+    #[env_config(
+        name = "ZO_STREAMING_BENCHMARK_ENABLED",
+        default = false,
+        help = "Enable streaming benchmark"
+    )]
+    pub streaming_benchmark_enabled: bool,
+    #[env_config(
+        name = "ZO_STREAMING_BENCHMARK_DUMMY_DATA_SIZE_MB",
+        default = 1,
+        help = "Size of dummy data to be used for streaming benchmark"
+    )]
+    pub streaming_benchmark_dummy_data_size: usize,
 }
 
 #[derive(EnvConfig)]
