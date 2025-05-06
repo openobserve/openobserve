@@ -34,8 +34,8 @@ use config::{
     get_config,
     meta::{
         search::{
-            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
-            SearchPartitionResponse,
+            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, ResponseChunk, ResponseChunkIterator,
+            SearchEventType, SearchPartitionRequest, SearchPartitionResponse,
         },
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
@@ -321,7 +321,7 @@ pub async fn search_http2_stream(
 
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, found cache responses len:{}, with hits: {},
-        cache_start_time: {:#?}, cache_end_time: {:#?}",
+            cache_start_time: {:#?}, cache_end_time: {:#?}",
                 trace_id,
                 cached_resp.len(),
                 cached_hits,
@@ -455,49 +455,53 @@ pub async fn search_http2_stream(
 
     // Return streaming response
     let cfg_clone = cfg.clone();
-    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).map(move |result| match result {
-        Ok(v) => {
-            // TEST: payload size
-            let mut v = v;
-            {
-                if cfg_clone.websocket.streaming_benchmark_enabled {
-                    match v {
-                        StreamResponses::SearchResponse {
-                            results,
-                            streaming_aggs,
-                            time_offset,
-                        } => {
-                            let mut results_clone = results.clone();
-                            let dummy_data =
-                                vec![
-                                    "a";
-                                    cfg_clone.websocket.streaming_benchmark_dummy_data_size
-                                        * 1024
-                                        * 1024
-                                ];
-                            results_clone.columns =
-                                dummy_data.iter().map(|v| v.to_string()).collect();
-                            let modified_response = StreamResponses::SearchResponse {
-                                results: results_clone,
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
+        let chunks_iter = match result {
+            Ok(v) => {
+                // TEST: payload size
+                let mut v = v;
+                {
+                    if cfg_clone.websocket.streaming_benchmark_enabled {
+                        match v {
+                            StreamResponses::SearchResponse {
+                                results,
                                 streaming_aggs,
                                 time_offset,
-                            };
-                            v = modified_response;
+                            } => {
+                                let mut results_clone = results.clone();
+                                let dummy_data =
+                                    vec![
+                                        "a";
+                                        cfg_clone.websocket.streaming_benchmark_dummy_data_size
+                                            * 1024
+                                            * 1024
+                                    ];
+                                results_clone.columns =
+                                    dummy_data.iter().map(|v| v.to_string()).collect();
+                                let modified_response = StreamResponses::SearchResponse {
+                                    results: results_clone,
+                                    streaming_aggs,
+                                    time_offset,
+                                };
+                                v = modified_response;
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
-            }
 
-            let encoded_response = v.to_response().into_bytes();
-            Ok::<_, std::io::Error>(BytesImpl::from(encoded_response))
-        }
-        Err(e) => {
-            log::error!("[HTTP2_STREAM] Error in stream: {}", e);
-            let err_res: StreamResponses = e.into();
-            let error_bytes = err_res.to_response().into_bytes();
-            Ok::<_, std::io::Error>(BytesImpl::from(error_bytes))
-        }
+                // Get the iterator directly
+                v.to_chunks()
+            }
+            Err(e) => {
+                log::error!("[HTTP2_STREAM] Error in stream: {}", e);
+                let err_res: StreamResponses = e.into();
+                err_res.to_chunks()
+            }
+        };
+
+        // Convert the iterator to a stream only once
+        futures::stream::iter(chunks_iter)
     });
 
     HttpResponse::Ok()
@@ -507,7 +511,7 @@ pub async fn search_http2_stream(
             header::TRANSFER_ENCODING,
             HeaderValue::from_static("chunked"),
         ))
-        // .insert_header(ContentEncoding::Identity) // to disable encoding
+        .insert_header(ContentEncoding::Identity) // to disable encoding
         .streaming(stream)
 }
 
@@ -583,7 +587,6 @@ pub async fn do_partitioned_search(
     );
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
-
         let mut req = req.clone();
         req.query.start_time = start_time;
         req.query.end_time = end_time;
@@ -743,6 +746,10 @@ async fn do_search(
     use_cache: bool,
 ) -> Result<Response, infra::errors::Error> {
     let mut req = req.clone();
+
+    // add sleep to simulate the search time
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
     req.use_cache = Some(use_cache);
     let res = SearchService::cache::search(
         trace_id,
@@ -773,10 +780,20 @@ fn handle_partial_response(mut res: Response) -> Response {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum StreamResponses {
+    // Original variant - to be deprecated but kept for backward compatibility
     SearchResponse {
         results: Response,
         streaming_aggs: bool,
         time_offset: TimeOffset,
+    },
+    // New focused variants
+    SearchResponseMetadata {
+        results: Response,
+        streaming_aggs: bool,
+        time_offset: TimeOffset,
+    },
+    SearchResponseHits {
+        hits: Vec<json::Value>,
     },
     Progress {
         percent: usize,
@@ -790,18 +807,144 @@ pub enum StreamResponses {
     Cancelled,
 }
 
+/// An iterator that yields formatted chunks from a StreamResponse
+pub struct StreamResponseChunks {
+    /// The inner iterator for search responses with multiple chunks
+    chunks_iter: Option<Box<dyn Iterator<Item = Result<BytesImpl, std::io::Error>> + Send>>,
+    /// Single chunk for simple responses
+    single_chunk: Option<Result<BytesImpl, std::io::Error>>,
+}
+
+impl Iterator for StreamResponseChunks {
+    type Item = Result<BytesImpl, std::io::Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(iter) = &mut self.chunks_iter {
+            iter.next()
+        } else {
+            self.single_chunk.take()
+        }
+    }
+}
+
 impl StreamResponses {
     pub fn to_string(&self) -> String {
         serde_json::to_string(self).expect("Failed to serialize search response")
     }
 
-    pub fn to_response(&self) -> String {
+    /// Convert a response to an iterator of formatted chunks
+    /// For SearchResponse, this will apply the ResponseChunkIterator to break it into multiple
+    /// chunks For other response types, this will return an iterator with a single chunk
+    pub fn to_chunks(&self) -> StreamResponseChunks {
+        // Helper function to format event data
+        let format_event = |event_type: &str, data: &str| -> BytesImpl {
+            let formatted = format!("event: {}\ndata: {}\n\n", event_type, data);
+            BytesImpl::from(formatted.into_bytes())
+        };
+
         match self {
-            StreamResponses::SearchResponse { .. } => format!("event: search_response\ndata: {}\n\n", self.to_string()),
-            StreamResponses::Progress { .. } => format!("event: progress\ndata: {}\n\n", self.to_string()),
-            StreamResponses::Error { .. } => format!("event: error\ndata: {}\n\n", self.to_string()),
-            StreamResponses::Done => format!("data: [[DONE]]\n\n"),
-            StreamResponses::Cancelled => format!("data: [[CANCELLED]]\n\n"),
+            // Handle search responses with chunking
+            StreamResponses::SearchResponse {
+                results,
+                streaming_aggs,
+                time_offset,
+            } => {
+                log::info!(
+                    "[HTTP2_STREAM] Chunking search response with {} hits using ResponseChunkIterator",
+                    results.hits.len()
+                );
+
+                // Create the iterator
+                let iterator = ResponseChunkIterator::new(
+                    results.clone(),
+                    None, // Use default chunk size (1MB)
+                );
+
+                // Capture needed values for the closure
+                let streaming_aggs = *streaming_aggs;
+                let time_offset = time_offset.clone();
+
+                // Create an iterator that maps each chunk to a formatted BytesImpl
+                let chunks_iter = iterator.map(move |chunk| {
+                    let (event_type, data) = match chunk {
+                        ResponseChunk::Metadata { response } => {
+                            // Add streaming_aggs and time_offset from the original response
+                            let metadata = StreamResponses::SearchResponseMetadata {
+                                results: response,
+                                streaming_aggs,
+                                time_offset: time_offset.clone(),
+                            };
+                            (
+                                "search_response_metadata",
+                                serde_json::to_string(&metadata).unwrap_or_default(),
+                            )
+                        }
+                        ResponseChunk::Hits { hits } => {
+                            let hits_chunk = StreamResponses::SearchResponseHits { hits };
+                            (
+                                "search_response_hits",
+                                serde_json::to_string(&hits_chunk).unwrap_or_default(),
+                            )
+                        }
+                    };
+
+                    // Format and encode the chunk
+                    Ok(format_event(event_type, &data))
+                });
+
+                StreamResponseChunks {
+                    chunks_iter: Some(Box::new(chunks_iter)),
+                    single_chunk: None,
+                }
+            }
+
+            // Handle other response types with a single chunk
+            StreamResponses::SearchResponseMetadata { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("search_response_metadata", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::SearchResponseHits { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("search_response_hits", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Progress { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("progress", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Error { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("error", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Done => {
+                let bytes = BytesImpl::from("data: [[DONE]]\n\n");
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Cancelled => {
+                let bytes = BytesImpl::from("data: [[CANCELLED]]\n\n");
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
         }
     }
 }
@@ -814,9 +957,17 @@ impl From<infra::errors::Error> for StreamResponses {
                 let error_detail = code.get_error_detail();
                 let http_response = map_error_to_http_response(&err, "".to_string());
 
-                StreamResponses::Error { code: http_response.status().into(), message, error_detail: Some(error_detail) }
+                StreamResponses::Error {
+                    code: http_response.status().into(),
+                    message,
+                    error_detail: Some(error_detail),
+                }
             }
-            _ => StreamResponses::Error { code: 500, message: err.to_string(), error_detail: None },
+            _ => StreamResponses::Error {
+                code: 500,
+                message: err.to_string(),
+                error_detail: None,
+            },
         }
     }
 }

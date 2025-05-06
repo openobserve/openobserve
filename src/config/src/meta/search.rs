@@ -16,6 +16,7 @@
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
+use std::collections::VecDeque;
 
 use crate::{
     meta::{sql::OrderBy, stream::StreamType},
@@ -216,6 +217,112 @@ pub struct Response {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_by: Option<OrderBy>,
+}
+
+/// Iterator for Streaming response of search `Response`
+///
+/// This is used to split the search response to smaller chunks based on
+/// env variable
+/// The format of the iterator is as follows:
+/// - Chunk 1: Response Metadata
+/// - Chunk 2: Hits (1MB)
+/// - Chunk 3: Hits (1MB)
+pub struct ResponseChunkIterator {
+    // Original response (will be split into chunks)
+    response: Response,
+    // Target size for each chunk in bytes
+    chunk_size: usize,
+    // Hits waiting to be processed
+    remaining_hits: VecDeque<crate::utils::json::Value>,
+    // Whether metadata has been sent
+    metadata_sent: bool,
+    // Current position in the iteration
+    position: usize,
+}
+
+impl ResponseChunkIterator {
+    /// Create a new response chunk iterator
+    pub fn new(
+        response: Response, 
+        chunk_size: Option<usize>,
+    ) -> Self {
+        // Default chunk size is 1MB if not specified
+        let chunk_size = chunk_size.unwrap_or(1024 * 1024);
+        let hits = response.hits.clone();
+        
+        Self {
+            response,
+            chunk_size,
+            remaining_hits: VecDeque::from(hits),
+            metadata_sent: false,
+            position: 0,
+        }
+    }
+}
+
+// Define the possible chunk types
+#[derive(Debug, Clone)]
+pub enum ResponseChunk {
+    Metadata {
+        response: Response,
+    },
+    Hits {
+        hits: Vec<crate::utils::json::Value>,
+    },
+}
+
+impl Iterator for ResponseChunkIterator {
+    type Item = ResponseChunk;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // First send metadata
+        if !self.metadata_sent {
+            self.metadata_sent = true;
+            self.position += 1;
+            
+            // Clone response but remove hits
+            let mut metadata_response = self.response.clone();
+            metadata_response.hits = vec![];
+            
+            return Some(ResponseChunk::Metadata {
+                response: metadata_response,
+            });
+        }
+        
+        // If we have no hits left, we're done
+        if self.remaining_hits.is_empty() {
+            return None;
+        }
+        
+        // Create the next chunk of hits
+        let mut current_chunk: Vec<crate::utils::json::Value> = Vec::new();
+        let mut current_chunk_size: usize = 0;
+        
+        // Keep adding hits until we reach the target chunk size
+        while !self.remaining_hits.is_empty() {
+            // Peek at the front hit
+            let hit = &self.remaining_hits[0];
+            let hit_size = crate::utils::json::estimate_json_bytes(hit);
+            
+            // If adding this hit would exceed target size, break
+            if !current_chunk.is_empty() && current_chunk_size + hit_size > self.chunk_size {
+                break;
+            }
+            
+            // Add hit to current chunk - using pop_front() for O(1) complexity
+            if let Some(hit) = self.remaining_hits.pop_front() {
+                current_chunk.push(hit);
+                current_chunk_size += hit_size;
+            }
+        }
+        
+        self.position += 1;
+        
+        // Return the hits chunk
+        Some(ResponseChunk::Hits {
+            hits: current_chunk,
+        })
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
