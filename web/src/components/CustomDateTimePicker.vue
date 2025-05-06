@@ -2,7 +2,7 @@
   <div>
     <q-btn
       :style="{
-        width: changeStyle ? '150px' : '180px',
+        width: changeStyle ? '170px' : '180px',
         height: changeStyle ? '40px' : '',
       }"
       data-test="date-time-btn"
@@ -201,7 +201,7 @@ const getDisplayValue = () => {
 };
 
 const getTrimmedDisplayValue = () => {
-return `${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
+return `Past ${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
 }
 
 // Check if the current selection matches the modelValue

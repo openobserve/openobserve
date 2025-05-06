@@ -67,14 +67,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-variables-key-input"
             v-model="variable.key"
             color="input-border"
-            bg-color="input-bg"
+            :class="store.state.theme === 'dark' ? 'input-bg-dark' : 'input-bg-light'"
             stack-label
+          
             outlined
             filled
             :placeholder="t('common.name')"
             dense
             tabindex="0"
-            style="min-width: 250px"
           />
         </div>
         <div class="q-ml-none">
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="variable.value"
             :placeholder="t('common.value')"
             color="input-border"
-            bg-color="input-bg"
+            :class="store.state.theme === 'dark' ? 'input-bg-dark' : 'input-bg-light'"
             stack-label
             outlined
             filled
@@ -169,5 +169,12 @@ const addVariable = () => {
       filter: none !important;
     }
   }
+}
+
+.input-bg-dark .q-field__control{
+  background-color: #181a1b !important;
+}
+.input-bg-light .q-field__control{
+  background-color: #ffffff !important;
 }
 </style>

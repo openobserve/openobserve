@@ -32,7 +32,13 @@
           />
           <div class="tw-flex tw-flex-col tw-items-start tw-justify-start">
            <span> {{ label }}</span>
-            <div v-if="subLabel" class="tw-text-[12px] tw-text-gray-500">
+            <div v-if="subLabel" class="tw-text-[13px]"
+            :class="[
+              store.state.theme === 'dark'
+                ? 'tw-text-[#c6c6c6]'
+                : 'tw-text-gray-900',
+            ]"
+            >
                 {{ subLabel }}
             </div>
           </div>
@@ -108,8 +114,8 @@
   <style scoped lang="scss">
 
   .light-mode-icon{
-    background-color: $primary;
-    color: $white;
+    background-color: #f2f1f1;
+    color: #555555;
   }
   </style>
   

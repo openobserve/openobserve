@@ -664,7 +664,7 @@ export default defineComponent({
   components: {
     QTablePagination,
     AddAlert: defineAsyncComponent(
-      () => import("@/components/alerts/AddAlertLatest.vue"),
+      () => import("@/components/alerts/AddAlert.vue"),
     ),
     NoData,
     ConfirmDialog,
