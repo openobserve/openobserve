@@ -168,7 +168,7 @@ impl FlightService for FlightServiceImpl {
 
         schema = add_scan_stats_to_schema(schema, scan_stats.clone());
         #[cfg(feature = "enterprise")]
-        if is_super_cluster {
+        {
             SEARCH_SERVER
                 .set_scan_stats(&trace_id, (&scan_stats).into())
                 .await;
