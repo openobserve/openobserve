@@ -243,12 +243,17 @@ pub struct ResponseChunkIterator {
 impl ResponseChunkIterator {
     /// Create a new response chunk iterator
     pub fn new(
-        response: Response, 
+        mut response: Response, 
         chunk_size: Option<usize>,
     ) -> Self {
-        // Default chunk size is 1MB if not specified
-        let chunk_size = chunk_size.unwrap_or(1024 * 1024);
-        let hits = response.hits.clone();
+        // Get the configured chunk size or use the provided one or default
+        let chunk_size = chunk_size.unwrap_or_else(|| {
+            // Get from config, convert from MB to bytes
+            let mb = 1024 * 1024;
+            crate::get_config().websocket.streaming_response_chunk_size * mb
+        });
+        
+        let hits = response.hits.drain(..).collect();
         
         Self {
             response,

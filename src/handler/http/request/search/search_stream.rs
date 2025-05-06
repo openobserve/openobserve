@@ -506,11 +506,11 @@ pub async fn search_http2_stream(
 
     HttpResponse::Ok()
         .content_type("text/event-stream")
-        .append_header((header::CONNECTION, HeaderValue::from_static("keep-alive")))
-        .append_header((
-            header::TRANSFER_ENCODING,
-            HeaderValue::from_static("chunked"),
-        ))
+        // .append_header((header::CONNECTION, HeaderValue::from_static("keep-alive")))
+        // .append_header((
+        //     header::TRANSFER_ENCODING,
+        //     HeaderValue::from_static("chunked"),
+        // ))
         .insert_header(ContentEncoding::Identity) // to disable encoding
         .streaming(stream)
 }
@@ -857,7 +857,13 @@ impl StreamResponses {
                 // Create the iterator
                 let iterator = ResponseChunkIterator::new(
                     results.clone(),
-                    None, // Use default chunk size (1MB)
+                    None, // Use configured chunk size from environment
+                );
+
+                // Add a log message to show the chunk size being used
+                log::info!(
+                    "[HTTP2_STREAM] Using chunk size of {}MB from configuration",
+                    cfg_clone.websocket.streaming_response_chunk_size
                 );
 
                 // Capture needed values for the closure
