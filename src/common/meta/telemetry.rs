@@ -121,6 +121,14 @@ pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String,
         cfg.common.cluster_coordinator.clone().into(),
     );
     data.insert("zo_version".to_string(), config::VERSION.to_owned().into());
+    data.insert(
+        "deployment_type".to_string(),
+        match cfg!(feature = "enterprise") {
+            false => "open_source".to_string(),
+            true => "enterprise".to_string(),
+        }
+        .into(),
+    );
 
     data.clone()
 }
