@@ -73,27 +73,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               dense
               size="sm"
-              :label="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.name?.column
-              "
+              :label="nameLabel"
               class="q-pl-sm"
-              :data-test="`dashboard-name-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.name?.column
-              }`"
+              :data-test="`dashboard-name-item-${nameLabel}`"
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-name-item-${
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.name?.column
-                }-menu`"
+                :data-test="`dashboard-name-item-${nameLabel}-menu`"
               >
                 <div>
+                  <DynamicFunctionPopUp
+                    v-model="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.name
+                    "
+                    :allowAggregation="false"
+                  />
                   <q-input
                     dense
                     filled
@@ -129,11 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-name-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.name?.column
-              }-remove`"
+              :data-test="`dashboard-name-item-${nameLabel}-remove`"
               @click="removeMapName()"
               icon="close"
             />
@@ -211,20 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               size="sm"
               :label="valueLabel"
-              :data-test="`dashboard-value_for_maps-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value_for_maps?.column
-              }`"
+              :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
               class="q-pl-sm"
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-value_for_maps-item-${
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.value_for_maps?.column
-                }-menu`"
+                :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
               >
                 <div>
                   <div class="row q-mb-sm" style="align-items: center">
@@ -235,9 +219,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].customQuery
                       "
                       class="q-mr-xs"
-                      style="width: 160px"
                     >
-                      <q-select
+                      <DynamicFunctionPopUp
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.value_for_maps
+                        "
+                        :allowAggregation="true"
+                      />
+                      <!-- <q-select
                         v-model="
                           dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
@@ -263,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="cursor-pointer"
                           />
                         </template>
-                      </q-select>
+                      </q-select> -->
                     </div>
                   </div>
                   <q-input
@@ -344,11 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-value_for_maps-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value_for_maps?.column
-              }-remove`"
+              :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
               @click="removeMapValue()"
               icon="close"
             />
@@ -392,6 +379,8 @@ import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
+import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
+import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
@@ -400,6 +389,7 @@ export default defineComponent({
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
+    DynamicFunctionPopUp,
   },
   props: ["dashboardData"],
   setup(props) {
@@ -481,7 +471,7 @@ export default defineComponent({
             addMapValue(dragElement);
             break;
           case "f":
-            addFilteredItem(dragElement?.name);
+            addFilteredItem(dragElement);
             break;
         }
       } else {
@@ -592,15 +582,28 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
+        //  HERE NEED CHANGES
         return field.column;
       }
-      if (field.aggregationFunction) {
-        const aggregation = field.aggregationFunction.toUpperCase();
-        return `${aggregation}(${field.column})`;
-      } else {
-        return field.column;
-      }
+      return buildSQLQueryFromInput(
+        field,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.joins?.length
+          ? dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.stream
+          : "",
+      );
     };
+
+    const nameLabel = computed(() => {
+      const nameField =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.name;
+      return commonBtnLabel(nameField);
+    });
 
     const valueLabel = computed(() => {
       const valueField =
@@ -666,6 +669,7 @@ export default defineComponent({
       dashboardPanelData,
       removeMapName,
       removeMapValue,
+      nameLabel,
       valueLabel,
       triggerOperators,
       pagination: ref({
