@@ -180,12 +180,6 @@ pprof = { version = "0.14", features = [
     "prost-codec",
 ], optional = true }
 tokio-stream.workspace = true
-
-[dev-dependencies]
-async-walkdir.workspace = true
-expect-test.workspace = true
-base64 = "0.22"
-float-cmp = "0.10"
 mime = "0.3.17"
 pin-project-lite = "0.2.16"
 futures-core = "0.3.31"
@@ -193,6 +187,12 @@ actix-service = "2.0.3"
 actix-utils = "3.0.1"
 derive_more = {version = "2.0.1", features = ["full"]}
 brotli = "8.0.1"
+
+[dev-dependencies]
+async-walkdir.workspace = true
+expect-test.workspace = true
+base64 = "0.22"
+float-cmp = "0.10"
 
 [workspace]
 members = [
