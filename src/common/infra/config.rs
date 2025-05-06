@@ -33,7 +33,7 @@ use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::RwLock as TokioRwLock;
+use tokio::sync::{RwLock as TokioRwLock, mpsc};
 use vector_enrichment::TableRegistry;
 
 use crate::{
@@ -101,3 +101,23 @@ pub static WS_SESSIONS: Lazy<RwAHashMap<String, Arc<TokioRwLock<WsSession>>>> =
     Lazy::new(Default::default);
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
+
+/// Refreshes in-memory cache in the event of NATs restart.
+///
+/// We should add all in-memory caches listed above that a CacheMiss is not followed by
+/// reading from db, e.g. UserSession, Pipeline
+pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<async_nats::Event>) {
+    while let Some(event) = nats_event_rx.recv().await {
+        if let async_nats::Event::Connected = event {
+            log::info!(
+                "[infra::config] received NATs event: {event}, refreshing in-memory cache for UserSessions and Pipelines"
+            );
+            if let Err(e) = crate::service::db::session::cache().await {
+                log::error!("Error refreshing in-memory cache \"UserSessions\": {}", e);
+            }
+            if let Err(e) = crate::service::db::pipeline::cache().await {
+                log::error!("Error refreshing in-memory cache \"Pipelines\": {}", e);
+            }
+        }
+    }
+}
