@@ -1,11 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 import { login } from "../utils/dashLogin.js";
-import geoMapdata from "../../../test-data/geo_map.json";
-import {
-  ingestionForMaps,
-  getAuthTokenformaps,
-  removeUTFCharacters1,
-} from "../utils/dashIngestion.js";
+import { ingestionForMaps } from "../utils/dashIngestion.js";
 
 import {
   waitForDashboardPage,
@@ -15,10 +10,7 @@ import {
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
-import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
-import Dashboardvariables from "../../pages/dashboardPages/dashboard-variables.js";
-import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -34,16 +26,13 @@ test.describe("dashboard maps testcases", () => {
     await page.waitForTimeout(2000);
   });
 
-  test("Should display the correct country when entering latitude and longitude values", async ({
+  test("Should display the correct location when entering latitude and longitude values", async ({
     page,
   }) => {
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
     const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
     const dashboardPageActions = new DashboardactionPage(page);
-    const dashboardVariables = new Dashboardvariables(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
 
     // select dashboard
     await dashboardPage.menuItem("dashboards-item");

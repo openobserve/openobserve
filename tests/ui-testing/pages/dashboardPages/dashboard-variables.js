@@ -34,7 +34,6 @@ export default class DashboardVariables {
     await this.page
       .getByRole("option", { name: streamName, exact: true })
       .click();
-    console.log("Selected stream:", streamName);
 
     // Select Field
     await this.page
@@ -44,7 +43,6 @@ export default class DashboardVariables {
       .locator('[data-test="dashboard-variable-field-select"]')
       .fill(field);
     await this.page.getByText(field).click();
-    console.log("Selected field:", field);
 
     // Save Variable and Close Settings
     await this.page
@@ -53,11 +51,10 @@ export default class DashboardVariables {
     await this.page
       .locator('[data-test="dashboard-settings-close-btn"]')
       .click();
-    console.log(`Dashboard variable "${name}" added successfully.`);
   }
 
   // Dynamic function to fill input by label
-  // Usage: this function is used for slect the variable value from dropdown
+  // Usage: this function is used for select the variable value from dropdown
   // Dynamically fill input and select the same value from dropdown
   async selectValueFromVariableDropDown(label, value) {
     const input = this.page.getByLabel(label, { exact: true });

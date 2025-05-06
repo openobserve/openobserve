@@ -1,11 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 import { login } from "../utils/dashLogin.js";
-import geoMapdata from "../../../test-data/geo_map.json";
-import {
-  ingestionForMaps,
-  getAuthTokenformaps,
-  removeUTFCharacters1,
-} from "../utils/dashIngestion.js";
+import { ingestionForMaps } from "../utils/dashIngestion.js";
 
 import {
   waitForDashboardPage,
@@ -15,7 +10,6 @@ import {
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
-import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
 import Dashboardvariables from "../../pages/dashboardPages/dashboard-variables.js";
 import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs.js";
@@ -42,7 +36,6 @@ test.describe("dashboard maps testcases", () => {
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
     const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
     const dashboardPageActions = new DashboardactionPage(page);
     const dashboardVariables = new Dashboardvariables(page);
 
@@ -64,7 +57,7 @@ test.describe("dashboard maps testcases", () => {
 
     // Add variable
     await dashboardVariables.addDashboardVariable(
-      "variablename1",
+      "variablename",
       "logs",
       "geojson",
       "country"
@@ -100,7 +93,7 @@ test.describe("dashboard maps testcases", () => {
 
     // selct the variable and enter the value
     await dashboardVariables.selectValueFromVariableDropDown(
-      "variablename1",
+      "variablename",
       "china"
     );
 
@@ -137,9 +130,7 @@ test.describe("dashboard maps testcases", () => {
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
     const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
     const dashboardPageActions = new DashboardactionPage(page);
-    const dashboardVariables = new Dashboardvariables(page);
     const dashboardPanelConfigs = new DashboardPanelConfigs(page);
 
     // select dashboard
@@ -169,7 +160,7 @@ test.describe("dashboard maps testcases", () => {
     await dashboardPageActions.waitForChartToRender();
 
     await dashboardPanelConfigs.openConfigPanel();
-    await dashboardPanelConfigs.selectLattitude("26.1206");
+    await dashboardPanelConfigs.selectLatitude("26.1206");
     await dashboardPanelConfigs.selectLongitude("091.6523");
     await dashboardPanelConfigs.selectZoom("12");
 

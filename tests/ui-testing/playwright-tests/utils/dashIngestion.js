@@ -1,12 +1,11 @@
 // ingestion.js
-import logsdata from "../../../test-data/logs_data.json"
+import logsdata from "../../../test-data/logs_data.json";
 import geoMapdata from "../../../test-data/geo_map.json";
 
-
 // Exported function to remove UTF characters
-export const removeUTFCharacters = (text) => {
-     // console.log(text, "tex");
-    // Remove UTF characters using regular expression
+const removeUTFCharacters = (text) => {
+  // console.log(text, "tex");
+  // Remove UTF characters using regular expression
   return text.replace(/[^\x00-\x7F]/g, " ");
 };
 
@@ -42,7 +41,9 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
     );
 
     if (!fetchResponse.ok) {
-      throw new Error(`HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`);
+      throw new Error(
+        `HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`
+      );
     }
 
     return await fetchResponse.json();
@@ -52,21 +53,7 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
   }
 };
 
-  
 // Dashboard maps ingestion
-
-// Exported function to remove UTF characters (only one declaration)
-const removeUTFCharacters1 = (text) => {
-  return text.replace(/[^\x00-\x7F]/g, " ");
-};
-
-// Function to retrieve authentication token (to be implemented securely)
-const getAuthTokenformaps = async () => {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-  return `Basic ${basicAuthCredentials}`;
-};
 
 // Ingestion function for Geomap and Maps chart
 const ingestionForMaps = async (page, streamName = "geojson") => {
@@ -79,7 +66,7 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
   try {
     const headers = {
       "Content-Type": "application/json",
-      Authorization: await getAuthTokenformaps(),
+      Authorization: await getAuthToken(),
     };
 
     const fetchResponse = await fetch(
@@ -87,12 +74,14 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
       {
         method: "POST",
         headers,
-        body: JSON.stringify(geoMapdata), // Ensure geoMapdata is defined/imported
+        body: JSON.stringify(geoMapdata),
       }
     );
 
     if (!fetchResponse.ok) {
-      throw new Error(`HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`);
+      throw new Error(
+        `HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`
+      );
     }
 
     return await fetchResponse.json();
@@ -103,4 +92,4 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
 };
 
 // Export only the required functions
-export { ingestionForMaps, getAuthTokenformaps, removeUTFCharacters1 };
+export { ingestionForMaps, getAuthToken, removeUTFCharacters };
