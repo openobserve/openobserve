@@ -203,11 +203,11 @@ where
                 Some(Err(err)) => return Poll::Ready(Some(Err(err))),
 
                 Some(Ok(chunk)) => {
-                    println!(
-                        "chunk: {:?}, {}",
-                        chunk.len(),
-                        String::from_utf8_lossy(&chunk)
-                    );
+                    // log::debug!(
+                    //     "chunk: {:?}, {}",
+                    //     chunk.len(),
+                    //     String::from_utf8_lossy(&chunk)
+                    // );
                     if let Some(mut encoder) = this.encoder.take() {
                         if chunk.len() < MAX_CHUNK_SIZE_ENCODE_IN_PLACE {
                             encoder.write(&chunk).map_err(EncoderError::Io)?;

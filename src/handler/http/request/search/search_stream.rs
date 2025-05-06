@@ -506,11 +506,11 @@ pub async fn search_http2_stream(
 
     HttpResponse::Ok()
         .content_type("text/event-stream")
-        .append_header((header::CONNECTION, HeaderValue::from_static("keep-alive")))
-        .append_header((
-            header::TRANSFER_ENCODING,
-            HeaderValue::from_static("chunked"),
-        ))
+        // .append_header((header::CONNECTION, HeaderValue::from_static("keep-alive")))
+        // .append_header((
+        //     header::TRANSFER_ENCODING,
+        //     HeaderValue::from_static("chunked"),
+        // ))
         // .insert_header(ContentEncoding::Identity) // to disable encoding
         .streaming(stream)
 }
