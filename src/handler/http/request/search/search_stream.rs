@@ -489,14 +489,13 @@ pub async fn search_http2_stream(
             }
 
             let encoded_response = v.to_response().into_bytes();
-            Ok(BytesImpl::from(encoded_response))
+            Ok::<_, std::io::Error>(BytesImpl::from(encoded_response))
         }
         Err(e) => {
             log::error!("[HTTP2_STREAM] Error in stream: {}", e);
-            // TODO: fix error map
-            // let err_res = map_error_to_http_response(&e, trace_id);
-            let error_bytes = format!("event: error\ndata: {}\n\n", e);
-            Err(std::io::Error::new(std::io::ErrorKind::Other, error_bytes))
+            let err_res: StreamResponses = e.into();
+            let error_bytes = err_res.to_response().into_bytes();
+            Ok::<_, std::io::Error>(BytesImpl::from(error_bytes))
         }
     });
 
@@ -583,6 +582,12 @@ pub async fn do_partitioned_search(
     );
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
+
+        if idx == 6 {
+            let err = infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchTimeout("test".to_string()));
+            sender.send(Err(err)).await.unwrap();
+            return Ok(());
+        }
         let mut req = req.clone();
         req.query.start_time = start_time;
         req.query.end_time = end_time;
@@ -770,6 +775,7 @@ fn handle_partial_response(mut res: Response) -> Response {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum StreamResponses {
     SearchResponse {
         results: Response,
@@ -779,6 +785,13 @@ pub enum StreamResponses {
     Progress {
         percent: usize,
     },
+    Error {
+        code: u16,
+        message: String,
+        error_detail: Option<String>,
+    },
+    Done,
+    Cancelled,
 }
 
 impl StreamResponses {
@@ -787,7 +800,28 @@ impl StreamResponses {
     }
 
     pub fn to_response(&self) -> String {
-        format!("data: {}\n\n", self.to_string())
+        match self {
+            StreamResponses::SearchResponse { .. } => format!("event: search_response\ndata: {}\n\n", self.to_string()),
+            StreamResponses::Progress { .. } => format!("event: progress\ndata: {}\n\n", self.to_string()),
+            StreamResponses::Error { .. } => format!("event: error\ndata: {}\n\n", self.to_string()),
+            StreamResponses::Done => format!("data: [[DONE]]\n\n"),
+            StreamResponses::Cancelled => format!("data: [[CANCELLED]]\n\n"),
+        }
+    }
+}
+
+impl From<infra::errors::Error> for StreamResponses {
+    fn from(err: infra::errors::Error) -> Self {
+        match err {
+            infra::errors::Error::ErrorCode(ref code) => {
+                let message = code.get_message();
+                let error_detail = code.get_error_detail();
+                let http_response = map_error_to_http_response(&err, "".to_string());
+
+                StreamResponses::Error { code: http_response.status().into(), message, error_detail: Some(error_detail) }
+            }
+            _ => StreamResponses::Error { code: 500, message: err.to_string(), error_detail: None },
+        }
     }
 }
 
