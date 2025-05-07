@@ -19,6 +19,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    cmp::Reverse,
+    collections::BinaryHeap,
     io::{Error, Write},
     time::Instant,
 };
@@ -35,13 +37,14 @@ use config::{
     meta::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, ResponseChunk, ResponseChunkIterator,
-            SearchEventType, SearchPartitionRequest, SearchPartitionResponse, StreamResponses, StreamResponseChunks, TimeOffset
+            SearchEventType, SearchPartitionRequest, SearchPartitionResponse, StreamResponseChunks,
+            StreamResponses, TimeOffset, ValuesEventContext,
         },
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
         websocket::SearchResultType,
     },
-    utils::json,
+    utils::json::{self, Value, get_string_value},
 };
 use flate2::{Compression, write::GzEncoder};
 use futures::{SinkExt, stream::StreamExt};
@@ -71,7 +74,9 @@ use crate::{
             websocket::{calc_queried_range, update_histogram_interval_in_query},
         },
     },
-    handler::http::request::search::error_utils::map_error_to_http_response,
+    handler::http::request::search::{
+        build_search_request_per_field, error_utils::map_error_to_http_response, json::Map,
+    },
     service::{
         search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
         websocket_events::{
@@ -270,6 +275,7 @@ pub async fn search_http2_stream(
         req_order_by,
         search_span.clone(),
         tx,
+        None,
     ));
 
     // Return streaming response
@@ -313,13 +319,17 @@ pub async fn search_http2_stream(
                 v.to_chunks()
             }
             Err(err) => {
-                log::error!("[HTTP2_STREAM] trace_id: {} Error in stream: {}", trace_id, err);
+                log::error!(
+                    "[HTTP2_STREAM] trace_id: {} Error in stream: {}",
+                    trace_id,
+                    err
+                );
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
                         let message = code.get_message();
                         let error_detail = code.get_error_detail();
                         let http_response = map_error_to_http_response(&err, "".to_string());
-        
+
                         StreamResponses::Error {
                             code: http_response.status().into(),
                             message,
@@ -356,6 +366,7 @@ async fn process_search_stream_request(
     req_order_by: OrderBy,
     search_span: tracing::Span,
     sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
+    values_ctx: Option<ValuesEventContext>,
 ) {
     log::info!(
         "[HTTP2_STREAM] trace_id: {} Received test HTTP/2 stream request for org_id: {}",
@@ -385,7 +396,10 @@ async fn process_search_stream_request(
                 );
                 // send error message to client
                 if let Err(e) = sender.send(Err(e)).await {
-                    log::error!("Error sending error message to client: {}", e);
+                    log::error!(
+                        "[HTTP2_STREAM] Error sending error message to client: {}",
+                        e
+                    );
                 }
                 return;
             }
@@ -448,12 +462,16 @@ async fn process_search_stream_request(
                 &req_order_by,
                 &mut start,
                 sender.clone(),
+                values_ctx,
             )
             .instrument(search_span.clone())
             .await
             {
                 if let Err(e) = sender.send(Err(e)).await {
-                    log::error!("Error sending error message to client: {}", e);
+                    log::error!(
+                        "[HTTP2_STREAM] Error sending error message to client: {}",
+                        e
+                    );
                 }
                 return;
             }
@@ -478,12 +496,16 @@ async fn process_search_stream_request(
                 &mut start,
                 &req_order_by,
                 sender.clone(),
+                values_ctx,
             )
             .instrument(search_span.clone())
             .await
             {
                 if let Err(e) = sender.send(Err(e)).await {
-                    log::error!("Error sending error message to client: {}", e);
+                    log::error!(
+                        "[HTTP2_STREAM] Error sending error message to client: {}",
+                        e
+                    );
                 }
                 return;
             }
@@ -505,7 +527,10 @@ async fn process_search_stream_request(
                     })
             {
                 if let Err(e) = sender.send(Err(e)).await {
-                    log::error!("Error sending error message to client: {}", e);
+                    log::error!(
+                        "[HTTP2_STREAM] Error sending error message to client: {}",
+                        e
+                    );
                 }
                 return;
             }
@@ -525,12 +550,16 @@ async fn process_search_stream_request(
             &mut start,
             &req_order_by,
             sender.clone(),
+            values_ctx,
         )
         .instrument(search_span.clone())
         .await
         {
             if let Err(e) = sender.send(Err(e)).await {
-                log::error!("Error sending error message to client: {}", e);
+                log::error!(
+                    "[HTTP2_STREAM] Error sending error message to client: {}",
+                    e
+                );
             }
             return;
         }
@@ -541,10 +570,16 @@ async fn process_search_stream_request(
         "[HTTP2_STREAM] trace_id {} all searches completed",
         trace_id
     );
-    
+
     // Send a completion signal
-    if let Err(e) = sender.send(Ok(config::meta::search::StreamResponses::Done)).await {
-        log::error!("Error sending completion message to client: {}", e);
+    if let Err(e) = sender
+        .send(Ok(config::meta::search::StreamResponses::Done))
+        .await
+    {
+        log::error!(
+            "[HTTP2_STREAM] Error sending completion message to client: {}",
+            e
+        );
     }
 }
 
@@ -563,6 +598,7 @@ pub async fn do_partitioned_search(
     start_timer: &mut Instant,
     req_order_by: &OrderBy,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    values_ctx: Option<ValuesEventContext>,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -666,22 +702,25 @@ pub async fn do_partitioned_search(
             }
 
             // add top k values for values search
-            // if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
-            //     let SEARCH_STREAM_span = tracing::info_span!(
-            //         "src::handler::http::request::search::test_stream::do_partitioned_search::get_top_k_values",
-            //         org_id = %req.org_id,
-            //     );
-            //     let instant = Instant::now();
-            //     let top_k_values = tokio::task::spawn_blocking(move || {
-            //         get_top_k_values(&search_res.hits,
-            // &req.values_event_context.clone().unwrap())     })
-            //     .instrument(SEARCH_STREAM_span.clone())
-            //     .await
-            //     .unwrap();
-            //     search_res.hits = top_k_values?;
-            //     let duration = instant.elapsed();
-            //     log::debug!("Top k values for partition {idx} took {:?}", duration);
-            // }
+            if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+                let search_stream_span = tracing::info_span!(
+                    "src::handler::http::request::search::test_stream::do_partitioned_search::get_top_k_values",
+                    org_id = %org_id,
+                );
+                let instant = Instant::now();
+                let field = values_ctx.as_ref().unwrap().field.clone();
+                let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
+                let no_count = values_ctx.as_ref().unwrap().no_count;
+                let top_k_values = tokio::task::spawn_blocking(move || {
+                    get_top_k_values(&search_res.hits, &field, top_k, no_count)
+                })
+                .instrument(search_stream_span.clone())
+                .await
+                .unwrap();
+                search_res.hits = top_k_values?;
+                let duration = instant.elapsed();
+                log::debug!("Top k values for partition {idx} took {:?}", duration);
+            }
 
             // Send the cached response
             let response = StreamResponses::SearchResponse {
@@ -807,7 +846,6 @@ fn handle_partial_response(mut res: Response) -> Response {
     res
 }
 
-
 #[tracing::instrument(
     name = "service:search:websocket::handle_cache_responses_and_deltas",
     skip_all
@@ -828,6 +866,7 @@ pub async fn handle_cache_responses_and_deltas(
     req_order_by: &OrderBy,
     start_timer: &mut Instant,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    values_ctx: Option<ValuesEventContext>,
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -917,6 +956,7 @@ pub async fn handle_cache_responses_and_deltas(
                     start_timer,
                     cache_order_by,
                     sender.clone(),
+                    values_ctx.clone(),
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -958,6 +998,7 @@ pub async fn handle_cache_responses_and_deltas(
                 start_timer,
                 cache_order_by,
                 sender.clone(),
+                values_ctx.clone(),
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -1009,6 +1050,7 @@ async fn process_delta(
     start_timer: &mut Instant,
     cache_order_by: &OrderBy,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    values_ctx: Option<ValuesEventContext>,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing delta for trace_id: {}, delta: {:?}",
@@ -1108,16 +1150,18 @@ async fn process_delta(
             let result_cache_ratio = search_res.result_cache_ratio;
 
             // TODO: add top k values for values search
-            // if req.search_type == SearchEventType::Values && req.values_event_context.is_some() {
-            //     log::debug!("Getting top k values for partition {idx}");
-            //     let values_event_context = req.values_event_context.clone().unwrap();
-            //     let top_k_values = tokio::task::spawn_blocking(move || {
-            //         get_top_k_values(&search_res.hits, &values_event_context)
-            //     })
-            //     .await
-            //     .unwrap();
-            //     search_res.hits = top_k_values?;
-            // }
+            if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+                log::debug!("Getting top k values for partition {idx}");
+                let field = values_ctx.as_ref().unwrap().field.clone();
+                let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
+                let no_count = values_ctx.as_ref().unwrap().no_count;
+                let top_k_values = tokio::task::spawn_blocking(move || {
+                    get_top_k_values(&search_res.hits, &field, top_k, no_count)
+                })
+                .await
+                .unwrap();
+                search_res.hits = top_k_values?;
+            }
 
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
@@ -1342,196 +1386,262 @@ async fn send_cached_responses(
     Ok(())
 }
 
-// // Now add the values API handler
-// #[post("/{org_id}/_values_stream")]
-// pub async fn values_http2_stream(
-//     org_id: web::Path<String>,
-//     in_req: HttpRequest,
-//     body: web::Bytes,
-// ) -> HttpResponse {
-//     let cfg = get_config();
-//     let org_id = org_id.into_inner();
+// Now add the values API handler
+#[post("/{org_id}/_values_stream")]
+pub async fn values_http2_stream(
+    org_id: web::Path<String>,
+    in_req: HttpRequest,
+    body: web::Bytes,
+) -> HttpResponse {
+    let cfg = get_config();
+    let org_id = org_id.into_inner();
 
-//     // Create a tracing span
-//     let http_span = if cfg.common.tracing_search_enabled {
-//         tracing::info_span!("/api/{org_id}/_values_stream", org_id = org_id.clone())
-//     } else {
-//         Span::none()
-//     };
-//     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    // Create a tracing span
+    let http_span = if cfg.common.tracing_search_enabled {
+        tracing::info_span!("/api/{org_id}/_values_stream", org_id = org_id.clone())
+    } else {
+        Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
-//     let user_id = in_req
-//         .headers()
-//         .get("user_id")
-//         .and_then(|v| v.to_str().ok())
-//         .unwrap_or("")
-//         .to_string();
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
 
-//     // Log the request
-//     log::info!(
-//         "[trace_id: {}] Received values HTTP/2 stream request for org_id: {}",
-//         trace_id,
-//         org_id
-//     );
+    // Log the request
+    log::info!(
+        "[trace_id: {}] Received values HTTP/2 stream request for org_id: {}",
+        trace_id,
+        org_id
+    );
 
-//     // Get query params
-//     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-//     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    // Get query params
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-//     // Parse the values request
-//     let values_req: config::meta::search::ValuesRequest = match json::from_slice(&body) {
-//         Ok(v) => v,
-//         Err(e) => return MetaHttpResponse::bad_request(e),
-//     };
+    // Parse the values request
+    let mut values_req: config::meta::search::ValuesRequest = match json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
 
-//     // Convert ValuesRequest to SearchRequest
-//     let mut req = convert_values_to_search_request(values_req.clone());
+    let no_count = values_req.no_count;
+    let top_k = values_req.size;
 
-//     // Set use_cache from query params
-//     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-//     req.use_cache = Some(use_cache);
+    // Get use_cache from query params
+    values_req.use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
 
-//     // Set search type if not set
-//     req.search_type = Some(SearchEventType::Values);
+    // Build search requests per field and use only the first one
+    let reqs = match build_search_request_per_field(
+        &values_req,
+        &org_id,
+        stream_type,
+        &values_req.stream_name,
+    )
+    .await
+    {
+        Ok(r) => r,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
 
-//     // Set search event context
-//     let context = SearchEventContext::default();
-//     req.search_event_context = Some(context);
+    if reqs.is_empty() {
+        return MetaHttpResponse::bad_request("No valid fields to process");
+    }
 
-//     // Get stream name directly from the values request
-//     let stream_names = vec![values_req.stream_name.clone()];
+    // Take only the first request
+    let (mut req, stream_type, field_name) = reqs.into_iter().next().unwrap();
 
-//     // Check permissions for each stream
-//     #[cfg(feature = "enterprise")]
-//     for stream_name in stream_names.iter() {
-//         if let Some(settings) =
-//             infra::schema::get_settings(&org_id, &stream_name, stream_type).await
-//         {
-//             let max_query_range =
-//                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
-//                     .await;
-//             if max_query_range > 0
-//                 && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
-//             {
-//                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
-//             }
-//         }
+    // Get stream name directly from the values request
+    let stream_names = vec![values_req.stream_name.clone()];
 
-//         // Check permissions on stream
-//         #[cfg(feature = "enterprise")]
-//         if let Some(res) =
-//             check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
-//         {
-//             return res;
-//         }
-//     }
+    // Check permissions for each stream
+    #[cfg(feature = "enterprise")]
+    for stream_name in stream_names.iter() {
+        if let Some(settings) =
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+        {
+            let max_query_range =
+                get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
+                    .await;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+            {
+                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+                log::info!(
+                    "Query duration is modified due to query range restriction of {} hours",
+                    max_query_range
+                );
+            }
+        }
 
-//     let search_span = setup_tracing_with_trace_id(
-//         &trace_id,
-//         tracing::info_span!("service::search::values_stream_h2"),
-//     )
-//     .await;
+        // Check permissions on stream
+        #[cfg(feature = "enterprise")]
+        if let Some(res) =
+            check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+        {
+            return res;
+        }
+    }
 
-//     // Create a channel for streaming results
-//     let (tx, rx) = mpsc::channel::<Result<config::meta::search::StreamResponses, infra::errors::Error>>(100);
+    let search_span = setup_tracing_with_trace_id(
+        &trace_id,
+        tracing::info_span!("service::search::values_stream_h2"),
+    )
+    .await;
 
-//     // Spawn the search task in a separate task
-//     actix_web::rt::spawn(process_search_stream_request(
-//         org_id.clone(),
-//         user_id,
-//         trace_id.clone(),
-//         req,
-//         stream_type,
-//         stream_names,
-//         "".to_string(), // No order_by for values API
-//         search_span.clone(),
-//         tx,
-//     ));
+    // Create a channel for streaming results
+    let (tx, rx) =
+        mpsc::channel::<Result<config::meta::search::StreamResponses, infra::errors::Error>>(100);
 
-//     // Return streaming response
-//     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
-//         let chunks_iter = match result {
-//             Ok(v) => v.to_chunks(),
-//             Err(err) => {
-//                 log::error!("[HTTP2_STREAM] trace_id: {} Error in stream: {}", trace_id, err);
-//                 let err_res = match err {
-//                     infra::errors::Error::ErrorCode(ref code) => {
-//                         let message = code.get_message();
-//                         let error_detail = code.get_error_detail();
-//                         let http_response = map_error_to_http_response(&err, "".to_string());
-        
-//                         config::meta::search::StreamResponses::Error {
-//                             code: http_response.status().into(),
-//                             message,
-//                             error_detail: Some(error_detail),
-//                         }
-//                     }
-//                     _ => config::meta::search::StreamResponses::Error {
-//                         code: 500,
-//                         message: err.to_string(),
-//                         error_detail: None,
-//                     },
-//                 };
-//                 err_res.to_chunks()
-//             }
-//         };
+    let values_event_context = ValuesEventContext {
+        field: field_name,
+        top_k,
+        no_count,
+    };
 
-//         // Convert the iterator to a stream only once
-//         futures::stream::iter(chunks_iter)
-//     });
+    // Spawn the search task to process the request
+    actix_web::rt::spawn(process_search_stream_request(
+        org_id.clone(),
+        user_id,
+        trace_id.clone(),
+        req,
+        stream_type,
+        stream_names,
+        OrderBy::default(),
+        search_span.clone(),
+        tx,
+        Some(values_event_context),
+    ));
 
-//     HttpResponse::Ok()
-//         .content_type("text/event-stream")
-//         .streaming(stream)
-// }
+    // Return streaming response
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
+        let chunks_iter = match result {
+            Ok(v) => v.to_chunks(),
+            Err(err) => {
+                log::error!(
+                    "[HTTP2_STREAM] trace_id: {} Error in stream: {}",
+                    trace_id,
+                    err
+                );
+                let err_res = match err {
+                    infra::errors::Error::ErrorCode(ref code) => {
+                        let message = code.get_message();
+                        let error_detail = code.get_error_detail();
+                        let http_response = map_error_to_http_response(&err, "".to_string());
 
-// // Helper function to convert ValuesRequest to SearchRequest
-// fn convert_values_to_search_request(values_req: config::meta::search::ValuesRequest) -> config::meta::search::Request {
-//     let sql = if !values_req.sql.is_empty() {
-//         values_req.sql
-//     } else {
-//         // Construct SQL for values query
-//         let field_clauses: Vec<String> = values_req.fields
-//             .iter()
-//             .map(|field| format!("_values({})", field))
-//             .collect();
-            
-//         let mut sql = format!("SELECT {} FROM {}", field_clauses.join(", "), values_req.stream_name);
-        
-//         // Add filter if present
-//         if let Some(filter) = &values_req.filter {
-//             if !filter.is_empty() {
-//                 sql.push_str(&format!(" WHERE {}", filter));
-//             }
-//         }
+                        config::meta::search::StreamResponses::Error {
+                            code: http_response.status().into(),
+                            message,
+                            error_detail: Some(error_detail),
+                        }
+                    }
+                    _ => config::meta::search::StreamResponses::Error {
+                        code: 500,
+                        message: err.to_string(),
+                        error_detail: None,
+                    },
+                };
+                err_res.to_chunks()
+            }
+        };
 
-//         sql
-//     };
+        // Convert the iterator to a stream only once
+        futures::stream::iter(chunks_iter)
+    });
 
-//     config::meta::search::Request {
-//         query: config::meta::search::Query {
-//             sql,
-//             from: 0,
-//             size: values_req.size.unwrap_or(10),
-//             start_time: values_req.start_time.unwrap_or(0),
-//             end_time: values_req.end_time.unwrap_or(0),
-//             quick_mode: false,
-//             query_type: "values".to_string(),
-//             track_total_hits: true,
-//             uses_zo_fn: values_req.vrl_fn.is_some(),
-//             query_fn: values_req.vrl_fn,
-//             action_id: None,
-//             skip_wal: false,
-//             streaming_output: true,
-//             streaming_id: None,
-//         },
-//         encoding: config::meta::search::RequestEncoding::Empty,
-//         regions: values_req.regions,
-//         clusters: values_req.clusters,
-//         timeout: values_req.timeout.unwrap_or(0),
-//         search_type: Some(config::meta::search::SearchEventType::Values),
-//         search_event_context: None,
-//         use_cache: Some(values_req.use_cache),
-//         local_mode: None,
-//     }
-// }
+    HttpResponse::Ok()
+        .content_type("text/event-stream")
+        .streaming(stream)
+}
+
+/// This function will compute top k values for values request
+#[tracing::instrument(name = "service:websocket_events:search::get_top_k_values", skip_all)]
+pub fn get_top_k_values(
+    hits: &Vec<Value>,
+    field: &str,
+    top_k: i64,
+    no_count: bool,
+) -> Result<Vec<Value>, infra::errors::Error> {
+    let mut top_k_values: Vec<Value> = Vec::new();
+
+    if field.is_empty() {
+        log::error!("Field is empty for values search");
+        return Err(infra::errors::Error::Message("field is empty".to_string()));
+    }
+
+    let k_limit = top_k;
+    let no_count = no_count;
+
+    let mut search_result_hits = Vec::new();
+    for hit in hits {
+        let key: String = hit
+            .get("zo_sql_key")
+            .map(get_string_value)
+            .unwrap_or_default();
+        let num = hit
+            .get("zo_sql_num")
+            .and_then(|v| v.as_i64())
+            .unwrap_or_default();
+        search_result_hits.push((key, num));
+    }
+
+    if no_count {
+        // For alphabetical sorting, collect all entries first
+        let mut all_entries: Vec<_> = search_result_hits;
+        all_entries.sort_by(|a, b| a.0.cmp(&b.0));
+        all_entries.truncate(k_limit as usize);
+
+        let top_hits = all_entries
+            .into_iter()
+            .map(|(k, v)| {
+                let mut item = Map::new();
+                item.insert("zo_sql_key".to_string(), Value::String(k));
+                item.insert("zo_sql_num".to_string(), Value::Number(v.into()));
+                Value::Object(item)
+            })
+            .collect::<Vec<_>>();
+
+        let mut field_value: Map<String, Value> = Map::new();
+        field_value.insert("field".to_string(), Value::String(field.to_string()));
+        field_value.insert("values".to_string(), Value::Array(top_hits));
+        top_k_values.push(Value::Object(field_value));
+    } else {
+        // For value-based sorting, use a min heap to get top k elements
+        let mut min_heap: BinaryHeap<Reverse<(i64, String)>> =
+            BinaryHeap::with_capacity(k_limit as usize);
+        for (k, v) in search_result_hits {
+            if min_heap.len() < k_limit as usize {
+                // If heap not full, just add
+                min_heap.push(Reverse((v, k)));
+            } else if !min_heap.is_empty() && v > min_heap.peek().unwrap().0.0 {
+                // If current value is larger than smallest in heap, replace it
+                min_heap.pop();
+                min_heap.push(Reverse((v, k)));
+            }
+        }
+
+        // Convert heap to vector and sort in descending order
+        let mut top_elements: Vec<_> = min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
+        top_elements.sort_by(|a, b| b.1.cmp(&a.1));
+
+        let top_hits = top_elements
+            .into_iter()
+            .map(|(k, v)| {
+                let mut item = Map::new();
+                item.insert("zo_sql_key".to_string(), Value::String(k));
+                item.insert("zo_sql_num".to_string(), Value::Number(v.into()));
+                Value::Object(item)
+            })
+            .collect::<Vec<_>>();
+
+        let mut field_value: Map<String, Value> = Map::new();
+        field_value.insert("field".to_string(), Value::String(field.to_string()));
+        field_value.insert("values".to_string(), Value::Array(top_hits));
+        top_k_values.push(Value::Object(field_value));
+    }
+
+    Ok(top_k_values)
+}

@@ -15,17 +15,16 @@
 
 use std::collections::VecDeque;
 
+use bytes::Bytes as BytesImpl;
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
+    config::get_config,
     meta::{sql::OrderBy, stream::StreamType},
     utils::{base64, json},
 };
-use crate::config::get_config;
-
-use bytes::Bytes as BytesImpl;
 
 pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
     "Please be aware that the response is based on partial data";
@@ -253,19 +252,16 @@ pub struct ResponseChunkIterator {
 
 impl ResponseChunkIterator {
     /// Create a new response chunk iterator
-    pub fn new(
-        mut response: Response, 
-        chunk_size: Option<usize>,
-    ) -> Self {
+    pub fn new(mut response: Response, chunk_size: Option<usize>) -> Self {
         // Get the configured chunk size or use the provided one or default
         let chunk_size = chunk_size.unwrap_or_else(|| {
             // Get from config, convert from MB to bytes
             let mb = 1024 * 1024;
             crate::get_config().websocket.streaming_response_chunk_size * mb
         });
-        
+
         let hits = response.hits.drain(..).collect::<Vec<_>>();
-        
+
         Self {
             response,
             chunk_size,

@@ -17,6 +17,7 @@ use actix_web::http::StatusCode;
 use config::{
     ider,
     meta::{
+        search::TimeOffset,
         sql::OrderBy,
         websocket::{SearchEventReq, ValuesEventReq},
     },
@@ -27,7 +28,6 @@ use tokio_tungstenite::tungstenite;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
-use config::meta::search::TimeOffset;
 
 pub mod enterprise_utils {
     #[allow(unused_imports)]
