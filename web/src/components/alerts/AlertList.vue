@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >{{
                           props.row.conditions != "" &&
                           props.row.conditions != "--"
-                            ? props.row?.conditions
+                            ? (props.row.type == 'sql' ? props.row.conditions : `if ${props.row.conditions}`)
                             : "No condition"
                         }} </pre
                       >
@@ -889,12 +889,66 @@ export default defineComponent({
           //localAllAlerts is the alerts that we use to store
           localAllAlerts = localAllAlerts.map((data: any) => {
             let conditions = "--";
-            if (data.condition.conditions?.length) {
-              conditions = data.condition.conditions
-                .map((condition: any) => {
-                  return `${condition.column} ${condition.operator} ${condition.value}`;
-                })
-                .join(" AND ");
+            //this is deprecated because we are using the new condition format
+            //the new format looks like this
+            //             {
+            //     "or": [
+            //         {
+            //             "column": "_timestamp",
+            //             "operator": "<=",
+            //             "value": "100",
+            //             "ignore_case": false
+            //         },
+            //         {
+            //             "column": "job",
+            //             "operator": "not_contains",
+            //             "value": "12",
+            //             "ignore_case": true
+            //         },
+            //         {
+            //             "or": [
+            //                 {
+            //                     "column": "job",
+            //                     "operator": "contains",
+            //                     "value": "1222",
+            //                     "ignore_case": true
+            //                 },
+            //                 {
+            //                     "column": "level",
+            //                     "operator": "not_contains",
+            //                     "value": "dsff",
+            //                     "ignore_case": true
+            //                 },
+            //                 {
+            //                     "or": [
+            //                         {
+            //                             "column": "job",
+            //                             "operator": "=",
+            //                             "value": "111",
+            //                             "ignore_case": true
+            //                         },
+            //                         {
+            //                             "column": "level",
+            //                             "operator": "contains",
+            //                             "value": "1222",
+            //                             "ignore_case": true
+            //                         }
+            //                     ]
+            //                 },
+            //                 {
+            //                     "column": "log",
+            //                     "operator": "!=",
+            //                     "value": "33",
+            //                     "ignore_case": true
+            //                 }
+            //             ]
+            //         }
+            //     ]
+            // }  
+            //converted into 
+            // (_timestamp <= '100' OR job not_contains '12' OR (job contains '1222' OR level not_contains 'dsff' OR (job = '111' OR level contains '1222') OR log != '33')) 
+            if (Object.keys(data.condition).length && data.condition.type == 'custom') {
+              conditions = transformToExpression(data.condition.conditions)
             } else if (data.condition.sql) {
               conditions = data.condition.sql;
             } else if (data.condition.promql) {
@@ -1794,6 +1848,32 @@ export default defineComponent({
       folderIdToBeCloned.value = folderId.value;
     };
 
+    function transformToExpression(data: any, wrap = true): string | null {
+        if (!data) return null;
+
+        const keys = Object.keys(data);
+        if (keys.length !== 1) return null;
+
+        const label = keys[0].toUpperCase(); // AND or OR
+        const itemsArray = data[label.toLowerCase()];
+
+        const parts = itemsArray.map((item: any) => {
+          if (item.and || item.or) {
+            return transformToExpression(item, true); // wrap nested groups
+          } else {
+            const column = item.column;
+            const operator = item.operator;
+            const value = typeof item.value === 'string' ? `'${item.value}'` : item.value;
+            return `${column} ${operator} ${value}`;
+          }
+        });
+
+        const joined = parts.join(` ${label} `);
+        return wrap ? `(${joined})` : joined;
+      }
+
+
+
 
     return {
       t,
@@ -1897,6 +1977,7 @@ export default defineComponent({
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
+      transformToExpression,
     };
   },
 });
