@@ -1340,7 +1340,7 @@ const useLogs = () => {
 
               notificationMsg.value = searchObj.data.errorMsg;
 
-              if (err?.request?.status >= 429) {
+              if (err?.request?.status >= 429 || err?.request?.status == 400) {
                 notificationMsg.value = err?.response?.data?.message;
                 searchObj.data.errorMsg = err?.response?.data?.message || "";
                 searchObj.data.errorDetail = err?.response?.data?.error_detail;
@@ -2260,7 +2260,7 @@ const useLogs = () => {
 
             notificationMsg.value = searchObj.data.countErrorMsg;
 
-            if (err?.request?.status >= 429) {
+            if (err?.request?.status >= 429 || err?.request?.status == 400) {
               notificationMsg.value = err?.response?.data?.message;
               searchObj.data.countErrorMsg += err?.response?.data?.message;
             }
@@ -2607,7 +2607,7 @@ const useLogs = () => {
 
           notificationMsg.value = searchObj.data.errorMsg;
 
-          if (err?.request?.status >= 429) {
+          if (err?.request?.status >= 429 || err?.request?.status == 400) {
             notificationMsg.value = err?.response?.data?.message || "";
             searchObj.data.errorMsg = err?.response?.data?.message || "";
             searchObj.data.errorDetail =
@@ -3933,7 +3933,7 @@ const useLogs = () => {
             searchObj.data.errorMsg = customMessage;
           }
 
-          if (err?.request?.status >= 429) {
+          if (err?.request?.status >= 429 || err?.request?.status == 400) {
             notificationMsg.value = err?.response?.data?.message;
             searchObj.data.errorMsg = err?.response?.data?.message;
           }

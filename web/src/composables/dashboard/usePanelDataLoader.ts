@@ -1619,7 +1619,11 @@ export const usePanelDataLoader = (
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
 
-        const errorCode = error?.response?.data?.code || error?.code || "";
+        const errorCode =
+          error?.response?.status ||
+          error?.status ||
+          error?.response?.data?.code ||
+          "";
 
         state.errorDetail = {
           message: trimmedErrorMessage,
@@ -1640,7 +1644,12 @@ export const usePanelDataLoader = (
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
 
-        const errorCode = error?.response?.data?.code || error?.code || "";
+        const errorCode = isWebSocketEnabled()
+          ? error?.response?.data?.code || error?.code || ""
+          : error?.response?.status ||
+            error?.status ||
+            error?.response?.data?.code ||
+            "";
 
         state.errorDetail = {
           message: trimmedErrorMessage,

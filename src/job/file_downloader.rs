@@ -60,24 +60,25 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             Ok(data_len) => {
                                 if data_len > 0 && data_len != file_size {
                                     log::warn!(
-                                        "[trace_id {trace_id}] search->storage: download file {} found size mismatch, expected: {}, actual: {}, will update it",
+                                        "[trace_id {trace_id}] search->storage: download file {} found size mismatch, expected: {}, actual: {}, will skip it",
                                         file,
                                         file_size,
                                         data_len,
                                     );
                                     // update database
-                                    if let Err(e) = infra::file_list::update_compressed_size(
-                                        &file,
-                                        data_len as i64,
-                                    )
-                                    .await
-                                    {
-                                        log::error!(
-                                            "[trace_id {trace_id}] search->storage: update file size for file {} err: {}",
-                                            file,
-                                            e,
-                                        );
-                                    }
+                                    // if let Err(e) = infra::file_list::update_compressed_size(
+                                    //     &file,
+                                    //     data_len as i64,
+                                    // )
+                                    // .await
+                                    // {
+                                    //     log::error!(
+                                    //         "[trace_id {trace_id}] search->storage: update file
+                                    // size for file {} err: {}",
+                                    //         file,
+                                    //         e,
+                                    //     );
+                                    // }
                                 }
                             }
                             Err(e) => {
