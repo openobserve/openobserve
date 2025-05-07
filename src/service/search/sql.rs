@@ -115,8 +115,8 @@ impl Sql {
         let mut limit = query.size as i64;
 
         // 1. get table name
-        let stream_names =
-            resolve_stream_names_with_type(&sql).map_err(|e| Error::Message(e.to_string()))?;
+        let stream_names = resolve_stream_names_with_type(&sql)
+            .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?;
         if stream_names.len() > 1 && stream_names.iter().any(|s| s.schema() == Some("index")) {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Index stream is not supported in multi-stream query".to_string(),
@@ -1614,12 +1614,16 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
         "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
         "day" | "days" | "d" => num.parse::<i64>().map(|n| n * 86400),
         _ => {
-            return Err(Error::Message(
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Unsupported histogram interval unit".to_string(),
-            ));
+            )));
         }
     };
-    seconds.map_err(|_| Error::Message("Invalid number format".to_string()))
+    seconds.map_err(|_| {
+        Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+            "Invalid number format".to_string(),
+        ))
+    })
 }
 
 pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
