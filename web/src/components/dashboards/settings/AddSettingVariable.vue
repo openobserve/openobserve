@@ -552,7 +552,131 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
+          <div class="q-mt-md">
+            <div class="q-mb-md">
+              <q-select
+                hint="Variables will be applied to all tabs and panels if global is selected."
+                v-model="variableData.scope"
+                :options="scopeOptions"
+                label="Select variable scope"
+                outlined
+                dense
+                emit-value
+                map-options
+                filled
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
+                data-test="dashboard-variable-scope-select"
+              />
+            </div>
 
+            <!-- Tab selection section - shown only when scope is tabs or panels -->
+            <div
+              v-if="
+                variableData.scope === 'tabs' || variableData.scope === 'panels'
+              "
+              class="q-mt-md"
+            >
+              <q-select
+                hint="Variables will be available only in the selected tabs."
+                v-model="selectedTabs"
+                :options="tabsOptions"
+                label="Select tabs"
+                multiple
+                stack-label
+                outlined
+                dense
+                emit-value
+                map-options
+                @update:model-value="updatePanels"
+                filled
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
+                data-test="dashboard-variable-tabs-select"
+              >
+                <template v-slot:option="{ opt, selected, toggleOption }">
+                  <q-item
+                    v-if="opt.isTab"
+                    class="bg-grey-3 text-bold text-dark"
+                    style="pointer-events: none"
+                  >
+                    <q-item-section>{{ opt.label }}</q-item-section>
+                  </q-item>
+                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                    <q-item-section side>
+                      <q-checkbox
+                        :model-value="selected"
+                        @update:model-value="() => toggleOption(opt)"
+                        dense
+                        class="q-ma-none"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label>{{ opt.label }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
+
+            <!-- Panel selection section - shown only when scope is panels -->
+            <div
+              v-if="variableData.scope === 'panels' && selectedTabs.length > 0"
+              class="q-mt-md"
+            >
+              <q-select
+                hint="Variables will be available only in the selected panels."
+                v-model="selectedPanels"
+                :options="groupedPanelsOptions"
+                label="Select panels"
+                stack-label
+                multiple
+                filled
+                outlined
+                dense
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
+                emit-value
+                map-options
+                data-test="dashboard-variable-panels-select"
+              >
+                <template v-slot:option="{ opt, selected, toggleOption }">
+                  <q-item
+                    v-if="opt.isTab"
+                    class="bg-grey-3 text-bold text-dark"
+                    style="pointer-events: none"
+                  >
+                    <q-item-section>{{ opt.label }}</q-item-section>
+                  </q-item>
+                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                    <q-item-section side>
+                      <q-checkbox
+                        :model-value="selected"
+                        @update:model-value="() => toggleOption(opt)"
+                        dense
+                        class="q-ma-none"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label>{{ opt.label }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
+          </div>
           <!-- hide on dashboard toggle -->
           <div>
             <q-toggle
@@ -580,8 +704,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 padding="sm xl"
                 no-caps
                 data-test="dashboard-variable-save-btn"
-                >Save</q-btn
-              >
+                :label="editMode ? 'Update' : 'Save'"
+              ></q-btn>
             </div>
           </div>
         </q-form>
@@ -602,6 +726,7 @@ import {
   toRaw,
   type Ref,
   computed,
+  nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
@@ -628,12 +753,47 @@ export default defineComponent({
   components: { DashboardHeader, CommonAutoComplete },
   emits: ["close", "save"],
   setup(props, { emit }) {
+    console.log("props----", props.dashboardVariablesList);
+    // Store dashboard data
+    const dashboardData = ref<any>({ tabs: [] });
+
+    // Store selected tabs and panels
+    const selectedTabs = ref<string[]>([]);
+    const selectedPanels = ref<string[]>([]);
+
+    // Format tabs for selection from dashboard data
+    const tabsOptions = computed(() =>
+      dashboardData.value.tabs.map((tab: any) => ({
+        label: tab.name,
+        value: tab.tabId,
+      })),
+    );
+
+    // Compute grouped panels options with tabs as separators
+    const groupedPanelsOptions = computed(() => {
+      return dashboardData.value.tabs
+        .filter((tab: any) => selectedTabs.value.includes(tab.tabId))
+        .flatMap((tab: any) => [
+          { label: tab.name, isTab: true },
+          ...(tab.panels || []).map((panel: any) => ({
+            label: panel.title,
+            value: panel.id,
+          })),
+        ]);
+    });
+
     const { t } = useI18n();
     const store = useStore();
     const addVariableForm: Ref<any> = ref(null);
     const data: any = reactive({
       schemaResponse: [],
-      streamType: ["logs", "metrics", "traces", "enrichment_tables", "metadata"],
+      streamType: [
+        "logs",
+        "metrics",
+        "traces",
+        "enrichment_tables",
+        "metadata",
+      ],
       streams: [],
       currentFieldsList: [],
 
@@ -685,7 +845,17 @@ export default defineComponent({
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
       customMultiSelectValue: [],
+      // Add these properties for tab/panel binding
+      scope: "global", // Can be 'global', 'tabs', or 'panels'
+      tabs: [], // Store selected tab IDs
+      panels: [], // Store selected panel IDs
     });
+
+    const scopeOptions = computed(() => [
+      { label: "Global", value: "global" },
+      { label: "Selected Tabs", value: "tabs" },
+      { label: "Selected Panels", value: "panels" },
+    ]);
 
     const filterCycleError: any = ref("");
 
@@ -742,7 +912,7 @@ export default defineComponent({
         if (newVal === "") {
           variableData.query_data.max_record_size = null;
         }
-      }
+      },
     );
 
     // watch for filter changes and set default value for Is Null and Is Not Null operators
@@ -757,52 +927,106 @@ export default defineComponent({
           });
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
+    // Modify the onMounted hook
     onMounted(async () => {
-      if (props.variableName) {
-        editMode.value = true;
-        title.value = "Edit Variable";
-        // Fetch dashboard data
-        const data = JSON.parse(
-          JSON.stringify(
-            await getDashboard(store, route.query.dashboard, route.query.folder)
-          )
-        )?.variables?.list;
-
-        // Find the variable to edit
-        const edit = (data || []).find(
-          (it: any) => it.name === props.variableName
+      try {
+        const data = await getDashboard(
+          store,
+          route.query.dashboard,
+          route.query.folder,
         );
 
-        // for already created variable, need to add selected fields
-        // check if variable type is custom
-        if (edit?.type === "custom") {
-          //  loop on on options, and assign selected = false if selected key is not found
-          edit.options.forEach((option: any) => {
-            if (option.selected === undefined || option.selected === null) {
-              option.selected = false;
-            }
-          });
+        dashboardData.value = data;
 
-          // for custom, check if all are selected
-          const allSelected = edit.options.every(
-            (option: any) => option.selected === true
+        if (props.variableName) {
+          editMode.value = true;
+          title.value = "Edit Variable";
+
+          const variablesList = data.variables?.list || [];
+          const variable = variablesList.find(
+            (v: any) => v.name === props.variableName,
           );
-          if (allSelected) {
-            customSelectAllModel.value = true;
+
+          if (variable) {
+            // First, set the basic variable data
+            Object.assign(variableData, JSON.parse(JSON.stringify(variable)));
+
+            // Set scope type correctly
+            if (variable.panels?.length > 0) {
+              variableData.scope = "panels";
+            } else if (variable.tabs?.length > 0) {
+              variableData.scope = "tabs";
+            } else {
+              variableData.scope = "global";
+            }
+
+            // Set initial values synchronously
+            selectedTabs.value = variable.tabs ? [...variable.tabs] : [];
+            selectedPanels.value = variable.panels ? [...variable.panels] : [];
+
+            // Force update panel options
+            nextTick(() => {
+              if (variableData.scope === "panels") {
+                updatePanels();
+              }
+            });
           }
         }
-
-        // Assign edit data to variableData
-        Object.assign(variableData, edit);
-      } else {
-        // default variable type will be query_values
-        variableData.type = "query_values";
-        editMode.value = false;
+      } catch (error) {
+        console.error("Error loading dashboard:", error);
+        showErrorNotification("Failed to load dashboard data");
       }
     });
+
+    // Modify the watch on scope
+    watch(
+      () => variableData.scope,
+      (newScope) => {
+        if (newScope === "global") {
+          selectedTabs.value = [];
+          selectedPanels.value = [];
+        } else if (newScope === "tabs") {
+          selectedPanels.value = [];
+        } else if (newScope === "panels" && selectedTabs.value.length > 0) {
+          nextTick(() => {
+            updatePanels();
+          });
+        }
+      },
+      { immediate: true },
+    );
+
+    // Modify updatePanels function
+    const updatePanels = () => {
+      if (variableData.scope === "panels" && selectedTabs.value.length > 0) {
+        const validPanelIds = dashboardData.value.tabs
+          .filter((tab: any) => selectedTabs.value.includes(tab.tabId))
+          .flatMap((tab: any) =>
+            (tab.panels || []).map((panel: any) => panel.id),
+          );
+
+        // Keep only valid panels from the current selection
+        selectedPanels.value = selectedPanels.value.filter((id: any) =>
+          validPanelIds.includes(id),
+        );
+      }
+    };
+
+    // Add a watch for selectedTabs
+    watch(
+      selectedTabs,
+      (newTabs) => {
+        if (variableData.scope === "panels") {
+          nextTick(() => {
+            updatePanels();
+          });
+        }
+      },
+      { deep: true },
+    );
 
     // check if type is query_values then get stream list and field list
     watch(
@@ -828,7 +1052,7 @@ export default defineComponent({
               // get all streams from current stream type
               const streamList: any = await getStreams(
                 variableData?.query_data?.stream_type,
-                false
+                false,
               );
               data.streams = streamList.list ?? [];
 
@@ -838,7 +1062,7 @@ export default defineComponent({
                 const fieldWithSchema: any = await getStream(
                   variableData?.query_data?.stream,
                   variableData.query_data.stream_type,
-                  true
+                  true,
                 );
 
                 // assign the schema
@@ -858,7 +1082,7 @@ export default defineComponent({
             });
           }
         }
-      }
+      },
     );
 
     const addField = () => {
@@ -882,15 +1106,14 @@ export default defineComponent({
 
     const saveVariableApiCall = useLoading(async () => await saveData());
 
+    // Modify the saveData function to include tabs and panels
     const saveData = async () => {
       const dashId = route.query.dashboard + "";
 
-      // remove query_data if type is not query_values
       if (variableData.type !== "query_values") {
         delete variableData["query_data"];
       }
 
-      // reset multi select config if type is not query_values or custom
       if (
         variableData.type !== "query_values" &&
         variableData.type !== "custom"
@@ -900,6 +1123,18 @@ export default defineComponent({
         variableData.customMultiSelectValue = [];
       }
 
+      // Set tabs and panels based on the selected scope
+      if (variableData.scope === "global") {
+        variableData.tabs = [];
+        variableData.panels = [];
+      } else if (variableData.scope === "tabs") {
+        variableData.tabs = [...selectedTabs.value];
+        variableData.panels = [];
+      } else if (variableData.scope === "panels") {
+        variableData.tabs = [...selectedTabs.value];
+        variableData.panels = [...selectedPanels.value];
+      }
+
       if (editMode.value) {
         try {
           await updateVariable(
@@ -907,7 +1142,7 @@ export default defineComponent({
             dashId,
             props.variableName,
             toRaw(variableData),
-            route.query.folder ?? "default"
+            route.query.folder ?? "default",
           );
           emit("save");
         } catch (error: any) {
@@ -915,7 +1150,7 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                "Variable update failed"
+                "Variable update failed",
             );
           } else {
             showErrorNotification(error.message ?? "Variable update failed", {
@@ -929,7 +1164,7 @@ export default defineComponent({
             store,
             dashId,
             variableData,
-            route.query.folder ?? "default"
+            route.query.folder ?? "default",
           );
           emit("save");
         } catch (error: any) {
@@ -937,7 +1172,7 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                "Variable creation failed"
+                "Variable creation failed",
             );
           } else {
             showErrorNotification(error.message ?? "Variable creation failed", {
@@ -955,8 +1190,12 @@ export default defineComponent({
         // get all variables data.
         let variablesData: any = JSON.parse(
           JSON.stringify(
-            await getDashboard(store, route.query.dashboard, route.query.folder)
-          )
+            await getDashboard(
+              store,
+              route.query.dashboard,
+              route.query.folder,
+            ),
+          ),
         )?.variables?.list;
 
         // current updated variable data need to merge/update in above variablesData.
@@ -965,7 +1204,7 @@ export default defineComponent({
         if (editMode.value) {
           //if name already exists
           const variableIndex = variablesData.findIndex(
-            (variable: any) => variable.name == props.variableName
+            (variable: any) => variable.name == props.variableName,
           );
 
           // Update the variable data in the list
@@ -988,7 +1227,7 @@ export default defineComponent({
         if (hasCycle) {
           // filter has cycle, so show error and return
           filterCycleError.value = `Variables has cycle: ${hasCycle.join(
-            "->"
+            "->",
           )} -> ${hasCycle[0]}`;
           return true;
         }
@@ -1001,7 +1240,7 @@ export default defineComponent({
           err?.message ??
             (editMode.value
               ? "Variable update failed"
-              : "Variable creation failed")
+              : "Variable creation failed"),
         );
         return true;
       }
@@ -1029,7 +1268,7 @@ export default defineComponent({
             err?.message ??
               (editMode.value
                 ? "Variable update failed"
-                : "Variable creation failed")
+                : "Variable creation failed"),
           );
         });
       });
@@ -1053,7 +1292,7 @@ export default defineComponent({
         // get all streams from current stream type
         const streamList: any = await getStreams(
           variableData?.query_data?.stream_type,
-          false
+          false,
         );
 
         // assign the stream list
@@ -1078,7 +1317,7 @@ export default defineComponent({
           const fieldWithSchema: any = await getStream(
             variableData?.query_data?.stream,
             variableData.query_data.stream_type,
-            true
+            true,
           );
 
           // assign the schema
@@ -1104,7 +1343,7 @@ export default defineComponent({
           label: it.name,
           value: "$" + it.name,
         }))
-        .filter((it: any) => it.label !== variableData.name)
+        .filter((it: any) => it.label !== variableData.name),
     );
 
     // Add new custom value to the array
@@ -1135,7 +1374,7 @@ export default defineComponent({
             }
           }
         }
-      }
+      },
     );
 
     watch(
@@ -1144,7 +1383,7 @@ export default defineComponent({
         if (newVal != "custom") {
           variableData.customMultiSelectValue = [];
         }
-      }
+      },
     );
 
     const onCheckboxClick = (index: any) => {
@@ -1201,6 +1440,13 @@ export default defineComponent({
       onCheckboxClick,
       customSelectAllModel,
       onCustomSelectAllClick,
+      selectedTabs,
+      updatePanels,
+      selectedPanels,
+      tabsOptions,
+      groupedPanelsOptions,
+      scopeOptions,
+      editMode,
     };
   },
 });
