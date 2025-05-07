@@ -26,6 +26,8 @@ const QUERIER_ROUTES: [(&str, usize); 21] = [
     ("query_manager", 2),                     // /api/{org_id}/query_manager/...
     ("ws", 2),                                // /api/{org_id}/ws
     ("_search", 2),                           // /api/{org_id}/_search
+    ("_search_stream", 2),                    // /api/{org_id}/_search_stream
+    ("_values_stream", 2),                    // /api/{org_id}/_values_stream
     ("_around", 3),                           // /api/{org_id}/{stream_name}/_around
     ("_values", 3),                           // /api/{org_id}/{stream_name}/_values
     ("functions?page_num=", 2),               // /api/{org_id}/functions
