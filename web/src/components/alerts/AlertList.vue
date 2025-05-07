@@ -1848,7 +1848,7 @@ export default defineComponent({
       folderIdToBeCloned.value = folderId.value;
     };
 
-    function transformToExpression(data: any, wrap = true): string | null {
+    function transformToExpression(data: any, wrap = true): any {
         if (!data) return null;
 
         const keys = Object.keys(data);
