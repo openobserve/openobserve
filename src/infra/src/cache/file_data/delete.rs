@@ -28,9 +28,7 @@ impl Queue {
         tokio::task::spawn(async move {
             while let Some(files) = rx.recv().await {
                 for file in files {
-                    if let Err(e) =
-                        super::disk::remove(super::TRACE_ID_FOR_CACHE_LATEST_FILE, &file).await
-                    {
+                    if let Err(e) = super::disk::remove(&file).await {
                         log::error!("[CACHE:FILE_DATA] Failed to delete file: {}", e);
                     }
                     tokio::task::consume_budget().await;

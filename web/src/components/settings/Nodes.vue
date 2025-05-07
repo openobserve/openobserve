@@ -718,7 +718,6 @@ export default defineComponent({
                     // Extract unique statuses
                     uniqueValues.statuses.add(node.status);
 
-                    console.log(node)
                     // Update max values
                     maxValues.tcpConnsEstablished.value = Math.max(maxValues.tcpConnsEstablished.value, node.metrics.tcp_conns_established);
                     maxValues.tcpConnsCloseWait.value = Math.max(maxValues.tcpConnsCloseWait.value, node.metrics.tcp_conns_close_wait);
@@ -997,15 +996,15 @@ export default defineComponent({
 }
 
 .status-online {
-  border-left: 5px solid green !important;
+  border-left: #00A76F 5px solid  !important;
 }
 
 .status-offline {
-  border-left: 5px solid red;
+  border-left: 5px solid #CE2528 !important;
 }
 
 .status-prepare {
-  border-left: 5px solid warning;
+  border-left: 5px solid #FFAB00  !important;
 }
 
 .node-list-filter-table {

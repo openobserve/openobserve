@@ -16,6 +16,9 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, http, http::header, post, web};
+use config::meta::otlp::OtlpRequestType;
+use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
+use prost::Message;
 
 use crate::{
     common::meta::{
@@ -25,10 +28,7 @@ use crate::{
         },
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    service::{
-        logs,
-        logs::otlp_http::{logs_json_handler, logs_proto_handler},
-    },
+    service::logs::{self, otlp::handle_request},
 };
 
 /// _bulk ES compatible ingestion API
@@ -347,42 +347,60 @@ pub async fn otlp_logs_write(
         .headers()
         .get(&config::get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
-    if content_type.eq(CONTENT_TYPE_PROTO) {
-        // log::info!("otlp::logs_proto_handler");
-        match logs_proto_handler(**thread_id, &org_id, body, in_stream_name, user_email).await {
-            Ok(v) => Ok(v),
+
+    let (request, request_type) = match content_type {
+        CONTENT_TYPE_PROTO => match ExportLogsServiceRequest::decode(body) {
+            Ok(req) => (req, OtlpRequestType::HttpProtobuf),
             Err(e) => {
-                log::error!(
-                    "Error processing otlp pb logs write request {org_id}/{:?}: {:?}",
-                    in_stream_name,
-                    e
-                );
-                Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                log::error!("[LOGS:OTLP] Invalid proto: {}", e);
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )))
+                    format!("Invalid proto: {}", e),
+                )));
+            }
+        },
+        CONTENT_TYPE_JSON => {
+            match serde_json::from_slice::<ExportLogsServiceRequest>(body.as_ref()) {
+                Ok(req) => (req, OtlpRequestType::HttpJson),
+                Err(e) => {
+                    log::error!("[LOGS:OTLP] Invalid json: {}", e);
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        format!("Invalid json: {}", e),
+                    )));
+                }
             }
         }
-    } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        // log::info!("otlp::logs_json_handler");
-        match logs_json_handler(**thread_id, &org_id, body, in_stream_name, user_email).await {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                log::error!(
-                    "Error processing otlp json logs write request {org_id}/{:?}: {:?}",
-                    in_stream_name,
-                    e
-                );
-                Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )))
-            }
+        _ => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Bad Request".to_string(),
+            )));
         }
-    } else {
-        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Bad Request".to_string(),
-        )))
+    };
+
+    match handle_request(
+        **thread_id,
+        &org_id,
+        request,
+        in_stream_name,
+        user_email,
+        request_type,
+    )
+    .await
+    {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            log::error!(
+                "Error processing otlp {} logs write request {org_id}/{:?}: {:?}",
+                content_type,
+                in_stream_name,
+                e
+            );
+            Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )))
+        }
     }
 }

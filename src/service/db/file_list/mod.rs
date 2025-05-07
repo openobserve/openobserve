@@ -45,13 +45,18 @@ pub static BLOCKED_ORGS: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
-    let file_data = FileKey::new(key.to_string(), meta.clone().unwrap_or_default(), deleted);
+pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
+    let file_data = FileKey::new(
+        account.to_string(),
+        key.to_string(),
+        meta.clone().unwrap_or_default(),
+        deleted,
+    );
 
     // write into file_list storage
     // retry 5 times
     for _ in 0..5 {
-        if let Err(e) = progress(key, meta.as_ref(), deleted).await {
+        if let Err(e) = progress(account, key, meta.as_ref(), deleted).await {
             log::error!("[FILE_LIST] Error saving file to storage, retrying: {}", e);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         } else {
@@ -70,7 +75,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()>
     Ok(())
 }
 
-async fn progress(key: &str, data: Option<&FileMeta>, delete: bool) -> Result<()> {
+async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: bool) -> Result<()> {
     if delete {
         if let Err(e) = infra::file_list::remove(key).await {
             log::error!(
@@ -80,7 +85,7 @@ async fn progress(key: &str, data: Option<&FileMeta>, delete: bool) -> Result<()
             );
         }
     } else {
-        if let Err(e) = infra::file_list::add(key, data.unwrap()).await {
+        if let Err(e) = infra::file_list::add(account, key, data.unwrap()).await {
             log::error!(
                 "service:db:file_list: add {}, set_file_to_cache error: {}",
                 key,

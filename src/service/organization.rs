@@ -16,7 +16,8 @@
 use config::{
     ider,
     meta::{
-        dashboards::ListDashboardsParams,
+        alerts::alert::ListAlertsParams, dashboards::ListDashboardsParams,
+       
         pipeline::components::PipelineSource,
         stream::StreamType,
         user::{UserOrg, UserRole},
@@ -79,10 +80,12 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             .count() as i64,
     };
 
-    let alerts = db::alerts::alert::list(org_id, None, None).await.unwrap();
+    let alerts = super::alerts::alert::list_with_folders_db(ListAlertsParams::new(org_id))
+        .await
+        .unwrap_or_default();
     let alert_summary = AlertSummary {
-        num_realtime: alerts.iter().filter(|a| a.is_real_time).count() as i64,
-        num_scheduled: alerts.iter().filter(|a| !a.is_real_time).count() as i64,
+        num_realtime: alerts.iter().filter(|(_, a)| a.is_real_time).count() as i64,
+        num_scheduled: alerts.iter().filter(|(_, a)| !a.is_real_time).count() as i64,
     };
 
     let functions = db::functions::list(org_id).await.unwrap_or_default();

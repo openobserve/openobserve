@@ -1214,7 +1214,7 @@
     "version": "Version",
     "cpu": "CPU %",
     "memory": "Memory %",
-    "tcp": "TCP",
+    "tcp": "TCP Connections",
     "filter_header": "Filters",
     "clear_all": "Clear All",
     "region": "Region",

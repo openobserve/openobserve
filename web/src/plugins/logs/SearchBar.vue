@@ -3090,6 +3090,8 @@ export default defineComponent({
       ) {
         confirmLogsVisualizeModeChangeDialog.value = true;
       } else {
+        // cancel all the logs queries
+        cancelQuery();
         searchObj.meta.logsVisualizeToggle = value;
       }
     };
@@ -3109,6 +3111,9 @@ export default defineComponent({
       // change logs visualize toggle
       searchObj.meta.logsVisualizeToggle = "logs";
       confirmLogsVisualizeModeChangeDialog.value = false;
+
+      // cancel all the visualize queries
+      cancelVisualizeQueries();
 
       // store dashboardPanelData meta object
       const dashboardPanelDataMetaObj = dashboardPanelData.meta;

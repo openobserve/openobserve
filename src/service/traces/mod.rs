@@ -43,10 +43,6 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
-use super::{
-    logs::O2IngestJsonData, metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-    pipeline::batch_execution::ExecutablePipelineTraceInputs,
-};
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
@@ -56,11 +52,17 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{TriggerAlertData, evaluate_trigger, grpc::get_val, write_file},
+        ingestion::{
+            SERVICE, SERVICE_NAME, TriggerAlertData, evaluate_trigger, grpc::get_val, write_file,
+        },
+        logs::O2IngestJsonData,
         metadata::{
-            MetadataItem, MetadataType, distinct_values::DvItem, trace_list_index::TraceListItem,
+            MetadataItem, MetadataType,
+            distinct_values::{DISTINCT_STREAM_PREFIX, DvItem},
+            trace_list_index::TraceListItem,
             write,
         },
+        pipeline::batch_execution::ExecutablePipelineTraceInputs,
         schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
     },
@@ -69,8 +71,6 @@ use crate::{
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
-const SERVICE_NAME: &str = "service.name";
-const SERVICE: &str = "service";
 const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_time"];
 // ref https://opentelemetry.io/docs/specs/otel/trace/api/#retrieving-the-traceid-and-spanid
 const SPAN_ID_BYTES_COUNT: usize = 8;
@@ -218,11 +218,11 @@ pub async fn handle_otlp_request(
                     let loc_service_name = get_val(&res_attr.value.as_ref());
                     if let Some(name) = loc_service_name.as_str() {
                         service_name = name.to_string();
-                        service_att_map.insert(res_attr.key, loc_service_name);
+                        service_att_map.insert(SERVICE_NAME.to_string(), loc_service_name);
                     }
                 } else {
                     service_att_map.insert(
-                        format!("{}.{}", SERVICE, res_attr.key),
+                        format!("{}_{}", SERVICE, res_attr.key),
                         get_val(&res_attr.value.as_ref()),
                     );
                 }
@@ -459,8 +459,16 @@ pub async fn handle_otlp_request(
                 partial_success.error_message = format!("Pipeline batch execution error: {}", e);
             }
             Ok(pl_results) => {
+                log::debug!(
+                    "[TRACES:OTLP] pipeline returned results map of size: {}",
+                    pl_results.len()
+                );
                 for (stream_params, stream_pl_results) in pl_results {
                     if stream_params.stream_type != StreamType::Traces {
+                        log::warn!(
+                            "[TRACES:OTLP] stream {:?} returned by pipeline is not a Trace stream. Records dropped",
+                            stream_params
+                        );
                         continue;
                     }
 
@@ -501,6 +509,12 @@ pub async fn handle_otlp_request(
                             }
                         };
 
+                        log::debug!(
+                            "[TRACES:OTLP] pipeline result for stream: {} got {} records",
+                            stream_params.stream_name,
+                            record_val.len()
+                        );
+
                         let Some(timestamp) = record_val
                             .get(TIMESTAMP_COL_NAME)
                             .and_then(|ts| ts.as_i64())
@@ -512,7 +526,7 @@ pub async fn handle_otlp_request(
                             continue;
                         };
                         let (ts_data, _) = json_data_by_stream
-                            .entry(traces_stream_name.to_string())
+                            .entry(stream_params.stream_name.to_string())
                             .or_insert((Vec::new(), None));
                         ts_data.push((timestamp, record_val));
                     }

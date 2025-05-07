@@ -111,7 +111,9 @@ pub async fn get_streams(
             stream_loc.stream_name.as_str(),
             stream_loc.stream_type,
         );
-        if stats.eq(&StreamStats::default()) {
+        if stats.eq(&StreamStats::default())
+            && stream_loc.stream_type != StreamType::EnrichmentTables
+        {
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,

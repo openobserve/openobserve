@@ -14,14 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::{
-    ider,
-    meta::websocket::{SearchEventReq, ValuesEventReq},
+use config::meta::{
+    sql::OrderBy,
+    websocket::{SearchEventReq, ValuesEventReq},
 };
 use infra::errors;
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::tungstenite;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 
@@ -230,21 +229,6 @@ pub mod sessions_cache_utils {
     }
 }
 
-/// Setup tracing with a trace ID
-pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) -> tracing::Span {
-    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    let traceparent = format!(
-        "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be
-                        * recorded/exported */
-        trace_id,
-        ider::generate_span_id()
-    );
-    headers.insert("traceparent".to_string(), traceparent);
-    let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
-    span.set_parent(parent_ctx);
-    span
-}
-
 /// Represents the different types of WebSocket client messages that can be sent.
 ///
 /// The `WSClientMessage` enum is used to represent the different types of messages that can be sent
@@ -285,16 +269,15 @@ pub enum WsClientEvents {
 }
 
 impl WsClientEvents {
-    pub fn get_type(&self) -> String {
+    pub fn event_type(&self) -> &'static str {
         match self {
-            WsClientEvents::Search(_) => "search",
-            WsClientEvents::Values(_) => "values",
+            WsClientEvents::Search(req) => req.event_type(),
+            WsClientEvents::Values(req) => req.event_type(),
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { .. } => "cancel",
             WsClientEvents::Benchmark { .. } => "benchmark",
             WsClientEvents::TestAbnormalClose { .. } => "test_abnormal_close",
         }
-        .to_string()
     }
 
     pub fn to_json(&self) -> String {
@@ -374,6 +357,11 @@ pub enum WsServerEvents {
     End {
         trace_id: Option<String>,
     },
+    EventProgress {
+        trace_id: String,
+        percent: usize,
+        event_type: String,
+    },
     Ping(Vec<u8>),
     Pong(Vec<u8>),
 }
@@ -422,6 +410,7 @@ impl WsServerEvents {
             Self::CancelResponse { trace_id, .. } => trace_id.to_string(),
             Self::Error { trace_id, .. } => trace_id.clone().unwrap_or_default(),
             Self::End { trace_id } => trace_id.clone().unwrap_or_default(),
+            Self::EventProgress { trace_id, .. } => trace_id.to_string(),
             Self::Ping(_) => "".to_string(),
             Self::Pong(_) => "".to_string(),
         }
@@ -468,5 +457,31 @@ impl TryFrom<serde_json::Value> for WsServerEvents {
             Some("end") => serde_json::from_value(value).map_err(|e| e.to_string()),
             _ => Err("Unknown message type".to_string()),
         }
+    }
+}
+
+/// Calculate the progress percentage based on the search type and current partition
+pub fn calculate_progress_percentage(
+    partition_start_time: i64,
+    partition_end_time: i64,
+    req_start_time: i64,
+    req_end_time: i64,
+    partition_order_by: &OrderBy,
+) -> usize {
+    if req_end_time <= req_start_time {
+        return 0;
+    }
+
+    let percentage = if *partition_order_by == OrderBy::Desc {
+        // For dashboards/histograms partitions processed newest to oldest
+        (req_end_time - partition_start_time) as f32 / (req_end_time - req_start_time) as f32
+    } else {
+        // For regular searches partitions processed oldest to newest
+        (partition_end_time - req_start_time) as f32 / (req_end_time - req_start_time) as f32
+    };
+    if percentage < 0.5 {
+        ((percentage * 100.0).ceil() as usize).min(100)
+    } else {
+        ((percentage * 100.0).floor() as usize).min(100)
     }
 }

@@ -5073,6 +5073,11 @@ const useLogs = () => {
           trace_id: queryReq.traceId,
           payload: {
             query: queryReq.queryReq.query,
+            // pass encodig if enabled,
+            // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+            ...(store.state.zoConfig.sql_base64_enabled
+              ? { encoding: "base64" }
+              : {}),
           } as SearchRequestPayload,
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
@@ -5110,12 +5115,13 @@ const useLogs = () => {
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
-    searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
+    if (response.type === "search_response") {
+      
+      searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
       ? searchPartitionMap[payload.traceId]
       : 0;
-    searchPartitionMap[payload.traceId]++;
+      searchPartitionMap[payload.traceId]++;
 
-    if (response.type === "search_response") {
       if (payload.type === "search") {
         handleLogsResponse(
           payload.queryReq,

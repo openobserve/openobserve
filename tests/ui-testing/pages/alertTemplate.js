@@ -1,4 +1,4 @@
-// pages/AlertTemplatePage.js
+// pages/AlertTemplate.js
 
 import { expect } from '@playwright/test';
 
@@ -71,7 +71,6 @@ export class  AlertTemplate {
     async checkForTextInTable(text) {
         await expect(this.page.locator('tbody')).toContainText(text);
     }
-
-
+    
 }
 

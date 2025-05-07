@@ -774,7 +774,9 @@ impl FromRequest for AuthExtractor {
     #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
-            let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+            let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+            let auth_tokens: AuthTokens =
+                json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
             let access_token = auth_tokens.access_token;
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
@@ -813,12 +815,17 @@ impl FromRequest for AuthExtractor {
 pub fn extract_auth_str(req: &HttpRequest) -> String {
     let auth_ext_cookie = |req: &HttpRequest| -> String {
         req.cookie("auth_ext")
-            .map(|cookie| cookie.value().to_string())
+            .map(|cookie| {
+                let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+                std::str::from_utf8(&val).unwrap_or_default().to_string()
+            })
             .unwrap_or_default()
     };
 
     if let Some(cookie) = req.cookie("auth_tokens") {
-        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens =
+            json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
         if access_token.is_empty() {
             // If cookie was set but access token is still empty
@@ -838,7 +845,8 @@ pub fn extract_auth_str(req: &HttpRequest) -> String {
             format!("Bearer {}", access_token)
         }
     } else if let Some(cookie) = req.cookie("auth_ext") {
-        cookie.value().to_string()
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        std::str::from_utf8(&val).unwrap_or_default().to_string()
     } else if let Some(auth_header) = req.headers().get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             auth_str.to_owned()

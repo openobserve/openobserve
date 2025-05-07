@@ -244,6 +244,7 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     cookie_expiry: E,
 ) -> cookie::Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
+    let tokens = base64::encode(&tokens);
     let mut auth_cookie = cookie::Cookie::new(cookie_name, tokens);
     auth_cookie.set_expires(cookie_expiry.into());
     auth_cookie.set_http_only(true);
@@ -405,6 +406,7 @@ pub async fn authentication(
         })
         .unwrap();
 
+        let tokens = base64::encode(&tokens);
         let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
             cookie::time::OffsetDateTime::now_utc()

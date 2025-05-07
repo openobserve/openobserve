@@ -139,6 +139,9 @@ export const usePanelDataLoader = (
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
     isOperationCancelled: false,
+    loadingTotal: 0,
+    loadingCompleted: 0,
+    loadingProgressPercentage: 0,
   });
 
   // observer for checking if panel is visible on the screen
@@ -339,8 +342,13 @@ export const usePanelDataLoader = (
     endISOTimestamp: string,
     histogramInterval: string | null,
   ) => {
+    const sql = store.state.zoConfig.sql_base64_enabled
+      ? b64EncodeUnicode(
+          await changeHistogramInterval(query, histogramInterval ?? null),
+        )
+      : await changeHistogramInterval(query, histogramInterval ?? null);
     return {
-      sql: await changeHistogramInterval(query, histogramInterval ?? null),
+      sql,
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
@@ -363,6 +371,11 @@ export const usePanelDataLoader = (
   ) => {
     const { traceparent, traceId } = generateTraceContext();
     addTraceId(traceId);
+
+    state.loadingTotal = 0;
+    state.loadingCompleted = 0;
+    state.loadingProgressPercentage = 0;
+
     try {
       // partition api call
       const res: any = await callWithAbortController(
@@ -370,7 +383,14 @@ export const usePanelDataLoader = (
           queryService.partition({
             org_identifier: store.state.selectedOrganization.identifier,
             query: {
-              sql: query,
+              sql: store.state.zoConfig.sql_base64_enabled
+                ? b64EncodeUnicode(query)
+                : query,
+              // pass encodig if enabled,
+              // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+              ...(store.state.zoConfig.sql_base64_enabled
+                ? { encoding: "base64" }
+                : {}),
               query_fn: it.vrlFunctionQuery
                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                 : null,
@@ -395,6 +415,14 @@ export const usePanelDataLoader = (
 
       // partition array from api response
       const partitionArr = res?.data?.partitions ?? [];
+
+      // Set total steps: number of partitions only (excluding the initial partition API call)
+      const totalSteps = partitionArr.length;
+      state.loadingTotal = totalSteps;
+
+      // Reset loading completed and progress since we're not counting the partition API call
+      state.loadingCompleted = 0;
+      state.loadingProgressPercentage = 0;
 
       // always sort partitions in descending order
       partitionArr.sort((a: any, b: any) => a[0] - b[0]);
@@ -442,6 +470,11 @@ export const usePanelDataLoader = (
                       partition[1],
                       histogramInterval,
                     ),
+                    // pass encodig if enabled,
+                    // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+                    ...(store.state.zoConfig.sql_base64_enabled
+                      ? { encoding: "base64" }
+                      : {}),
                   },
                   page_type: pageType,
                   traceparent,
@@ -452,6 +485,14 @@ export const usePanelDataLoader = (
               ),
             abortControllerRef.signal,
           );
+
+          // Update the progress after each partition completes
+          state.loadingCompleted = state.loadingCompleted + 1;
+          // Calculate progress in 0-100 format
+          state.loadingProgressPercentage = Math.round(
+            (state.loadingCompleted / totalSteps) * 100,
+          );
+
           // remove past error detail
           state.errorDetail = {
             message: "",
@@ -614,6 +655,9 @@ export const usePanelDataLoader = (
       if (response.type === "error") {
         // set loading to false
         state.loading = false;
+        state.loadingTotal = 0;
+        state.loadingCompleted = 0;
+        state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
 
         processApiError(response?.content, "sql");
@@ -622,12 +666,22 @@ export const usePanelDataLoader = (
       if (response.type === "end") {
         // set loading to false
         state.loading = false;
+        state.loadingTotal = 0;
+        state.loadingCompleted = 0;
+        state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
+      }
+      if (response.type === "event_progress") {
+        // The loadingProgressPercentage value is now in 0-100 format, no need to multiply
+        state.loadingProgressPercentage = response?.content?.percent ?? 0;
       }
     } catch (error: any) {
       // set loading to false
       state.loading = false;
       state.isOperationCancelled = false;
+      state.loadingTotal = 0;
+      state.loadingCompleted = 0;
+      state.loadingProgressPercentage = 0;
       state.errorDetail = {
         message: error?.message || "Unknown error in search response",
         code: error?.code ?? "",
@@ -658,6 +712,11 @@ export const usePanelDataLoader = (
             payload.queryReq.endISOTimestamp,
             null,
           ),
+          // pass encodig if enabled,
+          // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
         },
         stream_type: payload.pageType,
         search_type: searchType.value ?? "dashboards",
@@ -708,6 +767,9 @@ export const usePanelDataLoader = (
 
     // set loading to false
     state.loading = false;
+    state.loadingTotal = 0;
+    state.loadingCompleted = 0;
+    state.loadingProgressPercentage = 0;
     state.isOperationCancelled = false;
 
     processApiError(response?.content, "sql");
@@ -739,6 +801,11 @@ export const usePanelDataLoader = (
           startISOTimestamp,
           endISOTimestamp,
           currentQueryIndex,
+          // pass encodig if enabled,
+          // make sure that encoding: null is not being passed, that's why used object extraction logic
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
         },
         type: "histogram",
         isPagination: false,
@@ -769,7 +836,9 @@ export const usePanelDataLoader = (
   const loadData = async () => {
     try {
       log("loadData: entering...");
-
+      state.loadingTotal = 0;
+      state.loadingCompleted = 0;
+      state.loadingProgressPercentage = 0;
       // Check and abort the previous call if necessary
       if (abortController) {
         log("loadData: aborting previous function call (if any)");

@@ -35,4 +35,25 @@ export default class DashboardactionPage {
       return btn && btn.classList.contains("bg-secondary");
     });
   }
+
+  //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
+
+  async selectPanelAction(panelName, action) {
+    const actionDataTestIds = {
+      Edit: "dashboard-edit-panel",
+      Layout: "dashboard-edit-layout",
+      Duplicate: "dashboard-duplicate-panel",
+      Inspector: "dashboard-query-inspector-panel",
+      Move: "dashboard-move-to-another-panel",
+      Delete: "dashboard-delete-panel",
+    };
+
+    const actionTestId = actionDataTestIds[action];
+    if (!actionTestId) throw new Error(`Unknown action: ${action}`);
+
+    await this.page
+      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .click();
+    await this.page.locator(`[data-test="${actionTestId}"]`).click();
+  }
 }
