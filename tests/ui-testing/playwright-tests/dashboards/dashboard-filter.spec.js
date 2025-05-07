@@ -568,22 +568,6 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
-    // await page.waitForTimeout(500);
-    // await page
-    //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-    //   .first()
-    //   .click();
-
-    // await page.getByText("Filters on Fieldarrow_drop_down").click();
-
-    // await page
-    //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-    //   .first()
-    //   .fill("kubernetes_container_image");
-
-    // await page
-    //   .getByText("Filters on Fieldarrow_drop_down")
-    //   .fill("kubernetes_container_image");
 
     const lastInput = page
       .locator('[data-test="dashboard-add-condition-column-0\\}"]')
@@ -592,13 +576,6 @@ test.describe("dashboard filter testcases", () => {
     lastInput.fill("kubernetes_container_image");
 
     await page.getByText("kubernetes_container_image", { exact: true }).click();
-
-    // Wait for the option to appear, and click it
-    // const option = page.getByText("kubernetes_container_image", {
-    //   exact: true,
-    // });
-    // await option.waitFor({ timeout: 15000 });
-    // await option.click();
 
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
