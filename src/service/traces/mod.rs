@@ -52,9 +52,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{
-            SERVICE, SERVICE_NAME, TriggerAlertData, evaluate_trigger, grpc::get_val, write_file,
-        },
+        ingestion::{TriggerAlertData, evaluate_trigger, grpc::get_val, write_file},
         logs::O2IngestJsonData,
         metadata::{
             MetadataItem, MetadataType,
@@ -68,6 +66,8 @@ use crate::{
     },
 };
 
+const SERVICE_NAME: &str = "service.name";
+const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
