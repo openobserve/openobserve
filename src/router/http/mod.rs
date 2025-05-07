@@ -317,12 +317,14 @@ async fn proxy_querier_by_body(
     let (key, payload) = match query_str {
         s if s.ends_with("/prometheus/api/v1/query_range") || s.ends_with("/prometheus/api/v1/query_exemplars") => {
             if req.method() == Method::GET {
-                let query = web::Query::<RequestRangeQuery>::from_query(req.query_string())
-                    .map_err(|_| HttpResponse::BadRequest().body("Failed to parse query string"))?;
+                let Ok(query) = web::Query::<RequestRangeQuery>::from_query(req.query_string()) else {
+                    return Ok(HttpResponse::BadRequest().body("Failed to parse query string"));
+                };
                 (query.query.clone().unwrap_or_default(), ProxyPayload::None)
             } else {
-                let query = web::Form::<RequestRangeQuery>::from_request(&req, &mut payload.into_inner()).await
-                    .map_err(|_| HttpResponse::BadRequest().body("Failed to parse form data"))?;
+                let Ok(query) = web::Form::<RequestRangeQuery>::from_request(&req, &mut payload.into_inner()).await else {
+                    return Ok(HttpResponse::BadRequest().body("Failed to parse form data"));
+                };
                 (
                     query.query.clone().unwrap_or_default(),
                     ProxyPayload::PromQLQuery(query),
@@ -336,11 +338,16 @@ async fn proxy_querier_by_body(
             let body = payload.to_bytes().await.map_err(|e| {
                 log::error!("Failed to parse {} request data: {:?}", request_type, e);
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                    &format!("Failed to parse {} request data", request_type)
+                    format!("Failed to parse {} request data", request_type).as_str(),
                 )))
             })?;
-            let query = json::from_slice::<SearchRequest>(&body)
-                .map_err(|_| HttpResponse::BadRequest().body(&format!("Failed to parse {} request", request_type)))?;
+            let Ok(query) = json::from_slice::<SearchRequest>(&body) else {
+                return if is_stream {
+                    Ok(HttpResponse::BadRequest().body("Failed to parse stream request"))
+                } else {
+                    Ok(HttpResponse::BadRequest().body("Failed to parse search request"))
+                };
+            };
             (
                 query.query.sql.to_string(),
                 ProxyPayload::SearchRequest(Box::new(web::Json(query))),
@@ -353,8 +360,9 @@ async fn proxy_querier_by_body(
                     "Failed to parse search partition request data",
                 )))
             })?;
-            let query = json::from_slice::<SearchPartitionRequest>(&body)
-                .map_err(|_| HttpResponse::BadRequest().body("Failed to parse search request"))?;
+            let Ok(query) = json::from_slice::<SearchPartitionRequest>(&body) else {
+                return Ok(HttpResponse::BadRequest().body("Failed to parse search request"));
+            };
             (
                 query.sql.to_string(),
                 ProxyPayload::SearchPartitionRequest(Box::new(web::Json(query))),
