@@ -523,57 +523,16 @@ export const usePanelDataLoader = (
           }
           // if order by is desc, append new partition response at end
           else if (order_by.toLowerCase() === "desc") {
-            // state.data[currentQueryIndex] = [
-            //   ...(state.data[currentQueryIndex] ?? []),
-            //   ...searchRes.data.hits,
-            // ];
-            // want to divide the hits into n chunks, and then append the chunks to the state data asynchronously
-            // and then update the state data
-            const n = 1000;
-            const chunks: any[] = [];
-            for (let i = 0; i < searchRes?.data?.hits?.length; i += n) {
-              chunks.push(searchRes?.data?.hits?.slice(i, i + n));
-            }
-            // use chunks to update the state data
-            for (let i = 0; i < chunks.length; i++) {
-              await new Promise((resolve) => {
-                setTimeout(() => {
-                  console.log("chunks", i);
-                  state.data[currentQueryIndex] = [
-                    ...(state.data[currentQueryIndex] ?? []),
-                    ...chunks[i],
-                  ];
-                  resolve(true);
-                }, 0);
-              });
-            }
+            state.data[currentQueryIndex] = [
+              ...(state.data[currentQueryIndex] ?? []),
+              ...searchRes.data.hits,
+            ];
           } else {
             // else append new partition response at start
-            // state.data[currentQueryIndex] = [
-            //   ...searchRes.data.hits,
-            //   ...(state.data[currentQueryIndex] ?? []),
-            // ];
-
-            // want to divide the hits into n chunks, and then append the chunks to the state data asynchronously
-            // and then update the state data
-            const n = 1000;
-            const chunks: any[] = [];
-            for (let i = 0; i < searchRes?.data?.hits?.length; i += n) {
-              chunks.push(searchRes?.data?.hits?.slice(i, i + n));
-            }
-            // use chunks to update the state data
-            for (let i = 0; i < chunks.length; i++) {
-              await new Promise((resolve) => {
-                setTimeout(() => {
-                  console.log("chunks", i);
-                  state.data[currentQueryIndex] = [
-                    ...chunks[i],
-                    ...(state.data[currentQueryIndex] ?? []),
-                  ];
-                  resolve(true);
-                }, 0);
-              });
-            }
+            state.data[currentQueryIndex] = [
+              ...searchRes.data.hits,
+              ...(state.data[currentQueryIndex] ?? []),
+            ];
           }
 
           // update result metadata

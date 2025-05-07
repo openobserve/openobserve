@@ -24,12 +24,11 @@ use ::config::{
     utils::{json, rand::get_rand_element},
 };
 use actix_web::{
-    FromRequest, HttpRequest, HttpResponse,
-    http::{Error, Method},
+    FromRequest, HttpMessage, HttpRequest, HttpResponse,
+    http::{Error, Method, header},
     route, web,
 };
 use hashbrown::HashMap;
-use futures::FutureExt;
 pub use ws::remove_querier_from_handler;
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
@@ -263,30 +262,38 @@ async fn default_proxy(
         }
     }
 
-    let http_response = if query_str.ends_with("/_search_stream") || query_str.ends_with("/_values_stream") {
-        new_resp.streaming(resp.body().into_stream())
-    } else {
-        let body = match resp
-            .body()
-            .limit(get_config().limit.req_payload_limit)
-            .await
-        {
-            Ok(b) => b,
-            Err(e) => {
-                log::error!(
-                    "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
-                    new_url.path,
-                    new_url.node_addr,
-                    e,
-                    start.elapsed().as_millis()
-                );
-                return Ok(HttpResponse::ServiceUnavailable()
-                    .force_close()
-                    .body(e.to_string()));
-            }
+    let http_response =
+        if query_str.ends_with("/_search_stream") || query_str.ends_with("/_values_stream") {
+            // Add headers to disable response buffering
+            new_resp
+                .insert_header((header::CACHE_CONTROL, "no-cache"))
+                .insert_header((
+                    header::CONNECTION,
+                    header::HeaderValue::from_static("keep-alive"),
+                ))
+                .streaming(resp.take_payload())
+        } else {
+            let body = match resp
+                .body()
+                .limit(get_config().limit.req_payload_limit)
+                .await
+            {
+                Ok(b) => b,
+                Err(e) => {
+                    log::error!(
+                        "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
+                        new_url.path,
+                        new_url.node_addr,
+                        e,
+                        start.elapsed().as_millis()
+                    );
+                    return Ok(HttpResponse::ServiceUnavailable()
+                        .force_close()
+                        .body(e.to_string()));
+                }
+            };
+            new_resp.body(body)
         };
-        new_resp.body(body)
-    };
     Ok(http_response)
 }
 
@@ -412,31 +419,26 @@ async fn proxy_querier_by_body(
         }
     }
 
-    let http_response = if query_str.ends_with("/_search_stream") || query_str.ends_with("/_values_stream") {
-        new_resp.streaming(resp.body().into_stream())
-    } else {
-        let body = match resp
-            .body()
-            .limit(get_config().limit.req_payload_limit)
-            .await
-        {
-            Ok(b) => b,
-            Err(e) => {
-                log::error!(
-                    "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
-                    new_url.path,
-                    new_url.node_addr,
-                    e,
-                    start.elapsed().as_millis()
-                );
-                return Ok(HttpResponse::ServiceUnavailable()
-                    .force_close()
-                    .body(e.to_string()));
-            }
-        };
-        new_resp.body(body)
+    let body = match resp
+        .body()
+        .limit(get_config().limit.req_payload_limit)
+        .await
+    {
+        Ok(b) => b,
+        Err(e) => {
+            log::error!(
+                "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
+                new_url.path,
+                new_url.node_addr,
+                e,
+                start.elapsed().as_millis()
+            );
+            return Ok(HttpResponse::ServiceUnavailable()
+                .force_close()
+                .body(e.to_string()));
+        }
     };
-    Ok(http_response)
+    Ok(new_resp.body(body))
 }
 
 async fn proxy_ws(

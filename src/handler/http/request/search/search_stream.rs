@@ -66,9 +66,9 @@ use crate::{
         },
         utils::{
             http::{
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_fallback_order_by_col_from_request
+                get_fallback_order_by_col_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request,
             },
             stream::{get_max_query_range, get_settings_max_query_range},
             websocket::{calc_queried_range, update_histogram_interval_in_query},
