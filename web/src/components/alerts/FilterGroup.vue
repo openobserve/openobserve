@@ -63,7 +63,7 @@
                 :depth="depth"
             />
             <div class="tw-mb-1">
-                <q-btn icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
+                <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
             </div>
                 </div>
         </div>
