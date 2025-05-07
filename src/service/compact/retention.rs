@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
-use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
@@ -361,10 +361,13 @@ pub async fn delete_by_date(
     if is_local_disk_storage() {
         let dirs_to_delete =
             generate_local_dirs(org_id, stream_type, stream_name, date_start, date_end);
-
         // Delete all collected directories in parallel
         let mut delete_tasks = vec![];
         for dir in dirs_to_delete {
+            log::info!(
+                "[COMPACTOR] stream {org_id}/{stream_type}/{stream_name} delete dir: {:?}",
+                dir
+            );
             delete_tasks.push(tokio::fs::remove_dir_all(dir));
         }
         futures::future::try_join_all(delete_tasks).await?;
@@ -497,6 +500,7 @@ async fn write_file_list(
                 let del_items = events
                     .iter()
                     .map(|v| FileListDeleted {
+                        account: v.account.clone(),
                         file: v.key.clone(),
                         index_file: v.meta.index_size > 0,
                         flattened: v.meta.flattened,
@@ -533,64 +537,6 @@ fn generate_local_dirs(
     let cfg = get_config();
     let mut dirs_to_delete = Vec::new();
     while date_start <= date_end {
-        // Handle yearly chunks
-        if date_start.month() == 1
-            && date_start.day() == 1
-            && (date_start + Duration::days(365)).year() <= date_end.year()
-        {
-            // stream data
-            let year_dir = format!(
-                "{}files/{org_id}/{stream_type}/{stream_name}/{}",
-                cfg.common.data_stream_dir,
-                date_start.format("%Y")
-            );
-            let year_path = std::path::Path::new(&year_dir);
-            if year_path.exists() {
-                dirs_to_delete.push(year_path.to_path_buf());
-            }
-            // index data
-            let year_dir = format!(
-                "{}files/{org_id}/index/{stream_name}_{stream_type}/{}",
-                cfg.common.data_stream_dir,
-                date_start.format("%Y")
-            );
-            let year_path = std::path::Path::new(&year_dir);
-            if year_path.exists() {
-                dirs_to_delete.push(year_path.to_path_buf());
-            }
-            date_start += Duration::days(365);
-            continue;
-        }
-
-        // Handle monthly chunks
-        if date_start.day() == 1 && (date_start + Duration::days(30)).month() != date_start.month()
-        {
-            // stream data
-            let month_dir = format!(
-                "{}files/{org_id}/{stream_type}/{stream_name}/{}",
-                cfg.common.data_stream_dir,
-                date_start.format("%Y/%m")
-            );
-            let month_path = std::path::Path::new(&month_dir);
-            if month_path.exists() {
-                dirs_to_delete.push(month_path.to_path_buf());
-            }
-            // index data
-            let month_dir = format!(
-                "{}files/{org_id}/index/{stream_name}_{stream_type}/{}",
-                cfg.common.data_stream_dir,
-                date_start.format("%Y/%m")
-            );
-            let month_path = std::path::Path::new(&month_dir);
-            if month_path.exists() {
-                dirs_to_delete.push(month_path.to_path_buf());
-            }
-            date_start += Duration::days(30); // Move to the next month
-            continue;
-        }
-
-        // Handle leftover day ranges
-        // stream data
         let day_dir = format!(
             "{}files/{org_id}/{stream_type}/{stream_name}/{}",
             cfg.common.data_stream_dir,

@@ -48,6 +48,7 @@ use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
     Arc::new(Schema::new(vec![
         Field::new("id", arrow_schema::DataType::Int64, false),
+        Field::new("account", arrow_schema::DataType::Utf8, false),
         Field::new("org", arrow_schema::DataType::Utf8, false),
         Field::new("stream", arrow_schema::DataType::Utf8, false),
         Field::new("date", arrow_schema::DataType::Utf8, false),
@@ -150,8 +151,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
-    let config = get_config();
 
+    let config = get_config();
     if !config.common.file_list_dump_enabled {
         return Ok(());
     }
@@ -428,18 +429,19 @@ async fn generate_dump(
         flattened: false,
     };
 
+    // first store the file in storage
+    // then update the entries in db,
+    // and if both pass only then set the job as dumped=true
+    let account = infra::storage::get_account(&file_key).unwrap_or_default();
+    infra::storage::put(&account, &file_key, buf.into()).await?;
+
     let dump_file = FileKey {
+        account: account.clone(),
         key: file_key.clone(),
         meta: meta.clone(),
         deleted: false,
         segment_ids: None,
     };
-
-    // first store the file in storage
-    // then update the entries in db,
-    // and if both pass only then set the job as dumped=true
-
-    infra::storage::put(&file_key, buf.into()).await?;
     infra::file_list::update_dump_records(&dump_file, &ids).await?;
     infra::file_list::set_job_dumped_status(job_id, true).await?;
     log::info!(
