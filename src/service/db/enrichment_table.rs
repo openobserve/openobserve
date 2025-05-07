@@ -17,7 +17,10 @@ use std::sync::Arc;
 
 use config::{
     meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
-    utils::{json, time::now_micros},
+    utils::{
+        json,
+        time::{BASE_TIME, now_micros},
+    },
 };
 use infra::{cache::stats, db as infra_db};
 use vrl::prelude::NotNan;
@@ -32,13 +35,8 @@ pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let (start_time, end_time) = match get_meta_table_stats(org_id, name).await {
-        Some(meta_stats) => (meta_stats.start_time, now_micros()),
-        None => {
-            let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
-            (stats.doc_time_min, now_micros())
-        }
-    };
+    let start_time = get_start_time(org_id, name).await;
+    let end_time = now_micros();
 
     let query = config::meta::search::Query {
         sql: format!("SELECT * FROM \"{name}\""),
@@ -133,7 +131,11 @@ pub async fn get_start_time(org_id: &str, name: &str) -> i64 {
         Some(meta_stats) => meta_stats.start_time,
         None => {
             let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
-            stats.doc_time_min
+            if stats.doc_time_min > 0 {
+                stats.doc_time_min
+            } else {
+                BASE_TIME.timestamp_micros()
+            }
         }
     }
 }
