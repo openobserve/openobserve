@@ -108,12 +108,8 @@ const useHttpStreaming = () => {
     data: {
       queryReq: SearchRequestPayload;
       type: "search" | "histogram" | "pageCount" | "values";
-      isPagination: boolean;
       traceId: string;
       org_id: string;
-      dashboard_id: string;
-      folder_id: string;
-      fallback_order_by_col: string;
       pageType: string;
       searchType: string;
       meta: any;
@@ -162,12 +158,8 @@ const useHttpStreaming = () => {
     data: {
       queryReq: SearchRequestPayload;
       type: "search" | "histogram" | "pageCount" | "values";
-      isPagination: boolean;
       traceId: string;
       org_id: string;
-      dashboard_id: string;
-      folder_id: string;
-      fallback_order_by_col: string;
       pageType: string;
       searchType: string;
       meta: any;
@@ -179,7 +171,7 @@ const useHttpStreaming = () => {
       reset: (data: any, response: any) => void;
     }
   ) => {
-    const { traceId, org_id, type, queryReq, searchType, dashboard_id, folder_id, fallback_order_by_col, pageType } = data;
+    const { traceId, org_id, type, queryReq, searchType, pageType, meta } = data;
     const abortController = new AbortController();
 
     // Store the abort controller for this trace
@@ -191,14 +183,27 @@ const useHttpStreaming = () => {
     const use_cache = (window as any).use_cache !== undefined
       ? (window as any).use_cache
       : true;
-     
-    url = `/_search_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
-    if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
-    if (folder_id) url += `&folder_id=${folder_id}`;
-    if (fallback_order_by_col) url += `&fallback_order_by_col=${fallback_order_by_col}`;
-    if (typeof queryReq.query.sql != "string") {
-      url = `/_search_multi_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
-    }
+
+      //TODO OK: Create method to get the url based on the type
+      if(type === "search" || type === "histogram" || type === "pageCount") {
+        url = `/_search_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
+        if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
+        if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
+        if (meta?.fallback_order_by_col) url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
+        if (typeof queryReq.query.sql != "string") {
+          url = `/_search_multi_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
+        }
+      } else if(type === "values") {
+        const fieldsString = meta?.fields.join(",");
+        url = `/_values_stream?fields=${fieldsString}&size=${meta?.size}&start_time=${meta?.start_time}&end_time=${meta?.end_time}`;
+        if (meta?.query_context) url = url + `&sql=${meta?.query_context}`;
+        if (meta?.no_count) url = url + `&no_count=${meta?.no_count}`;
+        if (meta?.query_fn?.trim()) url = url + `&query_fn=${meta?.query_fn}`;
+        if (meta?.action_id?.trim()) url = url + `&action_id=${meta?.action_id}`;
+        if (type) url += "&type=" + type;
+        if (meta?.regions) url += "&regions=" + meta?.regions;
+        if (meta?.clusters) url += "&clusters=" + meta?.clusters;
+      }
 
     url = `${store.state.API_ENDPOINT}/api/${org_id}` + url;
 

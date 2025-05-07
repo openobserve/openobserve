@@ -939,9 +939,6 @@ export const usePanelDataLoader = (
         traceId: string;
         org_id: string;
         pageType: string;
-        dashboard_id: string;
-        folder_id: string;
-        fallback_order_by_col: string;
         searchType: string;
         meta: any;
       } = {
@@ -960,11 +957,11 @@ export const usePanelDataLoader = (
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
         searchType: searchType.value ?? "dashboards",
-        dashboard_id: dashboardId?.value,
-        folder_id: folderId?.value,
-        fallback_order_by_col: getFallbackOrderByCol(),
         meta: {
           currentQueryIndex,
+          dashboard_id: dashboardId?.value,
+          folder_id: folderId?.value,
+          fallback_order_by_col: getFallbackOrderByCol(),
         },
       };
 
