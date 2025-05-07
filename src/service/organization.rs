@@ -18,8 +18,7 @@ use std::io::{Error, ErrorKind};
 use config::{
     meta::{
         alerts::alert::ListAlertsParams, dashboards::ListDashboardsParams,
-        pipeline::components::PipelineSource,
-        self_reporting::usage, stream::StreamType,
+        pipeline::components::PipelineSource, self_reporting::usage, stream::StreamType,
     },
     utils::{json, rand::generate_random_string, time},
 };
