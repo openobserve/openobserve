@@ -214,6 +214,10 @@ pub async fn query(
     id_hint: Option<i64>,
 ) -> Result<Vec<FileRecord>, errors::Error> {
     let cfg = get_config();
+    if !cfg.common.file_list_dump_enabled {
+        return Ok(vec![]);
+    }
+
     let stream_key = format!(
         "{org}/{}/{org}_{stream_type}_{stream}",
         StreamType::Filelist
