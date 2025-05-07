@@ -37,6 +37,7 @@ pub struct Dashboard {
     pub v3: Option<v3::Dashboard>,
     pub v4: Option<v4::Dashboard>,
     pub v5: Option<v5::Dashboard>,
+    pub v6: Option<v6::Dashboard>,
     pub version: i32,
     pub hash: String,
     #[serde(default)]
@@ -51,6 +52,7 @@ impl Dashboard {
             3 => self.v3.as_ref().map(|inner| inner.dashboard_id.as_str()),
             4 => self.v4.as_ref().map(|inner| inner.dashboard_id.as_str()),
             5 => self.v5.as_ref().map(|inner| inner.dashboard_id.as_str()),
+            6 => self.v6.as_ref().map(|inner| inner.dashboard_id.as_str()),
             _ => None,
         }
     }
@@ -82,6 +84,11 @@ impl Dashboard {
                 v5: Some(inner),
                 ..
             } => inner.dashboard_id = dashboard_id,
+            Self {
+                version: 6,
+                v6: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
             _ => {}
         };
     }
@@ -97,6 +104,7 @@ impl Dashboard {
             3 => self.v3.as_ref().map(|inner| inner.owner.as_str()),
             4 => self.v4.as_ref().map(|inner| inner.owner.as_str()),
             5 => self.v5.as_ref().map(|inner| inner.owner.as_str()),
+            6 => self.v6.as_ref().map(|inner| inner.owner.as_str()),
             _ => None,
         }
     }
@@ -128,6 +136,11 @@ impl Dashboard {
                 v5: Some(inner),
                 ..
             } => inner.owner = owner,
+            Self {
+                version: 6,
+                v6: Some(inner),
+                ..
+            } => inner.owner = owner,
             _ => {}
         };
     }
@@ -139,6 +152,7 @@ impl Dashboard {
             3 => self.v3.as_ref().map(|inner| inner.title.as_str()),
             4 => self.v4.as_ref().map(|inner| inner.title.as_str()),
             5 => self.v5.as_ref().map(|inner| inner.title.as_str()),
+            6 => self.v6.as_ref().map(|inner| inner.title.as_str()),
             _ => None,
         }
     }
@@ -170,6 +184,11 @@ impl Dashboard {
                 v5: Some(inner),
                 ..
             } => inner.title = title,
+            Self {
+                version: 6,
+                v6: Some(inner),
+                ..
+            } => inner.title = title,
             _ => {}
         };
     }
@@ -181,6 +200,7 @@ impl Dashboard {
             3 => self.v3.as_ref().map(|inner| inner.description.as_str()),
             4 => self.v4.as_ref().map(|inner| inner.description.as_str()),
             5 => self.v5.as_ref().map(|inner| inner.description.as_str()),
+            6 => self.v6.as_ref().map(|inner| inner.description.as_str()),
             _ => None,
         }
     }
@@ -192,6 +212,7 @@ impl Dashboard {
             3 => self.v3.as_ref().map(|inner| inner.role.as_str()),
             4 => self.v4.as_ref().map(|inner| inner.role.as_str()),
             5 => self.v5.as_ref().map(|inner| inner.role.as_str()),
+            6 => self.v6.as_ref().map(|inner| inner.role.as_str()),
             _ => None,
         }
     }
@@ -209,6 +230,7 @@ impl Dashboard {
             3 => self.v3.as_ref().map(|inner| inner.created),
             4 => self.v4.as_ref().map(|inner| inner.created),
             5 => self.v5.as_ref().map(|inner| inner.created),
+            6 => self.v6.as_ref().map(|inner| inner.created),
             _ => None,
         }
     }
@@ -220,6 +242,7 @@ pub mod v2;
 pub mod v3;
 pub mod v4;
 pub mod v5;
+pub mod v6;
 
 pub fn datetime_now() -> DateTime<FixedOffset> {
     Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(

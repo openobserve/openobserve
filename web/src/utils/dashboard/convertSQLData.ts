@@ -262,7 +262,6 @@ export const convertSQLData = async (
       }
 
       const yAxisValue = item[yAxisKey];
-
       acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
       return acc;
     }, {});
@@ -349,7 +348,9 @@ export const convertSQLData = async (
 
   const missingValue = () => {
     // Get the interval in minutes
-    const interval = resultMetaData?.map((it: any) => it?.histogram_interval)?.[0];
+    const interval = resultMetaData?.map(
+      (it: any) => it?.histogram_interval,
+    )?.[0];
 
     if (
       !interval ||
@@ -1908,8 +1909,9 @@ export const convertSQLData = async (
 
         const field = panelSchema.queries[0].fields?.x.find(
           (it: any) =>
-            it.aggregationFunction == "histogram" &&
-            it.column == store.state.zoConfig.timestamp_column,
+            it.functionName == "histogram" &&
+            it?.args?.[0]?.value?.field ==
+              store.state.zoConfig.timestamp_column,
         );
         // if histogram
         if (field) {
@@ -2213,14 +2215,14 @@ export const convertSQLData = async (
     // auto SQL: if x axis has time series(aggregation function is histogram)
     const field = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
-        it.aggregationFunction == "histogram" &&
-        it.column == store.state.zoConfig.timestamp_column,
+        it.functionName == "histogram" &&
+        it?.args?.[0]?.value?.field == store.state.zoConfig.timestamp_column,
     );
 
     const timestampField = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
-        !it.aggregationFunction &&
-        it.column == store.state.zoConfig.timestamp_column,
+        !it.functionName &&
+        it?.args?.[0]?.value?.field == store.state.zoConfig.timestamp_column,
     );
 
     //if x axis has time series
