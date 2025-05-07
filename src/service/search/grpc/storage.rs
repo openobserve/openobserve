@@ -283,7 +283,7 @@ pub async fn search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, cached ratio {},{download_msg} took: {} ms",
+                "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
                 query.trace_id,
                 query.org_id,
                 query.stream_type,
@@ -536,7 +536,7 @@ pub async fn filter_file_list_by_tantivy_index(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, cached ratio {},{download_msg} took: {} ms",
+                "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
                 query.trace_id,
                 query.org_id,
                 query.stream_type,
