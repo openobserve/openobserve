@@ -119,6 +119,8 @@ jobs:
             "dashboards/dashboard2.spec.js",
             "dashboards/dashboardtype.spec.js",
             "dashboards/visualize.spec.js",
+            # "unflattened.spec.js",
+            # "secondsPrecisionAdded.spec.js",
             "dashboards/visualization-vrl.spec.js",
             "enrichment.spec.js",
             "join.spec.js",
