@@ -342,9 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <HighLight
                   :content="cell.renderValue()"
                   :query-string="
-                    searchObj.meta.sqlMode
-                      ? searchObj.data.query.toLowerCase().split('where')[1]
-                      : searchObj.data.query.toLowerCase()
+                    highlightQuery
                   "
                 />
               </td>
@@ -374,7 +372,6 @@ import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "quasar";
-import useLogs from "@/composables/useLogs";
 
 const props = defineProps({
   rows: {
@@ -418,6 +415,11 @@ const props = defineProps({
     default: () => true,
   },
   jsonpreviewStreamName:{
+    type: String,
+    default: "",
+    required: false,
+  },
+  highlightQuery:{
     type: String,
     default: "",
     required: false,
@@ -466,7 +468,9 @@ const isFunctionErrorOpen = ref(false);
 
 const activeCellActionId = ref("");
 
-const {searchObj} = useLogs();
+const highlightQuery = computed(() => {
+  return props.highlightQuery;
+});
 
 watch(
   () => props.columns,

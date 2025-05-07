@@ -47,22 +47,23 @@ export default defineComponent({
     const list = ref<any>([]);
     let timeoutId: ReturnType<typeof setTimeout>;
     //this function is used to get the keywords from the query string
-    //which matches match_all(string) , fuzzy_match_all(string)
+    //which matches match_all(string) , fuzzy_match_all(string, number)
+    //it should only match the string and not the number in fuzzy_match_all
     const getKeywords = (queryString: string): string[] => {
-  if (!queryString?.trim()) return [];
+      if (!queryString?.trim()) return [];
 
-  const regex = /(?:(?:match_all|fuzzy_match_all)\((['"])([^'"]+)\1\)|(['"])([^'"]+)\4)/g;
-  const result: string[] = [];
-  let match;
+      const regex = /\b(?:match_all|fuzzy_match_all)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/g;
+      const result: string[] = [];
+      let match;
 
-  while ((match = regex.exec(queryString)) !== null) {
-    if (match[2]) result.push(match[2]);
-    else if (match[4] && !/^[a-zA-Z_]+\s*=\s*$/.test(match[4])) {
-      result.push(match[4]);
-    }
-  }
-  return Array.from(new Set(result));
-};
+      while ((match = regex.exec(queryString)) !== null) {
+        if (match[2]) result.push(match[2]);
+        else if (match[4] && !/^[a-zA-Z_]+\s*=\s*$/.test(match[4])) {
+          result.push(match[4]);
+        }
+      }
+    return Array.from(new Set(result));
+  };
 
 
     //it takes the content and the keywords and returns the content with the keywords highlighted
@@ -81,7 +82,6 @@ export default defineComponent({
         const isKeyWord = keywords.some(k => k.toLowerCase() === part.toLowerCase());
         result.push({ isKeyWord, text: part });
       }
-
       return result;
     };
 
