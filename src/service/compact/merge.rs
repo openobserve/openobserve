@@ -1310,17 +1310,20 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                             file_size,
                             data_len,
                         );
-                        if let Err(e) =
-                            file_list::update_compressed_size(&file_name, data_len as i64).await
-                        {
-                            log::error!(
-                                "[COMPACT] update file size for file {} err: {}",
-                                file_name,
-                                e
-                            );
-                        }
+                        // update database
+                        // if let Err(e) =
+                        //     file_list::update_compressed_size(&file_name, data_len as i64).await
+                        // {
+                        //     log::error!(
+                        //         "[COMPACT] update file size for file {} err: {}",
+                        //         file_name,
+                        //         e
+                        //     );
+                        // }
+                        Some(file_name)
+                    } else {
+                        None
                     }
-                    None
                 }
                 Err(e) => {
                     if e.to_string().to_lowercase().contains("not found")
