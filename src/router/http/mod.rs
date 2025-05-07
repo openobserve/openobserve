@@ -29,6 +29,7 @@ use actix_web::{
     route, web,
 };
 use hashbrown::HashMap;
+use futures::FutureExt;
 pub use ws::remove_querier_from_handler;
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
@@ -232,6 +233,8 @@ async fn default_proxy(
     new_url: URLDetails,
     start: std::time::Instant,
 ) -> actix_web::Result<HttpResponse, Error> {
+    let p = new_url.path.find("?").unwrap_or(new_url.path.len());
+    let query_str = &new_url.path[..p];
     // send query
     let req = create_proxy_request(client, req, &new_url).await?;
     let mut resp = match req.send_stream(payload).await {
@@ -260,27 +263,31 @@ async fn default_proxy(
         }
     }
 
-    // set body
-    let body = match resp
-        .body()
-        .limit(get_config().limit.req_payload_limit)
-        .await
-    {
-        Ok(b) => b,
-        Err(e) => {
-            log::error!(
-                "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
-                new_url.path,
-                new_url.node_addr,
-                e,
-                start.elapsed().as_millis()
-            );
-            return Ok(HttpResponse::ServiceUnavailable()
-                .force_close()
-                .body(e.to_string()));
-        }
+    let http_response = if query_str.ends_with("/_search_stream") || query_str.ends_with("/_values_stream") {
+        new_resp.streaming(resp.body().into_stream())
+    } else {
+        let body = match resp
+            .body()
+            .limit(get_config().limit.req_payload_limit)
+            .await
+        {
+            Ok(b) => b,
+            Err(e) => {
+                log::error!(
+                    "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
+                    new_url.path,
+                    new_url.node_addr,
+                    e,
+                    start.elapsed().as_millis()
+                );
+                return Ok(HttpResponse::ServiceUnavailable()
+                    .force_close()
+                    .body(e.to_string()));
+            }
+        };
+        new_resp.body(body)
     };
-    Ok(new_resp.body(body))
+    Ok(http_response)
 }
 
 enum ProxyPayload {
@@ -405,27 +412,31 @@ async fn proxy_querier_by_body(
         }
     }
 
-    // set body
-    let body = match resp
-        .body()
-        .limit(get_config().limit.req_payload_limit)
-        .await
-    {
-        Ok(b) => b,
-        Err(e) => {
-            log::error!(
-                "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
-                new_url.path,
-                new_url.node_addr,
-                e,
-                start.elapsed().as_millis()
-            );
-            return Ok(HttpResponse::ServiceUnavailable()
-                .force_close()
-                .body(e.to_string()));
-        }
+    let http_response = if query_str.ends_with("/_search_stream") || query_str.ends_with("/_values_stream") {
+        new_resp.streaming(resp.body().into_stream())
+    } else {
+        let body = match resp
+            .body()
+            .limit(get_config().limit.req_payload_limit)
+            .await
+        {
+            Ok(b) => b,
+            Err(e) => {
+                log::error!(
+                    "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
+                    new_url.path,
+                    new_url.node_addr,
+                    e,
+                    start.elapsed().as_millis()
+                );
+                return Ok(HttpResponse::ServiceUnavailable()
+                    .force_close()
+                    .body(e.to_string()));
+            }
+        };
+        new_resp.body(body)
     };
-    Ok(new_resp.body(body))
+    Ok(http_response)
 }
 
 async fn proxy_ws(

@@ -1487,10 +1487,6 @@ impl Iterator for StreamResponseChunks {
 }
 
 impl StreamResponses {
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).expect("Failed to serialize search response")
-    }
-
     /// Convert a response to an iterator of formatted chunks
     /// For SearchResponse, this will apply the ResponseChunkIterator to break it into multiple
     /// chunks For other response types, this will return an iterator with a single chunk

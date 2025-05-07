@@ -68,7 +68,7 @@ use crate::{
             http::{
                 get_or_create_trace_id, get_search_event_context_from_request,
                 get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request,
+                get_use_cache_from_request, get_fallback_order_by_col_from_request
             },
             stream::{get_max_query_range, get_settings_max_query_range},
             websocket::{calc_queried_range, update_histogram_interval_in_query},
@@ -163,6 +163,8 @@ pub async fn search_http2_stream(
             Err(e) => return MetaHttpResponse::bad_request(e),
         };
     }
+
+    let fallback_order_by_col = get_fallback_order_by_col_from_request(&query);
 
     // Set search event context if not set
     if req.search_event_context.is_none() {
@@ -276,6 +278,7 @@ pub async fn search_http2_stream(
         search_span.clone(),
         tx,
         None,
+        fallback_order_by_col,
     ));
 
     // Return streaming response
@@ -367,6 +370,7 @@ async fn process_search_stream_request(
     search_span: tracing::Span,
     sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
+    fallback_order_by_col: Option<String>,
 ) {
     log::info!(
         "[HTTP2_STREAM] trace_id: {} Received test HTTP/2 stream request for org_id: {}",
@@ -497,6 +501,7 @@ async fn process_search_stream_request(
                 &req_order_by,
                 sender.clone(),
                 values_ctx,
+                fallback_order_by_col,
             )
             .instrument(search_span.clone())
             .await
@@ -551,6 +556,7 @@ async fn process_search_stream_request(
             &req_order_by,
             sender.clone(),
             values_ctx,
+            fallback_order_by_col,
         )
         .instrument(search_span.clone())
         .await
@@ -584,7 +590,7 @@ async fn process_search_stream_request(
 }
 
 // Do partitioned search without cache
-#[tracing::instrument(name = "service:search:websocket::do_partitioned_search", skip_all)]
+#[tracing::instrument(name = "service:search::http::do_partitioned_search", skip_all)]
 #[allow(clippy::too_many_arguments)]
 pub async fn do_partitioned_search(
     req: &mut config::meta::search::Request,
@@ -599,6 +605,7 @@ pub async fn do_partitioned_search(
     req_order_by: &OrderBy,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
+    fallback_order_by_col: Option<String>,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -671,7 +678,7 @@ pub async fn do_partitioned_search(
 
         if !search_res.hits.is_empty() {
             // TODO: Streaming aggs we need special order
-            // search_res = order_search_results(search_res, req.fallback_order_by_col);
+            // search_res = order_search_results(search_res, fallback_order_by_col);
 
             // set took
             search_res.set_took(start_timer.elapsed().as_millis() as usize);
@@ -847,7 +854,7 @@ fn handle_partial_response(mut res: Response) -> Response {
 }
 
 #[tracing::instrument(
-    name = "service:search:websocket::handle_cache_responses_and_deltas",
+    name = "service:search:http::handle_cache_responses_and_deltas",
     skip_all
 )]
 #[allow(clippy::too_many_arguments)]
@@ -1149,7 +1156,6 @@ async fn process_delta(
             // `result_cache_ratio` will be 0 for delta search
             let result_cache_ratio = search_res.result_cache_ratio;
 
-            // TODO: add top k values for values search
             if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
                 log::debug!("Getting top k values for partition {idx}");
                 let field = values_ctx.as_ref().unwrap().field.clone();
@@ -1514,6 +1520,7 @@ pub async fn values_http2_stream(
         search_span.clone(),
         tx,
         Some(values_event_context),
+        None,
     ));
 
     // Return streaming response
@@ -1558,7 +1565,7 @@ pub async fn values_http2_stream(
 }
 
 /// This function will compute top k values for values request
-#[tracing::instrument(name = "service:websocket_events:search::get_top_k_values", skip_all)]
+#[tracing::instrument(name = "service:search:http::get_top_k_values", skip_all)]
 pub fn get_top_k_values(
     hits: &Vec<Value>,
     field: &str,
