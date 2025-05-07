@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <span
-      v-for="(item, index) in list"
-      :key="index"
+      v-for="(item) in list"
+      :key="item.id"
       :title="title"
       :class="{ highlight: item.isKeyWord }"
     >
@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { getUUID } from "@/utils/zincutils";
 import { defineComponent, ref, watch, computed, onBeforeMount } from "vue";
 
 export default defineComponent({
@@ -80,7 +81,7 @@ export default defineComponent({
       for (const part of parts) {
         if (!part) continue;
         const isKeyWord = keywords.some(k => k.toLowerCase() === part.toLowerCase());
-        result.push({ isKeyWord, text: part });
+        result.push({ isKeyWord, text: part, id: getUUID() });
       }
       return result;
     };
