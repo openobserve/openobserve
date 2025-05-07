@@ -214,8 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="custom-first-chart xl:tw-min-h-[200px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)] tw-w-full"  >
               <CustomChartRenderer
-                :key="panelDataKey"
-                :data="panelData"
+                :key="alertsPanelDataKey"
+                :data="alertsPanelData"
                 class="tw-w-full tw-h-full md:tw-h-[calc(100vh-400px)] "
               />
             </div>
@@ -248,8 +248,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="custom-second-chart xl:tw-min-h-[200px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)]"  >
               <CustomChartRenderer
-                :key="panelDataKey"
-                :data="panelData2"
+                :key="pipelinesPanelDataKey"
+                :data="pipelinesPanelData"
                 class="tw-w-full tw-h-full "
               />
             </div>
@@ -352,7 +352,8 @@ export default defineComponent({
     const no_data_ingest = ref(false);
     const isCloud = config.isCloud;
     const { setStreams } = useStreams();
-    const panelDataKey = ref(0); // Start with a default key
+    const alertsPanelDataKey = ref(0);
+    const pipelinesPanelDataKey = ref(0);
     const isLoadingSummary = ref(false);
 
 
@@ -429,7 +430,7 @@ export default defineComponent({
       getSummary(store.state.selectedOrganization.identifier);
     }
 
-  const panelData = computed (() => ({
+  const alertsPanelData = computed (() => ({
     chartType: "custom_chart",
     title: {
       text: "Last 15 minutes",
@@ -495,7 +496,7 @@ export default defineComponent({
     ]
   }));
 
-  const panelData2 = computed(() => {
+  const pipelinesPanelData = computed(() => {
 
       return {
         chartType: "custom_chart",
@@ -531,7 +532,7 @@ export default defineComponent({
           },
           axisLabel: {
             fontSize: 12,
-            color: store.state.theme === 'dark' ? '#B7B7B&' : '#72777B'
+            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
           },
           splitLine: {
             lineStyle: {
@@ -613,9 +614,10 @@ export default defineComponent({
       getSummary,
       isCloud,
       getImageURL,
-      panelData,
-      panelData2,
-      panelDataKey,
+      alertsPanelData,
+      pipelinesPanelData,
+      alertsPanelDataKey,
+      pipelinesPanelDataKey,
       compressedSizeIcon,
       ingestedSizeIcon,
       indexSizeIcon,
