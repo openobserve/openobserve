@@ -118,9 +118,7 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
 
     // cloud-related migrations
     #[cfg(feature = "cloud")]
-    if let Err(e) = o2_enterprise::enterprise::cloud::migrate().await {
-        job_init_tx.send(false).ok();
-        panic!("cloud sea_orm migrate failed: {}", e);
-    }
+    o2_enterprise::enterprise::cloud::migrate().await?;
+
     Ok(())
 }
