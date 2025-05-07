@@ -73,7 +73,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                     // .await
                                     // {
                                     //     log::error!(
-                                    //         "[trace_id {trace_id}] search->storage: update file size for file {} err: {}",
+                                    //         "[trace_id {trace_id}] search->storage: update file
+                                    // size for file {} err: {}",
                                     //         file,
                                     //         e,
                                     //     );
