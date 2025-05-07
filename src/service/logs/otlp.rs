@@ -43,7 +43,7 @@ use crate::{
     service::{
         format_stream_name,
         ingestion::{
-            SERVICE, SERVICE_NAME, check_ingestion_allowed,
+            check_ingestion_allowed,
             grpc::{get_val, get_val_with_type_retained},
         },
         logs::bulk::TRANSFORM_FAILED,
@@ -122,17 +122,10 @@ pub async fn handle_request(
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
         if let Some(resource) = resource_log.resource {
             for res_attr in resource.attributes {
-                if res_attr.key.eq(SERVICE_NAME) {
-                    let loc_service_name = get_val(&res_attr.value.as_ref());
-                    if loc_service_name.as_str().is_some() {
-                        service_att_map.insert(SERVICE_NAME.to_string(), loc_service_name);
-                    }
-                } else {
-                    service_att_map.insert(
-                        format!("{}_{}", SERVICE, res_attr.key),
-                        get_val_with_type_retained(&res_attr.value.as_ref()),
-                    );
-                }
+                service_att_map.insert(
+                    res_attr.key.to_string(),
+                    get_val_with_type_retained(&res_attr.value.as_ref()),
+                );
             }
         }
 
@@ -193,12 +186,12 @@ pub async fn handle_request(
                 };
 
                 rec["body"] = get_val(&log_record.body.as_ref());
-                log_record.attributes.iter().for_each(|local_attr| {
-                    let mut key = local_attr.key.clone();
-                    flatten::format_key(&mut key);
-                    rec[key] = get_val_with_type_retained(&local_attr.value.as_ref());
-                });
                 rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
+
+                log_record.attributes.iter().for_each(|local_attr| {
+                    rec[local_attr.key.as_str()] =
+                        get_val_with_type_retained(&local_attr.value.as_ref());
+                });
 
                 match TraceId::from_bytes(
                     log_record
