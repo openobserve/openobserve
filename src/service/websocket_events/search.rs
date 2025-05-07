@@ -20,7 +20,7 @@ use config::{
     meta::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
-            SearchPartitionResponse, ValuesEventContext,
+            SearchPartitionResponse, ValuesEventContext, TimeOffset
         },
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
@@ -51,7 +51,7 @@ use crate::{
             sql::Sql,
         },
         websocket_events::{
-            TimeOffset, WsServerEvents, calculate_progress_percentage, setup_tracing_with_trace_id,
+            WsServerEvents, calculate_progress_percentage, setup_tracing_with_trace_id,
         },
     },
 };

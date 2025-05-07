@@ -27,6 +27,7 @@ use tokio_tungstenite::tungstenite;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
+use config::meta::search::TimeOffset;
 
 pub mod enterprise_utils {
     #[allow(unused_imports)]
@@ -200,13 +201,6 @@ impl WsClientEvents {
             _ => {}
         }
     }
-}
-
-/// To represent the query start and end time based of partition or cache
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TimeOffset {
-    pub start_time: i64,
-    pub end_time: i64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

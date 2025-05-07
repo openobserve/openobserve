@@ -35,7 +35,7 @@ use config::{
     meta::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, ResponseChunk, ResponseChunkIterator,
-            SearchEventType, SearchPartitionRequest, SearchPartitionResponse,
+            SearchEventType, SearchPartitionRequest, SearchPartitionResponse, StreamResponses, StreamResponseChunks, TimeOffset
         },
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
@@ -76,7 +76,7 @@ use crate::{
         search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
         websocket_events::{
             search::write_results_to_cache,
-            utils::{TimeOffset, calculate_progress_percentage, setup_tracing_with_trace_id},
+            utils::{calculate_progress_percentage, setup_tracing_with_trace_id},
         },
     },
 };
@@ -108,7 +108,7 @@ pub async fn search_http2_stream(
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> HttpResponse {
-    let mut start = Instant::now();
+    let start = Instant::now();
     let cfg = get_config();
     let org_id = org_id.into_inner();
 
@@ -119,8 +119,6 @@ pub async fn search_http2_stream(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-
-    let mut accumulated_results: Vec<SearchResultType> = Vec::new();
 
     let user_id = in_req
         .headers()
@@ -209,9 +207,6 @@ pub async fn search_http2_stream(
             return res;
         }
     }
-    // Clone required values for the async task
-    let trace_id_clone = trace_id.clone();
-    let org_id_clone = org_id.clone();
 
     // create new sql query with histogram interval
     let sql = match crate::service::search::sql::Sql::new(
@@ -261,197 +256,21 @@ pub async fn search_http2_stream(
         req.search_type = Some(SearchEventType::Other);
     }
 
-    let start_time = req.query.start_time;
-    let end_time = req.query.end_time;
-
     // Create a channel for streaming results
     let (tx, rx) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
-    let sender = tx.clone();
 
-    // Spawn the test data generation in a separate task
-    actix_web::rt::spawn(async move {
-        log::info!(
-            "[HTTP2_STREAM] trace_id: {} Received test HTTP/2 stream request for org_id: {}",
-            trace_id,
-            org_id
-        );
-
-        let max_query_range =
-            get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
-
-        if req.query.from == 0 {
-            let c_resp =
-                match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
-                    .instrument(search_span.clone())
-                    .await
-                {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!(
-                            "[HTTP2_STREAM] trace_id: {}; Failed to check cache: {}",
-                            trace_id,
-                            e.to_string()
-                        );
-                        // send error message to client
-                        if let Err(e) = sender.send(Err(e)).await {
-                            log::error!("Error sending error message to client: {}", e);
-                        }
-                        return;
-                    }
-                };
-            let local_c_resp = c_resp.clone();
-            let cached_resp = local_c_resp.cached_response;
-            let mut deltas = local_c_resp.deltas;
-            deltas.sort();
-            deltas.dedup();
-
-            let cached_hits = cached_resp
-                .iter()
-                .fold(0, |acc, c| acc + c.cached_response.hits.len());
-
-            let c_start_time = cached_resp
-                .first()
-                .map(|c| c.response_start_time)
-                .unwrap_or_default();
-
-            let c_end_time = cached_resp
-                .last()
-                .map(|c| c.response_end_time)
-                .unwrap_or_default();
-
-            log::info!(
-                "[HTTP2_STREAM] trace_id: {}, found cache responses len:{}, with hits: {},
-            cache_start_time: {:#?}, cache_end_time: {:#?}",
-                trace_id,
-                cached_resp.len(),
-                cached_hits,
-                c_start_time,
-                c_end_time
-            );
-
-            // handle cache responses and deltas
-            if !cached_resp.is_empty() && cached_hits > 0 {
-                // `max_query_range` is used initialize `remaining_query_range`
-                // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
-                // for cache only search
-                let remaining_query_range = if max_query_range == 0 {
-                    i64::MAX
-                } else {
-                    max_query_range
-                }; // hours
-
-                let size = req.query.size;
-                // Step 1(a): handle cache responses & query the deltas
-                if let Err(e) = handle_cache_responses_and_deltas(
-                    &mut req,
-                    size,
-                    &trace_id,
-                    &org_id,
-                    stream_type,
-                    cached_resp,
-                    deltas,
-                    &mut accumulated_results,
-                    &user_id,
-                    max_query_range,
-                    remaining_query_range,
-                    &req_order_by,
-                    &mut start,
-                    sender.clone(),
-                )
-                .instrument(search_span.clone())
-                .await
-                {
-                    if let Err(e) = sender.send(Err(e)).await {
-                        log::error!("Error sending error message to client: {}", e);
-                    }
-                    return;
-                }
-            } else {
-                // Step 2: Search without cache
-                // no caches found process req directly
-                log::info!(
-                    "[HTTP2_STREAM] trace_id: {} No cache found, processing search request",
-                    trace_id
-                );
-
-                let size = req.query.size;
-                if let Err(e) = do_partitioned_search(
-                    &mut req,
-                    &trace_id,
-                    &org_id,
-                    stream_type,
-                    size,
-                    &user_id,
-                    &mut accumulated_results,
-                    max_query_range,
-                    &mut start,
-                    &req_order_by,
-                    sender.clone(),
-                )
-                .instrument(search_span.clone())
-                .await
-                {
-                    if let Err(e) = sender.send(Err(e)).await {
-                        log::error!("Error sending error message to client: {}", e);
-                    }
-                    return;
-                }
-            }
-            // Step 3: Write to results cache
-            // cache only if from is 0 and is not an aggregate_query
-            if req.query.from == 0 {
-                if let Err(e) =
-                    write_results_to_cache(c_resp, start_time, end_time, &mut accumulated_results)
-                        .instrument(search_span.clone())
-                        .await
-                        .map_err(|e| {
-                            log::error!(
-                                "[HTTP2_STREAM] trace_id: {}, Error writing results to cache: {:?}",
-                                trace_id,
-                                e
-                            );
-                            e
-                        })
-                {
-                    if let Err(e) = sender.send(Err(e)).await {
-                        log::error!("Error sending error message to client: {}", e);
-                    }
-                    return;
-                }
-            }
-        } else {
-            // Step 4: Search without cache for req with from > 0
-            let size = req.query.size;
-            if let Err(e) = do_partitioned_search(
-                &mut req,
-                &trace_id,
-                &org_id,
-                stream_type,
-                size,
-                &user_id,
-                &mut accumulated_results,
-                max_query_range,
-                &mut start,
-                &req_order_by,
-                sender.clone(),
-            )
-            .instrument(search_span.clone())
-            .await
-            {
-                if let Err(e) = sender.send(Err(e)).await {
-                    log::error!("Error sending error message to client: {}", e);
-                }
-                return;
-            }
-        }
-
-        // Once all searches are complete, write the accumulated results to a file
-        log::info!(
-            "[HTTP2_STREAM] trace_id {} all searches completed",
-            trace_id
-        );
-        sender.send(Ok(StreamResponses::Done)).await.unwrap();
-    });
+    // Spawn the search task in a separate task
+    actix_web::rt::spawn(process_search_stream_request(
+        org_id.clone(),
+        user_id,
+        trace_id.clone(),
+        req,
+        stream_type,
+        stream_names,
+        req_order_by,
+        search_span.clone(),
+        tx,
+    ));
 
     // Return streaming response
     let cfg_clone = cfg.clone();
@@ -493,9 +312,26 @@ pub async fn search_http2_stream(
                 // Get the iterator directly
                 v.to_chunks()
             }
-            Err(e) => {
-                log::error!("[HTTP2_STREAM] Error in stream: {}", e);
-                let err_res: StreamResponses = e.into();
+            Err(err) => {
+                log::error!("[HTTP2_STREAM] trace_id: {} Error in stream: {}", trace_id, err);
+                let err_res = match err {
+                    infra::errors::Error::ErrorCode(ref code) => {
+                        let message = code.get_message();
+                        let error_detail = code.get_error_detail();
+                        let http_response = map_error_to_http_response(&err, "".to_string());
+        
+                        StreamResponses::Error {
+                            code: http_response.status().into(),
+                            message,
+                            error_detail: Some(error_detail),
+                        }
+                    }
+                    _ => StreamResponses::Error {
+                        code: 500,
+                        message: err.to_string(),
+                        error_detail: None,
+                    },
+                };
                 err_res.to_chunks()
             }
         };
@@ -506,13 +342,210 @@ pub async fn search_http2_stream(
 
     HttpResponse::Ok()
         .content_type("text/event-stream")
-        // .append_header((header::CONNECTION, HeaderValue::from_static("keep-alive")))
-        // .append_header((
-        //     header::TRANSFER_ENCODING,
-        //     HeaderValue::from_static("chunked"),
-        // ))
-        // .insert_header(ContentEncoding::Identity) // to disable encoding
         .streaming(stream)
+}
+
+// New function to encapsulate search task logic
+async fn process_search_stream_request(
+    org_id: String,
+    user_id: String,
+    trace_id: String,
+    mut req: config::meta::search::Request,
+    stream_type: StreamType,
+    stream_names: Vec<String>,
+    req_order_by: OrderBy,
+    search_span: tracing::Span,
+    sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
+) {
+    log::info!(
+        "[HTTP2_STREAM] trace_id: {} Received test HTTP/2 stream request for org_id: {}",
+        trace_id,
+        org_id
+    );
+
+    let mut start = Instant::now();
+    let mut accumulated_results: Vec<SearchResultType> = Vec::new();
+    let use_cache = req.use_cache.unwrap_or(false);
+    let start_time = req.query.start_time;
+    let end_time = req.query.end_time;
+
+    let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
+
+    if req.query.from == 0 {
+        let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
+            .instrument(search_span.clone())
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "[HTTP2_STREAM] trace_id: {}; Failed to check cache: {}",
+                    trace_id,
+                    e.to_string()
+                );
+                // send error message to client
+                if let Err(e) = sender.send(Err(e)).await {
+                    log::error!("Error sending error message to client: {}", e);
+                }
+                return;
+            }
+        };
+        let local_c_resp = c_resp.clone();
+        let cached_resp = local_c_resp.cached_response;
+        let mut deltas = local_c_resp.deltas;
+        deltas.sort();
+        deltas.dedup();
+
+        let cached_hits = cached_resp
+            .iter()
+            .fold(0, |acc, c| acc + c.cached_response.hits.len());
+
+        let c_start_time = cached_resp
+            .first()
+            .map(|c| c.response_start_time)
+            .unwrap_or_default();
+
+        let c_end_time = cached_resp
+            .last()
+            .map(|c| c.response_end_time)
+            .unwrap_or_default();
+
+        log::info!(
+            "[HTTP2_STREAM] trace_id: {}, found cache responses len:{}, with hits: {},
+        cache_start_time: {:#?}, cache_end_time: {:#?}",
+            trace_id,
+            cached_resp.len(),
+            cached_hits,
+            c_start_time,
+            c_end_time
+        );
+
+        // handle cache responses and deltas
+        if !cached_resp.is_empty() && cached_hits > 0 {
+            // `max_query_range` is used initialize `remaining_query_range`
+            // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
+            // for cache only search
+            let remaining_query_range = if max_query_range == 0 {
+                i64::MAX
+            } else {
+                max_query_range
+            }; // hours
+
+            let size = req.query.size;
+            // Step 1(a): handle cache responses & query the deltas
+            if let Err(e) = handle_cache_responses_and_deltas(
+                &mut req,
+                size,
+                &trace_id,
+                &org_id,
+                stream_type,
+                cached_resp,
+                deltas,
+                &mut accumulated_results,
+                &user_id,
+                max_query_range,
+                remaining_query_range,
+                &req_order_by,
+                &mut start,
+                sender.clone(),
+            )
+            .instrument(search_span.clone())
+            .await
+            {
+                if let Err(e) = sender.send(Err(e)).await {
+                    log::error!("Error sending error message to client: {}", e);
+                }
+                return;
+            }
+        } else {
+            // Step 2: Search without cache
+            // no caches found process req directly
+            log::info!(
+                "[HTTP2_STREAM] trace_id: {} No cache found, processing search request",
+                trace_id
+            );
+
+            let size = req.query.size;
+            if let Err(e) = do_partitioned_search(
+                &mut req,
+                &trace_id,
+                &org_id,
+                stream_type,
+                size,
+                &user_id,
+                &mut accumulated_results,
+                max_query_range,
+                &mut start,
+                &req_order_by,
+                sender.clone(),
+            )
+            .instrument(search_span.clone())
+            .await
+            {
+                if let Err(e) = sender.send(Err(e)).await {
+                    log::error!("Error sending error message to client: {}", e);
+                }
+                return;
+            }
+        }
+        // Step 3: Write to results cache
+        // cache only if from is 0 and is not an aggregate_query
+        if req.query.from == 0 {
+            if let Err(e) =
+                write_results_to_cache(c_resp, start_time, end_time, &mut accumulated_results)
+                    .instrument(search_span.clone())
+                    .await
+                    .map_err(|e| {
+                        log::error!(
+                            "[HTTP2_STREAM] trace_id: {}, Error writing results to cache: {:?}",
+                            trace_id,
+                            e
+                        );
+                        e
+                    })
+            {
+                if let Err(e) = sender.send(Err(e)).await {
+                    log::error!("Error sending error message to client: {}", e);
+                }
+                return;
+            }
+        }
+    } else {
+        // Step 4: Search without cache for req with from > 0
+        let size = req.query.size;
+        if let Err(e) = do_partitioned_search(
+            &mut req,
+            &trace_id,
+            &org_id,
+            stream_type,
+            size,
+            &user_id,
+            &mut accumulated_results,
+            max_query_range,
+            &mut start,
+            &req_order_by,
+            sender.clone(),
+        )
+        .instrument(search_span.clone())
+        .await
+        {
+            if let Err(e) = sender.send(Err(e)).await {
+                log::error!("Error sending error message to client: {}", e);
+            }
+            return;
+        }
+    }
+
+    // Once all searches are complete, write the accumulated results to a file
+    log::info!(
+        "[HTTP2_STREAM] trace_id {} all searches completed",
+        trace_id
+    );
+    
+    // Send a completion signal
+    if let Err(e) = sender.send(Ok(config::meta::search::StreamResponses::Done)).await {
+        log::error!("Error sending completion message to client: {}", e);
+    }
 }
 
 // Do partitioned search without cache
@@ -774,206 +807,6 @@ fn handle_partial_response(mut res: Response) -> Response {
     res
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum StreamResponses {
-    // Original variant - to be deprecated but kept for backward compatibility
-    SearchResponse {
-        results: Response,
-        streaming_aggs: bool,
-        time_offset: TimeOffset,
-    },
-    // New focused variants
-    SearchResponseMetadata {
-        results: Response,
-        streaming_aggs: bool,
-        time_offset: TimeOffset,
-    },
-    SearchResponseHits {
-        hits: Vec<json::Value>,
-    },
-    Progress {
-        percent: usize,
-    },
-    Error {
-        code: u16,
-        message: String,
-        error_detail: Option<String>,
-    },
-    Done,
-    Cancelled,
-}
-
-/// An iterator that yields formatted chunks from a StreamResponse
-pub struct StreamResponseChunks {
-    /// The inner iterator for search responses with multiple chunks
-    chunks_iter: Option<Box<dyn Iterator<Item = Result<BytesImpl, std::io::Error>> + Send>>,
-    /// Single chunk for simple responses
-    single_chunk: Option<Result<BytesImpl, std::io::Error>>,
-}
-
-impl Iterator for StreamResponseChunks {
-    type Item = Result<BytesImpl, std::io::Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(iter) = &mut self.chunks_iter {
-            iter.next()
-        } else {
-            self.single_chunk.take()
-        }
-    }
-}
-
-impl StreamResponses {
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).expect("Failed to serialize search response")
-    }
-
-    /// Convert a response to an iterator of formatted chunks
-    /// For SearchResponse, this will apply the ResponseChunkIterator to break it into multiple
-    /// chunks For other response types, this will return an iterator with a single chunk
-    pub fn to_chunks(&self) -> StreamResponseChunks {
-        // Helper function to format event data
-        let format_event = |event_type: &str, data: &str| -> BytesImpl {
-            let formatted = format!("event: {}\ndata: {}\n\n", event_type, data);
-            BytesImpl::from(formatted.into_bytes())
-        };
-
-        match self {
-            // Handle search responses with chunking
-            StreamResponses::SearchResponse {
-                results,
-                streaming_aggs,
-                time_offset,
-            } => {
-                log::info!(
-                    "[HTTP2_STREAM] Chunking search response with {} hits using ResponseChunkIterator",
-                    results.hits.len()
-                );
-
-                // Create the iterator
-                let iterator = ResponseChunkIterator::new(
-                    results.clone(),
-                    None, // Use configured chunk size from environment
-                );
-
-                // Add a log message to show the chunk size being used
-                log::info!(
-                    "[HTTP2_STREAM] Using chunk size of {}MB from configuration",
-                    get_config().websocket.streaming_response_chunk_size
-                );
-
-                // Capture needed values for the closure
-                let streaming_aggs = *streaming_aggs;
-                let time_offset = time_offset.clone();
-
-                // Create an iterator that maps each chunk to a formatted BytesImpl
-                let chunks_iter = iterator.map(move |chunk| {
-                    let (event_type, data) = match chunk {
-                        ResponseChunk::Metadata { response } => {
-                            // Add streaming_aggs and time_offset from the original response
-                            let metadata = StreamResponses::SearchResponseMetadata {
-                                results: response,
-                                streaming_aggs,
-                                time_offset: time_offset.clone(),
-                            };
-                            (
-                                "search_response_metadata",
-                                serde_json::to_string(&metadata).unwrap_or_default(),
-                            )
-                        }
-                        ResponseChunk::Hits { hits } => {
-                            let hits_chunk = StreamResponses::SearchResponseHits { hits };
-                            (
-                                "search_response_hits",
-                                serde_json::to_string(&hits_chunk).unwrap_or_default(),
-                            )
-                        }
-                    };
-
-                    // Format and encode the chunk
-                    Ok(format_event(event_type, &data))
-                });
-
-                StreamResponseChunks {
-                    chunks_iter: Some(Box::new(chunks_iter)),
-                    single_chunk: None,
-                }
-            }
-
-            // Handle other response types with a single chunk
-            StreamResponses::SearchResponseMetadata { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("search_response_metadata", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::SearchResponseHits { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("search_response_hits", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Progress { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("progress", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Error { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("error", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Done => {
-                let bytes = BytesImpl::from("data: [[DONE]]\n\n");
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Cancelled => {
-                let bytes = BytesImpl::from("data: [[CANCELLED]]\n\n");
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-        }
-    }
-}
-
-impl From<infra::errors::Error> for StreamResponses {
-    fn from(err: infra::errors::Error) -> Self {
-        match err {
-            infra::errors::Error::ErrorCode(ref code) => {
-                let message = code.get_message();
-                let error_detail = code.get_error_detail();
-                let http_response = map_error_to_http_response(&err, "".to_string());
-
-                StreamResponses::Error {
-                    code: http_response.status().into(),
-                    message,
-                    error_detail: Some(error_detail),
-                }
-            }
-            _ => StreamResponses::Error {
-                code: 500,
-                message: err.to_string(),
-                error_detail: None,
-            },
-        }
-    }
-}
 
 #[tracing::instrument(
     name = "service:search:websocket::handle_cache_responses_and_deltas",
@@ -1508,3 +1341,197 @@ async fn send_cached_responses(
 
     Ok(())
 }
+
+// // Now add the values API handler
+// #[post("/{org_id}/_values_stream")]
+// pub async fn values_http2_stream(
+//     org_id: web::Path<String>,
+//     in_req: HttpRequest,
+//     body: web::Bytes,
+// ) -> HttpResponse {
+//     let cfg = get_config();
+//     let org_id = org_id.into_inner();
+
+//     // Create a tracing span
+//     let http_span = if cfg.common.tracing_search_enabled {
+//         tracing::info_span!("/api/{org_id}/_values_stream", org_id = org_id.clone())
+//     } else {
+//         Span::none()
+//     };
+//     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+
+//     let user_id = in_req
+//         .headers()
+//         .get("user_id")
+//         .and_then(|v| v.to_str().ok())
+//         .unwrap_or("")
+//         .to_string();
+
+//     // Log the request
+//     log::info!(
+//         "[trace_id: {}] Received values HTTP/2 stream request for org_id: {}",
+//         trace_id,
+//         org_id
+//     );
+
+//     // Get query params
+//     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+//     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+//     // Parse the values request
+//     let values_req: config::meta::search::ValuesRequest = match json::from_slice(&body) {
+//         Ok(v) => v,
+//         Err(e) => return MetaHttpResponse::bad_request(e),
+//     };
+
+//     // Convert ValuesRequest to SearchRequest
+//     let mut req = convert_values_to_search_request(values_req.clone());
+
+//     // Set use_cache from query params
+//     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+//     req.use_cache = Some(use_cache);
+
+//     // Set search type if not set
+//     req.search_type = Some(SearchEventType::Values);
+
+//     // Set search event context
+//     let context = SearchEventContext::default();
+//     req.search_event_context = Some(context);
+
+//     // Get stream name directly from the values request
+//     let stream_names = vec![values_req.stream_name.clone()];
+
+//     // Check permissions for each stream
+//     #[cfg(feature = "enterprise")]
+//     for stream_name in stream_names.iter() {
+//         if let Some(settings) =
+//             infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+//         {
+//             let max_query_range =
+//                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
+//                     .await;
+//             if max_query_range > 0
+//                 && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+//             {
+//                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+//             }
+//         }
+
+//         // Check permissions on stream
+//         #[cfg(feature = "enterprise")]
+//         if let Some(res) =
+//             check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+//         {
+//             return res;
+//         }
+//     }
+
+//     let search_span = setup_tracing_with_trace_id(
+//         &trace_id,
+//         tracing::info_span!("service::search::values_stream_h2"),
+//     )
+//     .await;
+
+//     // Create a channel for streaming results
+//     let (tx, rx) = mpsc::channel::<Result<config::meta::search::StreamResponses, infra::errors::Error>>(100);
+
+//     // Spawn the search task in a separate task
+//     actix_web::rt::spawn(process_search_stream_request(
+//         org_id.clone(),
+//         user_id,
+//         trace_id.clone(),
+//         req,
+//         stream_type,
+//         stream_names,
+//         "".to_string(), // No order_by for values API
+//         search_span.clone(),
+//         tx,
+//     ));
+
+//     // Return streaming response
+//     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
+//         let chunks_iter = match result {
+//             Ok(v) => v.to_chunks(),
+//             Err(err) => {
+//                 log::error!("[HTTP2_STREAM] trace_id: {} Error in stream: {}", trace_id, err);
+//                 let err_res = match err {
+//                     infra::errors::Error::ErrorCode(ref code) => {
+//                         let message = code.get_message();
+//                         let error_detail = code.get_error_detail();
+//                         let http_response = map_error_to_http_response(&err, "".to_string());
+        
+//                         config::meta::search::StreamResponses::Error {
+//                             code: http_response.status().into(),
+//                             message,
+//                             error_detail: Some(error_detail),
+//                         }
+//                     }
+//                     _ => config::meta::search::StreamResponses::Error {
+//                         code: 500,
+//                         message: err.to_string(),
+//                         error_detail: None,
+//                     },
+//                 };
+//                 err_res.to_chunks()
+//             }
+//         };
+
+//         // Convert the iterator to a stream only once
+//         futures::stream::iter(chunks_iter)
+//     });
+
+//     HttpResponse::Ok()
+//         .content_type("text/event-stream")
+//         .streaming(stream)
+// }
+
+// // Helper function to convert ValuesRequest to SearchRequest
+// fn convert_values_to_search_request(values_req: config::meta::search::ValuesRequest) -> config::meta::search::Request {
+//     let sql = if !values_req.sql.is_empty() {
+//         values_req.sql
+//     } else {
+//         // Construct SQL for values query
+//         let field_clauses: Vec<String> = values_req.fields
+//             .iter()
+//             .map(|field| format!("_values({})", field))
+//             .collect();
+            
+//         let mut sql = format!("SELECT {} FROM {}", field_clauses.join(", "), values_req.stream_name);
+        
+//         // Add filter if present
+//         if let Some(filter) = &values_req.filter {
+//             if !filter.is_empty() {
+//                 sql.push_str(&format!(" WHERE {}", filter));
+//             }
+//         }
+
+//         sql
+//     };
+
+//     config::meta::search::Request {
+//         query: config::meta::search::Query {
+//             sql,
+//             from: 0,
+//             size: values_req.size.unwrap_or(10),
+//             start_time: values_req.start_time.unwrap_or(0),
+//             end_time: values_req.end_time.unwrap_or(0),
+//             quick_mode: false,
+//             query_type: "values".to_string(),
+//             track_total_hits: true,
+//             uses_zo_fn: values_req.vrl_fn.is_some(),
+//             query_fn: values_req.vrl_fn,
+//             action_id: None,
+//             skip_wal: false,
+//             streaming_output: true,
+//             streaming_id: None,
+//         },
+//         encoding: config::meta::search::RequestEncoding::Empty,
+//         regions: values_req.regions,
+//         clusters: values_req.clusters,
+//         timeout: values_req.timeout.unwrap_or(0),
+//         search_type: Some(config::meta::search::SearchEventType::Values),
+//         search_event_context: None,
+//         use_cache: Some(values_req.use_cache),
+//         local_mode: None,
+//     }
+// }
