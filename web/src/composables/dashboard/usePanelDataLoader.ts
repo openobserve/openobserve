@@ -646,11 +646,60 @@ export const usePanelDataLoader = (
       searchRes?.content?.results ?? {};
   };
 
+  const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
+    // update result metadata
+    state.resultMetaData[payload?.meta?.currentQueryIndex] =
+      searchRes?.content?.results ?? {};  
+  };
+
+  const handleStreamingHistogramHits = (payload: any, searchRes: any) => {
+    // remove past error detail
+    state.errorDetail = {
+      message: "",
+      code: "",
+    };
+
+    // is streaming aggs
+    const streaming_aggs = searchRes?.content?.streaming_aggs ?? false;
+
+    // if streaming aggs, replace the state data
+    if (streaming_aggs) {
+      state.data[payload?.meta?.currentQueryIndex] = [
+        ...(searchRes?.content?.results?.hits ?? {}),
+      ];
+    }
+    // if order by is desc, append new partition response at end
+    else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
+      // else append new partition response at start
+      state.data[payload?.meta?.currentQueryIndex] = [
+        ...(searchRes?.content?.results?.hits ?? {}),
+        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
+      ];
+    } else {
+      state.data[payload?.meta?.currentQueryIndex] = [
+        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
+        ...(searchRes?.content?.results?.hits ?? {}),
+      ];
+    }
+
+    // update result metadata
+    state.resultMetaData[payload?.meta?.currentQueryIndex].hits =
+      searchRes?.content?.results?.hits ?? {};  
+  };
+
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (payload: any, response: any) => {
     try {
       console.log('panel data loader response', payload.traceId, response);
-      
+
+      if (response.type === "search_response_metadata") {
+        handleStreamingHistogramMetadata(payload, response);
+      }
+
+      if (response.type === "search_response_hits") {
+        handleStreamingHistogramHits(payload, response);
+      }
+
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
       }
