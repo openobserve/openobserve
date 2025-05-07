@@ -29,7 +29,7 @@ use config::{
     utils::json,
 };
 use datafusion::{
-    common::{DataFusionError, tree_node::TreeNode},
+    common::tree_node::TreeNode,
     physical_plan::{displayable, visit_execution_plan},
 };
 use hashbrown::HashMap;
@@ -162,31 +162,26 @@ pub async fn search(
                 Ok(ret) => Ok(ret),
                 Err(err) => {
                     log::error!("[trace_id {trace_id}] super cluster leader: datafusion execute error: {}", err);
-                    Err(DataFusionError::Execution(err.to_string()))
+                    Err(Error::Message(err.to_string()))
                 }
             }
         },
         _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
             query_task.abort();
             log::error!("[trace_id {trace_id}] super cluster leader: search timeout");
-            Err(DataFusionError::ResourcesExhausted("super cluster leader: search timeout".to_string()))
+            Err(Error::ErrorCode(ErrorCodes::SearchTimeout("super cluster leader: search timeout".to_string())))
         },
         _ = abort_receiver => {
             query_task.abort();
             log::info!("[trace_id {trace_id}] super cluster leader: search canceled");
-            Err(DataFusionError::ResourcesExhausted("super cluster leader: search canceled".to_string()))
+            Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery("super cluster leader: search canceled".to_string())))
         }
     };
 
     let data = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
-        Err(err) => match err {
-            DataFusionError::ResourcesExhausted(err) => Err(Error::ErrorCode(
-                ErrorCodes::SearchCancelQuery(err.to_string()),
-            )),
-            _ => Err(Error::Message(err.to_string())),
-        },
+        Err(err) => Err(err),
     };
     let (data, mut scan_stats, partial_err) = match data {
         Ok(v) => v,

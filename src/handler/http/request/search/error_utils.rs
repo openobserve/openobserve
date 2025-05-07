@@ -23,14 +23,12 @@ use crate::{
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: String) -> HttpResponse {
     match err {
         errors::Error::ErrorCode(code) => match code {
-            errors::ErrorCodes::SearchCancelQuery(_) | errors::ErrorCodes::RatelimitExceeded(_) => {
-                HttpResponse::TooManyRequests()
-                    .append_header((ERROR_HEADER, code.to_json()))
-                    .json(MetaHttpResponse::error_code_with_trace_id(
-                        code,
-                        Some(trace_id),
-                    ))
-            }
+            errors::ErrorCodes::RatelimitExceeded(_) => HttpResponse::TooManyRequests()
+                .append_header((ERROR_HEADER, code.to_json()))
+                .json(MetaHttpResponse::error_code_with_trace_id(
+                    code,
+                    Some(trace_id),
+                )),
             errors::ErrorCodes::SearchTimeout(_) => HttpResponse::RequestTimeout()
                 .append_header((ERROR_HEADER, code.to_json()))
                 .json(MetaHttpResponse::error_code_with_trace_id(
@@ -44,7 +42,8 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: String) -> Http
             | errors::ErrorCodes::FullTextSearchFieldNotFound
             | errors::ErrorCodes::SearchFieldNotFound(_)
             | errors::ErrorCodes::SearchSQLNotValid(_)
-            | errors::ErrorCodes::SearchStreamNotFound(_) => HttpResponse::BadRequest()
+            | errors::ErrorCodes::SearchStreamNotFound(_)
+            | errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::BadRequest()
                 .append_header((ERROR_HEADER, code.to_json()))
                 .json(MetaHttpResponse::error_code_with_trace_id(
                     code,
