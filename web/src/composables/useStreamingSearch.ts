@@ -17,6 +17,7 @@ import { ref } from "vue";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
 import store from "@/stores";
+import { getUUID } from "src/utils/zincutils";
 
 // Create and manage stream workers
 let streamWorker: Worker | null = null;
@@ -208,6 +209,7 @@ const useHttpStreaming = () => {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'traceparent': `00-${traceId}-${getUUID().slice(0, 16)}-01`,
         },
         body: JSON.stringify(queryReq),
         signal: abortController.signal,
