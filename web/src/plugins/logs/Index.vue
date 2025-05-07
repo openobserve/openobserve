@@ -566,7 +566,7 @@ export default defineComponent({
       enableRefreshInterval,
       buildWebSocketPayload,
       initializeSearchConnection,
-      addRequestId,
+      addTraceId,
       sendCancelSearchMessage,
       isDistinctQuery,
       isWithQuery,
@@ -1536,9 +1536,7 @@ export default defineComponent({
     // [END] cancel running queries
 
     const cancelOnGoingSearchQueries = () => {
-      sendCancelSearchMessage(
-        searchObj.data.searchWebSocketRequestIdsAndTraceIds,
-      );
+      sendCancelSearchMessage(searchObj.data.searchWebSocketTraceIds);
     };
 
     return {
@@ -1590,7 +1588,7 @@ export default defineComponent({
       isLimitQuery,
       buildWebSocketPayload,
       initializeSearchConnection,
-      addRequestId,
+      addTraceId,
       isWebSocketEnabled,
       showJobScheduler,
       showSearchScheduler,
@@ -1719,7 +1717,7 @@ export default defineComponent({
             const requestId = this.initializeSearchConnection(payload);
 
             if (requestId) {
-              this.addRequestId(requestId, payload.traceId);
+              this.addTraceId(payload.traceId);
             }
 
             return;

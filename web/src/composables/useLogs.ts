@@ -245,7 +245,7 @@ const defaultObject = {
     customDownloadQueryObj: <any>{},
     functionError: "",
     searchRequestTraceIds: <string[]>[],
-    searchWebSocketRequestIdsAndTraceIds: <{ traceId: string }[]>[],
+    searchWebSocketTraceIds: <string[]>[],
     isOperationCancelled: false,
     searchRetriesCount: <{ [key: string]: number }>{},
     actionId: null,
@@ -1569,7 +1569,7 @@ const useLogs = () => {
       // Reset cancel query on new search request initation
       searchObj.data.isOperationCancelled = false;
       searchObj.data.searchRequestTraceIds = [];
-      searchObj.data.searchWebSocketRequestIdsAndTraceIds = [];
+      searchObj.data.searchWebSocketTraceIds = [];
 
       // get websocket enable config from store
       // window will have more priority
@@ -4428,37 +4428,39 @@ const useLogs = () => {
   };
 
   const addTraceId = (traceId: string) => {
-    if (searchObj.data.searchRequestTraceIds.includes(traceId)) {
-      return;
-    }
+    if (searchObj.communicationMethod !== "ws") {
+      if (searchObj.data.searchRequestTraceIds.includes(traceId)) {
+        return;
+      }
 
-    searchObj.data.searchRequestTraceIds.push(traceId);
+      searchObj.data.searchRequestTraceIds.push(traceId);
+    } else {
+      if (searchObj.data.searchWebSocketTraceIds.includes(traceId)) {
+        return;
+      }
+
+      searchObj.data.searchWebSocketTraceIds.push(traceId);
+    }
   };
 
   const removeTraceId = (traceId: string) => {
-    searchObj.data.searchRequestTraceIds =
-      searchObj.data.searchRequestTraceIds.filter(
-        (id: string) => id !== traceId,
-      );
-  };
-
-  const addRequestId = (traceId: string) => {
-    searchObj.data.searchWebSocketRequestIdsAndTraceIds.push({
-      traceId,
-    });
-  };
-
-  const removeRequestId = (traceId: string) => {
-    searchObj.data.searchWebSocketRequestIdsAndTraceIds =
-      searchObj.data.searchWebSocketRequestIdsAndTraceIds.filter(
-        (id) => id.traceId !== traceId,
-      );
+    if (searchObj.communicationMethod !== "ws") {
+      searchObj.data.searchRequestTraceIds =
+        searchObj.data.searchRequestTraceIds.filter(
+          (id: string) => id !== traceId,
+        );
+    } else {
+      searchObj.data.searchWebSocketTraceIds =
+        searchObj.data.searchWebSocketTraceIds.filter(
+          (_traceId) => _traceId !== traceId,
+        );
+    }
   };
 
   const cancelQuery = () => {
     if (searchObj.communicationMethod === "ws") {
       sendCancelSearchMessage([
-        ...searchObj.data.searchWebSocketRequestIdsAndTraceIds,
+        ...searchObj.data.searchWebSocketTraceIds,
       ]);
       return;
     }
@@ -4980,7 +4982,7 @@ const useLogs = () => {
         throw new Error(`Failed to initialize ${searchObj.communicationMethod} connection`);
       }
 
-      addRequestId(payload.traceId);
+      addTraceId(payload.traceId);
     } catch (e: any) {
       console.error(`Error while getting data through ${searchObj.communicationMethod}`, e);
       searchObj.loading = false;
@@ -5090,7 +5092,7 @@ const useLogs = () => {
         const payload = buildWebSocketPayload(data.queryReq, data.isPagination, "search");
 
         initializeSearchConnection(payload);
-        addRequestId(payload.traceId);
+        addTraceId(payload.traceId);
       }
 
       if(data.type === "histogram" || data.type === "pageCount") {
@@ -5124,7 +5126,7 @@ const useLogs = () => {
 
         initializeSearchConnection(payload);
 
-        addRequestId(payload.traceId);
+        addTraceId(payload.traceId);
       }
     } catch(e: any){
       console.error("Error while resetting search", e);
@@ -5851,7 +5853,7 @@ const useLogs = () => {
 
         const requestId = initializeSearchConnection(payload);
 
-        addRequestId(payload.traceId);
+        addTraceId(payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT and LIMIT queries.", -1);
@@ -5929,7 +5931,7 @@ const useLogs = () => {
   }
 
   const handleSearchClose = (payload: any, response: any) => {
-    if (payload.traceId) removeRequestId(payload.traceId);
+    if (payload.traceId) removeTraceId(payload.traceId);
 
     // Any case where below logic may end in recursion
     if (payload.traceId) delete searchPartitionMap[payload.traceId];
@@ -6149,7 +6151,7 @@ const useLogs = () => {
 
     const requestId = initializeSearchConnection(payload);
 
-    addRequestId(payload.traceId);
+    addTraceId(payload.traceId);
   };
 
   const sendCancelSearchMessage = (searchRequests: any[]) => {
@@ -6162,7 +6164,7 @@ const useLogs = () => {
       searchObj.data.isOperationCancelled = true;
 
       // loop on all requestIds
-      searchRequests.forEach(({ traceId }) => {
+      searchRequests.forEach((traceId) => {
         cancelSearchQueryBasedOnRequestId({
           trace_id: traceId,
           org_id: store?.state?.selectedOrganization?.identifier,
@@ -6290,7 +6292,7 @@ const useLogs = () => {
     enableRefreshInterval,
     buildWebSocketPayload,
     initializeSearchConnection,
-    addRequestId,
+    addTraceId,
     routeToSearchSchedule,
     isActionsEnabled,
     sendCancelSearchMessage,
