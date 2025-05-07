@@ -1582,6 +1582,12 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         );
         tantivy_schema_builder.add_text_field(field, index_opts);
     }
+    // add _timestamp field to tantivy schema
+    let index_opts = tantivy::schema::NumericOptions::default()
+        .set_coerce()   // coerce values if not a number
+        .set_stored()   // persist values into the Tantivy's store
+        .set_indexed(); //generate a posting list -> searchable field
+    tantivy_schema_builder.add_f64_field(TIMESTAMP_COL_NAME, index_opts);
     let tantivy_schema = tantivy_schema_builder.build();
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
@@ -1637,6 +1643,26 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                     doc.add_text(field, column_data.value(i));
                     tokio::task::coop::consume_budget().await;
                 }
+            }
+
+            // process _timestamp field
+            let column_data = match inverted_idx_batch.column_by_name(TIMESTAMP_COL_NAME) {
+                Some(column_data) => match column_data.as_any().downcast_ref::<Int64Array>() {
+                    Some(column_data) => column_data,
+                    None => {
+                        // generate empty array to ensure the tantivy and parquet have same rows
+                        &Int64Array::from(vec![0; num_rows])
+                    }
+                },
+                None => {
+                    // generate empty array to ensure the tantivy and parquet have same rows
+                    &Int64Array::from(vec![0; num_rows])
+                }
+            };
+            let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap(); // unwrap directly since added above
+            for (i, doc) in docs.iter_mut().enumerate() {
+                doc.add_i64(ts_field, column_data.value(i));
+                tokio::task::coop::consume_budget().await;
             }
 
             tx.send(docs).await?;
