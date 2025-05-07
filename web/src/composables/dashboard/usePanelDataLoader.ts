@@ -649,8 +649,7 @@ export const usePanelDataLoader = (
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (payload: any, response: any) => {
     try {
-      console.log('response', response);
-      console.log('payload', payload);
+      console.log('panel data loader response', payload.traceId, response);
       
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);

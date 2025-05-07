@@ -3,7 +3,6 @@
 
 let activeStreams = {};
 let activeBuffers = {};
-
 // Handle messages from main thread
 self.onmessage = async (event) => {
   const { action, traceId, readableStream, chunk } = event.data;
@@ -44,8 +43,8 @@ async function processStream(traceId, reader) {
 
   try {
     while (activeStreams[traceId]) {
-      const { done, value } = await reader.read();
-      
+      const { done, value, cancelled } = await reader.read();
+
       if (done) {
         // Stream ended, send end notification
         self.postMessage({
@@ -71,65 +70,63 @@ async function processStream(traceId, reader) {
       const lines = messages.filter(line => line.trim());
       
       // Process each complete line
-      for (const line of lines) {
+      for (let i = 0; i < lines.length; i++) {
         try {
-          let processedLine = line;
-          
-          // Handle SSE format
-          if (processedLine.startsWith('data: ')) {
-            processedLine = processedLine.slice(6);
+          const msgLines = lines[i].split('\n');          
+          // Check if this is an event line
+
+          if(msgLines.length > 1){
+            const eventType = msgLines[0].startsWith('event:') ? msgLines[0].slice(7).trim() : msgLines[0].slice(6).trim();
+
+            if (msgLines[1]?.startsWith('data:') || msgLines[1]?.startsWith('data: ')) {
+              const data = msgLines[1]?.startsWith('data:') ? msgLines[1]?.slice(6) : msgLines[1]?.slice(5);
+
+              try {
+                // Try to parse as JSON
+                const json = JSON.parse(data);
+                                // Send message based on event type
+                self.postMessage({
+                  type: eventType,
+                  traceId,
+                  data: json,
+                });
+              } catch (parseErr) {
+                // If JSON parsing fails, send raw data
+                self.postMessage({
+                  type: 'error',
+                  traceId,
+                  data: { message: 'Error parsing data', error: parseErr.toString() },
+                });
+              }
+            }
           }
-          
-          // Parse JSON
-          const json = JSON.parse(processedLine);
-          
-          // Handle different response types
-          if (json.code > 200) {
-            // Send error to main thread
-            self.postMessage({
-              type: 'error',
-              traceId,
-              data: json,
-            });
-          } else if (json.Progress) {
-            // Send progress to main thread
-            self.postMessage({
-              type: 'progress',
-              traceId,
-              data: json,
-            });
-          } else {
-            // Send search response to main thread
-            self.postMessage({
-              type: 'data',
-              traceId,
-              data: json,
-            });
-          }
-        } catch (e) {
-          // If parsing failed, check if it's SSE
-          if (line.startsWith('data: ')) {
+
+          if (msgLines[0]?.startsWith('data:') || msgLines[0]?.startsWith('data: ')) {
+            const data = msgLines[0]?.startsWith('data:') ? msgLines[0]?.slice(6) : msgLines[0]?.slice(5);
             try {
-              const data = line.slice(6);
+              // Try to parse as JSON
+              const json = JSON.parse(data);
+                              // Send message based on event type
+              self.postMessage({
+                type: 'data',
+                traceId,
+                data: json,
+              });
+            } catch (parseErr) {
+              // If JSON parsing fails, send raw data
               self.postMessage({
                 type: 'data',
                 traceId,
                 data: data,
               });
-            } catch (err) {
-              self.postMessage({
-                type: 'error',
-                traceId,
-                data: { message: 'Error parsing SSE message', error: err },
-              });
             }
-          } else {
-            self.postMessage({
-              type: 'error',
-              traceId,
-              data: { message: 'Error parsing message', error: e },
-            });
           }
+        } catch (e) {
+          self.postMessage({
+            type: 'error',
+            traceId,
+            data: { message: 'Error processing message', error: e.toString() },
+          });
         }
       }
     }

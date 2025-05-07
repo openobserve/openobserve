@@ -5110,8 +5110,6 @@ const useLogs = () => {
         
         resetHistogramError();
 
-        console.log('search reset Loading');
-
         searchObj.loadingHistogram = true;
 
         if(data.type === "histogram") await generateHistogramSkeleton();
@@ -5178,18 +5176,294 @@ const useLogs = () => {
     searchObj.data.datetime.endTime = extractedDate.to;
   };
 
+
+  // Get metadata
+  // Update metadata
+  // Update results
+
+  const handleStreamingHits = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+    if (
+      searchObj.meta.refreshInterval > 0 &&
+      router.currentRoute.value.name == "logs"
+    ) {
+      searchObj.data.queryResults.hits = response.content.results.hits;
+    }
+
+    if (!searchObj.meta.refreshInterval) {
+      // Scan-size and took time in histogram title
+      // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
+      // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
+      if (appendResult) {
+        searchObj.data.queryResults.hits.push(
+          ...response.content.results.hits,
+        );
+      } else {
+        searchObj.data.queryResults.hits = response.content.results.hits;
+      }
+    }
+
+    //       // We are storing time_offset for the context of pagecount, to get the partial pagecount
+    // if (searchObj.data.queryResults) {
+    //   searchObj.data.queryResults.time_offset = response.content?.time_offset;
+    // }
+
+    processPostPaginationData();
+  }
+
+  const handleStreamingMetadata = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+    ////// Handle function error ///////
+    handleFunctionError(queryReq, response);
+      
+    ////// Handle aggregation ///////
+    handleAggregation(queryReq, response);
+    
+    ////// Handle reset field values ///////
+    resetFieldValues();
+
+    if (
+      searchObj.meta.refreshInterval > 0 &&
+      router.currentRoute.value.name == "logs"
+    ) {
+      searchObj.data.queryResults.from = response.content.results.from;
+      searchObj.data.queryResults.scan_size =
+        response.content.results.scan_size;
+      searchObj.data.queryResults.took = response.content.results.took;
+      searchObj.data.queryResults.aggs = response.content.results.aggs;
+    }
+
+    if (!searchObj.meta.refreshInterval) {
+      // In page count we set track_total_hits
+      if (!queryReq.query.hasOwnProperty("track_total_hits")) {
+        delete response.content.total;
+      }
+
+      // Scan-size and took time in histogram title
+      // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
+      // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
+      if (appendResult) {
+        searchObj.data.queryResults.total += response.content.results.total;
+        searchObj.data.queryResults.took += response.content.results.took;
+        searchObj.data.queryResults.scan_size +=
+          response.content.results.scan_size;
+      } else {
+        if (response.content?.streaming_aggs) {
+          searchObj.data.queryResults = {
+            ...response.content.results,
+            took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
+            scan_size: (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
+          }
+        } else if (isPagination) {
+          searchObj.data.queryResults.from = response.content.results.from;
+          searchObj.data.queryResults.scan_size =
+            response.content.results.scan_size;
+          searchObj.data.queryResults.took = response.content.results.took;
+          searchObj.data.queryResults.total = response.content.results.total;
+        } else {
+          searchObj.data.queryResults = response.content.results;
+        }
+      }
+    }
+
+          // We are storing time_offset for the context of pagecount, to get the partial pagecount
+    if (searchObj.data.queryResults) {
+      searchObj.data.queryResults.time_offset = response.content?.time_offset;
+    }
+
+          // If its a pagination request, then append
+    if (!isPagination) {
+      searchObj.data.queryResults.pagination = [];
+    }
+    
+    if (isPagination) refreshPagination(true);
+  }
+
+  const handleHistogramStreamingHits = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+
+    (async () => {
+      try {
+        generateHistogramData();
+        if (!queryReq.meta?.isHistogramOnly) refreshPagination(true);
+      } catch (error) {
+        console.error("Error processing histogram data:", error);
+
+        searchObj.loadingHistogram = false;
+      }
+    })();
+
+    // queryReq.query.start_time =
+    //   searchObj.data.queryResults.partitionDetail.paginations[
+    //     searchObj.data.resultGrid.currentPage - 1
+    //   ][0].startTime;
+    // queryReq.query.end_time =
+    //   searchObj.data.queryResults.partitionDetail.paginations[
+    //     searchObj.data.resultGrid.currentPage - 1
+    //   ][0].endTime;
+
+    // if (hasAggregationFlag) {
+    //   searchObj.data.queryResults.total = res.data.total;
+    // }
+
+    if (!queryReq.meta?.isHistogramOnly)
+      searchObj.data.histogram.chartParams.title = getHistogramTitle();
+
+    searchObjDebug["histogramProcessingEndTime"] = performance.now();
+    searchObjDebug["histogramEndTime"] = performance.now();
+  }
+
+  const handleHistogramStreamingMetadata = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+    searchObjDebug["histogramProcessingStartTime"] = performance.now();
+
+    searchObj.loading = false;
+
+    if (searchObj.data.queryResults.aggs == null) {
+      searchObj.data.queryResults.aggs = [];
+    }
+
+    if (
+      searchObj.data.queryResults.aggs.length == 0 &&
+      response.content.results.hits.length > 0
+    ) {
+      let date = new Date();
+
+      const startDateTime =
+        searchObj.data.customDownloadQueryObj.query.start_time / 1000;
+
+      const endDateTime =
+        searchObj.data.customDownloadQueryObj.query.end_time / 1000;
+
+      const nowString = response.content.results.hits[0].zo_sql_key;
+      const now = new Date(nowString);
+
+      const day = String(now.getDate()).padStart(2, "0");
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const year = now.getFullYear();
+
+      const dateToBePassed = `${day}-${month}-${year}`;
+      const hours = String(now.getHours()).padStart(2, "0");
+      let minutes = String(now.getMinutes()).padStart(2, "0");
+      if (searchObj.data.histogramInterval / 1000 <= 9999) {
+        minutes = String(now.getMinutes() + 1).padStart(2, "0");
+      }
+
+      const time = `${hours}:${minutes}`;
+
+      const currentTimeToBePassed = convertDateToTimestamp(
+        dateToBePassed,
+        time,
+        "UTC",
+      );
+      for (
+        let currentTime: any = currentTimeToBePassed.timestamp / 1000;
+        currentTime < endDateTime;
+        currentTime += searchObj.data.histogramInterval / 1000
+      ) {
+        date = new Date(currentTime);
+        histogramResults.push({
+          zo_sql_key: date.toISOString().slice(0, 19),
+          zo_sql_num: 0,
+        });
+      }
+      for (
+        let currentTime: any = currentTimeToBePassed.timestamp / 1000;
+        currentTime > startDateTime;
+        currentTime -= searchObj.data.histogramInterval / 1000
+      ) {
+        date = new Date(currentTime);
+        histogramResults.push({
+          zo_sql_key: date.toISOString().slice(0, 19),
+          zo_sql_num: 0,
+        });
+      }
+    }
+
+    searchObj.data.queryResults.scan_size += response.content.results.scan_size;
+    searchObj.data.queryResults.took += response.content.results.took;
+    searchObj.data.queryResults.result_cache_ratio +=
+      response.content.results.result_cache_ratio;
+  }
+
+  const handlePageCountStreamingHits = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+    let regeratePaginationFlag = false;
+    if (
+      response.content.results.hits.length !=
+      searchObj.meta.resultGrid.rowsPerPage
+    ) {
+      regeratePaginationFlag = true;
+    }
+  
+    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+
+    // if total records in partition is greater than recordsPerPage then we need to update pagination
+    // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
+    refreshPagination(regeratePaginationFlag);
+
+    searchObj.data.histogram.chartParams.title = getHistogramTitle();
+  }
+
+  const handlePageCountStreamingMetadata = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+    removeTraceId(response.content.traceId);
+
+    if (searchObj.data.queryResults.aggs == null) {
+      searchObj.data.queryResults.aggs = [];
+    }
+
+    searchObj.data.queryResults.scan_size += response.content.results.scan_size;
+    searchObj.data.queryResults.took += response.content.results.took;
+  }
+
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
-    console.log('handleSearchResponse', response);
-    console.log('payload', payload);
+    if(payload.type === "search" && response.content.type === "search_response_hits") {
+      handleStreamingHits(payload.queryReq, response, payload.isPagination, !response.content?.streaming_aggs && searchPartitionMap[payload.traceId] > 1);
+      return;
+    }
 
-    console.log('Loading', searchObj.loading, searchObj.loadingHistogram);
+    if(payload.type === "search" && response.content.type === "search_response_metadata") {
+      searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
+      ? searchPartitionMap[payload.traceId]
+      : 0;
+      searchPartitionMap[payload.traceId]++;
+      handleStreamingMetadata(payload.queryReq, response, payload.isPagination, !response.content?.streaming_aggs && searchPartitionMap[payload.traceId] > 1);
+      return;
+    }
+
+    if(payload.type === "histogram" && response.content.type === "search_response_hits") {
+      handleHistogramStreamingHits(payload.queryReq, response, payload.isPagination);
+      return;
+    }
+
+    if(payload.type === "histogram" && response.content.type === "search_response_metadata") {
+      handleHistogramStreamingMetadata(payload.queryReq, response, payload.isPagination);
+      return;
+    }
+
+
+    if(payload.type === "histogram" && response.content.type === "search_response_hits") {
+      handleHistogramStreamingHits(payload.queryReq, response, payload.isPagination);
+      return;
+    }
+
+    if(payload.type === "histogram" && response.content.type === "search_response_metadata") {
+      handleHistogramStreamingMetadata(payload.queryReq, response, payload.isPagination);
+      return;
+    }
+
+
+    if(payload.type === "pageCount" && response.content.type === "search_response_hits") {
+      handlePageCountStreamingHits(payload.queryReq, response, payload.isPagination);
+      return;
+    }
+
+    if(payload.type === "pageCount" && response.content.type === "search_response_metadata") {
+      handlePageCountStreamingMetadata(payload.queryReq, response, payload.isPagination);
+      return;
+    }
     
     if (response.type === "search_response") {
-      
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
       ? searchPartitionMap[payload.traceId]
       : 0;
@@ -5234,6 +5508,116 @@ const useLogs = () => {
     }
   };
 
+  const handleFunctionError = (queryReq: SearchRequestPayload, response: any) => {
+    if (
+      response.content.results.hasOwnProperty("function_error") &&
+      response.content.results.function_error != ""
+    ) {
+      searchObj.data.functionError = response.content.results.function_error;
+    }
+
+    if (
+      response.content.results.hasOwnProperty("function_error") &&
+      response.content.results.function_error != "" &&
+      response.content.results.hasOwnProperty("new_start_time") &&
+      response.content.results.hasOwnProperty("new_end_time")
+    ) {
+      response.content.results.function_error = getFunctionErrorMessage(
+        response.content.results.function_error,
+        response.content.results.new_start_time,
+        response.content.results.new_end_time,
+        store.state.timezone,
+      );
+      searchObj.data.datetime.startTime =
+        response.content.results.new_start_time;
+      searchObj.data.datetime.endTime = response.content.results.new_end_time;
+      searchObj.data.datetime.type = "absolute";
+      queryReq.query.start_time = response.content.results.new_start_time;
+      queryReq.query.end_time = response.content.results.new_end_time;
+      searchObj.data.histogramQuery.query.start_time =
+        response.content.results.new_start_time;
+      searchObj.data.histogramQuery.query.end_time =
+        response.content.results.new_end_time;
+
+      updateUrlQueryParams();
+    }
+  }
+
+  const handleAggregation = (queryReq: SearchRequestPayload, response: any) => {
+    const parsedSQL = fnParsedSQL();
+
+    if (searchObj.meta.sqlMode) {
+      if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+        searchAggData.hasAggregation = true;
+        searchObj.meta.resultGrid.showPagination = false;
+
+        if (response.content?.streaming_aggs) {
+          searchAggData.total = response.content?.results?.total;
+        } else {
+          searchAggData.total =
+            searchAggData.total + response.content?.results?.total;
+        }
+      }
+    }
+  }
+
+  const updateResult = (queryReq: SearchRequestPayload, response: any, isPagination: boolean, appendResult: boolean = false) => {
+    if (
+      searchObj.meta.refreshInterval > 0 &&
+      router.currentRoute.value.name == "logs"
+    ) {
+      searchObj.data.queryResults.from = response.content.results.from;
+      searchObj.data.queryResults.scan_size =
+        response.content.results.scan_size;
+      searchObj.data.queryResults.took = response.content.results.took;
+      searchObj.data.queryResults.aggs = response.content.results.aggs;
+      searchObj.data.queryResults.hits = response.content.results.hits;
+    }
+
+    if (!searchObj.meta.refreshInterval) {
+      // In page count we set track_total_hits
+      if (!queryReq.query.hasOwnProperty("track_total_hits")) {
+        delete response.content.total;
+      }
+
+      // Scan-size and took time in histogram title
+      // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
+      // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
+      if (appendResult) {
+        searchObj.data.queryResults.hits.push(
+          ...response.content.results.hits,
+        );
+
+        searchObj.data.queryResults.total += response.content.results.total;
+        searchObj.data.queryResults.took += response.content.results.took;
+        searchObj.data.queryResults.scan_size +=
+          response.content.results.scan_size;
+      } else {
+        if (response.content?.streaming_aggs) {
+          searchObj.data.queryResults = {
+            ...response.content.results,
+            took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
+            scan_size: (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
+          }
+        } else if (isPagination) {
+          searchObj.data.queryResults.hits = response.content.results.hits;
+          searchObj.data.queryResults.from = response.content.results.from;
+          searchObj.data.queryResults.scan_size =
+            response.content.results.scan_size;
+          searchObj.data.queryResults.took = response.content.results.took;
+          searchObj.data.queryResults.total = response.content.results.total;
+        } else {
+          searchObj.data.queryResults = response.content.results;
+        }
+      }
+    }
+
+          // We are storing time_offset for the context of pagecount, to get the partial pagecount
+    if (searchObj.data.queryResults) {
+      searchObj.data.queryResults.time_offset = response.content?.time_offset;
+    }
+  }
+
   const handleLogsResponse = async (
     queryReq: SearchRequestPayload,
     isPagination: boolean,
@@ -5242,111 +5626,18 @@ const useLogs = () => {
     appendResult: boolean = false,
   ) => {
     try {
-      const parsedSQL = fnParsedSQL();
+      ////// Handle function error ///////
+      handleFunctionError(queryReq, response);
+      
+      ////// Handle aggregation ///////
+      handleAggregation(queryReq, response);
 
-      if (
-        response.content.results.hasOwnProperty("function_error") &&
-        response.content.results.function_error != ""
-      ) {
-        searchObj.data.functionError = response.content.results.function_error;
-      }
-
-      if (
-        response.content.results.hasOwnProperty("function_error") &&
-        response.content.results.function_error != "" &&
-        response.content.results.hasOwnProperty("new_start_time") &&
-        response.content.results.hasOwnProperty("new_end_time")
-      ) {
-        response.content.results.function_error = getFunctionErrorMessage(
-          response.content.results.function_error,
-          response.content.results.new_start_time,
-          response.content.results.new_end_time,
-          store.state.timezone,
-        );
-        searchObj.data.datetime.startTime =
-          response.content.results.new_start_time;
-        searchObj.data.datetime.endTime = response.content.results.new_end_time;
-        searchObj.data.datetime.type = "absolute";
-        queryReq.query.start_time = response.content.results.new_start_time;
-        queryReq.query.end_time = response.content.results.new_end_time;
-        searchObj.data.histogramQuery.query.start_time =
-          response.content.results.new_start_time;
-        searchObj.data.histogramQuery.query.end_time =
-          response.content.results.new_end_time;
-
-        updateUrlQueryParams();
-      }
-
-      if (searchObj.meta.sqlMode) {
-        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
-          searchAggData.hasAggregation = true;
-          searchObj.meta.resultGrid.showPagination = false;
-
-          if (response.content?.streaming_aggs) {
-            searchAggData.total = response.content?.results?.total;
-          } else {
-            searchAggData.total =
-              searchAggData.total + response.content?.results?.total;
-          }
-        }
-      }
-
+      ////// Handle reset field values ///////
       resetFieldValues();
 
-      if (
-        searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs"
-      ) {
-        searchObj.data.queryResults.from = response.content.results.from;
-        searchObj.data.queryResults.scan_size =
-          response.content.results.scan_size;
-        searchObj.data.queryResults.took = response.content.results.took;
-        searchObj.data.queryResults.aggs = response.content.results.aggs;
-        searchObj.data.queryResults.hits = response.content.results.hits;
-      }
-
-      if (!searchObj.meta.refreshInterval) {
-        // In page count we set track_total_hits
-        if (!queryReq.query.hasOwnProperty("track_total_hits")) {
-          delete response.content.total;
-        }
-
-        // Scan-size and took time in histogram title
-        // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
-        // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
-        if (appendResult) {
-          searchObj.data.queryResults.hits.push(
-            ...response.content.results.hits,
-          );
-
-          searchObj.data.queryResults.total += response.content.results.total;
-          searchObj.data.queryResults.took += response.content.results.took;
-          searchObj.data.queryResults.scan_size +=
-            response.content.results.scan_size;
-        } else {
-          if (response.content?.streaming_aggs) {
-            searchObj.data.queryResults = {
-              ...response.content.results,
-              took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
-              scan_size: (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
-            }
-          } else if (isPagination) {
-            searchObj.data.queryResults.hits = response.content.results.hits;
-            searchObj.data.queryResults.from = response.content.results.from;
-            searchObj.data.queryResults.scan_size =
-              response.content.results.scan_size;
-            searchObj.data.queryResults.took = response.content.results.took;
-            searchObj.data.queryResults.total = response.content.results.total;
-          } else {
-            searchObj.data.queryResults = response.content.results;
-          }
-        }
-      }
-
-      // We are storing time_offset for the context of pagecount, to get the partial pagecount
-      if (searchObj.data.queryResults) {
-        searchObj.data.queryResults.time_offset = response.content?.time_offset;
-      }
+      ////// Update results ///////
+      updateResult(queryReq, response, isPagination, appendResult);
+    
 
       // If its a pagination request, then append
       if (!isPagination) {
@@ -5534,6 +5825,7 @@ const useLogs = () => {
       return;
     }
 
+
     searchObj.data.queryResults.aggs = [];
     if (shouldShowHistogram) {
       searchObj.meta.refreshHistogram = false;
@@ -5541,7 +5833,6 @@ const useLogs = () => {
         searchObjDebug["histogramStartTime"] = performance.now();
         resetHistogramError();
 
-        console.log('Processing histogram');
         searchObj.loadingHistogram = true;
 
         await generateHistogramSkeleton();
@@ -5645,7 +5936,6 @@ const useLogs = () => {
 
     if (searchObj.data.isOperationCancelled) {
       searchObj.loading = false;
-      console.log('loading operation cancelled', searchObj.loading);
       searchObj.loadingHistogram = false;
       searchObj.data.isOperationCancelled = false;
 
@@ -5676,6 +5966,10 @@ const useLogs = () => {
 
     if (payload.traceId) removeTraceId(payload.traceId);
 
+    if(!searchObj.data.queryResults.hasOwnProperty('hits')){
+      searchObj.data.queryResults.hits = [];
+    }
+
     if (
       payload.type === "search" &&
       !payload.isPagination &&
@@ -5686,16 +5980,15 @@ const useLogs = () => {
 
     if (payload.type === "search" && !response?.content?.should_client_retry) searchObj.loading = false;
     if ((payload.type === "histogram" || payload.type === "pageCount") && !response?.content?.should_client_retry){
-      console.log('loading histogram false');
       searchObj.loadingHistogram = false;
     }
+
 
 
     searchObj.data.isOperationCancelled = false;
   };
 
   const handleSearchError = (request: any, err: WebSocketErrorResponse) => {
-    console.log('handleSearchError', err);
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
 
@@ -5789,6 +6082,7 @@ const useLogs = () => {
       return false;
     }
   };
+  
   const refreshJobPagination = (regenrateFlag: boolean = false) => {
     try {
       const { rowsPerPage } = searchObj.meta.resultGrid;
@@ -5850,8 +6144,6 @@ const useLogs = () => {
     }
 
     const payload = buildWebSocketPayload(queryReq, false, "pageCount");
-
-      console.log('loading get page count', searchObj.loading);
 
     searchObj.loadingHistogram = true;
 

@@ -50,29 +50,24 @@ const streamConnections = ref<Record<string, ReadableStreamDefaultReader<Uint8Ar
 const abortControllers = ref<Record<string, AbortController>>({});
 const errorOccurred = ref(false);
 
-const useHttpStreaming = () => {
+type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end';
 
-  const onData = (traceId: string, type: 'search_response' | 'error' | 'event_progress', response: any) => {
+const useHttpStreaming = () => {
+  const onData = (traceId: string, type: StreamResponseType | 'end', response: any) => {
     if (!traceMap.value[traceId]) return;
 
     if (response === 'end' || response === '[[DONE]]') {
       for (const handler of traceMap.value[traceId].complete) {
         handler(traceId);
       }
-
       return
     }
 
     if (typeof response === 'string') {
       response = JSON.parse(response);
     }
-    const wsMapper = {
-      'search_response': convertToWsResponse,
-      'error': convertToWsError,
-      'event_progress': convertToWsEventProgress,
-    }
 
-    const wsResponse = wsMapper[type](traceId, response);
+    const wsResponse = wsMapper[type as StreamResponseType](traceId, response, type);
 
 
     for (const handler of traceMap.value[traceId].data) {
@@ -88,13 +83,15 @@ const useHttpStreaming = () => {
     }
   };
 
-  const onError = async (error: any, traceId: string) => {
+  const onError = async (traceId: string, error: any) => {
     if (!traceMap.value[traceId]) return;
 
     errorOccurred.value = true;
+    
+    const response = convertToWsError(traceId, error);
 
     for (const handler of traceMap.value[traceId].error) {
-      handler(error, traceId);
+      handler(response, traceId);
     }
   };
 
@@ -225,23 +222,25 @@ const useHttpStreaming = () => {
       
       if(worker) {
       // Set up worker message handling
-      worker.onmessage = (event) => {
-        const { type, traceId: eventTraceId, data } = event.data;
-        
-        switch (type) {
-          case 'data':
-            onData(eventTraceId, 'search_response', data);
-            break;
-          case 'progress':
-            onData(eventTraceId, 'event_progress', data);
-            break;
-          case 'error':
-            onError(data, eventTraceId);
-            break;
-          case 'end':
-            onData(eventTraceId, 'search_response', 'end');
-            break;
-        }
+        worker.onmessage = (event) => {
+          const { type, traceId: eventTraceId, data } = event.data;
+          switch (type) {
+            case 'search_response_metadata':
+              onData(eventTraceId, 'search_response_metadata', data);
+              break;
+            case 'search_response_hits':
+              onData(eventTraceId, 'search_response_hits', data);
+              break;
+            case 'progress':
+              onData(eventTraceId, 'progress', data);
+              break;
+            case 'error':
+              onError(eventTraceId, data);
+              break;
+            case 'end':
+              onData(eventTraceId, 'end', 'end');
+              break;
+          }
         };
       } else {
         throw new Error('Worker is not supported');
@@ -272,7 +271,7 @@ const useHttpStreaming = () => {
       if ((error as any).name === 'AbortError') {
         console.error('Stream was canceled');
       } else {
-        onError(error, traceId);
+        onError(traceId, error);
       }
     }
   };
@@ -350,12 +349,13 @@ const useHttpStreaming = () => {
   };
 
 
-  const convertToWsResponse = (traceId: string, response: any) => {
+  const convertToWsResponse = (traceId: string, response: any, type: StreamResponseType) => {
 
     let resp = {
       content: {
-        results: response.SearchResponse.results,
-        streaming_aggs: response.SearchResponse.streaming_aggs,
+        type: type,
+        results: response.results || response,
+        streaming_aggs: response.streaming_aggs,
         trace_id: traceId,
       },
       type: "search_response",
@@ -366,20 +366,37 @@ const useHttpStreaming = () => {
   const convertToWsError = (traceId: string, response: any) => {
     return {
       content: {
-        error: response.error,
+        ...response,
         trace_id: traceId,
       },
       type: "error",
     }
   }
 
-  const convertToWsEventProgress = (traceId: string, response: any) => {
+  const convertToWsEventProgress = (traceId: string, response: any, type: StreamResponseType) => {
     return {
       content: {
-        percent: response?.Progress?.percent,
+        percent: response?.percent,
       },
       type: "event_progress",
     }
+  }
+
+  const convertToWsEnd = (traceId: string, response: any, type: StreamResponseType) => {
+    return {
+      content: {
+        end: true,
+      },
+      type: "end",
+    }
+  }
+
+  const wsMapper = {
+    'search_response_metadata': convertToWsResponse,
+    'search_response_hits': convertToWsResponse,
+    'progress': convertToWsEventProgress,
+    'error': convertToWsError,
+    'end': convertToWsEnd,
   }
 
   return {
