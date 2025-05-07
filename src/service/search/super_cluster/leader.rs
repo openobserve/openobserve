@@ -204,9 +204,10 @@ pub async fn search(
         scan_stats
     );
 
+    let main_trace_id = trace_id.split("-").next().unwrap();
     for node in nodes {
         let mut scan_stats_request = tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
-            trace_id: trace_id.to_string(),
+            trace_id: main_trace_id.to_string(),
         });
         let mut client =
             match make_grpc_search_client(trace_id, &mut scan_stats_request, &node).await {

@@ -169,9 +169,16 @@ impl FlightService for FlightServiceImpl {
         schema = add_scan_stats_to_schema(schema, scan_stats.clone());
         #[cfg(feature = "enterprise")]
         {
-            log::info!("setting scan stat trace_id {} {:?}", trace_id, scan_stats);
+            // split will always have atleast one element even if the string is empty
+            // or the split char is not in string, so we can safely unwrap here
+            let main_trace_id = trace_id.split("-").next().unwrap();
+            log::info!(
+                "setting scan stat trace_id {} {:?}",
+                main_trace_id,
+                scan_stats
+            );
             SEARCH_SERVER
-                .set_scan_stats(&trace_id, (&scan_stats).into())
+                .set_scan_stats(main_trace_id, (&scan_stats).into())
                 .await;
         }
 
