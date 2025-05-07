@@ -60,7 +60,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             Ok(data_len) => {
                                 if data_len > 0 && data_len != file_size {
                                     log::warn!(
-                                        "[trace_id {trace_id}] search->storage: download file {} found size mismatch, expected: {}, actual: {}, will update it",
+                                        "[trace_id {trace_id}] search->storage: download file {} found size mismatch, expected: {}, actual: {}, will skip it",
                                         file,
                                         file_size,
                                         data_len,

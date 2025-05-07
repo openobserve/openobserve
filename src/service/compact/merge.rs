@@ -1305,7 +1305,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                 Ok(data_len) => {
                     if data_len > 0 && data_len != file_size as usize {
                         log::warn!(
-                            "[COMPACT] download file {} found size mismatch, expected: {}, actual: {}, will update it",
+                            "[COMPACT] download file {} found size mismatch, expected: {}, actual: {}, will skip it",
                             file_name,
                             file_size,
                             data_len,
