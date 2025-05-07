@@ -259,6 +259,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("infra init failed: {}", e);
             }
+
             if let Err(e) = common_infra::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {}", e);
@@ -268,7 +269,7 @@ async fn main() -> Result<(), anyhow::Error> {
             #[cfg(feature = "enterprise")]
             if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
-                panic!("enerprise init failed: {}", e);
+                panic!("enterprise init failed: {}", e);
             }
 
             // ingester init
