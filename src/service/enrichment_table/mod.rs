@@ -289,6 +289,9 @@ pub async fn save_enrichment_data(
     if !append_data {
         enrich_meta_stats.start_time = started_at;
     }
+    if enrich_meta_stats.start_time == 0 {
+        enrich_meta_stats.start_time = enrichment_table::get_start_time(org_id, stream_name).await;
+    }
     enrich_meta_stats.end_time = now_micros();
     enrich_meta_stats.size = total_expected_size_in_bytes as i64;
     // The stream_stats table takes some time to update, so we need to update the enrichment table
