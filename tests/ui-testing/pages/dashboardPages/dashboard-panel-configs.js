@@ -40,7 +40,7 @@ export default class DashboardPanelConfigs {
 
     //GeoMap locators
     this.baseMap = page.locator('[data-test="dashboard-config-basemap"]');
-    this.lattitude = page.locator('[data-test="dashboard-config-latitude"]');
+    this.latitude = page.locator('[data-test="dashboard-config-latitude"]');
     this.longitude = page.locator('[data-test="dashboard-config-longitude"]');
     this.zoom = page.locator('[data-test="dashboard-config-zoom"]');
     this.symbolSize = page.locator('[data-test="dashboard-config-symbol"]');
@@ -190,10 +190,10 @@ export default class DashboardPanelConfigs {
 
   //Lattitude and longitude
   //Lattitude
-  async selectLattitude(lat) {
-    await this.lattitude.waitFor({ state: "visible" });
-    await this.lattitude.click();
-    await this.lattitude.fill(lat);
+  async selectLatitude(lat) {
+    await this.latitude.waitFor({ state: "visible" });
+    await this.latitude.click();
+    await this.latitude.fill(lat);
   }
   //Longitude
   async selectLongitude(long) {

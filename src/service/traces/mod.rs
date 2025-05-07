@@ -52,9 +52,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{
-            SERVICE, SERVICE_NAME, TriggerAlertData, evaluate_trigger, grpc::get_val, write_file,
-        },
+        ingestion::{TriggerAlertData, evaluate_trigger, grpc::get_val, write_file},
         logs::O2IngestJsonData,
         metadata::{
             MetadataItem, MetadataType,
@@ -68,6 +66,8 @@ use crate::{
     },
 };
 
+const SERVICE_NAME: &str = "service.name";
+const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
@@ -459,8 +459,16 @@ pub async fn handle_otlp_request(
                 partial_success.error_message = format!("Pipeline batch execution error: {}", e);
             }
             Ok(pl_results) => {
+                log::debug!(
+                    "[TRACES:OTLP] pipeline returned results map of size: {}",
+                    pl_results.len()
+                );
                 for (stream_params, stream_pl_results) in pl_results {
                     if stream_params.stream_type != StreamType::Traces {
+                        log::warn!(
+                            "[TRACES:OTLP] stream {:?} returned by pipeline is not a Trace stream. Records dropped",
+                            stream_params
+                        );
                         continue;
                     }
 
@@ -501,6 +509,12 @@ pub async fn handle_otlp_request(
                             }
                         };
 
+                        log::debug!(
+                            "[TRACES:OTLP] pipeline result for stream: {} got {} records",
+                            stream_params.stream_name,
+                            record_val.len()
+                        );
+
                         let Some(timestamp) = record_val
                             .get(TIMESTAMP_COL_NAME)
                             .and_then(|ts| ts.as_i64())
@@ -512,7 +526,7 @@ pub async fn handle_otlp_request(
                             continue;
                         };
                         let (ts_data, _) = json_data_by_stream
-                            .entry(traces_stream_name.to_string())
+                            .entry(stream_params.stream_name.to_string())
                             .or_insert((Vec::new(), None));
                         ts_data.push((timestamp, record_val));
                     }

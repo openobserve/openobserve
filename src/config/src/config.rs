@@ -2685,14 +2685,14 @@ fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             Ok(v) => v,
             Err(e) => {
                 return Err(anyhow::anyhow!(
-                    "master encryption key is not properly base64 encoded : {e}"
+                    "master encryption key is not properly base64 encoded: {e}"
                 ));
             }
         };
         match Aes256Siv::new_from_slice(&key) {
             Ok(_) => {}
             Err(e) => {
-                return Err(anyhow::anyhow!("invalid master encryption key : {e}"));
+                return Err(anyhow::anyhow!("invalid master encryption key: {e}"));
             }
         }
     }
