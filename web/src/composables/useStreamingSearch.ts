@@ -353,12 +353,11 @@ const useHttpStreaming = () => {
 
     let resp = {
       content: {
-        type: type,
         results: response.results || response,
         streaming_aggs: response.streaming_aggs,
         trace_id: traceId,
       },
-      type: "search_response",
+      type: type,
     };
     return resp;
   }

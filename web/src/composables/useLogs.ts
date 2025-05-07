@@ -5181,7 +5181,7 @@ const useLogs = () => {
   // Update metadata
   // Update results
 
-  const handleStreamingHits = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+  const handleStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
     if (
       searchObj.meta.refreshInterval > 0 &&
       router.currentRoute.value.name == "logs"
@@ -5210,12 +5210,12 @@ const useLogs = () => {
     processPostPaginationData();
   }
 
-  const handleStreamingMetadata = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+  const handleStreamingMetadata = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
     ////// Handle function error ///////
-    handleFunctionError(queryReq, response);
+    handleFunctionError(payload.queryReq, response);
       
     ////// Handle aggregation ///////
-    handleAggregation(queryReq, response);
+    handleAggregation(payload.queryReq, response);
     
     ////// Handle reset field values ///////
     resetFieldValues();
@@ -5233,7 +5233,7 @@ const useLogs = () => {
 
     if (!searchObj.meta.refreshInterval) {
       // In page count we set track_total_hits
-      if (!queryReq.query.hasOwnProperty("track_total_hits")) {
+      if (!payload.queryReq.query.hasOwnProperty("track_total_hits")) {
         delete response.content.total;
       }
 
@@ -5277,13 +5277,13 @@ const useLogs = () => {
     if (isPagination) refreshPagination(true);
   }
 
-  const handleHistogramStreamingHits = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+  const handleHistogramStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
     searchObj.data.queryResults.aggs.push(...response.content.results.hits);
 
     (async () => {
       try {
         generateHistogramData();
-        if (!queryReq.meta?.isHistogramOnly) refreshPagination(true);
+        if (!payload.meta?.isHistogramOnly) refreshPagination(true);
       } catch (error) {
         console.error("Error processing histogram data:", error);
 
@@ -5304,14 +5304,14 @@ const useLogs = () => {
     //   searchObj.data.queryResults.total = res.data.total;
     // }
 
-    if (!queryReq.meta?.isHistogramOnly)
+    if (!payload.meta?.isHistogramOnly)
       searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
     searchObjDebug["histogramProcessingEndTime"] = performance.now();
     searchObjDebug["histogramEndTime"] = performance.now();
   }
 
-  const handleHistogramStreamingMetadata = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+  const handleHistogramStreamingMetadata = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
 
     searchObj.loading = false;
@@ -5383,7 +5383,7 @@ const useLogs = () => {
       response.content.results.result_cache_ratio;
   }
 
-  const handlePageCountStreamingHits = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+  const handlePageCountStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
     let regeratePaginationFlag = false;
     if (
       response.content.results.hits.length !=
@@ -5401,7 +5401,7 @@ const useLogs = () => {
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
   }
 
-  const handlePageCountStreamingMetadata = (queryReq: WebSocketSearchPayload, response: WebSocketSearchResponse | WebSocketErrorResponse, isPagination: boolean, appendResult: boolean = false) => {
+  const handlePageCountStreamingMetadata = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
     removeTraceId(response.content.traceId);
 
     if (searchObj.data.queryResults.aggs == null) {
@@ -5415,51 +5415,51 @@ const useLogs = () => {
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (
     payload: WebSocketSearchPayload,
-    response: WebSocketSearchResponse | WebSocketErrorResponse,
+    response: WebSocketSearchResponse,
   ) => {
-    if(payload.type === "search" && response.content.type === "search_response_hits") {
-      handleStreamingHits(payload.queryReq, response, payload.isPagination, !response.content?.streaming_aggs && searchPartitionMap[payload.traceId] > 1);
+    if(payload.type === "search" && response?.type === "search_response_hits") {
+      handleStreamingHits(payload, response, payload.isPagination, !response.content?.streaming_aggs && searchPartitionMap[payload.traceId] > 1);
       return;
     }
 
-    if(payload.type === "search" && response.content.type === "search_response_metadata") {
+    if(payload.type === "search" && response?.type === "search_response_metadata") {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
       ? searchPartitionMap[payload.traceId]
       : 0;
       searchPartitionMap[payload.traceId]++;
-      handleStreamingMetadata(payload.queryReq, response, payload.isPagination, !response.content?.streaming_aggs && searchPartitionMap[payload.traceId] > 1);
+      handleStreamingMetadata(payload, response, payload.isPagination, !response.content?.streaming_aggs && searchPartitionMap[payload.traceId] > 1);
       return;
     }
 
-    if(payload.type === "histogram" && response.content.type === "search_response_hits") {
-      handleHistogramStreamingHits(payload.queryReq, response, payload.isPagination);
+    if(payload.type === "histogram" && response?.type === "search_response_hits") {
+      handleHistogramStreamingHits(payload, response, payload.isPagination);
       return;
     }
 
-    if(payload.type === "histogram" && response.content.type === "search_response_metadata") {
-      handleHistogramStreamingMetadata(payload.queryReq, response, payload.isPagination);
-      return;
-    }
-
-
-    if(payload.type === "histogram" && response.content.type === "search_response_hits") {
-      handleHistogramStreamingHits(payload.queryReq, response, payload.isPagination);
-      return;
-    }
-
-    if(payload.type === "histogram" && response.content.type === "search_response_metadata") {
-      handleHistogramStreamingMetadata(payload.queryReq, response, payload.isPagination);
+    if(payload.type === "histogram" && response?.type === "search_response_metadata") {
+      handleHistogramStreamingMetadata(payload, response, payload.isPagination);
       return;
     }
 
 
-    if(payload.type === "pageCount" && response.content.type === "search_response_hits") {
-      handlePageCountStreamingHits(payload.queryReq, response, payload.isPagination);
+    if(payload.type === "histogram" && response?.type === "search_response_hits") {
+      handleHistogramStreamingHits(payload, response, payload.isPagination);
       return;
     }
 
-    if(payload.type === "pageCount" && response.content.type === "search_response_metadata") {
-      handlePageCountStreamingMetadata(payload.queryReq, response, payload.isPagination);
+    if(payload.type === "histogram" && response?.type === "search_response_metadata") {
+      handleHistogramStreamingMetadata(payload, response, payload.isPagination);
+      return;
+    }
+
+
+    if(payload.type === "pageCount" && response?.type === "search_response_hits") {
+      handlePageCountStreamingHits(payload, response, payload.isPagination);
+      return;
+    }
+
+    if(payload.type === "pageCount" && response?.type === "search_response_metadata") {
+      handlePageCountStreamingMetadata(payload, response, payload.isPagination);
       return;
     }
     
@@ -5494,9 +5494,9 @@ const useLogs = () => {
       }
     }
 
-    if (response.type === "error") {
-      handleSearchError(payload.traceId, response);
-    }
+    // if (response.type === "error") {
+    //   handleSearchError(payload.traceId, response);
+    // }
 
     if (response.type === "cancel_response") {
       searchObj.loading = false;

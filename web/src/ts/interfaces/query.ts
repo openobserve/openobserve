@@ -43,7 +43,7 @@ export interface HistogramQueryPayload {
 }
 
 export interface WebSocketSearchResponse {
-  type: "search_response" | "cancel_response";
+  type: "search_response" | "cancel_response" | "error" | "end" | "progress" | "search_response_metadata" | "search_response_hits";
   content: {
     results: {
       hits: any[];
@@ -53,8 +53,15 @@ export interface WebSocketSearchResponse {
       new_start_time?: number;
       new_end_time?: number;
       scan_size?: number;
+      from?: number;
+      aggs?: any;
+      result_cache_ratio?: number;
     };
     streaming_aggs?: boolean;
+    total?: number;
+    time_offset?: string;
+    traceId: string;
+    type?: string;
   };
 }
 
