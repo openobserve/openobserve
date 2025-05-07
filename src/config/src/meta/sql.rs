@@ -32,7 +32,7 @@ use sqlparser::{
 use utoipa::ToSchema;
 
 use super::stream::StreamType;
-use crate::{TIMESTAMP_COL_NAME, get_config};
+use crate::{TIMESTAMP_COL_NAME, get_config, meta::errors::ErrorCodes};
 
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
@@ -50,7 +50,9 @@ pub fn resolve_stream_names(sql: &str) -> Result<Vec<String>, anyhow::Error> {
     let dialect = &PostgreSqlDialect {};
     let statement = DFParser::parse_sql_with_dialect(sql, dialect)?
         .pop_back()
-        .ok_or(anyhow::anyhow!("Failed to parse sql"))?;
+        .ok_or(anyhow::anyhow!(ErrorCodes::SearchSQLNotValid(
+            "Failed to parse sql".to_string(),
+        )))?;
     let (table_refs, _) = resolve_table_references(&statement, true)?;
     let mut tables = Vec::new();
     for table in table_refs {
@@ -63,7 +65,9 @@ pub fn resolve_stream_names_with_type(sql: &str) -> Result<Vec<TableReference>, 
     let dialect = &PostgreSqlDialect {};
     let statement = dbg!(DFParser::parse_sql_with_dialect(sql, dialect))?
         .pop_back()
-        .ok_or(anyhow::anyhow!("Failed to parse sql"))?;
+        .ok_or(anyhow::anyhow!(ErrorCodes::SearchSQLNotValid(
+            "Failed to parse sql".to_string(),
+        )))?;
     let (table_refs, _) = resolve_table_references(&statement, true)?;
     let mut tables = Vec::new();
     for table in table_refs {
