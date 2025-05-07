@@ -2685,6 +2685,8 @@ export const convertSQLData = async (
     });
   }
 
+  console.log("options");
+
   return {
     options,
     extras: {

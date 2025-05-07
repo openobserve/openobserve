@@ -523,16 +523,57 @@ export const usePanelDataLoader = (
           }
           // if order by is desc, append new partition response at end
           else if (order_by.toLowerCase() === "desc") {
-            state.data[currentQueryIndex] = [
-              ...(state.data[currentQueryIndex] ?? []),
-              ...searchRes.data.hits,
-            ];
+            // state.data[currentQueryIndex] = [
+            //   ...(state.data[currentQueryIndex] ?? []),
+            //   ...searchRes.data.hits,
+            // ];
+            // want to divide the hits into n chunks, and then append the chunks to the state data asynchronously
+            // and then update the state data
+            const n = 1000;
+            const chunks: any[] = [];
+            for (let i = 0; i < searchRes?.data?.hits?.length; i += n) {
+              chunks.push(searchRes?.data?.hits?.slice(i, i + n));
+            }
+            // use chunks to update the state data
+            for (let i = 0; i < chunks.length; i++) {
+              await new Promise((resolve) => {
+                setTimeout(() => {
+                  console.log("chunks", i);
+                  state.data[currentQueryIndex] = [
+                    ...(state.data[currentQueryIndex] ?? []),
+                    ...chunks[i],
+                  ];
+                  resolve(true);
+                }, 0);
+              });
+            }
           } else {
             // else append new partition response at start
-            state.data[currentQueryIndex] = [
-              ...searchRes.data.hits,
-              ...(state.data[currentQueryIndex] ?? []),
-            ];
+            // state.data[currentQueryIndex] = [
+            //   ...searchRes.data.hits,
+            //   ...(state.data[currentQueryIndex] ?? []),
+            // ];
+
+            // want to divide the hits into n chunks, and then append the chunks to the state data asynchronously
+            // and then update the state data
+            const n = 1000;
+            const chunks: any[] = [];
+            for (let i = 0; i < searchRes?.data?.hits?.length; i += n) {
+              chunks.push(searchRes?.data?.hits?.slice(i, i + n));
+            }
+            // use chunks to update the state data
+            for (let i = 0; i < chunks.length; i++) {
+              await new Promise((resolve) => {
+                setTimeout(() => {
+                  console.log("chunks", i);
+                  state.data[currentQueryIndex] = [
+                    ...chunks[i],
+                    ...(state.data[currentQueryIndex] ?? []),
+                  ];
+                  resolve(true);
+                }, 0);
+              });
+            }
           }
 
           // update result metadata
@@ -649,7 +690,7 @@ export const usePanelDataLoader = (
   const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
     // update result metadata
     state.resultMetaData[payload?.meta?.currentQueryIndex] =
-      searchRes?.content?.results ?? {};  
+      searchRes?.content?.results ?? {};
   };
 
   const handleStreamingHistogramHits = (payload: any, searchRes: any) => {
@@ -684,13 +725,13 @@ export const usePanelDataLoader = (
 
     // update result metadata
     state.resultMetaData[payload?.meta?.currentQueryIndex].hits =
-      searchRes?.content?.results?.hits ?? {};  
+      searchRes?.content?.results?.hits ?? {};
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (payload: any, response: any) => {
     try {
-      console.log('panel data loader response', payload.traceId, response);
+      console.log("panel data loader response", payload.traceId, response);
 
       if (response.type === "search_response_metadata") {
         handleStreamingHistogramMetadata(payload, response);
@@ -857,7 +898,7 @@ export const usePanelDataLoader = (
         pageType,
         meta: {
           currentQueryIndex,
-        }
+        },
       };
 
       fetchQueryDataWithWebSocket(payload, {
@@ -924,7 +965,7 @@ export const usePanelDataLoader = (
         fallback_order_by_col: getFallbackOrderByCol(),
         meta: {
           currentQueryIndex,
-        }
+        },
       };
 
       // type: "search",
@@ -947,8 +988,6 @@ export const usePanelDataLoader = (
       //   folder_id: folderId?.value,
       //   fallback_order_by_col: getFallbackOrderByCol(),
       // },
-
-
 
       fetchQueryDataWithHttpStream(payload, {
         data: handleSearchResponse,
@@ -1385,7 +1424,7 @@ export const usePanelDataLoader = (
                 Number(startISOTimestamp),
                 Number(endISOTimestamp),
               );
-              
+
               state.annotations = annotations;
 
               const shouldUseStreaming = (window as any).use_streaming === true;
