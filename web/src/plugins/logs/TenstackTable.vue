@@ -343,8 +343,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="cell.renderValue()"
                   :query-string="
                     searchObj.meta.sqlMode
-                      ? searchObj.data.query.split('where')[1]
-                      : searchObj.data.query
+                      ? searchObj.data.query.toLowerCase().split('where')[1]
+                      : searchObj.data.query.toLowerCase()
                   "
                 />
               </td>
