@@ -12,6 +12,10 @@ import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
 import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
 import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
+import { waitForDashboardPage } from "../utils/dashCreation.js";
+import { DashboardPage } from "../../pages/dashboardPage.js";
+ 
+
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
@@ -39,6 +43,8 @@ test.describe("dashboard UI testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
 
+  });
+  test("should add and delete the dashboard", async ({ page }) => {
     dashboardCreate = new DashboardCreate(page);
     dashboardList = new DashboardListPage(page);
     dashboardActions = new DashboardactionPage(page);
@@ -48,10 +54,10 @@ test.describe("dashboard UI testcases", () => {
     dashboardPanel = new DashboardPanel(page);
     chartTypeSelector = new ChartTypeSelector(page);
     dashboardPanelConfigs = new DashboardPanelConfigs(page);
-  });
-  test("should add and delete the dashboard", async ({ page }) => {
-    const randomDashboardName = `Dashboard_${Date.now()}`;
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+
+    await waitForDashboardPage(page);
+
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
@@ -65,13 +71,18 @@ test.describe("dashboard UI testcases", () => {
   });
 
   test("should create a duplicate of the dashboard", async ({ page }) => {
-    const randomDashboardName = `Dashboard_${Date.now()}`;
+    dashboardCreate = new DashboardCreate(page);
+    dashboardList = new DashboardListPage(page);
+    dashboardActions = new DashboardactionPage(page);
+    
+    
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
 
     await dashboardCreate.createDashboard(randomDashboardName);
+    await waitForDashboardPage(page);
     await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
       timeout: 30000,
     });
@@ -85,8 +96,18 @@ test.describe("dashboard UI testcases", () => {
   });
 
   test("should create a dashboard and add the breakdown", async ({ page }) => {
-    const randomDashboardName = `Dashboard_${Date.now()}`;
+    dashboardCreate = new DashboardCreate(page);
+    dashboardList = new DashboardListPage(page);
+    dashboardActions = new DashboardactionPage(page);
+    dashboardDrilldown = new DashboardDrilldownPage(page);
+    dashboardRefresh = new DashboardTimeRefresh(page);
+    chartTypeSelector = new DashboardPanelConfigs(page);
+    dashboardPanel = new DashboardPanel(page);
+    chartTypeSelector = new ChartTypeSelector(page);
+    dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
@@ -110,8 +131,18 @@ test.describe("dashboard UI testcases", () => {
   test("should update the data when changing the time between both absolute and relative time using the Kolkata time zone.", async ({
     page,
   }) => {
-    const randomDashboardName = `Dashboard_${Date.now()}`;
+    dashboardCreate = new DashboardCreate(page);
+    dashboardList = new DashboardListPage(page);
+    dashboardActions = new DashboardactionPage(page);
+    dashboardDrilldown = new DashboardDrilldownPage(page);
+    dashboardRefresh = new DashboardTimeRefresh(page);
+    chartTypeSelector = new DashboardPanelConfigs(page);
+    dashboardPanel = new DashboardPanel(page);
+    chartTypeSelector = new ChartTypeSelector(page);
+    dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
@@ -134,9 +165,19 @@ test.describe("dashboard UI testcases", () => {
   test("should update the chart with the results of a custom SQL query", async ({
     page,
   }) => {
-    const randomDashboardName = `Dashboard_${Date.now()}`;
+    dashboardCreate = new DashboardCreate(page);
+    dashboardList = new DashboardListPage(page);
+    dashboardActions = new DashboardactionPage(page);
+    dashboardDrilldown = new DashboardDrilldownPage(page);
+    dashboardRefresh = new DashboardTimeRefresh(page);
+    chartTypeSelector = new DashboardPanelConfigs(page);
+    dashboardPanel = new DashboardPanel(page);
+    chartTypeSelector = new ChartTypeSelector(page);
+    dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    
     const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
@@ -165,9 +206,19 @@ test.describe("dashboard UI testcases", () => {
   test("should display the correct and updated chart when changing the chart type", async ({
     page,
   }) => {
-    const randomDashboardName = `Dashboard_${Date.now()}`;
+    dashboardCreate = new DashboardCreate(page);
+    dashboardList = new DashboardListPage(page);
+    dashboardActions = new DashboardactionPage(page);
+    dashboardDrilldown = new DashboardDrilldownPage(page);
+    dashboardRefresh = new DashboardTimeRefresh(page);
+    chartTypeSelector = new DashboardPanelConfigs(page);
+    dashboardPanel = new DashboardPanel(page);
+    chartTypeSelector = new ChartTypeSelector(page);
+    dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    
     const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
@@ -200,9 +251,19 @@ test.describe("dashboard UI testcases", () => {
   test("should navigate to another dashboard using the DrillDown feature.", async ({
     page,
   }) => {
-    const randomDashboardName = `Dashboard_${Date.now()}`;
+    dashboardCreate = new DashboardCreate(page);
+    dashboardList = new DashboardListPage(page);
+    dashboardActions = new DashboardactionPage(page);
+    dashboardDrilldown = new DashboardDrilldownPage(page);
+    dashboardRefresh = new DashboardTimeRefresh(page);
+    chartTypeSelector = new DashboardPanelConfigs(page);
+    dashboardPanel = new DashboardPanel(page);
+    chartTypeSelector = new ChartTypeSelector(page);
+    dashboardPanelConfigs = new DashboardPanelConfigs(page);
+  
     const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
