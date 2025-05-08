@@ -886,6 +886,7 @@ export const usePanelDataLoader = (
     endISOTimestamp: string,
     pageType: string,
     currentQueryIndex: number,
+    abortControllerRef: any,
   ) => {
     try {
       const { traceId } = generateTraceContext();
@@ -944,6 +945,11 @@ export const usePanelDataLoader = (
       //   folder_id: folderId?.value,
       //   fallback_order_by_col: getFallbackOrderByCol(),
       // },
+
+      // if aborted, return
+      if (abortControllerRef?.signal?.aborted) {
+        return;
+      }
 
       fetchQueryDataWithHttpStream(payload, {
         data: handleSearchResponse,
@@ -1392,6 +1398,7 @@ export const usePanelDataLoader = (
                   endISOTimestamp,
                   pageType,
                   panelQueryIndex,
+                  abortControllerRef,
                 );
               } else if (isWebSocketEnabled()) {
                 await getDataThroughWebSocket(
