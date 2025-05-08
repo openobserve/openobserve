@@ -5281,45 +5281,10 @@ const useLogs = () => {
   }
 
   const handleHistogramStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
-    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
-
-    (async () => {
-      try {
-        generateHistogramData();
-        if (!payload.meta?.isHistogramOnly) refreshPagination(true);
-      } catch (error) {
-        console.error("Error processing histogram data:", error);
-
-        searchObj.loadingHistogram = false;
-      }
-    })();
-
-    // queryReq.query.start_time =
-    //   searchObj.data.queryResults.partitionDetail.paginations[
-    //     searchObj.data.resultGrid.currentPage - 1
-    //   ][0].startTime;
-    // queryReq.query.end_time =
-    //   searchObj.data.queryResults.partitionDetail.paginations[
-    //     searchObj.data.resultGrid.currentPage - 1
-    //   ][0].endTime;
-
-    // if (hasAggregationFlag) {
-    //   searchObj.data.queryResults.total = res.data.total;
-    // }
-
-    if (!payload.meta?.isHistogramOnly)
-      searchObj.data.histogram.chartParams.title = getHistogramTitle();
-
-    searchObjDebug["histogramProcessingEndTime"] = performance.now();
-    searchObjDebug["histogramEndTime"] = performance.now();
-  }
-
-  const handleHistogramStreamingMetadata = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
-    searchObjDebug["histogramProcessingStartTime"] = performance.now();
-
+    
     searchObj.loading = false;
 
-    if (searchObj.data.queryResults.aggs == null) {
+    if (!searchObj.data.queryResults.aggs) {
       searchObj.data.queryResults.aggs = [];
     }
 
@@ -5379,6 +5344,42 @@ const useLogs = () => {
         });
       }
     }
+    
+    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+
+    (async () => {
+      try {
+        generateHistogramData();
+        if (!payload.meta?.isHistogramOnly) refreshPagination(true);
+      } catch (error) {
+        console.error("Error processing histogram data:", error);
+
+        searchObj.loadingHistogram = false;
+      }
+    })();
+
+    // queryReq.query.start_time =
+    //   searchObj.data.queryResults.partitionDetail.paginations[
+    //     searchObj.data.resultGrid.currentPage - 1
+    //   ][0].startTime;
+    // queryReq.query.end_time =
+    //   searchObj.data.queryResults.partitionDetail.paginations[
+    //     searchObj.data.resultGrid.currentPage - 1
+    //   ][0].endTime;
+
+    // if (hasAggregationFlag) {
+    //   searchObj.data.queryResults.total = res.data.total;
+    // }
+
+    if (!payload.meta?.isHistogramOnly)
+      searchObj.data.histogram.chartParams.title = getHistogramTitle();
+
+    searchObjDebug["histogramProcessingEndTime"] = performance.now();
+    searchObjDebug["histogramEndTime"] = performance.now();
+  }
+
+  const handleHistogramStreamingMetadata = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
+    searchObjDebug["histogramProcessingStartTime"] = performance.now();
 
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     searchObj.data.queryResults.took += response.content.results.took;
@@ -5433,17 +5434,6 @@ const useLogs = () => {
       handleStreamingMetadata(payload, response, payload.isPagination, !response.content?.streaming_aggs && searchPartitionMap[payload.traceId] > 1);
       return;
     }
-
-    if(payload.type === "histogram" && response?.type === "search_response_hits") {
-      handleHistogramStreamingHits(payload, response, payload.isPagination);
-      return;
-    }
-
-    if(payload.type === "histogram" && response?.type === "search_response_metadata") {
-      handleHistogramStreamingMetadata(payload, response, payload.isPagination);
-      return;
-    }
-
 
     if(payload.type === "histogram" && response?.type === "search_response_hits") {
       handleHistogramStreamingHits(payload, response, payload.isPagination);
