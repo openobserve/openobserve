@@ -40,9 +40,6 @@ test.describe("dashboard folder testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await orgNavigation;
-
-    dashboardPage = new DashboardListPage(page);
-    dashboardFolders = new DashboardFolder(page);
   });
 
   test.skip("Should create and delete a unique folder, and verify it's deleted", async ({
@@ -85,6 +82,8 @@ test.describe("dashboard folder testcases", () => {
   test("should create and edit folder name and verify it's updated", async ({
     page,
   }) => {
+    dashboardPage = new DashboardListPage(page);
+    dashboardFolders = new DashboardFolder(page);
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
