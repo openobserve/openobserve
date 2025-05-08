@@ -2422,7 +2422,7 @@ const useLogs = () => {
               searchObj.data.queryResults.from += res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.hits.push(...res.data.hits);
+              await chunkedAppend(searchObj.data.queryResults.hits, res.data.hits);
             } else {
               searchObj.data.queryResults.from = res.data.from;
               searchObj.data.queryResults.scan_size = res.data.scan_size;
@@ -5242,9 +5242,7 @@ const useLogs = () => {
         // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
         // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
         if (appendResult) {
-          searchObj.data.queryResults.hits.push(
-            ...response.content.results.hits,
-          );
+          await chunkedAppend(searchObj.data.queryResults.hits, response.content.results.hits);
 
           searchObj.data.queryResults.total += response.content.results.total;
           searchObj.data.queryResults.took += response.content.results.took;
@@ -5292,6 +5290,13 @@ const useLogs = () => {
         notificationMsg.value || "Error occurred while handling logs response.",
       );
       notificationMsg.value = "";
+    }
+  };
+
+  const chunkedAppend = async (target: any, source: any, chunkSize = 5000) => {
+    for (let i = 0; i < source.length; i += chunkSize) {
+      target.push.apply(target, source.slice(i, i + chunkSize));
+      await new Promise(resolve => setTimeout(resolve, 0)); // Let UI update
     }
   };
 
