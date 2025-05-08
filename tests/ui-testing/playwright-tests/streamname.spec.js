@@ -55,6 +55,7 @@ test.describe("Stream multiselect testcases", () => {
     for (const stream of streams) {
       await streamPage.navigateToStreamExplorer();
       await streamPage.searchStream(stream.name);
+      await streamPage.verifyStreamNameVisibility(stream.name);
       await streamPage.exploreStream();
       await streamPage.verifyStreamExploration();
       await streamPage.goBack();

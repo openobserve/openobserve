@@ -19,6 +19,10 @@ export class StreamPage {
     await this.page.waitForTimeout(3000);
   }
 
+  async verifyStreamNameVisibility(streamName) {
+    await expect(this.page.getByText(streamName)).toBeVisible();
+  }
+
   async exploreStream() {
     const streamButton = this.page.getByRole("button", { name: 'Explore' });
     await expect(streamButton).toBeVisible();
