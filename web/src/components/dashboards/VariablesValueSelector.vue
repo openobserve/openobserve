@@ -100,7 +100,7 @@ import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
-import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
+import { b64EncodeCustom, escapeSingleQuotes } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 
 export default defineComponent({
@@ -643,7 +643,7 @@ export default defineComponent({
       }
 
       // Base64 encode the query context
-      return b64EncodeUnicode(queryContext);
+      return b64EncodeCustom(queryContext);
     };
 
     /**

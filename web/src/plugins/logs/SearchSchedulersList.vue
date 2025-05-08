@@ -340,9 +340,9 @@ import {
   onActivated,
 } from "vue";
 import {
+  b64EncodeCustom,
+  b64DecodeCustom,
   timestampToTimezoneDate,
-  b64EncodeUnicode,
-  b64DecodeUnicode,
   convertDateToTimestamp,
 } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
@@ -592,7 +592,7 @@ export default defineComponent({
                 element["sql"] = JSON.parse(element.payload).query.sql;
 
                 if (JSON.parse(element.payload).query.query_fn) {
-                  element["function"] = b64DecodeUnicode(
+                  element["function"] = b64DecodeCustom(
                     JSON.parse(element.payload).query.query_fn,
                   );
                 }
@@ -847,7 +847,7 @@ export default defineComponent({
       const to = row.toBeStoredEndTime;
       const refresh = 0;
 
-      const query = b64EncodeUnicode(row.sql);
+      const query = b64EncodeCustom(row.sql);
       const rawStreamNames = JSON.parse(row.stream_names)
       const stream_name =
         rawStreamNames.length > 1
@@ -869,7 +869,7 @@ export default defineComponent({
       };
 
       if (row.hasOwnProperty("function") && row.function) {
-        const functionContent = b64EncodeUnicode(row.function);
+        const functionContent = b64EncodeCustom(row.function);
         queryObject["functionContent"] = functionContent;
       }
 

@@ -45,7 +45,7 @@ import { useQuasar } from "quasar";
 import search from "@/services/search";
 import { logsErrorMessage } from "@/utils/common";
 import { useI18n } from "vue-i18n";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeCustom } from "@/utils/zincutils";
 import type { IDateTime } from "@/ts/interfaces";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
@@ -261,7 +261,7 @@ export default defineComponent({
 
         if (store.state.zoConfig.sql_base64_enabled) {
           req["encoding"] = "base64";
-          req.query.sql = b64EncodeUnicode(req.query.sql);
+          req.query.sql = b64EncodeCustom(req.query.sql);
         }
 
         return req;

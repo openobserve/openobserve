@@ -27,7 +27,7 @@ use once_cell::sync::Lazy;
 
 static CUSTOM: Lazy<GeneralPurpose> = Lazy::new(|| {
     let custom =
-        Alphabet::new("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_.").unwrap();
+        Alphabet::new("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_").unwrap();
     base64::engine::GeneralPurpose::new(&custom, NO_PAD)
 });
 
@@ -60,6 +60,7 @@ pub fn encode_url(s: &str) -> String {
 }
 
 pub fn decode_url(s: &str) -> Result<String, Error> {
+    let s = s.trim_end_matches('.').trim_end_matches('=');
     let v = URL_SAFE_NO_PAD.decode(s.as_bytes()).map_err(|e| {
         Error::new(
             ErrorKind::InvalidData,
@@ -93,6 +94,19 @@ pub fn decode_custom(s: &str) -> Result<String, Error> {
             format!("base64 decode_custom error: {e}"),
         )
     })
+}
+
+pub fn decode_for_query(s: &str) -> Result<String, Error> {
+    if let Ok(v) = decode_custom(s) {
+        return Ok(v);
+    }
+    if let Ok(v) = decode_url(s) {
+        return Ok(v);
+    }
+    Err(Error::new(
+        ErrorKind::InvalidData,
+        "base64 decode_for_query error",
+    ))
 }
 
 #[cfg(test)]
@@ -307,5 +321,19 @@ mod tests {
         let encoded = encode_custom(&binary_str);
         let decoded = decode_custom(&encoded).unwrap();
         assert_eq!(decoded, binary_str);
+    }
+
+    #[test]
+    fn test_base64_decode_for_query() {
+        let test_cases = vec![
+            ("SGVsbG8", "Hello"),
+            (
+                "bT9LrTgLp6lConkLsCZLt41Bu65Js6NBbCdLrg",
+                "/root/defau/root@example.com",
+            ),
+        ];
+        for (encoded, expected) in test_cases {
+            assert_eq!(decode_for_query(encoded).unwrap(), expected);
+        }
     }
 }

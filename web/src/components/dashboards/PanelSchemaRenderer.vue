@@ -288,7 +288,7 @@ import {
 } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { onUnmounted } from "vue";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeCustom } from "@/utils/zincutils";
 import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
@@ -1295,7 +1295,7 @@ export default defineComponent({
               metadata?.value?.queries[0]?.query ??
               panelSchema?.value?.queries[0]?.query ??
               "";
-            drilldownVariables.query_encoded = b64EncodeUnicode(
+            drilldownVariables.query_encoded = b64EncodeCustom(
               drilldownVariables.query,
             );
 
@@ -1367,7 +1367,7 @@ export default defineComponent({
 
           modifiedQuery = modifiedQuery.replace(/`/g, '"');
 
-          const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
+          const encodedQuery: any = b64EncodeCustom(modifiedQuery);
 
           const pos = window.location.pathname.indexOf("/web/");
           const currentUrl =
@@ -1429,7 +1429,7 @@ export default defineComponent({
           metadata?.value?.queries[0]?.query ??
           panelSchema?.value?.queries[0]?.query ??
           "";
-        drilldownVariables.query_encoded = b64EncodeUnicode(
+        drilldownVariables.query_encoded = b64EncodeCustom(
           metadata?.value?.queries[0]?.query ??
             panelSchema?.value?.queries[0]?.query ??
             "",

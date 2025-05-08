@@ -158,7 +158,7 @@ pub async fn search_multi(
     let mut query_fn = multi_req
         .query_fn
         .as_ref()
-        .and_then(|v| base64::decode_url(v).ok());
+        .and_then(|v| base64::decode_for_query(v).ok());
 
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
@@ -831,7 +831,7 @@ pub async fn around_multi(
         .map(|v| v.to_str().unwrap_or("").to_string());
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_names = base64::decode_url(&stream_names)?;
+    let stream_names = base64::decode_for_query(&stream_names)?;
     let stream_names = stream_names.split(',').collect::<Vec<&str>>();
 
     let mut around_sqls = stream_names
@@ -841,7 +841,7 @@ pub async fn around_multi(
     if let Some(v) = query.get("sql") {
         let sqls = v.split(',').collect::<Vec<&str>>();
         for (i, sql) in sqls.into_iter().enumerate() {
-            if let Ok(sql) = base64::decode_url(sql) {
+            if let Ok(sql) = base64::decode_for_query(sql) {
                 around_sqls[i] = sql;
             }
         }

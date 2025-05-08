@@ -131,7 +131,7 @@ import {
   defineAsyncComponent,
 } from "vue";
 import AppTable from "@/components/rum/AppTable.vue";
-import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeCustom, b64DecodeCustom } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import ErrorDetail from "@/components/rum/ErrorDetail.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
@@ -453,8 +453,7 @@ function restoreUrlQueryParams() {
   }
 
   if (queryParams.query) {
-    errorTrackingState.data.editorValue =
-      b64DecodeUnicode(queryParams.query as string) || "";
+    errorTrackingState.data.editorValue = b64DecodeCustom(queryParams.query as string) || "";
   }
 }
 
@@ -471,7 +470,7 @@ function updateUrlQueryParams() {
     query["to"] = date.endTime;
   }
 
-  query["query"] = b64EncodeUnicode(errorTrackingState.data.editorValue);
+  query["query"] = b64EncodeCustom(errorTrackingState.data.editorValue);
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   router.push({ query });

@@ -199,9 +199,9 @@ import useTraces from "@/composables/useTraces";
 import searchService from "@/services/search";
 import TransformService from "@/services/jstransform";
 import {
-  b64EncodeUnicode,
+  b64EncodeCustom,
+  b64DecodeCustom,
   verifyOrganizationStatus,
-  b64DecodeUnicode,
   formatTimeWithSuffix,
   timestampToTimezoneDate,
 } from "@/utils/zincutils";
@@ -534,7 +534,7 @@ function buildSearch() {
     // const unparsedSQL = parser.sqlify(parsedSQL);
     // console.log(unparsedSQL);
 
-    req.query.sql = b64EncodeUnicode(req.query.sql);
+    req.query.sql = b64EncodeCustom(req.query.sql);
 
     const queryParams = getUrlQueryParams();
 
@@ -571,7 +571,7 @@ const buildTraceSearchQuery = (trace: string) => {
   req.query.start_time = trace.trace_start_time - 30000000;
   req.query.end_time = trace.trace_end_time + 30000000;
 
-  req.query.sql = b64EncodeUnicode(
+  req.query.sql = b64EncodeCustom(
     `SELECT * FROM ${selectedStreamName.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
   );
 
@@ -1070,7 +1070,7 @@ function restoreUrlQueryParams() {
   }
 
   if (queryParams.query) {
-    searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+    searchObj.data.editorValue = b64DecodeCustom(queryParams.query);
   }
 
   if (

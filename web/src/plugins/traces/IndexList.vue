@@ -137,7 +137,7 @@ import AdvancedValuesFilter from "./fields-sidebar/AdvancedValuesFilter.vue";
 import { computed } from "vue";
 
 import streamService from "@/services/stream";
-import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
+import { b64EncodeCustom, formatLargeNumber } from "@/utils/zincutils";
 import { watch } from "vue";
 
 export default defineComponent({
@@ -308,7 +308,7 @@ export default defineComponent({
             fields: [name],
             size: fieldValues.value[name].size,
             type: "traces",
-            query_context: b64EncodeUnicode(query_context),
+            query_context: b64EncodeCustom(query_context),
           })
           .then((res: any) => {
             updateSelectedValues(res.data.hits);
@@ -471,7 +471,7 @@ export default defineComponent({
           fields,
           size: 10,
           type: "traces",
-          query_context: b64EncodeUnicode(query_context),
+          query_context: b64EncodeCustom(query_context),
         })
         .then((res: any) => {
           let fieldsToUpdate = [];

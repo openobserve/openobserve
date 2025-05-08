@@ -339,7 +339,7 @@ pub async fn search_multi(
     let mut query_fn = multi_req
         .query_fn
         .as_ref()
-        .and_then(|v| base64::decode_url(v).ok());
+        .and_then(|v| base64::decode_for_query(v).ok());
 
     if let Some(vrl_function) = &query_fn {
         if RESULT_ARRAY.is_match(vrl_function) {
@@ -596,7 +596,7 @@ pub async fn search_partition(
             if v.is_empty() {
                 false
             } else {
-                let v = base64::decode_url(v).unwrap_or(v.to_string());
+                let v = base64::decode_for_query(v).unwrap_or(v.to_string());
                 RESULT_ARRAY.is_match(&v)
             }
         }

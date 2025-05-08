@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -148,7 +148,7 @@ export const getUserInfo = (loginString: string) => {
 };
 
 export const invlidateLoginData = () => {
-  userService.logout().then((res: any) => {});
+  userService.logout().then((res: any) => { });
 };
 
 export const getLoginURL = () => {
@@ -156,11 +156,9 @@ export const getLoginURL = () => {
 };
 
 export const getLogoutURL = () => {
-  return `https://${config.oauth.domain}/oidc/v1/end_session?client_id=${
-    config.aws_user_pools_web_client_id
-  }&id_token_hint=${useLocalUserInfo()}&post_logout_redirect_uri=${
-    config.oauth.redirectSignOut
-  }&state=random_string`;
+  return `https://${config.oauth.domain}/oidc/v1/end_session?client_id=${config.aws_user_pools_web_client_id
+    }&id_token_hint=${useLocalUserInfo()}&post_logout_redirect_uri=${config.oauth.redirectSignOut
+    }&state=random_string`;
 };
 
 export const getDecodedAccessToken = (token: string) => {
@@ -239,6 +237,49 @@ export const b64DecodeStandard = (str: string) => {
     console.log("Error: getBase64Decode: error while decoding.");
   }
 };
+
+// custom base64 encode
+const customb64Chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_';
+
+export const b64EncodeCustom = (input: string) => {
+  let output = '';
+  let buffer = 0;
+  let bufferLength = 0;
+
+  for (let i = 0; i < input.length; i++) {
+    buffer = (buffer << 8) | input.charCodeAt(i);
+    bufferLength += 8;
+
+    while (bufferLength >= 6) {
+      bufferLength -= 6;
+      output += customb64Chars[(buffer >> bufferLength) & 0x3F];
+    }
+  }
+
+  if (bufferLength > 0) {
+    output += customb64Chars[(buffer << (6 - bufferLength)) & 0x3F];
+  }
+
+  return output;
+}
+
+export const b64DecodeCustom = (input: string) => {
+  let output = '';
+  let buffer = 0;
+  let bufferLength = 0;
+
+  for (let i = 0; i < input.length; i++) {
+    buffer = (buffer << 6) | customb64Chars.indexOf(input[i]);
+    bufferLength += 6;
+
+    if (bufferLength >= 8) {
+      bufferLength -= 8;
+      output += String.fromCharCode((buffer >> bufferLength) & 0xFF);
+    }
+  }
+
+  return output;
+}
 
 export const getSessionStorageVal = (key: string) => {
   try {
@@ -797,18 +838,16 @@ export const durationFormatter = (durationInSeconds: number): string => {
     // For example, if the duration is 150 seconds, the output string will be "2m 30s".
     const minutes = Math.floor(durationInSeconds / 60);
     const seconds = durationInSeconds % 60;
-    formattedDuration = `${minutes > 0 ? `${minutes}m ` : ""}${
-      seconds > 0 ? `${seconds}s` : ""
-    }`.trim();
+    formattedDuration = `${minutes > 0 ? `${minutes}m ` : ""}${seconds > 0 ? `${seconds}s` : ""
+      }`.trim();
   } else if (durationInSeconds < 86400) {
     // If duration is less than 1 day, calculate hours, minutes, and seconds and return
     // For example, if the duration is 7200 seconds, the output string will be "2h".
     const hours = Math.floor(durationInSeconds / 3600);
     const minutes = Math.floor((durationInSeconds % 3600) / 60);
     const seconds = durationInSeconds % 60;
-    formattedDuration = `${hours > 0 ? `${hours}h ` : ""}${
-      minutes > 0 ? `${minutes}m ` : ""
-    }${seconds > 0 ? `${seconds}s` : ""}`.trim();
+    formattedDuration = `${hours > 0 ? `${hours}h ` : ""}${minutes > 0 ? `${minutes}m ` : ""
+      }${seconds > 0 ? `${seconds}s` : ""}`.trim();
   } else {
     // If duration is equal to or greater than 1 day, calculate days, hours, minutes, and seconds and return
     // For example, if the durartion is 86900 seconds, the output string will be "1d 8m 20s".
@@ -816,17 +855,15 @@ export const durationFormatter = (durationInSeconds: number): string => {
     const hours = Math.floor((durationInSeconds % 86400) / 3600);
     const minutes = Math.floor((durationInSeconds % 3600) / 60);
     const seconds = durationInSeconds % 60;
-    formattedDuration = `${days > 0 ? `${days}d ` : ""}${
-      hours > 0 ? `${hours}h ` : ""
-    }${minutes > 0 ? `${minutes}m ` : ""}${
-      seconds > 0 ? `${seconds}s` : ""
-    }`.trim();
+    formattedDuration = `${days > 0 ? `${days}d ` : ""}${hours > 0 ? `${hours}h ` : ""
+      }${minutes > 0 ? `${minutes}m ` : ""}${seconds > 0 ? `${seconds}s` : ""
+      }`.trim();
   }
 
   return formattedDuration;
 };
 
-export const getTimezoneOffset = (timezone: string |null = null) => {
+export const getTimezoneOffset = (timezone: string | null = null) => {
   const now = new Date();
 
   // Get the day, month, and year from the date object

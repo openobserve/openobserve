@@ -15,8 +15,8 @@
 
 import { reactive } from "vue";
 import {
+  b64EncodeCustom,
   b64EncodeStandard,
-  b64EncodeUnicode,
   useLocalTraceFilterField,
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -203,7 +203,7 @@ const useTraces = () => {
       query["to"] = date.endTime;
     }
 
-    query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
+    query["query"] = b64EncodeCustom(searchObj.data.editorValue);
 
     query["org_identifier"] = store.state.selectedOrganization.identifier;
 

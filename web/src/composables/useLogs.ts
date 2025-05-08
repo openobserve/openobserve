@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -37,8 +37,8 @@ import {
 
 import {
   useLocalLogFilterField,
-  b64EncodeUnicode,
-  b64DecodeUnicode,
+  b64EncodeCustom,
+  b64DecodeCustom,
   formatSizeFromMB,
   timestampToTimezoneDate,
   histogramDateTimezone,
@@ -61,11 +61,6 @@ import {
 import { byString } from "@/utils/json";
 import { logsErrorMessage } from "@/utils/common";
 import useSqlSuggestions from "@/composables/useSuggestions";
-// import {
-//   b64EncodeUnicode,
-//   useLocalLogFilterField,
-//   b64DecodeUnicode,
-// } from "@/utils/zincutils";
 
 import useFunctions from "@/composables/useFunctions";
 import useNotifications from "@/composables/useNotifications";
@@ -606,14 +601,14 @@ const useLogs = () => {
 
     if (searchObj.data.query) {
       query["sql_mode"] = searchObj.meta.sqlMode;
-      query["query"] = b64EncodeUnicode(searchObj.data.query.trim());
+      query["query"] = b64EncodeCustom(searchObj.data.query.trim());
     }
 
     if (
       searchObj.data.transformType === "function" &&
       searchObj.data.tempFunctionContent != ""
     ) {
-      query["functionContent"] = b64EncodeUnicode(
+      query["functionContent"] = b64EncodeCustom(
         searchObj.data.tempFunctionContent.trim(),
       );
     }
@@ -1107,12 +1102,12 @@ const useLogs = () => {
 
       if (store.state.zoConfig.sql_base64_enabled) {
         req["encoding"] = "base64";
-        req.query.sql = b64EncodeUnicode(req.query.sql);
+        req.query.sql = b64EncodeCustom(req.query.sql);
         //encode the histogram only if the current page is 1 
         if (
           searchObj.data.resultGrid.currentPage == 1
         ) {
-          req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
+          req.aggs.histogram = b64EncodeCustom(req.aggs.histogram);
         }
       }
 
@@ -1996,7 +1991,7 @@ const useLogs = () => {
   function addTransformToQuery(queryReq: any) {
     if (shouldAddFunctionToSearch()) {
       queryReq.query["query_fn"] =
-        b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+        b64EncodeCustom(searchObj.data.tempFunctionContent) || "";
     }
 
     // Add action ID if it exists
@@ -3723,7 +3718,7 @@ const useLogs = () => {
         const parsedSQL: any = parser.astify(query);
         parsedSQL.where = null;
         sqlContext.push(
-          b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')),
+          b64EncodeCustom(parser.sqlify(parsedSQL).replace(/`/g, '"')),
         );
       } else {
         const parseQuery = [query];
@@ -3775,13 +3770,13 @@ const useLogs = () => {
             "[FIELD_LIST]",
             `'${item}' as _stream_name` + queryFieldList,
           );
-          sqlContext.push(b64EncodeUnicode(finalQuery));
+          sqlContext.push(b64EncodeCustom(finalQuery));
         });
       }
 
       let query_fn: any = "";
       if (shouldAddFunctionToSearch()) {
-        query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
+        query_fn = b64EncodeCustom(searchObj.data.tempFunctionContent);
       }
 
       let action_id: any = "";
@@ -3793,7 +3788,7 @@ const useLogs = () => {
       let streamName: string = "";
       if (searchObj.data.stream.selectedStream.length > 1) {
         streamName =
-          b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) ||
+          b64EncodeCustom(searchObj.data.stream.selectedStream.join(",")) ||
           "";
       } else {
         streamName = searchObj.data.stream.selectedStream[0];
@@ -4102,8 +4097,8 @@ const useLogs = () => {
 
     if (queryParams.query) {
       searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
-      searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-      searchObj.data.query = b64DecodeUnicode(queryParams.query);
+      searchObj.data.editorValue = b64DecodeCustom(queryParams.query);
+      searchObj.data.query = b64DecodeCustom(queryParams.query);
     }
 
     if (
@@ -4131,7 +4126,7 @@ const useLogs = () => {
 
     if (queryParams.functionContent) {
       searchObj.data.tempFunctionContent =
-        b64DecodeUnicode(queryParams.functionContent) || "";
+        b64DecodeCustom(queryParams.functionContent) || "";
       searchObj.meta.functionEditorPlaceholderFlag = false;
       searchObj.data.transformType = "function";
     }

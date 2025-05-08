@@ -209,9 +209,7 @@
   <script lang="ts">
   //@ts-nocheck
   import { ref, watch, onMounted  , nextTick,computed, onUnmounted} from 'vue';
-  import {
-    timestampToTimezoneDate , b64EncodeUnicode,convertDateToTimestamp, 
-    getUUID} from "@/utils/zincutils";
+  import { timestampToTimezoneDate , b64EncodeCustom, convertDateToTimestamp, getUUID} from "@/utils/zincutils";
   import { useRouter, useRoute } from 'vue-router';
   import { useStore } from 'vuex';
   import { defineAsyncComponent ,defineComponent} from 'vue';
@@ -570,7 +568,7 @@
        row.toBeStoredEndTime ;
       const refresh = 0;
 
-      const query = b64EncodeUnicode(row.sql);
+      const query = b64EncodeCustom(row.sql);
 
       const queryObject = {
         stream_type: "logs",
@@ -587,7 +585,7 @@
       };
 
       if(row.hasOwnProperty('function') && row.function){
-        const functionContent = b64EncodeUnicode(row.function);
+        const functionContent = b64EncodeCustom(row.function);
         queryObject['functionContent'] = functionContent;
       }
 

@@ -701,7 +701,7 @@ pub async fn build_search_request_per_field(
     let query_fn = req
         .vrl_fn
         .as_ref()
-        .and_then(|v| base64::decode_url(v.as_ref()).ok())
+        .and_then(|v| base64::decode_for_query(v.as_ref()).ok())
         .map(|vrl| {
             if !vrl.trim().ends_with('.') {
                 format!("{} \n .", vrl)
@@ -751,7 +751,7 @@ pub async fn build_search_request_per_field(
         (start_time, end_time)
     };
 
-    let decoded_sql = base64::decode_url(&req.sql).unwrap_or_default();
+    let decoded_sql = base64::decode_for_query(&req.sql).unwrap_or_default();
 
     let mut query = config::meta::search::Query {
         sql: decoded_sql.clone(), // Will be populated per field in the loop below
@@ -901,7 +901,7 @@ async fn values_v1(
     };
     let query_fn = query
         .get("query_fn")
-        .and_then(|v| base64::decode_url(v.as_ref()).ok())
+        .and_then(|v| base64::decode_for_query(v.as_ref()).ok())
         .map(|vrl_function| {
             if !vrl_function.trim().ends_with('.') {
                 format!("{} \n .", vrl_function)
@@ -940,7 +940,7 @@ async fn values_v1(
     };
 
     if let Some(v) = query.get("sql") {
-        if let Ok(sql) = base64::decode_url(v) {
+        if let Ok(sql) = base64::decode_for_query(v) {
             uses_fn = functions::get_all_transform_keys(org_id)
                 .await
                 .iter()

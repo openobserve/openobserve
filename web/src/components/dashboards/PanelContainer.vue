@@ -382,7 +382,7 @@ import RelativeTime from "@/components/common/RelativeTime.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeCustom } from "@/utils/zincutils";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -610,7 +610,7 @@ export default defineComponent({
 
       modifiedQuery = modifiedQuery.replace(/`/g, '"');
 
-      const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
+      const encodedQuery: any = b64EncodeCustom(modifiedQuery);
 
       const pos = window.location.pathname.indexOf("/web/");
       const currentUrl =

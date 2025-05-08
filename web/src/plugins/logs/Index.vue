@@ -613,8 +613,8 @@ export default defineComponent({
     //   }
     //   if (queryParams.query) {
     //     searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
-    //     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-    //     searchObj.data.query = b64DecodeUnicode(queryParams.query);
+    //     searchObj.data.editorValue = b64DecodeCustom(queryParams.query);
+    //     searchObj.data.query = b64DecodeCustom(queryParams.query);
     //   }
     //   if (queryParams.refresh) {
     //     searchObj.meta.refreshInterval = queryParams.refresh;

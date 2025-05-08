@@ -166,8 +166,8 @@ import { useI18n } from "vue-i18n";
 import AppTable from "@/components/rum/AppTable.vue";
 import {
   formatDuration,
-  b64DecodeUnicode,
-  b64EncodeUnicode,
+  b64EncodeCustom,
+  b64DecodeCustom,
 } from "@/utils/zincutils";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
@@ -629,8 +629,7 @@ function restoreUrlQueryParams() {
   }
 
   if (queryParams.query) {
-    sessionState.data.editorValue =
-      b64DecodeUnicode(queryParams.query as string) || "";
+    sessionState.data.editorValue = b64DecodeCustom(queryParams.query as string) || "";
   }
 }
 
@@ -647,7 +646,7 @@ function updateUrlQueryParams() {
     query["to"] = date.endTime;
   }
 
-  query["query"] = b64EncodeUnicode(sessionState.data.editorValue);
+  query["query"] = b64EncodeCustom(sessionState.data.editorValue);
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   router.push({ query });

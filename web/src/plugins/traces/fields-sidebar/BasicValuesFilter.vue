@@ -119,7 +119,7 @@
 <script lang="ts" setup>
 import { ref } from "vue";
 import useTraces from "@/composables/useTraces";
-import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
+import { b64EncodeCustom, formatLargeNumber } from "@/utils/zincutils";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -205,7 +205,7 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
     } else {
       query_context = query_context.replace("[WHERE_CLAUSE]", "");
     }
-    query_context = b64EncodeUnicode(query_context) || "";
+    query_context = b64EncodeCustom(query_context) || "";
 
     fieldValues.value[name] = {
       isLoading: true,

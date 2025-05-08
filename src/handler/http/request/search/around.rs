@@ -56,7 +56,7 @@ pub(crate) async fn around(
     };
     let mut query_fn = query
         .get("query_fn")
-        .and_then(|v| base64::decode_url(v).ok());
+        .and_then(|v| base64::decode_for_query(v).ok());
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
             query_fn = Some(format!("{} \n .", vrl_function));
@@ -69,7 +69,7 @@ pub(crate) async fn around(
     } else {
         match query.get("sql") {
             None => default_sql,
-            Some(v) => match base64::decode_url(v) {
+            Some(v) => match base64::decode_for_query(v) {
                 Err(_) => default_sql,
                 Ok(sql) => sql,
             },

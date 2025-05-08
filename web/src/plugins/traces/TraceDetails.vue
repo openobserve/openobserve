@@ -395,7 +395,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeCustom } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
@@ -710,7 +710,7 @@ export default defineComponent({
       req.query.start_time = trace.from;
       req.query.end_time = trace.to;
 
-      req.query.sql = b64EncodeUnicode(
+      req.query.sql = b64EncodeCustom(
         `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
       ) as string;
 
@@ -1141,7 +1141,7 @@ export default defineComponent({
         searchObj.data.traceDetails.selectedTrace?.trace_end_time + 60000000;
       const refresh = 0;
 
-      const query = b64EncodeUnicode(
+      const query = b64EncodeCustom(
         `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`,
       );
 

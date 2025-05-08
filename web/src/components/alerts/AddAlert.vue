@@ -493,10 +493,10 @@ import segment from "../../services/segment_analytics";
 import {
   getUUID,
   getTimezoneOffset,
-  b64EncodeUnicode,
-  b64DecodeUnicode,
-  isValidResourceName,
   getTimezonesByOffset,
+  isValidResourceName,
+  b64EncodeCustom,
+  b64DecodeCustom,
 } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
@@ -1094,7 +1094,7 @@ export default defineComponent({
       }
 
       if (formData.value.query_condition.vrl_function) {
-        payload.query_condition.vrl_function = b64EncodeUnicode(
+        payload.query_condition.vrl_function = b64EncodeCustom(
           formData.value.query_condition.vrl_function.trim(),
         );
       }
@@ -1223,7 +1223,7 @@ export default defineComponent({
       }
 
       if (formData.value.query_condition.vrl_function)
-        query.query.query_fn = b64EncodeUnicode(
+        query.query.query_fn = b64EncodeCustom(
           formData.value.query_condition.vrl_function,
         );
 
@@ -1421,7 +1421,7 @@ export default defineComponent({
 
       if (this.formData.query_condition.vrl_function) {
         this.showVrlFunction = true;
-        this.formData.query_condition.vrl_function = b64DecodeUnicode(
+        this.formData.query_condition.vrl_function = b64DecodeCustom(
           this.formData.query_condition.vrl_function,
         );
       }

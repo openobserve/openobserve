@@ -316,7 +316,6 @@ import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
 import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import useQuery from "@/composables/useQuery";
-import { b64EncodeUnicode } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { event, useQuasar } from "quasar";

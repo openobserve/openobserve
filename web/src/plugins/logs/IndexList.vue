@@ -669,7 +669,7 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
 import {
-  b64EncodeUnicode,
+  b64EncodeCustom,
   getImageURL,
   convertTimeFromMicroToMilli,
   formatLargeNumber,
@@ -953,7 +953,7 @@ export default defineComponent({
           } else {
             query_context = query_context.replace("[WHERE_CLAUSE]", "");
           }
-          // query_context = b64EncodeUnicode(query_context) || "";
+          // query_context = b64EncodeCustom(query_context) || "";
         }
 
         let query_fn = "";
@@ -961,7 +961,7 @@ export default defineComponent({
           searchObj.data.tempFunctionContent != "" &&
           searchObj.data.transformType === "function"
         ) {
-          query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+          query_fn = b64EncodeCustom(searchObj.data.tempFunctionContent) || "";
         }
 
         let action_id = "";
@@ -1022,7 +1022,7 @@ export default defineComponent({
                 stream_type: searchObj.data.stream.streamType,
                 use_cache: (window as any).use_cache ?? true,
                 sql:
-                  b64EncodeUnicode(
+                  b64EncodeCustom(
                     query_context.replace("[INDEX_NAME]", selectedStream),
                   ) || "",
               });
@@ -1038,7 +1038,7 @@ export default defineComponent({
                 fields: [name],
                 size: 10,
                 query_context:
-                  b64EncodeUnicode(
+                  b64EncodeCustom(
                     query_context.replace("[INDEX_NAME]", selectedStream),
                   ) || "",
                 query_fn: query_fn,

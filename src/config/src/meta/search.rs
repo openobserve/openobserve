@@ -156,12 +156,7 @@ impl Request {
     pub fn decode(&mut self) -> Result<(), std::io::Error> {
         match self.encoding {
             RequestEncoding::Base64 => {
-                self.query.sql = match base64::decode_url(&self.query.sql) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(e);
-                    }
-                };
+                self.query.sql = base64::decode_for_query(&self.query.sql)?;
             }
             RequestEncoding::Empty => {}
         }
@@ -382,12 +377,7 @@ impl SearchPartitionRequest {
     pub fn decode(&mut self) -> Result<(), std::io::Error> {
         match self.encoding {
             RequestEncoding::Base64 => {
-                self.sql = match base64::decode_url(&self.sql) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(e);
-                    }
-                };
+                self.sql = base64::decode_for_query(&self.sql)?;
             }
             RequestEncoding::Empty => {}
         }
@@ -1006,12 +996,12 @@ impl MultiStreamRequest {
             let query_fn = if query.is_old_format {
                 self.query_fn
                     .as_ref()
-                    .and_then(|v| base64::decode_url(v).ok())
+                    .and_then(|v| base64::decode_for_query(v).ok())
             } else {
                 query
                     .query_fn
                     .as_ref()
-                    .and_then(|v| base64::decode_url(v).ok())
+                    .and_then(|v| base64::decode_for_query(v).ok())
             };
             res.push(Request {
                 query: Query {

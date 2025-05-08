@@ -91,7 +91,7 @@ pub async fn search(
         .query
         .query_fn
         .as_ref()
-        .map(|v| match base64::decode_url(v) {
+        .map(|v| match base64::decode_for_query(v) {
             Ok(v) => v,
             Err(_) => v.to_string(),
         });
@@ -874,7 +874,7 @@ pub async fn check_cache_v2(
         .query
         .query_fn
         .as_ref()
-        .and_then(|v| base64::decode_url(v).ok());
+        .and_then(|v| base64::decode_for_query(v).ok());
 
     // calculate hash for the query
     let mut hash_body = vec![origin_sql.to_string()];

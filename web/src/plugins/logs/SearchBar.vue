@@ -1202,13 +1202,13 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import {
   mergeDeep,
-  b64DecodeUnicode,
   getImageURL,
   useLocalInterestingFields,
   useLocalSavedView,
   queryIndexSplit,
   timestampToTimezoneDate,
-  b64EncodeUnicode,
+  b64EncodeCustom,
+  b64DecodeCustom,
 } from "@/utils/zincutils";
 
 import savedviewsService from "@/services/saved_views";
@@ -1939,7 +1939,7 @@ export default defineComponent({
           searchObj.data.tempFunctionContent)
       ) {
         const fnContent = router.currentRoute.value.query.functionContent
-          ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
+          ? b64DecodeCustom(router.currentRoute.value.query.functionContent)
           : searchObj.data.tempFunctionContent;
         fnEditorRef?.value?.setValue(fnContent);
       }
@@ -1967,7 +1967,7 @@ export default defineComponent({
         searchObj.data.transformType === "function"
       ) {
         const fnContent = router.currentRoute.value.query.functionContent
-          ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
+          ? b64DecodeCustom(router.currentRoute.value.query.functionContent)
           : searchObj.data.tempFunctionContent;
         fnEditorRef?.value?.setValue(fnContent);
         fnEditorRef?.value?.resetEditorLayout();
@@ -2549,7 +2549,7 @@ export default defineComponent({
           });
           console.log(err);
         });
-      // const extractedObj = JSON.parse(b64DecodeUnicode(item.data));
+      // const extractedObj = JSON.parse(b64DecodeCustom(item.data));
       // searchObj.value = mergeDeep(searchObj, extractedObj);
       // await nextTick();
       // updatedLocalLogFilterField();
@@ -2653,7 +2653,7 @@ export default defineComponent({
         delete savedSearchObj.value;
 
         return savedSearchObj;
-        // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
+        // return b64EncodeCustom(JSON.stringify(savedSearchObj));
       } catch (e) {
         console.log("Error while encoding search obj", e);
       }
@@ -3248,14 +3248,14 @@ export default defineComponent({
 
     const checkQuery = (query) => {
       const jobQuery = router.currentRoute.value.query.query;
-      if (jobQuery == b64EncodeUnicode(query)) {
+      if (jobQuery == b64EncodeCustom(query)) {
         return true;
       }
       return false;
     };
     const checkFnQuery = (fnQuery) => {
       const jobFnQuery = router.currentRoute.value.query.functionContent;
-      if (jobFnQuery == b64EncodeUnicode(fnQuery)) {
+      if (jobFnQuery == b64EncodeCustom(fnQuery)) {
         return true;
       }
       return false;

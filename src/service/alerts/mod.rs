@@ -378,7 +378,7 @@ impl QueryConditionExt for QueryCondition {
                     action_id: None,
                     uses_zo_fn: false,
                     query_fn: if self.vrl_function.is_some() {
-                        match base64::decode_url(self.vrl_function.as_ref().unwrap()) {
+                        match base64::decode_for_query(self.vrl_function.as_ref().unwrap()) {
                             Ok(query_fn) => Some(query_fn),
                             Err(e) => {
                                 return Err(anyhow::anyhow!(

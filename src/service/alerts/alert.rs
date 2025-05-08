@@ -299,7 +299,7 @@ async fn prepare_alert(
     }
 
     if let Some(vrl) = alert.query_condition.vrl_function.as_ref() {
-        match base64::decode_url(vrl) {
+        match base64::decode_for_query(vrl) {
             Ok(vrl) => {
                 let vrl = vrl.trim().to_owned();
                 if !vrl.is_empty() && !vrl.ends_with('.') {

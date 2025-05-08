@@ -36,7 +36,7 @@ import {
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
 import {
-  b64EncodeUnicode,
+  b64EncodeCustom,
   generateTraceContext,
   isWebSocketEnabled,
 } from "@/utils/zincutils";
@@ -343,14 +343,14 @@ export const usePanelDataLoader = (
     histogramInterval: string | null,
   ) => {
     const sql = store.state.zoConfig.sql_base64_enabled
-      ? b64EncodeUnicode(
+      ? b64EncodeCustom(
           await changeHistogramInterval(query, histogramInterval ?? null),
         )
       : await changeHistogramInterval(query, histogramInterval ?? null);
     return {
       sql,
       query_fn: it.vrlFunctionQuery
-        ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
+        ? b64EncodeCustom(it.vrlFunctionQuery.trim())
         : null,
       sql_mode: "full",
       // if i == 0 ? then do gap of 7 days
@@ -384,7 +384,7 @@ export const usePanelDataLoader = (
             org_identifier: store.state.selectedOrganization.identifier,
             query: {
               sql: store.state.zoConfig.sql_base64_enabled
-                ? b64EncodeUnicode(query)
+                ? b64EncodeCustom(query)
                 : query,
               // pass encodig if enabled,
               // make sure that `encoding: null` is not being passed, that's why used object extraction logic
@@ -392,7 +392,7 @@ export const usePanelDataLoader = (
                 ? { encoding: "base64" }
                 : {}),
               query_fn: it.vrlFunctionQuery
-                ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
+                ? b64EncodeCustom(it.vrlFunctionQuery.trim())
                 : null,
               sql_mode: "full",
               start_time: startISOTimestamp,
@@ -1117,7 +1117,7 @@ export const usePanelDataLoader = (
                             query: {
                               sql: searchQueries,
                               query_fn: it.vrlFunctionQuery
-                                ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
+                                ? b64EncodeCustom(it.vrlFunctionQuery.trim())
                                 : null,
                               sql_mode: "full",
                               start_time: startISOTimestamp,

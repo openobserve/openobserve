@@ -94,7 +94,7 @@ import useSession from "@/composables/useSessionReplay";
 import useErrorTracking from "@/composables/useErrorTracking";
 import usePerformance from "@/composables/rum/usePerformance";
 
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeCustom } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import useRum from "@/composables/rum/useRum";
 import useStreams from "@/composables/useStreams";
@@ -242,7 +242,7 @@ const getQueryParams = (dateTime: any, editorValue: string) => {
     query["to"] = dateTime.endTime;
   }
 
-  if (editorValue) query["query"] = b64EncodeUnicode(editorValue);
+  if (editorValue) query["query"] = b64EncodeCustom(editorValue);
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   return query;
