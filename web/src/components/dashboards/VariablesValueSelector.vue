@@ -233,7 +233,7 @@ export default defineComponent({
       removeTraceId(request.queryReq.fields[0], request.content.trace_id);
     };
 
-    const handleSearchResponse = (payload: any, response: any) => {
+    const handleSearchResponse = async (payload: any, response: any) => {
       if (response.type === "cancel_response") {
         removeTraceId(payload.queryReq.fields[0], response.content.trace_id);
         return;
@@ -242,11 +242,44 @@ export default defineComponent({
       const variableObject = variablesData.values.find(
         (v: any) => v.query_data?.field === payload.queryReq.fields[0],
       );
-      console.log("variableObject", variableObject);
-      console.log("response", response);
 
       if (variableObject && response.type === "search_response") {
+        const oldValue = variableObject.value;
+
+        // Update the current variable's options
         updateVariableOptions(variableObject, response.content.results.hits);
+
+        // Mark current variable as loaded
+        variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
+
+        // Only trigger child variable loading if the parent value has actually changed
+        // and this is not just a dropdown open event
+        const valueChanged = oldValue !== variableObject.value;
+        const isManualValueChange =
+          oldVariablesData[variableObject.name] !== variableObject.value;
+
+        if (valueChanged && isManualValueChange) {
+          const childVariables =
+            variablesDependencyGraph[variableObject.name]?.childVariables || [];
+          if (childVariables.length > 0) {
+            const childVariableObjects = variablesData.values.filter(
+              (variable: any) => childVariables.includes(variable.name),
+            );
+
+            // Update old variables data before loading children
+            oldVariablesData[variableObject.name] = variableObject.value;
+
+            // Reset and load child variables
+            for (const childVar of childVariableObjects) {
+              childVar.isLoading = true;
+              childVar.isVariableLoadingPending = true;
+              childVar.value = childVar.multiSelect ? [] : null;
+              childVar.options = [];
+              await loadSingleVariableDataByName(childVar);
+            }
+          }
+        }
       }
 
       removeTraceId(payload.queryReq.fields[0], response.content.trace_id);
@@ -713,15 +746,19 @@ export default defineComponent({
      * @returns {Promise<boolean>} - true if the variable was loaded successfully, false if it was not
      */
     const loadSingleVariableDataByName = async (variableObject: any) => {
+      console.log(`Loading variable ${variableObject.name}`);
+
       return new Promise(async (resolve, reject) => {
         const { name } = variableObject;
 
         if (!name || !variableObject) {
+          console.log(`Variable ${name} is not a valid variable`);
           return resolve(false);
         }
 
         // If the variable is already being processed
         if (currentlyExecutingPromises[name]) {
+          console.log(`Canceling previous promise for ${name}`);
           currentlyExecutingPromises[name](false);
         }
         currentlyExecutingPromises[name] = reject;
@@ -736,20 +773,31 @@ export default defineComponent({
             isInvalidDate(props.selectedTimeDate?.start_time) ||
             isInvalidDate(props.selectedTimeDate?.end_time)
           ) {
+            console.log(
+              `Variable ${name} is a query_values type, but start or end time is invalid`,
+            );
             return resolve(false);
           }
         }
 
         // For variables with dependencies, check if dependencies are loaded
         if (hasParentVariables && isDependentVariableLoading(variableObject)) {
+          console.log(
+            `Variable ${name} has dependencies which are not yet loaded`,
+          );
           return resolve(false);
         }
 
         try {
+          console.log(
+            `Loading variable ${name} with type ${variableObject.type}`,
+          );
           const success = await handleVariableType(variableObject);
           await finalizeVariableLoading(variableObject, success);
+          console.log(`Variable ${name} loaded successfully`);
           resolve(success);
         } catch (error) {
+          console.log(`Error occurred while loading variable ${name}`);
           await finalizeVariableLoading(variableObject, false);
           resolve(false);
         }
