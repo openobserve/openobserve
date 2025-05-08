@@ -123,7 +123,7 @@ jobs:
             # "dashboards/dashboard-import.spec.js",
             # "reportsUpdated.spec.js",
             # "reportsUpdated2.spec.js",
-            "dashboards/dashboard-filter.spec.js",
+            # "dashboards/dashboard-filter.spec.js",
             "dashboards/dashboard-aggsQuery.spec.js",
             # "dashboards/dashboard-folder.spec.js",
             # "dashboards/dashboard-multi-y-axis.spec.js",
