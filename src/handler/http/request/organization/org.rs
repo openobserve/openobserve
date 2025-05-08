@@ -540,7 +540,7 @@ async fn get_local_nodes() -> NodeListResponse {
     // Get all nodes from cache if available
     if let Some(nodes) = cluster::get_cached_nodes(|_| true).await {
         for node in nodes {
-            response.add_node(node.clone(), node.get_region(), node.get_cluster_name());
+            response.add_node(node.clone(), node.get_region(), node.get_cluster());
         }
     }
 
@@ -572,7 +572,7 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
     let trace_id = config::ider::generate_trace_id();
     for cluster in clusters {
         let region = cluster.get_region();
-        let cluster_name = cluster.get_cluster_name();
+        let cluster_name = cluster.get_cluster();
 
         // Fetch child nodes from this cluster
         match crate::service::node::get_node_list(&trace_id, cluster).await {
@@ -642,7 +642,7 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
     let trace_id = config::ider::generate_trace_id();
     for cluster in clusters {
         let region = cluster.get_region();
-        let cluster_name = cluster.get_cluster_name();
+        let cluster_name = cluster.get_cluster();
 
         // Fetch cluster info from this cluster node
         match crate::service::cluster_info::get_super_cluster_info(&trace_id, cluster).await {
