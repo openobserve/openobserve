@@ -339,7 +339,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @add-field-to-table="addFieldToTable"
                   />
                 </template>
-                {{ cell.renderValue() }}
+                <HighLight
+                  :content="cell.renderValue()"
+                  :query-string="
+                    highlightQuery
+                  "
+                />
               </td>
             </template>
           </tr>
@@ -352,6 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, defineEmits, watch, nextTick, onMounted } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
+import HighLight from "@/components/HighLight.vue";
 import {
   FlexRender,
   type ColumnDef,
@@ -412,6 +418,11 @@ const props = defineProps({
     type: String,
     default: "",
     required: false,
+  },
+  highlightQuery:{
+    type: String,
+    default: "",
+    required: false,
   }
 });
 
@@ -456,6 +467,10 @@ const tableRows = ref(props.rows);
 const isFunctionErrorOpen = ref(false);
 
 const activeCellActionId = ref("");
+
+const highlightQuery = computed(() => {
+  return props.highlightQuery;
+});
 
 watch(
   () => props.columns,
