@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -316,37 +316,32 @@ pub static QUERY_DISK_METRICS_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(||
 });
 
 // query cache ratio for parquet files
-pub static QUERY_PARQUET_CACHE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "query_parquet_cache_requests",
-            "Querier parquet cache requests.".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
-    )
-    .expect("Metric created")
-});
-pub static QUERY_PARQUET_CACHE_RATIO: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
+pub static QUERY_PARQUET_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
             "query_parquet_cache_ratio",
             "Querier parquet cache ratio.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
+        .buckets(vec![
+            0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.0,
+        ])
         .const_labels(create_const_labels()),
         &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
-pub static QUERY_PARQUET_CACHE_RATIO_NODE: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
+
+pub static QUERY_PARQUET_CACHE_RATIO_NODE: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
             "query_parquet_cache_ratio_node",
             "Querier parquet cache ratio for local node.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
+        .buckets(vec![
+            0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.0,
+        ])
         .const_labels(create_const_labels()),
         &["organization", "stream_type"],
     )
@@ -354,25 +349,16 @@ pub static QUERY_PARQUET_CACHE_RATIO_NODE: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 // query cache ratio for metrics
-pub static QUERY_METRICS_CACHE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "query_metrics_cache_requests",
-            "Querier metrics cache requests.".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-pub static QUERY_METRICS_CACHE_RATIO: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
+pub static QUERY_METRICS_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
             "query_metrics_cache_ratio",
             "Querier metrics cache ratio.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
+        .buckets(vec![
+            0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.0,
+        ])
         .const_labels(create_const_labels()),
         &[],
     )
@@ -808,16 +794,10 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(QUERY_DISK_METRICS_CACHE_USED_BYTES.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(QUERY_PARQUET_CACHE_REQUESTS.clone()))
-        .expect("Metric registered");
-    registry
         .register(Box::new(QUERY_PARQUET_CACHE_RATIO.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_PARQUET_CACHE_RATIO_NODE.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(QUERY_METRICS_CACHE_REQUESTS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_METRICS_CACHE_RATIO.clone()))
