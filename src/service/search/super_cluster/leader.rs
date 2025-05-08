@@ -205,6 +205,10 @@ pub async fn search(
     );
 
     let main_trace_id = trace_id.split("-").next().unwrap();
+    log::info!(
+        "[trace_id {trace_id}] getting scan stats with trace {main_trace_id}, from nodes {:?}",
+        nodes
+    );
     for node in nodes {
         let mut scan_stats_request = tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
             trace_id: main_trace_id.to_string(),
