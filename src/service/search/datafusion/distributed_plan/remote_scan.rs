@@ -453,11 +453,11 @@ fn get_empty_record_batch_stream(
 ) -> SendableRecordBatchStream {
     if e.code() != tonic::Code::Ok {
         log::info!(
-            "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {}, took: {} ms",
+            "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {:?}, took: {} ms",
             trace_id,
             node_addr,
             is_querier,
-            e.to_string(),
+            e,
             start.elapsed().as_millis(),
         );
         process_partial_err(partial_err, e);
@@ -605,12 +605,12 @@ impl Stream for FlightStream {
         if self.start.elapsed().as_secs() > self.timeout {
             let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
             log::error!(
-                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {}, took: {} ms",
+                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
                 self.trace_id,
                 self.node.get_grpc_addr(),
                 self.is_super,
                 self.is_querier,
-                e.to_string(),
+                e,
                 self.start.elapsed().as_millis(),
             );
             process_partial_err(self.partial_err.clone(), e);
@@ -632,12 +632,12 @@ impl Stream for FlightStream {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => {
                 log::error!(
-                    "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {}, took: {} ms",
+                    "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
                     self.trace_id,
                     self.node.get_grpc_addr(),
                     self.is_super,
                     self.is_querier,
-                    e.to_string(),
+                    e,
                     self.start.elapsed().as_millis(),
                 );
                 process_partial_err(self.partial_err.clone(), e);
