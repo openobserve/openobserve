@@ -1,6 +1,7 @@
 import { test, expect } from "./baseFixtures";
-import logData from "../cypress/fixtures/log.json";
 import { LogsPage } from '../pages/logsPage.js';
+import { StreamPage } from '../pages/streamPage.js';
+import { getHeaders, getIngestionUrl, sendRequest } from '../utils/apiUtils.js';
 
 test.describe.configure({ mode: "parallel" });
 
@@ -17,41 +18,14 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 
-const getHeaders = () => {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-
-  return {
-    Authorization: `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-};
-
-const getIngestionUrl = (orgId, streamName) => {
-  return `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
-};
-
-const sendRequest = async (page, url, payload, headers) => {
-  return await page.evaluate(
-    async ({ url, headers, payload }) => {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(payload),
-      });
-      return await response.json();
-    },
-    { url, headers, payload }
-  );
-};
-
 test.describe("Stream multiselect testcases", () => {
   let logsPage;
+  let streamPage;
 
   test.beforeEach(async ({ page }) => {
     await login(page);
     logsPage = new LogsPage(page);
+    streamPage = new StreamPage(page);
     await page.waitForTimeout(5000);
   });
 
@@ -64,6 +38,7 @@ test.describe("Stream multiselect testcases", () => {
       { name: "mylowerstream1" },
     ];
 
+    // Ingest data into streams
     for (const stream of streams) {
       const ingestionUrl = getIngestionUrl(orgId, stream.name);
       const payload = {
@@ -76,27 +51,13 @@ test.describe("Stream multiselect testcases", () => {
       console.log(`Ingested to ${stream.name}:`, response);
     }
 
-    // Navigate to Stream Explorer
-    // await page.locator('[data-test="date-time-btn"]').click({ force: true });
-    // await page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
-    // await page.waitForTimeout(1000);
-
-    // Validate casing and explore streams
+    // Validate streams in Stream Explorer
     for (const stream of streams) {
-      await page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
-      await page.waitForTimeout(1000);
-      await page.getByPlaceholder("Search Stream").click();
-      await page.getByPlaceholder("Search Stream").fill(stream.name);
-      await page.waitForTimeout(3000);
-
-      const streamButton = page.getByRole("button", { name: 'Explore' });
-      await expect(streamButton).toBeVisible();
-
-      await streamButton.click({ force: true });
-      await page.waitForTimeout(1000);
-      await expect(page.url()).toContain("logs");
-      await page.goBack();
-      await page.waitForTimeout(1000);
+      await streamPage.navigateToStreamExplorer();
+      await streamPage.searchStream(stream.name);
+      await streamPage.exploreStream();
+      await streamPage.verifyStreamExploration();
+      await streamPage.goBack();
     }
   });
 });
