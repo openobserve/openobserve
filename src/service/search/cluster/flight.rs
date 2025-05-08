@@ -126,7 +126,7 @@ pub async fn search(
                 .component("flight:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .desc(format!("get files {} ids", file_id_list_num,))
+                .desc(format!("get files {} ids", file_id_list_num))
                 .build()
         )
     );
