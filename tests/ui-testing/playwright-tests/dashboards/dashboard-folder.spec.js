@@ -26,13 +26,14 @@ test.describe("dashboard folder testcases", () => {
     );
     await orgNavigation;
 
-    dashboardPage = new DashboardListPage(page);
-    dashboardFolders = new DashboardFolder(page);
+    
   });
 
   test("should create and delete a unique folder, and verify it's deleted", async ({
     page,
   }) => {
+    dashboardPage = new DashboardListPage(page);
+    dashboardFolders = new DashboardFolder(page);
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
@@ -54,6 +55,8 @@ test.describe("dashboard folder testcases", () => {
   test("should create and edit folder name and verify it's updated", async ({
     page,
   }) => {
+    dashboardPage = new DashboardListPage(page);
+    dashboardFolders = new DashboardFolder(page);
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 

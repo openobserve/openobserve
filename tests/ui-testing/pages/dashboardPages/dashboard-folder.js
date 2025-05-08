@@ -21,14 +21,21 @@ export default class DashboardFolder {
 
   // Create folder
   async createFolder(folderName) {
-    await this.page.locator('[data-test="dashboard-new-folder-btn"]').click();
-    await this.page.locator('[data-test="dashboard-folder-add-name"]').click();
-    await this.page
-      .locator('[data-test="dashboard-folder-add-name"]')
-      .fill(folderName);
-    await this.page.locator('[data-test="dashboard-folder-add-save"]').click();
+    const newFolderBtn = this.page.locator('[data-test="dashboard-new-folder-btn"]');
+    const nameInput = this.page.locator('[data-test="dashboard-folder-add-name"]');
+    const saveBtn = this.page.locator('[data-test="dashboard-folder-add-save"]');
+  
+    await newFolderBtn.waitFor({ state: "visible", timeout: 5000 });
+    await newFolderBtn.click();
+  
+    await nameInput.waitFor({ state: "visible", timeout: 5000 });
+    await nameInput.click();
+    await nameInput.fill(folderName);
+  
+    await saveBtn.waitFor({ state: "visible", timeout: 5000 });
+    await saveBtn.click();
   }
-
+  
   // Delete folder
   async deleteFolder(folderName) {
     const { page } = this;
