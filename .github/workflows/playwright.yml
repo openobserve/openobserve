@@ -34,6 +34,7 @@ env:
   ZO_WEBSOCKET_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
   ZO_SMTP_ENABLED: true
+  ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
 
 jobs:
   build_binary:
