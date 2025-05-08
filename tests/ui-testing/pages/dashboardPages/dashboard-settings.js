@@ -41,12 +41,14 @@ export default class DashboardSetting {
     return `${prefix}_${Date.now()}`;
   }
 
-  async dashboardNameChange(name) {
+  async openSetting() {
     await this.page.waitForSelector('[data-test="dashboard-setting-btn"]', {
       state: "visible",
       timeout: 15000,
     });
     await this.setting.click();
+  }
+  async dashboardNameChange(name) {
     await this.general.waitFor({ state: "visible" });
     await this.newName.waitFor({ state: "visible" });
     await this.newName.click();
@@ -90,8 +92,6 @@ export default class DashboardSetting {
 
   //Add new tab//
   async addTabSetting(tabnewName) {
-    await this.setting.waitFor({ state: "visible" });
-    await this.setting.click();
     await this.tab.waitFor({ state: "visible" });
     await this.tab.click();
     await this.addtab.click();
@@ -101,8 +101,6 @@ export default class DashboardSetting {
 
   //Delete tab
   async deleteTabSetting() {
-    await this.setting.waitFor({ state: "visible" });
-    await this.setting.click();
     await this.tab.waitFor({ state: "visible" });
     await this.tab.click();
     await this.deletebtn.waitFor({ state: "visible" });
@@ -117,8 +115,7 @@ export default class DashboardSetting {
   }
 
   async editTabName(newName) {
-    await this.setting.waitFor({ state: "visible" });
-    await this.setting.click();
+   
     await this.tab.waitFor({ state: "visible" });
     await this.tab.click();
     await this.editBtn.waitFor({ state: "visible" });
