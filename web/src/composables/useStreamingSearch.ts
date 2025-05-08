@@ -17,7 +17,7 @@ import { ref } from "vue";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
 import store from "@/stores";
-import { getUUID } from "src/utils/zincutils";
+import { getUUID } from "@/utils/zincutils";
 
 // Create and manage stream workers
 let streamWorker: Worker | null = null;
