@@ -18,9 +18,9 @@ use std::str::FromStr;
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use config::meta::{
     alerts::{
-        QueryCondition as MetaQueryCondition, TriggerCondition as MetaTriggerCondition,
+        ConditionList, QueryCondition as MetaQueryCondition,
+        TriggerCondition as MetaTriggerCondition,
         alert::{Alert as MetaAlert, ListAlertsParams},
-        ConditionList,
     },
     folder::{Folder as MetaFolder, FolderType},
     stream::StreamType as MetaStreamType,

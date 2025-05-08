@@ -233,7 +233,7 @@ pub enum FrequencyType {
     Minutes,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
@@ -265,8 +265,38 @@ pub enum ConditionList {
     },
     /// This variant handles data serialized in `Vec<Condition>`
     /// where all conditions are evaluated as conjunction
+    #[serde(serialize_with = "serialize_legacy_conditions")]
     LegacyConditions(Vec<Condition>),
     EndCondition(Condition),
+}
+
+// Custom serializer function to serialize LegacyConditions as AndNode
+fn serialize_legacy_conditions<S>(
+    conditions: &[Condition],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeMap;
+
+    // Transform the Vec<Condition> into EndCondition variants
+    let end_conditions: Vec<ConditionList> = conditions
+        .iter()
+        .map(|condition| ConditionList::EndCondition(condition.clone()))
+        .collect();
+
+    // If there are no conditions, serialize as an empty "and" array
+    if end_conditions.is_empty() {
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry("and", &Vec::<ConditionList>::new())?;
+        map.end()
+    } else {
+        // Serialize as an AndNode
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry("and", &end_conditions)?;
+        map.end()
+    }
 }
 
 impl ConditionList {
@@ -901,5 +931,58 @@ mod test {
                 ]
             }
         );
+    }
+
+    #[test]
+    fn test_serialize_legacy_conditions() {
+        // Create a LegacyConditions variant with some test conditions
+        let legacy_conditions = ConditionList::LegacyConditions(vec![
+            Condition {
+                column: "level".into(),
+                operator: Operator::EqualTo,
+                value: Value::String("error".into()),
+                ignore_case: false,
+            },
+            Condition {
+                column: "job".into(),
+                operator: Operator::EqualTo,
+                value: Value::String("something".into()),
+                ignore_case: false,
+            },
+        ]);
+
+        // Serialize to JSON
+        let serialized =
+            serde_json::to_string_pretty(&legacy_conditions).expect("Failed to serialize");
+
+        // Expected format is an AndNode structure
+        let expected_json = r#"{
+  "and": [
+    {
+      "column": "level",
+      "operator": "=",
+      "value": "error",
+      "ignore_case": false
+    },
+    {
+      "column": "job",
+      "operator": "=",
+      "value": "something",
+      "ignore_case": false
+    }
+  ]
+}"#;
+
+        // Compare the serialized JSON with the expected format
+        assert_eq!(serialized, expected_json);
+
+        // Verify empty array case
+        let empty_legacy_conditions = ConditionList::LegacyConditions(vec![]);
+        let serialized =
+            serde_json::to_string_pretty(&empty_legacy_conditions).expect("Failed to serialize");
+        let expected_json = r#"{
+  "and": []
+}"#;
+        assert_eq!(serialized, expected_json);
     }
 }

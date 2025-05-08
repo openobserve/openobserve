@@ -346,8 +346,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
     fn from(value: meta_alerts::QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
-            conditions: value
-                .conditions,
+            conditions: value.conditions,
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
