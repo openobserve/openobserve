@@ -112,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Enrichment_tables as destination stream is only available for scheduled pipelines</span>
 
           <span class="tw-flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
+
             </div>
         </div>
 
@@ -232,20 +233,48 @@ watch(
     getStreamList();
   }
 );
+function sanitizeStreamName(input: string): string {
+  //check whether it is dynamic stream name or not
+  //if it is wrapped in curly braces then it is dynamic stream name
+  const isWrapped = input.startsWith("{") && input.endsWith("}");
+  //if it is dynamic stream name then remove the curly braces to get the core name
+  const actualName = isWrapped ? input.slice(1, -1) : input;
+
+  // Replace all non-alphanumeric characters with "_"
+  const sanitizedName = actualName
+    .split("")
+    .map((char, index) => {
+
+      //if the character is not a letter or a number then replace it with "_"
+      return /[a-zA-Z0-9]/.test(char) ? char : "_";
+    })
+    .join("")
+
+    //if it is wrapped return { sanitizedName } else return sanitizedName
+
+  return isWrapped ? `{${sanitizedName}}` : sanitizedName;
+}
 
 
-watch(() => dynamic_stream_name.value,
-()=>{
-  if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== "" && selectedNodeType.value === 'output'){
-    //this regex will check if the value is in the format of { stream_name } or { stream_name }_postfix or prefix_{ stream_name }_postfix or just stream_name 
-    const regex = /^([a-zA-Z][a-zA-Z0-9_]{0,63}|\{[a-zA-Z][a-zA-Z0-9_]{0,63}\})$/;
-    if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
-      // dynamic_stream_name.value.value = dynamic_stream_name.value.value.replace(/_/g, '-');
-        saveDynamicStream();
-      }
-   
+watch(() => dynamic_stream_name.value, () => {
+  if (
+    dynamic_stream_name.value !== null &&
+    dynamic_stream_name.value !== "" &&
+    selectedNodeType.value === "output"
+  ) {
+    const rawValue =
+      typeof dynamic_stream_name.value === 'object' &&
+      dynamic_stream_name.value.hasOwnProperty('value')
+        ? dynamic_stream_name.value.value
+        : dynamic_stream_name.value;
+
+    const sanitized = sanitizeStreamName(rawValue as string);
+
+    dynamic_stream_name.value = sanitized;
+    saveDynamicStream();
   }
-})
+});
+
 async function getUsedStreamsList() {
     const org_identifier = store.state.selectedOrganization.identifier;
   try {
