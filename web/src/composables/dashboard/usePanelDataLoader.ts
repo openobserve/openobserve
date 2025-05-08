@@ -1688,12 +1688,13 @@ export const usePanelDataLoader = (
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
 
-        const errorCode = isWebSocketEnabled()
-          ? error?.response?.data?.code || error?.code || ""
-          : error?.response?.status ||
-            error?.status ||
-            error?.response?.data?.code ||
-            "";
+        const errorCode =
+          isWebSocketEnabled() || (window as any).use_streaming === true
+            ? error?.response?.data?.code || error?.code || ""
+            : error?.response?.status ||
+              error?.status ||
+              error?.response?.data?.code ||
+              "";
 
         state.errorDetail = {
           message: trimmedErrorMessage,
