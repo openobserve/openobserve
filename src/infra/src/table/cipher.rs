@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use aes_siv::{KeyInit, siv::Aes256Siv};
-use base64::{Engine, prelude::BASE64_STANDARD};
 use config::get_config;
 use once_cell::sync::Lazy;
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set, SqlErr};
@@ -36,7 +35,7 @@ pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";
 static MASTER_KEY: Lazy<Algorithm> = Lazy::new(|| {
     let config = get_config();
     // we currently only support one algorithm, so directly get key
-    let key = match BASE64_STANDARD.decode(&config.encryption.master_key) {
+    let key = match config::utils::base64::decode_raw(&config.encryption.master_key) {
         Ok(v) => v,
         Err(e) => {
             log::debug!("potential error in configuring master encryption for cipher table: {e}");
@@ -70,7 +69,7 @@ impl Algorithm {
                             "error encrypting data for cipher table {e}"
                         ))
                     })
-                    .map(|v| BASE64_STANDARD.encode(&v))
+                    .map(|v| config::utils::base64::encode_raw(&v))
             }
             Self::None => Ok(plaintext.to_owned()),
         }
@@ -79,7 +78,7 @@ impl Algorithm {
         match self {
             Self::Aes256Siv(k) => {
                 let mut c = Aes256Siv::new_from_slice(k).unwrap();
-                let v = match BASE64_STANDARD.decode(encrypted) {
+                let v = match config::utils::base64::decode_raw(encrypted) {
                     Ok(v) => v,
                     Err(e) => {
                         log::warn!("error in decoding encrypted key {e}");

@@ -17,7 +17,6 @@ use std::fmt::Debug;
 
 use actix_web::{Error, FromRequest, HttpRequest, dev::Payload};
 use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString};
-use base64::Engine;
 use config::utils::json;
 use futures::future::{Ready, ready};
 use once_cell::sync::Lazy;
@@ -840,7 +839,7 @@ pub fn generate_presigned_url(
     let stage3 = get_hash(&format!("{}{}", &stage2, exp_in), salt);
 
     let user_pass = format!("{}:{}", username, stage3);
-    let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
+    let auth = config::utils::base64::encode(&user_pass);
 
     format!(
         "{}/auth/login?request_time={}&exp_in={}&auth={}",
@@ -1065,7 +1064,7 @@ mod tests {
         println!("pass3: {}", pass3);
 
         let user_pass = format!("{}:{}", "b@b.com", pass3);
-        let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
+        let auth = config::utils::base64::encode(&user_pass);
         println!(
             "http://localhost:5080/auth/login?request_time={}&exp_in={}&auth={}",
             time, exp_in, auth

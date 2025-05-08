@@ -35,7 +35,6 @@ use {
     crate::{common::meta::ingestion::INGESTION_EP, service::self_reporting::audit},
     actix_http::h1::Payload,
     actix_web::{HttpMessage, web::BytesMut},
-    base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
@@ -121,7 +120,7 @@ async fn audit_middleware(
         if res.response().error().is_none() {
             let body = if path.ends_with("/settings/logo") {
                 // Binary data, encode it with base64
-                general_purpose::STANDARD.encode(&request_body)
+                config::utils::base64::encode(&request_body)
             } else {
                 String::from_utf8(request_body.to_vec()).unwrap_or_default()
             };

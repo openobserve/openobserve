@@ -17,7 +17,6 @@ use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration
 
 use aes_siv::{KeyInit, siv::Aes256Siv};
 use arc_swap::ArcSwap;
-use base64::{Engine, prelude::BASE64_STANDARD};
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv_override;
@@ -2681,7 +2680,7 @@ fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         // this is basically a duplication of code from tables/cipher.rs
         // but we only support one algorithm for now, so ok. Once we support more
         // we have to extract this into proper functions and use the same in both places
-        let key = match BASE64_STANDARD.decode(&cfg.encryption.master_key) {
+        let key = match crate::utils::base64::decode_raw(&cfg.encryption.master_key) {
             Ok(v) => v,
             Err(e) => {
                 return Err(anyhow::anyhow!(
