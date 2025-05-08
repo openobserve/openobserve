@@ -39,6 +39,7 @@ test.describe("dashboard aggregations testcases", () => {
     const dashboardPage = new DashboardListPage(page);
     const dashboardCreate = new DashboardCreate(page);
     const dashboardPageActions = new DashboardactionPage(page);
+    const dateTimeHelper = new DateTimeHelper(page);
 
     await dashboardPage.menuItem("dashboards-item");
 
@@ -53,13 +54,20 @@ test.describe("dashboard aggregations testcases", () => {
     await chartTypeSelector.selectStreamType("logs");
 
     await chartTypeSelector.selectStream("e2e_automate");
+
+    await page.waitForTimeout(2000);
     await page
-      .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
+      .locator('[data-test="dashboard-x-item-x_axis_1-remove"]')
       .click();
+    //   await page
+    // .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
+    // .click();
 
     await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
 
     await chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
+
+    await dateTimeHelper.setRelativeTimeRange("6-w");
 
     await dashboardPageActions.applyDashboardBtn();
 
@@ -136,13 +144,17 @@ test.describe("dashboard aggregations testcases", () => {
     await dashboardPageActions.applyDashboardBtn();
     await page.waitForResponse(async (res) => {
       const url = res.url();
+      console.log(url, "url");
       const isValid =
         url.includes("/_search_partition") &&
         url.includes("type=logs") &&
         res.status() === 200;
 
+      console.log(isValid, "isValid");
+
       if (isValid) {
         const body = await res.json().catch(() => null);
+        console.log(body, "body");
         return body?.streaming_aggs === false;
       }
       return false;
