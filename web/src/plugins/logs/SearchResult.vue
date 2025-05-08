@@ -189,6 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :functionErrorMsg="searchObj?.data?.functionError"
         :expandedRows="expandedLogs"
         :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
+        :highlight-query="searchObj.meta.sqlMode ? searchObj.data.query.toLowerCase().split('where')[1] : searchObj.data.query.toLowerCase()"
         :default-columns="!searchObj.data.stream.selectedFields.length"
         class="col-12"
         :style="{
@@ -205,6 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click:data-row="openLogDetails"
         @expand-row="expandLog"
         @view-trace="redirectToTraces"
+
       />
 
       <q-dialog
