@@ -369,8 +369,6 @@ impl Search for Searcher {
 
         use config::meta::cluster::NodeInfo;
 
-        use crate::service::grpc::make_grpc_search_client;
-
         let inner_req = req.into_inner();
 
         let is_leader = inner_req.is_leader;
@@ -383,35 +381,14 @@ impl Search for Searcher {
             if let Some(nodes) =
                 crate::common::infra::cluster::get_cached_online_query_nodes(None).await
             {
-                for node in nodes {
-                    let mut scan_stats_request =
-                        tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
-                            trace_id: trace_id.to_string(),
-                            is_leader: false,
-                        });
-                    let mut client = match make_grpc_search_client(
-                        &trace_id,
-                        &mut scan_stats_request,
-                        &(Arc::new(node) as Arc<dyn NodeInfo>),
-                    )
-                    .await
-                    {
-                        Ok(c) => c,
-                        Err(e) => {
-                            log::error!("error in creating get scan stats client :{e}, skipping");
-                            continue;
-                        }
-                    };
-                    let stats = match client.get_scan_stats(scan_stats_request).await {
-                        Ok(v) => v,
-                        Err(e) => {
-                            log::error!("error in getting scan stats : {e}, skipping");
-                            continue;
-                        }
-                    };
-                    let stats = stats.into_inner().stats.unwrap_or_default();
-                    ret.add(&(&stats).into());
-                }
+                let nodes: Vec<_> = nodes
+                    .into_iter()
+                    .map(|n| Arc::new(n) as Arc<dyn NodeInfo>)
+                    .collect();
+                let stats =
+                    crate::service::search::utils::collect_scan_stats(&nodes, &trace_id, false)
+                        .await;
+                ret.add(&stats);
             }
             Ok(Response::new(ScanStatsResponse {
                 stats: Some((&ret).into()),

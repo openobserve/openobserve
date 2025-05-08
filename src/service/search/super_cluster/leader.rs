@@ -40,20 +40,17 @@ use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::{
-    grpc::make_grpc_search_client,
-    search::{
-        DATAFUSION_RUNTIME, SearchResult,
-        cluster::flight::{generate_context, register_table},
-        datafusion::distributed_plan::{
-            remote_scan::RemoteScanExec,
-            rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
-        },
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        request::Request,
-        sql::Sql,
-        utils::ScanStatsVisitor,
+use crate::service::search::{
+    DATAFUSION_RUNTIME, SearchResult,
+    cluster::flight::{generate_context, register_table},
+    datafusion::distributed_plan::{
+        remote_scan::RemoteScanExec,
+        rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
     },
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    request::Request,
+    sql::Sql,
+    utils::ScanStatsVisitor,
 };
 
 #[async_recursion]
@@ -200,29 +197,8 @@ pub async fn search(
     };
 
     let main_trace_id = trace_id.split("-").next().unwrap();
-    for node in nodes {
-        let mut scan_stats_request = tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
-            trace_id: main_trace_id.to_string(),
-            is_leader: true,
-        });
-        let mut client =
-            match make_grpc_search_client(trace_id, &mut scan_stats_request, &node).await {
-                Ok(c) => c,
-                Err(e) => {
-                    log::error!("error in creating get scan stats client :{e}, skipping");
-                    continue;
-                }
-            };
-        let stats = match client.get_scan_stats(scan_stats_request).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("error in getting scan stats : {e}, skipping");
-                continue;
-            }
-        };
-        let stats = stats.into_inner().stats.unwrap_or_default();
-        scan_stats.add(&(&stats).into());
-    }
+    let stats = super::super::utils::collect_scan_stats(&nodes, main_trace_id, true).await;
+    scan_stats.add(&stats);
 
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
