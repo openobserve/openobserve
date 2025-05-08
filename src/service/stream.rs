@@ -41,12 +41,18 @@ use infra::{
 
 use super::db::enrichment_table;
 use crate::{
-    common::meta::{
-        authz::Authz,
-        http::HttpResponse as MetaHttpResponse,
-        stream::{Stream, StreamProperty},
+    common::{
+        meta::{
+            authz::Authz,
+            http::HttpResponse as MetaHttpResponse,
+            stream::{Stream, StreamProperty},
+        },
+        utils::stream::get_default_max_query_range,
     },
-    service::{db, db::distinct_values, metrics::get_prom_metadata_from_schema},
+    service::{
+        db::{self, distinct_values},
+        metrics::get_prom_metadata_from_schema,
+    },
 };
 
 const LOCAL: &str = "disk";
@@ -182,6 +188,7 @@ pub fn stream_res(
         settings.partition_time_level,
         stream_type,
     ));
+    settings.max_query_range = get_default_max_query_range(settings.max_query_range);
 
     Stream {
         name: stream_name.to_string(),
