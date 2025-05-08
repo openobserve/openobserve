@@ -173,6 +173,8 @@ jobs:
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
+          echo "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES=${ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES}" >> .env
+          echo "ZO_FEATURE_QUERY_STREAMING_AGGS=${ZO_FEATURE_QUERY_STREAMING_AGGS}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
 
