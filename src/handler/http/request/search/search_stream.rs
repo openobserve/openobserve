@@ -329,14 +329,22 @@ pub async fn search_http2_stream(
                 );
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
-                        let message = code.get_message();
-                        let error_detail = code.get_error_detail();
-                        let http_response = map_error_to_http_response(&err, "".to_string());
+                        // if err code is cancelled return cancelled response
+                        match code {
+                            infra::errors::ErrorCodes::SearchCancelQuery(_) => {
+                                StreamResponses::Cancelled
+                            }
+                            _ => {
+                                let message = code.get_message();
+                                let error_detail = code.get_error_detail();
+                                let http_response = map_error_to_http_response(&err, "".to_string());
 
-                        StreamResponses::Error {
-                            code: http_response.status().into(),
-                            message,
-                            error_detail: Some(error_detail),
+                                StreamResponses::Error {
+                                    code: http_response.status().into(),
+                                    message,
+                                    error_detail: Some(error_detail),
+                                }
+                            }
                         }
                     }
                     _ => StreamResponses::Error {
