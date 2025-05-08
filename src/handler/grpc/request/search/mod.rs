@@ -365,10 +365,60 @@ impl Search for Searcher {
         &self,
         req: Request<GetScanStatsRequest>,
     ) -> Result<Response<ScanStatsResponse>, Status> {
-        let trace_id = req.into_inner().trace_id;
-        let stats = self.get_scan_stats(&trace_id).await;
+        use std::sync::Arc;
 
-        Ok(Response::new(ScanStatsResponse { stats: Some(stats) }))
+        use config::meta::cluster::NodeInfo;
+
+        use crate::service::grpc::make_grpc_search_client;
+
+        let inner_req = req.into_inner();
+
+        let is_leader = inner_req.is_leader;
+        let trace_id = inner_req.trace_id;
+        if !is_leader {
+            let stats = self.get_scan_stats(&trace_id).await;
+            Ok(Response::new(ScanStatsResponse { stats: Some(stats) }))
+        } else {
+            let mut ret = search::ScanStats::default();
+            if let Some(nodes) =
+                crate::common::infra::cluster::get_cached_online_query_nodes(None).await
+            {
+                for node in nodes {
+                    let node_name = node.get_name();
+                    let mut scan_stats_request =
+                        tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
+                            trace_id: trace_id.to_string(),
+                            is_leader: false,
+                        });
+                    let mut client = match make_grpc_search_client(
+                        &trace_id,
+                        &mut scan_stats_request,
+                        &(Arc::new(node) as Arc<dyn NodeInfo>),
+                    )
+                    .await
+                    {
+                        Ok(c) => c,
+                        Err(e) => {
+                            log::warn!("error in creating get scan stats client :{e}, skipping");
+                            continue;
+                        }
+                    };
+                    let stats = match client.get_scan_stats(scan_stats_request).await {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::warn!("error in getting scan stats : {e}, skipping");
+                            continue;
+                        }
+                    };
+                    log::info!("got scan stats from {} : {:?}", node_name, stats);
+                    let stats = stats.into_inner().stats.unwrap_or_default();
+                    ret.add(&(&stats).into());
+                }
+            }
+            Ok(Response::new(ScanStatsResponse {
+                stats: Some((&ret).into()),
+            }))
+        }
     }
 
     #[cfg(not(feature = "enterprise"))]

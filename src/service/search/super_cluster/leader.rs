@@ -212,6 +212,7 @@ pub async fn search(
     for node in nodes {
         let mut scan_stats_request = tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
             trace_id: main_trace_id.to_string(),
+            is_leader: true,
         });
         let mut client =
             match make_grpc_search_client(trace_id, &mut scan_stats_request, &node).await {

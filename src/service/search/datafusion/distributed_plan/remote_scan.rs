@@ -372,6 +372,10 @@ async fn get_remote_batch(
     };
     // convert FlightData to a stream
     let schema = Arc::new(Schema::try_from(&flight_data)?);
+    log::info!(
+        "[trace_id {trace_id}] schema in remote batch : {:?}",
+        schema
+    );
 
     let mut files = 0;
     let mut scan_size = 0;

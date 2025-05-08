@@ -977,6 +977,8 @@ pub struct GetResultResponse {
 pub struct GetScanStatsRequest {
     #[prost(string, tag = "1")]
     pub trace_id: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub is_leader: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
