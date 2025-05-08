@@ -3,6 +3,7 @@ import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { login } from "../utils/dashLogin.js";
 import { ingestion } from "../utils/dashIngestion.js";
+import { waitForDashboardPage } from "../utils/dashCreation.js";
 import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
@@ -39,6 +40,12 @@ test.describe("dashboard UI testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
 
+  
+  });
+
+  test("should create, compare area type chart image and delete dashboard", async ({
+    page,
+  }) => {
     dashboardCreate = new DashboardCreate(page);
     dashboardList = new DashboardListPage(page);
     dashboardActions = new DashboardactionPage(page);
@@ -48,11 +55,6 @@ test.describe("dashboard UI testcases", () => {
     dashboardPanel = new DashboardPanel(page);
     chartTypeSelector = new ChartTypeSelector(page);
     dashboardPanelConfigs = new DashboardPanelConfigs(page);
-  });
-
-  test("should create, compare area type chart image and delete dashboard", async ({
-    page,
-  }) => {
     const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
     const dashboardName = randomDashboardName;
 
@@ -60,6 +62,8 @@ test.describe("dashboard UI testcases", () => {
       .locator('[data-test="menu-link-\\/dashboards-item"]')
       .waitFor({ state: "visible" });
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    
 
     await page
       .locator('[data-test="dashboard-folder-tab-default"]')
