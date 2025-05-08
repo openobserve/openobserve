@@ -27,15 +27,13 @@ use serde_json::{Map, Value};
 
 use super::str::find;
 use crate::{
-    FxIndexMap, TIMESTAMP_COL_NAME, config,
+    FxIndexMap, TIMESTAMP_COL_NAME,
     meta::{promql::HASH_LABEL, stream::StreamType},
 };
 
 const MAX_PARTITION_KEY_LENGTH: usize = 100;
 
 static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_:]+").unwrap());
-static FORMAT_STREAM_NAME_TO_LOWERCASE: Lazy<bool> =
-    Lazy::new(|| config::get_config().common.format_stream_name_to_lower);
 
 pub fn infer_json_schema<R: BufRead>(
     reader: R,
@@ -272,7 +270,7 @@ pub fn format_partition_key(input: &str) -> String {
 
 // format stream name
 pub fn format_stream_name(stream_name: &str) -> String {
-    if *FORMAT_STREAM_NAME_TO_LOWERCASE {
+    if crate::get_config().common.format_stream_name_to_lower {
         RE_CORRECT_STREAM_NAME
             .replace_all(stream_name, "_")
             .to_string()
