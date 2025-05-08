@@ -17,7 +17,7 @@ import { ref } from "vue";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
 import store from "@/stores";
-import { getUUID } from "@/utils/zincutils";
+import { generateTraceContext } from "@/utils/zincutils";
 
 // Create and manage stream workers
 let streamWorker: Worker | null = null;
@@ -208,13 +208,14 @@ const useHttpStreaming = () => {
     url = `${store.state.API_ENDPOINT}/api/${org_id}` + url;
 
     try {
+      const traceparent = generateTraceContext()?.traceparent;
       // Make the HTTP/2 streaming request
       const response = await fetch(url, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'traceparent': `00-${traceId}-${getUUID().slice(0, 16)}-01`,
+          'traceparent': traceparent,
         },
         body: JSON.stringify(queryReq),
         signal: abortController.signal,
