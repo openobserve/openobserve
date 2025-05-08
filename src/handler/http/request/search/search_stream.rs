@@ -80,6 +80,7 @@ use crate::{
     service::{
         search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
         websocket_events::{
+            sort::order_search_results,
             search::write_results_to_cache,
             utils::{calculate_progress_percentage, setup_tracing_with_trace_id},
         },
@@ -472,6 +473,7 @@ async fn process_search_stream_request(
                 max_query_range,
                 remaining_query_range,
                 &req_order_by,
+                fallback_order_by_col,
                 &mut start,
                 sender.clone(),
                 values_ctx,
@@ -685,8 +687,7 @@ pub async fn do_partitioned_search(
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
-            // TODO: Streaming aggs we need special order
-            // search_res = order_search_results(search_res, fallback_order_by_col);
+            search_res = order_search_results(search_res, fallback_order_by_col.clone());
 
             // set took
             search_res.set_took(start_timer.elapsed().as_millis() as usize);
@@ -879,6 +880,7 @@ pub async fn handle_cache_responses_and_deltas(
     max_query_range: i64,
     remaining_query_range: i64,
     req_order_by: &OrderBy,
+    fallback_order_by_col: Option<String>,
     start_timer: &mut Instant,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
@@ -984,7 +986,7 @@ pub async fn handle_cache_responses_and_deltas(
                     cached,
                     &mut curr_res_size,
                     accumulated_results,
-                    // req.fallback_order_by_col.clone(),
+                    fallback_order_by_col.clone(),
                     cache_order_by,
                     start_timer,
                     sender.clone(),
@@ -1026,7 +1028,7 @@ pub async fn handle_cache_responses_and_deltas(
                 cached,
                 &mut curr_res_size,
                 accumulated_results,
-                // req.fallback_order_by_col.clone(),
+                fallback_order_by_col.clone(),
                 cache_order_by,
                 start_timer,
                 sender.clone(),
@@ -1319,7 +1321,7 @@ async fn send_cached_responses(
     cached: &CachedQueryResponse,
     curr_res_size: &mut i64,
     accumulated_results: &mut Vec<SearchResultType>,
-    // fallback_order_by_col: Option<String>,
+    fallback_order_by_col: Option<String>,
     cache_order_by: &OrderBy,
     start_timer: &mut Instant,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
@@ -1345,8 +1347,7 @@ async fn send_cached_responses(
         }
     }
 
-    // TODO: order the cached response
-    // cached.cached_response = order_search_results(cached.cached_response, fallback_order_by_col);
+    cached.cached_response = order_search_results(cached.cached_response, fallback_order_by_col);
 
     accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
 
