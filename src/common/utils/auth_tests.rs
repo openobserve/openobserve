@@ -3003,11 +3003,10 @@ mod tests {
             websocket: config::WebSocket {
                 enabled: bool::default(),
                 session_idle_timeout_secs: i64::default(),
-                session_max_lifetime_secs: i64::default(),
-                session_gc_interval_secs: i64::default(),
                 ping_interval_secs: i64::default(),
                 max_frame_size: usize::default(),
                 max_continuation_size: usize::default(),
+                max_channel_buffer_size: usize::default(),
             },
             route: config::Route {
                 timeout: u64::default(),
@@ -3362,6 +3361,7 @@ mod tests {
                 max_idle_per_host: usize::default(),
                 keepalive_timeout: u64::default(),
                 multi_part_upload_size: usize::default(),
+                feature_bulk_delete: bool::default(),
             },
             sns: config::Sns {
                 endpoint: String::default(),
@@ -3440,10 +3440,6 @@ mod tests {
             encryption: config::Encryption {
                 algorithm: String::default(),
                 master_key: String::default(),
-            },
-            ratelimit: config::RateLimit {
-                ratelimit_rule_refresh_interval: 0,
-                ratelimit_enabled: false,
             },
         }
     }
