@@ -18,7 +18,7 @@ use ::config::{
     meta::{
         cluster::{Role, RoleGroup},
         promql::RequestRangeQuery,
-        search::{Request as SearchRequest, SearchPartitionRequest},
+        search::{Request as SearchRequest, SearchPartitionRequest, ValuesRequest},
     },
     router::{INGESTER_ROUTES, is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
     utils::{json, rand::get_rand_element},
@@ -302,6 +302,7 @@ enum ProxyPayload {
     PromQLQuery(web::Form<RequestRangeQuery>),
     SearchRequest(Box<web::Json<SearchRequest>>),
     SearchPartitionRequest(Box<web::Json<SearchPartitionRequest>>),
+    ValuesRequest(Box<web::Json<ValuesRequest>>),
 }
 
 async fn proxy_querier_by_body(
@@ -331,8 +332,23 @@ async fn proxy_querier_by_body(
                 )
             }
         },
-        s if s.ends_with("/_search") || s.ends_with("/_search_stream") || s.ends_with("/_values_stream") => {
-            let is_stream = s.ends_with("_stream");
+        s if s.ends_with("/_values_stream") => {
+            let body = payload.to_bytes().await.map_err(|e| {
+                log::error!("Failed to parse values stream request data: {:?}", e);
+                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                    "Failed to parse values stream request data",
+                )))
+            })?;
+            let Ok(query) = json::from_slice::<ValuesRequest>(&body) else {
+                return Ok(HttpResponse::BadRequest().body("Failed to parse values stream request"));
+            };
+            (
+                query.sql.to_string(),
+                ProxyPayload::ValuesRequest(Box::new(web::Json(query))),
+            )
+        }
+        s if s.ends_with("/_search") || s.ends_with("/_search_stream") => {
+            let is_stream = s.ends_with("/_stream");
             let request_type = if is_stream { "stream" } else { "search" };
             
             let body = payload.to_bytes().await.map_err(|e| {
@@ -343,7 +359,7 @@ async fn proxy_querier_by_body(
             })?;
             let Ok(query) = json::from_slice::<SearchRequest>(&body) else {
                 return if is_stream {
-                    Ok(HttpResponse::BadRequest().body("Failed to parse stream request"))
+                    Ok(HttpResponse::BadRequest().body("Failed to parse search stream request"))
                 } else {
                     Ok(HttpResponse::BadRequest().body("Failed to parse search request"))
                 };
@@ -398,6 +414,7 @@ async fn proxy_querier_by_body(
         ProxyPayload::PromQLQuery(payload) => req.send_form(&payload).await,
         ProxyPayload::SearchRequest(payload) => req.send_json(&payload).await,
         ProxyPayload::SearchPartitionRequest(payload) => req.send_json(&payload).await,
+        ProxyPayload::ValuesRequest(payload) => req.send_json(&payload).await,
     };
     let mut resp = match resp {
         Ok(resp) => resp,
