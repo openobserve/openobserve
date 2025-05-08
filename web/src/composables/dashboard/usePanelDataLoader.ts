@@ -890,7 +890,6 @@ export const usePanelDataLoader = (
   ) => {
     try {
       const { traceId } = generateTraceContext();
-      addTraceId(traceId);
 
       const payload: {
         queryReq: any;
