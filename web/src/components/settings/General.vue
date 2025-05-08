@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="enableWebsocketSearch"
           :label="t('settings.enableWebsocketSearch')"
           data-test="general-settings-enable-websocket"
-          class="q-py-md showLabelOnTop"
+          class="q-pt-md q-pb-md showLabelOnTop"
         />
 
         <q-toggle
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="enableStreamingSearch"
           :label="t('settings.enableStreamingSearch')"
           data-test="general-settings-enable-websocket"
-          class="q-py-md showLabelOnTop"
+          class="q-pb-lg showLabelOnTop"
         />
 
         <span>&nbsp;</span>
@@ -267,7 +267,7 @@ export default defineComponent({
 
     const enableStreamingSearch = ref(
       store.state?.organizationData?.organizationSettings
-        ?.enable_http2_streaming_search ?? false,
+        ?.enable_streaming_search ?? false,
     );
 
     const loadingState = ref(false);
@@ -288,7 +288,7 @@ export default defineComponent({
 
       enableStreamingSearch.value =
         store.state?.organizationData?.organizationSettings
-          ?.enable_http2_streaming_search ?? false;
+          ?.enable_streaming_search ?? false;
     });
 
     watch(
