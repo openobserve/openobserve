@@ -384,7 +384,6 @@ impl Search for Searcher {
                 crate::common::infra::cluster::get_cached_online_query_nodes(None).await
             {
                 for node in nodes {
-                    let node_name = node.get_name();
                     let mut scan_stats_request =
                         tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
                             trace_id: trace_id.to_string(),
@@ -399,18 +398,17 @@ impl Search for Searcher {
                     {
                         Ok(c) => c,
                         Err(e) => {
-                            log::warn!("error in creating get scan stats client :{e}, skipping");
+                            log::error!("error in creating get scan stats client :{e}, skipping");
                             continue;
                         }
                     };
                     let stats = match client.get_scan_stats(scan_stats_request).await {
                         Ok(v) => v,
                         Err(e) => {
-                            log::warn!("error in getting scan stats : {e}, skipping");
+                            log::error!("error in getting scan stats : {e}, skipping");
                             continue;
                         }
                     };
-                    log::info!("got scan stats from {} : {:?}", node_name, stats);
                     let stats = stats.into_inner().stats.unwrap_or_default();
                     ret.add(&(&stats).into());
                 }

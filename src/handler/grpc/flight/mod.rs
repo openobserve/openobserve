@@ -166,17 +166,13 @@ impl FlightService for FlightServiceImpl {
             println!("{}", plan);
         }
 
-        schema = add_scan_stats_to_schema(schema, scan_stats.clone());
+        schema = add_scan_stats_to_schema(schema, scan_stats);
         #[cfg(feature = "enterprise")]
         if !req.super_cluster_info.is_super_cluster {
+            // we only set for non-follow leaders
             // split will always have atleast one element even if the string is empty
             // or the split char is not in string, so we can safely unwrap here
             let main_trace_id = trace_id.split("-").next().unwrap();
-            log::info!(
-                "setting scan stat trace_id {} {:?}",
-                main_trace_id,
-                scan_stats
-            );
             SEARCH_SERVER
                 .set_scan_stats(main_trace_id, (&scan_stats).into())
                 .await;

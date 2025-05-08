@@ -199,16 +199,7 @@ pub async fn search(
         }
     };
 
-    log::info!(
-        "[trace_id {trace_id}] super cluster original scan stats : {:?}",
-        scan_stats
-    );
-
     let main_trace_id = trace_id.split("-").next().unwrap();
-    log::info!(
-        "[trace_id {trace_id}] getting scan stats with trace {main_trace_id}, from nodes {:?}",
-        nodes
-    );
     for node in nodes {
         let mut scan_stats_request = tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
             trace_id: main_trace_id.to_string(),
@@ -218,27 +209,22 @@ pub async fn search(
             match make_grpc_search_client(trace_id, &mut scan_stats_request, &node).await {
                 Ok(c) => c,
                 Err(e) => {
-                    log::warn!("error in creating get scan stats client :{e}, skipping");
+                    log::error!("error in creating get scan stats client :{e}, skipping");
                     continue;
                 }
             };
         let stats = match client.get_scan_stats(scan_stats_request).await {
             Ok(v) => v,
             Err(e) => {
-                log::warn!("error in getting scan stats : {e}, skipping");
+                log::error!("error in getting scan stats : {e}, skipping");
                 continue;
             }
         };
-        log::info!("got scan stats from {} : {:?}", node.get_name(), stats);
         let stats = stats.into_inner().stats.unwrap_or_default();
         scan_stats.add(&(&stats).into());
     }
 
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
-    log::info!(
-        "[trace_id {trace_id}] super cluster final scan stats : {:?}",
-        scan_stats
-    );
 
     scan_stats.format_to_mb();
     Ok((data, scan_stats, 0, !partial_err.is_empty(), partial_err))
