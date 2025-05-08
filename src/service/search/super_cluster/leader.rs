@@ -224,6 +224,7 @@ pub async fn search(
                 continue;
             }
         };
+        log::info!("got scan stats from {} : {:?}", node.get_name(), stats);
         let stats = stats.into_inner().stats.unwrap_or_default();
         scan_stats.add(&(&stats).into());
     }
