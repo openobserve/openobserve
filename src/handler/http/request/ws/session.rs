@@ -37,9 +37,11 @@ use crate::handler::http::request::search::error_utils::map_error_to_http_respon
 use crate::service::{self_reporting::audit, websocket_events::handle_cancel};
 use crate::{
     common::utils::websocket::get_ping_interval_secs_with_jitter,
-    service::websocket_events::{
-        WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
+    service::{
         setup_tracing_with_trace_id,
+        websocket_events::{
+            WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
+        },
     },
 };
 
@@ -140,9 +142,7 @@ pub async fn handle_text_message(
             // Setup tracing
             let ws_span = setup_tracing_with_trace_id(
                 &client_msg.get_trace_id(),
-                tracing::info_span!(
-                    "src::handler::http::request::websocket::ws::session::handle_text_message"
-                ),
+                tracing::info_span!("http:request:ws:session:handle_text_message"),
             )
             .await;
 

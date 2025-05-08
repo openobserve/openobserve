@@ -34,9 +34,12 @@ use config::{
         json::{Map, Value},
     },
 };
+use tracing::Instrument;
 
 use super::promql;
-use crate::service::{search as SearchService, self_reporting::http_report_metrics};
+use crate::service::{
+    search as SearchService, self_reporting::http_report_metrics, setup_tracing_with_trace_id,
+};
 
 pub mod alert;
 pub mod derived_streams;
@@ -109,13 +112,17 @@ impl QueryConditionExt for QueryCondition {
         search_event_context: Option<SearchEventContext>,
         trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error> {
+        let trace_id = trace_id.unwrap_or_else(ider::generate_trace_id);
+        // create context with trace_id
+        let eval_span = setup_tracing_with_trace_id(
+            &trace_id,
+            tracing::info_span!("service:alerts:evaluate_scheduled"),
+        )
+        .await;
+
         let mut eval_results = TriggerEvalResults {
             end_time,
             ..Default::default()
-        };
-        let trace_id = match trace_id {
-            Some(id) => id,
-            None => ider::generate_trace_id(),
         };
         let sql = match self.query_type {
             QueryType::Custom => {
@@ -353,6 +360,7 @@ impl QueryConditionExt for QueryCondition {
                 &req,
                 Some(RoleGroup::Background),
             )
+            .instrument(eval_span)
             .await
             // SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
         } else {
@@ -408,6 +416,7 @@ impl QueryConditionExt for QueryCondition {
                 &req,
                 Some(RoleGroup::Background),
             )
+            .instrument(eval_span)
             .await
         };
 
