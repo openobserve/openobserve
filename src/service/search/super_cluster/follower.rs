@@ -131,30 +131,28 @@ pub async fn search(
     // 1. get file id list
     let file_id_list =
         get_file_id_lists(&trace_id, &req.org_id, stream_type, &stream, req.time_range).await?;
-
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
+    let file_id_list_num = file_id_list_vec.len();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
-                req.time_range,
-                file_id_list_vec.len(),
-                file_id_list_took,
+                req.time_range, file_id_list_num, file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("super:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .desc(format!("get files {} ids", file_id_list_vec.len(),))
+                .desc(format!("get files {} ids", file_id_list_num))
                 .build()
         )
     );
 
     let mut scan_stats = ScanStats {
-        files: file_id_list_vec.len() as i64,
+        files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
         file_list_took: file_id_list_took as i64,
         ..Default::default()
@@ -255,6 +253,28 @@ pub async fn search(
 
     // partition file list
     let partition_file_lists = partition_filt_list(file_id_list, &nodes, role_group).await?;
+    let mut need_ingesters = 0;
+    let mut need_queriers = 0;
+    for (i, node) in nodes.iter().enumerate() {
+        if node.is_ingester() {
+            need_ingesters += 1;
+            continue;
+        }
+        if node.is_querier()
+            && partition_file_lists
+                .get(i)
+                .map(|v| !v.is_empty())
+                .unwrap_or_default()
+        {
+            need_queriers += 1;
+        }
+    }
+    log::info!(
+        "[trace_id {trace_id}] flight->follower_leader: get files num: {}, need ingester num: {}, need querier num: {}",
+        file_id_list_num,
+        need_ingesters,
+        need_queriers,
+    );
 
     // update search session scan stats
     super::super::SEARCH_SERVER
