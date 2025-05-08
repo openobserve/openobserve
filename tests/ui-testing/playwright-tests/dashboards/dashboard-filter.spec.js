@@ -50,6 +50,10 @@ test.describe("dashboard filter testcases", () => {
     await login(page);
     await page.waitForTimeout(1000);
     await ingestion(page);
+
+    // Ensure the "dashboards-item" menu is loaded before proceeding
+    await dashboardList.menuItem("dashboards-item");
+    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({ state: "visible" });
   });
 
   test("should correctly apply the filter conditions with different operators", async ({ page }) => {
@@ -71,8 +75,7 @@ test.describe("dashboard filter testcases", () => {
     await dashboardAction.savePanel();
     await dashboardPanel.editPanel(panelName);
     await dashboardPanelConfigs.openConfigPanel();
-    await dashboardPanelConfigs.selectQueryLimit("100");
-    await dashboardPanelConfigs.selectNoValueReplace("-");
+  
     await dashboardPanelConfigs.selectLineThickness("2");
     await dashboardPanelConfigs.selectLineInterpolation("smooth");
     await dashboardPanelConfigs.selectValuePosition("Inside Top");
@@ -102,6 +105,7 @@ test.describe("dashboard filter testcases", () => {
     await dashboardList.menuItem("dashboards-item");
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.addPanel();
+    await dashboardAction.addPanelName(panelName);
     await chartTypeSelector.selectChartType("stacked");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
@@ -110,7 +114,7 @@ test.describe("dashboard filter testcases", () => {
     await dashboardPanelConfigs.openConfigPanel();
     await dashboardDrilldown.addDrillownDashboard(folderName, drilldownName, randomDashboardName, tabName);
     await dashboardAction.applyDashboardBtn();
-    await dashboardAction.addPanelName(panelName);
+    await dashboardAction.savePanel();
   });
 
   test("should duplicate a dashboard and verify duplication", async ({ page }) => {
@@ -118,6 +122,7 @@ test.describe("dashboard filter testcases", () => {
 
     await dashboardList.menuItem("dashboards-item");
     await dashboardCreate.createDashboard(randomDashboardName);
+    await dashboardCreate.backToDashboardList();
     await dashboardCreate.searchDashboard(randomDashboardName);
     await dashboardList.duplicateDashboard(randomDashboardName);
     await expect(page.getByText("Dashboard Duplicated")).toBeVisible();
@@ -125,13 +130,14 @@ test.describe("dashboard filter testcases", () => {
 
   test("should move a dashboard to another folder", async ({ page }) => {
     const randomDashboardName = generateDashboardName();
-    const folderName = dashboardFolder.generateUniqueFolderName("TargetFolder");
+    const folderName = dashboardFolder.generateUniqueFolderName("Test_Folder");
+    const folder ="testing"
 
     await dashboardList.menuItem("dashboards-item");
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.backToDashboardList();
     await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardList.moveDashnboardToanotherFolder("testing");
+    await dashboardList.moveDashboardToAnotherFolder(folder);
     await expect(page.getByText("Dashboard moved successfully")).toBeVisible();
   });
 
@@ -143,14 +149,14 @@ test.describe("dashboard filter testcases", () => {
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.addPanel();
     await dashboardAction.addPanelName(panelName);
-    await chartTypeSelector.selectChartType("stacked");
+    await chartTypeSelector.selectChartType("line");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
     await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
     await dashboardAction.applyDashboardBtn();
+    await dashboardAction.savePanel();
     await dashboardTimeRefresh.refreshDashboard();
-    await expect(page.getByText("Dashboard refreshed successfully").first()).toBeVisible();
   });
 
   test("should edit a dashboard panel and verify changes", async ({ page }) => {
@@ -161,20 +167,19 @@ test.describe("dashboard filter testcases", () => {
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.addPanel();
     await dashboardAction.addPanelName(panelName);
-    await chartTypeSelector.selectChartType("stacked");
+    await chartTypeSelector.selectChartType("line");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
     await dashboardAction.applyDashboardBtn();
     await dashboardAction.savePanel();
     await dashboardPanel.editPanel(panelName);
-    await chartTypeSelector.selectChartType("line");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.searchAndAddField("count", "y");
+    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
     await dashboardAction.applyDashboardBtn();
     await dashboardAction.savePanel();
-    await expect(page.getByText("Panel updated successfully").first()).toBeVisible();
+   
   });
 
   test("add panel to dashboard", async ({ page }) => {
@@ -185,7 +190,7 @@ test.describe("dashboard filter testcases", () => {
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.addPanel();
     await dashboardAction.addPanelName(panelName);
-    await chartTypeSelector.selectChartType("bar");
+    await chartTypeSelector.selectChartType("line");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");

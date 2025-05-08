@@ -20,8 +20,10 @@ export default class DashboardCreate {
   async createDashboard(dashboardName) {
     await this.dashCreateBtn.waitFor({ state: "visible" });
     await this.dashCreateBtn.click();
-    await this.dashName.waitFor({ state: "visible" });
-    await this.dashName.click();
+    await this.page.locator('[data-test="add-dashboard-name"]').waitFor({
+      state: "visible",
+    })
+    await this.page.locator('[data-test="add-dashboard-name"]').click();
     await this.dashName.fill(dashboardName);
     await this.submitBtn.click();
   }
