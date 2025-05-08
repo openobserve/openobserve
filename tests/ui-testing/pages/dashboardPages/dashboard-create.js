@@ -18,15 +18,19 @@ export default class DashboardCreate {
   }
 
   async createDashboard(dashboardName) {
-    await this.dashCreateBtn.waitFor({ state: "visible" });
+    const nameInput = this.page.locator('[data-test="add-dashboard-name"]');
+  
+    await this.dashCreateBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.dashCreateBtn.click();
-    await this.page.locator('[data-test="add-dashboard-name"]').waitFor({
-      state: "visible",
-    })
-    await this.page.locator('[data-test="add-dashboard-name"]').click();
+  
+    await this.dashName.waitFor({ state: "visible", timeout:15000 });
+    await this.dashName.click();
     await this.dashName.fill(dashboardName);
+  
+    await this.submitBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.submitBtn.click();
   }
+  
 
   //back to dashboard list
   async backToDashboardList() {

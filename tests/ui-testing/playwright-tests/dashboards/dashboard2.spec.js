@@ -12,6 +12,7 @@ import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
 import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
 import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
+import { waitForDashboardPage } from "../utils/dashCreation.js";
 
 const dashboardName = `Dashboard_${Date.now()}`;
 
@@ -25,13 +26,7 @@ test.describe("dashboard UI testcases", () => {
   let dashboardPanel;
 
   test.beforeEach(async ({ page }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
-    dashboardRefresh = new DashboardTimeRefresh(page);
-    chartTypeSelector = new ChartTypeSelector(page);
-    dashboardDrilldown = new DashboardDrilldownPage(page);
-    dashboardPanel = new DashboardPanel(page);
+   
 
     await login(page);
     await page.waitForTimeout(1000);
@@ -46,12 +41,20 @@ test.describe("dashboard UI testcases", () => {
   test("should add the breakdown field to the dashboard panel and allow the user to cancel the action", async ({
     page,
   }) => {
+    dashboardCreate = new DashboardCreate(page);
+    dashboardList = new DashboardListPage(page);
+    dashboardActions = new DashboardactionPage(page);
+    dashboardRefresh = new DashboardTimeRefresh(page);
+    chartTypeSelector = new ChartTypeSelector(page);
+    dashboardDrilldown = new DashboardDrilldownPage(page);
+    dashboardPanel = new DashboardPanel(page);
     const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
 
     await page
       .locator('[data-test="menu-link-\\/dashboards-item"]')
       .waitFor({ state: "visible" });
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
 
     await page
       .locator('[data-test="dashboard-folder-tab-default"]')
@@ -94,9 +97,17 @@ test.describe("dashboard UI testcases", () => {
   test("should add and cancel the breakdown field with different times and timezones and ensure it displays the correct output", async ({
     page,
   }) => {
+    dashboardCreate = new DashboardCreate(page);
+    dashboardList = new DashboardListPage(page);
+    dashboardActions = new DashboardactionPage(page);
+    dashboardRefresh = new DashboardTimeRefresh(page);
+    chartTypeSelector = new ChartTypeSelector(page);
+    dashboardDrilldown = new DashboardDrilldownPage(page);
+    dashboardPanel = new DashboardPanel(page);
     const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
 
     await page
       .locator('[data-test="dashboard-folder-tab-default"]')
@@ -110,7 +121,7 @@ test.describe("dashboard UI testcases", () => {
       "y"
     );
     await chartTypeSelector.searchAndAddField("kubernetes_container_name", "b");
-    // await chartTypeSelector.removeField("kubernetes_container_name", "b");
+  
 
     await waitForDateTimeButtonToBeEnabled(page);
     await dashboardRefresh.setRelative("6", "w");
