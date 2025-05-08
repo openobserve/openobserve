@@ -56,12 +56,12 @@ test.describe("dashboard aggregations testcases", () => {
     await chartTypeSelector.selectStream("e2e_automate");
 
     await page.waitForTimeout(2000);
+    // await page
+    //   .locator('[data-test="dashboard-x-item-x_axis_1-remove"]')
+    //   .click();
     await page
-      .locator('[data-test="dashboard-x-item-x_axis_1-remove"]')
+      .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
       .click();
-    //   await page
-    // .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
-    // .click();
 
     await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
 
