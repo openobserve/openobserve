@@ -16,6 +16,7 @@ export default class DashboardSetting {
     this.saveSettingBtn = page.locator(
       '[data-test="dashboard-general-setting-save-btn"]'
     );
+    this.cancelBtn = page.locator('[data-test="cancel-button"]');
     this.deletebtn = page.locator(
       '[data-test="dashboard-tab-settings-tab-delete-btn"]'
     );
@@ -29,19 +30,57 @@ export default class DashboardSetting {
     this.fullScreen = page.locator('[data-test="dashboard-fullscreen-btn"]');
     this.tabName = page.locator('[data-test="dashboard-add-tab-name"]');
     this.saveTab = page.locator('[data-test="dashboard-add-tab-submit"]');
+    this.closeSetting = page.locator(
+      '[data-test="dashboard-settings-close-btn"]'
+    );
+    this.timeBtn = page.locator('[data-test="date-time-btn"]');
+    this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
+
   }
   generateUniqueDashboardnewName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
   }
 
   async dashboardNameChange(name) {
+    await this.page.waitForSelector('[data-test="dashboard-setting-btn"]', {
+      state: "visible",
+      timeout: 15000,
+    });
     await this.setting.click();
     await this.general.waitFor({ state: "visible" });
+    await this.newName.waitFor({ state: "visible" });
     await this.newName.click();
     await this.newName.fill(name);
-    await this.saveSettingBtn.click();
   }
 
+  //Time Setting//
+  async relativeTimeSelection(date, time) {
+    await this.page.locator('[data-test="dashboard-general-setting-datetime-picker"] [data-test="date-time-btn"]').click();
+    
+    await this.page
+      .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
+      .click();
+  }
+
+  //Save Setting//
+  async saveSetting() {
+    await this.saveSettingBtn.waitFor({ state: "visible" });
+    await this.saveSettingBtn.click();
+  }
+  async cancelSettingDashboard() {
+    await this.cancelBtn.waitFor({ state: "visible" });
+    await this.cancelBtn.click();
+  }
+  async closeSettingDashboard() {
+    await this.closeSetting.waitFor({ state: "visible" });
+    await this.closeSetting.click();
+  }
+
+  //show dynamic filter//
+  async showDynamicFilter() {
+    await this.dynamicFilter.waitFor({ state: "visible" });
+    await this.dynamicFilter.click();
+  }
   //Add Tabs//
   generateUniqueTabnewName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
