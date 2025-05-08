@@ -144,17 +144,13 @@ test.describe("dashboard aggregations testcases", () => {
     await dashboardPageActions.applyDashboardBtn();
     await page.waitForResponse(async (res) => {
       const url = res.url();
-      console.log(url, "url");
       const isValid =
         url.includes("/_search_partition") &&
         url.includes("type=logs") &&
         res.status() === 200;
 
-      console.log(isValid, "isValid");
-
       if (isValid) {
         const body = await res.json().catch(() => null);
-        console.log(body, "body");
         return body?.streaming_aggs === false;
       }
       return false;
