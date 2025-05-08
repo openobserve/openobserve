@@ -268,7 +268,8 @@ async fn get_parquet_metadata(
     .await?;
     let mut buf = [0_u8; parquet::file::FOOTER_SIZE];
     data.copy_to_slice(&mut buf);
-    let metadata_len = ParquetMetaDataReader::decode_footer(&buf)?;
+    let metadata_len =
+        ParquetMetaDataReader::decode_footer_tail(&buf).map(|footer| footer.metadata_length())?;
 
     // read metadata
     let data = get_range(
