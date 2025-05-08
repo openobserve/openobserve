@@ -39,6 +39,7 @@ import {
   b64EncodeUnicode,
   generateTraceContext,
   isWebSocketEnabled,
+  isStreamingEnabled
 } from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
@@ -1388,8 +1389,7 @@ export const usePanelDataLoader = (
 
               state.annotations = annotations;
 
-              const shouldUseStreaming = (window as any).use_streaming === true;
-              if (shouldUseStreaming) {
+              if (isStreamingEnabled()) {
                 await getDataThroughStreaming(
                   query,
                   it,
@@ -1695,7 +1695,7 @@ export const usePanelDataLoader = (
             : errorDetailValue;
 
         const errorCode =
-          isWebSocketEnabled() || (window as any).use_streaming === true
+          isWebSocketEnabled() || isStreamingEnabled()
             ? error?.response?.data?.code || error?.code || ""
             : error?.response?.status ||
               error?.status ||

@@ -53,6 +53,7 @@ import {
   generateTraceContext,
   arraysMatch,
   isWebSocketEnabled,
+  isStreamingEnabled
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -1577,7 +1578,7 @@ const useLogs = () => {
       // else use organization settings
       searchObj.meta.jobId = "";
       const shouldUseWebSocket = isWebSocketEnabled();
-      const shouldUseStreaming = (window as any).use_streaming === true;
+      const shouldUseStreaming = isStreamingEnabled();
 
       const isMultiStreamSearch =
         searchObj.data.stream.selectedStream.length > 1 &&

@@ -676,6 +676,7 @@ import {
   useLocalInterestingFields,
   generateTraceContext,
   isWebSocketEnabled,
+  isStreamingEnabled,
   b64EncodeStandard,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
@@ -1014,7 +1015,7 @@ export default defineComponent({
             query_context = query_context == undefined ? "" : query_context;
 
             // Implement websocket based field values, check getQueryData in useLogs for websocket enabled
-            if (isWebSocketEnabled() || (window as any).use_streaming) {
+            if (isWebSocketEnabled() || isStreamingEnabled()) {
               fetchValuesWithWebsocket({
                 fields: [name],
                 size: 10,
@@ -1314,15 +1315,17 @@ export default defineComponent({
           message: handleSearchResponse,
           reset: handleSearchReset,
         }) as string;
+        return;
       }
 
-      if ((window as any).use_streaming) {
+      if (isStreamingEnabled()) {
         fetchQueryDataWithHttpStream(payload, {
           data: handleSearchResponse,
           error: handleSearchError,
           complete: handleSearchClose,
           reset: handleSearchReset,
         });
+        return;
       }
     };
 

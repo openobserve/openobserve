@@ -48,6 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="general-settings-enable-websocket"
           class="q-py-md showLabelOnTop"
         />
+
+        <q-toggle
+          v-if="store.state.zoConfig.streaming_enabled"
+          v-model="enableStreamingSearch"
+          :label="t('settings.enableStreamingSearch')"
+          data-test="general-settings-enable-websocket"
+          class="q-py-md showLabelOnTop"
+        />
+
         <span>&nbsp;</span>
 
         <div class="flex justify-start">
@@ -256,6 +265,11 @@ export default defineComponent({
         ?.enable_websocket_search ?? false,
     );
 
+    const enableStreamingSearch = ref(
+      store.state?.organizationData?.organizationSettings
+        ?.enable_http2_streaming_search ?? false,
+    );
+
     const loadingState = ref(false);
     const customText = ref("");
     const editingText = ref(false);
@@ -271,6 +285,10 @@ export default defineComponent({
       enableWebsocketSearch.value =
         store.state?.organizationData?.organizationSettings
           ?.enable_websocket_search ?? false;
+
+      enableStreamingSearch.value =
+        store.state?.organizationData?.organizationSettings
+          ?.enable_http2_streaming_search ?? false;
     });
 
     watch(
@@ -290,6 +308,7 @@ export default defineComponent({
           ...store.state?.organizationData?.organizationSettings,
           scrape_interval: scrapeIntereval.value,
           enable_websocket_search: enableWebsocketSearch.value,
+          enable_streaming_search: enableStreamingSearch.value,
         });
 
         //update settings in backend
@@ -514,6 +533,7 @@ export default defineComponent({
       updateCustomText,
       confirmDeleteImage: ref(false),
       sanitizeInput,
+      enableStreamingSearch,
     };
   },
 });

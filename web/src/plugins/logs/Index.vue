@@ -387,7 +387,7 @@ import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
-import { isWebSocketEnabled } from "@/utils/zincutils";
+import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -1595,6 +1595,7 @@ export default defineComponent({
       closeSearchSchedulerFn,
       isDistinctQuery,
       isWithQuery,
+      isStreamingEnabled,
     };
   },
   computed: {
@@ -1700,11 +1701,11 @@ export default defineComponent({
           this.searchObj.loadingHistogram = true;
 
           const shouldUseWebSocket = this.isWebSocketEnabled();
-
+          const shouldUseStreaming = this.isStreamingEnabled();
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
-          if (shouldUseWebSocket) {
+          if (shouldUseWebSocket || shouldUseStreaming) {
             // Use WebSocket for histogram data
             const payload = this.buildWebSocketPayload(
               this.searchObj.data.histogramQuery,

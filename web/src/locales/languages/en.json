@@ -1091,7 +1091,8 @@
     "spanIdFieldName": "Span ID Field Name",
     "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
     "cipherKeys": "Cipher Keys",
-    "nodes": "Nodes"
+    "nodes": "Nodes",
+    "enableStreamingSearch": "Enable Streaming Search"
   },
   "reports": {
     "header": "Reports",
