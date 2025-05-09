@@ -149,8 +149,9 @@ pub async fn search(
     );
 
     let trace_id_move = trace_id.to_string();
+    let follower_nodes = nodes.clone();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        run_datafusion(trace_id_move, req, sql, nodes)
+        run_datafusion(trace_id_move, req, sql, follower_nodes)
             .instrument(datafusion_span)
             .await
     });
@@ -189,6 +190,10 @@ pub async fn search(
             return Err(e);
         }
     };
+
+    let main_trace_id = trace_id.split("-").next().unwrap();
+    let stats = super::super::utils::collect_scan_stats(&nodes, main_trace_id, true).await;
+    scan_stats.add(&stats);
 
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
