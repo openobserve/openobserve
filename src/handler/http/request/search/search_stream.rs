@@ -313,7 +313,7 @@ async fn process_search_stream_request(
     );
 
     // Send a progress: 0 event as an indiciator of search initiation
-    if let Err(e) = sender.send(Ok(StreamResponses::Progress(0))).await {
+    if let Err(e) = sender.send(Ok(StreamResponses::Progress{ percent: 0 })).await {
         log::error!("[HTTP2_STREAM] Error sending progress event: {}", e);
     }
 
