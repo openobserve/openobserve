@@ -7,12 +7,14 @@ import {
   waitForDashboardPage,
   deleteDashboard,
 } from "../utils/dashCreation.js";
-
+import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit.js";
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
 import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
+import DashboardSetting from "../../pages/dashboardPages/dashboard-settings.js";
+import DashboardDrilldownPage from "../../pages/dashboardPages/dashboard-drilldown.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -20,6 +22,15 @@ const randomDashboardName =
 test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard multi y axis testcases", () => {
+  let chartTypeSelector;
+  let dashboardPage;
+  let dashboardCreate;
+  let dateTimeHelper;
+  let dashboardPageActions;
+  let dashboardSetting;
+  let dashboardDrilldown;
+  let dashboardPanel;
+
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
     await login(page);
@@ -31,17 +42,21 @@ test.describe("dashboard multi y axis testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await orgNavigation;
+
+    chartTypeSelector = new ChartTypeSelector(page);
+    dashboardPage = new DashboardListPage(page);
+    dashboardCreate = new DashboardCreate(page);
+    dateTimeHelper = new DateTimeHelper(page);
+    dashboardPageActions = new DashboardactionPage(page);
+    dashboardSetting = new DashboardSetting(page);
+    dashboardDrilldown = new DashboardDrilldownPage(page);
+    dashboardPanel = new DashboardPanel(page);
   });
 
   test("Should correctly add multiple Y-axes to the stacked chart type.", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
-
+    const panelName = dashboardDrilldown.generateUniquePanelName("Test_Panel");
     await dashboardPage.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
@@ -82,7 +97,7 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
-    await dashboardPageActions.addPanelName(randomDashboardName);
+    await dashboardPageActions.addPanelName(panelName);
 
     await dashboardPageActions.savePanel();
 
@@ -94,11 +109,7 @@ test.describe("dashboard multi y axis testcases", () => {
   test("should correctly display and update multiple Y-axes in edit panel.", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
+    const panelName = dashboardDrilldown.generateUniquePanelName("Test_Panel");
 
     await dashboardPage.menuItem("dashboards-item");
 
@@ -140,29 +151,17 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
-    await dashboardPageActions.addPanelName(randomDashboardName);
+    await dashboardPageActions.addPanelName(panelName);
 
     await dashboardPageActions.savePanel();
+    await dashboardPanel.editPanel(panelName);
+    await chartTypeSelector.searchAndAddField("kubernetes_labels_name", "y");
 
-    await dashboardPageActions.selectPanelAction(randomDashboardName, "Edit");
+    await dashboardPageActions.applyDashboardBtn();
 
     await dashboardPageActions.waitForChartToRender();
 
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
-
-    await expect(
-      page
-        .getByRole("cell", {
-          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", kubernetes_labels_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
-        })
-        .first()
-    ).toBeVisible();
-
-    await page.locator('[data-test="query-inspector-close-btn"]').click();
-
-    await dashboardPageActions.addPanelName(randomDashboardName);
+    await dashboardPageActions.addPanelName(panelName);
 
     await dashboardPageActions.savePanel();
 

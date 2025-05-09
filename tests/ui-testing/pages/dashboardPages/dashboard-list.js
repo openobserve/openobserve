@@ -8,19 +8,20 @@ export default class DashboardListPage {
 
   // Duplicate dashboard
   async duplicateDashboard(dashboardName) {
-    const duplicateBtn = this.page
-      .getByRole("row", { name: new RegExp(`.*${dashboardName}`) })
-      .locator('[data-test="dashboard-duplicate"]');
-    await duplicateBtn.click();
+     await this.page.locator('[data-test="dashboard-duplicate"]').click();
+    
   }
+ 
 
   // Move dashboard
-  async moveDashboardToAnotherFolder(dashboardName) {
-    const moveBtn = this.page
-      .getByRole("row", { name: new RegExp(`.*${dashboardName}`) })
-      .locator('[data-test="dashboard-move-to-another-folder"]');
-    await moveBtn.click();
+  async moveDashboardToAnotherFolder(folder) {
+    await this.page.locator('[data-test="dashboard-move-to-another-folder"]').click();
+    await this.page.locator('[data-test="index-dropdown-stream_type"]').click();
+    await this.page.getByRole('option', { name: folder }).click();
+    await this.page.locator('[data-test="dashboard-folder-move"]').click();
   }
+
+  
   // Menu Items
   async menuItem(item) {
     const MenuItem = this.page.locator(`[data-test="menu-link-\\/${item}"]`);
