@@ -276,7 +276,7 @@ impl ResponseChunkIterator {
 #[derive(Debug, Clone)]
 pub enum ResponseChunk {
     Metadata {
-        response: Response,
+        response: Box<Response>,
     },
     Hits {
         hits: Vec<crate::utils::json::Value>,
@@ -297,7 +297,7 @@ impl Iterator for ResponseChunkIterator {
             metadata_response.hits = vec![];
 
             return Some(ResponseChunk::Metadata {
-                response: metadata_response,
+                response: Box::new(metadata_response),
             });
         }
 
@@ -1531,7 +1531,7 @@ impl StreamResponses {
                         ResponseChunk::Metadata { response } => {
                             // Add streaming_aggs and time_offset from the original response
                             let metadata = StreamResponses::SearchResponseMetadata {
-                                results: response,
+                                results: *response,
                                 streaming_aggs,
                                 time_offset: time_offset.clone(),
                             };
