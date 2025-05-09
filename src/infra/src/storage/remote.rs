@@ -398,7 +398,7 @@ pub async fn test_config() -> Result<(), anyhow::Error> {
         Err(e) => match e {
             object_store::Error::NotFound { .. } => {}
             object_store::Error::PermissionDenied { path: _, source }
-                if !source.to_string().contains("ListBucket") => {}
+                if source.to_string().contains("ListBucket") => {}
             _ => {
                 return Err(anyhow::anyhow!("S3 download test failed: {:?}", e));
             }
