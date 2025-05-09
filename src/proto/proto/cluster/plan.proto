@@ -65,6 +65,7 @@ message IdxOptimizeMode {
   oneof mode {
     SimpleSelect simple_select = 1;
     SimpleCount   simple_count = 2;
+    SimpleHistogram simple_histogram = 3;
   }
 }
 
@@ -74,6 +75,8 @@ message SimpleSelect {
 }
 
 message SimpleCount {}
+
+message SimpleHistogram {}
 
 message KvItem {
     string   key = 1;

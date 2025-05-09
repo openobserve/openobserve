@@ -65,6 +65,7 @@ impl std::fmt::Display for InvertedIndexTantivyMode {
 pub enum InvertedIndexOptimizeMode {
     SimpleSelect(usize, bool),
     SimpleCount,
+    SimpleHistogram,
 }
 
 impl std::fmt::Display for InvertedIndexOptimizeMode {
@@ -74,6 +75,7 @@ impl std::fmt::Display for InvertedIndexOptimizeMode {
                 write!(f, "simple_select(limit: {}, ascend: {})", limit, ascend)
             }
             InvertedIndexOptimizeMode::SimpleCount => write!(f, "simple_count"),
+            InvertedIndexOptimizeMode::SimpleHistogram => write!(f, "simple_histogram"),
         }
     }
 }
@@ -86,6 +88,9 @@ impl From<cluster_rpc::IdxOptimizeMode> for InvertedIndexOptimizeMode {
             }
             Some(cluster_rpc::idx_optimize_mode::Mode::SimpleCount(_)) => {
                 InvertedIndexOptimizeMode::SimpleCount
+            }
+            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleHistogram(_)) => {
+                InvertedIndexOptimizeMode::SimpleHistogram
             }
             None => panic!("Invalid InvertedIndexOptimizeMode"),
         }
@@ -106,6 +111,11 @@ impl From<InvertedIndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
             InvertedIndexOptimizeMode::SimpleCount => cluster_rpc::IdxOptimizeMode {
                 mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleCount(
                     cluster_rpc::SimpleCount {},
+                )),
+            },
+            InvertedIndexOptimizeMode::SimpleHistogram => cluster_rpc::IdxOptimizeMode {
+                mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleHistogram(
+                    cluster_rpc::SimpleHistogram {},
                 )),
             },
         }
