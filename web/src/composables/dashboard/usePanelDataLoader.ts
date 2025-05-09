@@ -39,7 +39,7 @@ import {
   b64EncodeUnicode,
   generateTraceContext,
   isWebSocketEnabled,
-  isStreamingEnabled
+  isStreamingEnabled,
 } from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
@@ -649,8 +649,10 @@ export const usePanelDataLoader = (
 
   const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
     // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex] =
-      searchRes?.content?.results ?? {};
+    state.resultMetaData[payload?.meta?.currentQueryIndex] = {
+      ...(searchRes?.content ?? {}),
+      ...(searchRes?.content?.results ?? {}),
+    };
   };
 
   const handleStreamingHistogramHits = (payload: any, searchRes: any) => {
@@ -661,7 +663,9 @@ export const usePanelDataLoader = (
     };
 
     // is streaming aggs
-    const streaming_aggs = searchRes?.content?.streaming_aggs ?? false;
+    const streaming_aggs =
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]
+        ?.streaming_aggs ?? false;
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
@@ -670,7 +674,10 @@ export const usePanelDataLoader = (
       ];
     }
     // if order by is desc, append new partition response at end
-    else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
+    else if (
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.order_by
+        ?.toLowerCase() === "asc"
+    ) {
       // else append new partition response at start
       state.data[payload?.meta?.currentQueryIndex] = [
         ...(searchRes?.content?.results?.hits ?? {}),
