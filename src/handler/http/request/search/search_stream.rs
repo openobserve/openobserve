@@ -312,6 +312,12 @@ async fn process_search_stream_request(
         org_id
     );
 
+    // Send a progress: 0 event as an indiciator of search initiation
+    if let Err(e) = sender.send(Ok(StreamResponses::Progress(0))).await {
+        log::error!("[HTTP2_STREAM] Error sending progress event: {}", e);
+    }
+
+
     let mut start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
     let use_cache = req.use_cache.unwrap_or(false);
