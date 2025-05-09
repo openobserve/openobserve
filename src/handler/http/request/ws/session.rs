@@ -26,7 +26,7 @@ use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, ResponseMeta},
     infra::config::get_config as get_o2_config,
 };
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::UnboundedSender;
 use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
@@ -38,12 +38,12 @@ use crate::service::{self_reporting::audit, websocket_events::handle_cancel};
 use crate::{
     common::utils::websocket::get_ping_interval_secs_with_jitter,
     service::websocket_events::{
-        WsClientEvents, WsServerEvents, handle_search_request, handle_values_request,
+        WsClientEvents, WsPayload, WsServerEvents, handle_search_request, handle_values_request,
         setup_tracing_with_trace_id,
     },
 };
 
-pub async fn _health_check(req_id: String, response_tx: Sender<WsServerEvents>) {
+pub async fn _health_check(req_id: String, response_tx: UnboundedSender<WsServerEvents>) {
     let cfg = get_config();
     log::info!(
         "[WS_HANDLER]: Starting health check for req_id: {}, querier: {}",
@@ -57,7 +57,7 @@ pub async fn _health_check(req_id: String, response_tx: Sender<WsServerEvents>) 
     ping_interval.tick().await;
     loop {
         ping_interval.tick().await;
-        if let Err(e) = response_tx.send(WsServerEvents::Ping(vec![])).await {
+        if let Err(e) = response_tx.send(WsServerEvents::Ping(vec![])) {
             log::error!(
                 "[WS_HANDLER]: Failed to send ping to client for req_id: {}, querier: {}, error: {}. Connection will be closed.",
                 req_id,
@@ -114,7 +114,7 @@ pub async fn handle_text_message(
     req_id: &str,
     msg: String,
     path: String,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsPayload>,
 ) {
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
@@ -349,23 +349,55 @@ pub async fn handle_text_message(
 pub async fn send_message_2(
     req_id: &str,
     msg: WsServerEvents,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsPayload>,
 ) -> Result<(), Error> {
+    let start = std::time::Instant::now();
     let trace_id = msg.get_trace_id();
     log::debug!(
         "[WS::Querier::Channel] attempting sending response between incoming->outgoing threads for trace_id: {}, request_id: {}",
         trace_id,
         req_id,
     );
-    if let Err(e) = response_tx.send(msg).await {
-        log::error!(
-            "[WS::Querier::Channel] sending response between incoming->outgoing threads for trace_id: {} error: {}",
-            trace_id,
-            e
-        );
-        return Err(Error::Message(e.to_string()));
+
+    // TODO: REMOVE BENCHMARK
+    let mut msg = msg;
+    if get_config().websocket.benchmark_mode {
+        msg = msg.increase_payload_size_for_benchmark();
     }
-    Ok(())
+    // End OF BENCHMARK
+
+    // encode only search_response
+    let payload: WsPayload = if get_config().websocket.use_payload_compression {
+        match msg {
+            WsServerEvents::SearchResponse { .. } => msg.encode(),
+            _ => WsPayload::Server(msg),
+        }
+    } else {
+        WsPayload::Server(msg)
+    };
+
+    match response_tx.send(payload) {
+        Err(e) => {
+            log::error!(
+                "[WS::Querier::Channel] failed to send response to handle_outgoing thread for trace_id: {} error: {}, after {} secs, req_id: {}",
+                trace_id,
+                e,
+                start.elapsed().as_secs_f64(),
+                req_id
+            );
+            Err(Error::Message(e.to_string()))
+        }
+        Ok(_) => {
+            log::debug!(
+                "[WS::Querier::Channel] successfully sent response to handle_outgoing thread for trace_id: {}, request_id: {}, took: {} secs, req_id: {}",
+                trace_id,
+                req_id,
+                start.elapsed().as_secs_f64(),
+                req_id
+            );
+            Ok(())
+        }
+    }
 }
 
 // Main search handler
@@ -376,7 +408,7 @@ async fn handle_search_event(
     user_id: &str,
     req_id: &str,
     #[allow(unused_variables)] path: String,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsPayload>,
 ) {
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
 
@@ -503,7 +535,7 @@ async fn handle_search_error(
     e: &Error,
     req_id: &str,
     trace_id: &str,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsPayload>,
 ) -> Option<CloseReason> {
     log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
     // Send error response
@@ -535,7 +567,7 @@ async fn handle_values_event(
     user_id: &str,
     req_id: &str,
     #[allow(unused_variables)] path: String,
-    response_tx: Sender<WsServerEvents>,
+    response_tx: UnboundedSender<WsPayload>,
 ) {
     let org_id = org_id.to_string();
     let user_id = user_id.to_string();
