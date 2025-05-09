@@ -2977,17 +2977,17 @@ const useLogs = () => {
               stream.settings = streamData.settings;
               stream.schema = streamSchema;
             }
-
             if (
-              stream.settings.max_query_range > 0 &&
+              (stream.settings.max_query_range > 0 || store.state.zoConfig.max_query_range > 0) &&
               (searchObj.data.datetime.queryRangeRestrictionInHour >
                 stream.settings.max_query_range ||
                 stream.settings.max_query_range == 0 ||
                 searchObj.data.datetime.queryRangeRestrictionInHour == -1) &&
               searchObj.data.datetime.queryRangeRestrictionInHour != 0
             ) {
-              searchObj.data.datetime.queryRangeRestrictionInHour =
-                stream.settings.max_query_range;
+              //if stream has max_query_range, then use that, otherwise use the default max_query_range from the config
+              searchObj.data.datetime.queryRangeRestrictionInHour = stream.settings.max_query_range > 0 ? stream.settings.max_query_range : store.state.zoConfig.max_query_range;
+
               searchObj.data.datetime.queryRangeRestrictionMsg = t(
                 "search.queryRangeRestrictionMsg",
                 {
