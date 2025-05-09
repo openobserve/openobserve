@@ -91,6 +91,19 @@ export const usePanelDataLoader = (
     panelSchema.value.id,
   );
 
+  const shouldFetchAnnotations = () => {
+    return [
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "stacked",
+      "h-stacked",
+    ].includes(panelSchema.value.type);
+  };
+
   const getFallbackOrderByCol = () => {
     // from panelSchema, get first x axis field alias
     if (panelSchema?.value?.queries?.[0]?.fields?.x) {
@@ -960,12 +973,10 @@ export const usePanelDataLoader = (
             }
           },
         );
-
         // get annotations
-        const annotationList = await refreshAnnotations(
-          startISOTimestamp,
-          endISOTimestamp,
-        );
+        const annotationList = shouldFetchAnnotations()
+          ? await refreshAnnotations(startISOTimestamp, endISOTimestamp)
+          : [];
 
         // Wait for all query promises to resolve
         const queryResults: any = await Promise.all(queryPromises);
@@ -1179,10 +1190,12 @@ export const usePanelDataLoader = (
                   }
 
                   // get annotations
-                  const annotationList = await refreshAnnotations(
-                    startISOTimestamp,
-                    endISOTimestamp,
-                  );
+                  const annotationList = shouldFetchAnnotations()
+                    ? await refreshAnnotations(
+                        startISOTimestamp,
+                        endISOTimestamp,
+                      )
+                    : [];
                   state.annotations = annotationList;
 
                   // need to break the loop, save the cache
@@ -1228,10 +1241,12 @@ export const usePanelDataLoader = (
               };
 
               state.metadata.queries[panelQueryIndex] = metadata;
-              const annotations = await refreshAnnotations(
-                Number(startISOTimestamp),
-                Number(endISOTimestamp),
-              );
+              const annotations = shouldFetchAnnotations()
+                ? await refreshAnnotations(
+                    Number(startISOTimestamp),
+                    Number(endISOTimestamp),
+                  )
+                : [];
               state.annotations = annotations;
               if (isWebSocketEnabled()) {
                 await getDataThroughWebSocket(
