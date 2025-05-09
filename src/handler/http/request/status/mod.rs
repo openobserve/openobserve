@@ -128,6 +128,7 @@ struct ConfigResponse<'a> {
     max_dashboard_series: usize,
     actions_enabled: bool,
     histogram_enabled: bool,
+    limit_panel_hits_size_in_kb: usize,
 }
 
 #[derive(Serialize)]
@@ -320,6 +321,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         max_dashboard_series: cfg.limit.max_dashboard_series,
         actions_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
+        limit_panel_hits_size_in_kb: cfg.limit.panel_hits_size_in_kb,
     }))
 }
 
