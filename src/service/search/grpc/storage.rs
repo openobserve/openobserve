@@ -959,6 +959,7 @@ async fn search_tantivy_index(
             (true, Some(InvertedIndexOptimizeMode::SimpleCount)) => tantivy_searcher
                 .search(&query, &tantivy::collector::Count)
                 .map(|ret| (HashSet::new(), ret)),
+            (true, Some(InvertedIndexOptimizeMode::SimpleHistogram)) => todo!("taiming"),
         })
         .await??;
 
