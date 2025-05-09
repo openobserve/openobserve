@@ -15,13 +15,14 @@
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use config::meta::{cluster::NodeInfo, search::ScanStats};
+use config::meta::search::ScanStats;
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
+#[cfg(feature = "enterprise")]
+use {crate::service::grpc::make_grpc_search_client, config::meta::cluster::NodeInfo};
 
 use super::{DATAFUSION_RUNTIME, datafusion::distributed_plan::remote_scan::RemoteScanExec};
-use crate::service::grpc::make_grpc_search_client;
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 
@@ -169,6 +170,7 @@ pub fn is_field(e: &Expr) -> bool {
     matches!(e, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn collect_scan_stats(
     nodes: &[Arc<dyn NodeInfo>],
     trace_id: &str,

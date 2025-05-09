@@ -36,14 +36,16 @@ use datafusion::{
     physical_plan::{displayable, execute_stream},
 };
 use futures::{Stream, StreamExt, TryStreamExt, stream::BoxStream};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::TaskStatus;
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-
 #[cfg(feature = "enterprise")]
-use crate::service::search::SEARCH_SERVER;
+use {
+    crate::service::search::SEARCH_SERVER,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::TaskStatus,
+};
+
 use crate::{
     handler::grpc::MetadataMap,
     service::search::{
@@ -168,7 +170,7 @@ impl FlightService for FlightServiceImpl {
 
         schema = add_scan_stats_to_schema(schema, scan_stats);
         #[cfg(feature = "enterprise")]
-        if !req.super_cluster_info.is_super_cluster {
+        if get_o2_config().super_cluster.enabled && !req.super_cluster_info.is_super_cluster {
             // we only set for non-follow leaders
             // split will always have atleast one element even if the string is empty
             // or the split char is not in string, so we can safely unwrap here

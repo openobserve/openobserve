@@ -13,22 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-use config::metrics;
 use config::{
     meta::{search, stream::StreamType},
     utils::json,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup};
 use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
     GetResultRequest, GetResultResponse, GetScanStatsRequest, QueryStatusRequest,
-    QueryStatusResponse, ScanStats, ScanStatsResponse, SearchPartitionRequest,
-    SearchPartitionResponse, SearchRequest, SearchResponse, search_server::Search,
+    QueryStatusResponse, ScanStatsResponse, SearchPartitionRequest, SearchPartitionResponse,
+    SearchRequest, SearchResponse, search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+#[cfg(feature = "enterprise")]
+use {
+    config::metrics,
+    o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
+    proto::cluster_rpc::ScanStats,
+};
 
 use crate::{handler::grpc::MetadataMap, service::search as SearchService};
 
