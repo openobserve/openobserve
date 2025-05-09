@@ -71,7 +71,8 @@ pub(crate) fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ra
 }
 
 /// Updates the `HISTOGRAM` function in a SQL query to include or modify the interval.
-pub(crate) fn update_histogram_interval_in_query(
+// TODO: should be a utils function in sql crate
+pub fn update_histogram_interval_in_query(
     sql: &str,
     histogram_interval: i64,
 ) -> Result<String, Error> {

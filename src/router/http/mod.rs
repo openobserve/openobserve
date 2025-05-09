@@ -18,14 +18,14 @@ use ::config::{
     meta::{
         cluster::{Role, RoleGroup},
         promql::RequestRangeQuery,
-        search::{Request as SearchRequest, SearchPartitionRequest},
+        search::{Request as SearchRequest, SearchPartitionRequest, ValuesRequest},
     },
     router::{INGESTER_ROUTES, is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
     utils::{json, rand::get_rand_element},
 };
 use actix_web::{
-    FromRequest, HttpRequest, HttpResponse,
-    http::{Error, Method},
+    FromRequest, HttpMessage, HttpRequest, HttpResponse,
+    http::{Error, Method, header},
     route, web,
 };
 use hashbrown::HashMap;
@@ -232,6 +232,8 @@ async fn default_proxy(
     new_url: URLDetails,
     start: std::time::Instant,
 ) -> actix_web::Result<HttpResponse, Error> {
+    let p = new_url.path.find("?").unwrap_or(new_url.path.len());
+    let query_str = &new_url.path[..p];
     // send query
     let req = create_proxy_request(client, req, &new_url).await?;
     let mut resp = match req.send_stream(payload).await {
@@ -260,27 +262,39 @@ async fn default_proxy(
         }
     }
 
-    // set body
-    let body = match resp
-        .body()
-        .limit(get_config().limit.req_payload_limit)
-        .await
-    {
-        Ok(b) => b,
-        Err(e) => {
-            log::error!(
-                "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
-                new_url.path,
-                new_url.node_addr,
-                e,
-                start.elapsed().as_millis()
-            );
-            return Ok(HttpResponse::ServiceUnavailable()
-                .force_close()
-                .body(e.to_string()));
-        }
-    };
-    Ok(new_resp.body(body))
+    let http_response =
+        if query_str.ends_with("/_search_stream") || query_str.ends_with("/_values_stream") {
+            // Add headers to disable response buffering
+            new_resp
+                .insert_header((header::CACHE_CONTROL, "no-cache"))
+                .insert_header((
+                    header::CONNECTION,
+                    header::HeaderValue::from_static("keep-alive"),
+                ))
+                .streaming(resp.take_payload())
+        } else {
+            let body = match resp
+                .body()
+                .limit(get_config().limit.req_payload_limit)
+                .await
+            {
+                Ok(b) => b,
+                Err(e) => {
+                    log::error!(
+                        "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
+                        new_url.path,
+                        new_url.node_addr,
+                        e,
+                        start.elapsed().as_millis()
+                    );
+                    return Ok(HttpResponse::ServiceUnavailable()
+                        .force_close()
+                        .body(e.to_string()));
+                }
+            };
+            new_resp.body(body)
+        };
+    Ok(http_response)
 }
 
 enum ProxyPayload {
@@ -288,6 +302,7 @@ enum ProxyPayload {
     PromQLQuery(web::Form<RequestRangeQuery>),
     SearchRequest(Box<web::Json<SearchRequest>>),
     SearchPartitionRequest(Box<web::Json<SearchPartitionRequest>>),
+    ValuesRequest(Box<web::Json<ValuesRequest>>),
 }
 
 async fn proxy_querier_by_body(
@@ -300,55 +315,82 @@ async fn proxy_querier_by_body(
     let p = new_url.path.find("?").unwrap_or(new_url.path.len());
     let query_str = &new_url.path[..p];
     log::debug!("proxy_querier_by_body checking query_str: {}", query_str);
-    let (key, payload) = if query_str.ends_with("/prometheus/api/v1/query_range")
-        || query_str.ends_with("/prometheus/api/v1/query_exemplars")
-    {
-        if req.method() == Method::GET {
-            let Ok(query) = web::Query::<RequestRangeQuery>::from_query(req.query_string()) else {
-                return Ok(HttpResponse::BadRequest().body("Failed to parse query string"));
-            };
-            (query.query.clone().unwrap_or_default(), ProxyPayload::None)
-        } else {
-            let Ok(query) =
-                web::Form::<RequestRangeQuery>::from_request(&req, &mut payload.into_inner()).await
-            else {
-                return Ok(HttpResponse::BadRequest().body("Failed to parse form data"));
+    let (key, payload) = match query_str {
+        s if s.ends_with("/prometheus/api/v1/query_range")
+            || s.ends_with("/prometheus/api/v1/query_exemplars") =>
+        {
+            if req.method() == Method::GET {
+                let Ok(query) = web::Query::<RequestRangeQuery>::from_query(req.query_string())
+                else {
+                    return Ok(HttpResponse::BadRequest().body("Failed to parse query string"));
+                };
+                (query.query.clone().unwrap_or_default(), ProxyPayload::None)
+            } else {
+                let Ok(query) =
+                    web::Form::<RequestRangeQuery>::from_request(&req, &mut payload.into_inner())
+                        .await
+                else {
+                    return Ok(HttpResponse::BadRequest().body("Failed to parse form data"));
+                };
+                (
+                    query.query.clone().unwrap_or_default(),
+                    ProxyPayload::PromQLQuery(query),
+                )
+            }
+        }
+        s if s.ends_with("/_values_stream") => {
+            let body = payload.to_bytes().await.map_err(|e| {
+                log::error!("Failed to parse values stream request data: {:?}", e);
+                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                    "Failed to parse values stream request data",
+                )))
+            })?;
+            let Ok(query) = json::from_slice::<ValuesRequest>(&body) else {
+                return Ok(HttpResponse::BadRequest().body("Failed to parse values stream request"));
             };
             (
-                query.query.clone().unwrap_or_default(),
-                ProxyPayload::PromQLQuery(query),
+                query.sql.to_string(),
+                ProxyPayload::ValuesRequest(Box::new(web::Json(query))),
             )
         }
-    } else if query_str.ends_with("/_search") {
-        let body = payload.to_bytes().await.map_err(|e| {
-            log::error!("Failed to parse search request data: {:?}", e);
-            Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                "Failed to parse search request data",
-            )))
-        })?;
-        let Ok(query) = json::from_slice::<SearchRequest>(&body) else {
-            return Ok(HttpResponse::BadRequest().body("Failed to parse search request"));
-        };
-        (
-            query.query.sql.to_string(),
-            ProxyPayload::SearchRequest(Box::new(web::Json(query))),
-        )
-    } else if query_str.ends_with("/_search_partition") {
-        let body = payload.to_bytes().await.map_err(|e| {
-            log::error!("Failed to parse search partition request data: {:?}", e);
-            Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                "Failed to parse search partition request data",
-            )))
-        })?;
-        let Ok(query) = json::from_slice::<SearchPartitionRequest>(&body) else {
-            return Ok(HttpResponse::BadRequest().body("Failed to parse search request"));
-        };
-        (
-            query.sql.to_string(),
-            ProxyPayload::SearchPartitionRequest(Box::new(web::Json(query))),
-        )
-    } else {
-        return default_proxy(req, payload, client, new_url, start).await;
+        s if s.ends_with("/_search") || s.ends_with("/_search_stream") => {
+            let is_stream = s.ends_with("/_stream");
+            let request_type = if is_stream { "stream" } else { "search" };
+
+            let body = payload.to_bytes().await.map_err(|e| {
+                log::error!("Failed to parse {} request data: {:?}", request_type, e);
+                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                    format!("Failed to parse {} request data", request_type).as_str(),
+                )))
+            })?;
+            let Ok(query) = json::from_slice::<SearchRequest>(&body) else {
+                return if is_stream {
+                    Ok(HttpResponse::BadRequest().body("Failed to parse search stream request"))
+                } else {
+                    Ok(HttpResponse::BadRequest().body("Failed to parse search request"))
+                };
+            };
+            (
+                query.query.sql.to_string(),
+                ProxyPayload::SearchRequest(Box::new(web::Json(query))),
+            )
+        }
+        s if s.ends_with("/_search_partition") => {
+            let body = payload.to_bytes().await.map_err(|e| {
+                log::error!("Failed to parse search partition request data: {:?}", e);
+                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                    "Failed to parse search partition request data",
+                )))
+            })?;
+            let Ok(query) = json::from_slice::<SearchPartitionRequest>(&body) else {
+                return Ok(HttpResponse::BadRequest().body("Failed to parse search request"));
+            };
+            (
+                query.sql.to_string(),
+                ProxyPayload::SearchPartitionRequest(Box::new(web::Json(query))),
+            )
+        }
+        _ => return default_proxy(req, payload, client, new_url, start).await,
     };
 
     // get node name by consistent hash
@@ -378,6 +420,7 @@ async fn proxy_querier_by_body(
         ProxyPayload::PromQLQuery(payload) => req.send_form(&payload).await,
         ProxyPayload::SearchRequest(payload) => req.send_json(&payload).await,
         ProxyPayload::SearchPartitionRequest(payload) => req.send_json(&payload).await,
+        ProxyPayload::ValuesRequest(payload) => req.send_json(&payload).await,
     };
     let mut resp = match resp {
         Ok(resp) => resp,
@@ -405,27 +448,39 @@ async fn proxy_querier_by_body(
         }
     }
 
-    // set body
-    let body = match resp
-        .body()
-        .limit(get_config().limit.req_payload_limit)
-        .await
-    {
-        Ok(b) => b,
-        Err(e) => {
-            log::error!(
-                "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
-                new_url.path,
-                new_url.node_addr,
-                e,
-                start.elapsed().as_millis()
-            );
-            return Ok(HttpResponse::ServiceUnavailable()
-                .force_close()
-                .body(e.to_string()));
-        }
-    };
-    Ok(new_resp.body(body))
+    let http_response =
+        if query_str.ends_with("/_search_stream") || query_str.ends_with("/_values_stream") {
+            // Add headers to disable response buffering
+            new_resp
+                .insert_header((header::CACHE_CONTROL, "no-cache"))
+                .insert_header((
+                    header::CONNECTION,
+                    header::HeaderValue::from_static("keep-alive"),
+                ))
+                .streaming(resp.take_payload())
+        } else {
+            let body = match resp
+                .body()
+                .limit(get_config().limit.req_payload_limit)
+                .await
+            {
+                Ok(b) => b,
+                Err(e) => {
+                    log::error!(
+                        "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
+                        new_url.path,
+                        new_url.node_addr,
+                        e,
+                        start.elapsed().as_millis()
+                    );
+                    return Ok(HttpResponse::ServiceUnavailable()
+                        .force_close()
+                        .body(e.to_string()));
+                }
+            };
+            new_resp.body(body)
+        };
+    Ok(http_response)
 }
 
 async fn proxy_ws(

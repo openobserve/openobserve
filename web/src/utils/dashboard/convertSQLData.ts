@@ -349,7 +349,9 @@ export const convertSQLData = async (
 
   const missingValue = () => {
     // Get the interval in minutes
-    const interval = resultMetaData?.map((it: any) => it?.histogram_interval)?.[0];
+    const interval = resultMetaData?.map(
+      (it: any) => it?.histogram_interval,
+    )?.[0];
 
     if (
       !interval ||

@@ -38,6 +38,13 @@ pub(crate) fn get_stream_type_from_request(
 }
 
 #[inline(always)]
+pub(crate) fn get_fallback_order_by_col_from_request(
+    query: &Query<HashMap<String, String>>,
+) -> Option<String> {
+    query.get("fallback_order_by_col").map(|s| s.to_string())
+}
+
+#[inline(always)]
 pub(crate) fn get_search_type_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Result<Option<SearchEventType>, Error> {

@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod check_keep_alive;
+mod compress;
+mod encoding;
 mod slow_log;
 
 pub use check_keep_alive::check_keep_alive;
+pub use compress::Compress;
 pub use slow_log::SlowLog;

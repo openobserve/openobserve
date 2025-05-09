@@ -13,17 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::VecDeque;
+
+use bytes::Bytes as BytesImpl;
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
+    config::get_config,
     meta::{sql::OrderBy, stream::StreamType},
     utils::{base64, json},
 };
 
 pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
     "Please be aware that the response is based on partial data";
+
+/// To represent the query start and end time based of partition or cache
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TimeOffset {
+    pub start_time: i64,
+    pub end_time: i64,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StorageType {
@@ -216,6 +227,114 @@ pub struct Response {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_by: Option<OrderBy>,
+}
+
+/// Iterator for Streaming response of search `Response`
+///
+/// This is used to split the search response to smaller chunks based on
+/// env variable
+/// The format of the iterator is as follows:
+/// - Chunk 1: Response Metadata
+/// - Chunk 2: Hits (1MB)
+/// - Chunk 3: Hits (1MB)
+pub struct ResponseChunkIterator {
+    // Original response (will be split into chunks)
+    response: Response,
+    // Target size for each chunk in bytes
+    chunk_size: usize,
+    // Hits waiting to be processed
+    remaining_hits: VecDeque<crate::utils::json::Value>,
+    // Whether metadata has been sent
+    metadata_sent: bool,
+    // Current position in the iteration
+    position: usize,
+}
+
+impl ResponseChunkIterator {
+    /// Create a new response chunk iterator
+    pub fn new(mut response: Response, chunk_size: Option<usize>) -> Self {
+        // Get the configured chunk size or use the provided one or default
+        let chunk_size = chunk_size.unwrap_or_else(|| {
+            // Get from config, convert from MB to bytes
+            let mb = 1024 * 1024;
+            crate::get_config().websocket.streaming_response_chunk_size * mb
+        });
+
+        let hits = response.hits.drain(..).collect::<Vec<_>>();
+
+        Self {
+            response,
+            chunk_size,
+            remaining_hits: VecDeque::from(hits),
+            metadata_sent: false,
+            position: 0,
+        }
+    }
+}
+
+// Define the possible chunk types
+#[derive(Debug, Clone)]
+pub enum ResponseChunk {
+    Metadata {
+        response: Box<Response>,
+    },
+    Hits {
+        hits: Vec<crate::utils::json::Value>,
+    },
+}
+
+impl Iterator for ResponseChunkIterator {
+    type Item = ResponseChunk;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // First send metadata
+        if !self.metadata_sent {
+            self.metadata_sent = true;
+            self.position += 1;
+
+            // Clone response but remove hits
+            let mut metadata_response = self.response.clone();
+            metadata_response.hits = vec![];
+
+            return Some(ResponseChunk::Metadata {
+                response: Box::new(metadata_response),
+            });
+        }
+
+        // If we have no hits left, we're done
+        if self.remaining_hits.is_empty() {
+            return None;
+        }
+
+        // Create the next chunk of hits
+        let mut current_chunk: Vec<crate::utils::json::Value> = Vec::new();
+        let mut current_chunk_size: usize = 0;
+
+        // Keep adding hits until we reach the target chunk size
+        while !self.remaining_hits.is_empty() {
+            // Peek at the front hit
+            let hit = &self.remaining_hits[0];
+            let hit_size = crate::utils::json::estimate_json_bytes(hit);
+
+            // If adding this hit would exceed target size, break
+            if !current_chunk.is_empty() && current_chunk_size + hit_size > self.chunk_size {
+                break;
+            }
+
+            // Add hit to current chunk - using pop_front() for O(1) complexity
+            if let Some(hit) = self.remaining_hits.pop_front() {
+                current_chunk.push(hit);
+                current_chunk_size += hit_size;
+            }
+        }
+
+        self.position += 1;
+
+        // Return the hits chunk
+        Some(ResponseChunk::Hits {
+            hits: current_chunk,
+        })
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -1313,6 +1432,180 @@ mod search_history_utils {
             AND user_email = 'user123@gmail.com'";
 
             assert_eq!(query, expected_query);
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum StreamResponses {
+    // Original variant - to be deprecated but kept for backward compatibility
+    SearchResponse {
+        results: Response,
+        streaming_aggs: bool,
+        time_offset: TimeOffset,
+    },
+    // New focused variants
+    SearchResponseMetadata {
+        results: Response,
+        streaming_aggs: bool,
+        time_offset: TimeOffset,
+    },
+    SearchResponseHits {
+        hits: Vec<json::Value>,
+    },
+    Progress {
+        percent: usize,
+    },
+    Error {
+        code: u16,
+        message: String,
+        error_detail: Option<String>,
+    },
+    Done,
+    Cancelled,
+}
+
+/// An iterator that yields formatted chunks from a StreamResponse
+pub struct StreamResponseChunks {
+    /// The inner iterator for search responses with multiple chunks
+    chunks_iter: Option<Box<dyn Iterator<Item = Result<BytesImpl, std::io::Error>> + Send>>,
+    /// Single chunk for simple responses
+    single_chunk: Option<Result<BytesImpl, std::io::Error>>,
+}
+
+impl Iterator for StreamResponseChunks {
+    type Item = Result<BytesImpl, std::io::Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(iter) = &mut self.chunks_iter {
+            iter.next()
+        } else {
+            self.single_chunk.take()
+        }
+    }
+}
+
+impl StreamResponses {
+    /// Convert a response to an iterator of formatted chunks
+    /// For SearchResponse, this will apply the ResponseChunkIterator to break it into multiple
+    /// chunks For other response types, this will return an iterator with a single chunk
+    pub fn to_chunks(&self) -> StreamResponseChunks {
+        // Helper function to format event data
+        let format_event = |event_type: &str, data: &str| -> BytesImpl {
+            let formatted = format!("event: {}\ndata: {}\n\n", event_type, data);
+            BytesImpl::from(formatted.into_bytes())
+        };
+
+        match self {
+            // Handle search responses with chunking
+            StreamResponses::SearchResponse {
+                results,
+                streaming_aggs,
+                time_offset,
+            } => {
+                log::info!(
+                    "[HTTP2_STREAM] Chunking search response with {} hits using ResponseChunkIterator",
+                    results.hits.len()
+                );
+
+                // Create the iterator
+                let iterator = ResponseChunkIterator::new(
+                    results.clone(),
+                    None, // Use configured chunk size from environment
+                );
+
+                // Add a log message to show the chunk size being used
+                log::info!(
+                    "[HTTP2_STREAM] Using chunk size of {}MB from configuration",
+                    get_config().websocket.streaming_response_chunk_size
+                );
+
+                // Capture needed values for the closure
+                let streaming_aggs = *streaming_aggs;
+                let time_offset = time_offset.clone();
+
+                // Create an iterator that maps each chunk to a formatted BytesImpl
+                let chunks_iter = iterator.map(move |chunk| {
+                    let (event_type, data) = match chunk {
+                        ResponseChunk::Metadata { response } => {
+                            // Add streaming_aggs and time_offset from the original response
+                            let metadata = StreamResponses::SearchResponseMetadata {
+                                results: *response,
+                                streaming_aggs,
+                                time_offset: time_offset.clone(),
+                            };
+                            (
+                                "search_response_metadata",
+                                serde_json::to_string(&metadata).unwrap_or_default(),
+                            )
+                        }
+                        ResponseChunk::Hits { hits } => {
+                            let hits_chunk = StreamResponses::SearchResponseHits { hits };
+                            (
+                                "search_response_hits",
+                                serde_json::to_string(&hits_chunk).unwrap_or_default(),
+                            )
+                        }
+                    };
+
+                    // Format and encode the chunk
+                    Ok(format_event(event_type, &data))
+                });
+
+                StreamResponseChunks {
+                    chunks_iter: Some(Box::new(chunks_iter)),
+                    single_chunk: None,
+                }
+            }
+
+            // Handle other response types with a single chunk
+            StreamResponses::SearchResponseMetadata { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("search_response_metadata", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::SearchResponseHits { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("search_response_hits", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Progress { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("progress", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Error { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("error", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Done => {
+                let bytes = BytesImpl::from("data: [[DONE]]\n\n");
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Cancelled => {
+                let bytes = BytesImpl::from("data: [[CANCELLED]]\n\n");
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
         }
     }
 }

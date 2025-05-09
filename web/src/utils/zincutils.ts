@@ -994,6 +994,20 @@ export const isWebSocketEnabled = () => {
     return (window as any).use_web_socket;
   }
 };
+
+export const isStreamingEnabled = () => {
+  if (!store.state.zoConfig?.streaming_enabled) {
+    return false;
+  }
+
+  if ((window as any).use_streaming === undefined) {
+    return store?.state?.organizationData?.organizationSettings
+      ?.enable_streaming_search;
+  } else {
+    return (window as any).use_streaming;
+  }
+};
+
 export const maxLengthCharValidation = (
   val: string = "",
   char_length: number = 50,

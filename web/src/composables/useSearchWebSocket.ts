@@ -206,6 +206,7 @@ const useSearchWebSocket = () => {
       isPagination: boolean;
       traceId: string;
       org_id: string;
+      meta: any;
     },
     handlers: {
       open: (data: any, response: any) => void;
@@ -254,6 +255,7 @@ const useSearchWebSocket = () => {
     isPagination: boolean;
     traceId: string;
     org_id: string;
+    meta: any;
   }, handlers: {
     open: (data: any, response: any) => void;
     message: (data: any, response: any) => void;

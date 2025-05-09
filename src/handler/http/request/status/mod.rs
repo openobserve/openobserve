@@ -130,6 +130,7 @@ struct ConfigResponse<'a> {
     query_default_limit: i64,
     max_dashboard_series: usize,
     actions_enabled: bool,
+    streaming_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -321,6 +322,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
         actions_enabled,
+        streaming_enabled: cfg.websocket.streaming_enabled,
     }))
 }
 
