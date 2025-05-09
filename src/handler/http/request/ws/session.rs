@@ -133,6 +133,50 @@ impl WsSession {
     }
 }
 
+pub async fn health_check(req_id: String) {
+    let cfg = get_config();
+    log::info!(
+        "[WS_HANDLER]: Starting health check for req_id: {}, querier: {}",
+        req_id,
+        cfg.common.instance_name
+    );
+    // Heartbeat to keep the connection alive
+    let mut ping_interval = tokio::time::interval(Duration::from_secs(
+        get_ping_interval_secs_with_jitter() as u64,
+    ));
+    ping_interval.tick().await;
+    loop {
+        ping_interval.tick().await;
+        if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
+            log::debug!(
+                "[WS_HANDLER]: Sending heartbeat ping to client for req_id: {}, querier: {}",
+                req_id,
+                cfg.common.instance_name
+            );
+            let mut session = session.write().await;
+            if let Err(e) = session.ping(&[]).await {
+                log::error!(
+                    "[WS_HANDLER]: Failed to send ping to client for req_id: {}, querier: {}, error: {}. Connection will be closed.",
+                    req_id,
+                    cfg.common.instance_name,
+                    e
+                );
+                drop(session);
+                break;
+            }
+            drop(session);
+        } else {
+            log::warn!(
+                "[WS_HANDLER]: Session not found for req_id: {}, querier: {} during heartbeat. Connection will be closed.",
+                req_id,
+                cfg.common.instance_name
+            );
+            break;
+        }
+    }
+    cleanup_and_close_session(&req_id, None).await;
+}
+
 pub async fn run(
     mut msg_stream: AggregatedMessageStream,
     user_id: String,
@@ -147,123 +191,126 @@ pub async fn run(
         cfg.common.instance_name
     );
 
-    let mut ping_interval = tokio::time::interval(Duration::from_secs(
-        get_ping_interval_secs_with_jitter() as _,
-    ));
     let mut close_reason: Option<CloseReason> = None;
 
     loop {
-        tokio::select! {
-            Some(msg) = msg_stream.next() => {
-                // Update activity and check cookie_expiry on any message
-                if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
-                    let mut session = session.write().await;
-                    session.update_activity();
-                    if !session.is_client_cookie_valid() {
-                        log::error!("[WS_HANDLER]: Session cookie expired for req_id: {}, querier: {}", req_id, cfg.common.instance_name);
-                        drop(session);
-                        break;
-                    }
-                    drop(session);
-                }
+        if let Some(msg) = msg_stream.next().await {
+            log::info!(
+                "[WS_HANDLER]: Received message for req_id: {}, path: {}, querier: {}",
+                req_id,
+                path,
+                cfg.common.instance_name
+            );
 
-                match msg {
-                    Ok(actix_ws::AggregatedMessage::Ping(bytes)) => {
-                        log::debug!(
-                            "[WS_HANDLER]: Received ping from client for req_id: {}, querier: {}",
-                            req_id,
-                            cfg.common.instance_name
-                        );
-                        if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
-                            let mut session = session.write().await;
-                            if let Err(e) = session.pong(&bytes).await {
-                                log::error!(
-                                    "[WS_HANDLER]: Failed to send pong to client for req_id: {}, querier: {}, error: {}",
-                                    req_id,
-                                    cfg.common.instance_name,
-                                    e
-                                );
-                                drop(session);
-                                break;
-                            }
-                            drop(session);
-                        } else {
-                            log::error!("[WS_HANDLER]: Session not found for ping response, req_id: {}, querier: {}", req_id, cfg.common.instance_name);
-                            break;
-                        }
-                    }
-                    Ok(actix_ws::AggregatedMessage::Pong(_)) => {
-                        log::debug!(
-                            "[WS_HANDLER]: Received pong from client for req_id: {}, querier: {}",
-                            req_id,
-                            cfg.common.instance_name
-                        );
-                    }
-                    Ok(actix_ws::AggregatedMessage::Text(msg)) => {
-                        log::info!("[WS_HANDLER]: Received text message for req_id: {}, querier: {}",
-                            req_id,
-                            cfg.common.instance_name,
-                        );
-                        handle_text_message(&user_id, &req_id, msg.to_string(), path.clone())
-                        .await;
-                    }
-                    Ok(actix_ws::AggregatedMessage::Close(reason)) => {
-                        if let Some(reason) = reason.as_ref() {
-                            match reason.code {
-                                CloseCode::Normal | CloseCode::Error => {
-                                    log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Closing connection with reason: {:?}",
-                                        req_id,
-                                        get_config().common.node_role,
-                                        reason
-                                    );
-                                },
-                                _ => {
-                                    log::error!("[WS_HANDLER]: Request Id: {} Node Role: {} Abnormal closure with reason: {:?}",req_id,get_config().common.node_role,reason);
-                                },
-                            }
-                        }
-                        close_reason = reason;
-                        break;
-                    }
-                    Err(e) => {
-                        log::error!("[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}", req_id, get_config().common.instance_name, e);
-                        break;
-                    }
-                    _ => {
-                        log::error!("[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}", req_id, get_config().common.instance_name, "Unknown error");
-                        break;
-                    }
-                }
-            }
-            // Heartbeat to keep the connection alive
-            _ = ping_interval.tick() => {
-                if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
-                    log::debug!(
-                        "[WS_HANDLER]: Sending heartbeat ping to client for req_id: {}, querier: {}",
+            // Update activity and check cookie_expiry on any message
+            if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
+                let mut session = session.write().await;
+                session.update_activity();
+                if !session.is_client_cookie_valid() {
+                    log::error!(
+                        "[WS_HANDLER]: Session cookie expired for req_id: {}, querier: {}",
                         req_id,
                         cfg.common.instance_name
                     );
-                    let mut session = session.write().await;
-                    if let Err(e) = session.ping(&[]).await {
-                        log::error!(
-                            "[WS_HANDLER]: Failed to send ping to client for req_id: {}, querier: {}, error: {}. Connection will be closed.",
-                            req_id,
-                            cfg.common.instance_name,
-                            e
-                        );
-                        drop(session);
-                        break;
-                    }
                     drop(session);
-                } else {
-                    log::warn!(
-                        "[WS_HANDLER]: Session not found for req_id: {}, querier: {} during heartbeat. Connection will be closed.",
+                    break;
+                }
+                drop(session);
+            }
+
+            match msg {
+                Ok(actix_ws::AggregatedMessage::Ping(bytes)) => {
+                    log::debug!(
+                        "[WS_HANDLER]: Received ping from client for req_id: {}, querier: {}",
                         req_id,
                         cfg.common.instance_name
+                    );
+                    if let Some(session) = sessions_cache_utils::get_session(&req_id).await {
+                        let mut session = session.write().await;
+                        if let Err(e) = session.pong(&bytes).await {
+                            log::error!(
+                                "[WS_HANDLER]: Failed to send pong to client for req_id: {}, querier: {}, error: {}",
+                                req_id,
+                                cfg.common.instance_name,
+                                e
+                            );
+                            drop(session);
+                            break;
+                        }
+                        drop(session);
+                    } else {
+                        log::error!(
+                            "[WS_HANDLER]: Session not found for ping response, req_id: {}, querier: {}",
+                            req_id,
+                            cfg.common.instance_name
+                        );
+                        break;
+                    }
+                }
+                Ok(actix_ws::AggregatedMessage::Pong(_)) => {
+                    log::debug!(
+                        "[WS_HANDLER]: Received pong from client for req_id: {}, querier: {}",
+                        req_id,
+                        cfg.common.instance_name
+                    );
+                }
+                Ok(actix_ws::AggregatedMessage::Text(msg)) => {
+                    log::info!(
+                        "[WS_HANDLER]: Received text message for req_id: {}, querier: {}",
+                        req_id,
+                        cfg.common.instance_name,
+                    );
+                    handle_text_message(&user_id, &req_id, msg.to_string(), path.clone()).await;
+                }
+                Ok(actix_ws::AggregatedMessage::Close(reason)) => {
+                    if let Some(reason) = reason.as_ref() {
+                        match reason.code {
+                            CloseCode::Normal | CloseCode::Error => {
+                                log::info!(
+                                    "[WS_HANDLER]: Request Id: {} Node Role: {} Closing connection with reason: {:?}",
+                                    req_id,
+                                    get_config().common.node_role,
+                                    reason
+                                );
+                            }
+                            _ => {
+                                log::error!(
+                                    "[WS_HANDLER]: Request Id: {} Node Role: {} Abnormal closure with reason: {:?}",
+                                    req_id,
+                                    get_config().common.node_role,
+                                    reason
+                                );
+                            }
+                        }
+                    }
+                    close_reason = reason;
+                    break;
+                }
+                Err(e) => {
+                    log::error!(
+                        "[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}",
+                        req_id,
+                        get_config().common.instance_name,
+                        e
+                    );
+                    break;
+                }
+                _ => {
+                    log::error!(
+                        "[WS_HANDLER]: Error in handling message for req_id: {}, node: {}, error: {}",
+                        req_id,
+                        get_config().common.instance_name,
+                        "Unknown error"
                     );
                     break;
                 }
             }
+        } else {
+            log::warn!(
+                "[WS_HANDLER]: No message received for req_id: {}, querier: {}",
+                req_id,
+                cfg.common.instance_name
+            );
         }
     }
     cleanup_and_close_session(&req_id, close_reason).await;
@@ -326,7 +373,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     None,
                     Default::default(),
                 );
-                let _ = send_message(req_id, err_res.to_json()).await;
+                let _ = send_message(req_id, err_res.to_json(), &client_msg.get_trace_id()).await;
                 return;
             }
 
@@ -361,7 +408,12 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                                         Some(search_req.trace_id.to_string()),
                                         Default::default(),
                                     );
-                                    let _ = send_message(req_id, err_res.to_json()).await;
+                                    let _ = send_message(
+                                        req_id,
+                                        err_res.to_json(),
+                                        &search_req.trace_id,
+                                    )
+                                    .await;
                                     return;
                                 }
                             };
@@ -399,7 +451,12 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                                         Some(values_req.trace_id.to_string()),
                                         Default::default(),
                                     );
-                                    let _ = send_message(req_id, err_res.to_json()).await;
+                                    let _ = send_message(
+                                        req_id,
+                                        err_res.to_json(),
+                                        &values_req.trace_id,
+                                    )
+                                    .await;
                                     return;
                                 }
                             };
@@ -430,7 +487,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                     log::info!("[WS_HANDLER]: trace_id: {}, Cancelling search", trace_id,);
 
                     let res = handle_cancel(&trace_id, &org_id).await;
-                    let _ = send_message(req_id, res.to_json()).await;
+                    let _ = send_message(req_id, res.to_json(), &trace_id).await;
 
                     // Only used for audit
                     #[cfg(feature = "enterprise")]
@@ -481,7 +538,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         "id": id,
                         "took": delay,
                     });
-                    let _ = send_message(req_id, response.to_string()).await;
+                    let _ = send_message(req_id, response.to_string(), &id).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
                         description: None,
@@ -515,7 +572,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                 None,
                 Default::default(),
             );
-            let _ = send_message(req_id, err_res.to_json()).await;
+            let _ = send_message(req_id, err_res.to_json(), "").await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
                 description: None,
@@ -533,22 +590,52 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
     }
 }
 
-pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
+pub async fn send_message(req_id: &str, msg: String, trace_id: &str) -> Result<(), Error> {
+    log::info!(
+        "[WS_HANDLER]: trace_id: {}, req_id: {}, attempt to send message",
+        trace_id,
+        req_id
+    );
     let session = if let Some(session) = sessions_cache_utils::get_session(req_id).await {
         session
     } else {
-        return Err(Error::Message(format!(
-            "[req_id {}] session not found",
+        log::error!(
+            "[WS_HANDLER]: trace_id: {}, req_id: {}, session not found",
+            trace_id,
             req_id
+        );
+        return Err(Error::Message(format!(
+            "[req_id {}, trace_id {}] session not found",
+            req_id, trace_id
         )));
     };
 
+    log::debug!(
+        "[WS_HANDLER]: trace_id: {}, req_id: {}, send message -> attempt to get write lock",
+        trace_id,
+        req_id
+    );
     let mut session = session.write().await;
+    log::debug!(
+        "[WS_HANDLER]: trace_id: {}, req_id: {}, send message -> got write lock",
+        trace_id,
+        req_id
+    );
     let _ = session.text(msg).await.map_err(|e| {
-        log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
+        log::error!(
+            "[WS_HANDLER]: trace_id: {}, req_id: {}, Failed to send message: {:?}",
+            trace_id,
+            req_id,
+            e
+        );
         Error::Message(e.to_string())
     });
     drop(session);
+    log::debug!(
+        "[WS_HANDLER]: trace_id: {}, req_id: {}, send message -> dropped write lock -> success",
+        trace_id,
+        req_id
+    );
     Ok(())
 }
 
@@ -626,82 +713,85 @@ async fn handle_search_event(
         // The task will also update the search state to completed
         // The task will also close the session
         // The task will also cleanup the search resources
-        tokio::select! {
-            search_result = handle_search_request(
-                &req_id,
-                &mut accumulated_results,
-                &org_id,
-                &user_id,
-                search_req.clone(),
-            ) => {
-                match search_result {
-                    Ok(_) => {
-                        // Add audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                            audit(AuditMessage {
-                                user_email: user_id,
-                                org_id,
-                                _timestamp: chrono::Utc::now().timestamp(),
-                                protocol: Protocol::Ws,
-                                response_meta: ResponseMeta {
-                                    http_method: "".to_string(),
-                                    http_path: path.clone(),
-                                    http_query_params: "".to_string(),
-                                    http_body: client_msg.to_json(),
-                                    http_response_code: 200,
-                                    error_msg: None,
-                                    trace_id: Some(trace_id.to_string()),
-                                },
-                            })
-                            .await;
-                        }
-                    }
-                    Err(e) => {
-                        let handle_err = async || {
-                            let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
+        let search_result = handle_search_request(
+            &req_id,
+            &mut accumulated_results,
+            &org_id,
+            &user_id,
+            search_req.clone(),
+        )
+        .await;
+        match search_result {
+            Ok(_) => {
+                // Add audit before closing
+                #[cfg(feature = "enterprise")]
+                if is_audit_enabled {
+                    audit(AuditMessage {
+                        user_email: user_id,
+                        org_id,
+                        _timestamp: chrono::Utc::now().timestamp(),
+                        protocol: Protocol::Ws,
+                        response_meta: ResponseMeta {
+                            http_method: "".to_string(),
+                            http_path: path.clone(),
+                            http_query_params: "".to_string(),
+                            http_body: client_msg.to_json(),
+                            http_response_code: 200,
+                            error_msg: None,
+                            trace_id: Some(trace_id.to_string()),
+                        },
+                    })
+                    .await;
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[WS_HANDLER]: trace_id: {}, req_id: {}, Search error: {}",
+                    trace_id,
+                    req_id,
+                    e
+                );
+                let handle_err = async || {
+                    let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
 
-                            #[cfg(feature = "enterprise")]
-                            let http_response_code: u16;
-                            #[cfg(feature = "enterprise")]
-                            {
-                                let http_response = map_error_to_http_response(&e, trace_id.to_string());
-                                http_response_code = http_response.status().into();
-                            }
-                            // Add audit before closing
-                            #[cfg(feature = "enterprise")]
-                            if is_audit_enabled {
-                                audit(AuditMessage {
-                                    user_email: user_id,
-                                    org_id,
-                                    _timestamp: chrono::Utc::now().timestamp(),
-                                    protocol: Protocol::Ws,
-                                    response_meta: ResponseMeta {
-                                        http_method: "".to_string(),
-                                        http_path: path.clone(),
-                                        http_query_params: "".to_string(),
-                                        http_body: client_msg.to_json(),
-                                        http_response_code,
-                                        error_msg: Some(e.to_string()),
-                                        trace_id: Some(trace_id.to_string()),
-                                    },
-                                })
-                                .await;
-                            }
+                    #[cfg(feature = "enterprise")]
+                    let http_response_code: u16;
+                    #[cfg(feature = "enterprise")]
+                    {
+                        let http_response = map_error_to_http_response(&e, trace_id.to_string());
+                        http_response_code = http_response.status().into();
+                    }
+                    // Add audit before closing
+                    #[cfg(feature = "enterprise")]
+                    if is_audit_enabled {
+                        audit(AuditMessage {
+                            user_email: user_id,
+                            org_id,
+                            _timestamp: chrono::Utc::now().timestamp(),
+                            protocol: Protocol::Ws,
+                            response_meta: ResponseMeta {
+                                http_method: "".to_string(),
+                                http_path: path.clone(),
+                                http_query_params: "".to_string(),
+                                http_body: client_msg.to_json(),
+                                http_response_code,
+                                error_msg: Some(e.to_string()),
+                                trace_id: Some(trace_id.to_string()),
+                            },
+                        })
+                        .await;
+                    }
+                };
+                match &e {
+                    #[cfg(feature = "enterprise")]
+                    errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
+                        let cancel_res = WsServerEvents::CancelResponse {
+                            trace_id: trace_id.to_string(),
+                            is_success: true,
                         };
-                        match &e {
-                            #[cfg(feature = "enterprise")]
-                            errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
-                                let cancel_res = WsServerEvents::CancelResponse {
-                                        trace_id: trace_id.to_string(),
-                                        is_success: true,
-                                    };
-                                    let _ = send_message(&req_id, cancel_res.to_json()).await;
-                                }
-                            _ => handle_err().await
-                        }
-
+                        let _ = send_message(&req_id, cancel_res.to_json(), &trace_id).await;
                     }
+                    _ => handle_err().await,
                 }
             }
         }
@@ -721,7 +811,7 @@ async fn handle_search_error(e: &Error, req_id: &str, trace_id: &str) -> Option<
         Some(trace_id.to_string()),
         Default::default(),
     );
-    let _ = send_message(req_id, err_res.to_json()).await;
+    let _ = send_message(req_id, err_res.to_json(), trace_id).await;
 
     // Close with error
     let close_reason = CloseReason {
@@ -767,81 +857,79 @@ async fn handle_values_event(
         // Otherwise, the task will complete and the results will be sent to the client
         // The task will also update the values state to completed
         // The task will also cleanup the values search resources
-        tokio::select! {
-            values_result = handle_values_request(
-                &org_id,
-                &user_id,
-                &req_id,
-                values_req.clone(),
-                &mut accumulated_results,
-            ) => {
-                match values_result {
-                    Ok(_) => {
-                        // Add audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                            audit(AuditMessage {
-                                user_email: user_id,
-                                org_id,
-                                _timestamp: chrono::Utc::now().timestamp(),
-                                protocol: Protocol::Ws,
-                                response_meta: ResponseMeta {
-                                    http_method: "".to_string(),
-                                    http_path: path.clone(),
-                                    http_query_params: "".to_string(),
-                                    http_body: client_msg.to_json(),
-                                    http_response_code: 200,
-                                    error_msg: None,
-                                    trace_id: Some(trace_id.to_string()),
-                                },
-                            })
-                            .await;
-                        }
-                    }
-                    Err(e) => {
-                        let handle_err = async || {
-                            let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
+        let values_result = handle_values_request(
+            &org_id,
+            &user_id,
+            &req_id,
+            values_req.clone(),
+            &mut accumulated_results,
+        )
+        .await;
+        match values_result {
+            Ok(_) => {
+                // Add audit before closing
+                #[cfg(feature = "enterprise")]
+                if is_audit_enabled {
+                    audit(AuditMessage {
+                        user_email: user_id,
+                        org_id,
+                        _timestamp: chrono::Utc::now().timestamp(),
+                        protocol: Protocol::Ws,
+                        response_meta: ResponseMeta {
+                            http_method: "".to_string(),
+                            http_path: path.clone(),
+                            http_query_params: "".to_string(),
+                            http_body: client_msg.to_json(),
+                            http_response_code: 200,
+                            error_msg: None,
+                            trace_id: Some(trace_id.to_string()),
+                        },
+                    })
+                    .await;
+                }
+            }
+            Err(e) => {
+                let handle_err = async || {
+                    let _ = handle_search_error(&e, &req_id, &trace_id_for_task).await;
 
-                            #[cfg(feature = "enterprise")]
-                            let http_response_code: u16;
-                            #[cfg(feature = "enterprise")]
-                            {
-                                let http_response = map_error_to_http_response(&e, trace_id.to_string());
-                                http_response_code = http_response.status().into();
-                            }
-                            // Add audit before closing
-                            #[cfg(feature = "enterprise")]
-                            if is_audit_enabled {
-                                audit(AuditMessage {
-                                    user_email: user_id,
-                                    org_id,
-                                    _timestamp: chrono::Utc::now().timestamp(),
-                                    protocol: Protocol::Ws,
-                                    response_meta: ResponseMeta {
-                                        http_method: "".to_string(),
-                                        http_path: path.clone(),
-                                        http_query_params: "".to_string(),
-                                        http_body: client_msg.to_json(),
-                                        http_response_code,
-                                        error_msg: Some(e.to_string()),
-                                        trace_id: Some(trace_id.to_string()),
-                                    },
-                                })
-                                .await;
-                            }
-                        };
-                        match &e {
-                            #[cfg(feature = "enterprise")]
-                            errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
-                                let cancel_res = WsServerEvents::CancelResponse {
-                                        trace_id: trace_id.to_string(),
-                                        is_success: true,
-                                    };
-                                    let _ = send_message(&req_id, cancel_res.to_json()).await;
-                                }
-                            _ => handle_err().await
-                        }
+                    #[cfg(feature = "enterprise")]
+                    let http_response_code: u16;
+                    #[cfg(feature = "enterprise")]
+                    {
+                        let http_response = map_error_to_http_response(&e, trace_id.to_string());
+                        http_response_code = http_response.status().into();
                     }
+                    // Add audit before closing
+                    #[cfg(feature = "enterprise")]
+                    if is_audit_enabled {
+                        audit(AuditMessage {
+                            user_email: user_id,
+                            org_id,
+                            _timestamp: chrono::Utc::now().timestamp(),
+                            protocol: Protocol::Ws,
+                            response_meta: ResponseMeta {
+                                http_method: "".to_string(),
+                                http_path: path.clone(),
+                                http_query_params: "".to_string(),
+                                http_body: client_msg.to_json(),
+                                http_response_code,
+                                error_msg: Some(e.to_string()),
+                                trace_id: Some(trace_id.to_string()),
+                            },
+                        })
+                        .await;
+                    }
+                };
+                match &e {
+                    #[cfg(feature = "enterprise")]
+                    errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) => {
+                        let cancel_res = WsServerEvents::CancelResponse {
+                            trace_id: trace_id.to_string(),
+                            is_success: true,
+                        };
+                        let _ = send_message(&req_id, cancel_res.to_json(), &trace_id).await;
+                    }
+                    _ => handle_err().await,
                 }
             }
         }
