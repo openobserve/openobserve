@@ -125,7 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        style="height: 100px"
+        :style="{
+          height: searchObj.meta.showHistogram ? '100px' : '0px',
+        }"
         v-if="
           searchObj.data?.histogram?.errorMsg == '' &&
           searchObj.data.histogram.errorCode != -1
