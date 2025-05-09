@@ -125,6 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
+        style="height: 100px"
         v-if="
           searchObj.data?.histogram?.errorMsg == '' &&
           searchObj.data.histogram.errorCode != -1
@@ -143,6 +144,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div
+          style="height: 100px"
+          v-else-if="
+            searchObj.meta.showHistogram &&
+            Object.keys(plotChart)?.length == 0 &&
+            searchObj.loadingHistogram == false &&
+            searchObj.loading == false
+          "
+        >
+          <h3 class="text-center">
+            <span style="min-height: 50px">
+              <q-icon name="warning" color="warning" size="xs"></q-icon> No data
+              found for histogram.</span
+            >
+          </h3>
+        </div>
+
+        <div
+          style="height: 100px"
+          v-else-if="
+            searchObj.meta.showHistogram && Object.keys(plotChart)?.length == 0
+          "
+        >
+          <h3 class="text-center">
+            <span style="min-height: 50px; color: transparent">.</span>
+          </h3>
+        </div>
+
+        <div
           v-else-if="
             searchObj.meta.showHistogram &&
             Object.keys(plotChart)?.length == 0 &&
@@ -157,8 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           class="q-pb-lg"
-          style="left: 45%; margin: 25px 0px"
-          v-else-if="histogramLoader"
+          style="top: 50px; position: absolute; left: 50%"
+          v-if="histogramLoader"
         >
           <q-spinner-hourglass
             color="primary"
@@ -672,9 +701,7 @@ export default defineComponent({
     const histogramLoader = computed(() => {
       return (
         searchObj.meta.showHistogram &&
-        (searchObj.loadingHistogram == true || searchObj.loading == true) &&
-        plotChart.value &&
-        Object.keys(plotChart.value)?.length == 0
+        (searchObj.loadingHistogram == true || searchObj.loading == true)
       );
     });
 
