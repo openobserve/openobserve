@@ -665,7 +665,7 @@ async fn handle_search_event(
                             let http_response_code: u16;
                             #[cfg(feature = "enterprise")]
                             {
-                                let http_response = map_error_to_http_response(&e, trace_id.to_string());
+                                let http_response = map_error_to_http_response(&e, Some(trace_id.to_string()));
                                 http_response_code = http_response.status().into();
                             }
                             // Add audit before closing
@@ -806,7 +806,7 @@ async fn handle_values_event(
                             let http_response_code: u16;
                             #[cfg(feature = "enterprise")]
                             {
-                                let http_response = map_error_to_http_response(&e, trace_id.to_string());
+                                let http_response = map_error_to_http_response(&e, Some(trace_id.to_string()));
                                 http_response_code = http_response.status().into();
                             }
                             // Add audit before closing

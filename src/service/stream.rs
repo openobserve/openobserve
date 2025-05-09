@@ -46,6 +46,7 @@ use crate::{
         http::HttpResponse as MetaHttpResponse,
         stream::{Stream, StreamProperty},
     },
+    handler::http::router::ERROR_HEADER,
     service::{
         db::{self, distinct_values},
         metrics::get_prom_metadata_from_schema,
@@ -209,12 +210,15 @@ pub async fn save_stream_settings(
     let cfg = config::get_config();
     // check if we are allowed to ingest
     if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+        return Ok(HttpResponse::BadRequest()
+            .append_header((
+                ERROR_HEADER,
                 format!("stream [{stream_name}] is being deleted"),
-            )),
-        );
+            ))
+            .json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("stream [{stream_name}] is being deleted"),
+            )));
     }
 
     // only allow setting user defined schema for logs stream
@@ -259,12 +263,12 @@ pub async fn save_stream_settings(
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(e) => {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+            return Ok(HttpResponse::InternalServerError()
+                .append_header((ERROR_HEADER, format!("error in getting schema : {e}")))
+                .json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                     format!("error in getting schema : {e}"),
-                )),
-            );
+                )));
         }
     };
     let schema_fields = schema
@@ -482,12 +486,15 @@ pub async fn update_stream_settings(
                         f,
                     );
                     if let Err(e) = distinct_values::add(record).await {
-                        return Ok(HttpResponse::InternalServerError().json(
-                            MetaHttpResponse::error(
+                        return Ok(HttpResponse::InternalServerError()
+                            .append_header((
+                                ERROR_HEADER,
+                                format!("error in updating settings : {e}"),
+                            ))
+                            .json(MetaHttpResponse::error(
                                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                                 format!("error in updating settings : {e}"),
-                            ),
-                        ));
+                            )));
                     }
                     // we cannot allow duplicate entries here
                     let temp = DistinctField {
@@ -506,12 +513,15 @@ pub async fn update_stream_settings(
                         match check_field_use(org_id, stream_name, stream_type.as_str(), f).await {
                             Ok(entry) => entry,
                             Err(e) => {
-                                return Ok(HttpResponse::InternalServerError().json(
-                                    MetaHttpResponse::error(
+                                return Ok(HttpResponse::InternalServerError()
+                                    .append_header((
+                                        ERROR_HEADER,
+                                        format!("error in updating settings : {e}"),
+                                    ))
+                                    .json(MetaHttpResponse::error(
                                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                                         format!("error in updating settings : {e}"),
-                                    ),
-                                ));
+                                    )));
                             }
                         };
                     // if there are multiple uses, we cannot allow it to be removed
@@ -602,22 +612,22 @@ pub async fn delete_stream(
     if let Err(e) =
         db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
     {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, format!("failed to delete stream: {e}")))
+            .json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
                 format!("failed to delete stream: {e}"),
-            )),
-        );
+            )));
     }
 
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, format!("failed to delete stream schema: {e}")))
+            .json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("failed to delete stream: {e}"),
-            )),
-        );
+                format!("failed to delete stream schema: {e}"),
+            )));
     }
 
     // delete stream schema cache
@@ -642,12 +652,15 @@ pub async fn delete_stream(
 
     // delete stream compaction offset
     if let Err(e) = db::compact::files::del_offset(org_id, stream_type, stream_name).await {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((
+                ERROR_HEADER,
+                format!("failed to delete stream compact offset: {e}"),
+            ))
+            .json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
                 format!("failed to delete stream: {e}"),
-            )),
-        );
+            )));
     };
 
     // delete associated pipelines
@@ -655,15 +668,21 @@ pub async fn delete_stream(
         db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
     {
         if let Err(e) = db::pipeline::delete(&pipeline.id).await {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+            return Ok(HttpResponse::InternalServerError()
+                .append_header((
+                    ERROR_HEADER,
+                    format!(
+                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
+                        pipeline.name
+                    ),
+                ))
+                .json(MetaHttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     format!(
                         "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
                         pipeline.name
                     ),
-                )),
-            );
+                )));
         }
     }
 
