@@ -447,18 +447,6 @@ pub struct WebSocket {
     )]
     pub max_channel_buffer_size: usize,
     #[env_config(
-        name = "ZO_STREAMING_BENCHMARK_ENABLED",
-        default = false,
-        help = "Enable streaming benchmark"
-    )]
-    pub streaming_benchmark_enabled: bool,
-    #[env_config(
-        name = "ZO_STREAMING_BENCHMARK_DUMMY_DATA_SIZE_MB",
-        default = 1,
-        help = "Size of dummy data to be used for streaming benchmark"
-    )]
-    pub streaming_benchmark_dummy_data_size: usize,
-    #[env_config(
         name = "ZO_STREAMING_RESPONSE_CHUNK_SIZE_MB",
         default = 1,
         help = "Size in MB for each chunk when streaming search responses"

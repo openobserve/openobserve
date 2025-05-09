@@ -1,8 +1,3 @@
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-#![allow(unused_assignments)]
-#![allow(unused_doc_comments)]
-
 // Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
@@ -21,23 +16,20 @@
 use std::{
     cmp::Reverse,
     collections::BinaryHeap,
-    io::{Error, Write},
     time::Instant,
 };
 
-use actix_http::{ContentEncoding, header};
 use actix_web::{
     HttpRequest, HttpResponse,
-    http::{StatusCode, header::HeaderValue},
+    http::StatusCode,
     post, web,
 };
-use bytes::Bytes as BytesImpl;
 use config::{
     get_config,
     meta::{
         search::{
-            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, ResponseChunk, ResponseChunkIterator,
-            SearchEventType, SearchPartitionRequest, SearchPartitionResponse, StreamResponseChunks,
+            PARTIAL_ERROR_RESPONSE_MESSAGE, Response,
+            SearchEventType, SearchPartitionRequest, SearchPartitionResponse,
             StreamResponses, TimeOffset, ValuesEventContext,
         },
         sql::{OrderBy, resolve_stream_names},
@@ -46,13 +38,10 @@ use config::{
     },
     utils::json::{self, Value, get_string_value},
 };
-use flate2::{Compression, write::GzEncoder};
-use futures::{SinkExt, stream::StreamExt};
+use futures::stream::StreamExt;
 use hashbrown::HashMap;
 use log;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 use tracing::{Instrument, Span};
 
 #[cfg(feature = "enterprise")]
@@ -114,7 +103,6 @@ pub async fn search_http2_stream(
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> HttpResponse {
-    let start = Instant::now();
     let cfg = get_config();
     let org_id = org_id.into_inner();
 
@@ -186,12 +174,10 @@ pub async fn search_http2_stream(
         }
     };
 
-    // Check permissions for each stream
-    let mut range_error = String::new();
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
         if let Some(settings) =
-            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+            infra::schema::get_settings(&org_id, stream_name, stream_type).await
         {
             let max_query_range =
                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
@@ -200,17 +186,16 @@ pub async fn search_http2_stream(
                 && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
             {
                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
-                range_error = format!(
+                log::info!(
                     "Query duration is modified due to query range restriction of {} hours",
                     max_query_range
                 );
             }
         }
 
-        // Check permissions on stream
-        #[cfg(feature = "enterprise")]
+        // Check permissions for each stream
         if let Some(res) =
-            check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+            check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
         {
             return res;
         }
@@ -283,43 +268,9 @@ pub async fn search_http2_stream(
     ));
 
     // Return streaming response
-    let cfg_clone = cfg.clone();
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
             Ok(v) => {
-                // TEST: payload size
-                let mut v = v;
-                {
-                    if cfg_clone.websocket.streaming_benchmark_enabled {
-                        match v {
-                            StreamResponses::SearchResponse {
-                                results,
-                                streaming_aggs,
-                                time_offset,
-                            } => {
-                                let mut results_clone = results.clone();
-                                let dummy_data =
-                                    vec![
-                                        "a";
-                                        cfg_clone.websocket.streaming_benchmark_dummy_data_size
-                                            * 1024
-                                            * 1024
-                                    ];
-                                results_clone.columns =
-                                    dummy_data.iter().map(|v| v.to_string()).collect();
-                                let modified_response = StreamResponses::SearchResponse {
-                                    results: results_clone,
-                                    streaming_aggs,
-                                    time_offset,
-                                };
-                                v = modified_response;
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-
-                // Get the iterator directly
                 v.to_chunks()
             }
             Err(err) => {
@@ -368,6 +319,7 @@ pub async fn search_http2_stream(
 }
 
 // New function to encapsulate search task logic
+#[allow(clippy::too_many_arguments)]
 async fn process_search_stream_request(
     org_id: String,
     user_id: String,
@@ -583,8 +535,9 @@ async fn process_search_stream_request(
 
     // Once all searches are complete, write the accumulated results to a file
     log::info!(
-        "[HTTP2_STREAM] trace_id {} all searches completed",
-        trace_id
+        "[HTTP2_STREAM] trace_id {} stream took {:?}",
+        trace_id,
+        start.elapsed()
     );
 
     // Send a completion signal
@@ -1080,7 +1033,7 @@ async fn process_delta(
     req.query.start_time = delta.delta_start_time;
     req.query.end_time = delta.delta_end_time;
 
-    let partition_resp = get_partitions(&trace_id, &org_id, stream_type, &req, user_id).await?;
+    let partition_resp = get_partitions(trace_id, org_id, stream_type, &req, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
@@ -1119,7 +1072,7 @@ async fn process_delta(
 
         // use cache for delta search
         let mut search_res =
-            do_search(&trace_id, &org_id, stream_type, &req, user_id, true).await?;
+            do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
@@ -1219,7 +1172,7 @@ async fn process_delta(
             );
             // passs original start_time and end_time partition end time
             let _ = send_partial_search_resp(
-                &trace_id,
+                trace_id,
                 "reached max query range limit",
                 new_start_time,
                 new_end_time,
@@ -1476,7 +1429,7 @@ pub async fn values_http2_stream(
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
         if let Some(settings) =
-            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+            infra::schema::get_settings(&org_id, stream_name, stream_type).await
         {
             let max_query_range =
                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
@@ -1495,7 +1448,7 @@ pub async fn values_http2_stream(
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         if let Some(res) =
-            check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+            check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
         {
             return res;
         }
@@ -1589,7 +1542,6 @@ pub fn get_top_k_values(
     }
 
     let k_limit = top_k;
-    let no_count = no_count;
 
     let mut search_result_hits = Vec::new();
     for hit in hits {

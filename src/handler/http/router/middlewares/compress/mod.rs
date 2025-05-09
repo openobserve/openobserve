@@ -217,7 +217,7 @@ where
 }
 
 static SUPPORTED_ENCODINGS_STRING: Lazy<String> =
-    Lazy::new(|| vec!["br", "gzip", "deflate", "zstd"].join(", "));
+    Lazy::new(|| "br, gzip, deflate, zstd".to_string());
 
 static SUPPORTED_ENCODINGS: &[Encoding] = &[
     Encoding::identity(),
