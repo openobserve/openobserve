@@ -13,21 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-use config::metrics;
 use config::{
     meta::{search, stream::StreamType},
     utils::json,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup};
 use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetResultRequest, GetResultResponse, QueryStatusRequest, QueryStatusResponse,
-    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
-    search_server::Search,
+    GetResultRequest, GetResultResponse, GetScanStatsRequest, QueryStatusRequest,
+    QueryStatusResponse, ScanStatsResponse, SearchPartitionRequest, SearchPartitionResponse,
+    SearchRequest, SearchResponse, search_server::Search,
 };
 use tonic::{Request, Response, Status};
+#[cfg(feature = "enterprise")]
+use {
+    config::metrics,
+    o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
+    proto::cluster_rpc::ScanStats,
+};
 
 use crate::service::search as SearchService;
 
@@ -105,6 +107,16 @@ impl Searcher {
         self.query_manager
             .add_work_group(trace_id, work_group)
             .await;
+    }
+
+    pub async fn set_scan_stats(&self, trace_id: &str, stats: ScanStats) {
+        self.query_manager
+            .set_stats(trace_id, (&stats).into())
+            .await;
+    }
+
+    pub async fn get_scan_stats(&self, trace_id: &str) -> ScanStats {
+        (&self.query_manager.get_stats(trace_id).await).into()
     }
 }
 
@@ -331,6 +343,50 @@ impl Search for Searcher {
         &self,
         _req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn get_scan_stats(
+        &self,
+        req: Request<GetScanStatsRequest>,
+    ) -> Result<Response<ScanStatsResponse>, Status> {
+        use std::sync::Arc;
+
+        use config::meta::cluster::NodeInfo;
+
+        let inner_req = req.into_inner();
+
+        let is_leader = inner_req.is_leader;
+        let trace_id = inner_req.trace_id;
+        if !is_leader {
+            let stats = self.get_scan_stats(&trace_id).await;
+            Ok(Response::new(ScanStatsResponse { stats: Some(stats) }))
+        } else {
+            let mut ret = search::ScanStats::default();
+            if let Some(nodes) =
+                crate::common::infra::cluster::get_cached_online_query_nodes(None).await
+            {
+                let nodes: Vec<_> = nodes
+                    .into_iter()
+                    .map(|n| Arc::new(n) as Arc<dyn NodeInfo>)
+                    .collect();
+                let stats =
+                    crate::service::search::utils::collect_scan_stats(&nodes, &trace_id, false)
+                        .await;
+                ret.add(&stats);
+            }
+            Ok(Response::new(ScanStatsResponse {
+                stats: Some((&ret).into()),
+            }))
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn get_scan_stats(
+        &self,
+        _req: Request<GetScanStatsRequest>,
+    ) -> Result<Response<ScanStatsResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
     }
 }

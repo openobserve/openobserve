@@ -316,6 +316,13 @@ pub async fn search(
 
     log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish",);
 
+    // we should collect scan state by `collect_stats`, here need to reutrn empty for super cluster
+    // follower
+    scan_stats.files = 0;
+    scan_stats.records = 0;
+    scan_stats.original_size = 0;
+    scan_stats.compressed_size = 0;
+
     Ok((ctx, physical_plan, defer, scan_stats))
 }
 
