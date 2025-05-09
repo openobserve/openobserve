@@ -776,7 +776,7 @@ async function extractFields() {
       );
       searchObj.data.datetime.queryRangeRestrictionInHour = -1;
       if (
-        stream.settings.max_query_range > 0 &&
+        (stream.settings.max_query_range > 0 || store.state.zoConfig.max_query_range > 0) &&
         (searchObj.data.datetime.queryRangeRestrictionInHour >
           stream.settings.max_query_range ||
           stream.settings.max_query_range == 0 ||
@@ -784,7 +784,7 @@ async function extractFields() {
         searchObj.data.datetime.queryRangeRestrictionInHour != 0
       ) {
         searchObj.data.datetime.queryRangeRestrictionInHour =
-          stream.settings.max_query_range;
+          stream.settings.max_query_range > 0 ? stream.settings.max_query_range : store.state.zoConfig.max_query_range;
         searchObj.data.datetime.queryRangeRestrictionMsg = t(
           "search.queryRangeRestrictionMsg",
           {
