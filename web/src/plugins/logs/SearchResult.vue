@@ -116,30 +116,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
         </div>
       </div>
-      <div v-if="searchObj.data?.histogram?.errorMsg == '' && searchObj.data.histogram.errorCode != -1">
+      <div style="height: 100px;" v-if="searchObj.data?.histogram?.errorMsg == '' && searchObj.data.histogram.errorCode != -1">
         <ChartRenderer
-          v-if="searchObj.meta.showHistogram && (searchObj.data?.queryResults?.aggs?.length > 0 || ( plotChart && Object.keys(plotChart)?.length > 0))"
+          v-if="searchObj.meta.showHistogram   && (searchObj.data?.queryResults?.aggs?.length > 0 || ( plotChart && Object.keys(plotChart)?.length > 0))"
           data-test="logs-search-result-bar-chart"
           :data="plotChart"
-          style="max-height: 100px"
+          style="max-height: 100px;"
           @updated:dataZoom="onChartUpdate"
         />
         
-        <div v-else-if="searchObj.meta.showHistogram && (Object.keys(plotChart)?.length == 0) && searchObj.loadingHistogram == false && searchObj.loading == false">
+        <div style="height: 100px;" v-else-if="searchObj.meta.showHistogram && (Object.keys(plotChart)?.length == 0) && (searchObj.loadingHistogram == false && searchObj.loading == false)">
           <h3
             class="text-center"
-            style="margin: 30px 0px"
           >
-            <q-icon name="warning" color="warning" size="xs"></q-icon> No data found for histogram.
+           <span style="min-height: 50px;"> <q-icon name="warning" color="warning" size="xs"></q-icon> No data found for histogram.</span>
           </h3>
         </div>
 
-
+        <div style="height: 100px;" v-else-if="searchObj.meta.showHistogram && ((Object.keys(plotChart)?.length == 0))  ">
+            <h3
+              class="text-center"
+            >
+              <span style="min-height: 50px; color: transparent;">.</span>
+            </h3>
+        </div>
 
         <div
           class="q-pb-lg"
-          style=" left: 45%; margin: 25px 0px;"
-          v-else-if="histogramLoader"
+          style="top: 50px; position: absolute; left: 50%"
+          v-if="histogramLoader"
           
         >
           <q-spinner-hourglass
@@ -643,7 +648,7 @@ export default defineComponent({
     });
     //this is used to show the histogram loader when the histogram is loading
     const histogramLoader = computed(()=>{
-      return (searchObj.meta.showHistogram) && (searchObj.loadingHistogram == true ||  searchObj.loading == true) && ( plotChart.value && Object.keys(plotChart.value)?.length == 0) 
+      return (searchObj.meta.showHistogram) && (searchObj.loadingHistogram == true ||  searchObj.loading == true);
     })
 
     return {
