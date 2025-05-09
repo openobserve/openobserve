@@ -938,7 +938,6 @@ export default defineComponent({
       variableObject: any,
       queryContext: string,
     ) => {
-      variableObject.isLoading = true; // Ensure loading is set for REST as well
       const payload = {
         org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
         stream_name: variableObject.query_data.stream, // Name of the stream
@@ -996,23 +995,16 @@ export default defineComponent({
             // Handle query values logic
             handleQueryValuesLogic(variableObject, oldValues);
           }
-          // Always update oldVariablesData after setting value
-          oldVariablesData[variableObject.name] = variableObject.value;
         } else {
           // Set default value to the first option if no old values are available
           variableObject.value = variableObject.options.length
             ? variableObject.options[0].value
             : null;
-          // Always update oldVariablesData after setting value
-          oldVariablesData[variableObject.name] = variableObject.value;
         }
       } else {
         // Reset variable state if no field values are available
         resetVariableState(variableObject);
       }
-      // Always set loading to false after updating options
-      variableObject.isLoading = false;
-      variableObject.isVariableLoadingPending = false;
       console.log(
         `[WebSocket] isLoading=false (updateVariableOptions) for`,
         variableObject.name,
@@ -1276,8 +1268,6 @@ export default defineComponent({
         } else {
           variable.value = null;
         }
-        // Always update oldVariablesData after resetting value
-        oldVariablesData[variable.name] = variable.value;
       });
 
       // Load variables in dependency order
