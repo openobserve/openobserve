@@ -166,6 +166,11 @@ export default defineComponent({
         return;
       }
 
+      // Set loading state before initiating WebSocket
+      variableObject.isLoading = true;
+      variableObject.isVariableLoadingPending = true;
+      console.log(`[WebSocket] isLoading=true for`, variableObject.name);
+
       const payload = {
         fields: [variableObject.query_data.field],
         size: variableObject.query_data.max_record_size || 10,
@@ -194,6 +199,11 @@ export default defineComponent({
       } catch (error) {
         console.error("WebSocket connection failed:", error);
         variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
+        console.log(
+          `[WebSocket] isLoading=false (error) for`,
+          variableObject.name,
+        );
       }
     };
 
@@ -227,6 +237,10 @@ export default defineComponent({
       variableObject: any,
     ) => {
       variableObject.isLoading = false;
+      console.log(
+        `[WebSocket] isLoading=false (close) for`,
+        variableObject.name,
+      );
 
       const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
       if (errorCodes.includes(response.code)) {
@@ -268,8 +282,28 @@ export default defineComponent({
           response.content?.results?.hits?.length &&
           response.type === "search_response"
         ) {
+          // Store the current value before updating options
+          const currentValue = variableObject.value;
+
+          // Update options
           updateVariableOptions(variableObject, response.content.results.hits);
-          // After updating options, trigger loading of dependent variables
+
+          // Restore the previous value if it exists in oldVariablesData
+          if (oldVariablesData[variableObject.name] !== undefined) {
+            const oldValues = Array.isArray(
+              oldVariablesData[variableObject.name],
+            )
+              ? oldVariablesData[variableObject.name]
+              : [oldVariablesData[variableObject.name]];
+
+            if (variableObject.type === "custom") {
+              handleCustomVariablesLogic(variableObject, oldValues);
+            } else {
+              handleQueryValuesLogic(variableObject, oldValues);
+            }
+          }
+
+          // Handle child variables
           const childVariables =
             variablesDependencyGraph[variableObject.name]?.childVariables || [];
           if (childVariables.length > 0) {
@@ -286,8 +320,13 @@ export default defineComponent({
         resetVariableState(variableObject);
       }
 
+      // Only set loading to false after all processing is complete
       variableObject.isLoading = false;
       variableObject.isVariableLoadingPending = false;
+      console.log(
+        `[WebSocket] isLoading=false (response) for`,
+        variableObject.name,
+      );
     };
 
     const handleSearchReset = (data: any) => {
@@ -599,7 +638,13 @@ export default defineComponent({
     };
 
     const handleSearchError = (request: any, err: any, variableObject: any) => {
+      console.error("WebSocket error:", err);
       variableObject.isLoading = false;
+      variableObject.isVariableLoadingPending = false;
+      console.log(
+        `[WebSocket] isLoading=false (error handler) for`,
+        variableObject.name,
+      );
       resetVariableState(variableObject);
       removeTraceId(variableObject.name, request.traceId);
     };
@@ -893,6 +938,7 @@ export default defineComponent({
       variableObject: any,
       queryContext: string,
     ) => {
+      variableObject.isLoading = true; // Ensure loading is set for REST as well
       const payload = {
         org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
         stream_name: variableObject.query_data.stream, // Name of the stream
@@ -950,16 +996,27 @@ export default defineComponent({
             // Handle query values logic
             handleQueryValuesLogic(variableObject, oldValues);
           }
+          // Always update oldVariablesData after setting value
+          oldVariablesData[variableObject.name] = variableObject.value;
         } else {
           // Set default value to the first option if no old values are available
           variableObject.value = variableObject.options.length
             ? variableObject.options[0].value
             : null;
+          // Always update oldVariablesData after setting value
+          oldVariablesData[variableObject.name] = variableObject.value;
         }
       } else {
         // Reset variable state if no field values are available
         resetVariableState(variableObject);
       }
+      // Always set loading to false after updating options
+      variableObject.isLoading = false;
+      variableObject.isVariableLoadingPending = false;
+      console.log(
+        `[WebSocket] isLoading=false (updateVariableOptions) for`,
+        variableObject.name,
+      );
     };
 
     /**
@@ -1219,6 +1276,8 @@ export default defineComponent({
         } else {
           variable.value = null;
         }
+        // Always update oldVariablesData after resetting value
+        oldVariablesData[variable.name] = variable.value;
       });
 
       // Load variables in dependency order
