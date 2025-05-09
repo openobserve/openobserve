@@ -280,20 +280,18 @@ impl Sql {
             ));
         }
 
-        // 13. check `select count(*) from table where match_all` optimizer
-        if can_optimize && is_simple_count_query(&mut statement) {
-            index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
+        // 13. check other inverted index optimize modes
+        // `select count(*) from table where match_all` -> SimpleCount
+        // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
+        if can_optimize && index_optimize_mode.is_none() {
+            let mut visitor = OtherIndexOptimizeModeVisitor::new();
+            statement.visit(&mut visitor);
+            if visitor.is_simple_count {
+                index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
+            } else if visitor.is_simple_histogram {
+                index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleHistogram);
+            }
         }
-
-        // 14. check `select histogram(..) AS zo_sql_key, count(*) AS zo_sql_num from table where
-        //     match_all` optimizer
-        // TODO(taiming): better way to identify histogram query
-        // maybe combine it with simple_count_query
-        if can_optimize && histogram_interval_visitor.interval.is_some() {
-            index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
-        }
-
-        log::warn!("idx_optimize_mode: {:?}", index_optimize_mode);
 
         Ok(Sql {
             sql: statement.to_string(),
@@ -1193,66 +1191,92 @@ impl VisitorMut for AddO2IdVisitor {
     }
 }
 
-fn is_simple_count_query(statement: &mut Statement) -> bool {
-    let mut visitor = SimpleCountVisitor::new();
-    statement.visit(&mut visitor);
-    visitor.is_simple_count
-}
-
 // check if the query is simple count query
 // 1. doesn't have subquery
 // 2. doesn't have join
 // 3. doesn't have group by
-// 4. only has count(*)
-// 5. doesn't have SetOperation(UNION/EXCEPT/INTERSECT of two queries)
-// 6. doesn't have distinct
-struct SimpleCountVisitor {
+// 4. doesn't have SetOperation(UNION/EXCEPT/INTERSECT of two queries)
+// 5. doesn't have distinct
+//
+// either only has count(*) -> SimpleCount
+// or has histogram(...) and count(*) -> SimpleHistogram
+struct OtherIndexOptimizeModeVisitor {
     pub is_simple_count: bool,
+    pub is_simple_histogram: bool,
 }
 
-impl SimpleCountVisitor {
+impl OtherIndexOptimizeModeVisitor {
     fn new() -> Self {
         Self {
             is_simple_count: false,
+            is_simple_histogram: false,
         }
     }
 }
 
-impl VisitorMut for SimpleCountVisitor {
+impl VisitorMut for OtherIndexOptimizeModeVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        // Check if the query is select *
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
-            if select.projection.len() != 1
+            if select.projection.len() > 2
                 || select.distinct.is_some()
                 || select.from.len() > 1
-                || select.from.iter().any(|from| !from.joins.is_empty())
-                || !matches!(select.group_by, GroupByExpr::Expressions(ref expr, _) if expr.is_empty())
+                || select.from.iter().any(|from| {
+                    !from.joins.is_empty()
+                        || matches!(
+                            from.relation,
+                            TableFactor::Derived { .. } | TableFactor::Function { .. }
+                        )
+                })
             {
                 return ControlFlow::Break(());
             }
 
-            self.is_simple_count = match &select.projection[0] {
-                SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
-                    if let Expr::Function(func) = expr {
-                        let name = trim_quotes(&func.name.to_string().to_lowercase());
-                        name == "count"
-                            && func.filter.is_none()
-                            && func.over.is_none()
-                            && func.within_group.is_empty()
-                            && matches!(
-                                &func.args,
-                                FunctionArguments::List(list) if list.args.len() == 1 && trim_quotes(&list.args[0].to_string()) == "*"
-                            )
-                    } else {
-                        false
+            // Check if the query is a simple `select sql_func(*)` without modifiers
+            let is_sql_func = |select: &SelectItem, fn_name: &str, with_star: bool| -> bool {
+                match select {
+                    SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
+                        if let Expr::Function(func) = expr {
+                            let name = trim_quotes(&func.name.to_string().to_lowercase());
+                            // Check function name matches and has no special modifiers
+                            let has_no_modifiers = func.filter.is_none()
+                                && func.over.is_none()
+                                && func.within_group.is_empty();
+
+                            // If with_start is true, check for single "*" argument
+                            let has_valid_args = if with_star {
+                                matches!(
+                                    &func.args,
+                                    FunctionArguments::List(list)
+                                        if list.args.len() == 1
+                                        && trim_quotes(&list.args[0].to_string()) == "*"
+                                )
+                            } else {
+                                true
+                            };
+
+                            name == fn_name && has_no_modifiers && has_valid_args
+                        } else {
+                            false
+                        }
                     }
+                    _ => false,
                 }
-                _ => false,
             };
+
+            if select.projection.len() == 1
+                && matches!(select.group_by, GroupByExpr::Expressions(ref expr, _) if expr.is_empty())
+            {
+                self.is_simple_count = is_sql_func(&select.projection[0], "count", true);
+            } else if select.projection.len() == 2
+                && is_sql_func(&select.projection[0], "histogram", false)
+                && is_sql_func(&select.projection[1], "count", true)
+            {
+                self.is_simple_histogram = true;
+            }
         }
-        if !self.is_simple_count {
+        if !self.is_simple_count || !self.is_simple_histogram {
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
@@ -1264,6 +1288,7 @@ impl VisitorMut for SimpleCountVisitor {
             Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. }
         ) {
             self.is_simple_count = false;
+            self.is_simple_histogram = false;
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
@@ -2104,6 +2129,12 @@ mod tests {
         assert_eq!(statement.to_string(), expected_sql);
     }
 
+    fn is_simple_count_query(statement: &mut Statement) -> bool {
+        let mut visitor = OtherIndexOptimizeModeVisitor::new();
+        statement.visit(&mut visitor);
+        visitor.is_simple_count
+    }
+
     #[test]
     fn test_is_simple_count_visit1() {
         let sql = "SELECT count(*) from t";
@@ -2162,6 +2193,77 @@ mod tests {
             .pop()
             .unwrap();
         assert_eq!(is_simple_count_query(&mut statement), false);
+    }
+
+    fn is_simple_histogram_query(statement: &mut Statement) -> bool {
+        let mut visitor = OtherIndexOptimizeModeVisitor::new();
+        statement.visit(&mut visitor);
+        visitor.is_simple_histogram
+    }
+
+    #[test]
+    fn test_is_simple_histogram_visit1() {
+        let sql = "select histogram(_timestamp, '10 second') AS zo_sql_key, count(*) AS zo_sql_num from \"default\"  GROUP BY zo_sql_key ORDER BY zo_sql_key";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_histogram_query(&mut statement), true);
+    }
+
+    #[test]
+    fn test_is_simple_histogram_visit2() {
+        // Test with additional where clause
+        let sql = "select histogram(_timestamp, '1m') as h, count(*) from t where name = 'test'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_histogram_query(&mut statement), true);
+    }
+
+    #[test]
+    fn test_is_simple_histogram_visit3() {
+        // Test with wrong order of projections (count before histogram)
+        let sql = "select count(*), histogram(_timestamp, '1m') from t";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_histogram_query(&mut statement), false);
+    }
+
+    #[test]
+    fn test_is_simple_histogram_visit4() {
+        // Test with subquery - should fail
+        let sql = "select histogram(_timestamp, '1m'), count(*) from (select * from t)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_histogram_query(&mut statement), false);
+    }
+
+    #[test]
+    fn test_is_simple_histogram_visit5() {
+        // Test with additional projection - should fail
+        let sql = "select histogram(_timestamp, '1m'), count(*), name from t";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_histogram_query(&mut statement), false);
+    }
+
+    #[test]
+    fn test_is_simple_histogram_visit6() {
+        // Test with join - should fail
+        let sql = "select histogram(_timestamp, '1m'), count(*) from t1 join t2";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_histogram_query(&mut statement), false);
     }
 
     #[test]
