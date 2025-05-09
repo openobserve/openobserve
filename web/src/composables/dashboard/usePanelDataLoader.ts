@@ -63,7 +63,6 @@ const calculateRawSize = (data: any) => {
 };
 
 // max raw size = 100KB
-const MAX_RAW_SIZE = 100 * 1024 * 8;
 
 export const usePanelDataLoader = (
   panelSchema: any,
@@ -84,6 +83,11 @@ export const usePanelDataLoader = (
   let runCount = 0;
 
   const store = useStore();
+
+  const MAX_RAW_SIZE =
+    (store.state?.zoConfig?.limit_panel_hits_size_in_kb ?? 100) * 1024 * 8;
+
+  const LIMIT_PANEL_HITS_SIZE_ERROR_MESSAGE = `Showing limited results upto ${store.state?.zoConfig?.limit_panel_hits_size_in_kb ?? 100}KB for performance`;
 
   const {
     fetchQueryDataWithWebSocket,
@@ -561,7 +565,6 @@ export const usePanelDataLoader = (
               );
 
               const hits = searchRes.data.hits.slice(0, hitsToAppend);
-              console.log("max raw size reached in desc", hits.length);
 
               state.data[currentQueryIndex] = [
                 ...(state.data[currentQueryIndex] ?? []),
@@ -571,7 +574,7 @@ export const usePanelDataLoader = (
 
               // add function error
               state.resultMetaData[currentQueryIndex].function_error =
-                `Showing limited results`;
+                LIMIT_PANEL_HITS_SIZE_ERROR_MESSAGE;
 
               break;
             } else {
@@ -600,7 +603,6 @@ export const usePanelDataLoader = (
               );
 
               const hits = searchRes.data.hits.slice(hitsLength - hitsToAppend);
-              console.log("max raw size reached in asc", hits.length);
 
               state.data[currentQueryIndex] = [
                 ...hits,
@@ -611,7 +613,7 @@ export const usePanelDataLoader = (
 
               // add function error
               state.resultMetaData[currentQueryIndex].function_error =
-                `Showing limited results`;
+                LIMIT_PANEL_HITS_SIZE_ERROR_MESSAGE;
 
               break;
             } else {
@@ -739,8 +741,6 @@ export const usePanelDataLoader = (
           hitsLength - hitsToAppend,
         );
 
-        console.log("max raw size reached in asc", hits.length);
-
         // add function error
 
         // else append new partition response at start
@@ -756,7 +756,7 @@ export const usePanelDataLoader = (
 
         state.resultMetaData[
           payload?.queryReq?.currentQueryIndex
-        ].function_error = `Showing limited results`;
+        ].function_error = LIMIT_PANEL_HITS_SIZE_ERROR_MESSAGE;
         return;
       } else {
         state.data[payload?.queryReq?.currentQueryIndex] = [
@@ -781,8 +781,6 @@ export const usePanelDataLoader = (
 
         const hits = searchRes?.content?.results?.hits?.slice(0, hitsToAppend);
 
-        console.log("max raw size reached in desc", hits.length);
-
         state.data[payload?.queryReq?.currentQueryIndex] = [
           ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
           ...(hits ?? {}),
@@ -796,7 +794,7 @@ export const usePanelDataLoader = (
         // add function error
         state.resultMetaData[
           payload?.queryReq?.currentQueryIndex
-        ].function_error = `Showing limited results`;
+        ].function_error = LIMIT_PANEL_HITS_SIZE_ERROR_MESSAGE;
         return;
       } else {
         state.data[payload?.queryReq?.currentQueryIndex] = [
