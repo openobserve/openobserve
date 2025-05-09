@@ -385,7 +385,7 @@ impl WsServerEvents {
                 let message = code.get_message();
                 let error_detail = code.get_error_detail();
                 let http_response =
-                    map_error_to_http_response(err, trace_id.clone().unwrap_or_default());
+                    map_error_to_http_response(err, Some(trace_id.clone().unwrap_or_default()));
                 WsServerEvents::Error {
                     code: http_response.status().into(),
                     message,
