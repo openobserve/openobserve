@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="store.state.zoConfig.streaming_enabled"
           v-model="enableStreamingSearch"
           :label="t('settings.enableStreamingSearch')"
-          data-test="general-settings-enable-websocket"
+          data-test="general-settings-enable-streaming"
           class="q-pb-lg showLabelOnTop"
         />
 
