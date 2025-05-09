@@ -391,17 +391,24 @@ fn init_client(config: StorageConfig) -> Box<dyn object_store::ObjectStore> {
 
 pub async fn test_config() -> Result<(), anyhow::Error> {
     // Test download
-    if let Err(e) = super::get("", TEST_FILE).await {
-        if matches!(e, object_store::Error::NotFound { .. }) {
-            let test_content = Bytes::from("Hello, S3!");
-            // Test upload
-            if let Err(e) = super::put("", TEST_FILE, test_content).await {
-                return Err(anyhow::anyhow!("S3 upload test failed: {:?}", e));
-            }
-        } else {
-            return Err(anyhow::anyhow!("S3 download test failed: {:?}", e));
+    match super::get("", TEST_FILE).await {
+        Ok(_) => {
+            return Ok(());
         }
-    }
+        Err(e) => match e {
+            object_store::Error::NotFound { .. } => {}
+            object_store::Error::PermissionDenied { path: _, source }
+                if !source.to_string().contains("ListBucket") => {}
+            _ => {
+                return Err(anyhow::anyhow!("S3 download test failed: {:?}", e));
+            }
+        },
+    };
 
+    // Test upload
+    let data = Bytes::from("Hello, OpenObserve!");
+    if let Err(e) = super::put("", TEST_FILE, data).await {
+        return Err(anyhow::anyhow!("S3 upload test failed: {:?}", e));
+    }
     Ok(())
 }
