@@ -347,9 +347,6 @@ pub async fn search(
         if files.is_empty() {
             continue;
         }
-        if files.is_empty() {
-            continue;
-        }
         let schema = schema_versions[ver].clone();
         let schema = schema.with_metadata(std::collections::HashMap::new());
 
