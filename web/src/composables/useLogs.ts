@@ -1398,7 +1398,7 @@ const useLogs = () => {
     }
   };
 
-  const refreshPartitionPagination = (regenrateFlag: boolean = false) => {
+  const refreshPartitionPagination = (regenrateFlag: boolean = false, isStreamingOutput: boolean = false) => {
     if (searchObj.meta.jobId != "") {
       return;
     }
@@ -1444,12 +1444,17 @@ const useLogs = () => {
           ) {
           }
         } else {
-          searchObj.data.queryResults.total =
+          if(isStreamingOutput) {
+            if(partitionDetail.partitionTotal[partitionDetail.partitionTotal.length - 1] > -1)
+              searchObj.data.queryResults.total = partitionDetail.partitionTotal[partitionDetail.partitionTotal.length - 1];
+          } else {
+            searchObj.data.queryResults.total =
             partitionDetail.partitionTotal.reduce(
               (accumulator: number, currentValue: number) =>
                 accumulator + Math.max(currentValue, 0),
               0,
             );
+          }
         }
         // partitionDetail.partitions.forEach((item: any, index: number) => {
         for (const [index, item] of partitionDetail.partitions.entries()) {
@@ -2173,12 +2178,15 @@ const useLogs = () => {
   const getPageCount = async (queryReq: any) => {
     return new Promise((resolve, reject) => {
       try {
+        const isStreamingOutput = !!queryReq.query.streaming_output;
         searchObj.loadingCounter = true;
         searchObj.data.countErrorMsg = "";
         queryReq.query.size = 0;
         delete queryReq.query.from;
         delete queryReq.query.quick_mode;
         if(queryReq.query.action_id) delete queryReq.query.action_id;
+        if(queryReq.query.hasOwnProperty("streaming_output")) delete queryReq.query.streaming_output;
+        if(queryReq.query.hasOwnProperty("streaming_id")) delete queryReq.query.streaming_id;
 
         queryReq.query["sql_mode"] = "full";
 
@@ -2203,6 +2211,8 @@ const useLogs = () => {
             //   (item: any, index: number) => {
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
+            
+            // Update total for the last partition
             if (searchObj.meta.jobId == "") {
               for (const [
                 index,
@@ -2224,13 +2234,17 @@ const useLogs = () => {
               }
             }
 
+            if (isStreamingOutput) {
+              searchObj.data.queryResults.total = res.data.total;
+            }
+
             let regeratePaginationFlag = false;
             if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
               regeratePaginationFlag = true;
             }
             // if total records in partition is greater than recordsPerPage then we need to update pagination
             // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-            refreshPartitionPagination(regeratePaginationFlag);
+            refreshPartitionPagination(regeratePaginationFlag, isStreamingOutput);
 
             searchObj.data.histogram.chartParams.title = getHistogramTitle();
             searchObj.loadingCounter = false;
