@@ -233,7 +233,7 @@ impl Sql {
 
         // 9. pick up histogram interval
         let mut histogram_interval_visitor =
-            HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
+            HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
 
         // NOTE: only this place modify the sql
@@ -284,6 +284,16 @@ impl Sql {
         if can_optimize && is_simple_count_query(&mut statement) {
             index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
         }
+
+        // 14. check `select histogram(..) AS zo_sql_key, count(*) AS zo_sql_num from table where
+        //     match_all` optimizer
+        // TODO(taiming): better way to identify histogram query
+        // maybe combine it with simple_count_query
+        if can_optimize && histogram_interval_visitor.interval.is_some() {
+            index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
+        }
+
+        log::warn!("idx_optimize_mode: {:?}", index_optimize_mode);
 
         Ok(Sql {
             sql: statement.to_string(),
@@ -1190,12 +1200,12 @@ fn is_simple_count_query(statement: &mut Statement) -> bool {
 }
 
 // check if the query is simple count query
-// 1. don't has subquery
-// 2. don't has join
-// 3. don't has group by
+// 1. doesn't have subquery
+// 2. doesn't have join
+// 3. doesn't have group by
 // 4. only has count(*)
-// 5. don't has SetOperation(UNION/EXCEPT/INTERSECT of two queries)
-// 6. don't has distinct
+// 5. doesn't have SetOperation(UNION/EXCEPT/INTERSECT of two queries)
+// 6. doesn't have distinct
 struct SimpleCountVisitor {
     pub is_simple_count: bool,
 }
@@ -1344,12 +1354,12 @@ impl VisitorMut for ComplexQueryVisitor {
     }
 }
 
-struct HistogramIntervalVistor {
+struct HistogramIntervalVisitor {
     pub interval: Option<i64>,
     time_range: Option<(i64, i64)>,
 }
 
-impl HistogramIntervalVistor {
+impl HistogramIntervalVisitor {
     fn new(time_range: Option<(i64, i64)>) -> Self {
         Self {
             interval: None,
@@ -1358,7 +1368,7 @@ impl HistogramIntervalVistor {
     }
 }
 
-impl VisitorMut for HistogramIntervalVistor {
+impl VisitorMut for HistogramIntervalVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
