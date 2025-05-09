@@ -69,8 +69,8 @@ use crate::{
     service::{
         search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
         websocket_events::{
-            sort::order_search_results,
             search::write_results_to_cache,
+            sort::order_search_results,
             utils::{calculate_progress_percentage, setup_tracing_with_trace_id},
         },
     },
@@ -289,7 +289,8 @@ pub async fn search_http2_stream(
                             _ => {
                                 let message = code.get_message();
                                 let error_detail = code.get_error_detail();
-                                let http_response = map_error_to_http_response(&err, "".to_string());
+                                let http_response =
+                                    map_error_to_http_response(&err, "".to_string());
 
                                 StreamResponses::Error {
                                     code: http_response.status().into(),

@@ -316,14 +316,20 @@ async fn proxy_querier_by_body(
     let query_str = &new_url.path[..p];
     log::debug!("proxy_querier_by_body checking query_str: {}", query_str);
     let (key, payload) = match query_str {
-        s if s.ends_with("/prometheus/api/v1/query_range") || s.ends_with("/prometheus/api/v1/query_exemplars") => {
+        s if s.ends_with("/prometheus/api/v1/query_range")
+            || s.ends_with("/prometheus/api/v1/query_exemplars") =>
+        {
             if req.method() == Method::GET {
-                let Ok(query) = web::Query::<RequestRangeQuery>::from_query(req.query_string()) else {
+                let Ok(query) = web::Query::<RequestRangeQuery>::from_query(req.query_string())
+                else {
                     return Ok(HttpResponse::BadRequest().body("Failed to parse query string"));
                 };
                 (query.query.clone().unwrap_or_default(), ProxyPayload::None)
             } else {
-                let Ok(query) = web::Form::<RequestRangeQuery>::from_request(&req, &mut payload.into_inner()).await else {
+                let Ok(query) =
+                    web::Form::<RequestRangeQuery>::from_request(&req, &mut payload.into_inner())
+                        .await
+                else {
                     return Ok(HttpResponse::BadRequest().body("Failed to parse form data"));
                 };
                 (
@@ -331,7 +337,7 @@ async fn proxy_querier_by_body(
                     ProxyPayload::PromQLQuery(query),
                 )
             }
-        },
+        }
         s if s.ends_with("/_values_stream") => {
             let body = payload.to_bytes().await.map_err(|e| {
                 log::error!("Failed to parse values stream request data: {:?}", e);
@@ -350,7 +356,7 @@ async fn proxy_querier_by_body(
         s if s.ends_with("/_search") || s.ends_with("/_search_stream") => {
             let is_stream = s.ends_with("/_stream");
             let request_type = if is_stream { "stream" } else { "search" };
-            
+
             let body = payload.to_bytes().await.map_err(|e| {
                 log::error!("Failed to parse {} request data: {:?}", request_type, e);
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
@@ -368,7 +374,7 @@ async fn proxy_querier_by_body(
                 query.query.sql.to_string(),
                 ProxyPayload::SearchRequest(Box::new(web::Json(query))),
             )
-        },
+        }
         s if s.ends_with("/_search_partition") => {
             let body = payload.to_bytes().await.map_err(|e| {
                 log::error!("Failed to parse search partition request data: {:?}", e);
@@ -383,7 +389,7 @@ async fn proxy_querier_by_body(
                 query.sql.to_string(),
                 ProxyPayload::SearchPartitionRequest(Box::new(web::Json(query))),
             )
-        },
+        }
         _ => return default_proxy(req, payload, client, new_url, start).await,
     };
 
