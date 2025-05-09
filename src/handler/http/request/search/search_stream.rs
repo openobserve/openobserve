@@ -13,24 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp::Reverse,
-    collections::BinaryHeap,
-    time::Instant,
-};
+use std::{cmp::Reverse, collections::BinaryHeap, time::Instant};
 
-use actix_web::{
-    HttpRequest, HttpResponse,
-    http::StatusCode,
-    post, web,
-};
+use actix_web::{HttpRequest, HttpResponse, http::StatusCode, post, web};
 use config::{
     get_config,
     meta::{
         search::{
-            PARTIAL_ERROR_RESPONSE_MESSAGE, Response,
-            SearchEventType, SearchPartitionRequest, SearchPartitionResponse,
-            StreamResponses, TimeOffset, ValuesEventContext,
+            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
+            SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
         },
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
@@ -176,8 +167,7 @@ pub async fn search_http2_stream(
 
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
-        if let Some(settings) =
-            infra::schema::get_settings(&org_id, stream_name, stream_type).await
+        if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await
         {
             let max_query_range =
                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
@@ -270,9 +260,7 @@ pub async fn search_http2_stream(
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
-            Ok(v) => {
-                v.to_chunks()
-            }
+            Ok(v) => v.to_chunks(),
             Err(err) => {
                 log::error!(
                     "[HTTP2_STREAM] trace_id: {} Error in stream: {}",
@@ -1072,8 +1060,7 @@ async fn process_delta(
         }
 
         // use cache for delta search
-        let mut search_res =
-            do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
+        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
@@ -1429,8 +1416,7 @@ pub async fn values_http2_stream(
     // Check permissions for each stream
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
-        if let Some(settings) =
-            infra::schema::get_settings(&org_id, stream_name, stream_type).await
+        if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await
         {
             let max_query_range =
                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))

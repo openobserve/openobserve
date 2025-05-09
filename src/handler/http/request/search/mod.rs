@@ -359,14 +359,6 @@ pub async fn search(
     match res {
         Ok(mut res) => {
             res.set_took(start.elapsed().as_millis() as usize);
-            // BENCHMARK: add dummy data to the response
-            {
-                if cfg.websocket.streaming_benchmark_enabled {
-                    let dummy_data =
-                        vec!["a"; cfg.websocket.streaming_benchmark_dummy_data_size * 1024 * 1024];
-                    res.columns = dummy_data.iter().map(|v| v.to_string()).collect();
-                }
-            }
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
