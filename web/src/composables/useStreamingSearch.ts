@@ -195,14 +195,7 @@ const useHttpStreaming = () => {
         }
       } else if(type === "values") {
         const fieldsString = meta?.fields.join(",");
-        url = `/_values_stream?fields=${fieldsString}&size=${meta?.size}&start_time=${meta?.start_time}&end_time=${meta?.end_time}`;
-        if (meta?.query_context) url = url + `&sql=${meta?.query_context}`;
-        if (meta?.no_count) url = url + `&no_count=${meta?.no_count}`;
-        if (meta?.query_fn?.trim()) url = url + `&query_fn=${meta?.query_fn}`;
-        if (meta?.action_id?.trim()) url = url + `&action_id=${meta?.action_id}`;
-        if (type) url += "&type=" + type;
-        if (meta?.regions) url += "&regions=" + meta?.regions;
-        if (meta?.clusters) url += "&clusters=" + meta?.clusters;
+        url = `/_values_stream`
       }
 
     url = `${store.state.API_ENDPOINT}/api/${org_id}` + url;
