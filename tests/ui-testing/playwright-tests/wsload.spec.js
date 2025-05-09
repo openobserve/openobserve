@@ -1,96 +1,99 @@
 import { test as base, expect } from "@playwright/test";
 
-async function userExists(page, email) {
-    const orgId = process.env["ORGNAME"];
-    const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/users?email=${email}`;
-    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+// async function userExists(page, email) {
+//     const orgId = process.env["ORGNAME"];
+//     const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/users/${email}`;
+//     //https://main.dev.zinclabs.dev/api/otlp-production/users/x_a45@a.com
+//     console.log("url", url);
+
+//     const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
     
-    const headers = {
-        // "Authorization": `Basic ${basicAuthCredentials}`,
-        "Authorization": `Basic Z29kQG1haW4uYWk6S2luZ3BpbiM0NTE=`,
-        "Content-Type": "application/json",
-    };
+//     const headers = {
+//         // "Authorization": `Basic ${basicAuthCredentials}`,
+//         "Authorization": `Basic Z29kQG1haW4uYWk6S2luZ3BpbiM0NTE=`,
+//         "Content-Type": "application/json",
+//     };
 
-    const response = await page.request.get(url, { headers: headers });
+//     const response = await page.request.get(url, { headers: headers });
     
-    return response.status() === 200 && response.json().length > 0; // Assuming the API returns an array of users
-}
-
-async function login(page, user) {
-    await page.goto(process.env["ZO_BASE_URL"]);
-    await page.waitForTimeout(2000);
-    
-    const userExistsFlag = await userExists(page, user);
-
-    if (!userExistsFlag) {
-        console.log(`User ${user} does not exist. Creating new user.`);
-        await createUser(page, user);
-    } else {
-        console.log(`User ${user} already exists. Proceeding to login.`);
-    }
-
-    await page.getByText("Login as internal user").click();
-    await page.locator('[data-cy="login-user-id"]').fill(user);
-    
-    // Enter Password
-    await page.locator('[data-cy="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]); // Use the password from environment variable
-    await page.locator('[data-cy="login-sign-in"]').click();
-    
-    await page.waitForTimeout(2000);
-    await page.goto(process.env["ZO_BASE_URL"]);
-    await page.waitForTimeout(2000);
-}
-
-async function createUser(page, email) {
-    const orgId = process.env["ORGNAME"];
-    const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/users`;
-    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-    
-    const headers = {
-        // "Authorization": `Basic ${basicAuthCredentials}`,
-        "Authorization": `Basic Z29kQG1haW4uYWk6S2luZ3BpbiM0NTE=`,
-        "Content-Type": "application/json",
-    };
-
-    const payload = {
-        organization: orgId,
-        email: email,
-        password: process.env["ZO_ROOT_USER_PASSWORD"],
-        first_name: "Shyam",
-        last_name: "P",
-        role: "admin",
-    };
-
-    const response = await page.request.post(url, {
-        data: payload,
-        headers: headers,
-    });
-
-    if (response.status() !== 200) {
-        throw new Error(`Failed to create user ${email}. Status: ${response.status()}`);
-    }
-
-    console.log(`Successfully created user: ${email}`);
-    return response;
-}
-
+//     return response.status() === 200 && response.json().length > 0; // Assuming the API returns an array of users
+// }
 
 // async function login(page, user) {
-//   //await page.goto(`https://main.dev.zinclabs.dev/web/logs?org_identifier=otlp-production`);
-// //   await page.goto("https://main.dev.zinclabs.dev");
-//   await page.goto(process.env["ZO_BASE_URL"]);
-//   await page.waitForTimeout(2000);
-//   await page.getByText("Login as internal user").click();
-//   await page.locator('[data-cy="login-user-id"]').fill(user);
-//   //Enter Password
-//   await page
-//     .locator('[data-cy="login-password"]')
-//     .fill('a');
-//   await page.locator('[data-cy="login-sign-in"]').click();
-//   await page.waitForTimeout(2000);
-//   await page.goto(process.env["ZO_BASE_URL"]);
-//   await page.waitForTimeout(2000);
+//     await page.goto(process.env["ZO_BASE_URL"]);
+//     await page.waitForTimeout(2000);
+    
+//     const userExistsFlag = await userExists(page, user);
+
+//     if (!userExistsFlag) {
+//         console.log(`User ${user} does not exist. Creating new user.`);
+//         await createUser(page, user);
+//     } else {
+//         console.log(`User ${user} already exists. Proceeding to login.`);
+//     }
+
+//     await page.getByText("Login as internal user").click();
+//     await page.locator('[data-cy="login-user-id"]').fill(user);
+    
+//     // Enter Password
+//     await page.locator('[data-cy="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]); // Use the password from environment variable
+//     await page.locator('[data-cy="login-sign-in"]').click();
+    
+//     await page.waitForTimeout(2000);
+//     await page.goto(process.env["ZO_BASE_URL"]);
+//     await page.waitForTimeout(2000);
 // }
+
+// async function createUser(page, email) {
+//     const orgId = process.env["ORGNAME"];
+//     const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/users`;
+//     const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+    
+//     const headers = {
+//         // "Authorization": `Basic ${basicAuthCredentials}`,
+//         "Authorization": `Basic Z29kQG1haW4uYWk6S2luZ3BpbiM0NTE=`,
+//         "Content-Type": "application/json",
+//     };
+
+//     const payload = {
+//         organization: orgId,
+//         email: email,
+//         password: process.env["ZO_ROOT_USER_PASSWORD"],
+//         first_name: "Shyam",
+//         last_name: "P",
+//         role: "admin",
+//     };
+
+//     const response = await page.request.post(url, {
+//         data: payload,
+//         headers: headers,
+//     });
+
+//     if (response.status() !== 200) {
+//         throw new Error(`Failed to create user ${email}. Status: ${response.status()}`);
+//     }
+
+//     console.log(`Successfully created user: ${email}`);
+//     return response;
+// }
+
+
+async function login(page, user) {
+  //await page.goto(`https://main.dev.zinclabs.dev/web/logs?org_identifier=otlp-production`);
+//   await page.goto("https://main.dev.zinclabs.dev");
+  await page.goto(process.env["ZO_BASE_URL"]);
+  await page.waitForTimeout(2000);
+  await page.getByText("Login as internal user").click();
+  await page.locator('[data-cy="login-user-id"]').fill(user);
+  //Enter Password
+  await page
+    .locator('[data-cy="login-password"]')
+    .fill('a');
+  await page.locator('[data-cy="login-sign-in"]').click();
+  await page.waitForTimeout(2000);
+  await page.goto(process.env["ZO_BASE_URL"]);
+  await page.waitForTimeout(2000);
+}
 
 // async function checkWebSocket(page) {
 //   await page.goto(
@@ -102,6 +105,69 @@ async function createUser(page, email) {
 //   await expect(page.getByLabel("Enable Websocket Search")).toBeChecked();
 //   await page.waitForTimeout(2000);
 // }
+
+async function checkStreamingSearch(page) {
+  await page.goto(
+    process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=otlp-production"
+  );
+  await page.waitForTimeout(2000);
+  await page.locator('[data-test="menu-link-settings-item"]').click();
+//   await page.getByLabel("General Settings").click();
+  await page.getByLabel('Enable Streaming Search').locator('div').nth(2).click();
+  await expect(page.getByLabel("Enable Streaming Search")).toBeChecked();
+  await page.waitForTimeout(2000);
+}
+
+
+async function checkStreaming(page) {
+
+    await page.goto(
+        process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=otlp-production"
+      );
+      await page.waitForTimeout(2000);
+      await page.locator('[data-test="menu-link-settings-item"]').click();
+      await page.goto(
+        process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=otlp-production"
+      );
+      await page.waitForTimeout(5000);
+    // Selector for the WebSocket toggle
+    //const toggleSelector = '[data-test="general-settings-enable-streaming-search"]';
+    const toggleSelector = '[aria-label="Enable Streaming Search"]';
+    
+    // Wait for the toggle element to be visible
+    await page.waitForSelector(toggleSelector);
+
+    // Get the current state of the toggle
+    const isChecked = await page.$eval(toggleSelector, (toggle) => {
+        return toggle.getAttribute('aria-checked') === 'true';
+    });
+
+    // Log the current state
+    console.log(`Streaming is currently ${isChecked ? 'enabled' : 'disabled'}.`);
+
+    // If the WebSocket is not enabled, click to enable it
+    if (!isChecked) {
+        console.log('Enabling Streaming...');
+        await page.click(toggleSelector);
+        
+        // Optionally, wait for a brief moment to ensure the toggle action is completed
+        await page.waitForTimeout(500); // Adjust the timeout as needed
+
+        // Verify if the toggle is now enabled
+        const newCheckedState = await page.$eval(toggleSelector, (toggle) => {
+            return toggle.getAttribute('aria-checked') === 'true';
+        });
+
+        if (newCheckedState) {
+            console.log('Streaming has been successfully enabled.');
+        } else {
+            console.log('Failed to enable Streaming.');
+        }
+    } else {
+        console.log('Streaming is already enabled.');
+    }
+}
+
 async function dashBoardLoard(page) {
   await page.locator('[data-test="menu-link-/dashboards-item"]').click();
   await page.locator('[data-test="dashboard-search"]').type("default_stream");
@@ -174,16 +240,18 @@ test.describe("Sanity Load testcases", () => {
         console.log("Set window.use_cache to:", window.use_cache);
       });
       await page.setDefaultTimeout(300000);
-      await login(page, `load${i}@a.com`);
+      await login(page, `x_a${i}@a.com`);
     //   await checkWebSocket(page);
+      await checkStreaming(page);
       await dashBoardLoard(page);
       await loadQuery(page);
     });
 
     test(`Wait for Cancel button to disappear- user ${i}`, async ({ page }) => {
       await page.setDefaultTimeout(300000);
-      await login(page, `load${i}@a.com`);
+      await login(page, `x_a${i}@a.com`);
       //   await checkWebSocket(page);
+      await checkStreaming(page);
 
       await dashBoardLoard(page);
       (
@@ -194,9 +262,9 @@ test.describe("Sanity Load testcases", () => {
 
     test(`Go to streams after dashboard- user ${i}`, async ({ page }) => {
       await page.setDefaultTimeout(300000);
-      await login(page, `load${i}@a.com`);
+      await login(page, `x_a${i}@a.com`);
       //   await checkWebSocket(page);
-
+      await checkStreaming(page);
       await dashBoardLoard(page);
       await page.locator('[data-test="menu-link-/streams-item"]').click();
       await page.waitForTimeout(2000);
