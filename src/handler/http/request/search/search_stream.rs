@@ -50,7 +50,7 @@ use crate::{
                 get_search_event_context_from_request, get_search_type_from_request,
                 get_stream_type_from_request, get_use_cache_from_request,
             },
-            stream::{get_max_query_range, get_settings_max_query_range},
+            stream::{get_max_query_range},
             websocket::{calc_queried_range, update_histogram_interval_in_query},
         },
     },
@@ -165,25 +165,9 @@ pub async fn search_http2_stream(
         }
     };
 
+    // Check permissions for each stream
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
-        if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await
-        {
-            let max_query_range =
-                get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
-                    .await;
-            if max_query_range > 0
-                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
-            {
-                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
-                log::info!(
-                    "Query duration is modified due to query range restriction of {} hours",
-                    max_query_range
-                );
-            }
-        }
-
-        // Check permissions for each stream
         if let Some(res) =
             check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
         {
@@ -1408,7 +1392,7 @@ pub async fn values_http2_stream(
     }
 
     // Take only the first request
-    let (mut req, stream_type, field_name) = reqs.into_iter().next().unwrap();
+    let (req, stream_type, field_name) = reqs.into_iter().next().unwrap();
 
     // Get stream name directly from the values request
     let stream_names = vec![values_req.stream_name.clone()];
@@ -1416,24 +1400,6 @@ pub async fn values_http2_stream(
     // Check permissions for each stream
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
-        if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await
-        {
-            let max_query_range =
-                get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
-                    .await;
-            if max_query_range > 0
-                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
-            {
-                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
-                log::info!(
-                    "Query duration is modified due to query range restriction of {} hours",
-                    max_query_range
-                );
-            }
-        }
-
-        // Check permissions on stream
-        #[cfg(feature = "enterprise")]
         if let Some(res) =
             check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
         {
