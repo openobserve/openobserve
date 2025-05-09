@@ -222,7 +222,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("search.histogramErrorBtnLabel") }}</q-btn
           ><br />
           <span v-if="disableMoreErrorDetails">
-            {{ searchObj.data.histogram?.errorMsg }}
+            <SanitizedHtmlRenderer
+              data-test="logs-search-histogram-error-message"
+              :htmlContent="
+                searchObj.data?.histogram?.errorMsg
+              "
+            />
           </span>
         </h6>
         <h6
@@ -230,6 +235,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="searchObj.data.histogram.errorCode != -1"
         >
           {{ searchObj.data.histogram?.errorMsg }}
+        <h6 class="text-center" v-else-if="searchObj.data.histogram.errorCode != -1">
+          <SanitizedHtmlRenderer
+              data-test="logs-search-histogram-error-message"
+              :htmlContent="
+                searchObj.data?.histogram?.errorMsg
+              "
+            />
         </h6>
       </div>
       <tenstack-table
