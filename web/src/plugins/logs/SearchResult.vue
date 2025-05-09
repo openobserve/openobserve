@@ -116,7 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
         </div>
       </div>
-      <div style="height: 100px;" v-if="searchObj.data?.histogram?.errorMsg == '' && searchObj.data.histogram.errorCode != -1">
+      <div :style="{
+        height: searchObj.meta.showHistogram ? '100px' : '0px'}" v-if="searchObj.data?.histogram?.errorMsg == '' && searchObj.data.histogram.errorCode != -1">
         <ChartRenderer
           v-if="searchObj.meta.showHistogram   && (searchObj.data?.queryResults?.aggs?.length > 0 || ( plotChart && Object.keys(plotChart)?.length > 0))"
           data-test="logs-search-result-bar-chart"
