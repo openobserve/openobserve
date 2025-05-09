@@ -357,6 +357,7 @@ const useHttpStreaming = () => {
       content: {
         results: response.results || response,
         streaming_aggs: response.streaming_aggs,
+        time_offset: response?.time_offset || {},
         trace_id: traceId,
       },
       type: type,
