@@ -16,6 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
+    loading: {{ variableItem.isLoading }} 
+    values: {{ variableItem.value }}
     <q-select
       style="min-width: 150px"
       filled
