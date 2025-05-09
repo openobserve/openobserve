@@ -1434,10 +1434,12 @@ const useLogs = () => {
           ) {
           }
         } else {
+          // if streaming output is enabled, then we need to update the total as the last partition total, as the last partition total is the total of all the records in case of streaming output
           if(isStreamingOutput) {
-            if(partitionDetail.partitionTotal[partitionDetail.partitionTotal.length - 1] > -1)
+            if(partitionDetail.partitionTotal[partitionDetail.partitionTotal?.length - 1] > -1)
               searchObj.data.queryResults.total = partitionDetail.partitionTotal[partitionDetail.partitionTotal.length - 1];
           } else {
+            // if streaming output is disabled, then we need to update the total as the sum of all partition totals
             searchObj.data.queryResults.total =
             partitionDetail.partitionTotal.reduce(
               (accumulator: number, currentValue: number) =>
