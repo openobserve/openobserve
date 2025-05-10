@@ -1646,7 +1646,7 @@ const useLogs = () => {
       //reset the plot chart when the query is run 
       //this is to avoid the issue of chart not updating when histogram is disabled and enabled and clicking the run query button
       //only reset the plot chart when the query is not run for pagination
-      if(!isPagination) searchObj.meta.resetPlotChart = true;
+      if(!isPagination && searchObj.meta.refreshInterval == 0) searchObj.meta.resetPlotChart = true;
 
       if (queryReq != null) {
         // in case of live refresh, reset from to 0
