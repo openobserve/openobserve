@@ -937,7 +937,8 @@
     "SearchFunctionNotDefined": "Error: Search function not defined.",
     "SearchParquetFileNotFound": "Error: Search parquet file not found.",
     "SearchFieldHasNoCompatibleDataType": "Error: Search file has no compatible data type.",
-    "SearchSQLExecuteError": "Error: Search SQL execute error."
+    "SearchSQLExecuteError": "Error: Search SQL execute error.",
+    "SearchSQLCancelled": "Error: Search SQL was cancelled."
   },
   "alerts": {
     "header": "Alerts",
