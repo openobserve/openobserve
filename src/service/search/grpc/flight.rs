@@ -187,7 +187,7 @@ pub async fn search(
         use_inverted_index: req.index_info.use_inverted_index,
     });
 
-    let mut idx_optimize_rule: Option<InvertedIndexOptimizeMode> =
+    let idx_optimize_rule: Option<InvertedIndexOptimizeMode> =
         req.index_info.index_optimize_mode.clone().map(|x| x.into());
 
     // get all tables
@@ -231,6 +231,7 @@ pub async fn search(
             )
         );
 
+        let mut storage_search_idx_optimize_rule = idx_optimize_rule.clone();
         if physical_plan.name() == "AggregateExec"
             && physical_plan.schema().fields().len() == 1
             && matches!(
@@ -247,7 +248,7 @@ pub async fn search(
             );
             tantivy_file_list = tantivy_files;
             file_list = datafusion_files;
-            idx_optimize_rule = None;
+            storage_search_idx_optimize_rule = None;
         }
 
         // sort by max_ts, the latest file should be at the top
@@ -263,7 +264,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
-            idx_optimize_rule.clone(),
+            storage_search_idx_optimize_rule,
         )
         .await
         {
