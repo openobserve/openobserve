@@ -503,7 +503,7 @@ pub async fn filter_file_list_by_tantivy_index(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
     index_condition: Option<IndexCondition>,
-    idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
+    idx_optimize_mode: Option<InvertedIndexOptimizeMode>,
 ) -> Result<(usize, bool, usize), Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -603,7 +603,7 @@ pub async fn filter_file_list_by_tantivy_index(
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
     let (mut index_parquet_files, query_limit) =
-        if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_rule {
+        if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_mode {
             if limit > 0 {
                 (
                     group_files_by_time_range(index_parquet_files, target_partitions),
@@ -665,7 +665,7 @@ pub async fn filter_file_list_by_tantivy_index(
             // Spawn a task for each file, wherein full text search and
             // secondary index search queries are executed
             let index_condition_clone = index_condition.clone();
-            let idx_optimize_rule_clone = idx_optimize_rule.clone();
+            let idx_optimize_rule_clone = idx_optimize_mode.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let task = tokio::task::spawn(async move {
                 // spawn a new task for catching the panic error
