@@ -55,7 +55,7 @@ use crate::service::{
                 empty_exec::NewEmptyExec,
             },
             exec::{prepare_datafusion_context, register_udf},
-            plan::tantivy_count_exec::TantivyCountExec,
+            plan::tantivy_count_exec::TantivyOptimizeExec,
             table_provider::uniontable::NewUnionTable,
         },
         index::IndexCondition,
@@ -236,6 +236,7 @@ pub async fn search(
             && matches!(
                 idx_optimize_rule,
                 Some(InvertedIndexOptimizeMode::SimpleCount)
+                    | Some(InvertedIndexOptimizeMode::SimpleHistogram)
             )
         {
             let (tantivy_files, datafusion_files) = split_file_list_by_time_range(
@@ -262,7 +263,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
-            idx_optimize_rule,
+            idx_optimize_rule.clone(),
         )
         .await
         {
@@ -354,11 +355,12 @@ pub async fn search(
 
     if !tantivy_file_list.is_empty() {
         scan_stats.add(&collect_stats(&tantivy_file_list));
-        let tantivy_exec = Arc::new(TantivyCountExec::new(
+        let tantivy_exec = Arc::new(TantivyOptimizeExec::new(
             query_params,
             physical_plan.schema(),
             tantivy_file_list,
             index_condition.unwrap(),
+            idx_optimize_rule,
         ));
         physical_plan = Arc::new(UnionExec::new(vec![physical_plan, tantivy_exec as _]));
     }
