@@ -649,7 +649,7 @@ export default defineComponent({
     });
     //this is used to show the histogram loader when the histogram is loading
     const histogramLoader = computed(()=>{
-      return (searchObj.meta.showHistogram) && (searchObj.loadingHistogram == true ||  searchObj.loading == true);
+      return (searchObj.meta.showHistogram) && searchObj.loadingHistogram == true;
     })
 
     return {
