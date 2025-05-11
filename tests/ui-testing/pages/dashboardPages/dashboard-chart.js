@@ -129,7 +129,10 @@ export default class ChartTypeSelector {
       await this.page
         .locator('[data-test="dashboard-add-condition-operator"]')
         .click();
-      await this.page.getByRole("option", { name: operator }).click();
+      await this.page
+        .getByRole("option", { name: operator, exact: true })
+        .nth(0)
+        .click();
     }
 
     // Step 5: Enter value if provided

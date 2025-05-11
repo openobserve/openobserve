@@ -270,10 +270,16 @@ pub fn format_partition_key(input: &str) -> String {
 
 // format stream name
 pub fn format_stream_name(stream_name: &str) -> String {
-    RE_CORRECT_STREAM_NAME
-        .replace_all(stream_name, "_")
-        .to_string()
-        .to_lowercase()
+    if crate::get_config().common.format_stream_name_to_lower {
+        RE_CORRECT_STREAM_NAME
+            .replace_all(stream_name, "_")
+            .to_string()
+            .to_lowercase()
+    } else {
+        RE_CORRECT_STREAM_NAME
+            .replace_all(stream_name, "_")
+            .to_string()
+    }
 }
 
 /// match a source is a needed file or not, return true if needed

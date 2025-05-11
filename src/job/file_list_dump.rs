@@ -48,6 +48,7 @@ use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
     Arc::new(Schema::new(vec![
         Field::new("id", arrow_schema::DataType::Int64, false),
+        Field::new("account", arrow_schema::DataType::Utf8, false),
         Field::new("org", arrow_schema::DataType::Utf8, false),
         Field::new("stream", arrow_schema::DataType::Utf8, false),
         Field::new("date", arrow_schema::DataType::Utf8, false),
@@ -150,8 +151,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
-    let config = get_config();
 
+    let config = get_config();
     if !config.common.file_list_dump_enabled {
         return Ok(());
     }

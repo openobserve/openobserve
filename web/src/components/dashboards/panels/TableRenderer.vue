@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="tableRef"
     data-test="dashboard-panel-table"
     @row-click="(...args: any) => $emit('row-click', ...args)"
+    hide-no-data
   >
     <template v-slot:body-cell="props">
       <q-td :props="props" :style="getStyle(props)">

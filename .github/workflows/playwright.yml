@@ -34,6 +34,7 @@ env:
   ZO_WEBSOCKET_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
   ZO_SMTP_ENABLED: true
+  ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
 
 jobs:
   build_binary:
@@ -122,6 +123,8 @@ jobs:
             "reportsUpdated.spec.js",
             "reportsUpdated2.spec.js",
             "dashboards/dashboard-filter.spec.js",
+            "dashboards/dashboard-geoMap.spec.js",
+            "dashboards/dashboard-maps.spec.js",
             "dashboards/dashboard-folder.spec.js",
             "dashboards/dashboard-multi-y-axis.spec.js",
             "join.spec.js",
@@ -132,6 +135,7 @@ jobs:
             "schemaload.spec.js",
             "websocket.spec.js",
             "alertImportTDA.spec.js",
+            "streamname.spec.js"
             # "remotepipeline.spec.js",
 
           ]
