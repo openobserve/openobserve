@@ -15,6 +15,11 @@
 
 pub mod session;
 
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
 use actix_web::{Error, HttpRequest, HttpResponse, get, web};
 use actix_ws::{CloseCode, CloseReason};
 use config::get_config;
@@ -22,7 +27,8 @@ use futures::StreamExt;
 use session::handle_text_message;
 
 use crate::{
-    router::http::ws::error::DisconnectMessage, service::websocket_events::WsServerEvents,
+    router::http::ws::error::DisconnectMessage,
+    service::websocket_events::{WsPayload, WsServerEvents},
 };
 
 #[get("{org_id}/ws/v2/{router_id}")]
@@ -72,19 +78,27 @@ pub async fn websocket(
 
     let req_id = router_id.clone();
     // channel between incoming_thread <----> outgoing thread
-    let (response_tx, mut response_rx) =
-        tokio::sync::mpsc::channel::<WsServerEvents>(cfg.websocket.max_channel_buffer_size);
+    let (response_tx, mut response_rx) = tokio::sync::mpsc::unbounded_channel::<WsPayload>();
     let (disconnect_tx, mut disconnect_rx) =
         tokio::sync::mpsc::channel::<Option<DisconnectMessage>>(10);
+    let outgoing_stopped = Arc::new(AtomicBool::new(false));
+    let outgoing_stopped_clone = outgoing_stopped.clone();
 
     // Spawn message handling tasks between router and querier
     let response_tx_clone = response_tx.clone();
     let disconnect_tx_clone = disconnect_tx.clone();
-    actix_web::rt::spawn(async move {
+    tokio::task::spawn_local(async move {
         // Handle incoming messages from client
-        let handle_incoming = async {
+        let req_id_clone = req_id.clone();
+        let handle_incoming = async move {
             loop {
                 if let Some(msg) = msg_stream.next().await {
+                    if outgoing_stopped_clone.load(Ordering::SeqCst) {
+                        log::debug!(
+                            "[WS_HANDLER]: outgoing task closed. Stop incoming task to accept new message for request_id: {req_id}",
+                        );
+                        break;
+                    }
                     match msg {
                         Ok(actix_ws::AggregatedMessage::Ping(ping)) => {
                             log::debug!(
@@ -94,8 +108,7 @@ pub async fn websocket(
                             );
                             let _ = response_tx_clone
                                 .clone()
-                                .send(WsServerEvents::Ping(ping.to_vec()))
-                                .await;
+                                .send(WsPayload::Server(WsServerEvents::Ping(ping.to_vec())));
                         }
                         Ok(actix_ws::AggregatedMessage::Pong(_)) => {
                             log::debug!(
@@ -196,13 +209,14 @@ pub async fn websocket(
         };
 
         // Handle outgoing messages from router to client
-        let handle_outgoing = async {
+        let req_id = req_id_clone.to_owned();
+        let handle_outgoing = async move {
             loop {
                 tokio::select! {
                     // response from querier
                     Some(message) = response_rx.recv() => {
                         match message {
-                            WsServerEvents::Ping(ping) => {
+                            WsPayload::Server(WsServerEvents::Ping(ping)) => {
                                 let mut close_conn = false;
                                 log::debug!("[WS::Querier::Handler]: sending pong to request_id: {}, msg: {:?}", req_id, String::from_utf8_lossy(&ping));
                                 if let Err(e) = ws_session.pong(&ping).await {
@@ -218,20 +232,22 @@ pub async fn websocket(
                                     return Ok(());
                                 }
                             }
-                            WsServerEvents::Pong(pong) => {
+                            WsPayload::Server(WsServerEvents::Pong(pong)) => {
                                 log::debug!("[WS::Querier::Handler]: Pong received from client : {:?}", pong);
                             }
                             _ => {
-                                let Ok(message_str) = serde_json::to_string(&message) else {
-                                    log::error!(
-                                        "[WS::Querier::Handler]: error convert WsServerEvents to string before sending back to client for request_id: {}", req_id
-                                    );
-                                    continue;
-                                };
-                                log::info!("[WS::Querier::Handler] received message from router-querier task for request_id: {}, trace_id: {}", req_id, message.get_trace_id());
-                                if let Err(e) = ws_session.text(message_str).await {
-                                    log::error!("[WS::Querier::Handler] Error sending message to request_id: {}, trace_id: {}, error: {}", req_id, message.get_trace_id(), e);
-                                    break;
+                                let trace_id = message.get_trace_id();
+                                log::debug!("[WS::Querier::Handler]: sending to client for request_id: {}, trace_id: {}", req_id, trace_id);
+                                let start = std::time::Instant::now();
+                                let json_str = message.to_json();
+                                match ws_session.text(json_str).await {
+                                    Ok(_) => {
+                                        log::debug!("[WS::Querier::Handler]: successfully sent to client for request_id: {}, trace_id: {}, took: {} secs", req_id, trace_id, start.elapsed().as_secs_f64());
+                                    }
+                                    Err(e) => {
+                                        log::error!("[WS::Querier::Handler]: Failed to send message to client: {}, took: {} secs", e, start.elapsed().as_secs_f64());
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -248,8 +264,15 @@ pub async fn websocket(
                             }
                             Some(DisconnectMessage::Error(err_msg)) => {
                                 // send error message to client first
-                                if let Err(e) = ws_session.text(err_msg.ws_server_events.to_json()).await {
-                                    log::error!("[WS::Querier::Handler]: Failed to send error message to client: {}", e);
+                                let start = std::time::Instant::now();
+                                let trace_id = err_msg.ws_server_events.get_trace_id();
+                                match ws_session.text(err_msg.ws_server_events.to_json()).await {
+                                    Ok(_) => {
+                                        log::info!("[WS::Querier::Handler] successfully sent error message to request_id: {}, trace_id: {}, took: {} secs", req_id, trace_id, start.elapsed().as_secs_f64());
+                                    }
+                                    Err(e) => {
+                                        log::error!("[WS::Querier::Handler]: Failed to send error message to client: {}, took: {} secs", e, start.elapsed().as_secs_f64());
+                                    }
                                 }
                                 if err_msg.should_disconnect {
                                     log::debug!("[WS::Querier::Handler]: disconnecting client for request_id: {}", req_id);
@@ -257,6 +280,11 @@ pub async fn websocket(
                                 }
                             }
                             Some(DisconnectMessage::Close(close_reason)) => {
+                                outgoing_stopped.store(true, Ordering::SeqCst);
+                                log::debug!(
+                                    "[WS::Querier::Handler] handle_outgoing task stopped for request_id: {}",
+                                    req_id
+                                );
                                 if let Err(e) = ws_session.close(close_reason).await {
                                     log::error!("[WS::Querier::Handler]: Error closing websocket session request_id: {}, error: {}", req_id, e);
                                 };
@@ -266,11 +294,16 @@ pub async fn websocket(
                     }
                 }
             }
-
             log::info!(
                 "[WS::Querier::Handler] handle_outgoing task stopped for request_id: {}",
                 req_id
             );
+
+            log::debug!(
+                "[WS::Querier::Handler] handle_outgoing task stopped for request_id: {}",
+                req_id
+            );
+            outgoing_stopped.store(true, Ordering::SeqCst);
             if let Err(e) = ws_session
                 .close(Some(CloseReason::from(CloseCode::Normal)))
                 .await
