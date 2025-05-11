@@ -40,6 +40,29 @@ def test_e2e_createusers(create_session, base_url):
     ), f"Deleting this user, but got {resp_delete_users.status_code} {resp_delete_users.content}"
 
 
+def test_e2e_createusers_invalid_password(create_session, base_url):
+    """Running an E2E test for new user creation with password length less than 8"""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    payload = {
+        "organization": "e2e",
+        "email": "pytests@gmail.com",
+        "password": "123456",
+        "first_name": "Anand",
+        "last_name": "Dubey",
+        "role": "admin",
+    }
+
+    resp_create_users = session.post(f"{url}api/{org_id}/users", json=payload)
+
+    print(resp_create_users.content)
+    assert (
+        resp_create_users.status_code == 400
+    ), f"Creating a user with invalid password should yield 400, but got {resp_create_users.status_code} {resp_create_users.content}"
+
+
 # def test_e2e_createusersasmember(create_session,base_url):
 #     """Running an E2E test for new user creation."""
 
@@ -72,7 +95,7 @@ def test_e2e_invalidrole(create_session, base_url):
     payload = {
         "organization": "e2e",
         "email": "pytests@gmail.com",
-        "password": "T",
+        "password": "Test@029w0",
         "first_name": "Nehapd",
         "last_name": "p",
         "role": "m",
@@ -96,7 +119,7 @@ def test_e2e_invalidorganization(create_session, base_url):
     payload = {
         "organization": "",
         "email": "pytests@gmail.com",
-        "password": "T",
+        "password": "Test@029w0",
         "first_name": "Nehapd",
         "last_name": "p",
         "role": "admin",
@@ -123,7 +146,7 @@ def test_e2e_addinvalidusertoOrg(create_session, base_url):
     payload = {
         "organization": "e2e",
         "email": "py@gmail.com",
-        "password": "T",
+        "password": "Test@029w0",
         "first_name": "Nehapd",
         "last_name": "p",
         "role": "admin",
@@ -148,7 +171,7 @@ def test_e2e_updateuser(create_session, base_url):
     payload = {
         "organization": "e2e",
         "email": "py@gmail.com",
-        "password": "T",
+        "password": "Test@029w0",
         "first_name": "Nehapd",
         "last_name": "p",
         "role": "admin",
@@ -164,7 +187,7 @@ def test_e2e_updateuser(create_session, base_url):
     payload = {
         "organization": "e2e",
         "email": "py@gmail.com",
-        "password": "T",
+        "password": "Test@029w0",
         "first_name": "Editedname",
         "last_name": "p",
         "role": "admin",
@@ -190,7 +213,7 @@ def test_e2e_updateusernotfound(create_session, base_url):
     payload = {
         "organization": "e2e",
         "email": "py@gmail.com",
-        "password": "T",
+        "password": "Test@029w0",
         "first_name": "Nehapd",
         "last_name": "p",
         "role": "admin",
@@ -206,7 +229,7 @@ def test_e2e_updateusernotfound(create_session, base_url):
     payload = {
         "organization": "default",
         "email": "py@gmail.com",
-        "password": "T",
+        "password": "Test@029w0",
         "first_name": "Editedname",
         "last_name": "p",
         "role": "admin",
@@ -232,7 +255,7 @@ def test_e2e_updateuserexists(create_session, base_url):
     payload = {
         "organization": "default",
         "email": "py@gmail.com",
-        "password": "T",
+        "password": "Test@029w0",
         "first_name": "Nehapd",
         "last_name": "p",
         "role": "admin",
@@ -248,7 +271,7 @@ def test_e2e_updateuserexists(create_session, base_url):
     payload = {
         "organization": "default",
         "email": "py@gmail.com",
-        "password": "T",
+        "password": "Test@029w0",
         "first_name": "Nehapd",
         "last_name": "p",
         "role": "admin",
