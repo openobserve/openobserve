@@ -2150,6 +2150,7 @@ const useLogs = () => {
     }
   };
 
+  // TODO OK : Replace backticks with double quotes, as stream name from sqlify is coming with backticks
   const fnUnparsedSQL = (parsedObj: any) => {
     try {
       return parser.sqlify(parsedObj);
@@ -4720,6 +4721,24 @@ const useLogs = () => {
     }
   };
 
+  /**
+   * Extract value query
+   * - Extract the query from the query string
+   * - Replace the INDEX_NAME with the stream name
+   * - Return the query
+   * 
+   * JOIN Queries
+   * - Parse the query and make where null
+   * - Replace the INDEX_NAME with the stream name
+   * - Return the query
+   * 
+   * UNION Queries
+   * - Parse the query and add where clause to each query
+   * - Replace the INDEX_NAME with the stream name
+   * - Return the query
+   * 
+   * @returns 
+   */
   const extractValueQuery = () => {
     try {
       if (searchObj.meta.sqlMode == false || searchObj.data.query == "") {
@@ -4742,7 +4761,7 @@ const useLogs = () => {
       ) {
         newParsedSQL.where = parsedSQL.where;
 
-        query = parser.sqlify(newParsedSQL);
+        query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
         outputQueries[parsedSQL.from[0].table] = query.replace(
           "INDEX_NAME",
           "[INDEX_NAME]",
@@ -4751,11 +4770,11 @@ const useLogs = () => {
         // parse join queries & union queries
         if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 1) {
           parsedSQL.where = cleanBinaryExpression(parsedSQL.where);
-          // parse join queries
+          // parse join queries and make where null
           searchObj.data.stream.selectedStream.forEach((stream: string) => {
             newParsedSQL.where = null;
 
-            query = parser.sqlify(newParsedSQL);
+            query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
             outputQueries[stream] = query.replace("INDEX_NAME", "[INDEX_NAME]");
           });
         } else if (parsedSQL._next != null) {
@@ -4766,7 +4785,7 @@ const useLogs = () => {
 
             newParsedSQL.where = parsedSQL.where;
 
-            query = parser.sqlify(newParsedSQL);
+            query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
             outputQueries[parsedSQL.from[0].table] = query.replace(
               "INDEX_NAME",
               "[INDEX_NAME]",
@@ -4779,12 +4798,12 @@ const useLogs = () => {
           while (nextTable && depth++ < MAX_DEPTH) {
             // Map through each "from" array in the _next object, as it can contain multiple tables
             if (nextTable.from) {
-              let query = `select * from INDEX_NAME`;
+              let query = "select * from INDEX_NAME";
               const newParsedSQL = parser.astify(query);
 
               newParsedSQL.where = nextTable.where;
 
-              query = parser.sqlify(newParsedSQL);
+              query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
               outputQueries[nextTable.from[0].table] = query.replace(
                 "INDEX_NAME",
                 "[INDEX_NAME]",
