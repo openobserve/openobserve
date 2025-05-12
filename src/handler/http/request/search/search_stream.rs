@@ -50,7 +50,7 @@ use crate::{
                 get_search_event_context_from_request, get_search_type_from_request,
                 get_stream_type_from_request, get_use_cache_from_request,
             },
-            stream::{get_max_query_range},
+            stream::get_max_query_range,
             websocket::{calc_queried_range, update_histogram_interval_in_query},
         },
     },
@@ -68,10 +68,12 @@ use crate::{
 };
 
 /// Search HTTP2 streaming endpoint
+///
+/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
-    operation_id = "TestSearchStreamHttp2",
+    operation_id = "SearchStreamHttp2",
     security(
         ("Authorization"= [])
     ),
@@ -313,10 +315,12 @@ async fn process_search_stream_request(
     );
 
     // Send a progress: 0 event as an indiciator of search initiation
-    if let Err(e) = sender.send(Ok(StreamResponses::Progress{ percent: 0 })).await {
+    if let Err(e) = sender
+        .send(Ok(StreamResponses::Progress { percent: 0 }))
+        .await
+    {
         log::error!("[HTTP2_STREAM] Error sending progress event: {}", e);
     }
-
 
     let mut start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
