@@ -113,33 +113,45 @@ pub async fn populate_file_meta(
     Ok(())
 }
 
+/// Get the default maximum query range in hours considering the stream setting max query range
+/// and the environment variable ZO_DEFAULT_MAX_QUERY_RANGE_DAYS
+pub fn get_default_max_query_range(stream_max_query_range: i64) -> i64 {
+    let config = get_config();
+    let default_max_query_range = config.limit.default_max_query_range_days * 24;
+
+    // This will allow the stream setting to override the global setting
+    if stream_max_query_range > 0 {
+        stream_max_query_range
+    } else {
+        default_max_query_range
+    }
+}
+
+/// Get the maximum query range considering service account specific restrictions,
+/// stream setting max query range and the environment variable ZO_DEFAULT_MAX_QUERY_RANGE_DAYS
 pub async fn get_settings_max_query_range(
     stream_max_query_range: i64,
     org_id: &str,
     user_id: Option<&str>,
 ) -> i64 {
+    let effective_max_query_range = get_default_max_query_range(stream_max_query_range);
     if user_id.is_none() {
-        return stream_max_query_range;
+        return effective_max_query_range;
     }
 
     if let Some(user) = users::get_user(Some(org_id), user_id.unwrap()).await {
-        return get_max_query_range_by_user_role(stream_max_query_range, &user);
+        // get_max_query_range_by_user_role will use the effective max query range internally
+        // Hence using the stream_max_query_range passed in
+        get_max_query_range_by_user_role(stream_max_query_range, &user)
+    } else {
+        effective_max_query_range
     }
-
-    stream_max_query_range
 }
 
+/// Get the maximum query range with service account specific restrictions
 pub fn get_max_query_range_by_user_role(stream_max_query_range: i64, user: &User) -> i64 {
     let config = get_config();
-    let default_max_query_range = config.limit.default_max_query_range_days * 24;
-
-    // This will allow the stream setting to override the global setting
-    let effective_max_query_range = if stream_max_query_range > 0 {
-        stream_max_query_range
-    } else {
-        default_max_query_range
-    };
-
+    let effective_max_query_range = get_default_max_query_range(stream_max_query_range);
     // Then apply service account specific restrictions if applicable
     if user.role == UserRole::ServiceAccount {
         let max_query_range_sa = config.limit.max_query_range_for_sa;
