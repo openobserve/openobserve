@@ -1956,6 +1956,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
    * @returns the formatted value
    */
   const formatINValue = (value: any) => {
+    console.log(value)
     // if variable is present, don't want to use splitQuotedString
     if (value?.includes("$")) {
       if (value.startsWith("(") && value.endsWith(")")) {
@@ -1963,7 +1964,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
       return value;
     } else {
-      return splitQuotedString(value)
+      return splitQuotedString(value ?? "")
         ?.map((it: any) => {
           return `'${escapeSingleQuotes(it)}'`;
         })
