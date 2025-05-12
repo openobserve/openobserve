@@ -171,6 +171,25 @@ pub async fn handle_otlp_request(
         )));
     }
 
+    #[cfg(feature = "cloud")]
+    {
+        match super::organization::is_org_in_free_trial_period(org_id).await {
+            Ok(false) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    http::StatusCode::FORBIDDEN.into(),
+                    format!("org {org_id} has expired its trial period"),
+                )));
+            }
+            Err(e) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    http::StatusCode::FORBIDDEN.into(),
+                    e.to_string(),
+                )));
+            }
+            _ => {}
+        }
+    }
+
     // check memtable
     if let Err(e) = ingester::check_memtable_size() {
         log::error!(
@@ -605,6 +624,25 @@ pub async fn ingest_json(
             http::StatusCode::FORBIDDEN.into(),
             format!("Quota exceeded for this organization [{}]", org_id),
         )));
+    }
+
+    #[cfg(feature = "cloud")]
+    {
+        match super::organization::is_org_in_free_trial_period(org_id).await {
+            Ok(false) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    http::StatusCode::FORBIDDEN.into(),
+                    format!("org {org_id} has expired its trial period"),
+                )));
+            }
+            Err(e) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    http::StatusCode::FORBIDDEN.into(),
+                    e.to_string(),
+                )));
+            }
+            _ => {}
+        }
     }
 
     // check memtable

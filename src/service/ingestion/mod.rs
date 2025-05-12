@@ -408,7 +408,7 @@ pub async fn write_file(
     Ok(req_stats)
 }
 
-pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Result<()> {
+pub async fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Result<()> {
     if !LOCAL_NODE.is_ingester() {
         return Err(anyhow!("not an ingester"));
     }
@@ -426,6 +426,13 @@ pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Resul
             return Err(anyhow!("stream [{stream_name}] is being deleted"));
         }
     };
+
+    #[cfg(feature = "cloud")]
+    {
+        if !super::organization::is_org_in_free_trial_period(org_id).await? {
+            return Err(anyhow!("org {org_id} has expired its trial period"));
+        }
+    }
 
     // check memtable
     ingester::check_memtable_size()?;

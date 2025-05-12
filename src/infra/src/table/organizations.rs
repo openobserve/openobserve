@@ -182,6 +182,20 @@ pub async fn get_by_name(org_name: &str) -> Result<Vec<OrganizationRecord>, erro
     Ok(records)
 }
 
+pub async fn get_creation_time(org_id: &str) -> Result<i64, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let record = Entity::find()
+        .filter(Column::Identifier.eq(org_id))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .ok_or_else(|| {
+            Error::DbError(DbError::SeaORMError("Organization not found".to_string()))
+        })?;
+
+    Ok(record.created_at)
+}
+
 pub async fn len() -> usize {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let len = Entity::find().count(client).await;

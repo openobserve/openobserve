@@ -74,7 +74,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     // check stream
     let stream_name = format_stream_name(in_stream_name);
-    if let Err(e) = check_ingestion_allowed(org_id, Some(&stream_name)) {
+    if let Err(e) = check_ingestion_allowed(org_id, Some(&stream_name)).await {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
