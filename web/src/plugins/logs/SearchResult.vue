@@ -224,9 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-if="disableMoreErrorDetails">
             <SanitizedHtmlRenderer
               data-test="logs-search-histogram-error-message"
-              :htmlContent="
-                searchObj.data?.histogram?.errorMsg
-              "
+              :htmlContent="searchObj.data?.histogram?.errorMsg"
             />
           </span>
         </h6>
@@ -234,14 +232,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-center"
           v-else-if="searchObj.data.histogram.errorCode != -1"
         >
-          {{ searchObj.data.histogram?.errorMsg }}
-        <h6 class="text-center" v-else-if="searchObj.data.histogram.errorCode != -1">
           <SanitizedHtmlRenderer
-              data-test="logs-search-histogram-error-message"
-              :htmlContent="
-                searchObj.data?.histogram?.errorMsg
-              "
-            />
+            data-test="logs-search-histogram-error-message"
+            :htmlContent="searchObj.data?.histogram?.errorMsg"
+          />
         </h6>
       </div>
       <tenstack-table
@@ -712,9 +706,9 @@ export default defineComponent({
       }
     });
     //this is used to show the histogram loader when the histogram is loading
-    const histogramLoader = computed(()=>{
-      return (searchObj.meta.showHistogram) && searchObj.loadingHistogram == true;
-    })
+    const histogramLoader = computed(() => {
+      return searchObj.meta.showHistogram && searchObj.loadingHistogram == true;
+    });
 
     return {
       t,
