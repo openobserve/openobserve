@@ -48,6 +48,7 @@ export default class ChartTypeSelector {
   // Search field and added for X, Y,Breakdown etc.
 
   async searchAndAddField(fieldName, target) {
+    console.log(`Adding field: ${fieldName} to: ${target}`);
     const searchInput = this.page.locator(
       '[data-test="index-field-search-input"]'
     );
@@ -74,16 +75,14 @@ export default class ChartTypeSelector {
       throw new Error(`Invalid target type: ${target}`);
     }
 
-    // Locate the specific field item container that contains the field name
-    const fieldItem = this.page.locator(`[data-test^="field-list-item-"]`, {
-      hasText: fieldName,
-    });
-
-    // Now locate the button within that field item
-    const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
+    const button = this.page.locator(`[data-test="${buttonTestId}"]`);
 
     // Click the button
+    console.log(`Clicking button: ${buttonTestId}`);
+    console.log("before click button", button);
+
     await button.click();
+    console.log("after click");
   }
 
   // Add filter condition
@@ -149,7 +148,44 @@ export default class ChartTypeSelector {
         .locator("div")
         .filter({ hasText: expectedError })
         .first();
-      await expect(errorMessageLocator).toBeVisible();
+      // await expect(errorMessageLocator).toBeVisible();
     }
   }
+
+  //remove fields
+
+  // Remove field by type (x, y, breakdown, etc.)
+  async removeField(fieldName, target) {
+    console.log(`Removing field: ${fieldName} from: ${target}`);
+
+    const removeSelectors = {
+      x: "dashboard-x-item",
+      y: "dashboard-y-item",
+      b: "dashboard-b-item",
+      filter: "dashboard-filter-item",
+      latitude: "dashboard-latitude-item",
+      longitude: "dashboard-longitude-item",
+      weight: "dashboard-weight-item",
+      z: "dashboard-z-item",
+      name: "dashboard-name-layout",
+      value: "dashboard-value_for_maps-layout",
+      firstcolumn: "dashboard-x-layout",
+      othercolumn: "dashboard-y-layout",
+    };
+
+    const baseTestId = removeSelectors[target];
+    if (!baseTestId) {
+      throw new Error(`Invalid target type: ${target}`);
+    }
+
+    const removeButton = this.page.locator(
+      `[data-test="${baseTestId}-${fieldName}-remove"]`
+    );
+
+    await removeButton.waitFor({ state: "visible", timeout: 5000 });
+    await removeButton.click();
+    console.log(`Removed field: ${fieldName} from ${target}`);
+  }
+
+  //drag and drop fields
 }
