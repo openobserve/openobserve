@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 use config::{get_config, meta::stream::FileMeta};
 use infra::cache::file_data;
@@ -39,11 +39,24 @@ impl DownloadQueue {
 struct PriorityDownloadQueue {
     sender: Sender<FileInfo>,
     receiver: Arc<Mutex<Receiver<FileInfo>>>,
+    stack: Arc<Mutex<VecDeque<FileInfo>>>,
 }
 
 impl PriorityDownloadQueue {
     fn new(sender: Sender<FileInfo>, receiver: Arc<Mutex<Receiver<FileInfo>>>) -> Self {
-        Self { sender, receiver }
+        Self {
+            sender,
+            receiver,
+            stack: Arc::new(Mutex::new(VecDeque::new())),
+        }
+    }
+
+    async fn push(&self, file_info: FileInfo) {
+        self.stack.lock().await.push_back(file_info);
+    }
+
+    async fn pop(&self) -> Option<FileInfo> {
+        self.stack.lock().await.pop_front()
     }
 }
 
@@ -113,40 +126,59 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
+    // add files to priority queue
+    let rx = PRIORITY_FILE_DOWNLOAD_CHANNEL.receiver.clone();
+    tokio::spawn(async move {
+        loop {
+            let ret = rx.lock().await.recv().await;
+            match ret {
+                None => {
+                    log::debug!(
+                        "[FILE_CACHE_DOWNLOAD:PRIORITY_QUEUE:JOB] Receiving channel is closed"
+                    );
+                    break;
+                }
+                Some((trace_id, file, file_size, cache)) => {
+                    PRIORITY_FILE_DOWNLOAD_CHANNEL
+                        .push((trace_id, file, file_size, cache))
+                        .await;
+                }
+            }
+        }
+    });
+
     // handle priority queue download
     for _ in 0..cfg.limit.file_download_priority_queue_thread_num {
-        let rx = PRIORITY_FILE_DOWNLOAD_CHANNEL.receiver.clone();
         tokio::spawn(async move {
             loop {
-                let ret = rx.lock().await.recv().await;
-                match ret {
-                    None => {
-                        log::debug!(
-                            "[FILE_CACHE_DOWNLOAD:PRIORITY_QUEUE:JOB] Receiving channel is closed"
-                        );
-                        break;
-                    }
+                let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
+                match file_info {
                     Some((trace_id, file, file_size, cache)) => {
                         match download_file(&trace_id, &file, file_size, cache).await {
                             Ok(data_len) => {
                                 if data_len > 0 && data_len != file_size {
                                     log::warn!(
-                                        "[trace_id {trace_id}] search->storage: download file {} found size mismatch, expected: {}, actual: {}, will skip it",
+                                        "[trace_id {}] priority queue download file {} found size mismatch, expected: {}, actual: {}, will skip it",
+                                        trace_id,
                                         file,
                                         file_size,
-                                        data_len,
+                                        data_len
                                     );
                                 }
                             }
                             Err(e) => {
                                 log::error!(
-                                    "[trace_id {trace_id}] search->storage: download file {} to cache {:?} err: {}",
+                                    "[trace_id {}] priority queue download file {} to cache {:?} err: {}",
+                                    trace_id,
                                     file,
                                     cache,
-                                    e,
+                                    e
                                 );
                             }
                         }
+                    }
+                    None => {
+                        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                     }
                 }
             }
