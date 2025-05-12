@@ -129,7 +129,7 @@ struct ConfigResponse<'a> {
     actions_enabled: bool,
     histogram_enabled: bool,
     max_query_range: i64,
-    limit_panel_hits_size_in_kb: usize,
+    limit_hits_per_panel: usize,
 }
 
 #[derive(Serialize)]
@@ -323,7 +323,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         actions_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
-        limit_panel_hits_size_in_kb: cfg.limit.panel_hits_size_in_kb,
+        limit_hits_per_panel: cfg.limit.limit_hits_per_panel,
     }))
 }
 

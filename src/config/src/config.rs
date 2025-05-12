@@ -1429,11 +1429,11 @@ pub struct Limit {
     )]
     pub histogram_enabled: bool,
     #[env_config(
-        name = "ZO_LIMIT_PANEL_HITS_SIZE_IN_KB",
-        default = 100,
-        help = "Limit the size of panel hits in KB"
+        name = "ZO_LIMIT_HITS_PER_PANEL",
+        default = 5000,
+        help = "Limit the number of panel hits per panel"
     )]
-    pub panel_hits_size_in_kb: usize,
+    pub limit_hits_per_panel: usize,
 }
 
 #[derive(EnvConfig)]
@@ -2028,8 +2028,8 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // reset to default if given zero
-    if cfg.limit.panel_hits_size_in_kb == 0 {
-        cfg.limit.panel_hits_size_in_kb = 100;
+    if cfg.limit.limit_hits_per_panel == 0 {
+        cfg.limit.limit_hits_per_panel = 5000;
     }
 
     // check for uds
