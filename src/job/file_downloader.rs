@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::get_config;
+use config::{get_config, meta::stream::FileMeta};
 use infra::cache::file_data;
 use once_cell::sync::Lazy;
 use tokio::sync::{
@@ -36,14 +36,31 @@ impl DownloadQueue {
     }
 }
 
+struct PriorityDownloadQueue {
+    sender: Sender<FileInfo>,
+    receiver: Arc<Mutex<Receiver<FileInfo>>>,
+}
+
+impl PriorityDownloadQueue {
+    fn new(sender: Sender<FileInfo>, receiver: Arc<Mutex<Receiver<FileInfo>>>) -> Self {
+        Self { sender, receiver }
+    }
+}
+
 const FILE_DOWNLOAD_QUEUE_SIZE: usize = 10000;
 static FILE_DOWNLOAD_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
     let (tx, rx) = tokio::sync::mpsc::channel::<FileInfo>(FILE_DOWNLOAD_QUEUE_SIZE);
     DownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
 });
 
+static PRIORITY_FILE_DOWNLOAD_CHANNEL: Lazy<PriorityDownloadQueue> = Lazy::new(|| {
+    let (tx, rx) = tokio::sync::mpsc::channel::<FileInfo>(FILE_DOWNLOAD_QUEUE_SIZE);
+    PriorityDownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
+});
+
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();
+    // handle normal queue download
     // move files
     for _ in 0..cfg.limit.file_download_thread_num {
         let rx = FILE_DOWNLOAD_CHANNEL.receiver.clone();
@@ -96,6 +113,45 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
+    // handle priority queue download
+    for _ in 0..cfg.limit.file_download_priority_queue_thread_num {
+        let rx = PRIORITY_FILE_DOWNLOAD_CHANNEL.receiver.clone();
+        tokio::spawn(async move {
+            loop {
+                let ret = rx.lock().await.recv().await;
+                match ret {
+                    None => {
+                        log::debug!(
+                            "[FILE_CACHE_DOWNLOAD:PRIORITY_QUEUE:JOB] Receiving channel is closed"
+                        );
+                        break;
+                    }
+                    Some((trace_id, file, file_size, cache)) => {
+                        match download_file(&trace_id, &file, file_size, cache).await {
+                            Ok(data_len) => {
+                                if data_len > 0 && data_len != file_size {
+                                    log::warn!(
+                                        "[trace_id {trace_id}] search->storage: download file {} found size mismatch, expected: {}, actual: {}, will skip it",
+                                        file,
+                                        file_size,
+                                        data_len,
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "[trace_id {trace_id}] search->storage: download file {} to cache {:?} err: {}",
+                                    file,
+                                    cache,
+                                    e,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
     Ok(())
 }
 
@@ -136,15 +192,38 @@ pub async fn queue_background_download(
     file: &str,
     size: i64,
     cache_type: file_data::CacheType,
+    to_priority_queue: bool,
 ) -> Result<(), anyhow::Error> {
-    FILE_DOWNLOAD_CHANNEL
-        .sender
-        .send((
-            trace_id.to_owned(),
-            file.to_owned(),
-            size as usize,
-            cache_type,
-        ))
-        .await?;
+    if !to_priority_queue {
+        FILE_DOWNLOAD_CHANNEL
+            .sender
+            .send((
+                trace_id.to_owned(),
+                file.to_owned(),
+                size as usize,
+                cache_type,
+            ))
+            .await?;
+    } else {
+        PRIORITY_FILE_DOWNLOAD_CHANNEL
+            .sender
+            .send((
+                trace_id.to_owned(),
+                file.to_owned(),
+                size as usize,
+                cache_type,
+            ))
+            .await?;
+    }
     Ok(())
+}
+
+pub fn should_priorotize_file(file_meta: &FileMeta) -> bool {
+    let cfg = get_config();
+    let window_micros = (cfg.limit.file_download_priority_queue_window_secs * 1_000_000) as i64;
+    let now = chrono::Utc::now().timestamp_micros();
+    // Check if the file's timestamp range overlaps with the current time window.
+    // A file is prioritized if its data is "fresh" - containing events from the recent past
+    // through the near future relative to current time, within the configured window.
+    file_meta.min_ts > now - window_micros && file_meta.max_ts < now + window_micros
 }

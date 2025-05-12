@@ -49,7 +49,7 @@ use tokio::sync::Semaphore;
 use tracing::Instrument;
 
 use crate::{
-    job,
+    job::{self, should_priorotize_file},
     service::{
         db, file_list,
         search::{
@@ -260,7 +260,13 @@ pub async fn search(
         &query.trace_id,
         &files
             .iter()
-            .map(|f| (f.key.as_ref(), f.meta.compressed_size))
+            .map(|f| {
+                (
+                    f.key.as_ref(),
+                    f.meta.compressed_size,
+                    should_priorotize_file(&f.meta),
+                )
+            })
             .collect_vec(),
         &mut scan_stats,
         "parquet",
@@ -399,13 +405,13 @@ pub async fn search(
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 pub async fn cache_files(
     trace_id: &str,
-    files: &[(&str, i64)],
+    files: &[(&str, i64, bool)],
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> Result<file_data::CacheType, Error> {
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
-    for (file, _) in files.iter() {
+    for (file, ..) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
@@ -441,19 +447,26 @@ pub async fn cache_files(
     let trace_id = trace_id.to_string();
     let files = files
         .iter()
-        .filter_map(|(f, size)| {
+        .filter_map(|(f, size, to_priority_queue)| {
             if cached_files.contains(f) {
                 None
             } else {
-                Some((f.to_string(), *size))
+                Some((f.to_string(), *size, *to_priority_queue))
             }
         })
         .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
         let files_num = files.len();
-        for (file, size) in files {
-            if let Err(e) = job::queue_background_download(&trace_id, &file, size, cache_type).await
+        for (file, size, to_priority_queue) in files {
+            if let Err(e) = job::queue_background_download(
+                &trace_id,
+                &file,
+                size,
+                cache_type,
+                to_priority_queue,
+            )
+            .await
             {
                 log::error!(
                     "[trace_id {trace_id}] error in queuing file {file} for background download: {e}"
@@ -516,7 +529,13 @@ pub async fn filter_file_list_by_tantivy_index(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, meta)| (ttv_file.as_str(), meta.meta.index_size))
+            .map(|(ttv_file, meta)| {
+                (
+                    ttv_file.as_str(),
+                    meta.meta.index_size,
+                    should_priorotize_file(&meta.meta),
+                )
+            })
             .collect_vec(),
         &mut scan_stats,
         "index",
