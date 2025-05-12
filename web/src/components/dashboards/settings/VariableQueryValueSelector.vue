@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    loading: {{ variableItem.isLoading }} 
-    values: {{ variableItem.value }}
+    loading: {{ variableItem.isLoading }} values: {{ variableItem.value }}
     <q-select
       style="min-width: 150px"
       filled
@@ -100,6 +99,12 @@ export default defineComponent({
   setup(props: any, { emit }) {
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
+    console.log("[Dropdown] Initial setup:", {
+      variableName: props.variableItem?.name,
+      initialValue: selectedValue.value,
+      isLoading: props.variableItem?.isLoading,
+      options: props.variableItem?.options,
+    });
 
     const options = toRef(props.variableItem, "options");
 
@@ -111,6 +116,12 @@ export default defineComponent({
     watch(
       () => props.variableItem,
       () => {
+        console.log("[Dropdown] Variable item changed:", {
+          variableName: props.variableItem?.name,
+          newOptions: props.variableItem?.options,
+          isLoading: props.variableItem?.isLoading,
+          value: props.variableItem?.value,
+        });
         options.value = props.variableItem?.options;
       },
     );
@@ -125,6 +136,11 @@ export default defineComponent({
 
     // Function to toggle select/deselect all options
     const toggleSelectAll = () => {
+      console.log("[Dropdown] Toggle select all:", {
+        variableName: props.variableItem?.name,
+        currentIsAllSelected: isAllSelected.value,
+        currentValue: selectedValue.value,
+      });
       if (!isAllSelected.value) {
         selectedValue.value = fieldsFilteredOptions.value.map(
           (option: any) => option.value,
@@ -135,6 +151,11 @@ export default defineComponent({
     };
 
     const applyChanges = () => {
+      console.log("[Dropdown] Applying changes:", {
+        variableName: props.variableItem?.name,
+        multiSelect: props.variableItem.multiSelect,
+        value: selectedValue.value,
+      });
       if (props.variableItem.multiSelect) {
         emitSelectedValues();
       }
@@ -142,12 +163,21 @@ export default defineComponent({
 
     // update selected value
     watch(selectedValue, () => {
+      console.log("[Dropdown] Selected value changed:", {
+        variableName: props.variableItem?.name,
+        newValue: selectedValue.value,
+        multiSelect: props.variableItem.multiSelect,
+      });
       if (!props.variableItem.multiSelect) {
         emitSelectedValues();
       }
     });
 
     const emitSelectedValues = () => {
+      console.log("[Dropdown] Emitting selected values:", {
+        variableName: props.variableItem?.name,
+        value: selectedValue.value,
+      });
       emit("update:modelValue", selectedValue.value);
     };
 
@@ -182,6 +212,11 @@ export default defineComponent({
     });
 
     const loadFieldValues = () => {
+      console.log("[Dropdown] Loading field values:", {
+        variableName: props.variableItem?.name,
+        isLoading: props.variableItem.isLoading,
+        hasLoadOptions: !!props.loadOptions,
+      });
       if (props.variableItem.isLoading || !props.loadOptions) {
         return;
       }
@@ -189,10 +224,20 @@ export default defineComponent({
     };
 
     const loadVariableTemp = () => {
+      console.log("[Dropdown] Loading variable temp:", {
+        variableName: props.variableItem?.name,
+        currentOptions: props.variableItem.options,
+      });
       try {
         props.loadOptions(props.variableItem);
         options.value = props.variableItem.options;
-      } catch (error) {}
+        console.log("[Dropdown] Variable temp loaded:", {
+          variableName: props.variableItem?.name,
+          newOptions: props.variableItem.options,
+        });
+      } catch (error) {
+        console.error("[Dropdown] Error loading variable temp:", error);
+      }
     };
 
     return {
