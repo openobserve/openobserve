@@ -1016,9 +1016,14 @@ export default defineComponent({
           if (streams.length > 1) {
             query_context = "select * from [INDEX_NAME]";
           }
-          if (searchObj.data.stream.selectedStream.length > 1) {
+          if (
+            searchObj.data.stream.selectedStream.length > 1 &&
+            searchObj.meta.sqlMode &&
+            queries[selectedStream]
+          ) {
             query_context = queries[selectedStream];
           }
+
           if (query_context !== "") {
             query_context = query_context == undefined ? "" : query_context;
 
