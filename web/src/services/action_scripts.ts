@@ -16,7 +16,7 @@
 import http from "./http";
 
 const actions = {
-  create: (org_identifier: string, action_id: string = "", data: any) => {
+  create: (org_identifier: string, data: any) => {
     return http().post(`/api/${org_identifier}/actions/upload`, data);
   },
   update: (org_identifier: string, action_id: string, data: any) => {
@@ -34,6 +34,17 @@ const actions = {
   delete: (org_identifier: string, action_id: string) => {
     return http().delete(
       `/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`,
+    );
+  },
+  get_zip_file: (org_identifier: string, action_id: string) => {
+    return http().get(
+      `/api/${org_identifier}/actions/download/${action_id}`,
+      {
+        responseType: "blob",
+        headers: {
+          "Content-Type": "application/zip",
+        },
+      },
     );
   },
 };
