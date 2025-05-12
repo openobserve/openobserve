@@ -1336,7 +1336,29 @@ async fn send_cached_responses(
     Ok(())
 }
 
-// Now add the values API handler
+/// Values  HTTP2 streaming endpoint
+///
+/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Search",
+    operation_id = "ValuesStreamHttp2",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = String, description = "Values query", content_type = "application/json", example = json!({
+        "sql": "select * from logs LIMIT 10",
+        "start_time": 1675182660872049i64,
+        "end_time": 1675185660872049i64
+    })),
+    responses(
+        (status = 200, description = "Success", content_type = "text/event-stream"),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[post("/{org_id}/_values_stream")]
 pub async fn values_http2_stream(
     org_id: web::Path<String>,

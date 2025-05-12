@@ -64,7 +64,6 @@ pub mod saved_view;
 pub mod search_inspector;
 pub mod search_job;
 pub(crate) mod utils;
-// pub mod streaming;
 pub mod search_stream;
 
 async fn can_use_distinct_stream(
