@@ -416,7 +416,7 @@ test.describe("dashboard filter testcases", () => {
 
     await deleteDashboard(page, randomDashboardName);
   });
-  test("Should  apply the  filter group inside group", async ({ page }) => {
+  test("Should apply the filter group inside group", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
