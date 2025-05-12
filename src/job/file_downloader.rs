@@ -25,6 +25,9 @@ use tokio::sync::{
 
 type FileInfo = (String, String, usize, file_data::CacheType);
 
+const NORMAL_QUEUE: &str = "normal";
+const PRIORITY_QUEUE: &str = "priority";
+
 struct DownloadQueue {
     sender: Sender<FileInfo>,
     receiver: Arc<Mutex<Receiver<FileInfo>>>,
@@ -123,7 +126,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
                         // update metrics
                         metrics::FILE_DOWNLOADER_QUEUE_SIZE
-                            .with_label_values(&["normal"])
+                            .with_label_values(&[NORMAL_QUEUE])
                             .dec();
                     }
                 }
@@ -184,7 +187,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
                         // update metrics
                         metrics::FILE_DOWNLOADER_QUEUE_SIZE
-                            .with_label_values(&["priority"])
+                            .with_label_values(&[PRIORITY_QUEUE])
                             .dec();
                     }
                     None => {
@@ -249,7 +252,7 @@ pub async fn queue_background_download(
 
         // update metrics
         metrics::FILE_DOWNLOADER_QUEUE_SIZE
-            .with_label_values(&["normal"])
+            .with_label_values(&[NORMAL_QUEUE])
             .inc();
     } else {
         PRIORITY_FILE_DOWNLOAD_CHANNEL
@@ -264,7 +267,7 @@ pub async fn queue_background_download(
 
         // update metrics
         metrics::FILE_DOWNLOADER_QUEUE_SIZE
-            .with_label_values(&["priority"])
+            .with_label_values(&[PRIORITY_QUEUE])
             .inc();
     }
     Ok(())
