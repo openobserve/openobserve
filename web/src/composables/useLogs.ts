@@ -5025,6 +5025,8 @@ const useLogs = () => {
           errorMsg: "",
           errorDetail: "",
         };
+        
+        if(!isPagination && searchObj.meta.refreshInterval == 0) searchObj.meta.resetPlotChart = true;
       }
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
