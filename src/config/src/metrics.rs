@@ -17,8 +17,8 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 use prometheus::{
-    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
-    TextEncoder,
+    CounterVec, Encoder, GaugeVec, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts,
+    Registry, TextEncoder,
 };
 
 pub const NAMESPACE: &str = "zo";
@@ -816,6 +816,16 @@ pub static FILE_DOWNLOADER_CACHE_MISS_COUNT: Lazy<CounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static FILE_DOWNLOADER_QUEUE_SIZE: Lazy<GaugeVec> = Lazy::new(|| {
+    GaugeVec::new(
+        Opts::new("file_downloader_queue_size", "file downloader queue size")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["queue_type"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1027,12 +1037,15 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
         .expect("Metric registered");
 
-    // file downloader cache metrics
+    // file downloader metrics
     registry
         .register(Box::new(FILE_DOWNLOADER_CACHE_HIT_COUNT.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(FILE_DOWNLOADER_CACHE_MISS_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(FILE_DOWNLOADER_QUEUE_SIZE.clone()))
         .expect("Metric registered");
 }
 

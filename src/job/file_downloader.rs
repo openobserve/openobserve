@@ -15,7 +15,7 @@
 
 use std::{collections::VecDeque, sync::Arc};
 
-use config::{get_config, meta::stream::FileMeta};
+use config::{get_config, meta::stream::FileMeta, metrics};
 use infra::cache::file_data;
 use once_cell::sync::Lazy;
 use tokio::sync::{
@@ -120,6 +120,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 );
                             }
                         }
+
+                        // update metrics
+                        metrics::FILE_DOWNLOADER_QUEUE_SIZE
+                            .with_label_values(&["normal"])
+                            .dec();
                     }
                 }
             }
@@ -176,6 +181,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 );
                             }
                         }
+
+                        // update metrics
+                        metrics::FILE_DOWNLOADER_QUEUE_SIZE
+                            .with_label_values(&["priority"])
+                            .dec();
                     }
                     None => {
                         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
@@ -236,6 +246,11 @@ pub async fn queue_background_download(
                 cache_type,
             ))
             .await?;
+
+        // update metrics
+        metrics::FILE_DOWNLOADER_QUEUE_SIZE
+            .with_label_values(&["normal"])
+            .inc();
     } else {
         PRIORITY_FILE_DOWNLOAD_CHANNEL
             .sender
@@ -246,6 +261,11 @@ pub async fn queue_background_download(
                 cache_type,
             ))
             .await?;
+
+        // update metrics
+        metrics::FILE_DOWNLOADER_QUEUE_SIZE
+            .with_label_values(&["priority"])
+            .inc();
     }
     Ok(())
 }
