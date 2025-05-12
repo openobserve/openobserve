@@ -5013,7 +5013,7 @@ const useLogs = () => {
       
       if(!isPagination) {
         searchObj.data.queryResults.hits = [];
-\        searchObj.data.histogram = {
+        searchObj.data.histogram = {
           xData: [],
           yData: [],
           chartParams: {
