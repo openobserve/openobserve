@@ -1600,13 +1600,6 @@ const useLogs = () => {
         searchObj.communicationMethod = "http";
       }
 
-      // Use the appropriate method to fetch data
-      if (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming") {
-        getDataThroughStream(isPagination);
-        return;
-      }
-
-
       // searchObj.data.histogram.chartParams.title = "";
       searchObjDebug["queryDataStartTime"] = performance.now();
       searchObj.meta.showDetailTab = false;
@@ -1628,6 +1621,13 @@ const useLogs = () => {
           (router.currentRoute.value?.query?.period as string) || "15m",
         );
       }
+
+      // Use the appropriate method to fetch data
+      if (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming") {
+        getDataThroughStream(isPagination);
+        return;
+      }
+    
 
       searchObjDebug["buildSearchStartTime"] = performance.now();
       const queryReq: any = buildSearch();
@@ -5012,6 +5012,8 @@ const useLogs = () => {
       if(!queryReq) return;
       
       if(!isPagination) {
+        resetQueryData();
+        histogramResults = [];
         searchObj.data.queryResults.hits = [];
         searchObj.data.histogram = {
           xData: [],
@@ -5025,8 +5027,8 @@ const useLogs = () => {
           errorMsg: "",
           errorDetail: "",
         };
-        
-        if(!isPagination && searchObj.meta.refreshInterval == 0) searchObj.meta.resetPlotChart = true;
+
+        if(searchObj.meta.refreshInterval == 0) searchObj.meta.resetPlotChart = true;
       }
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
