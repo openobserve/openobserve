@@ -182,7 +182,6 @@ export default defineComponent({
         no_count: true,
         start_time: startTime,
         end_time: endTime,
-        timeout: 30000,
         stream_name: variableObject.query_data.stream,
         stream_type: variableObject.query_data.stream_type || "logs",
         use_cache: (window as any).use_cache ?? true,
@@ -298,20 +297,42 @@ export default defineComponent({
           response.content?.results?.hits?.length &&
           response.type === "search_response"
         ) {
-          // Store the current value before updating options
-          const currentValue = variableObject.value;
-          console.log(
-            `[WebSocket] Updating options for ${variableObject.name}:`,
-            {
-              oldValue: currentValue,
-              hits: response.content.results.hits,
-            },
+          const hits = response.content.results.hits;
+          const fieldHit = hits.find(
+            (field: any) => field.field === variableObject.query_data.field,
           );
 
-          // Update options
-          updateVariableOptions(variableObject, response.content.results.hits);
+          if (fieldHit) {
+            const newOptions = fieldHit.values
+              .filter(
+                (value: any) => value.zo_sql_key || value.zo_sql_key === "",
+              )
+              .map((value: any) => ({
+                label:
+                  value.zo_sql_key !== ""
+                    ? value.zo_sql_key.toString()
+                    : "<blank>",
+                value: value.zo_sql_key.toString(),
+              }));
 
-          // Restore the previous value if it exists in oldVariablesData
+            if (!Array.isArray(variableObject.options)) {
+              variableObject.options = [];
+            }
+
+            const existingValuesSet = new Set(
+              variableObject.options.map((opt: any) => opt.value),
+            );
+
+            newOptions.forEach((opt) => {
+              if (!existingValuesSet.has(opt.value)) {
+                variableObject.options.push(opt);
+              }
+            });
+
+            variableObject.options.sort((a, b) =>
+              a.label.localeCompare(b.label),
+            );
+          }
           if (oldVariablesData[variableObject.name] !== undefined) {
             const oldValues = Array.isArray(
               oldVariablesData[variableObject.name],
@@ -962,6 +983,8 @@ export default defineComponent({
       if (isWebSocketEnabled()) {
         variableObject.isLoading = true;
         fetchFieldValuesWithWebsocket(variableObject, queryContext);
+        console.log("[WebSocket] Starting fetch for", variableObject.name);
+
         // Return a dummy response since WebSocket is asynchronous
         return { data: { hits: [] } };
       }
