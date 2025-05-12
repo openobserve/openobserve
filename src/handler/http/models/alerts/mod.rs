@@ -154,7 +154,7 @@ pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
     pub query_type: QueryType,
-    pub conditions: Option<Vec<Condition>>,
+    pub conditions: Option<meta_alerts::ConditionList>,
     pub sql: Option<String>,
     pub promql: Option<String>,
     pub promql_condition: Option<Condition>,
@@ -346,9 +346,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
     fn from(value: meta_alerts::QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
-            conditions: value
-                .conditions
-                .map(|cs| cs.into_iter().map(|c| c.into()).collect()),
+            conditions: value.conditions,
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
@@ -520,9 +518,7 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
     fn from(value: QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
-            conditions: value
-                .conditions
-                .map(|cs| cs.into_iter().map(|c| c.into()).collect()),
+            conditions: value.conditions,
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
