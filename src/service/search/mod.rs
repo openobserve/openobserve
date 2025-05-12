@@ -771,7 +771,11 @@ pub async fn search_partition(
         part_num = 1000;
     }
 
-    part_num = 10;
+    #[allow(unused_assignments)]
+    {
+        // DEBUG: Override calculated partition number for testing/debugging
+        part_num = 10;
+    }
 
     // Calculate step with all constraints
     let mut step = (req.end_time - req.start_time) / part_num as i64;
