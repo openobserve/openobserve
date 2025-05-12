@@ -42,7 +42,7 @@ mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
 
-pub use file_downloader::{queue_background_download, should_priorotize_file};
+pub use file_downloader::{queue_background_download, should_prioritize_file};
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 pub async fn init() -> Result<(), anyhow::Error> {

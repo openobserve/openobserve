@@ -218,7 +218,7 @@ pub async fn queue_background_download(
     Ok(())
 }
 
-pub fn should_priorotize_file(file_meta: &FileMeta) -> bool {
+pub fn should_prioritize_file(file_meta: &FileMeta) -> bool {
     let cfg = get_config();
     let window_micros = (cfg.limit.file_download_priority_queue_window_secs * 1_000_000) as i64;
     let now = chrono::Utc::now().timestamp_micros();

@@ -789,6 +789,33 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// file downloader metrics
+pub static FILE_DOWNLOADER_CACHE_HIT_COUNT: Lazy<CounterVec> = Lazy::new(|| {
+    CounterVec::new(
+        Opts::new(
+            "file_downloader_cache_hit_count",
+            "file downloader cache hit count".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "storage_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static FILE_DOWNLOADER_CACHE_MISS_COUNT: Lazy<CounterVec> = Lazy::new(|| {
+    CounterVec::new(
+        Opts::new(
+            "file_downloader_cache_miss_count",
+            "file downloader cache miss count".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "storage_type"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -998,6 +1025,14 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
+        .expect("Metric registered");
+
+    // file downloader cache metrics
+    registry
+        .register(Box::new(FILE_DOWNLOADER_CACHE_HIT_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(FILE_DOWNLOADER_CACHE_MISS_COUNT.clone()))
         .expect("Metric registered");
 }
 

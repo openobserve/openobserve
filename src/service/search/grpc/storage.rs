@@ -27,7 +27,7 @@ use config::{
         search::{ScanStats, StorageType},
         stream::{FileKey, StreamType},
     },
-    metrics::QUERY_PARQUET_CACHE_RATIO_NODE,
+    metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
     utils::{
         file::is_exists,
         inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
@@ -49,7 +49,7 @@ use tokio::sync::Semaphore;
 use tracing::Instrument;
 
 use crate::{
-    job::{self, should_priorotize_file},
+    job::{self, should_prioritize_file},
     service::{
         db, file_list,
         search::{
@@ -256,7 +256,7 @@ pub async fn search(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let cache_type = cache_files(
+    let (cache_type, cache_hits, cache_misses) = cache_files(
         &query.trace_id,
         &files
             .iter()
@@ -264,7 +264,7 @@ pub async fn search(
                 (
                     f.key.as_ref(),
                     f.meta.compressed_size,
-                    should_priorotize_file(&f.meta),
+                    should_prioritize_file(&f.meta),
                 )
             })
             .collect_vec(),
@@ -399,6 +399,14 @@ pub async fn search(
         )
     );
 
+    // report cache hit and miss metrics
+    metrics::FILE_DOWNLOADER_CACHE_HIT_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "local"])
+        .inc_by(cache_hits as f64);
+    metrics::FILE_DOWNLOADER_CACHE_MISS_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "remote"])
+        .inc_by(cache_misses as f64);
+
     Ok((tables, scan_stats))
 }
 
@@ -408,22 +416,27 @@ pub async fn cache_files(
     files: &[(&str, i64, bool)],
     scan_stats: &mut ScanStats,
     file_type: &str,
-) -> Result<file_data::CacheType, Error> {
+) -> Result<(file_data::CacheType, i64, i64), Error> {
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
+    let (mut cache_hits, mut cache_misses) = (0, 0);
     for (file, ..) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
+            cache_hits += 1;
         } else if file_data::disk::exist(file).await {
             scan_stats.querier_disk_cached_files += 1;
             cached_files.insert(file);
+            cache_hits += 1;
+        } else {
+            cache_misses += 1;
         }
     }
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
-        return Ok(file_data::CacheType::None);
+        return Ok((file_data::CacheType::None, cache_hits, cache_misses));
     }
 
     // check cache size
@@ -441,7 +454,7 @@ pub async fn cache_files(
         file_data::CacheType::Disk
     } else {
         // no cache, the files are too big than cache size
-        return Ok(file_data::CacheType::None);
+        return Ok((file_data::CacheType::None, cache_hits, cache_misses));
     };
 
     let trace_id = trace_id.to_string();
@@ -485,9 +498,9 @@ pub async fn cache_files(
     // if cached file less than 50% of the total files, return None
     if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num / 2
     {
-        Ok(file_data::CacheType::None)
+        Ok((file_data::CacheType::None, cache_hits, cache_misses))
     } else {
-        Ok(cache_type)
+        Ok((cache_type, cache_hits, cache_misses))
     }
 }
 
@@ -525,7 +538,7 @@ pub async fn filter_file_list_by_tantivy_index(
         })
         .collect_vec();
     scan_stats.querier_files = index_file_names.len() as i64;
-    let cache_type = cache_files(
+    let (cache_type, cache_hits, cache_misses) = cache_files(
         &query.trace_id,
         &index_file_names
             .iter()
@@ -533,7 +546,7 @@ pub async fn filter_file_list_by_tantivy_index(
                 (
                     ttv_file.as_str(),
                     meta.meta.index_size,
-                    should_priorotize_file(&meta.meta),
+                    should_prioritize_file(&meta.meta),
                 )
             })
             .collect_vec(),
@@ -541,6 +554,14 @@ pub async fn filter_file_list_by_tantivy_index(
         "index",
     )
     .await?;
+
+    // report cache hit and miss metrics
+    metrics::FILE_DOWNLOADER_CACHE_HIT_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "local"])
+        .inc_by(cache_hits as f64);
+    metrics::FILE_DOWNLOADER_CACHE_MISS_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "remote"])
+        .inc_by(cache_misses as f64);
 
     let cached_ratio = (scan_stats.querier_memory_cached_files
         + scan_stats.querier_disk_cached_files) as f64

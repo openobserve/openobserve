@@ -22,6 +22,7 @@ use config::{
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
+    metrics,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -40,7 +41,7 @@ use promql_parser::label::{MatchOp, Matchers};
 use tracing::Instrument;
 
 use crate::{
-    job::should_priorotize_file,
+    job::should_prioritize_file,
     service::{
         db, file_list,
         search::{
@@ -148,7 +149,7 @@ pub(crate) async fn create_context(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let cache_type = cache_files(
+    let (cache_type, cache_hits, cache_misses) = cache_files(
         trace_id,
         &files
             .iter()
@@ -156,7 +157,7 @@ pub(crate) async fn create_context(
                 (
                     f.key.as_ref(),
                     f.meta.compressed_size,
-                    should_priorotize_file(&f.meta),
+                    should_prioritize_file(&f.meta),
                 )
             })
             .collect_vec(),
@@ -211,7 +212,7 @@ pub(crate) async fn create_context(
     let index_condition = convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
     if !index_condition.conditions.is_empty() && cfg.common.inverted_index_enabled {
         let (idx_took, ..) =
-            filter_file_list_by_tantivy_index(query, &mut files, Some(index_condition), None)
+            filter_file_list_by_tantivy_index(query.clone(), &mut files, Some(index_condition), None)
                 .await
                 .map_err(|e| {
                     log::error!(
@@ -241,6 +242,15 @@ pub(crate) async fn create_context(
         true,
     )
     .await?;
+
+    // report cache hit and miss metrics
+    metrics::FILE_DOWNLOADER_CACHE_HIT_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "local"])
+        .inc_by(cache_hits as f64);
+    metrics::FILE_DOWNLOADER_CACHE_MISS_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "remote"])
+        .inc_by(cache_misses as f64);
+
     Ok(Some((ctx, schema, scan_stats)))
 }
 
