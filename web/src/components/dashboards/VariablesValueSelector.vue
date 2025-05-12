@@ -177,7 +177,7 @@ export default defineComponent({
       });
 
       const payload = {
-        fields: [variableObject.query_data.field],
+        field: variableObject.query_data.field,
         size: variableObject.query_data.max_record_size || 10,
         no_count: true,
         start_time: startTime,
@@ -371,7 +371,7 @@ export default defineComponent({
 
     const handleSearchReset = (data: any) => {
       const variableObject = variablesData.values.find(
-        (v: any) => v.query_data?.field === data.payload.queryReq.fields[0],
+        (v: any) => v.query_data?.field === data.payload.queryReq.field,
       );
       if (variableObject) {
         // resetVariableState(variableObject);
