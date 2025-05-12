@@ -5289,6 +5289,8 @@ const useLogs = () => {
             ...response.content.results,
             took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
             scan_size: (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
+            hits: searchObj.data?.queryResults?.hits || [],
+            streaming_aggs: response.content?.streaming_aggs,
           }
         } else if (isPagination) {
           searchObj.data.queryResults.from = response.content.results.from;
@@ -5457,7 +5459,7 @@ const useLogs = () => {
     response: WebSocketSearchResponse,
   ) => {
     if(payload.type === "search" && response?.type === "search_response_hits") {
-      handleStreamingHits(payload, response, payload.isPagination, !response.content?.streaming_aggs && searchPartitionMap[payload.traceId] > 1);
+      handleStreamingHits(payload, response, payload.isPagination, !(response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs) && searchPartitionMap[payload.traceId] > 1);
       return;
     }
 
