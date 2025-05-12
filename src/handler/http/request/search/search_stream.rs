@@ -58,11 +58,12 @@ use crate::{
         build_search_request_per_field, error_utils::map_error_to_http_response, json::Map,
     },
     service::{
+        setup_tracing_with_trace_id,
         search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
         websocket_events::{
             search::write_results_to_cache,
             sort::order_search_results,
-            utils::{calculate_progress_percentage, setup_tracing_with_trace_id},
+            utils::calculate_progress_percentage,
         },
     },
 };
