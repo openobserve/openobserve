@@ -6020,7 +6020,7 @@ const useLogs = () => {
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
 
-    const { message, trace_id, code, error_detail } = err.content;
+    const { message, trace_id, code, error_detail, error } = err.content;
 
     // 20009 is the code for query cancelled
     if (code === 20009) {
@@ -6030,12 +6030,16 @@ const useLogs = () => {
 
     if (trace_id) removeTraceId(trace_id);
 
-    const errorMsg = constructErrorMessage({
+    let errorMsg = constructErrorMessage({
       message,
       code,
       trace_id,
       defaultMessage: "Error while processing request",
     });
+
+    if(error === "rate_limit_exceeded") {
+      errorMsg = message;
+    }
 
     searchObj.data.errorDetail = error_detail || "";
     searchObj.data.errorMsg = errorMsg;
