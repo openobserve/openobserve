@@ -574,6 +574,23 @@ pub async fn get_org(org: &str) -> Option<Organization> {
     db::organization::get_org(org).await.ok()
 }
 
+#[cfg(feature = "cloud")]
+pub async fn is_org_in_free_trial_period(org_id: &str) -> Result<bool, anyhow::Error> {
+    use config::utils::time::day_micros;
+    use o2_enterprise::enterprise::cloud::billings;
+    // first check if the org is
+    let subscription = billings::get_billing_by_org_id(org_id).await?;
+
+    if subscription.is_none() || subscription.unwrap().subscription_type.is_free_sub() {
+        let creation_time = infra::table::organizations::get_creation_time(org_id).await?;
+        let now = Utc::now().timestamp_micros();
+        if now - creation_time > day_micros(14) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use infra::{db as infra_db, table as infra_table};

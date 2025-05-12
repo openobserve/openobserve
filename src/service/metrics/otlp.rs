@@ -129,6 +129,16 @@ pub async fn handle_otlp_request(
             )));
     }
 
+    #[cfg(feature = "cloud")]
+    {
+        if !crate::service::organization::is_org_in_free_trial_period(org_id).await? {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                http::StatusCode::FORBIDDEN.into(),
+                format!("org {org_id} has expired its trial period"),
+            )));
+        }
+    }
+
     if !db::file_list::BLOCKED_ORGS.is_empty()
         && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {

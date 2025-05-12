@@ -71,6 +71,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         ));
     }
 
+    #[cfg(feature = "cloud")]
+    {
+        if !crate::service::organization::is_org_in_free_trial_period(org_id).await? {
+            return Err(anyhow!("org {org_id} has expired its trial period"));
+        }
+    }
+
     // check memtable
     if let Err(e) = ingester::check_memtable_size() {
         return Ok(IngestionResponse {
