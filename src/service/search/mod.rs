@@ -771,6 +771,7 @@ pub async fn search_partition(
         part_num = 1000;
     }
 
+    // added for debug
     part_num = 10;
 
     // Calculate step with all constraints
