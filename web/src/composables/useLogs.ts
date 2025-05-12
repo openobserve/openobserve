@@ -5010,6 +5010,22 @@ const useLogs = () => {
       const queryReq = getQueryReq(isPagination) as SearchRequestPayload;
 
       if(!queryReq) return;
+      
+      if(!isPagination) {
+        searchObj.data.queryResults.hits = [];
+\        searchObj.data.histogram = {
+          xData: [],
+          yData: [],
+          chartParams: {
+            title: "",
+            unparsed_x_data: [],
+            timezone: "",
+          },
+          errorCode: 0,
+          errorMsg: "",
+          errorDetail: "",
+        };
+      }
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       const requestId = initializeSearchConnection(payload);
