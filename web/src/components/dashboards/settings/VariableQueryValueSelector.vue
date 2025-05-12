@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
       </template>
+      <template v-slot:loading> Loading... </template>
     </q-select>
   </div>
 </template>
@@ -183,9 +184,19 @@ export default defineComponent({
 
     // Display the selected value
     const displayValue = computed(() => {
+      console.log("[Dropdown] Calculating display value", {
+        variableName: props.variableItem?.name,
+        selectedValue: selectedValue.value,
+        multiSelect: props.variableItem.multiSelect,
+      });
       if (selectedValue.value || selectedValue.value == "") {
         if (Array.isArray(selectedValue.value)) {
           if (selectedValue.value.length > 2) {
+            console.log("[Dropdown] Display value: using ellipsis", {
+              variableName: props.variableItem?.name,
+              selectedValue: selectedValue.value,
+              multiSelect: props.variableItem.multiSelect,
+            });
             const firstTwoValues = selectedValue.value
               .slice(0, 2)
               .map((it: any) => (it === "" ? "<blank>" : it))
@@ -193,20 +204,50 @@ export default defineComponent({
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
           } else if (props.variableItem.options.length == 0) {
+            console.log("[Dropdown] Display value: no data found", {
+              variableName: props.variableItem?.name,
+              selectedValue: selectedValue.value,
+              multiSelect: props.variableItem.multiSelect,
+            });
             return "(No Data Found)";
           } else {
+            console.log("[Dropdown] Display value: not using ellipsis", {
+              variableName: props.variableItem?.name,
+              selectedValue: selectedValue.value,
+              multiSelect: props.variableItem.multiSelect,
+            });
             return selectedValue.value
               .map((it: any) => (it === "" ? "<blank>" : it))
               .join(", ");
           }
         } else if (selectedValue.value == "") {
+          console.log("[Dropdown] Display value: blank", {
+            variableName: props.variableItem?.name,
+            selectedValue: selectedValue.value,
+            multiSelect: props.variableItem.multiSelect,
+          });
           return "<blank>";
         } else {
+          console.log("[Dropdown] Display value: single value", {
+            variableName: props.variableItem?.name,
+            selectedValue: selectedValue.value,
+            multiSelect: props.variableItem.multiSelect,
+          });
           return selectedValue.value;
         }
       } else if (!props.variableItem.isLoading) {
+        console.log("[Dropdown] Display value: no data found (not loading)", {
+          variableName: props.variableItem?.name,
+          selectedValue: selectedValue.value,
+          multiSelect: props.variableItem.multiSelect,
+        });
         return "(No Data Found)";
       } else {
+        console.log("[Dropdown] Display value: loading", {
+          variableName: props.variableItem?.name,
+          selectedValue: selectedValue.value,
+          multiSelect: props.variableItem.multiSelect,
+        });
         return "";
       }
     });
@@ -234,6 +275,7 @@ export default defineComponent({
         console.log("[Dropdown] Variable temp loaded:", {
           variableName: props.variableItem?.name,
           newOptions: props.variableItem.options,
+          newValue: selectedValue.value,
         });
       } catch (error) {
         console.error("[Dropdown] Error loading variable temp:", error);
