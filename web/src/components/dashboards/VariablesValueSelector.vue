@@ -169,7 +169,12 @@ export default defineComponent({
       // Set loading state before initiating WebSocket
       variableObject.isLoading = true;
       variableObject.isVariableLoadingPending = true;
-      console.log(`[WebSocket] isLoading=true for`, variableObject.name);
+      console.log(`[WebSocket] Starting fetch for ${variableObject.name}:`, {
+        isLoading: variableObject.isLoading,
+        isVariableLoadingPending: variableObject.isVariableLoadingPending,
+        currentValue: variableObject.value,
+        options: variableObject.options,
+      });
 
       const payload = {
         fields: [variableObject.query_data.field],
@@ -201,8 +206,11 @@ export default defineComponent({
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
         console.log(
-          `[WebSocket] isLoading=false (error) for`,
-          variableObject.name,
+          `[WebSocket] Failed to connect for ${variableObject.name}:`,
+          {
+            isLoading: variableObject.isLoading,
+            isVariableLoadingPending: variableObject.isVariableLoadingPending,
+          },
         );
       }
     };
@@ -272,6 +280,14 @@ export default defineComponent({
         return;
       }
 
+      console.log(`[WebSocket] Received response for ${variableObject.name}:`, {
+        responseType: response.type,
+        hasResults: !!response.content?.results?.hits?.length,
+        currentValue: variableObject.value,
+        isLoading: variableObject.isLoading,
+        isVariableLoadingPending: variableObject.isVariableLoadingPending,
+      });
+
       if (response.type === "cancel_response") {
         removeTraceId(variableObject.name, response.content.trace_id);
         return;
@@ -284,6 +300,13 @@ export default defineComponent({
         ) {
           // Store the current value before updating options
           const currentValue = variableObject.value;
+          console.log(
+            `[WebSocket] Updating options for ${variableObject.name}:`,
+            {
+              oldValue: currentValue,
+              hits: response.content.results.hits,
+            },
+          );
 
           // Update options
           updateVariableOptions(variableObject, response.content.results.hits);
@@ -296,6 +319,14 @@ export default defineComponent({
               ? oldVariablesData[variableObject.name]
               : [oldVariablesData[variableObject.name]];
 
+            console.log(
+              `[WebSocket] Restoring old values for ${variableObject.name}:`,
+              {
+                oldValues,
+                type: variableObject.type,
+              },
+            );
+
             if (variableObject.type === "custom") {
               handleCustomVariablesLogic(variableObject, oldValues);
             } else {
@@ -307,6 +338,10 @@ export default defineComponent({
           const childVariables =
             variablesDependencyGraph[variableObject.name]?.childVariables || [];
           if (childVariables.length > 0) {
+            console.log(
+              `[WebSocket] Loading child variables for ${variableObject.name}:`,
+              childVariables,
+            );
             const childVariableObjects = variablesData.values.filter(
               (variable: any) => childVariables.includes(variable.name),
             );
@@ -324,8 +359,13 @@ export default defineComponent({
       variableObject.isLoading = false;
       variableObject.isVariableLoadingPending = false;
       console.log(
-        `[WebSocket] isLoading=false (response) for`,
-        variableObject.name,
+        `[WebSocket] Completed processing for ${variableObject.name}:`,
+        {
+          isLoading: variableObject.isLoading,
+          isVariableLoadingPending: variableObject.isVariableLoadingPending,
+          finalValue: variableObject.value,
+          options: variableObject.options,
+        },
       );
     };
 
