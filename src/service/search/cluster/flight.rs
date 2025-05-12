@@ -33,7 +33,6 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    error::DataFusionError,
     physical_plan::{ExecutionPlan, displayable, visit_execution_plan},
     prelude::SessionContext,
 };
@@ -354,14 +353,14 @@ pub async fn search(
                 Ok(ret) => Ok(ret),
                 Err(err) => {
                     log::error!("[trace_id {trace_id}] flight->search: datafusion execute error: {}", err);
-                    Err(DataFusionError::Execution(err.to_string()))
+                    Err(Error::Message(err.to_string()))
                 }
             }
         },
         _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
             query_task.abort();
             log::error!("[trace_id {trace_id}] flight->search: search timeout");
-            Err(DataFusionError::ResourcesExhausted("flight->search: search timeout".to_string()))
+            Err(Error::ErrorCode(ErrorCodes::SearchTimeout("flight->search: search timeout".to_string())))
         },
         _ = async {
             #[cfg(feature = "enterprise")]
@@ -371,7 +370,7 @@ pub async fn search(
         } => {
             query_task.abort();
             log::info!("[trace_id {trace_id}] flight->search: search canceled");
-            Err(DataFusionError::ResourcesExhausted("flight->search: search canceled".to_string()))
+            Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery("flight->search: search canceled".to_string())))
         }
     };
 
@@ -382,12 +381,7 @@ pub async fn search(
     let (data, mut scan_stats, partial_err): (Vec<RecordBatch>, ScanStats, String) = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
-        Err(err) => match err {
-            DataFusionError::ResourcesExhausted(err) => Err(Error::ErrorCode(
-                ErrorCodes::SearchCancelQuery(err.to_string()),
-            )),
-            _ => Err(Error::Message(err.to_string())),
-        },
+        Err(err) => Err(err),
     }?;
 
     log::info!("[trace_id {trace_id}] flight->search: search finished");
