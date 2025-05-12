@@ -46,7 +46,10 @@ use crate::{
         http::HttpResponse as MetaHttpResponse,
         stream::{Stream, StreamProperty},
     },
-    service::{db, db::distinct_values, metrics::get_prom_metadata_from_schema},
+    service::{
+        db::{self, distinct_values},
+        metrics::get_prom_metadata_from_schema,
+    },
 };
 
 const LOCAL: &str = "disk";
