@@ -666,7 +666,7 @@ export default defineComponent({
         end_time: new Date(
           props.selectedTimeDate?.end_time?.toISOString(),
         ).getTime(), // End time in milliseconds
-        fields: [variableObject.query_data.field], // Fields to fetch
+        field: [variableObject.query_data.field], // Fields to fetch
         size: variableObject.query_data.max_record_size || 10, // Maximum number of records
         type: variableObject.query_data.stream_type, // Type of the stream
         query_context: queryContext, // Encoded query context
