@@ -417,7 +417,9 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("Should  apply the  filter group inside group", async ({ page }) => {
+  test.skip("Should  apply the  filter group inside group", async ({
+    page,
+  }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -1028,7 +1030,8 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="common-auto-complete"]').click();
     await page.locator('[data-test="common-auto-complete-option"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
-    await page.getByText("Error Loading Data").click();
+    // await page.getByText("Error Loading Data").click();
+    await expect(page.getByText('sql parser error: Expected:').first()).toBeVisible();
 
     await page
       .locator(
