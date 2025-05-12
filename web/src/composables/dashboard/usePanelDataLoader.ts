@@ -58,10 +58,6 @@ const adjustTimestampByTimeRangeGap = (
   return timestamp - timeRangeGapSeconds * 1000;
 };
 
-const calculateRawSize = (data: any) => {
-  return JSON.stringify(data).length;
-};
-
 // max raw size = 100KB
 
 export const usePanelDataLoader = (
@@ -84,10 +80,10 @@ export const usePanelDataLoader = (
 
   const store = useStore();
 
-  const MAX_RAW_SIZE =
-    (store.state?.zoConfig?.limit_panel_hits_size_in_kb ?? 100) * 1024 * 8;
+  const MAX_HITS_PER_PANEL =
+    store.state?.zoConfig?.limit_hits_per_panel ?? 5000;
 
-  const LIMIT_PANEL_HITS_SIZE_ERROR_MESSAGE = `Showing limited results upto ${store.state?.zoConfig?.limit_panel_hits_size_in_kb ?? 100}KB for performance`;
+  const LIMIT_HITS_PER_PANEL_ERROR_MESSAGE = `Showing limited results upto ${MAX_HITS_PER_PANEL} for performance`;
 
   const {
     fetchQueryDataWithWebSocket,
@@ -166,7 +162,6 @@ export const usePanelDataLoader = (
     loadingTotal: 0,
     loadingCompleted: 0,
     loadingProgressPercentage: 0,
-    rawSize: 0,
   });
 
   // observer for checking if panel is visible on the screen
@@ -337,7 +332,6 @@ export const usePanelDataLoader = (
 
   const cancelQueryAbort = () => {
     state.loading = false;
-    state.rawSize = 0;
     state.isOperationCancelled = true;
 
     if (isWebSocketEnabled() && state.searchRequestTraceIds) {
@@ -547,34 +541,34 @@ export const usePanelDataLoader = (
 
           // if order by is desc, append new partition response at end
           if (order_by.toLowerCase() === "desc") {
-            const currentHitsRawSize = calculateRawSize(searchRes.data.hits);
             const hitsLength = searchRes?.data?.hits?.length;
 
-            // first check if the raw size is greater than the max raw size
-            // if it is, then break the hits and append based on remaining raw size
-            // else append the hits and update the raw size
-            if (state.rawSize + currentHitsRawSize > MAX_RAW_SIZE) {
-              const remainingRawSize = MAX_RAW_SIZE - state.rawSize;
-
-              // calculate how much hits can append based on remaining raw size
-              const hitsToAppend = Math.max(
-                Math.floor(
-                  (remainingRawSize / currentHitsRawSize) * hitsLength,
-                ),
+            // if the hits length is greater than the max hits per panel,
+            //  then break the hits and append based on remaining raw size
+            // else append the hits
+            if (
+              (state?.data?.[currentQueryIndex]?.length ?? 0) + hitsLength >
+              MAX_HITS_PER_PANEL
+            ) {
+              const remainingHits = Math.max(
+                MAX_HITS_PER_PANEL -
+                  (state?.data?.[currentQueryIndex]?.length ?? 0),
                 0,
               );
 
-              const hits = searchRes.data.hits.slice(0, hitsToAppend);
+              const hits = searchRes.data.hits.slice(0, remainingHits);
 
               state.data[currentQueryIndex] = [
                 ...(state.data[currentQueryIndex] ?? []),
                 ...hits,
               ];
-              state.rawSize = state.rawSize + currentHitsRawSize;
+
+              // update result metadata
+              state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
 
               // add function error
               state.resultMetaData[currentQueryIndex].function_error =
-                LIMIT_PANEL_HITS_SIZE_ERROR_MESSAGE;
+                LIMIT_HITS_PER_PANEL_ERROR_MESSAGE;
 
               break;
             } else {
@@ -582,38 +576,38 @@ export const usePanelDataLoader = (
                 ...(state.data[currentQueryIndex] ?? []),
                 ...searchRes.data.hits,
               ];
-              state.rawSize = state.rawSize + currentHitsRawSize;
             }
           } else {
-            const currentHitsRawSize = calculateRawSize(searchRes.data.hits);
             const hitsLength = searchRes?.data?.hits?.length;
 
-            // first check if the raw size is greater than the max raw size
-            // if it is, then break the hits and append based on remaining raw size
-            // else append the hits and update the raw size
-            if (state.rawSize + currentHitsRawSize > MAX_RAW_SIZE) {
-              const remainingRawSize = MAX_RAW_SIZE - state.rawSize;
-
-              // calculate how much hits can append based on remaining raw size
-              const hitsToAppend = Math.max(
-                Math.floor(
-                  (remainingRawSize / currentHitsRawSize) * hitsLength,
-                ),
+            // if the hits length is greater than the max hits per panel,
+            //  then break the hits and append based on remaining raw size
+            // else append the hits
+            if (
+              (state?.data?.[currentQueryIndex]?.length ?? 0) + hitsLength >
+              MAX_HITS_PER_PANEL
+            ) {
+              const remainingHits = Math.max(
+                MAX_HITS_PER_PANEL -
+                  (state?.data?.[currentQueryIndex]?.length ?? 0),
                 0,
               );
 
-              const hits = searchRes.data.hits.slice(hitsLength - hitsToAppend);
+              const hits = searchRes.data.hits.slice(
+                hitsLength - remainingHits,
+              );
 
               state.data[currentQueryIndex] = [
                 ...hits,
                 ...(state.data[currentQueryIndex] ?? []),
               ];
 
-              state.rawSize = state.rawSize + currentHitsRawSize;
+              // update result metadata
+              state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
 
               // add function error
               state.resultMetaData[currentQueryIndex].function_error =
-                LIMIT_PANEL_HITS_SIZE_ERROR_MESSAGE;
+                LIMIT_HITS_PER_PANEL_ERROR_MESSAGE;
 
               break;
             } else {
@@ -621,7 +615,6 @@ export const usePanelDataLoader = (
                 ...(state.data[currentQueryIndex] ?? []),
                 ...searchRes.data.hits,
               ];
-              state.rawSize = state.rawSize + currentHitsRawSize;
             }
           }
 
@@ -697,7 +690,6 @@ export const usePanelDataLoader = (
     } finally {
       // set loading to false
       state.loading = false;
-      state.rawSize = 0;
       removeTraceId(traceId);
     }
   };
@@ -720,35 +712,31 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
-      const currentHitsRawSize = calculateRawSize(
-        searchRes?.content?.results?.hits,
-      );
       const hitsLength = searchRes?.content?.results?.hits?.length;
 
-      // first check if the raw size is greater than the max raw size
-      // if it is, then break the hits and append based on remaining raw size
-      // else append the hits and update the raw size
-      if (state.rawSize + currentHitsRawSize > MAX_RAW_SIZE) {
-        const remainingRawSize = MAX_RAW_SIZE - state.rawSize;
-
-        // calculate how much hits can append based on remaining raw size
-        const hitsToAppend = Math.max(
-          Math.floor((remainingRawSize / currentHitsRawSize) * hitsLength),
+      // if the hits length is greater than the max hits per panel,
+      //  then break the hits and append based on remaining raw size
+      // else append the hits
+      if (
+        (state?.data?.[payload?.queryReq?.currentQueryIndex]?.length ?? 0) +
+          hitsLength >
+        MAX_HITS_PER_PANEL
+      ) {
+        const remainingHits = Math.max(
+          MAX_HITS_PER_PANEL -
+            (state?.data?.[payload?.queryReq?.currentQueryIndex]?.length ?? 0),
           0,
         );
 
         const hits = searchRes?.content?.results?.hits?.slice(
-          hitsLength - hitsToAppend,
+          hitsLength - remainingHits,
         );
-
-        // add function error
 
         // else append new partition response at start
         state.data[payload?.queryReq?.currentQueryIndex] = [
           ...(hits ?? {}),
           ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
         ];
-        state.rawSize = state.rawSize + currentHitsRawSize;
 
         // update result metadata and add function error and return
         state.resultMetaData[payload?.queryReq?.currentQueryIndex] =
@@ -756,36 +744,34 @@ export const usePanelDataLoader = (
 
         state.resultMetaData[
           payload?.queryReq?.currentQueryIndex
-        ].function_error = LIMIT_PANEL_HITS_SIZE_ERROR_MESSAGE;
+        ].function_error = LIMIT_HITS_PER_PANEL_ERROR_MESSAGE;
         return;
       } else {
         state.data[payload?.queryReq?.currentQueryIndex] = [
           ...(searchRes?.content?.results?.hits ?? {}),
           ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
         ];
-        state.rawSize = state.rawSize + currentHitsRawSize;
       }
     } else {
-      const currentHitsRawSize = calculateRawSize(
-        searchRes?.content?.results?.hits,
-      );
       const hitsLength = searchRes?.content?.results?.hits?.length;
 
-      if (state.rawSize + currentHitsRawSize > MAX_RAW_SIZE) {
-        const remainingRawSize = MAX_RAW_SIZE - state.rawSize;
-
-        const hitsToAppend = Math.max(
-          Math.floor((remainingRawSize / currentHitsRawSize) * hitsLength),
+      if (
+        (state?.data?.[payload?.queryReq?.currentQueryIndex]?.length ?? 0) +
+          hitsLength >
+        MAX_HITS_PER_PANEL
+      ) {
+        const remainingHits = Math.max(
+          MAX_HITS_PER_PANEL -
+            (state?.data?.[payload?.queryReq?.currentQueryIndex]?.length ?? 0),
           0,
         );
 
-        const hits = searchRes?.content?.results?.hits?.slice(0, hitsToAppend);
+        const hits = searchRes?.content?.results?.hits?.slice(0, remainingHits);
 
         state.data[payload?.queryReq?.currentQueryIndex] = [
           ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
           ...(hits ?? {}),
         ];
-        state.rawSize = state.rawSize + currentHitsRawSize;
 
         // update result metadata and add function error and return
         state.resultMetaData[payload?.queryReq?.currentQueryIndex] =
@@ -794,14 +780,13 @@ export const usePanelDataLoader = (
         // add function error
         state.resultMetaData[
           payload?.queryReq?.currentQueryIndex
-        ].function_error = LIMIT_PANEL_HITS_SIZE_ERROR_MESSAGE;
+        ].function_error = LIMIT_HITS_PER_PANEL_ERROR_MESSAGE;
         return;
       } else {
         state.data[payload?.queryReq?.currentQueryIndex] = [
           ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
           ...(searchRes?.content?.results?.hits ?? {}),
         ];
-        state.rawSize = state.rawSize + currentHitsRawSize;
       }
     }
 
@@ -820,7 +805,6 @@ export const usePanelDataLoader = (
       if (response.type === "error") {
         // set loading to false
         state.loading = false;
-        state.rawSize = 0;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
         state.loadingProgressPercentage = 0;
@@ -832,7 +816,6 @@ export const usePanelDataLoader = (
       if (response.type === "end") {
         // set loading to false
         state.loading = false;
-        state.rawSize = 0;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
         state.loadingProgressPercentage = 0;
@@ -845,7 +828,6 @@ export const usePanelDataLoader = (
     } catch (error: any) {
       // set loading to false
       state.loading = false;
-      state.rawSize = 0;
       state.isOperationCancelled = false;
       state.loadingTotal = 0;
       state.loadingCompleted = 0;
@@ -921,7 +903,6 @@ export const usePanelDataLoader = (
     // set loading to false
     state.loading = false;
     state.isOperationCancelled = false;
-    state.rawSize = 0;
 
     // save current state to cache
     saveCurrentStateToCache();
@@ -940,7 +921,6 @@ export const usePanelDataLoader = (
     state.loadingCompleted = 0;
     state.loadingProgressPercentage = 0;
     state.isOperationCancelled = false;
-    state.rawSize = 0;
 
     processApiError(response?.content, "sql");
   };
@@ -1000,7 +980,6 @@ export const usePanelDataLoader = (
       };
       state.loading = false;
       state.isOperationCancelled = false;
-      state.rawSize = 0;
     }
   };
 
@@ -1029,7 +1008,6 @@ export const usePanelDataLoader = (
           queries: [],
         };
         state.resultMetaData = [];
-        state.rawSize = 0;
         return;
       }
 
@@ -1076,7 +1054,6 @@ export const usePanelDataLoader = (
         if (isRestoredFromCache) {
           state.loading = false;
           state.isOperationCancelled = false;
-          state.rawSize = 0;
           log("loadData: panelcache: restored from cache");
           runCount++;
           return;
@@ -1092,7 +1069,6 @@ export const usePanelDataLoader = (
 
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
-      state.rawSize = 0;
 
       // remove past error detail
       state.errorDetail = {
@@ -1175,7 +1151,6 @@ export const usePanelDataLoader = (
         try {
           // Call search API
           state.data = [];
-          state.rawSize = 0;
           state.metadata = {
             queries: [],
           };
@@ -1390,7 +1365,6 @@ export const usePanelDataLoader = (
               } finally {
                 // set loading to false
                 state.loading = false;
-                state.rawSize = 0;
               }
             } else {
               const { query: query1, metadata: metadata1 } = replaceQueryValue(
