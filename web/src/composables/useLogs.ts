@@ -5453,7 +5453,11 @@ const useLogs = () => {
       regeratePaginationFlag = true;
     }
   
-    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    if(response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs) {
+      searchObj.data.queryResults.aggs = response.content.results.hits;
+    } else {
+      searchObj.data.queryResults.hits.push(...response.content.results.hits);
+    }
 
     // if total records in partition is greater than recordsPerPage then we need to update pagination
     // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
@@ -5468,6 +5472,8 @@ const useLogs = () => {
     if (searchObj.data.queryResults.aggs == null) {
       searchObj.data.queryResults.aggs = [];
     }
+
+    searchObj.data.queryResults.streaming_aggs = response?.content?.streaming_aggs;
 
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     searchObj.data.queryResults.took += response.content.results.took;
