@@ -232,14 +232,17 @@ pub async fn search(
         );
 
         let mut storage_search_idx_optimize_rule = idx_optimize_rule.clone();
-        if physical_plan.name() == "AggregateExec"
-            && physical_plan.schema().fields().len() == 1
+        let is_aggregate_exec = physical_plan.name() == "AggregateExec";
+        let is_simple_count = physical_plan.schema().fields().len() == 1
             && matches!(
                 idx_optimize_rule,
                 Some(InvertedIndexOptimizeMode::SimpleCount)
-                    | Some(InvertedIndexOptimizeMode::SimpleHistogram)
-            )
-        {
+            );
+        let is_simple_histogram = matches!(
+            idx_optimize_rule,
+            Some(InvertedIndexOptimizeMode::SimpleHistogram)
+        );
+        if is_aggregate_exec && (is_simple_count || is_simple_histogram) {
             let (tantivy_files, datafusion_files) = split_file_list_by_time_range(
                 file_list,
                 req.search_info.start_time,

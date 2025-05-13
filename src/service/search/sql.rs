@@ -1379,6 +1379,7 @@ impl VisitorMut for ComplexQueryVisitor {
     }
 }
 
+#[derive(Debug)]
 struct HistogramIntervalVisitor {
     pub interval: Option<i64>,
     time_range: Option<(i64, i64)>,

@@ -20,6 +20,7 @@ use std::{
     sync::Arc,
 };
 
+use config::TIMESTAMP_COL_NAME;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use tantivy::{
@@ -215,6 +216,7 @@ pub async fn warm_up_terms(
     let mut warm_up_fields_futures = Vec::new();
     let mut warm_up_fields_term_futures = Vec::new();
     let mut warm_up_terms_futures = Vec::new();
+    let mut warm_up_fast_fields_futures = Vec::new();
     for (field, terms) in terms_grouped_by_field {
         for segment_reader in searcher.segment_readers() {
             let inv_idx = segment_reader.inverted_index(*field)?;
@@ -231,6 +233,9 @@ pub async fn warm_up_terms(
                 warm_up_terms_futures
                     .push(async move { inv_idx_clone.warm_postings(term, *position_needed).await });
             }
+            let fast_field_reader = segment_reader.fast_fields();
+            warm_up_fast_fields_futures
+                .push(async move { warm_up_fastfield(&fast_field_reader).await });
         }
     }
     if !warm_up_fields_futures.is_empty() {
@@ -242,5 +247,23 @@ pub async fn warm_up_terms(
     if !warm_up_terms_futures.is_empty() {
         try_join_all(warm_up_terms_futures).await?;
     }
+    if !warm_up_fast_fields_futures.is_empty() {
+        try_join_all(warm_up_fast_fields_futures).await?;
+    }
+    Ok(())
+}
+
+async fn warm_up_fastfield(
+    fast_field_reader: &tantivy::fastfield::FastFieldReaders,
+) -> anyhow::Result<()> {
+    let columns = fast_field_reader
+        .list_dynamic_column_handles(TIMESTAMP_COL_NAME)
+        .await?;
+    futures::future::try_join_all(
+        columns
+            .into_iter()
+            .map(|col| async move { col.file_slice().read_bytes_async().await }),
+    )
+    .await?;
     Ok(())
 }

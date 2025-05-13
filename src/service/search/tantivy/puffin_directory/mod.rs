@@ -33,8 +33,8 @@ pub mod writer;
 // We do not need all of the tantivy files, only the .term and .idx files
 // for getting doc IDs and also the meta.json file
 // This might change in the future when we add more features to the index
-const ALLOWED_FILE_EXT: &[&str] = &["term", "idx", "pos"];
-const EMPTY_FILE_EXT: &[&str] = &["fast", "fieldnorm", "store"];
+const ALLOWED_FILE_EXT: &[&str] = &["term", "idx", "pos", "fast"];
+const EMPTY_FILE_EXT: &[&str] = &["fieldnorm", "store"];
 const META_JSON: &str = "meta.json";
 const FOOTER_CACHE: &str = "footer_cache";
 
