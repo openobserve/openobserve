@@ -177,7 +177,7 @@ export default defineComponent({
       });
 
       const payload = {
-        field: variableObject.query_data.field,
+        fields: [variableObject.query_data.field],
         size: variableObject.query_data.max_record_size || 10,
         no_count: true,
         start_time: startTime,
@@ -361,23 +361,8 @@ export default defineComponent({
               variableObject,
               hits,
             });
-            // Set a value as soon as we have options if none is selected
-            if (variableObject.options.length > 0) {
-              if (variableObject.multiSelect) {
-                if (
-                  !variableObject.value ||
-                  variableObject.value.length === 0
-                ) {
-                  const oldValues = oldVariablesData[variableObject.name] || [];
-                  handleQueryValuesLogic(variableObject, oldValues);
-                }
-              } else if (!variableObject.value) {
-                const oldValues = oldVariablesData[variableObject.name]
-                  ? [oldVariablesData[variableObject.name]]
-                  : [];
-                handleQueryValuesLogic(variableObject, oldValues);
-              }
-            }
+
+            updateVariableOptions(variableObject, hits);
 
             // Process any child variables immediately if we have options
             const childVariables =
@@ -424,7 +409,7 @@ export default defineComponent({
 
     const handleSearchReset = (data: any) => {
       const variableObject = variablesData.values.find(
-        (v: any) => v.query_data?.field === data.payload.queryReq.field,
+        (v: any) => v.query_data?.field === data.payload.queryReq.fields[0],
       );
       if (variableObject) {
         // resetVariableState(variableObject);
