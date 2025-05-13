@@ -366,7 +366,7 @@ pub async fn do_partitioned_search(
         req.query.start_time = start_time;
         req.query.end_time = end_time;
 
-        if req_size != -1 {
+        if req_size != -1 && !is_streaming_aggs{
             req.query.size -= curr_res_size;
         }
 
