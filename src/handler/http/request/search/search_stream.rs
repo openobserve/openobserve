@@ -245,7 +245,7 @@ pub async fn search_http2_stream(
                                 let message = code.get_message();
                                 let error_detail = code.get_error_detail();
                                 let http_response =
-                                    map_error_to_http_response(&err, "".to_string());
+                                    map_error_to_http_response(&err, None);
 
                                 StreamResponses::Error {
                                     code: http_response.status().into(),
@@ -422,7 +422,7 @@ pub async fn values_http2_stream(
                     infra::errors::Error::ErrorCode(ref code) => {
                         let message = code.get_message();
                         let error_detail = code.get_error_detail();
-                        let http_response = map_error_to_http_response(&err, "".to_string());
+                        let http_response = map_error_to_http_response(&err, None);
 
                         config::meta::search::StreamResponses::Error {
                             code: http_response.status().into(),
