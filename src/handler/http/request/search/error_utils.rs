@@ -20,21 +20,15 @@ use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse, handler::http::router::ERROR_HEADER,
 };
 
-pub fn map_error_to_http_response(err: &errors::Error, trace_id: String) -> HttpResponse {
+pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> HttpResponse {
     match err {
         errors::Error::ErrorCode(code) => match code {
             errors::ErrorCodes::RatelimitExceeded(_) => HttpResponse::TooManyRequests()
                 .append_header((ERROR_HEADER, code.to_json()))
-                .json(MetaHttpResponse::error_code_with_trace_id(
-                    code,
-                    Some(trace_id),
-                )),
+                .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
             errors::ErrorCodes::SearchTimeout(_) => HttpResponse::RequestTimeout()
                 .append_header((ERROR_HEADER, code.to_json()))
-                .json(MetaHttpResponse::error_code_with_trace_id(
-                    code,
-                    Some(trace_id),
-                )),
+                .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
             errors::ErrorCodes::InvalidParams(_)
             | errors::ErrorCodes::SearchSQLExecuteError(_)
             | errors::ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
@@ -45,18 +39,12 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: String) -> Http
             | errors::ErrorCodes::SearchStreamNotFound(_)
             | errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::BadRequest()
                 .append_header((ERROR_HEADER, code.to_json()))
-                .json(MetaHttpResponse::error_code_with_trace_id(
-                    code,
-                    Some(trace_id),
-                )),
+                .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
 
             errors::ErrorCodes::ServerInternalError(_)
             | errors::ErrorCodes::SearchParquetFileNotFound => HttpResponse::InternalServerError()
                 .append_header((ERROR_HEADER, code.to_json()))
-                .json(MetaHttpResponse::error_code_with_trace_id(
-                    code,
-                    Some(trace_id),
-                )),
+                .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
         },
         _ => HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, err.to_string()))

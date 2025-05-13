@@ -243,8 +243,7 @@ impl WsServerEvents {
             errors::Error::ErrorCode(code) => {
                 let message = code.get_message();
                 let error_detail = code.get_error_detail();
-                let http_response =
-                    map_error_to_http_response(err, trace_id.clone().unwrap_or_default());
+                let http_response = map_error_to_http_response(err, trace_id.clone());
                 WsServerEvents::Error {
                     code: http_response.status().into(),
                     message,
