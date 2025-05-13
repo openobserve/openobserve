@@ -61,6 +61,7 @@ const useHttpStreaming = () => {
       for (const handler of traceMap.value[traceId].complete) {
         handler(traceId);
       }
+      cleanUpListeners(traceId);
       return
     }
 
@@ -94,6 +95,9 @@ const useHttpStreaming = () => {
     for (const handler of traceMap.value[traceId].error) {
       handler(response, traceId);
     }
+
+    cleanUpListeners(traceId);
+
   };
 
   const onReset = (data: any, traceId: string) => {
@@ -216,7 +220,11 @@ const useHttpStreaming = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        onError(traceId, {
+          status: response.status,
+          ...(await response.json()),
+        });
+        return;
       }
 
       // Set up worker for stream processing

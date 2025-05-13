@@ -1703,7 +1703,7 @@ export const usePanelDataLoader = (
 
         const errorCode =
           isWebSocketEnabled() || isStreamingEnabled()
-            ? error?.response?.data?.code || error?.code || ""
+            ? error?.response?.data?.code || error?.code || error?.status || ""
             : error?.response?.status ||
               error?.status ||
               error?.response?.data?.code ||
