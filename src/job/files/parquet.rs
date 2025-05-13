@@ -1586,6 +1586,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     let index_opts = tantivy::schema::NumericOptions::default()
         .set_coerce()   // coerce values if not a number
         .set_stored()   // persist values into the Tantivy's store
+        .set_fast() // designate the field as a FAST field for random access
         .set_indexed(); //generate a posting list -> searchable field
     tantivy_schema_builder.add_i64_field(TIMESTAMP_COL_NAME, index_opts);
     let tantivy_schema = tantivy_schema_builder.build();

@@ -18,7 +18,7 @@ use std::{collections::HashSet, sync::Arc};
 use anyhow::Context;
 use arrow_schema::Schema;
 use config::{
-    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL,
+    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
     meta::{
@@ -985,8 +985,24 @@ async fn search_tantivy_index(
             }
             (true, Some(InvertedIndexOptimizeMode::SimpleCount)) => tantivy_searcher
                 .search(&query, &tantivy::collector::Count)
-                .map(|ret| (HashSet::new(), ret)),
-            (true, Some(InvertedIndexOptimizeMode::SimpleHistogram)) => todo!("taiming"),
+                .map(|ret| {
+                    log::warn!("tantivy count result: {:?}", ret);
+                    (HashSet::new(), ret)
+                }),
+            (true, Some(InvertedIndexOptimizeMode::SimpleHistogram)) => tantivy_searcher
+                .search(
+                    &tantivy::query::AllQuery,
+                    &tantivy::collector::HistogramCollector::new::<i64>(
+                        TIMESTAMP_COL_NAME.to_string(),
+                        1746834941116293i64,
+                        10,
+                        2,
+                    ),
+                )
+                .map(|ret| {
+                    log::warn!("tantivy histogram result: {:?}", ret);
+                    (HashSet::new(), ret.len())
+                }),
         })
         .await??;
 
@@ -1211,5 +1227,43 @@ mod tests {
         ];
         let max_index = find_max_group_index(&groups);
         assert_eq!(max_index, 1);
+    }
+
+    #[test]
+    fn test_histogram_i64() {
+        const MARGIN_IN_BYTES: usize = 1_000_000;
+        const MEMORY_BUDGET_NUM_BYTES_MIN: usize = ((MARGIN_IN_BYTES as u32) * 15u32) as usize;
+
+        let mut schema_builder = tantivy::schema::SchemaBuilder::new();
+        let val_field = schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
+        let schema = schema_builder.build();
+        let index = tantivy::index::Index::create_in_ram(schema);
+        let mut writer = index
+            .writer_with_num_threads(1, MEMORY_BUDGET_NUM_BYTES_MIN)
+            .unwrap();
+        writer
+            .add_document(tantivy::doc!(val_field=>12i64))
+            .unwrap();
+        writer
+            .add_document(tantivy::doc!(val_field=>-30i64))
+            .unwrap();
+        writer
+            .add_document(tantivy::doc!(val_field=>-12i64))
+            .unwrap();
+        writer
+            .add_document(tantivy::doc!(val_field=>-10i64))
+            .unwrap();
+        writer.commit().unwrap();
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        let all_query = tantivy::query::AllQuery;
+        let histogram_collector = tantivy::collector::HistogramCollector::new(
+            TIMESTAMP_COL_NAME.to_string(),
+            -20i64,
+            10u64,
+            4,
+        );
+        let histogram = searcher.search(&all_query, &histogram_collector).unwrap();
+        assert_eq!(histogram, vec![1, 1, 0, 1]);
     }
 }
