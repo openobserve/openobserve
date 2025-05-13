@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div   class="row tw-min-h-[44px]">
         <div
-          class="col-6 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
+          class="col-7 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-6 text-left q-pl-lg q-mt-xs warning flex items-center">
+        <div v-else class="col-7 text-left q-pl-lg q-mt-xs warning flex items-center">
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
         </div>
 
-        <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
+        <div class="col-5 text-right q-pr-md q-gutter-xs pagination-block">
           
           <q-pagination
             v-if="searchObj.meta.resultGrid.showPagination"
