@@ -186,7 +186,7 @@ export default defineComponent({
         stream_type: variableObject.query_data.stream_type || "logs",
         use_cache: (window as any).use_cache ?? true,
         sql: queryContext || "",
-        org_identifier: store.state.selectedOrganization.identifier,
+        // org_identifier: store.state.selectedOrganization.identifier,
       };
 
       const wsPayload = {
@@ -314,6 +314,10 @@ export default defineComponent({
                     : "<blank>",
                 value: value.zo_sql_key.toString(),
               }));
+            console.log(
+              `[WebSocket] New options for variable based on ${variableObject.name}:`,
+              newOptions,
+            );
 
             if (!Array.isArray(variableObject.options)) {
               variableObject.options = [];
@@ -322,38 +326,38 @@ export default defineComponent({
             const existingValuesSet = new Set(
               variableObject.options.map((opt: any) => opt.value),
             );
+            console.log(
+              `[WebSocket] Existing options for ${variableObject.name}:`,
+              variableObject.options,
+            );
 
-            newOptions.forEach((opt) => {
+            newOptions.forEach((opt: any) => {
               if (!existingValuesSet.has(opt.value)) {
                 variableObject.options.push(opt);
               }
             });
 
-            variableObject.options.sort((a, b) =>
+            console.log(
+              `[WebSocket] New options for ${variableObject.name}:`,
+              variableObject.options,
+            );
+
+            variableObject.options.sort((a: any, b: any) =>
               a.label.localeCompare(b.label),
             );
-          }
-          if (oldVariablesData[variableObject.name] !== undefined) {
-            const oldValues = Array.isArray(
-              oldVariablesData[variableObject.name],
-            )
-              ? oldVariablesData[variableObject.name]
-              : [oldVariablesData[variableObject.name]];
-
             console.log(
-              `[WebSocket] Restoring old values for ${variableObject.name}:`,
+              `[WebSocket] Sorted options for ${variableObject.name}:`,
               {
-                oldValues,
-                type: variableObject.type,
+                options: variableObject.options,
               },
             );
-
-            if (variableObject.type === "custom") {
-              handleCustomVariablesLogic(variableObject, oldValues);
-            } else {
-              handleQueryValuesLogic(variableObject, oldValues);
-            }
           }
+          console.log("before updateVariableOptions", {
+            variableObject,
+            hits,
+          });
+
+          updateVariableOptions(variableObject, hits);
 
           // Handle child variables
           const childVariables =
@@ -840,15 +844,30 @@ export default defineComponent({
      * @returns {Promise<boolean>} - true if the variable was loaded successfully, false if it was not
      */
     const loadSingleVariableDataByName = async (variableObject: any) => {
+      console.log(
+        `[WebSocket] Loading variable data for ${variableObject.name}:`,
+        variableObject,
+      );
+      console.log(
+        `[WebSocket] Currently executing promises:`,
+        currentlyExecutingPromises,
+      );
+
       return new Promise(async (resolve, reject) => {
         const { name } = variableObject;
 
         if (!name || !variableObject) {
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: variableObject is invalid`,
+          );
           return resolve(false);
         }
 
         // If the variable is already being processed
         if (currentlyExecutingPromises[name]) {
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: cancelling previous promise for ${name}`,
+          );
           currentlyExecutingPromises[name](false);
         }
         currentlyExecutingPromises[name] = reject;
@@ -863,20 +882,36 @@ export default defineComponent({
             isInvalidDate(props.selectedTimeDate?.start_time) ||
             isInvalidDate(props.selectedTimeDate?.end_time)
           ) {
+            console.log(
+              `[WebSocket] loadSingleVariableDataByName: invalid date for ${name}`,
+            );
             return resolve(false);
           }
         }
 
         // For variables with dependencies, check if dependencies are loaded
         if (hasParentVariables && isDependentVariableLoading(variableObject)) {
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: dependent variables are still loading for ${name}`,
+          );
           return resolve(false);
         }
 
         try {
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: starting to load ${name}`,
+          );
           const success = await handleVariableType(variableObject);
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: finished loading ${name}`,
+          );
           await finalizeVariableLoading(variableObject, success);
           resolve(success);
         } catch (error) {
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: error loading ${name}`,
+            error,
+          );
           await finalizeVariableLoading(variableObject, false);
           resolve(false);
         }
@@ -889,31 +924,62 @@ export default defineComponent({
      * @returns {Promise<boolean>} - true if the variable was handled successfully, false if it was not
      */
     const handleVariableType = async (variableObject: any) => {
+      console.log(
+        `[WebSocket] handleVariableType: starting handle for ${variableObject.name}`,
+      );
       switch (variableObject.type) {
         case "query_values": {
+          console.log(
+            `[WebSocket] handleVariableType: building query context for ${variableObject.name}`,
+          );
           try {
             const queryContext: any = await buildQueryContext(variableObject);
+            console.log(
+              `[WebSocket] handleVariableType: built query context for ${variableObject.name}`,
+            );
             const response = await fetchFieldValues(
               variableObject,
               queryContext,
             );
+            console.log(
+              `[WebSocket] handleVariableType: fetched field values for ${variableObject.name}`,
+            );
             updateVariableOptions(variableObject, response.data.hits);
+            console.log(
+              `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
+            );
             return true;
           } catch (error) {
+            console.log(
+              `[WebSocket] handleVariableType: error fetching field values for ${variableObject.name}`,
+              error,
+            );
             resetVariableState(variableObject);
             return false;
           }
         }
         case "custom": {
+          console.log(
+            `[WebSocket] handleVariableType: handling custom variable ${variableObject.name}`,
+          );
           handleCustomVariable(variableObject);
+          console.log(
+            `[WebSocket] handleVariableType: finished handling custom variable ${variableObject.name}`,
+          );
           return true;
         }
         case "constant":
         case "textbox":
         case "dynamic_filters": {
+          console.log(
+            `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
+          );
           return true;
         }
         default: {
+          console.log(
+            `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
+          );
           return false;
         }
       }
@@ -1050,7 +1116,13 @@ export default defineComponent({
           const oldValues = Array.isArray(oldVariablesData[variableObject.name])
             ? oldVariablesData[variableObject.name]
             : [oldVariablesData[variableObject.name]];
-
+          console.log(
+            `[WebSocket] before Restoring old values for ${variableObject.name}:`,
+            {
+              oldValues,
+              type: variableObject.type,
+            },
+          );
           if (variableObject.type === "custom") {
             // Handle custom variable logic
             handleCustomVariablesLogic(variableObject, oldValues);
@@ -1085,6 +1157,10 @@ export default defineComponent({
     ) => {
       const { name } = variableObject;
 
+      console.log(
+        `[WebSocket] Finalizing load for ${name} with success=${success}`,
+      );
+
       // Clear the currently executing promise
       currentlyExecutingPromises[name] = null;
 
@@ -1092,14 +1168,28 @@ export default defineComponent({
         // Update old variables data
         oldVariablesData[name] = variableObject.value;
 
+        console.log(
+          `[WebSocket] Updated old variables data for ${name}`,
+          oldVariablesData,
+        );
+
         // Update loading states
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
+
+        console.log(
+          `[WebSocket] Updated loading states for ${name}`,
+          variableObject,
+        );
 
         // Update global loading state
         variablesData.isVariablesLoading = variablesData.values.some(
           (val: { isLoading: any; isVariableLoadingPending: any }) =>
             val.isLoading || val.isVariableLoadingPending,
+        );
+
+        console.log(
+          `[WebSocket] Updated global loading state to ${variablesData.isVariablesLoading}`,
         );
 
         // Don't load child variables on dropdown open events
@@ -1111,8 +1201,15 @@ export default defineComponent({
             (variable: any) => childVariables.includes(variable.name),
           );
 
+          console.log(
+            `[WebSocket] Found child variables for ${name}`,
+            childVariableObjects,
+          );
+
           // Only load children if the parent value actually changed
           if (oldVariablesData[name] !== variableObject.value) {
+            console.log(`[WebSocket] Loading child variables for ${name}`);
+
             await Promise.all(
               childVariableObjects.map((childVariable: any) =>
                 loadSingleVariableDataByName(childVariable),
@@ -1135,6 +1232,10 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when the options have been loaded.
      */
     const loadVariableOptions = async (variableObject: any) => {
+      console.log(
+        `[WebSocket] Loading options for ${variableObject.name} on dropdown open`,
+      );
+
       // When a dropdown is opened, only load the variable data
       await loadSingleVariableDataByName(variableObject);
     };
