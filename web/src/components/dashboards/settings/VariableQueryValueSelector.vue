@@ -251,24 +251,30 @@ export default defineComponent({
         return "";
       }
     });
-
     const loadFieldValues = () => {
       console.log("[Dropdown] Loading field values:", {
         variableName: props.variableItem?.name,
         isLoading: props.variableItem.isLoading,
-        hasLoadOptions: !!props.loadOptions,
+        hasLoadOptions: props.loadOptions,
+        currentOptions: props.variableItem?.options,
+        hasExistingValue: !!selectedValue.value,
+        optionsLength: options.value?.length,
       });
+
       if (props.variableItem.isLoading || !props.loadOptions) {
         return;
       }
       loadVariableTemp();
     };
-
     const loadVariableTemp = () => {
       console.log("[Dropdown] Loading variable temp:", {
         variableName: props.variableItem?.name,
         currentOptions: props.variableItem.options,
+        currentValue: selectedValue.value,
+        isLoading: props.variableItem.isLoading,
+        hasLoadOptions: props.loadOptions,
       });
+
       try {
         props.loadOptions(props.variableItem);
         options.value = props.variableItem.options;
