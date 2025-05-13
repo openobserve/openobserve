@@ -873,7 +873,7 @@ pub async fn build_search_request_per_field(
     for field in fields {
         let sql = if no_count {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
+                "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
             )
         } else {
             format!(
