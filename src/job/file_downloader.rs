@@ -134,8 +134,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
-    // add files to priority queue
+    // main task: add files to priority queue
     let rx = PRIORITY_FILE_DOWNLOAD_CHANNEL.receiver.clone();
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+
     tokio::spawn(async move {
         loop {
             let ret = rx.lock().await.recv().await;
@@ -144,6 +146,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     log::debug!(
                         "[FILE_CACHE_DOWNLOAD:PRIORITY_QUEUE:JOB] Receiving channel is closed"
                     );
+                    if shutdown_tx.send(true).is_err() {
+                        log::error!(
+                            "[FILE_CACHE_DOWNLOAD:PRIORITY_QUEUE:JOB] Failed to send disconnect signal"
+                        );
+                    }
                     break;
                 }
                 Some((trace_id, file, file_size, cache)) => {
@@ -155,10 +162,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     });
 
-    // handle priority queue download
+    // worker tasks: handle priority queue download
     for _ in 0..cfg.limit.file_download_priority_queue_thread_num {
+        let shutdown_rx = shutdown_rx.clone();
         tokio::spawn(async move {
             loop {
+                if *shutdown_rx.borrow() {
+                    log::warn!(
+                        "[FILE_CACHE_DOWNLOAD:PRIORITY_QUEUE:JOB] Received shutdown signal, exiting"
+                    );
+                    break;
+                }
+
                 let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
                 match file_info {
                     Some((trace_id, file, file_size, cache)) => {
