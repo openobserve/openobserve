@@ -950,18 +950,31 @@ export default defineComponent({
             console.log(
               `[WebSocket] handleVariableType: built query context for ${variableObject.name}`,
             );
-            const response = await fetchFieldValues(
-              variableObject,
-              queryContext,
-            );
-            console.log(
-              `[WebSocket] handleVariableType: fetched field values for ${variableObject.name}`,
-            );
-            updateVariableOptions(variableObject, response.data.hits);
-            console.log(
-              `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
-            );
-            return true;
+
+            if (isWebSocketEnabled()) {
+              // For WebSocket, we don't need to wait for the response here
+              // as it will be handled by the WebSocket handlers
+              fetchFieldValuesWithWebsocket(variableObject, queryContext);
+              return true;
+            } else {
+              // For REST API, we handle the response directly
+              const response = await fetchFieldValuesREST(
+                variableObject,
+                queryContext,
+              );
+              console.log(
+                `[WebSocket] handleVariableType: fetched field values for ${variableObject.name}`,
+                response,
+              );
+              if (response?.data?.hits) {
+                updateVariableOptions(variableObject, response.data.hits);
+                console.log(
+                  `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
+                );
+                return true;
+              }
+            }
+            return false;
           } catch (error) {
             console.log(
               `[WebSocket] handleVariableType: error fetching field values for ${variableObject.name}`,
@@ -1047,27 +1060,6 @@ export default defineComponent({
 
       // Base64 encode the query context
       return b64EncodeUnicode(queryContext);
-    };
-
-    /**
-     * Fetches field values based on the provided variable object and query context.
-     * @param variableObject - The variable object containing query data.
-     * @param queryContext - The context for the query as a string.
-     * @returns The response from the stream service containing field values.
-     */
-    const fetchFieldValues = async (
-      variableObject: any,
-      queryContext: string,
-    ) => {
-      if (isWebSocketEnabled()) {
-        variableObject.isLoading = true;
-        fetchFieldValuesWithWebsocket(variableObject, queryContext);
-        console.log("[WebSocket] Starting fetch for", variableObject.name);
-
-        // Return a dummy response since WebSocket is asynchronous
-        return { data: { hits: [] } };
-      }
-      return fetchFieldValuesREST(variableObject, queryContext);
     };
 
     /**
