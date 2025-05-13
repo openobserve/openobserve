@@ -87,6 +87,7 @@ export interface ErrorContent {
   trace_id?: string;
   code?: number;
   error_detail?: string;
+  error?: string;
 }
 
 export interface WebSocketErrorResponse {
