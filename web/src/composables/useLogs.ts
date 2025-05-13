@@ -2290,7 +2290,7 @@ const useLogs = () => {
         return;
       }
       if (searchObj.meta.jobId != "") {
-        searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
+        // searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
       }
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
@@ -2505,7 +2505,7 @@ const useLogs = () => {
             await getPaginatedData(queryReq, true);
           }
           if (searchObj.meta.jobId != "") {
-            searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
+            // searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
             searchObj.data.queryResults.pagination = [];
             refreshJobPagination(true);
           }
