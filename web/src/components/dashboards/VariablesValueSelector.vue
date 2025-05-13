@@ -303,6 +303,12 @@ export default defineComponent({
           );
 
           if (fieldHit) {
+            // Initialize options array if it doesn't exist
+            if (!Array.isArray(variableObject.options)) {
+              variableObject.options = [];
+            }
+
+            // Get new values from the response
             const newOptions = fieldHit.values
               .filter(
                 (value: any) => value.zo_sql_key || value.zo_sql_key === "",
@@ -319,10 +325,7 @@ export default defineComponent({
               newOptions,
             );
 
-            if (!Array.isArray(variableObject.options)) {
-              variableObject.options = [];
-            }
-
+            // Create a set of existing values for quick lookup
             const existingValuesSet = new Set(
               variableObject.options.map((opt: any) => opt.value),
             );
@@ -331,9 +334,11 @@ export default defineComponent({
               variableObject.options,
             );
 
+            // Add only new values to the existing options array
             newOptions.forEach((opt: any) => {
               if (!existingValuesSet.has(opt.value)) {
                 variableObject.options.push(opt);
+                existingValuesSet.add(opt.value);
               }
             });
 
@@ -345,34 +350,54 @@ export default defineComponent({
             variableObject.options.sort((a: any, b: any) =>
               a.label.localeCompare(b.label),
             );
+
             console.log(
               `[WebSocket] Sorted options for ${variableObject.name}:`,
               {
                 options: variableObject.options,
               },
             );
-          }
-          console.log("before updateVariableOptions", {
-            variableObject,
-            hits,
-          });
-
-          updateVariableOptions(variableObject, hits);
-
-          // Handle child variables
-          const childVariables =
-            variablesDependencyGraph[variableObject.name]?.childVariables || [];
-          if (childVariables.length > 0) {
-            console.log(
-              `[WebSocket] Loading child variables for ${variableObject.name}:`,
-              childVariables,
-            );
-            const childVariableObjects = variablesData.values.filter(
-              (variable: any) => childVariables.includes(variable.name),
-            );
-            childVariableObjects.forEach((childVariable: any) => {
-              loadSingleVariableDataByName(childVariable);
+            console.log("before updateVariableOptions", {
+              variableObject,
+              hits,
             });
+            // Set a value as soon as we have options if none is selected
+            if (variableObject.options.length > 0) {
+              if (variableObject.multiSelect) {
+                if (
+                  !variableObject.value ||
+                  variableObject.value.length === 0
+                ) {
+                  const oldValues = oldVariablesData[variableObject.name] || [];
+                  handleQueryValuesLogic(variableObject, oldValues);
+                }
+              } else if (!variableObject.value) {
+                const oldValues = oldVariablesData[variableObject.name]
+                  ? [oldVariablesData[variableObject.name]]
+                  : [];
+                handleQueryValuesLogic(variableObject, oldValues);
+              }
+            }
+
+            // Process any child variables immediately if we have options
+            const childVariables =
+              variablesDependencyGraph[variableObject.name]?.childVariables ||
+              [];
+
+            if (childVariables.length > 0) {
+              console.log(
+                `[WebSocket] Loading child variables for ${variableObject.name}:`,
+                childVariables,
+              );
+              const childVariableObjects = variablesData.values.filter(
+                (variable: any) => childVariables.includes(variable.name),
+              );
+
+              // Start loading child variables right away
+              childVariableObjects.forEach((childVariable: any) => {
+                loadSingleVariableDataByName(childVariable);
+              });
+            }
           }
         }
       } catch (error) {
@@ -383,6 +408,7 @@ export default defineComponent({
       // Only set loading to false after all processing is complete
       variableObject.isLoading = false;
       variableObject.isVariableLoadingPending = false;
+
       console.log(
         `[WebSocket] Completed processing for ${variableObject.name}:`,
         {
@@ -392,6 +418,8 @@ export default defineComponent({
           options: variableObject.options,
         },
       );
+      // Emit updated data to ensure UI gets notified
+      emitVariablesData();
     };
 
     const handleSearchReset = (data: any) => {
