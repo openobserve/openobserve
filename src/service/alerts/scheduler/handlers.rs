@@ -44,12 +44,13 @@ use proto::cluster_rpc;
 
 use crate::service::{
     alerts::{
-        alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
+        alert::{self, AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
         derived_streams::DerivedStreamExt,
     },
     dashboards::reports::SendReport,
-    db::{self, alerts::alert::set_without_updating_trigger},
+    db::{self, alerts::alert::set_without_updating_trigger, pipeline},
     ingestion::ingestion_service,
+    organization::is_org_in_free_trial_period,
     pipeline::batch_execution::ExecutablePipeline,
     self_reporting::publish_triggers_usage,
 };
@@ -190,6 +191,35 @@ async fn handle_alert_triggers(
             trigger.module_key
         ));
     };
+
+    #[cfg(feature = "cloud")]
+    {
+        // TODO (YJDoc2) : if we enabled alert, does the trigger gets reset?
+        if !is_org_in_free_trial_period(&trigger.org).await? {
+            let mut alert = alert;
+            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            alert.enabled = false;
+            log::info!(
+                "disabling alert {} id {} in org {} because free trial expiry",
+                alert.name,
+                trigger.module_key,
+                trigger.org
+            );
+            alert::update(client, &trigger.org, None, alert.clone()).await?;
+            let mut new_trigger = db::scheduler::Trigger {
+                next_run_at: Utc::now().timestamp_micros(),
+                is_realtime: alert.is_real_time,
+                is_silenced: true,
+                status: db::scheduler::TriggerStatus::Waiting,
+                retries: 0,
+                ..trigger.clone()
+            };
+            // update trigger, check on next week
+            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+            db::scheduler::update_trigger(new_trigger).await?;
+            return Ok(());
+        }
+    }
 
     let is_realtime = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
@@ -641,6 +671,24 @@ async fn handle_report_triggers(
         ..trigger.clone()
     };
 
+    #[cfg(feature = "cloud")]
+    {
+        if !is_org_in_free_trial_period(&trigger.org).await? {
+            let mut report = report;
+            report.enabled = false;
+            log::info!(
+                "disabling report {}  in org {} because free trial expiry",
+                report_name,
+                trigger.org
+            );
+            db::dashboards::reports::set(org_id, &report, false).await?;
+            // update trigger, check on next week
+            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+            db::scheduler::update_trigger(new_trigger).await?;
+            return Ok(());
+        }
+    }
+
     if !report.enabled {
         log::debug!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Report not enabled: org: {}, report: {}",
@@ -912,6 +960,25 @@ async fn handle_derived_stream_triggers(
             err_msg
         ));
     };
+
+    #[cfg(feature = "cloud")]
+    {
+        if !is_org_in_free_trial_period(&trigger.org).await? {
+            let mut pipeline = pipeline;
+            pipeline.enabled = false;
+            log::info!(
+                "disabling pipeline {} id {} in org {} because free trial expiry",
+                pipeline.name,
+                pipeline_id,
+                trigger.org
+            );
+            pipeline::update(&pipeline, None).await?;
+            // update trigger, check on next day
+            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+            db::scheduler::update_trigger(new_trigger).await?;
+            return Ok(());
+        }
+    }
 
     if !pipeline.enabled {
         // Pipeline not enabled, check again in 5 mins
