@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="row tw-min-h-[44px]">
         <div
-          class="col-6 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
+          class="col-7 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
