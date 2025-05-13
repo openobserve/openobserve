@@ -20,12 +20,7 @@ use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse, handler::http::router::ERROR_HEADER,
 };
 
-pub fn map_error_to_http_response(err: &errors::Error, trace_id: String) -> HttpResponse {
-    let trace_id = if trace_id.is_empty() {
-        None
-    } else {
-        Some(trace_id)
-    };
+pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> HttpResponse {
     match err {
         errors::Error::ErrorCode(code) => match code {
             errors::ErrorCodes::RatelimitExceeded(_) => HttpResponse::TooManyRequests()

@@ -23,9 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="searchListContainer"
       style="width: 100%"
     >
-      <div class="row">
+      <div class="row tw-min-h-[44px]">
         <div
-          class="col-6 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
+          class="col-7 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="col-6 text-left q-pl-lg q-mt-xs warning flex items-center"
+          class="col-7 text-left q-pl-lg q-mt-xs warning flex items-center"
         >
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
+        <div class="col-5 text-right q-pr-md q-gutter-xs pagination-block">
           <q-pagination
             v-if="searchObj.meta.resultGrid.showPagination"
             :disable="searchObj.loading == true"
@@ -173,19 +173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </h3>
         </div>
 
-        <div
-          v-else-if="
-            searchObj.meta.showHistogram &&
-            Object.keys(plotChart)?.length == 0 &&
-            searchObj.loadingHistogram == false &&
-            searchObj.loading == false
-          "
-        >
-          <h3 class="text-center" style="margin: 30px 0px">
-            <q-icon name="warning" color="warning" size="xs"></q-icon> No data
-            found for histogram.
-          </h3>
-        </div>
         <div
           class="q-pb-lg"
           style="top: 50px; position: absolute; left: 50%"

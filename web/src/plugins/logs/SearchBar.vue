@@ -717,9 +717,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:query="searchObj.data.query"
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
-              @keydown.ctrl.enter="handleRunQueryFn"
               @update:query="updateQueryValue"
               @run-query="handleRunQueryFn"
+              @keydown="handleKeyDown"
               :class="
                 searchObj.data.editorValue == '' &&
                 searchObj.meta.queryEditorPlaceholderFlag
@@ -749,7 +749,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'empty-function'
                       : ''
                   "
-                  @keydown.ctrl.enter="handleRunQueryFn"
+                  @keydown="handleKeyDown"
                   language="vrl"
                   @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
                   @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
@@ -1355,6 +1355,11 @@ export default defineComponent({
           });
         });
     },
+    handleKeyDown(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          this.handleRunQueryFn();
+      }
+    }
   },
   props: {
     fieldValues: {
