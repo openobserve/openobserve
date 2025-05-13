@@ -1388,7 +1388,7 @@ const useLogs = () => {
     }
   };
 
-  const refreshPartitionPagination = (regenrateFlag: boolean = false) => {
+  const refreshPartitionPagination = (regenrateFlag: boolean = false, isStreamingOutput: boolean = false) => {
     if (searchObj.meta.jobId != "") {
       return;
     }
@@ -1434,12 +1434,19 @@ const useLogs = () => {
           ) {
           }
         } else {
-          searchObj.data.queryResults.total =
+          // if streaming output is enabled, then we need to update the total as the last partition total, as the last partition total is the total of all the records in case of streaming output
+          if(isStreamingOutput) {
+            if(partitionDetail.partitionTotal[partitionDetail.partitionTotal?.length - 1] > -1)
+              searchObj.data.queryResults.total = partitionDetail.partitionTotal[partitionDetail.partitionTotal.length - 1];
+          } else {
+            // if streaming output is disabled, then we need to update the total as the sum of all partition totals
+            searchObj.data.queryResults.total =
             partitionDetail.partitionTotal.reduce(
               (accumulator: number, currentValue: number) =>
                 accumulator + Math.max(currentValue, 0),
               0,
             );
+          }
         }
         // partitionDetail.partitions.forEach((item: any, index: number) => {
         for (const [index, item] of partitionDetail.partitions.entries()) {
@@ -1620,7 +1627,7 @@ const useLogs = () => {
       //reset the plot chart when the query is run 
       //this is to avoid the issue of chart not updating when histogram is disabled and enabled and clicking the run query button
       //only reset the plot chart when the query is not run for pagination
-      if(!isPagination) searchObj.meta.resetPlotChart = true;
+      // if(!isPagination && searchObj.meta.refreshInterval == 0) searchObj.meta.resetPlotChart = true;
 
       if (queryReq != null) {
         // in case of live refresh, reset from to 0
@@ -1739,6 +1746,7 @@ const useLogs = () => {
         // based on pagination request, get the data
         searchObjDebug["paginatedDatawithAPIStartTime"] = performance.now();
         await getPaginatedData(queryReq);
+        if(!isPagination && searchObj.meta.refreshInterval == 0 && searchObj.data.queryResults.hits.length > 0) searchObj.meta.resetPlotChart = true;
         searchObjDebug["paginatedDatawithAPIEndTime"] = performance.now();
         const parsedSQL: any = fnParsedSQL();
 
@@ -2124,6 +2132,7 @@ const useLogs = () => {
     }
   };
 
+  // TODO OK : Replace backticks with double quotes, as stream name from sqlify is coming with backticks
   const fnUnparsedSQL = (parsedObj: any) => {
     try {
       return parser.sqlify(parsedObj);
@@ -2154,12 +2163,15 @@ const useLogs = () => {
   const getPageCount = async (queryReq: any) => {
     return new Promise((resolve, reject) => {
       try {
+        const isStreamingOutput = !!queryReq.query.streaming_output;
         searchObj.loadingCounter = true;
         searchObj.data.countErrorMsg = "";
         queryReq.query.size = 0;
         delete queryReq.query.from;
         delete queryReq.query.quick_mode;
         if(queryReq.query.action_id) delete queryReq.query.action_id;
+        if(queryReq.query.hasOwnProperty("streaming_output")) delete queryReq.query.streaming_output;
+        if(queryReq.query.hasOwnProperty("streaming_id")) delete queryReq.query.streaming_id;
 
         queryReq.query["sql_mode"] = "full";
 
@@ -2184,6 +2196,8 @@ const useLogs = () => {
             //   (item: any, index: number) => {
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
+            
+            // Update total for the last partition
             if (searchObj.meta.jobId == "") {
               for (const [
                 index,
@@ -2205,13 +2219,17 @@ const useLogs = () => {
               }
             }
 
+            if (isStreamingOutput) {
+              searchObj.data.queryResults.total = res.data.total;
+            }
+
             let regeratePaginationFlag = false;
             if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
               regeratePaginationFlag = true;
             }
             // if total records in partition is greater than recordsPerPage then we need to update pagination
             // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-            refreshPartitionPagination(regeratePaginationFlag);
+            refreshPartitionPagination(regeratePaginationFlag, isStreamingOutput);
 
             searchObj.data.histogram.chartParams.title = getHistogramTitle();
             searchObj.loadingCounter = false;
@@ -4683,6 +4701,24 @@ const useLogs = () => {
     }
   };
 
+  /**
+   * Extract value query
+   * - Extract the query from the query string
+   * - Replace the INDEX_NAME with the stream name
+   * - Return the query
+   * 
+   * JOIN Queries
+   * - Parse the query and make where null
+   * - Replace the INDEX_NAME with the stream name
+   * - Return the query
+   * 
+   * UNION Queries
+   * - Parse the query and add where clause to each query
+   * - Replace the INDEX_NAME with the stream name
+   * - Return the query
+   * 
+   * @returns 
+   */
   const extractValueQuery = () => {
     try {
       if (searchObj.meta.sqlMode == false || searchObj.data.query == "") {
@@ -4705,7 +4741,7 @@ const useLogs = () => {
       ) {
         newParsedSQL.where = parsedSQL.where;
 
-        query = parser.sqlify(newParsedSQL);
+        query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
         outputQueries[parsedSQL.from[0].table] = query.replace(
           "INDEX_NAME",
           "[INDEX_NAME]",
@@ -4714,11 +4750,11 @@ const useLogs = () => {
         // parse join queries & union queries
         if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 1) {
           parsedSQL.where = cleanBinaryExpression(parsedSQL.where);
-          // parse join queries
+          // parse join queries and make where null
           searchObj.data.stream.selectedStream.forEach((stream: string) => {
             newParsedSQL.where = null;
 
-            query = parser.sqlify(newParsedSQL);
+            query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
             outputQueries[stream] = query.replace("INDEX_NAME", "[INDEX_NAME]");
           });
         } else if (parsedSQL._next != null) {
@@ -4729,7 +4765,7 @@ const useLogs = () => {
 
             newParsedSQL.where = parsedSQL.where;
 
-            query = parser.sqlify(newParsedSQL);
+            query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
             outputQueries[parsedSQL.from[0].table] = query.replace(
               "INDEX_NAME",
               "[INDEX_NAME]",
@@ -4742,12 +4778,12 @@ const useLogs = () => {
           while (nextTable && depth++ < MAX_DEPTH) {
             // Map through each "from" array in the _next object, as it can contain multiple tables
             if (nextTable.from) {
-              let query = `select * from INDEX_NAME`;
+              let query = "select * from INDEX_NAME";
               const newParsedSQL = parser.astify(query);
 
               newParsedSQL.where = nextTable.where;
 
-              query = parser.sqlify(newParsedSQL);
+              query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
               outputQueries[nextTable.from[0].table] = query.replace(
                 "INDEX_NAME",
                 "[INDEX_NAME]",

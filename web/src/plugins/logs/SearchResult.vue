@@ -23,9 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="searchListContainer"
       style="width: 100%"
     >
-      <div class="row">
+      <div   class="row tw-min-h-[44px]">
         <div
-          class="col-6 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
+          class="col-7 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-6 text-left q-pl-lg q-mt-xs warning flex items-center">
+        <div v-else class="col-7 text-left q-pl-lg q-mt-xs warning flex items-center">
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
         </div>
 
-        <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
+        <div class="col-5 text-right q-pr-md q-gutter-xs pagination-block">
           
           <q-pagination
             v-if="searchObj.meta.resultGrid.showPagination"
@@ -116,30 +116,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
         </div>
       </div>
-      <div v-if="searchObj.data?.histogram?.errorMsg == '' && searchObj.data.histogram.errorCode != -1">
+      <div :style="{
+        height: searchObj.meta.showHistogram ? '100px' : '0px'}" v-if="searchObj.data?.histogram?.errorMsg == '' && searchObj.data.histogram.errorCode != -1">
         <ChartRenderer
-          v-if="searchObj.meta.showHistogram && (searchObj.data?.queryResults?.aggs?.length > 0 || ( plotChart && Object.keys(plotChart)?.length > 0))"
+          v-if="searchObj.meta.showHistogram   && (searchObj.data?.queryResults?.aggs?.length > 0 || ( plotChart && Object.keys(plotChart)?.length > 0))"
           data-test="logs-search-result-bar-chart"
           :data="plotChart"
-          style="max-height: 100px"
+          style="max-height: 100px;"
           @updated:dataZoom="onChartUpdate"
         />
         
-        <div v-else-if="searchObj.meta.showHistogram && (Object.keys(plotChart)?.length == 0) && searchObj.loadingHistogram == false && searchObj.loading == false">
+        <div style="height: 100px;" v-else-if="searchObj.meta.showHistogram && (Object.keys(plotChart)?.length == 0) && (searchObj.loadingHistogram == false && searchObj.loading == false)">
           <h3
             class="text-center"
-            style="margin: 30px 0px"
           >
-            <q-icon name="warning" color="warning" size="xs"></q-icon> No data found for histogram.
+           <span style="min-height: 50px;"> <q-icon name="warning" color="warning" size="xs"></q-icon> No data found for histogram.</span>
           </h3>
         </div>
 
-
+        <div style="height: 100px;" v-else-if="searchObj.meta.showHistogram && ((Object.keys(plotChart)?.length == 0))  ">
+            <h3
+              class="text-center"
+            >
+              <span style="min-height: 50px; color: transparent;">.</span>
+            </h3>
+        </div>
 
         <div
           class="q-pb-lg"
-          style=" left: 45%; margin: 25px 0px;"
-          v-else-if="histogramLoader"
+          style="top: 50px; position: absolute; left: 50%"
+          v-if="histogramLoader"
           
         >
           <q-spinner-hourglass
@@ -170,11 +176,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("search.histogramErrorBtnLabel") }}</q-btn
           ><br />
           <span v-if="disableMoreErrorDetails">
-            {{ searchObj.data.histogram?.errorMsg }}
+            <SanitizedHtmlRenderer
+              data-test="logs-search-histogram-error-message"
+              :htmlContent="
+                searchObj.data?.histogram?.errorMsg
+              "
+            />
           </span>
         </h6>
         <h6 class="text-center" v-else-if="searchObj.data.histogram.errorCode != -1">
-          {{ searchObj.data.histogram?.errorMsg }}
+          <SanitizedHtmlRenderer
+              data-test="logs-search-histogram-error-message"
+              :htmlContent="
+                searchObj.data?.histogram?.errorMsg
+              "
+            />
         </h6>
       </div>
       <tenstack-table
@@ -633,7 +649,7 @@ export default defineComponent({
     });
     //this is used to show the histogram loader when the histogram is loading
     const histogramLoader = computed(()=>{
-      return (searchObj.meta.showHistogram) && (searchObj.loadingHistogram == true ||  searchObj.loading == true) && ( plotChart.value && Object.keys(plotChart.value)?.length == 0) 
+      return (searchObj.meta.showHistogram) && searchObj.loadingHistogram == true;
     })
 
     return {
