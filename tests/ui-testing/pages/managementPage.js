@@ -94,14 +94,13 @@ export
         await this.page.goto(
             process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=default"
           );
-          await this.page.waitForTimeout(2000);
+          await this.page.waitForLoadState('networkidle');
           await this.page.locator('[data-test="menu-link-settings-item"]').click();
           await this.page.goto(
             process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=default"
           );
-          await this.page.waitForTimeout(5000);
-        // Selector for the WebSocket toggle
-        //const toggleSelector = '[data-test="general-settings-enable-streaming-search"]';
+          await this.page.waitForLoadState('networkidle');
+        
         const toggleSelector = '[data-test="general-settings-enable-streaming"]';
         
         // Wait for the toggle element to be visible
@@ -115,7 +114,7 @@ export
         // Log the current state
         console.log(`Streaming is currently ${isChecked ? 'enabled' : 'disabled'}.`);
       
-        // If the WebSocket is not enabled, click to enable it
+        // If the Streaming is not enabled, click to enable it
         if (!isChecked) {
             console.log('Enabling Streaming...');
             await this.page.click(toggleSelector);

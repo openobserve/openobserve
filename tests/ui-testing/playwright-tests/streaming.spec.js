@@ -28,10 +28,6 @@ test.describe("Streaming for logs", () => {
 
     test("Run query after selecting two streams after enabling streaming", async ({ page }) => {
 
-        // If using CommonJS
-        // const managementPage = require('../pages/managementPage');
-        
-
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.displayTwoStreams();
@@ -95,6 +91,7 @@ test.describe("Streaming for logs", () => {
         await logsPage.kubernetesContainerNameJoinLike();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
+        await logsPage.validateResult();
        
       
 
@@ -169,7 +166,7 @@ test.describe("Streaming for logs", () => {
         await logsPage.addRemoveInteresting();
     });
 
-    test("Streaming enabled histogram is disabled and run query, results appear and then user switches on Historgram, getting error", async ({ page }) => {
+    test("Streaming enabled histogram is disabled and run query, results appear and then user switches on Histogram, getting error", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStreamDefault();
