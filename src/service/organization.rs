@@ -576,6 +576,10 @@ pub async fn get_org(org: &str) -> Option<Organization> {
 
 #[cfg(feature = "cloud")]
 pub async fn is_org_in_free_trial_period(org_id: &str) -> Result<bool, anyhow::Error> {
+    // exception for meta org
+    if org_id == "_meta" {
+        return Ok(true);
+    }
     use config::utils::time::day_micros;
     use o2_enterprise::enterprise::cloud::billings;
     // first check if the org is
