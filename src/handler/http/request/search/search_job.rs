@@ -49,6 +49,7 @@ use {
 
 #[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
+use crate::service::organization::is_org_in_free_trial_period;
 
 // 1. submit
 /// SearchSQL
@@ -103,6 +104,25 @@ pub async fn submit_job(
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_string();
+
+        #[cfg(feature = "cloud")]
+        {
+            match is_org_in_free_trial_period(&org_id).await {
+                Ok(false) => {
+                    return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN.into(),
+                        format!("org {org_id} has expired its trial period"),
+                    )));
+                }
+                Err(e) => {
+                    return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN.into(),
+                        e.to_string(),
+                    )));
+                }
+                _ => {}
+            }
+        }
 
         let query = match web::Query::<HashMap<String, String>>::from_query(in_req.query_string()) {
             Ok(q) => q,
