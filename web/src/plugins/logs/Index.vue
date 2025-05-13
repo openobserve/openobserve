@@ -1668,7 +1668,7 @@ export default defineComponent({
         : 0;
     },
     async showHistogram(newVal, oldVal) {
-      if(newVal == true && oldVal == false && this.searchObj.meta.histogramDirtyFlag == true){
+      if(newVal == true && oldVal == false && this.searchObj.meta.histogramDirtyFlag == true && this.searchObj.data.queryResults.hits.length > 0){
         this.searchObj.meta.resetPlotChart = true;
         this.searchObj.data.queryResults.aggs = [];
       }
