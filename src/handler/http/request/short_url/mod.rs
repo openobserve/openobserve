@@ -15,15 +15,15 @@
 
 use std::io::Error;
 
-use actix_http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, get, post, web};
 use config::meta::short_url::ShortenUrlResponse;
 
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse},
+        meta::http::HttpResponse as MetaHttpResponse,
         utils::redirect_response::RedirectResponseBuilder,
     },
+    handler::http::request::search::error_utils::map_error_to_http_response,
     service::short_url,
 };
 
@@ -72,12 +72,7 @@ pub async fn shorten(org_id: web::Path<String>, body: web::Bytes) -> Result<Http
         }
         Err(e) => {
             log::error!("Failed to shorten URL: {:?}", e);
-            Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            )
+            Ok(map_error_to_http_response(&e.into(), None))
         }
     }
 }

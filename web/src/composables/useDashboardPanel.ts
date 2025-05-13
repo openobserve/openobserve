@@ -1963,7 +1963,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
       return value;
     } else {
-      return splitQuotedString(value)
+      return splitQuotedString(value ?? "")
         ?.map((it: any) => {
           return `'${escapeSingleQuotes(it)}'`;
         })
