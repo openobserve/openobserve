@@ -252,6 +252,13 @@ pub async fn search(
             tantivy_file_list = tantivy_files;
             file_list = datafusion_files;
             storage_search_idx_optimize_rule = None;
+            log::debug!(
+                "[trace_id {}] flight->search: after_split_file idx: {}, datafusion_files: {}, optimize_rule: {:?}",
+                trace_id,
+                tantivy_file_list.len(),
+                file_list.len(),
+                storage_search_idx_optimize_rule
+            );
         }
 
         // sort by max_ts, the latest file should be at the top
@@ -364,7 +371,7 @@ pub async fn search(
             physical_plan.schema(),
             tantivy_file_list,
             index_condition.unwrap(),
-            idx_optimize_rule,
+            idx_optimize_rule.unwrap(), // guaranteed Some, if tantivy_file_list is not empty
         ));
         physical_plan = Arc::new(UnionExec::new(vec![physical_plan, tantivy_exec as _]));
     }
