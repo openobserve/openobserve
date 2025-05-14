@@ -2320,9 +2320,9 @@ const useLogs = () => {
         showCancelSearchNotification();
         return;
       }
-      if (searchObj.meta.jobId != "") {
-        searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
-      }
+      // if (searchObj.meta.jobId != "") {
+      //   searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
+      // }
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
@@ -2546,7 +2546,7 @@ const useLogs = () => {
             await getPaginatedData(queryReq, true);
           }
           if (searchObj.meta.jobId != "") {
-            searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
+            // searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
             searchObj.data.queryResults.pagination = [];
             refreshJobPagination(true);
           }
