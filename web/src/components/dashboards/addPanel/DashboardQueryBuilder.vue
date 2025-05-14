@@ -112,11 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`dashboard-x-item-${itemX?.alias}`"
                   >
                     <q-menu
-                      class="q-pa-md"
                       :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
+                      class="field-function-menu-popup"
                     >
-                      <div>
-                        <div class="">
+                      <div style="padding: 3px 16px 16px 16px">
+                        <div>
                           <div
                             v-if="
                               !dashboardPanelData.data.queries[
@@ -135,6 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ].fields.x[index]
                               "
                               :allowAggregation="false"
+                              :customQuery="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].customQuery
+                              "
                             />
                             <!-- <q-select
                               v-model="
@@ -201,37 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                           />
                         </div> -->
-                        <q-input
-                          dense
-                          filled
-                          data-test="dashboard-x-item-input"
-                          :label="t('common.label')"
-                          v-model="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.x[index].label
-                          "
-                          :rules="[(val: any) => val.length > 0 || 'Required']"
-                        />
-                        <div
-                          v-if="
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery &&
-                            dashboardPanelData.data.queryType == 'sql' &&
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.x[index].isDerived
-                          "
-                        >
-                          <SortByBtnGrp
-                            :fieldObj="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields?.x[index]
-                            "
-                          />
-                        </div>
+                        
                       </div>
                     </q-menu>
                   </q-btn>
@@ -1972,5 +1947,15 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
+}
+
+.field-function-menu-popup {
+  width: 771px;
+  height: 323px;
+  border-radius: 4px;
+  border: 1px solid #d5d5d5;
+  background: #fff;
+  box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.05);
+  padding: 16px;
 }
 </style>
