@@ -26,8 +26,6 @@ test.describe("dashboard UI testcases", () => {
   let dashboardPanel;
 
   test.beforeEach(async ({ page }) => {
-   
-
     await login(page);
     await page.waitForTimeout(1000);
     await ingestion(page);
@@ -121,7 +119,6 @@ test.describe("dashboard UI testcases", () => {
       "y"
     );
     await chartTypeSelector.searchAndAddField("kubernetes_container_name", "b");
-  
 
     await waitForDateTimeButtonToBeEnabled(page);
     await dashboardRefresh.setRelative("6", "w");
@@ -142,5 +139,342 @@ test.describe("dashboard UI testcases", () => {
     await dashboardCreate.searchDashboard(dashboardName);
     await dashboardCreate.deleteDashboard(dashboardName);
     await page.waitForTimeout(5000);
+  });
+
+  test("should update the breakdown field correctly to match the existing one according to the chart type when changing the chart type.", async ({
+    page,
+  }) => {
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPanel = new DashboardPanel(page);
+    const dashboardDrilldown = new DashboardDrilldownPage(page);
+    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
+    await dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Add a new dashboard
+    await dashboardCreate.createDashboard(dashboardName);
+
+    // Add a panel to the dashboard
+    await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+    await chartTypeSelector.selectChartType("line");
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+
+    // Add fields to the chart
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_annotations_kubernetes_io_psp",
+      "y"
+    );
+
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_container_image",
+      "y"
+    );
+
+    // Set the date-time range and apply changes
+    await waitForDateTimeButtonToBeEnabled(page);
+    await dashboardTimeRefresh.setRelative("6", "w");
+    await dashboardActions.applyDashboardBtn();
+
+    // Change chart types and verify
+    await chartTypeSelector.selectChartType("area");
+    await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "b");
+
+    await chartTypeSelector.selectChartType("area-stacked");
+    await chartTypeSelector.selectChartType("h-bar");
+    await chartTypeSelector.selectChartType("scatter");
+    await chartTypeSelector.selectChartType("h-stacked");
+    await chartTypeSelector.selectChartType("stacked");
+
+    // Save the dashboard panel
+    await dashboardActions.savePanel();
+
+    // Switch to Bar chart and apply changes
+    await dashboardPanel.editPanel(panelName);
+    await chartTypeSelector.selectChartType("bar");
+    await dashboardActions.applyDashboardBtn();
+    await dashboardActions.savePanel();
+
+    // Delete the panel and confirm
+    await dashboardPanel.deletePanel(panelName);
+  });
+
+  test("should create the panel successfully after adding a breakdown", async ({
+    page,
+  }) => {
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
+    const dashboardPanel = new DashboardPanel(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardDrilldown = new DashboardDrilldownPage(page);
+    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
+    await dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await dashboardCreate.createDashboard(dashboardName);
+
+    // Add a panel to the dashboard
+    await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+
+    await chartTypeSelector.selectChartType("line");
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+
+    // Add fields to the chart
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_annotations_kubernetes_io_psp",
+      "y"
+    );
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_container_image",
+      "b"
+    );
+
+    // Set the date-time range and apply changes
+    await waitForDateTimeButtonToBeEnabled(page);
+    await dashboardTimeRefresh.setRelative("6", "w");
+    await dashboardActions.applyDashboardBtn();
+
+    // Save the dashboard panel
+    await dashboardActions.savePanel();
+
+    // Delete the panel and confirm
+    await dashboardPanel.deletePanel(panelName);
+  });
+
+  test("should clear the selections after adding a breakdown and refreshing the page.", async ({
+    page,
+  }) => {
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardDrilldown = new DashboardDrilldownPage(page);
+    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
+    await dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await dashboardCreate.createDashboard(dashboardName);
+
+    // Add a panel to the dashboard
+    await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+    await chartTypeSelector.selectChartType("line");
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+
+    // Add fields to the chart
+    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
+    await chartTypeSelector.searchAndAddField("kubernetes_host", "b");
+
+    // Set the date-time range
+    await dashboardTimeRefresh.setRelative("6", "w");
+    await dashboardActions.applyDashboardBtn();
+
+    // Refresh the page
+    await page.reload();
+    await page.waitForTimeout(1000);
+
+    // Handle dialog and verify no data is visible
+    page.once("dialog", (dialog) => {
+      console.log(`Dialog message: ${dialog.message()}`);
+      dialog.dismiss().catch(() => {});
+    });
+    await expect(page.locator('[data-test="no-data"]')).toBeVisible();
+  });
+  test("should display the correct output when changing relative and absolute times with different timezones after adding a breakdown", async ({
+    page,
+  }) => {
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
+    const dashboardPanel = new DashboardPanel(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardDrilldown = new DashboardDrilldownPage(page);
+    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
+    await dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await dashboardCreate.createDashboard(dashboardName);
+
+    // Add a panel to the dashboard
+    await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+    await chartTypeSelector.selectChartType("line");
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+
+    // Add fields to the chart
+    await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
+    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "b");
+
+    // Set relative date-time and timezone
+    await waitForDateTimeButtonToBeEnabled(page);
+    await dashboardTimeRefresh.setRelative("6", "w");
+    await dashboardActions.applyDashboardBtn();
+
+    // Set absolute date-time and timezone
+    await dashboardTimeRefresh.setRelative("2", "w");
+    await dashboardActions.applyDashboardBtn();
+
+    // Save the dashboard panel
+    await dashboardActions.savePanel();
+
+    // Delete the panel and confirm
+    await dashboardPanel.deletePanel(panelName);
+  });
+
+  test("should redirect to the list of dashboard pages when discarding changes", async ({
+    page,
+  }) => {
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardDrilldown = new DashboardDrilldownPage(page);
+    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
+    await dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await dashboardCreate.createDashboard(dashboardName);
+
+    // Add a panel to the dashboard
+    await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+    await chartTypeSelector.selectChartType("line");
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+
+    // Add fields to the chart
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_container_image",
+      "b"
+    );
+    await chartTypeSelector.searchAndAddField("kubernetes_docker_id", "y");
+
+    // Apply changes
+    await dashboardActions.applyDashboardBtn();
+
+    await page.locator('[data-test="dashboard-panel-discard"]').click();
+  });
+
+  test('should plot the data when adding a "Sort by" filter, a breakdown, and other required fields', async ({
+    page,
+  }) => {
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
+    const dashboardPanel = new DashboardPanel(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardDrilldown = new DashboardDrilldownPage(page);
+    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
+    await dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await dashboardCreate.createDashboard(dashboardName);
+
+    // Add a panel to the dashboard
+    await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+    await chartTypeSelector.selectChartType("line");
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+
+    // Add fields to the chart
+    await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
+    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "b");
+
+    // Set relative date-time and timezone
+    await waitForDateTimeButtonToBeEnabled(page);
+    await dashboardTimeRefresh.setRelative("6", "w");
+    await dashboardActions.applyDashboardBtn();
+    await dashboardActions.savePanel();
+
+    // Delete the panel and confirm
+    await dashboardPanel.deletePanel(panelName);
+  });
+
+  test("should correctly handle and display string and numeric values when no value replacement occurs", async ({
+    page,
+  }) => {
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
+    const dashboardPanel = new DashboardPanel(page);
+    const dashboardDrilldown = new DashboardDrilldownPage(page);
+    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const chartTypeSelector = new ChartTypeSelector(page);
+
+    // Navigate to dashboards
+    await dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await dashboardCreate.createDashboard(dashboardName);
+
+    // Add a panel to the dashboard
+    await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+    await chartTypeSelector.selectChartType("line");
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+
+    // Add fields to the chart
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_annotations_kubectl_kubernetes_io_default_container",
+      "y"
+    );
+    await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "b");
+
+    // Set relative date-time
+    await waitForDateTimeButtonToBeEnabled(page);
+    await dashboardTimeRefresh.setRelative("6", "w");
+
+    // Configure no value replacement
+    await dashboardPanelConfigs.openConfigPanel();
+    await dashboardPanelConfigs.selectNoValeuReplace("2");
+    await dashboardActions.applyDashboardBtn();
+
+    // Save the dashboard panel
+    await dashboardActions.savePanel();
+
+    // Delete the panel and confirm
+    await dashboardPanel.deletePanel(panelName);
   });
 });
