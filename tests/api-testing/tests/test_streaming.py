@@ -623,13 +623,8 @@ def test_streaming_histogram(create_session, base_url, test_name, hist_query, ex
 
     # Parse the JSON response
     
-    for line in res_histog.iter_lines():
-
-    # filter out keep-alive new lines
-        if line:
-            # decoded_line = line.decode('utf-8')
-            print(line)
-
+    response = read_response(res_histog)
+    print(f"API {test_name} Response {url} Histog:", response)
 
 
     # print(f"API {test_name} Response cache false {url} Histog:", res_data_histog) 
@@ -850,3 +845,27 @@ def test_streaming_histogram(create_session, base_url, test_name, hist_query, ex
 #     print(f"Deleted Stream Response: {resp_delete_stream_join.text}")
 #     assert resp_delete_stream_join.status_code == 200, f"Failed to delete stream {stream_join}"
 #     print(f"Successfully deleted stream {stream_join}")
+
+# Read HTTP 2 responses from the stream
+# two events in particular `search_response_metadata` and `search_response_hits`
+# return a single json object as search response, i.e. the first partitions
+def read_response(reader):
+    for line in reader:
+        text = line.strip()
+        if text.startswith("event: search_response_metadata"):
+            # Get the data part which follows in the next line
+            data_line = next(reader, "").strip()
+            if data_line.startswith("data: "):
+                try:
+                    search_metadata = data_line[6:]  # Remove "data: " prefix
+                    search_metadata = json.loads(search_metadata)
+                    next_line = next(reader, "").strip()
+                    if next_line.startswith("event: search_response_hits"):
+                        search_hits = next_line[6:]
+                        search_hits = json.loads(search_hits)
+                        search_metadata["hits"] = search_hits
+                    return search_metadata
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing JSON: {e}")
+                    continue
+    return None
