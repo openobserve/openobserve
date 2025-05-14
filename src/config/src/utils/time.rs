@@ -122,7 +122,23 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
         if s.len() == 19 {
             let fmt = "%Y-%m-%dT%H:%M:%S";
             NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
+        } else if s.contains('.') {
+            // Handle formats with decimal seconds: "2025-05-14T01:15:25.047"
+            // First check if it has milliseconds (3 decimal places)
+            if s.split('.').next_back().unwrap_or("").len() == 3 {
+                let fmt = "%Y-%m-%dT%H:%M:%S%.3f";
+                NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
+            } else if s.split('.').next_back().unwrap_or("").len() == 6 {
+                // Handle microseconds (6 decimal places)
+                let fmt = "%Y-%m-%dT%H:%M:%S%.6f";
+                NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
+            } else {
+                // Fall back to RFC3339 parsing for other decimal formats
+                let t = DateTime::parse_from_rfc3339(s)?;
+                t.into()
+            }
         } else {
+            // Other formats with 'T' but no spaces or decimal points
             let t = DateTime::parse_from_rfc3339(s)?;
             t.into()
         }

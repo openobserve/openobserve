@@ -235,7 +235,7 @@ pub async fn warm_up_terms(
             }
             let fast_field_reader = segment_reader.fast_fields();
             warm_up_fast_fields_futures
-                .push(async move { warm_up_fastfield(&fast_field_reader).await });
+                .push(async move { warm_up_fastfield(fast_field_reader).await });
         }
     }
     if !warm_up_fields_futures.is_empty() {
