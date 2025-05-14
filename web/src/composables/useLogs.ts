@@ -2320,9 +2320,9 @@ const useLogs = () => {
         showCancelSearchNotification();
         return;
       }
-      if (searchObj.meta.jobId != "") {
+      // if (searchObj.meta.jobId != "") {
         // searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
-      }
+      // }
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
