@@ -477,9 +477,6 @@ export default defineComponent({
       };
 
       try {
-        // Cancel any existing requests for this variable
-        cancelTraceId(variableObject.name);
-
         // Start new connection
         initializeWebSocketConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
