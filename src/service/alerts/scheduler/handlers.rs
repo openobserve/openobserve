@@ -1017,8 +1017,10 @@ async fn handle_derived_stream_triggers(
         .num_microseconds()
         .unwrap();
 
-    let (mut start, mut end) = if let Some(t0) = start_time {
-        // Don't use only the period_num_microseconds, because, the the delay is lets say 10 secs
+    let (mut start, mut end) = if derived_stream.start_at.is_some() && trigger.data.is_empty() {
+        (derived_stream.start_at, supposed_to_be_run_at)
+    } else if let Some(t0) = start_time {
+        // Don't use only the period_num_microseconds, because, then the delay is lets say 10 secs
         // The following code will make a separate query to cover the delay period of 10 secs which
         // is unnecessary. Hence, we need to check how big the delay is.
         // Note: For pipeline, period and frequency both have the same value.
