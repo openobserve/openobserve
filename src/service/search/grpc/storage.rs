@@ -989,14 +989,21 @@ async fn search_tantivy_index(
                     log::warn!("tantivy count result: {:?}", ret);
                     (HashSet::new(), ret)
                 }),
-            (true, Some(InvertedIndexOptimizeMode::SimpleHistogram)) => tantivy_searcher
+            (
+                true,
+                Some(InvertedIndexOptimizeMode::SimpleHistogram(
+                    min_value,
+                    bucket_width,
+                    num_buckets,
+                )),
+            ) => tantivy_searcher
                 .search(
-                    &tantivy::query::AllQuery,
+                    &query,
                     &tantivy::collector::HistogramCollector::new::<i64>(
                         TIMESTAMP_COL_NAME.to_string(),
-                        1746834941116293i64,
-                        10,
-                        2,
+                        min_value,
+                        bucket_width,
+                        num_buckets,
                     ),
                 )
                 .map(|ret| {

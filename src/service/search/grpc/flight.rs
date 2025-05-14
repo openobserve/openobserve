@@ -240,7 +240,7 @@ pub async fn search(
             );
         let is_simple_histogram = matches!(
             idx_optimize_rule,
-            Some(InvertedIndexOptimizeMode::SimpleHistogram)
+            Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
         );
         if is_aggregate_exec && (is_simple_count || is_simple_histogram) {
             let (tantivy_files, datafusion_files) = split_file_list_by_time_range(

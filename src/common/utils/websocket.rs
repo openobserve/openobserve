@@ -81,7 +81,7 @@ pub fn update_histogram_interval_in_query(
         .pop()
         .unwrap();
 
-    visit_statements_mut(&mut statement, |stmt| {
+    let _ = visit_statements_mut(&mut statement, |stmt| {
         if let Statement::Query(query) = stmt {
             if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
                 for projection in &mut select.projection {
