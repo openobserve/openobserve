@@ -127,6 +127,8 @@ export default defineComponent({
     const instance = getCurrentInstance();
     const store = useStore();
 
+    // ------------- Start WebSocket Implementation -------------
+
     const {
       fetchQueryDataWithWebSocket,
       sendSearchMessageBasedOnRequestId,
@@ -148,7 +150,6 @@ export default defineComponent({
       }) as string;
     };
 
-    // WebSocket Implementation
     const fetchFieldValuesWithWebsocket = (
       variableObject: any,
       queryContext: string,
@@ -448,6 +449,20 @@ export default defineComponent({
       }
     };
 
+    const handleSearchError = (request: any, err: any, variableObject: any) => {
+      console.error("WebSocket error:", err);
+      variableObject.isLoading = false;
+      variableObject.isVariableLoadingPending = false;
+      console.log(
+        `[WebSocket] isLoading=false (error handler) for`,
+        variableObject.name,
+      );
+      resetVariableState(variableObject);
+      removeTraceId(variableObject.name, request.traceId);
+    };
+
+    // ------------- End WebSocket Implementation -------------
+
     // variables data derived from the variables config list
     const variablesData: any = reactive({
       isVariablesLoading: false,
@@ -715,17 +730,6 @@ export default defineComponent({
       }
     };
 
-    const handleSearchError = (request: any, err: any, variableObject: any) => {
-      console.error("WebSocket error:", err);
-      variableObject.isLoading = false;
-      variableObject.isVariableLoadingPending = false;
-      console.log(
-        `[WebSocket] isLoading=false (error handler) for`,
-        variableObject.name,
-      );
-      resetVariableState(variableObject);
-      removeTraceId(variableObject.name, request.traceId);
-    };
     /**
      * Handle custom variables logic
      * @param {object} currentVariable - current variable
