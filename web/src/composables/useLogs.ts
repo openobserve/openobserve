@@ -5305,7 +5305,12 @@ const useLogs = () => {
         searchObj.data.queryResults.scan_size +=
           response.content.results.scan_size;
       } else {
-        if (response.content?.streaming_aggs) {
+        if (isPagination && response.content?.streaming_aggs) {
+          searchObj.data.queryResults.from = response.content.results.from;
+          searchObj.data.queryResults.scan_size =
+            response.content.results.scan_size;
+          searchObj.data.queryResults.took = response.content.results.took;
+        } else if (response.content?.streaming_aggs) {
           searchObj.data.queryResults = {
             ...response.content.results,
             took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
