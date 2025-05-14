@@ -13,6 +13,7 @@ export default class DashboardImport {
 
   //click import button
   async clickImportButton() {
+    await this.importButtonByRole.waitFor({ state: "visible" });
     await this.importButtonByRole.click();
   }
 
