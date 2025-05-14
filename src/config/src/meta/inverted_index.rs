@@ -98,7 +98,7 @@ impl From<cluster_rpc::IdxOptimizeMode> for InvertedIndexOptimizeMode {
                 InvertedIndexOptimizeMode::SimpleHistogram(
                     select.min_value,
                     select.bucket_width,
-                    select.num_buckets as _,
+                    select.num_buckets as usize,
                 )
             }
             None => panic!("Invalid InvertedIndexOptimizeMode"),
@@ -128,7 +128,7 @@ impl From<InvertedIndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
                         cluster_rpc::SimpleHistogram {
                             min_value,
                             bucket_width,
-                            num_buckets: num_buckets as _,
+                            num_buckets: num_buckets as u32,
                         },
                     )),
                 }

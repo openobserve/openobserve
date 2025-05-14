@@ -1284,7 +1284,7 @@ impl VisitorMut for OtherIndexOptimizeModeVisitor {
                 self.is_simple_histogram = true;
             }
         }
-        if !self.is_simple_count || !self.is_simple_histogram {
+        if self.is_simple_count || self.is_simple_histogram {
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())

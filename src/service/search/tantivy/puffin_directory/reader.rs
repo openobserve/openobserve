@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashSet,
     io,
     ops::Range,
     path::{Path, PathBuf},
@@ -212,11 +213,13 @@ impl Directory for PuffinDirReader {
 pub async fn warm_up_terms(
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
+    need_fast_field: bool,
 ) -> anyhow::Result<()> {
     let mut warm_up_fields_futures = Vec::new();
     let mut warm_up_fields_term_futures = Vec::new();
     let mut warm_up_terms_futures = Vec::new();
     let mut warm_up_fast_fields_futures = Vec::new();
+    let mut warmed_segments = HashSet::new();
     for (field, terms) in terms_grouped_by_field {
         for segment_reader in searcher.segment_readers() {
             let inv_idx = segment_reader.inverted_index(*field)?;
@@ -233,9 +236,18 @@ pub async fn warm_up_terms(
                 warm_up_terms_futures
                     .push(async move { inv_idx_clone.warm_postings(term, *position_needed).await });
             }
-            let fast_field_reader = segment_reader.fast_fields();
-            warm_up_fast_fields_futures
-                .push(async move { warm_up_fastfield(fast_field_reader).await });
+
+            // only warm up fast fields if needed
+            if need_fast_field {
+                // only warm up fast fields once per segment
+                let segment_id = segment_reader.segment_id();
+                if !warmed_segments.contains(&segment_id) {
+                    let fast_field_reader = segment_reader.fast_fields();
+                    warm_up_fast_fields_futures
+                        .push(async move { warm_up_fastfield(fast_field_reader).await });
+                    warmed_segments.insert(segment_id);
+                }
+            }
         }
     }
     if !warm_up_fields_futures.is_empty() {

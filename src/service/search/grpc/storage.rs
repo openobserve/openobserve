@@ -984,7 +984,10 @@ async fn search_tantivy_index(
                 warm_terms.insert(field, HashMap::new());
             }
         }
-        warm_up_terms(&tantivy_searcher, &warm_terms).await?;
+        let need_fast_field = idx_optimize_rule
+            .as_ref()
+            .is_some_and(|rule| matches!(rule, InvertedIndexOptimizeMode::SimpleHistogram(..)));
+        warm_up_terms(&tantivy_searcher, &warm_terms, need_fast_field).await?;
     }
 
     // search the index

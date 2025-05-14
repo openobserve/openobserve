@@ -1661,9 +1661,15 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 }
             };
             let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap(); // unwrap directly since added above
+            const YIELD_THRESHOLD: usize = 100;
+            let mut batch_size = 0;
             for (i, doc) in docs.iter_mut().enumerate() {
                 doc.add_i64(ts_field, column_data.value(i));
-                tokio::task::coop::consume_budget().await;
+                batch_size += 1;
+                if batch_size >= YIELD_THRESHOLD {
+                    tokio::task::coop::consume_budget().await;
+                    batch_size = 0;
+                }
             }
 
             tx.send(docs).await?;
