@@ -576,19 +576,26 @@ pub async fn get_org(org: &str) -> Option<Organization> {
 
 #[cfg(feature = "cloud")]
 pub async fn is_org_in_free_trial_period(org_id: &str) -> Result<bool, anyhow::Error> {
+    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    let o2_config = get_o2_config();
+
+    // if trial period check is disabled, everything is free trial period
+    if !o2_config.common.trial_period_enabled {
+        return Ok(true);
+    }
+
     // exception for meta org
     if org_id == "_meta" {
         return Ok(true);
     }
-    use config::utils::time::day_micros;
     use o2_enterprise::enterprise::cloud::billings;
     // first check if the org is
     let subscription = billings::get_billing_by_org_id(org_id).await?;
 
     if subscription.is_none() || subscription.unwrap().subscription_type.is_free_sub() {
-        let creation_time = infra::table::organizations::get_creation_time(org_id).await?;
+        let org = infra::table::organizations::get(org_id).await?;
         let now = Utc::now().timestamp_micros();
-        if now - creation_time > day_micros(14) {
+        if now > org.trial_ends_at {
             return Ok(false);
         }
     }

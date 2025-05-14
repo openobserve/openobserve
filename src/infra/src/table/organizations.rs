@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::organization::OrganizationType;
+use config::{meta::organization::OrganizationType, utils::time::day_micros};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Schema, Set, entity::prelude::Expr,
@@ -33,14 +33,21 @@ pub struct OrganizationRecord {
     pub identifier: String,
     pub org_name: String,
     pub org_type: OrganizationType,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub trial_ends_at: i64,
 }
 
 impl OrganizationRecord {
     pub fn new(identifier: &str, org_name: &str, org_type: OrganizationType) -> Self {
+        let now = chrono::Utc::now().timestamp_micros();
         Self {
             identifier: identifier.to_string(),
             org_name: org_name.to_string(),
             org_type,
+            created_at: now,
+            updated_at: now,
+            trial_ends_at: now + day_micros(14),
         }
     }
 }
@@ -51,6 +58,9 @@ impl From<Model> for OrganizationRecord {
             identifier: model.identifier,
             org_name: model.org_name,
             org_type: model.org_type.into(),
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+            trial_ends_at: model.trial_ends_at,
         }
     }
 }
@@ -84,12 +94,14 @@ pub async fn add(
     org_type: OrganizationType,
 ) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
+    let trial_end = now + day_micros(14);
     let record = ActiveModel {
         identifier: Set(org_id.to_string()),
         org_name: Set(org_name.to_string()),
         org_type: Set(org_type.into()),
         created_at: Set(now),
         updated_at: Set(now),
+        trial_ends_at: Set(trial_end),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -180,20 +192,6 @@ pub async fn get_by_name(org_name: &str) -> Result<Vec<OrganizationRecord>, erro
         .collect();
 
     Ok(records)
-}
-
-pub async fn get_creation_time(org_id: &str) -> Result<i64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find()
-        .filter(Column::Identifier.eq(org_id))
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
-        .ok_or_else(|| {
-            Error::DbError(DbError::SeaORMError("Organization not found".to_string()))
-        })?;
-
-    Ok(record.created_at)
 }
 
 pub async fn len() -> usize {

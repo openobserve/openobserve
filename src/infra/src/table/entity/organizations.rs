@@ -11,6 +11,7 @@ pub struct Model {
     pub org_type: i16,
     pub created_at: i64,
     pub updated_at: i64,
+    pub trial_ends_at: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
