@@ -347,15 +347,15 @@ test.describe("Logs Queries testcases", () => {
     await logsPage.executeQueryWithKeyboardShortcutTest();
   });
 
-  test("should execute query with keyboard shortcut after clicking elsewhere", async ({ page }) => {
+  test("should execute query with keyboard shortcut (Cmd+Enter or Ctrl+Enter) after clicking elsewhere ", async ({ page }) => {
     await logsPage.executeQueryWithKeyboardShortcutAfterClickingElsewhere();
   });
 
-  test("should execute different query with keyboard shortcut", async ({ page }) => {
+  test("should execute different query with keyboard shortcut (Cmd+Enter or Ctrl+Enter)", async ({ page }) => {
     await logsPage.executeQueryWithKeyboardShortcutWithDifferentQuery();
   });
 
-  test("should execute SQL query with keyboard shortcut", async ({ page }) => {
+  test("should execute SQL query with keyboard shortcut (Cmd+Enter or Ctrl+Enter)", async ({ page }) => {
     await logsPage.executeQueryWithKeyboardShortcutWithSQLMode();
   });
 })
