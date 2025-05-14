@@ -76,7 +76,11 @@ message SimpleSelect {
 
 message SimpleCount {}
 
-message SimpleHistogram {}
+message SimpleHistogram {
+  int64 min_value = 1;
+  uint64 bucket_width = 2;
+  uint32 num_buckets = 3;
+}
 
 message KvItem {
     string   key = 1;
