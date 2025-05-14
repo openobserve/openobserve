@@ -136,6 +136,7 @@ export default defineComponent({
     } = useSearchWebSocket();
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
+    const variableFirstResponseProcessed = ref<{ [key: string]: boolean }>({});
 
     const initializeWebSocketConnection = (
       payload: any,
@@ -177,6 +178,9 @@ export default defineComponent({
         options: variableObject.options,
       });
 
+      // Reset first response flag when starting a new fetch
+      variableFirstResponseProcessed.value[variableObject.name] = false;
+
       const payload = {
         fields: [variableObject.query_data.field],
         size: variableObject.query_data.max_record_size || 10,
@@ -187,7 +191,6 @@ export default defineComponent({
         stream_type: variableObject.query_data.stream_type || "logs",
         use_cache: (window as any).use_cache ?? true,
         sql: queryContext || "",
-        // org_identifier: store.state.selectedOrganization.identifier,
       };
 
       const wsPayload = {
@@ -199,6 +202,10 @@ export default defineComponent({
       };
 
       try {
+        // Cancel any existing requests for this variable
+        cancelTraceId(variableObject.name);
+
+        // Start new connection
         initializeWebSocketConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
       } catch (error) {
@@ -245,10 +252,7 @@ export default defineComponent({
       variableObject: any,
     ) => {
       variableObject.isLoading = false;
-      console.log(
-        `[WebSocket] isLoading=false (close) for`,
-        variableObject.name,
-      );
+      variableObject.isVariableLoadingPending = false;
 
       const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
       if (errorCodes.includes(response.code)) {
@@ -304,117 +308,111 @@ export default defineComponent({
           );
 
           if (fieldHit) {
-            // Initialize options array if it doesn't exist
-            if (!Array.isArray(variableObject.options)) {
-              variableObject.options = [];
-            }
-
-            // Get new values from the response
-            const newOptions = fieldHit.values
-              .filter(
-                (value: any) => value.zo_sql_key || value.zo_sql_key === "",
-              )
-              .map((value: any) => ({
-                label:
-                  value.zo_sql_key !== ""
-                    ? value.zo_sql_key.toString()
-                    : "<blank>",
-                value: value.zo_sql_key.toString(),
-              }));
-            console.log(
-              `[WebSocket] New options for variable based on ${variableObject.name}:`,
-              newOptions,
+            const originalValue = JSON.parse(
+              JSON.stringify(variableObject.value),
             );
+            // Check if this is the first response for this variable
+            const isFirstResponse =
+              !variableFirstResponseProcessed.value[variableObject.name];
 
-            // Create a set of existing values for quick lookup
-            const existingValuesSet = new Set(
-              variableObject.options.map((opt: any) => opt.value),
-            );
-            console.log(
-              `[WebSocket] Existing options for ${variableObject.name}:`,
-              variableObject.options,
-            );
-
-            // Add only new values to the existing options array
-            newOptions.forEach((opt: any) => {
-              if (!existingValuesSet.has(opt.value)) {
-                variableObject.options.push(opt);
-                existingValuesSet.add(opt.value);
+            if (isFirstResponse) {
+              // Initialize options array if it doesn't exist
+              if (!Array.isArray(variableObject.options)) {
+                variableObject.options = [];
               }
-            });
 
-            console.log(
-              `[WebSocket] New options for ${variableObject.name}:`,
-              variableObject.options,
-            );
+              // Process the first response
+              const newOptions = fieldHit.values
+                .filter((value: any) => value.zo_sql_key !== undefined)
+                .map((value: any) => ({
+                  label:
+                    value.zo_sql_key !== ""
+                      ? value.zo_sql_key.toString()
+                      : "<blank>",
+                  value: value.zo_sql_key.toString(),
+                }));
 
-            variableObject.options.sort((a: any, b: any) =>
-              a.label.localeCompare(b.label),
-            );
-
-            console.log(
-              `[WebSocket] Sorted options for ${variableObject.name}:`,
-              {
-                options: variableObject.options,
-              },
-            );
-            console.log("before updateVariableOptions", {
-              variableObject,
-              hits,
-            });
-
-            updateVariableOptions(variableObject, hits);
-
-            // Process any child variables immediately if we have options
-            const childVariables =
-              variablesDependencyGraph[variableObject.name]?.childVariables ||
-              [];
-
-            if (childVariables.length > 0) {
-              console.log(
-                `[WebSocket] Loading child variables for ${variableObject.name}:`,
-                childVariables,
+              // Set the options
+              variableObject.options = newOptions;
+              variableObject.options.sort((a: any, b: any) =>
+                a.label.localeCompare(b.label),
               );
-              const childVariableObjects = variablesData.values.filter(
-                (variable: any) => childVariables.includes(variable.name),
+              updateVariableOptions(variableObject, hits);
+
+              // Mark that we've processed the first response
+              variableFirstResponseProcessed.value[variableObject.name] = true;
+
+              // We can set isVariableLoadingPending to false since we have the initial values
+              // but keep isLoading true until all responses are done
+              variableObject.isVariableLoadingPending = false;
+
+              // Immediately process child variables
+              processChildVariables(variableObject);
+            } else {
+              // For subsequent responses, we'll accumulate values but not trigger UI updates
+              const existingValuesSet = new Set(
+                variableObject.options.map((opt: any) => opt.value),
               );
 
-              // Start loading child variables right away
-              childVariableObjects.forEach((childVariable: any) => {
-                loadSingleVariableDataByName(childVariable);
-              });
+              // Accumulate new values that don't exist yet
+              const newOptions = fieldHit.values
+                .filter((value: any) => value.zo_sql_key !== undefined)
+                .map((value: any) => ({
+                  label:
+                    value.zo_sql_key !== ""
+                      ? value.zo_sql_key.toString()
+                      : "<blank>",
+                  value: value.zo_sql_key.toString(),
+                }))
+                .filter((opt: any) => !existingValuesSet.has(opt.value));
+
+              // Add new options to the existing array
+              variableObject.options.push(...newOptions);
+              variableObject.options.sort((a: any, b: any) =>
+                a.label.localeCompare(b.label),
+              );
+              // If the variable's selected value has changed significantly due to new options,
+              // we might want to reload child variables
+              if (hasVariableValueChanged(variableObject, originalValue)) {
+                processChildVariables(variableObject);
+              }
             }
           }
         }
       } catch (error) {
-        console.error("Error processing WebSocket response:", error);
         resetVariableState(variableObject);
+        variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
       }
+    };
 
-      // Only set loading to false after all processing is complete
-      variableObject.isLoading = false;
-      variableObject.isVariableLoadingPending = false;
+    const processChildVariables = (parentVariable: any) => {
+      // Find child variables that depend on this parent
+      const childVariables =
+        variablesDependencyGraph[parentVariable.name]?.childVariables || [];
 
-      console.log(
-        `[WebSocket] Completed processing for ${variableObject.name}:`,
-        {
-          isLoading: variableObject.isLoading,
-          isVariableLoadingPending: variableObject.isVariableLoadingPending,
-          finalValue: variableObject.value,
-          options: variableObject.options,
-        },
-      );
-      // Emit updated data to ensure UI gets notified
-      emitVariablesData();
+      if (childVariables.length > 0) {
+        const childVariableObjects = variablesData.values.filter(
+          (variable: any) => childVariables.includes(variable.name),
+        );
+
+        // Load each child variable
+        childVariableObjects.forEach((childVariable: any) => {
+          loadSingleVariableDataByName(childVariable);
+        });
+      }
     };
 
     const handleSearchReset = (data: any) => {
       const variableObject = variablesData.values.find(
         (v: any) => v.query_data?.field === data.payload.queryReq.fields[0],
       );
+
       if (variableObject) {
-        // resetVariableState(variableObject);
+        // Reset variable state but don't clear options
         variableObject.isLoading = true;
+        variableFirstResponseProcessed.value[variableObject.name] = false;
+
         fetchFieldValuesWithWebsocket(
           variableObject,
           data.payload.queryReq.query_context,
@@ -439,29 +437,33 @@ export default defineComponent({
 
     const cancelTraceId = (field: string) => {
       const traceIds = traceIdMapper.value[field];
-      if (traceIds) {
+      if (traceIds && traceIds.length > 0) {
         traceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
+        // Clear the trace IDs after cancellation
+        traceIdMapper.value[field] = [];
       }
     };
 
     const handleSearchError = (request: any, err: any, variableObject: any) => {
-      console.error("WebSocket error:", err);
       variableObject.isLoading = false;
       variableObject.isVariableLoadingPending = false;
-      console.log(
-        `[WebSocket] isLoading=false (error handler) for`,
-        variableObject.name,
-      );
       resetVariableState(variableObject);
       removeTraceId(variableObject.name, request.traceId);
     };
 
-    // ------------- End WebSocket Implementation -------------
+    // Utility function to check if variable value has changed
+    const hasVariableValueChanged = (variableObject: any, newValue: any) => {
+      // Implement comparison logic based on your variable structure
+      // Return true if the value has changed, false otherwise
+      return JSON.stringify(variableObject.value) !== JSON.stringify(newValue);
+    };
+
+    // ------------- End Enhanced WebSocket Implementation -------------
 
     // variables data derived from the variables config list
     const variablesData: any = reactive({
