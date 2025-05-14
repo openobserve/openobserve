@@ -193,7 +193,11 @@ async fn adapt_tantivy_result(
                 num_buckets,
             )?
         }
-        _ => unreachable!(),
+        _ => {
+            return internal_err!(
+                "Only count and histogram optimize modes are supported by TantivyOptimizeExec"
+            );
+        }
     };
 
     RecordBatch::try_new(schema, array).map_err(|e| {
@@ -253,7 +257,16 @@ fn create_histogram_arrow_array(
 
     for (i, &count) in normalized_counts.iter().enumerate() {
         if count > 0 {
-            let bucket_timestamp = min_value + (i as i64 * bucket_width as i64);
+            let bucket_offset = i64::try_from(i)
+                .and_then(|i| i64::try_from(bucket_width).map(|w| i * w))
+                .map_err(|_| {
+                    DataFusionError::Internal(
+                        "Bucket timestamp calculation would overflow".to_string(),
+                    )
+                })?;
+            let bucket_timestamp = min_value.checked_add(bucket_offset).ok_or_else(|| {
+                DataFusionError::Internal("Bucket timestamp calculation would overflow".to_string())
+            })?;
             timestamp_values.push(bucket_timestamp);
             count_values.push(count as i64);
         }
@@ -272,8 +285,14 @@ fn create_histogram_arrow_array(
             // Convert microseconds to nanoseconds
             let nano_values = timestamp_values
                 .iter()
-                .map(|&ts| ts * 1000)
-                .collect::<Vec<_>>();
+                .map(|&ts| {
+                    ts.checked_mul(1000).ok_or_else(|| {
+                        DataFusionError::Internal(
+                            "Timestamp conversion to nanoseconds would overflow".to_string(),
+                        )
+                    })
+                })
+                .collect::<Result<Vec<_>, DataFusionError>>()?;
             Arc::new(TimestampNanosecondArray::from(nano_values)) as Arc<dyn Array>
         }
         // Handle other timestamp types as needed
