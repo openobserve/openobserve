@@ -182,10 +182,6 @@ export default defineComponent({
       }
     };
 
-    const hasVariableValueChanged = (variableObject: any, newValue: any) => {
-      return JSON.stringify(variableObject.value) !== JSON.stringify(newValue);
-    };
-
     const sendSearchMessage = (queryReq: any) => {
       const payload = {
         type: "values",
@@ -346,17 +342,43 @@ export default defineComponent({
               variableFirstResponseProcessed.value[variableObject.name] = true;
               variableObject.isVariableLoadingPending = false;
 
-              // Process child variables if any
-              const childVariables =
-                variablesDependencyGraph[variableObject.name]?.childVariables ||
-                [];
-              if (childVariables.length > 0) {
-                const childVariableObjects = variablesData.values.filter(
-                  (variable: any) => childVariables.includes(variable.name),
+              // Check if value actually changed before loading child variables
+              const hasValueChanged =
+                Array.isArray(originalValue) &&
+                Array.isArray(variableObject.value)
+                  ? JSON.stringify(originalValue) !==
+                    JSON.stringify(variableObject.value)
+                  : originalValue !== variableObject.value;
+
+              console.log(
+                `[WebSocket] First response value change check for ${variableObject.name}:`,
+                {
+                  originalValue,
+                  newValue: variableObject.value,
+                  hasValueChanged,
+                },
+              );
+
+              // Only load child variables if value actually changed
+              if (hasValueChanged) {
+                const childVariables =
+                  variablesDependencyGraph[variableObject.name]
+                    ?.childVariables || [];
+                if (childVariables.length > 0) {
+                  console.log(
+                    `[WebSocket] Loading child variables for ${variableObject.name} due to value change`,
+                  );
+                  const childVariableObjects = variablesData.values.filter(
+                    (variable: any) => childVariables.includes(variable.name),
+                  );
+                  childVariableObjects.forEach((childVariable: any) => {
+                    loadSingleVariableDataByName(childVariable);
+                  });
+                }
+              } else {
+                console.log(
+                  `[WebSocket] Skipping child variable load for ${variableObject.name} - value unchanged`,
                 );
-                childVariableObjects.forEach((childVariable: any) => {
-                  loadSingleVariableDataByName(childVariable);
-                });
               }
             } else {
               // For subsequent responses, we'll accumulate values but not trigger UI updates
@@ -381,13 +403,33 @@ export default defineComponent({
               variableObject.options.sort((a: any, b: any) =>
                 a.label.localeCompare(b.label),
               );
-              // If the variable's selected value has changed significantly due to new options,
-              // we might want to reload child variables
-              if (hasVariableValueChanged(variableObject, originalValue)) {
+
+              // Check if the variable's selected value has changed significantly
+              const hasValueChanged =
+                Array.isArray(originalValue) &&
+                Array.isArray(variableObject.value)
+                  ? JSON.stringify(originalValue) !==
+                    JSON.stringify(variableObject.value)
+                  : originalValue !== variableObject.value;
+
+              console.log(
+                `[WebSocket] Subsequent response value change check for ${variableObject.name}:`,
+                {
+                  originalValue,
+                  newValue: variableObject.value,
+                  hasValueChanged,
+                },
+              );
+
+              // Only load child variables if value actually changed
+              if (hasValueChanged) {
                 const childVariables =
                   variablesDependencyGraph[variableObject.name]
                     ?.childVariables || [];
                 if (childVariables.length > 0) {
+                  console.log(
+                    `[WebSocket] Loading child variables for ${variableObject.name} due to value change`,
+                  );
                   const childVariableObjects = variablesData.values.filter(
                     (variable: any) => childVariables.includes(variable.name),
                   );
@@ -395,6 +437,10 @@ export default defineComponent({
                     loadSingleVariableDataByName(childVariable);
                   });
                 }
+              } else {
+                console.log(
+                  `[WebSocket] Skipping child variable load for ${variableObject.name} - value unchanged`,
+                );
               }
             }
           }
