@@ -343,4 +343,19 @@ test.describe("Logs Queries testcases", () => {
     await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
 
+  test("should trigger search results when pressing Cmd+Enter or Ctrl+Enter", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutTest();
+  });
+
+  test("should execute query with keyboard shortcut (Cmd+Enter or Ctrl+Enter) after clicking elsewhere ", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutAfterClickingElsewhere();
+  });
+
+  test("should execute different query with keyboard shortcut (Cmd+Enter or Ctrl+Enter)", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutWithDifferentQuery();
+  });
+
+  test("should execute SQL query with keyboard shortcut (Cmd+Enter or Ctrl+Enter)", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutWithSQLMode();
+  });
 })
