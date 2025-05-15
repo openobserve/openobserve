@@ -689,14 +689,18 @@ export const changeHistogramInterval = async (
 };
 
 export const convertQueryIntoSingleLine = async (query: any) => {
-  // if histogramInterval is null or query is null or query is empty, return query
-  if (query === null || query === "") {
+  try {
+    // if query is null or empty, return query as is
+    if (query === null || query === "") {
+      return query;
+    }
+
+    await importSqlParser();
+    const ast: any = parser.astify(query);
+
+    const sql = parser.sqlify(ast);
+    return sql.replace(/`/g, '"');
+  } catch (error) {
     return query;
   }
-
-  await importSqlParser();
-  const ast: any = parser.astify(query);
-
-  const sql = parser.sqlify(ast);
-  return sql.replace(/`/g, '"');
 };
