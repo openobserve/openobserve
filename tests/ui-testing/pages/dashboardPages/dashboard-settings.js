@@ -36,7 +36,12 @@ export default class DashboardSetting {
     this.timeBtn = page.locator('[data-test="date-time-btn"]');
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
 
+    this.addTabCancel = page.locator('[dashboard-add-cancel"]');
+    this.EditSave = page.locator(
+      '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
+    );
   }
+
   generateUniqueDashboardnewName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
   }
@@ -57,8 +62,12 @@ export default class DashboardSetting {
 
   //Time Setting//
   async relativeTimeSelection(date, time) {
-    await this.page.locator('[data-test="dashboard-general-setting-datetime-picker"] [data-test="date-time-btn"]').click();
-    
+    await this.page
+      .locator(
+        '[data-test="dashboard-general-setting-datetime-picker"] [data-test="date-time-btn"]'
+      )
+      .click();
+
     await this.page
       .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
       .click();
@@ -96,6 +105,8 @@ export default class DashboardSetting {
     await this.tab.click();
     await this.addtab.click();
     await this.tabName.fill(tabnewName);
+  }
+  async saveTabSetting() {
     await this.saveTab.click();
   }
 
@@ -115,9 +126,12 @@ export default class DashboardSetting {
   }
 
   async editTabName(newName) {
-   
     await this.tab.waitFor({ state: "visible" });
     await this.tab.click();
+    await this.page
+      .locator('[data-test="dashboard-tab-settings-drag"] div')
+      .filter({ hasText: "drag_indicatortestedit" });
+
     await this.editBtn.waitFor({ state: "visible" });
     await this.editBtn.click();
     await this.editName.click();
@@ -128,5 +142,195 @@ export default class DashboardSetting {
   async fullScreenSettings() {
     await this.fullScreen.waitFor({ state: "visible" });
     await this.fullScreen.click();
+  }
+  async cancelTabwithoutSave() {
+    await this.page.locator('[data-test="dashboard-add-cancel"]').click();
+  }
+
+  async saveEditedtab() {
+    await this.page
+      .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
+      .click();
+  }
+
+  async cancelEditedtab() {
+    await page
+      .locator('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]')
+      .click();
+  }
+  async deleteTab() {
+    await this.page.locator('[data-test="confirm-button"]').click();
+  }
+  async openVariables() {
+    await this.page
+      .locator('[data-test="dashboard-settings-variable-tab"]')
+      .click();
+  }
+
+  variableName(prefix = "u") {
+    return `${prefix}_${Date.now()}`;
+  }
+
+  //variable type: Query Values
+  async addVariable(type, variableName, streamType, Stream, field) {
+    await this.page
+      .locator('[data-test="dashboard-variable-add-btn"]')
+      .waitFor({ state: "visible" });
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page
+      .locator('[data-test="dashboard-variable-type-select"]')
+      .waitFor({ state: "visible" });
+    await this.page
+      .locator('[data-test="dashboard-variable-type-select"]')
+      .click();
+    await this.page.getByRole("option", { name: type }).click();
+    await this.page.locator('[data-test="dashboard-variable-name"]').click();
+    await this.page
+      .locator('[data-test="dashboard-variable-name"]')
+      .fill(variableName);
+    await this.page
+      .locator('[data-test="dashboard-variable-stream-type-select"]')
+      .click();
+    await this.page.getByRole("option", { name: streamType }).click();
+    await this.page
+      .locator('[data-test="dashboard-variable-stream-select"]')
+      .click();
+    await this.page.getByRole("option", { name: Stream }).click();
+    await this.page
+      .locator('[data-test="dashboard-variable-field-select"]')
+      .click();
+    await this.page.getByRole("option", { name: field }).click();
+  }
+
+  //select Constand type
+  async selectConstantType(type, variableName, value) {
+    await this.page
+      .locator('[data-test="dashboard-variable-add-btn"]')
+      .waitFor({ state: "visible" });
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page
+      .locator('[data-test="dashboard-variable-type-select"]')
+      .waitFor({ state: "visible" });
+    await this.page
+      .locator('[data-test="dashboard-variable-type-select"]')
+      .click();
+    await this.page.getByRole("option", { name: type }).click();
+    await this.page.locator('[data-test="dashboard-variable-name"]').click();
+    await this.page
+      .locator('[data-test="dashboard-variable-name"]')
+      .fill(variableName);
+    await this.page
+      .locator('[data-test="dashboard-variable-constant-value"]')
+      .click();
+    await this.page
+      .locator('[data-test="dashboard-variable-constant-value"]')
+      .fill(value);
+  }
+
+  //select Textbox type
+  async selectTextType(type, variableName) {
+    await this.page
+      .locator('[data-test="dashboard-variable-add-btn"]')
+      .waitFor({ state: "visible" });
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page
+      .locator('[data-test="dashboard-variable-type-select"]')
+      .waitFor({ state: "visible" });
+    await this.page
+      .locator('[data-test="dashboard-variable-type-select"]')
+      .click();
+    await this.page.getByRole("option", { name: type }).click();
+    await this.page.locator('[data-test="dashboard-variable-name"]').click();
+    await this.page
+      .locator('[data-test="dashboard-variable-name"]')
+      .fill(variableName);
+  }
+
+  //select Custom type
+  async selectCustomType(type, variableName, label, value) {
+    await this.page
+      .locator('[data-test="dashboard-variable-add-btn"]')
+      .waitFor({ state: "visible" });
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page
+      .locator('[data-test="dashboard-variable-type-select"]')
+      .waitFor({ state: "visible" });
+    await this.page
+      .locator('[data-test="dashboard-variable-type-select"]')
+      .click();
+    await this.page.getByRole("option", { name: type }).click();
+    await this.page.locator('[data-test="dashboard-variable-name"]').click();
+    await this.page
+      .locator('[data-test="dashboard-variable-name"]')
+      .fill(variableName);
+    await this.page.getByRole("button", { name: "Add Option" }).click();
+
+    await this.page
+      .locator('[data-test="dashboard-custom-variable-0-label"]')
+      .click();
+    await this.page
+      .locator('[data-test="dashboard-custom-variable-0-label"]')
+      .fill(label);
+    await this.page
+      .locator('[data-test="dashboard-custom-variable-0-value"]')
+      .click();
+    await this.page
+      .locator('[data-test="dashboard-custom-variable-0-value"]')
+      .fill(value);
+  }
+
+  async addMaxRecord(value) {
+    await this.page
+      .locator('[data-test="dashboard-variable-max-record-size"]')
+      .click();
+    await this.page
+      .locator('[data-test="dashboard-variable-max-record-size"]')
+      .fill(value);
+  }
+
+  async enableMultiSelect() {
+    await this.page
+      .locator('[data-test="dashboard-query_values-show_multiple_values"]')
+      .click();
+  }
+
+  // async addDefaultValue() {
+  //   await this.page.locator('[data-test="dashboard-multi-select-default-value-toggle-first-value"]').click();
+  //   await this.page.locator('[data-test="dashboard-multi-select-default-value-toggle-first-value"]').fill(value);
+  // }
+  async addCustomValue(value) {
+    await this.page
+      .locator(
+        '[data-test="dashboard-multi-select-default-value-toggle-custom"]'
+      )
+      .click();
+    await this.page
+      .locator('[data-test="dashboard-variable-custom-value-0"]')
+      .click();
+    await this.page
+      .locator('[data-test="dashboard-variable-custom-value-0"]')
+      .fill(value);
+  }
+  async saveVariable() {
+    await this.page
+      .locator('[data-test="dashboard-variable-save-btn"]')
+      .click();
+  }
+
+  async cancelVariable() {
+    await this.page
+      .locator('[data-test="dashboard-variable-cancel-btn"]')
+      .click();
+  }
+
+  async hideVariable() {
+    await this.page
+      .locator('[data-test="dashboard-variable-hide_on_dashboard"]')
+      .click();
+  }
+  async closeSettingWindow() {
+    await this.page
+      .locator('[data-test="dashboard-settings-close-btn"]')
+      .click();
   }
 }
