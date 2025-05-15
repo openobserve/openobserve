@@ -31,6 +31,7 @@ export class LogsQueryPage {
   }
 
   async clickErrorMessage() {
+    await expect(this.page.locator(this.errorMessage).getByText('No events found')).toBeVisible();
     await this.page.locator(this.errorMessage).click();
   }
 
@@ -39,7 +40,9 @@ export class LogsQueryPage {
   }
 
   async clickNoDataFound() {
-    await this.page.getByText(this.noDataFoundText).click();
+    const noDataFoundLocator = this.page.getByText(this.noDataFoundText);
+    await expect(noDataFoundLocator).toBeVisible({ timeout: 10000 });
+    await noDataFoundLocator.click();
   }
 
   async clickResultDetail() {
