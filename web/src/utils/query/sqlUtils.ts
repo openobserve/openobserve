@@ -640,7 +640,7 @@ export const changeHistogramInterval = async (
   histogramInterval: any,
 ) => {
   // if histogramInterval is null or query is null or query is empty, return query
-  if (histogramInterval === null || query === null || query === "") {
+  if (query === null || query === "") {
     return query;
   }
 
@@ -648,11 +648,12 @@ export const changeHistogramInterval = async (
   const ast: any = parser.astify(query);
 
   // Iterate over the columns to check if the column is histogram
-  ast.columns.forEach((column: any) => {
+  ast?.columns?.forEach((column: any) => {
     // check if the column is histogram
     if (
       column.expr.type === "function" &&
-      column?.expr?.name?.name?.[0]?.value === "histogram"
+      column?.expr?.name?.name?.[0]?.value === "histogram" &&
+      histogramInterval !== null
     ) {
       const histogramExpr = column.expr;
       if (histogramExpr.args && histogramExpr.args.type === "expr_list") {
@@ -685,4 +686,21 @@ export const changeHistogramInterval = async (
 
   const sql = parser.sqlify(ast);
   return sql.replace(/`/g, '"');
+};
+
+export const convertQueryIntoSingleLine = async (query: any) => {
+  try {
+    // if query is null or empty, return query as is
+    if (query === null || query === "") {
+      return query;
+    }
+
+    await importSqlParser();
+    const ast: any = parser.astify(query);
+
+    const sql = parser.sqlify(ast);
+    return sql.replace(/`/g, '"');
+  } catch (error) {
+    return query;
+  }
 };
