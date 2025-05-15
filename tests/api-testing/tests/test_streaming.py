@@ -105,67 +105,67 @@ test_data_histog = [
         3848,
     ),
 
-    # (
-    #     "AND",
-    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     1,
-    #     2002,
-    # ),
+    (
+        "AND",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        2002,
+    ),
 
-    # (
-    #     "OR",
-    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     1,
-    #     2002,
-    # ),
-    # (
-    #     "Match_all",
-    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE match_all('ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     1,
-    #     18,
-    # ),  
-    # (
-    #     "str_match",
-    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE str_match(kubernetes_container_name, 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     1,
-    #     2002,
-    # ), 
+    (
+        "OR",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        2002,
+    ),
+    (
+        "Match_all",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE match_all('ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        18,
+    ),  
+    (
+        "str_match",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE str_match(kubernetes_container_name, 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        2002,
+    ), 
 
-    # (
-    #     "Like",
-    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name LIKE '%ziox%' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     1,
-    #     2002,
-    # ), 
+    (
+        "Like",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name LIKE '%ziox%' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        2002,
+    ), 
     
-    #  (
-    #     "IN",
-    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name IN ('controller', 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     1,
-    #     2816,
-    # ),  
+     (
+        "IN",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name IN ('controller', 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        2816,
+    ),  
     
     
-    # (
-    #     "str_match_ignore_case",
-    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE str_match_ignore_case(kubernetes_container_name, 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     1,
-    #     2002,
-    # ),  
+    (
+        "str_match_ignore_case",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE str_match_ignore_case(kubernetes_container_name, 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        2002,
+    ),  
 
-    # (
-    #     "Count Having",
-    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     1,
-    #     3848,
-    # ),
+    (
+        "Count Having",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        3848,
+    ),
 
-    # (
-    #     "Not Null",
-    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_image IS NOT NULL GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     1,
-    #     3846,
-    # ),
+    (
+        "Not Null",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_image IS NOT NULL GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        3846,
+    ),
   
   
  
@@ -210,7 +210,7 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_tot
         res_histog.status_code == 200
     ), f"histogram mode {test_name} added 200, but got {res_histog.status_code} {res_histog.content}"
 
-    print(f"API {test_name} Response {url} Histog status code:", res_histog.status_code) 
+    print(f"API {test_name} Response {url} Histog False Cache HTTP:", res_histog.status_code) 
 
     # Parse the JSON response
     
@@ -237,7 +237,7 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_tot
         res_histog_cache.status_code == 200
     ), f"histogram cache {test_name} mode added 200, but got {res_histog_cache.status_code} {res_histog_cache.content}"
 
-    print(f"Response {url} Cache Histog status code:", res_histog_cache.status_code) 
+    print(f"Response {url} Cache True Histog HTTP:", res_histog_cache.status_code) 
 
     # Parse the JSON response
     
@@ -266,223 +266,223 @@ test_data_sql = [
         100,
     ),
 
-    # (
-    #     "AND",
-    #     f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox'",
-    #     100,
-    #     100,
-    # ),
+    (
+        "AND",
+        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox'",
+        100,
+        100,
+    ),
 
-    # (
+    (
 
-    #     "OR",
-    #     f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox'",
-    #     100,
-    #     100,
-    # ),
-    # (
-    #     "Match_all",
-    #     f"SELECT * FROM \"{stream_name}\" WHERE match_all('ziox')",
-    #     100,
-    #     18,
-    # ),
+        "OR",
+        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox'",
+        100,
+        100,
+    ),
+    (
+        "Match_all",
+        f"SELECT * FROM \"{stream_name}\" WHERE match_all('ziox')",
+        100,
+        18,
+    ),
 
-    # (
-    #     "Str_match",
-    #     f"SELECT * FROM \"{stream_name}\" where str_match(kubernetes_container_name, 'ziox')",
-    #     100,
-    #     100,
-    # ),
+    (
+        "Str_match",
+        f"SELECT * FROM \"{stream_name}\" where str_match(kubernetes_container_name, 'ziox')",
+        100,
+        100,
+    ),
 
-    # (
-    #     "Like",
-    #     f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_name LIKE '%ziox%'",
-    #     100,
-    #     100,
-    # ),
+    (
+        "Like",
+        f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_name LIKE '%ziox%'",
+        100,
+        100,
+    ),
 
-    # (
-    #     "AS",
-    #     f"SELECT kubernetes_container_name as \"breakdown_1\" FROM \"{stream_name}\"",
-    #     100,
-    #     100,
-    # ),
+    (
+        "AS",
+        f"SELECT kubernetes_container_name as \"breakdown_1\" FROM \"{stream_name}\"",
+        100,
+        100,
+    ),
 
-    # (
-    #     "IN",
-    #     f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_name IN ('controller', 'ziox')",
-    #     100,
-    #     100,
-    # ),
+    (
+        "IN",
+        f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_name IN ('controller', 'ziox')",
+        100,
+        100,
+    ),
 
-    # (
-    #     "str_match_ignore_case",
-    #     f"SELECT * FROM \"{stream_name}\" where str_match_ignore_case(kubernetes_container_name, 'ziox')",
-    #     100,
-    #     100,
-    # ),
+    (
+        "str_match_ignore_case",
+        f"SELECT * FROM \"{stream_name}\" where str_match_ignore_case(kubernetes_container_name, 'ziox')",
+        100,
+        100,
+    ),
   
     
-    # (
-    #     "Limit",
-    #     f"SELECT * FROM \"{stream_name}\" LIMIT 10",
-    #     10,
-    #     10,
-    # ),
+    (
+        "Limit",
+        f"SELECT * FROM \"{stream_name}\" LIMIT 10",
+        10,
+        10,
+    ),
     
-    # (
-    #     "DISTINCT",
-    #     f"SELECT DISTINCT code FROM \"{stream_name}\"",
-    #     100,
-    #     3,
-    # ),
+    (
+        "DISTINCT",
+        f"SELECT DISTINCT code FROM \"{stream_name}\"",
+        100,
+        3,
+    ),
 
-    # (
-    #     "UNION",
-    #     f"SELECT * FROM \"{stream_name}\" UNION SELECT * FROM \"{stream_join}\"",
-    #     50,
-    #     50,
-    # ),
+    (
+        "UNION",
+        f"SELECT * FROM \"{stream_name}\" UNION SELECT * FROM \"{stream_join}\"",
+        50,
+        50,
+    ),
 
-    # (
-    #     "UNION ALL",
-    #     f"SELECT * FROM \"{stream_name}\" UNION ALL SELECT * FROM \"{stream_join}\"",
-    #     50,
-    #     50,
-    # ),
+    (
+        "UNION ALL",
+        f"SELECT * FROM \"{stream_name}\" UNION ALL SELECT * FROM \"{stream_join}\"",
+        50,
+        50,
+    ),
 
-    # (
-    #     "Join",
-    #     f"SELECT a.kubernetes_namespace_name , b.kubernetes_namespace_name  FROM \"{stream_name}\" as a join \"{stream_join}\" as b on a.kubernetes_namespace_name  = b.kubernetes_namespace_name",
-    #     50,
-    #     50,
-    # ),
+    (
+        "Join",
+        f"SELECT a.kubernetes_namespace_name , b.kubernetes_namespace_name  FROM \"{stream_name}\" as a join \"{stream_join}\" as b on a.kubernetes_namespace_name  = b.kubernetes_namespace_name",
+        50,
+        50,
+    ),
 
-    # (
-    #     "LEFT Join",
-    #     f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a LEFT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
-    #     50,
-    #     50,
-    # ),
+    (
+        "LEFT Join",
+        f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a LEFT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
+        50,
+        50,
+    ),
 
-    # (
-    #     "RIGHT Join",
-    #     f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a RIGHT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
-    #     50,
-    #     50,
-    # ),
+    (
+        "RIGHT Join",
+        f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a RIGHT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
+        50,
+        50,
+    ),
 
-    # (
-    #     "FULL Join",
-    #     f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a FULL JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
-    #     50,
-    #     50,
-    # ),
+    (
+        "FULL Join",
+        f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a FULL JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
+        50,
+        50,
+    ),
 
-    # (
-    #     "Join Where",
-    #     f"SELECT a.kubernetes_namespace_name , b.kubernetes_namespace_name  FROM \"{stream_name}\" as a join \"{stream_join}\" as b on a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
-    #     50,
-    #     50,
-    # ),
+    (
+        "Join Where",
+        f"SELECT a.kubernetes_namespace_name , b.kubernetes_namespace_name  FROM \"{stream_name}\" as a join \"{stream_join}\" as b on a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        50,
+        50,
+    ),
 
-    # (
-    #     "LEFT Join Where",
-    #     f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a LEFT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
-    #     50,
-    #     50,
-    # ),
+    (
+        "LEFT Join Where",
+        f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a LEFT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        50,
+        50,
+    ),
 
-    # (
-    #     "RIGHT Join Where",
-    #     f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a RIGHT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
-    #     50,
-    #     50,
-    # ),
+    (
+        "RIGHT Join Where",
+        f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a RIGHT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        50,
+        50,
+    ),
 
-    # (
-    #     "FULL Join",
-    #     f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a FULL JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
-    #     50,
-    #     50,
-    # ),
+    (
+        "FULL Join",
+        f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a FULL JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        50,
+        50,
+    ),
 
-    # (
-    #     "INNER Join Like",
-    #     f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name LIKE '%ziox%'",
-    #     50,
-    #     50,
-    # ),
+    (
+        "INNER Join Like",
+        f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name LIKE '%ziox%'",
+        50,
+        50,
+    ),
 
-    # (
-    #     "INNER Join Like Limit",
-    #     f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name LIKE '%ziox%' LIMIT 10",
-    #     50,
-    #     10,
-    # ),
+    (
+        "INNER Join Like Limit",
+        f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name LIKE '%ziox%' LIMIT 10",
+        50,
+        10,
+    ),
 
-    # (
-    #     "INNER Join IN",
-    #     f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name IN ('ziox')",
-    #     50,
-    #     50,
-    # ),
+    (
+        "INNER Join IN",
+        f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name IN ('ziox')",
+        50,
+        50,
+    ),
 
-    # (
-    #     "INNER Join IN Limit",
-    #     f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name IN ('ziox') LIMIT 10",
-    #     50,
-    #     10,
-    # ),
+    (
+        "INNER Join IN Limit",
+        f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name IN ('ziox') LIMIT 10",
+        50,
+        10,
+    ),
 
-    # (
-    #     "Count Having",
-    #     f"SELECT COUNT(_timestamp) as totallogcount FROM \"{stream_name}\" Having totallogcount > 1000",
-    #     -1,
-    #     1,
-    # ),
+    (
+        "Count Having",
+        f"SELECT COUNT(_timestamp) as totallogcount FROM \"{stream_name}\" Having totallogcount > 1000",
+        -1,
+        1,
+    ),
 
-    # (
-    #     "regexp_match",
-    #     f"SELECT _timestamp, array_extract(regexp_match(log, '^[^\\\\]\\n]*\\\\]\\\\s+(?P<httpMethod>\\\\w+)(?:[^/\\n]*/){4}(?P<catalogApi>\\\\w+)(?:[^\\n]* ){2}(?P<httpStatusCode>[^ ]+)\\\\s+(?P<apiPayloadSize>[^ ]+)\\\\s+(?P<responseTime>\\\\d+)'), 3) AS status FROM \"{stream_name}\"",
-    #     100,
-    #     100,
-    # ),
+    (
+        "regexp_match",
+        f"SELECT _timestamp, array_extract(regexp_match(log, '^[^\\\\]\\n]*\\\\]\\\\s+(?P<httpMethod>\\\\w+)(?:[^/\\n]*/){4}(?P<catalogApi>\\\\w+)(?:[^\\n]* ){2}(?P<httpStatusCode>[^ ]+)\\\\s+(?P<apiPayloadSize>[^ ]+)\\\\s+(?P<responseTime>\\\\d+)'), 3) AS status FROM \"{stream_name}\"",
+        100,
+        100,
+    ),
 
-    # (
-    #     "Count Distinct",
-    #     f"SELECT count(distinct(kubernetes_container_name)) FROM \"{stream_name}\"",
-    #     -1,
-    #     1,
-    # ),
+    (
+        "Count Distinct",
+        f"SELECT count(distinct(kubernetes_container_name)) FROM \"{stream_name}\"",
+        -1,
+        1,
+    ),
 
-    # (
-    #     "MAX",
-    #     f"SELECT MAX(_timestamp), count(_timestamp) FROM \"{stream_name}\"",
-    #     -1,
-    #     1,
-    # ),
+    (
+        "MAX",
+        f"SELECT MAX(_timestamp), count(_timestamp) FROM \"{stream_name}\"",
+        -1,
+        1,
+    ),
 
-    # (
-    #     "Count Aggregate",
-    #     f"SELECT count(*) FROM \"{stream_name}\"",
-    #     -1,
-    #     1,
-    # ),
+    (
+        "Count Aggregate",
+        f"SELECT count(*) FROM \"{stream_name}\"",
+        -1,
+        1,
+    ),
 
-    # (
-    #     "Not Null",
-    #     f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_image IS NOT NULL",
-    #     -1,
-    #     1000,
-    # ),
+    (
+        "Not Null",
+        f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_image IS NOT NULL",
+        -1,
+        1000,
+    ),
 
-    # (
-    #     "Avg",
-    #     f"SELECT avg(code) FROM \"{stream_name}\" WHERE code > 200",
-    #     -1,
-    #     1,
-    # ),
+    (
+        "Avg",
+        f"SELECT avg(code) FROM \"{stream_name}\" WHERE code > 200",
+        -1,
+        1,
+    ),
 
 
 
@@ -530,7 +530,7 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total
         res_sql.status_code == 200
     ), f"SQL mode {test_name_sql} added 200, but got {res_sql.status_code} {res_sql.content}"
 
-    print(f"Response {url} SQL code:", res_sql.status_code) 
+    print(f"Response {url} SQL False Cache HTTP:", res_sql.status_code) 
 
     # Parse the JSON response
     
@@ -550,7 +550,7 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total
         res_sql_cache.status_code == 200
     ), f"SQL cache {test_name_sql} mode added 200, but got {res_sql_cache.status_code} {res_sql_cache.content}"
 
-    print(f"Response {test_name_sql} Cache SQL {url} status code :", res_sql_cache.status_code) 
+    print(f"Response {test_name_sql} Cache True SQL {url} HTTP:", res_sql_cache.status_code) 
 
     # Parse the JSON response
     
@@ -619,29 +619,26 @@ def test_streaming_histogram(create_session, base_url, test_name, hist_query, ex
         res_histog.status_code == 200
     ), f"histogram mode {test_name} added 200, but got {res_histog.status_code} {res_histog.content}"
 
-    print(f"API {test_name} Response {url} Histog status code:", res_histog.status_code) 
+    print(f"API {test_name} Response {url} Histog False Cache Streaming", res_histog.status_code) 
 
     # Parse the JSON response
     
-    response = read_response(res_histog)
-    print(f"API {test_name} Response {url} Histog:", response)
+    res_data_histog = read_response(res_histog)
+    # print(f"API {test_name} Response False Cache Streaming Search {url} Histog:", res_data_histog)
 
+    # Validate the total in the response
+    total_hits_histog = res_data_histog["results"]["total"]
 
-    # print(f"API {test_name} Response cache false {url} Histog:", res_data_histog) 
+    # Adjust the assertion based on our expectations
+    expected_hits_histog = expected_total_hits_results_histg  # we're expecting
+    assert total_hits_histog == expected_hits_histog, f"Expected total {test_name} to be {expected_hits_histog}, but got {total_hits_histog}"
 
-    # # Validate the total in the response
-    # total_hits_histog = res_data_histog["total"]
-
-    # # Adjust the assertion based on our expectations
-    # expected_hits_histog = expected_total_hits_results_histg  # we're expecting
-    # assert total_hits_histog == expected_hits_histog, f"Expected total {test_name} to be {expected_hits_histog}, but got {total_hits_histog}"
-
-    # # Validate zo_sql_num hits histogram in the first hit
-    # if total_hits_histog > 0:
-    #     actual_zo_sql_num_hits_histog = res_data_histog["hits"][0]["zo_sql_num"]
-    #     assert actual_zo_sql_num_hits_histog == expected_zo_sql_num_histg, f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog}"
-    # else:
-    #     pytest.fail("No hits found in the response.")
+    # Validate zo_sql_num hits histogram in the first hit
+    if total_hits_histog > 0:
+        actual_zo_sql_num_hits_histog = res_data_histog["results"]["hits"][0]["zo_sql_num"]
+        assert actual_zo_sql_num_hits_histog == expected_zo_sql_num_histg, f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog}"
+    else:
+        pytest.fail("No hits found in the response.")
 
     # Generate request for histogram cache enabled
     res_histog_cache = session.post(f"{url}api/{org_id}/_search_stream?type=logs&search_type=ui&use_cache=true", json=json_data_hist, stream=True)
@@ -650,181 +647,98 @@ def test_streaming_histogram(create_session, base_url, test_name, hist_query, ex
         res_histog_cache.status_code == 200
     ), f"histogram cache {test_name} mode added 200, but got {res_histog_cache.status_code} {res_histog_cache.content}"
 
-    print(f"Response {url} Cache Histog status code:", res_histog_cache.status_code) 
+    print(f"Response {url} Cache True Histog Streaming:", res_histog_cache.status_code) 
 
-    for line in res_histog_cache.iter_lines():
+    res_data_histog_cache = read_response(res_histog_cache)
+    # print(f"API {test_name} Response cache true Streaming Search {url} Histog:", res_data_histog_cache)
 
-    # filter out keep-alive new lines
-        if line:
-            # decoded_line = line.decode('utf-8')
-            print(line)
+    # for line in res_histog_cache.iter_lines():
+
+    # # filter out keep-alive new lines
+    #     if line:
+    #         # decoded_line = line.decode('utf-8')
+    #         print(line)
+
+    
+    # Validate the total in the response
+    total_hits_histog_cache = res_data_histog_cache["results"]["total"]
+
+    # Adjust the assertion based on our expectations
+    expected_hits_histog_cache = expected_total_hits_results_histg  # what we're expecting
+    assert total_hits_histog_cache == expected_hits_histog_cache, f"Expected {test_name} total to be {expected_hits_histog_cache}, but got {total_hits_histog_cache}"
+
+    # Validate zo_sql_num hits histogram in the first hit
+    if total_hits_histog_cache > 0:
+        actual_zo_sql_num_hits_histog_cache = res_data_histog_cache["results"]["hits"][0]["zo_sql_num"]
+        assert actual_zo_sql_num_hits_histog_cache == expected_zo_sql_num_histg, f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog_cache}"
+    else:
+        pytest.fail("No hits found in the response.")
+
+
+@pytest.mark.parametrize("test_name_sql, sql_query, sql_size, total_exp", test_data_sql)
+def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total_exp):
+    """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
+
+    session = create_session
+    url = base_url
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    json_data_sql = {
+    "query": {
+        "sql": sql_query,
+        "start_time": ten_min_ago,
+        "end_time": end_time,
+        "from": 0,
+        "size": sql_size,
+        "quick_mode": False,
+        "sql_mode": "full"
+    },
+    "regions": [],
+    "clusters": []
+    }
+    
+    res_sql = session.post(f"{url}api/{org_id}/_search_stream?type=logs&search_type=UI&use_cache=false", json=json_data_sql, stream=True)
+   
+    assert (
+        res_sql.status_code == 200
+    ), f"SQL mode {test_name_sql} added 200, but got {res_sql.status_code} {res_sql.content}"
+
+    print(f"Response {url} SQL False Cache Streaming:", res_sql.status_code) 
 
     # Parse the JSON response
     
-    res_data_histog_cache = res_histog_cache.json()
-
-    print(f"API {test_name} Response cache true {url} Histog:", res_data_histog_cache) 
+    res_data_sql = read_response(res_sql)
 
     # Validate the total in the response
-    total_hits_histog_cache = res_data_histog_cache["total"]
+    total_hits_sql = res_data_sql["results"]["total"]
 
-    # # Adjust the assertion based on our expectations
-    # expected_hits_histog_cache = expected_total_hits_results_histg  # what we're expecting
-    # assert total_hits_histog_cache == expected_hits_histog_cache, f"Expected {test_name} total to be {expected_hits_histog_cache}, but got {total_hits_histog_cache}"
+    # Adjust the assertion based on our expectations
+    expected_hits_sql = total_exp  # what we're expecting
+    assert total_hits_sql == expected_hits_sql, f"Expected total {test_name_sql} to be {expected_hits_sql}, but got {total_hits_sql}"
 
-    # # Validate zo_sql_num hits histogram in the first hit
-    # if total_hits_histog_cache > 0:
-    #     actual_zo_sql_num_hits_histog_cache = res_data_histog_cache["hits"][0]["zo_sql_num"]
-    #     assert actual_zo_sql_num_hits_histog_cache == expected_zo_sql_num_histg, f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog_cache}"
-    # else:
-    #     pytest.fail("No hits found in the response.")
+    # Generate request for cache
+    res_sql_cache = session.post(f"{url}api/{org_id}/_search_stream?type=logs&search_type=UI&use_cache=true", json=json_data_sql, stream=True)
+   
+    assert (
+        res_sql_cache.status_code == 200
+    ), f"SQL cache {test_name_sql} mode added 200, but got {res_sql_cache.status_code} {res_sql_cache.content}"
 
+    print(f"Response {test_name_sql} Cache True SQL {url} Streaming:", res_sql_cache.status_code) 
 
-# @pytest.mark.parametrize("test_name_sql, sql_query, sql_size, total_exp", test_data_sql)
-# def test_streaming_sql(test_name_sql, sql_query, sql_size, total_exp):
-#     """Test WebSocket with sql when websocket is enabled ."""
-#     # Prepare headers with cookies
-
-#     cookie_header_sql = f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}"
+    # Parse the JSON response
     
-#     # Generate a dynamic UUID
-#     uuid_sql = str(uuid.uuid4())  # Generates a new UUID
+    res_data_sql_cache = read_response(res_sql_cache)
 
-#     # Construct the WebSocket URL
-#     WS_URL_sql = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_sql}"
+    # Validate the total in the response
+    total_hits_sql_cache = res_data_sql_cache["results"]["total"]
 
-#     # Now we can use WS_URL in our WebSocket connection
-
-    
-#     try:
-#         ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
-#         # Proceed with your WebSocket logic here
-#     except websocket.WebSocketBadStatusException as e:
-#         print(f"Streaming connection failed: {e}")
-#         # Use the exception's message directly
-#         status_code = e.args[0].split()[2] if e.args else "Unknown"
-#         assert False, f"Streaming connection failed with status: {status_code} and message: {e.args[0]}"
-#     except Exception as e:
-#         print(f"An unexpected error occurred: {e}")
-#         assert False, f"An unexpected error occurred: {e}"
-
-#     print(f"Streaming {test_name_sql} SQL {WS_ZO_BASE_URL} connection established", ws_sql)
-
-#     # Generate a dynamic trace_id
-#     trace_id_sql = str(uuid.uuid4())
-
-#     now = datetime.now(timezone.utc)
-#     end_time = int(now.timestamp() * 1000000)
-#     # Prepare the specific message to send
-#     message_sql = {
-#         "type": "search",
-#         "content": {
-#             "trace_id": trace_id_sql,  # Use dynamic trace_id
-#             "payload": {
-#                 "query": {
-#                     "sql": sql_query,
-#                     "start_time": ten_min_ago,
-#                     "end_time": end_time,
-#                     "from": 0,
-#                     "size": sql_size,
-#                     "quick_mode": False,
-#                     "sql_mode": "full"
-#                 },
-#                 "regions": [],
-#                 "clusters": []
-#             },
-#             "stream_type": "logs",
-#             "search_type": "ui",
-#             "use_cache": False
-#         }
-#     }
-
-#     # Send the specific message
-#     ws_sql.send(json.dumps(message_sql))
-
-#     # Receive the response
-#     response_sql = ws_sql.recv()
-
-#     # print("WebSocket response for SQL:", response_sql)
-
-#     # Parse the JSON response
-#     response_data_sql = json.loads(response_sql)
-
-#     # Validate the total in the response
-#     total_hits_sql = response_data_sql["content"]["results"]["total"]
-
-#     # Adjust the assertion based on our expectations
-#     expected_hits_sql = total_exp  # That's what we're expecting
-#     assert total_hits_sql == expected_hits_sql, f"Expected {test_name_sql} total to be {expected_hits_sql}, but got {total_hits_sql}"
-    
-#     ws_sql.close()
-
-#     # Generate a dynamic UUID for cache when websocket is enabled
-
-#     uuid_sql_cache = str(uuid.uuid4())  # Generates a new UUID
-
-#     # Construct the WebSocket URL
-#     WS_URL_sql_cache = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_sql_cache}"
-
-#     # Example of using the WS_URL
-#     # print("WebSocket SQL URL Cache:", WS_URL_sql_cache)
-
-#     # Now we can use WS_URL in our WebSocket connection for cache
-
-#     ws_sql_cache = websocket.create_connection(WS_URL_sql_cache, header={"Cookie": cookie_header_sql})
-
-#     print(f"Streaming {test_name_sql} Cache SQL {WS_ZO_BASE_URL} connection established", ws_sql_cache)
-
-#     # Generate a dynamic trace_id
-#     trace_id_sql_cache = str(uuid.uuid4())
-
-#     now = datetime.now(timezone.utc)
-#     end_time = int(now.timestamp() * 1000000)
-#     # Prepare the specific message to send
-#     message_sql_cache = {
-#         "type": "search",
-#         "content": {
-#             "trace_id": trace_id_sql_cache,  # Use dynamic trace_id
-#             "payload": {
-#                 "query": {
-#                     "sql": sql_query,
-#                     "start_time": ten_min_ago,
-#                     "end_time": end_time,
-#                     "from": 0,
-#                     "size": sql_size,
-#                     "quick_mode": False,
-#                     "sql_mode": "full"
-#                 },
-#                 "regions": [],
-#                 "clusters": []
-#             },
-#             "stream_type": "logs",
-#             "search_type": "ui",
-#             "use_cache": True
-#         }
-#     }
-
-#     # Send the specific message
-#     ws_sql_cache.send(json.dumps(message_sql_cache))
+    # Adjust the assertion based on our expectations
+    expected_hits_sql_cache = total_exp  # what we're expecting
+    assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
 
 
-#     # Receive the response
-#     response_sql_cache = ws_sql_cache.recv()
-
-#     # print("WebSocket cache response for SQL:", response_sql_cache)
-
-#     # Parse the JSON response
-
-#     response_data_sql_cache = json.loads(response_sql_cache)
-
-#     # Validate the total in the response
-#     total_hits_sql_cache = response_data_sql_cache["content"]["results"]["total"]
-
-#     # Adjust the assertion based on our expectations
-#     expected_hits_sql_cache = total_exp  # That's what we're expecting
-#     assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected cache {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
-
-#     ws_sql_cache.close()
 
 # def test_delete_stream(create_session, base_url):
 #     """Running an E2E test for deleting the created stream."""
@@ -846,26 +760,35 @@ def test_streaming_histogram(create_session, base_url, test_name, hist_query, ex
 #     assert resp_delete_stream_join.status_code == 200, f"Failed to delete stream {stream_join}"
 #     print(f"Successfully deleted stream {stream_join}")
 
+
 # Read HTTP 2 responses from the stream
 # two events in particular `search_response_metadata` and `search_response_hits`
 # return a single json object as search response, i.e. the first partitions
 def read_response(reader):
-    for line in reader:
+    content = reader.content.decode('utf-8')
+    lines = content.split('\n')
+    for i, line in enumerate(lines):
         text = line.strip()
         if text.startswith("event: search_response_metadata"):
             # Get the data part which follows in the next line
-            data_line = next(reader, "").strip()
-            if data_line.startswith("data: "):
-                try:
-                    search_metadata = data_line[6:]  # Remove "data: " prefix
-                    search_metadata = json.loads(search_metadata)
-                    next_line = next(reader, "").strip()
-                    if next_line.startswith("event: search_response_hits"):
-                        search_hits = next_line[6:]
-                        search_hits = json.loads(search_hits)
-                        search_metadata["hits"] = search_hits
-                    return search_metadata
-                except json.JSONDecodeError as e:
-                    print(f"Error parsing JSON: {e}")
-                    continue
+            if i + 1 < len(lines):
+                data_line = lines[i + 1].strip()
+                if data_line.startswith("data: "):
+                    try:
+                        search_metadata = data_line[6:]  # Remove "data: " prefix
+                        search_metadata = json.loads(search_metadata)
+                        if i + 4 < len(lines):
+                            
+                            next_line = lines[i + 3].strip()
+                            if next_line.startswith("event: search_response_hits"):
+                                next_line = lines[i + 4].strip()
+        
+                                search_hits = next_line[6:]
+                                search_hits = json.loads(search_hits)
+                                search_metadata["results"]["hits"] = search_hits["hits"]
+                        
+                        return search_metadata
+                    except json.JSONDecodeError as e:
+                        print(f"Error parsing JSON: {e}")
+                        continue
     return None
