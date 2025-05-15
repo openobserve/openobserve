@@ -688,7 +688,7 @@ export const changeHistogramInterval = async (
   return sql.replace(/`/g, '"');
 };
 
-export const formatQuery = async (query: any) => {
+export const convertQueryIntoSingleLine = async (query: any) => {
   // if histogramInterval is null or query is null or query is empty, return query
   if (query === null || query === "") {
     return query;
