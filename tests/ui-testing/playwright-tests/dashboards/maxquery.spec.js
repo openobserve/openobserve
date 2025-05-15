@@ -47,7 +47,7 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "4");
 
-    await page.waitForTimeout(5000);
+    // await page.waitForTimeout(5000);
 
     await dashboardPage.menuItem("dashboards-item");
 
@@ -100,7 +100,7 @@ test.describe("dashboard multi y axis testcases", () => {
     await deleteDashboard(page, randomDashboardName);
 
     await dashboardPage.menuItem("streams-item");
-    await page.waitForTimeout(3000);
+    // await page.waitForTimeout(3000);
 
     await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "0");
     await page.waitForTimeout(2000);
