@@ -289,10 +289,13 @@ impl Sql {
             if visitor.is_simple_count {
                 index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
             } else if visitor.is_simple_histogram && histogram_interval_visitor.interval.is_some() {
-                let min_value = query.start_time;
                 let bucket_width = histogram_interval_visitor.interval.unwrap() as u64 * 1_000_000;
-                let num_buckets = ((query.end_time - query.start_time) as f64 / bucket_width as f64)
-                    .ceil() as usize;
+                // round the bucket edges to even start
+                let rounding_by = bucket_width as i64;
+                let min_value = (query.start_time / rounding_by) * rounding_by;
+                let max_value = (query.end_time / rounding_by) * rounding_by;
+                let num_buckets =
+                    ((max_value - min_value) as f64 / bucket_width as f64).ceil() as usize;
                 index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleHistogram(
                     min_value,
                     bucket_width,
