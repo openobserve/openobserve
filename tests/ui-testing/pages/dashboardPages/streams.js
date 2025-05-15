@@ -10,13 +10,18 @@ export default class StreamSettingsPage {
     const searchInput = page.getByPlaceholder("Search Stream");
     await searchInput.click();
     await searchInput.fill(streamName);
-    await page.waitForTimeout(3000); // Replace with auto-wait logic if needed
+    await page.waitForTimeout(5000); // Replace with auto-wait logic if needed
 
-    const streamDetailButton = page.getByRole("button", {
-      name: "Stream Detail",
-    });
-    await streamDetailButton.waitFor({ state: "visible", timeout: 5000 });
-    await streamDetailButton.click();
+    // const streamDetailButton = page.getByRole("button", {
+    //   name: "Stream Detail",
+    // });
+    // await streamDetailButton.waitFor({ state: "visible", timeout: 5000 });
+    // await streamDetailButton.click();
+
+    await page
+      .getByRole("cell", { name: "Explore Stream Detail Delete" })
+      .click();
+    await page.waitForTimeout(3000);
 
     // Edit Max Query Range
     const maxQueryInput = page.locator(
@@ -32,6 +37,8 @@ export default class StreamSettingsPage {
     );
     await saveButton.waitFor({ state: "visible", timeout: 5000 });
     await saveButton.click();
+
+    await page.waitForTimeout(3000);
 
     // Close the modal
     const closeButton = page.locator("button", { hasText: "close" });
