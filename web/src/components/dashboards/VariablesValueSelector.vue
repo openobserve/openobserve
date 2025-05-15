@@ -242,8 +242,10 @@ export default defineComponent({
     };
 
     const handleSearchReset = (data: any) => {
+      console.log("[WebSocket] Received reset:", data);
+
       const variableObject = variablesData.values.find(
-        (v: any) => v.query_data?.field === data.payload.queryReq.fields[0],
+        (v: any) => v.query_data?.field === data.queryReq?.fields[0],
       );
 
       if (variableObject) {
@@ -252,7 +254,7 @@ export default defineComponent({
 
         fetchFieldValuesWithWebsocket(
           variableObject,
-          data.payload.queryReq.query_context,
+          data.queryReq.query_context,
         );
       }
     };
@@ -490,8 +492,8 @@ export default defineComponent({
       }
 
       // Set loading state before initiating WebSocket
-      variableObject.isLoading = true;
-      variableObject.isVariableLoadingPending = true;
+      // variableObject.isLoading = true;
+      // variableObject.isVariableLoadingPending = true;
       console.log(`[WebSocket] Starting fetch for ${variableObject.name}:`, {
         isLoading: variableObject.isLoading,
         isVariableLoadingPending: variableObject.isVariableLoadingPending,
