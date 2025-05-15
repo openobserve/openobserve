@@ -10,6 +10,13 @@ import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
 import { waitForDashboardPage } from "../utils/dashCreation";
 
+import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
+import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
+import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
+import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
+import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
+import DashboardImport from "../../pages/dashboardPages/dashboard.import.js";
+import DashboardFolder from "../../pages/dashboardPages/dashboard-folder.js";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -28,122 +35,61 @@ test.describe("dashboard Import testcases", () => {
   });
 
   test("should import the dashbaord", async ({ page }) => {
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+
+    await dashboardPage.menuItem("dashboards-item");
+
     await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
+
+    await dashboardImport.clickImportDashboard();
 
     //file name to be used for import
     const fileContentPath = "../test-data/dashboards-import.json";
 
     // Locate the file input field and set the JSON file
-    const inputFile = await page.locator('input[type="file"]');
-    //is used for setting the file to be imported
-    await inputFile.setInputFiles(fileContentPath);
+    await dashboardImport.inputFiles1(fileContentPath);
 
-    await page.getByRole("button", { name: "Import" }).click();
+    await dashboardImport.clickImportButton();
 
-    await page.waitForTimeout(2000);
+    await waitForDashboardPage(page);
 
     await expect(
       page.getByRole("cell", { name: "Cloudfront to OpenObserve" }).first()
     ).toBeVisible();
-    await page
-      .getByRole("row", { name: "01 Cloudfront to OpenObserve" })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
-  });
-  test("should import the dashbaord using URL import", async ({ page }) => {
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-    await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
-    await page.locator('[data-test="tab-import_json_url"]').click();
-    await page.getByLabel("Add your url").click();
-    await page
-      .getByLabel("Add your url")
-      .fill(
-        "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json"
-      );
 
-    await page.waitForTimeout(2000);
-
-    await expect(
-      page.getByRole("code").filter({ hasText: '"dashboardId": "' })
-    ).toBeVisible();
-  
-    //is used for setting the file to be imported
-    await page.getByRole("button", { name: "Import" }).click();
-
-    await expect(
-      page.getByRole("cell", { name: "Cloudfront to OpenObserve" }).first()
-    ).toBeVisible();
-    await page
-      .getByRole("row", { name: "01 Cloudfront to OpenObserve" })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
-  });
-
-  test("Should cancel the file upload action when clicking the Cancel button in the 'Drop your file' dialog", async ({
-    page,
-  }) => {
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-    await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
-
-    //file name to be used for import
-    const fileContentPath = "../test-data/dashboards-import.json";
-
-    // Locate the file input field and set the JSON file
-    const inputFile = await page.locator('input[type="file"]');
-    //is used for setting the file to be imported
-    await inputFile.setInputFiles(fileContentPath);
-
-    await page.getByText("close").click();
-    await expect(page.getByLabel("cloud_uploadDrop your file")).toBeVisible();
-    await page.getByRole("button", { name: "Import" }).click();
-    await expect(page.getByText("Please Enter a JSON object")).toBeVisible();
-    await page.getByRole("button", { name: "Cancel" }).click();
-  });
-
-  test("Should display an error validation message when clicking the Import button if the 'Title' field is missing in the .json data.", async ({
-    page,
-  }) => {
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-    await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
-
-    //file name to be used for import
-    const fileContentPath = "../test-data/dashboard1-import.json";
-
-    // Locate the file input field and set the JSON file
-    const inputFile = await page.locator('input[type="file"]');
-    //is used for setting the file to be imported
-    await inputFile.setInputFiles(fileContentPath);
-
-    await page.getByRole("button", { name: "Import" }).click();
-
-    await expect(
-      page.getByText("Title is required for dashboard ")
-    ).toBeVisible();
+    await dashboardImport.deleteImportedDashboard(
+      "01",
+      "Cloudfront to OpenObserve"
+    );
   });
 
   test("Should auto-update the .json data at the correct location when the Dashboard title is added from the error validation dialog.", async ({
     page,
   }) => {
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+
+    await dashboardPage.menuItem("dashboards-item");
+
     await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
+
+    await dashboardImport.clickImportDashboard();
 
     //file name to be used for import
     const fileContentPath = "../test-data/dashboard1-import.json";
 
-    // Locate the file input field and set the JSON file
-    const inputFile = await page.locator('input[type="file"]');
-    //is used for setting the file to be imported
-    await inputFile.setInputFiles(fileContentPath);
+    await dashboardImport.inputFiles1(fileContentPath);
 
-    await page.getByRole("button", { name: "Import" }).click();
+    await dashboardImport.clickImportButton();
 
     // Assert that the error message is displayed
 
@@ -153,7 +99,6 @@ test.describe("dashboard Import testcases", () => {
 
     const title = "Cloudfront to OpenObserve";
 
-    // Fill in the dashboard title
     await page.getByLabel("Dashboard Title").fill(title);
 
     // Assert that the title is correctly displayed on the UI
@@ -171,65 +116,182 @@ test.describe("dashboard Import testcases", () => {
     const normalizedJsonTitle = jsonTitle.trim().replace(/\s+/g, " ");
 
     expect(normalizedJsonTitle).toBe(title);
-
-    await page.getByRole("button", { name: "Import" }).click();
-
-    await page.waitForTimeout(2000);
+    await dashboardImport.clickImportButton();
+    await waitForDashboardPage(page);
 
     //  delete the dashboard
+    await dashboardImport.deleteImportedDashboard(
+      "01",
+      "Cloudfront to OpenObserve"
+    );
+  });
+
+  test("should import the dashbaord using URL import", async ({ page }) => {
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+
+    await dashboardPage.menuItem("dashboards-item");
+
+    await waitForDashboardPage(page);
+
+    await dashboardImport.clickImportDashboard();
+
+    await page.locator('[data-test="tab-import_json_url"]').click();
+
+    await page.getByLabel("Add your url").click();
+
     await page
-      .getByRole("row", { name: "01 Cloudfront to OpenObserve" })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
+      .getByLabel("Add your url")
+      .fill(
+        "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json"
+      );
+
+    await expect(
+      page.getByRole("code").filter({ hasText: '"dashboardId": "' })
+    ).toBeVisible();
+
+    await dashboardImport.clickImportButton();
+    await waitForDashboardPage(page);
+
+    await expect(
+      page.getByRole("cell", { name: "Cloudfront to OpenObserve" }).first()
+    ).toBeVisible();
+
+    await dashboardImport.deleteImportedDashboard(
+      "01",
+      "Cloudfront to OpenObserve"
+    );
+  });
+
+  test("Should cancel the file upload action when clicking the Cancel button in the 'Drop your file' dialog", async ({
+    page,
+  }) => {
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+
+    await dashboardPage.menuItem("dashboards-item");
+
+    await waitForDashboardPage(page);
+
+    await dashboardImport.clickImportDashboard();
+
+    //file name to be used for import
+    const fileContentPath = "../test-data/dashboards-import.json";
+
+    // // Locate the file input field and set the JSON file
+    // const inputFile = await page.locator('input[type="file"]');
+
+    // //is used for setting the file to be imported
+    // await inputFile.setInputFiles(fileContentPath);
+
+    await dashboardImport.inputFiles1(fileContentPath);
+
+    await page.getByText("close").click();
+
+    await expect(page.getByLabel("cloud_uploadDrop your file")).toBeVisible();
+
+    await dashboardImport.clickImportButton();
+
+    await expect(page.getByText("Please Enter a JSON object")).toBeVisible();
+
+    await page.getByRole("button", { name: "Cancel" }).click();
+  });
+
+  test("Should display an error validation message when clicking the Import button if the 'Title' field is missing in the .json data.", async ({
+    page,
+  }) => {
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+
+    await dashboardPage.menuItem("dashboards-item");
+
+    await waitForDashboardPage(page);
+
+    await dashboardImport.clickImportDashboard();
+
+    //file name to be used for import
+    const fileContentPath = "../test-data/dashboard1-import.json";
+
+    // Locate the file input field and set the JSON file
+    await dashboardImport.inputFiles1(fileContentPath);
+
+    //is used for setting the file to be imported
+
+    await dashboardImport.clickImportButton();
+
+    await expect(
+      page.getByText("Title is required for dashboard ")
+    ).toBeVisible();
   });
 
   test("Should display an error validation message if the 'Stream type' field is missing in the .json data when clicking the Import button.", async ({
     page,
   }) => {
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+
+    await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
+
+    await dashboardImport.clickImportDashboard();
 
     //file name to be used for import
     const fileContentPath = "../test-data/dashboard2-import.json";
 
     // Locate the file input field and set the JSON file
-    const inputFile = await page.locator('input[type="file"]');
-    //is used for setting the file to be imported
-    await inputFile.setInputFiles(fileContentPath);
+    await dashboardImport.inputFiles1(fileContentPath);
 
-    await page.getByRole("button", { name: "Import" }).click();
+    await dashboardImport.clickImportButton();
 
-    await expect(page.getByText('warning1 File(s) Failed to Import')).toBeVisible();
     await expect(
-      page.getByText(
-        " JSON 1 : Request failed with status code 400"
-      )
+      page.getByText("warning1 File(s) Failed to Import")
+    ).toBeVisible();
+    await expect(
+      page.getByText(" JSON 1 : Request failed with status code 400")
     ).toBeVisible();
   });
 
   test("Should save the .json file in the correct folder when selecting a dashboard folder name and delete it", async ({
     page,
   }) => {
-    // Step 1: Navigate to the dashboard page
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+    const dashboardFolders = new DashboardFolder(page);
+
+    await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
-    // Step 2: Click the import dashboard button
-    await page.locator('[data-test="dashboard-import"]').click();
+    await dashboardImport.clickImportDashboard();
 
     // Step 3: Set the JSON file for import
     const fileContentPath = "../test-data/dashboards-import.json";
-    const inputFile = await page.locator('input[type="file"]');
-    await inputFile.setInputFiles(fileContentPath);
-    await page.waitForTimeout(2000); // Optional wait for file processing
+
+    await dashboardImport.inputFiles1(fileContentPath);
 
     // Step 4: Create a unique folder via UI
     function generateUniqueFolderName(prefix = "u") {
       return `${prefix}_${Date.now()}`;
     }
-
     const folderName = generateUniqueFolderName();
 
     // Fill in the folder name in the input and save it
@@ -241,19 +303,14 @@ test.describe("dashboard Import testcases", () => {
       .fill(folderName);
     await page.locator('[data-test="dashboard-folder-add-save"]').click();
 
-    const importButton = page.getByRole("button", { name: "Import" });
-    await expect(importButton).toBeVisible({ timeout: 10000 });
-    await importButton.click();
+    await dashboardImport.clickImportButton();
 
     //  delete the dashboard
-    await page
-      .getByRole("row", { name: "01 Cloudfront to OpenObserve" })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
 
-    // Log folder name (for debug)
-    console.log(`Created folder name: ${folderName}`);
+    await dashboardImport.deleteImportedDashboard(
+      "01",
+      "Cloudfront to OpenObserve"
+    );
 
     // Step 6: Find the folder card by folder name and click the More (3 dots) icon
     const folderCard = page.locator(`[data-test^="dashboard-folder-tab-"]`, {
@@ -276,63 +333,69 @@ test.describe("dashboard Import testcases", () => {
         hasText: folderName,
       })
     ).toHaveCount(0);
-
-    console.log(`Successfully deleted folder via UI: ${folderName}`);
   });
 
   test("Should import the Version 3 dashboard successfully", async ({
     page,
   }) => {
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+
     await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
+
+    await dashboardPage.menuItem("dashboards-item");
+
+    await dashboardImport.clickImportDashboard();
 
     //file name to be used for import
     const fileContentPath1 = "../test-data/dashboardV3-import.json";
 
     // Locate the file input field and set the JSON file
-    const inputFile = await page.locator('input[type="file"]');
-    //is used for setting the file to be imported
-    await inputFile.setInputFiles(fileContentPath1);
+    await dashboardImport.inputFiles1(fileContentPath1);
 
-    await page.getByRole("button", { name: "Import" }).click();
+    await dashboardImport.clickImportButton();
 
-    await page.waitForTimeout(2000);
-
+    await waitForDashboardPage(page);
     await expect(
       page.getByRole("cell", { name: "AWS VPC Flow Log" }).first()
     ).toBeVisible();
-    await page
-      .getByRole("row", { name: "01 AWS VPC Flow Log" })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
+
+    await dashboardImport.deleteImportedDashboard("01", "AWS VPC Flow Log");
   });
+
   test("Should import the Azure dashboard without errors", async ({ page }) => {
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+
+    await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
+
+    await dashboardImport.clickImportDashboard();
 
     //file name to be used for import
     const fileContentPath = "../test-data/dashboardAzure.json";
 
     // Locate the file input field and set the JSON file
-    const inputFile = await page.locator('input[type="file"]');
-    //is used for setting the file to be imported
-    await inputFile.setInputFiles(fileContentPath);
+    await dashboardImport.inputFiles1(fileContentPath);
 
-    await page.getByRole("button", { name: "Import" }).click();
+    await dashboardImport.clickImportButton();
 
-    await page.waitForTimeout(2000);
-
+    await waitForDashboardPage(page);
     await expect(
       page.getByRole("cell", { name: "Frontdoor" }).first()
     ).toBeVisible();
-    await page
-      .getByRole("row", { name: "01 Frontdoor" })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
+
+    await dashboardImport.deleteImportedDashboard("01", "Frontdoor");
   });
 
   test("should import the 'Azure Loadblance' dashbaord using URL import", async ({
@@ -345,9 +408,19 @@ test.describe("dashboard Import testcases", () => {
         errorMessage += msg.text() + "\n";
       }
     });
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+
+    await dashboardPage.menuItem("dashboards-item");
+
     await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
+
+    await dashboardImport.clickImportDashboard();
+
     await page.locator('[data-test="tab-import_json_url"]').click();
     await page.getByLabel("Add your url").click();
     await page
@@ -357,7 +430,7 @@ test.describe("dashboard Import testcases", () => {
       );
 
     await page.waitForTimeout(2000);
-    // await page.waitForSelector('.table-row'); // adjust selector as needed
+
     await expect(
       page
         .getByRole("code")
@@ -367,16 +440,15 @@ test.describe("dashboard Import testcases", () => {
     ).toBeVisible();
 
     //is used for setting the file to be importedad
-    await page.getByRole("button", { name: "Import" }).click();
+
+    await dashboardImport.clickImportButton();
+    await waitForDashboardPage(page);
 
     await expect(
       page.getByRole("cell", { name: "Azure Loadblancer" }).first()
     ).toBeVisible();
-    await page
-      .getByRole("row", { name: "01 Azure Loadblancer" })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
+
+    await dashboardImport.deleteImportedDashboard("01", "Azure Loadblancer");
 
     // Assert no error occurred
     expect(errorMessage).toBe("");
@@ -392,32 +464,45 @@ test.describe("dashboard Import testcases", () => {
         errorMessage += msg.text() + "\n";
       }
     });
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const dashboardImport = new DashboardImport(page);
+
+    await dashboardPage.menuItem("dashboards-item");
+
     await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
+
+    await dashboardImport.clickImportDashboard();
+
     await page.locator('[data-test="tab-import_json_url"]').click();
+
     await page.getByLabel("Add your url").click();
     await page
       .getByLabel("Add your url")
       .fill(
         "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Kubernetes(kube-prometheus-stack)/Kubernetes%20_%20Compute%20Resources%20_%20Cluster.dashboard.json"
       );
-
     await page.waitForTimeout(1000);
+
     //is used for setting the file to be importedad
-    await page.getByRole("button", { name: "Import" }).click();
-    await page.waitForTimeout(3000);
+    await dashboardImport.clickImportButton();
+
+    await waitForDashboardPage(page);
 
     await expect(
       page
         .getByRole("cell", { name: "Kubernetes / Compute Resources / Cluster" })
         .first()
     ).toBeVisible();
-    await page
-      .getByRole("row", { name: "01 Kubernetes / Compute Resources / Cluster" })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
+
+    await dashboardImport.deleteImportedDashboard(
+      "01",
+      "Kubernetes / Compute Resources / Cluster"
+    );
 
     // Assert no error occurred
     expect(errorMessage).toBe("");
