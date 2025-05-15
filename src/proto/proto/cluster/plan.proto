@@ -63,8 +63,9 @@ message SuperClusterInfo {
 
 message IdxOptimizeMode {
   oneof mode {
-    SimpleSelect simple_select = 1;
-    SimpleCount   simple_count = 2;
+    SimpleSelect    simple_select = 1;
+    SimpleCount     simple_count = 2;
+    SimpleHistogram simple_histogram = 3;
   }
 }
 
@@ -74,6 +75,12 @@ message SimpleSelect {
 }
 
 message SimpleCount {}
+
+message SimpleHistogram {
+  int64 min_value = 1;
+  uint64 bucket_width = 2;
+  uint32 num_buckets = 3;
+}
 
 message KvItem {
     string   key = 1;

@@ -278,9 +278,6 @@ pub async fn search_parquet(
         if files.is_empty() {
             continue;
         }
-        if files.is_empty() {
-            continue;
-        }
         let schema = schema_versions[ver]
             .clone()
             .with_metadata(std::collections::HashMap::new());
