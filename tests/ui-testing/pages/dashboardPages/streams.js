@@ -12,22 +12,19 @@ export default class StreamSettingsPage {
     await searchInput.fill(streamName);
     await page.waitForTimeout(5000); // Replace with auto-wait logic if needed
 
-    // const streamDetailButton = page.getByRole("button", {
-    //   name: "Stream Detail",
-    // });
-    // await streamDetailButton.waitFor({ state: "visible", timeout: 5000 });
-    // await streamDetailButton.click();
+    const streamDetailButton = await page.getByRole("button", {
+      name: "Stream Detail",
+    });
+    await streamDetailButton.waitFor({ state: "visible", timeout: 5000 });
+    await streamDetailButton.click();
 
-    await page
-      .getByRole("cell", { name: "Explore Stream Detail Delete" })
-      .click();
     await page.waitForTimeout(3000);
 
     // Edit Max Query Range
     const maxQueryInput = page.locator(
       '[data-test="stream-details-max-query-range-input"]'
     );
-    await maxQueryInput.waitFor({ state: "visible", timeout: 5000 });
+    await maxQueryInput.waitFor({ state: "visible", timeout: 15000 });
     await maxQueryInput.click();
     await maxQueryInput.fill(newValue);
 
