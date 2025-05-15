@@ -849,6 +849,17 @@ export default defineComponent({
       filterHitsColumns();
     }
 
+    /**
+     * Single Stream
+     * - Consider filter in sql and non sql mode, create sql query and fetch values
+     *
+     * Multiple Stream
+     * - Dont consider filter in both mode, create sql query for each stream and fetch values
+     *
+     * @param event
+     * @param param1
+     */
+
     const openFilterCreator = async (
       event: any,
       { name, ftsKey, isSchemaField, streams }: any,
@@ -999,14 +1010,20 @@ export default defineComponent({
             );
           }
         }
+
         let countTotal = streams.length;
         for (const selectedStream of streams) {
           if (streams.length > 1) {
             query_context = "select * from [INDEX_NAME]";
           }
-          if (searchObj.data.stream.selectedStream.length > 1) {
+          if (
+            searchObj.data.stream.selectedStream.length > 1 &&
+            searchObj.meta.sqlMode &&
+            queries[selectedStream]
+          ) {
             query_context = queries[selectedStream];
           }
+
           if (query_context !== "") {
             query_context = query_context == undefined ? "" : query_context;
 
@@ -1033,21 +1050,30 @@ export default defineComponent({
               continue;
             }
 
-            //TODO : add comments for this in future 
+            //TODO : add comments for this in future
             //for future reference
             //values api using partition based api
-            let queryToBeSent = searchObj.meta.sqlMode ? searchObj.data.query : query_context.replace("[INDEX_NAME]", selectedStream);
-            const response = await getValuesPartition(startISOTimestamp,endISOTimestamp,name,queryToBeSent);
+            let queryToBeSent = query_context.replace(
+              "[INDEX_NAME]",
+              selectedStream,
+            );
+
+            const response = await getValuesPartition(
+              startISOTimestamp,
+              endISOTimestamp,
+              name,
+              queryToBeSent,
+            );
             const partitions: any = response?.data.partitions || [];
-          
 
             for (const partition of partitions) {
               try {
-                //check if the field is opened because sometimes 
+                //check if the field is opened because sometimes
                 // user might close the field before all the subsequent requests are completed
-                if(!openedFilterFields.value.includes(name)){
+                if (!openedFilterFields.value.includes(name)) {
                   return;
                 }
+
                 const res: any = await streamService.fieldValues({
                   org_identifier: store.state.selectedOrganization.identifier,
                   stream_name: selectedStream,
@@ -1055,10 +1081,7 @@ export default defineComponent({
                   end_time: partition[1],
                   fields: [name],
                   size: 10,
-                  query_context:
-                    b64EncodeUnicode(
-                      query_context.replace("[INDEX_NAME]", selectedStream),
-                    ) || "",
+                  query_context: b64EncodeUnicode(queryToBeSent) || "",
                   query_fn: query_fn,
                   action_id,
                   type: searchObj.data.stream.streamType,
@@ -1076,7 +1099,8 @@ export default defineComponent({
                         (value: any) => value.key === subItem.zo_sql_key,
                       );
                       if (index !== -1) {
-                        fieldValues.value[name]["values"][index].count += parseInt(subItem.zo_sql_num);
+                        fieldValues.value[name]["values"][index].count +=
+                          parseInt(subItem.zo_sql_num);
                       } else {
                         fieldValues.value[name]["values"].push({
                           key: subItem.zo_sql_key,
@@ -1087,8 +1111,12 @@ export default defineComponent({
                   });
 
                   if (fieldValues.value[name]["values"].length > 10) {
-                    fieldValues.value[name]["values"].sort((a, b) => b.count - a.count);
-                    fieldValues.value[name]["values"] = fieldValues.value[name]["values"].slice(0, 10);
+                    fieldValues.value[name]["values"].sort(
+                      (a, b) => b.count - a.count,
+                    );
+                    fieldValues.value[name]["values"] = fieldValues.value[name][
+                      "values"
+                    ].slice(0, 10);
                   }
                 }
               } catch (err) {
@@ -1101,13 +1129,17 @@ export default defineComponent({
                 }
               }
             }
-            openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== name);
-
           }
         }
+
+        openedFilterFields.value = openedFilterFields.value.filter(
+          (field: string) => field !== name,
+        );
       } catch (err) {
         fieldValues.value[name]["isLoading"] = false;
-        openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== name);
+        openedFilterFields.value = openedFilterFields.value.filter(
+          (field: string) => field !== name,
+        );
         console.log(err);
         $q.notify({
           type: "negative",
@@ -1347,7 +1379,7 @@ export default defineComponent({
     };
 
     const handleSearchError = (request: any, err: any) => {
-      if (fieldValues.value[request.queryReq.fields[0]]) {
+      if (fieldValues.value[request.queryReq?.fields[0]]) {
         fieldValues.value[request.queryReq.fields[0]].isLoading = false;
         fieldValues.value[request.queryReq.fields[0]].errMsg =
           "Failed to fetch field values";
@@ -1357,78 +1389,91 @@ export default defineComponent({
     };
 
     const handleSearchResponse = (payload: any, response: any) => {
-      if (response.type === "cancel_response") {
-        removeTraceId(payload.queryReq.fields[0], response.content.trace_id);
-        return;
-      }
+      const fieldName = payload?.queryReq?.fields[0];
+      const streamName = payload?.queryReq?.stream_name;
 
-      const fieldName = payload.queryReq.fields[0];
-      const streamName = payload.queryReq.stream_name;
+      try {
+        // We don't need to handle search_response_metadata
+        if (response.type === "cancel_response") {
+          removeTraceId(payload.queryReq.fields[0], response.content.trace_id);
+          return;
+        }
 
-      // Initialize if not exists
-      if (!fieldValues.value[fieldName]) {
-        fieldValues.value[fieldName] = {
+        if (response.type !== "search_response_hits") {
+          return;
+        }
+
+        // Initialize if not exists
+        if (!fieldValues.value[fieldName]) {
+          fieldValues.value[fieldName] = {
+            values: [],
+            isLoading: false,
+            errMsg: "",
+          };
+        }
+
+        // Initialize stream-specific values if not exists
+        if (!streamFieldValues.value[fieldName]) {
+          streamFieldValues.value[fieldName] = {};
+        }
+
+        streamFieldValues.value[fieldName][streamName] = {
           values: [],
-          isLoading: false,
-          errMsg: "",
         };
-      }
 
-      // Initialize stream-specific values if not exists
-      if (!streamFieldValues.value[fieldName]) {
-        streamFieldValues.value[fieldName] = {};
-      }
+        // Process the results
+        if (response.content.results.hits.length) {
+          // Store stream-specific values
+          const streamValues: { key: string; count: number }[] = [];
 
-      streamFieldValues.value[fieldName][streamName] = {
-        values: [],
-      };
-
-      // Process the results
-      if (response.content.results.hits.length) {
-        // Store stream-specific values
-        const streamValues: { key: string; count: number }[] = [];
-
-        response.content.results.hits.forEach((item: any) => {
-          item.values.forEach((subItem: any) => {
-            streamValues.push({
-              key: subItem.zo_sql_key,
-              count: parseInt(subItem.zo_sql_num),
+          response.content.results.hits.forEach((item: any) => {
+            item.values.forEach((subItem: any) => {
+              streamValues.push({
+                key: subItem.zo_sql_key,
+                count: parseInt(subItem.zo_sql_num),
+              });
             });
           });
-        });
 
-        // Update stream-specific values
-        streamFieldValues.value[fieldName][streamName].values = streamValues;
+          // Update stream-specific values
+          streamFieldValues.value[fieldName][streamName].values = streamValues;
 
-        // Aggregate values across all streams
-        const aggregatedValues: { [key: string]: number } = {};
+          // Aggregate values across all streams
+          const aggregatedValues: { [key: string]: number } = {};
 
-        // Collect all values from all streams
-        Object.keys(streamFieldValues.value[fieldName]).forEach((stream) => {
-          streamFieldValues.value[fieldName][stream].values.forEach((value) => {
-            if (aggregatedValues[value.key]) {
-              aggregatedValues[value.key] += value.count;
-            } else {
-              aggregatedValues[value.key] = value.count;
-            }
+          // Collect all values from all streams
+          Object.keys(streamFieldValues.value[fieldName]).forEach((stream) => {
+            streamFieldValues.value[fieldName][stream].values.forEach(
+              (value) => {
+                if (aggregatedValues[value.key]) {
+                  aggregatedValues[value.key] += value.count;
+                } else {
+                  aggregatedValues[value.key] = value.count;
+                }
+              },
+            );
           });
-        });
 
-        // Convert aggregated values to array and sort
-        const aggregatedArray = Object.keys(aggregatedValues).map((key) => ({
-          key,
-          count: aggregatedValues[key],
-        }));
+          // Convert aggregated values to array and sort
+          const aggregatedArray = Object.keys(aggregatedValues).map((key) => ({
+            key,
+            count: aggregatedValues[key],
+          }));
 
-        // Sort by count in descending order
-        aggregatedArray.sort((a, b) => b.count - a.count);
+          // Sort by count in descending order
+          aggregatedArray.sort((a, b) => b.count - a.count);
 
-        // Take top 10
-        fieldValues.value[fieldName].values = aggregatedArray.slice(0, 10);
+          // Take top 10
+          fieldValues.value[fieldName].values = aggregatedArray.slice(0, 10);
+        }
+
+        // Mark as not loading
+        fieldValues.value[fieldName].isLoading = false;
+      } catch (error) {
+        console.error("Failed to fetch field values:", error);
+        fieldValues.value[fieldName].errMsg = "Failed to fetch field values";
+        fieldValues.value[fieldName].isLoading = false;
       }
-
-      // Mark as not loading
-      fieldValues.value[fieldName].isLoading = false;
     };
 
     const handleSearchReset = (data: any) => {
@@ -1465,17 +1510,15 @@ export default defineComponent({
       }
     };
 
-
     const cancelFilterCreator = (row: any) => {
       //if it is websocker based then cancel the trace id
       //else cancel the further value api calls using the openedFilterFields
-      if(isWebSocketEnabled()){
+      if (isWebSocketEnabled()) {
         cancelTraceId(row.name);
-      }
-      else{
+      } else {
         cancelValueApi(row.name);
       }
-    }
+    };
 
     const cancelTraceId = (field: string) => {
       const traceIds = traceIdMapper.value[field];
@@ -1490,30 +1533,36 @@ export default defineComponent({
     };
     const cancelValueApi = (value: string) => {
       //remove the field from the openedFilterFields
-      openedFilterFields.value = openedFilterFields.value.filter((field:string)=>field !== value);
-    }
-    const getValuesPartition = async (start: number, end: number,name:string,queryToBeSent:string) => {
-      try{
-          const queryReq = {
-            sql: queryToBeSent,
-            start_time: start,
-            end_time: end,
-            sql_mode: "context",
-            // streaming_output: true,
-          }
-          const res = await searchService.partition({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query: queryReq,
-            page_type: searchObj.data.stream.streamType,
-            traceparent: generateTraceContext().traceId,
-          });
-        
-          return res;
+      openedFilterFields.value = openedFilterFields.value.filter(
+        (field: string) => field !== value,
+      );
+    };
+    const getValuesPartition = async (
+      start: number,
+      end: number,
+      name: string,
+      queryToBeSent: string,
+    ) => {
+      try {
+        const queryReq = {
+          sql: queryToBeSent,
+          start_time: start,
+          end_time: end,
+          sql_mode: "context",
+          // streaming_output: true,
+        };
+        const res = await searchService.partition({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: queryReq,
+          page_type: searchObj.data.stream.streamType,
+          traceparent: generateTraceContext().traceId,
+        });
+
+        return res;
       } catch (err) {
         console.error("Failed to fetch field values:", err);
         fieldValues.value[name].errMsg = "Failed to fetch field values";
       }
-
     };
 
     return {
@@ -1587,7 +1636,7 @@ export default defineComponent({
       sortedStreamFields,
       placeHolderText,
       cancelTraceId,
-      cancelFilterCreator
+      cancelFilterCreator,
     };
   },
 });
