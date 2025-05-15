@@ -32,6 +32,7 @@ env:
   ZO_USAGE_REPORTING_ENABLED: true
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
   ZO_STREAMING_ENABLED: true
+  ZO_STREAMING_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
   ZO_SMTP_ENABLED: true
   ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
@@ -113,6 +114,7 @@ jobs:
             "dashboards/dashboard-import.spec.js",
             "dashboards/dashboard-maps.spec.js",
             "dashboards/dashboard-multi-y-axis.spec.js",
+            "streamname.spec.js",
             "dashboards/dashboard-tabs-setting.spec.js",
             "dashboards/dashboard-transpose.spec.js",
             "dashboards/dashboard-variables-setting.spec.js",

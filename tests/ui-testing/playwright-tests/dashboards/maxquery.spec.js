@@ -33,7 +33,7 @@ test.describe("dashboard multi y axis testcases", () => {
     );
     await orgNavigation;
   });
-  test("should correctly display and update multiple Y-axes in edit panel.", async ({
+  test("should correctly display max query range error message when max query range is exceeded.", async ({
     page,
   }) => {
     const chartTypeSelector = new ChartTypeSelector(page);
@@ -45,7 +45,7 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await dashboardPage.menuItem("streams-item");
 
-    streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "3");
+    streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "4");
 
     await page.waitForTimeout(5000);
 
@@ -100,12 +100,9 @@ test.describe("dashboard multi y axis testcases", () => {
     await deleteDashboard(page, randomDashboardName);
 
     await dashboardPage.menuItem("streams-item");
-    await page.waitForTimeout(3000);
+    // await page.waitForTimeout(3000);
 
     streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "0");
-
-    // await page.locator('[data-test="dashboard-back-btn"]').click();
-
-    // await deleteDashboard(page, randomDashboardName);
+    await page.waitForTimeout(2000);
   });
 });
