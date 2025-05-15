@@ -114,7 +114,7 @@ jobs:
             "dashboards/dashboard-import.spec.js",
             "dashboards/dashboard-maps.spec.js",
             "dashboards/dashboard-multi-y-axis.spec.js",
-            "streamname.spec.js",
+            "maxquery.spec.js",
             "dashboards/dashboard-tabs-setting.spec.js",
             "dashboards/dashboard-transpose.spec.js",
             "dashboards/dashboard-variables-setting.spec.js",
