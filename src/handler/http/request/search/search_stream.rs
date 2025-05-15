@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, http::StatusCode, post, web};
+use actix_web::{HttpRequest, HttpResponse, post, web};
 use config::{
     get_config,
     meta::{
@@ -25,14 +25,17 @@ use config::{
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
 use log;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::{
+    auditor::{AuditMessage, Protocol, ResponseMeta},
+    infra::config::get_config as get_o2_config,
+};
 use tokio::sync::mpsc;
 use tracing::Span;
 
-#[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::check_stream_permissions;
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse},
+        meta::http::HttpResponse as MetaHttpResponse,
         utils::{
             http::{
                 get_fallback_order_by_col_from_request, get_or_create_trace_id,
@@ -45,9 +48,15 @@ use crate::{
     handler::http::request::search::{
         build_search_request_per_field, error_utils::map_error_to_http_response,
     },
-    service::{search::search_stream::process_search_stream_request, setup_tracing_with_trace_id},
+    service::{
+        search::search_stream::{AuditContext, process_search_stream_request},
+        setup_tracing_with_trace_id,
+    },
 };
-
+#[cfg(feature = "enterprise")]
+use crate::{
+    handler::http::request::search::utils::check_stream_permissions, service::self_reporting::audit,
+};
 /// Search HTTP2 streaming endpoint
 ///
 /// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
@@ -97,7 +106,7 @@ pub async fn search_http2_stream(
 
     // Log the request
     log::info!(
-        "[trace_id: {}] Received test HTTP/2 stream request for org_id: {}",
+        "[trace_id: {}] Received HTTP/2 stream request at handler for org_id: {}",
         trace_id,
         org_id
     );
@@ -106,13 +115,50 @@ pub async fn search_http2_stream(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
+    let body_bytes = String::from_utf8_lossy(&body).to_string();
+
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return MetaHttpResponse::bad_request(e),
+        Err(e) => {
+            let message = e.to_string();
+            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    http_response.status().into(),
+                    Some(message),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
+            return http_response;
+        }
     };
+
     if let Err(e) = req.decode() {
-        return MetaHttpResponse::bad_request(e);
+        let message = e.to_string();
+        let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+        // Add audit before closing
+        #[cfg(feature = "enterprise")]
+        {
+            report_to_audit(
+                user_id,
+                org_id,
+                trace_id,
+                http_response.status().into(),
+                Some(message),
+                &in_req,
+                body_bytes,
+            )
+            .await;
+        }
+        return http_response;
     }
 
     // Set use_cache from query params
@@ -123,7 +169,25 @@ pub async fn search_http2_stream(
     if req.search_type.is_none() {
         req.search_type = match get_search_type_from_request(&query) {
             Ok(v) => v,
-            Err(e) => return MetaHttpResponse::bad_request(e),
+            Err(e) => {
+                let message = e.to_string();
+                let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+                // Add audit before closing
+                #[cfg(feature = "enterprise")]
+                {
+                    report_to_audit(
+                        user_id,
+                        org_id,
+                        trace_id,
+                        http_response.status().into(),
+                        Some(message),
+                        &in_req,
+                        body_bytes,
+                    )
+                    .await;
+                }
+                return http_response;
+            }
         };
     }
 
@@ -141,10 +205,23 @@ pub async fn search_http2_stream(
     let stream_names = match resolve_stream_names(&req.query.sql) {
         Ok(v) => v.clone(),
         Err(e) => {
-            return HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.into(),
-                e.to_string(),
-            ));
+            let message = e.to_string();
+            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    http_response.status().into(),
+                    Some(message),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
+            return http_response;
         }
     };
 
@@ -154,6 +231,20 @@ pub async fn search_http2_stream(
         if let Some(res) =
             check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
         {
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    res.status().into(),
+                    Some("Unauthorized Access".to_string()),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
             return res;
         }
     }
@@ -169,8 +260,24 @@ pub async fn search_http2_stream(
     {
         Ok(v) => v,
         Err(e) => {
-            log::error!("Error parsing sql: {:?}", e);
-            return MetaHttpResponse::bad_request(e);
+            log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
+            let message = e.to_string();
+            let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    http_response.status().into(),
+                    Some(message),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
+            return http_response;
         }
     };
 
@@ -180,15 +287,30 @@ pub async fn search_http2_stream(
             req.query.sql = updated_query;
         } else {
             log::error!(
-                "[HTTP2_STREAM] trace_id: {}; Failed to update query with histogram interval: {}",
+                "[HTTP2_STREAM] [trace_id: {}] Failed to update query with histogram interval: {}",
                 trace_id,
                 interval
             );
 
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    400,
+                    Some("Failed to update query with histogram interval".to_string()),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
+
             return MetaHttpResponse::bad_request("Failed to update query with histogram interval");
         }
         log::info!(
-            "[HTTP2_STREAM] trace_id: {}; Updated query {}; with histogram interval: {}",
+            "[HTTP2_STREAM] [trace_id: {}] Updated query {}; with histogram interval: {}",
             trace_id,
             req.query.sql,
             interval
@@ -209,6 +331,16 @@ pub async fn search_http2_stream(
     // Create a channel for streaming results
     let (tx, rx) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
 
+    #[cfg(feature = "enterprise")]
+    let audit_ctx = Some(AuditContext {
+        method: in_req.method().to_string(),
+        path: in_req.path().to_string(),
+        query_params: in_req.query_string().to_string(),
+        body: body_bytes,
+    });
+    #[cfg(not(feature = "enterprise"))]
+    let audit_ctx = None;
+
     // Spawn the search task in a separate task
     actix_web::rt::spawn(process_search_stream_request(
         org_id.clone(),
@@ -222,6 +354,7 @@ pub async fn search_http2_stream(
         tx,
         None,
         fallback_order_by_col,
+        audit_ctx,
     ));
 
     // Return streaming response
@@ -244,8 +377,7 @@ pub async fn search_http2_stream(
                             _ => {
                                 let message = code.get_message();
                                 let error_detail = code.get_error_detail();
-                                let http_response =
-                                    map_error_to_http_response(&err, None);
+                                let http_response = map_error_to_http_response(&err, None);
 
                                 StreamResponses::Error {
                                     code: http_response.status().into(),
@@ -272,6 +404,38 @@ pub async fn search_http2_stream(
     HttpResponse::Ok()
         .content_type("text/event-stream")
         .streaming(stream)
+}
+
+#[cfg(feature = "enterprise")]
+async fn report_to_audit(
+    user_id: String,
+    org_id: String,
+    trace_id: String,
+    code: u16,
+    error_message: Option<String>,
+    req: &HttpRequest,
+    req_body: String,
+) {
+    let is_audit_enabled = get_o2_config().common.audit_enabled;
+    if is_audit_enabled {
+        // Using spawn to handle the async call
+        audit(AuditMessage {
+            user_email: user_id,
+            org_id,
+            _timestamp: chrono::Utc::now().timestamp(),
+            protocol: Protocol::Http,
+            response_meta: ResponseMeta {
+                http_method: req.method().to_string(),
+                http_path: req.path().to_string(),
+                http_query_params: req.query_string().to_string(),
+                http_body: req_body,
+                http_response_code: code,
+                error_msg: error_message,
+                trace_id: Some(trace_id.to_string()),
+            },
+        })
+        .await;
+    }
 }
 
 /// Values  HTTP2 streaming endpoint
@@ -332,12 +496,31 @@ pub async fn values_http2_stream(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
+    let body_bytes = String::from_utf8_lossy(&body).to_string();
+
     // Parse the values request
     let mut values_req: config::meta::search::ValuesRequest = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return MetaHttpResponse::bad_request(e),
+        Err(e) => {
+            let message = e.to_string();
+            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    http_response.status().into(),
+                    Some(message),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
+            return http_response;
+        }
     };
-
     let no_count = values_req.no_count;
     let top_k = values_req.size;
 
@@ -354,11 +537,43 @@ pub async fn values_http2_stream(
     .await
     {
         Ok(r) => r,
-        Err(e) => return MetaHttpResponse::bad_request(e),
+        Err(e) => {
+            let message = e.to_string();
+            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    http_response.status().into(),
+                    Some(message),
+                    &in_req,
+                    body_bytes.clone(),
+                )
+                .await;
+            }
+            return http_response;
+        }
     };
-
     if reqs.is_empty() {
-        return MetaHttpResponse::bad_request("No valid fields to process");
+        let http_response = MetaHttpResponse::bad_request("No valid fields to process");
+        // Add audit before closing
+        #[cfg(feature = "enterprise")]
+        {
+            report_to_audit(
+                user_id,
+                org_id,
+                trace_id,
+                http_response.status().into(),
+                Some("No valid fields to process".to_string()),
+                &in_req,
+                body_bytes.clone(),
+            )
+            .await;
+        }
+        return http_response;
     }
 
     // Take only the first request
@@ -373,6 +588,20 @@ pub async fn values_http2_stream(
         if let Some(res) =
             check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
         {
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    res.status().into(),
+                    Some("Unauthorized Access".to_string()),
+                    &in_req,
+                    body_bytes.clone(),
+                )
+                .await;
+            }
             return res;
         }
     }
@@ -393,6 +622,16 @@ pub async fn values_http2_stream(
         no_count,
     };
 
+    #[cfg(feature = "enterprise")]
+    let audit_ctx = Some(AuditContext {
+        method: in_req.method().to_string(),
+        path: in_req.path().to_string(),
+        query_params: in_req.query_string().to_string(),
+        body: body_bytes,
+    });
+    #[cfg(not(feature = "enterprise"))]
+    let audit_ctx = None;
+
     // Spawn the search task to process the request
     actix_web::rt::spawn(process_search_stream_request(
         org_id.clone(),
@@ -406,6 +645,7 @@ pub async fn values_http2_stream(
         tx,
         Some(values_event_context),
         None,
+        audit_ctx,
     ));
 
     // Return streaming response
