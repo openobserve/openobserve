@@ -44,6 +44,7 @@ use infra::{
 
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    handler::http::router::ERROR_HEADER,
     service::{
         compact::retention,
         db::{self, enrichment_table},
@@ -72,12 +73,12 @@ pub async fn save_enrichment_data(
     let stream_name = &format_stream_name(table_name);
 
     if !LOCAL_NODE.is_ingester() {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, "not an ingester".to_string()))
+            .json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 "not an ingester".to_string(),
-            )),
-        );
+            )));
     }
 
     // check if we are allowed to ingest
@@ -87,12 +88,15 @@ pub async fn save_enrichment_data(
         stream_name,
         None,
     ) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+        return Ok(HttpResponse::BadRequest()
+            .append_header((
+                ERROR_HEADER,
                 format!("enrichment table [{stream_name}] is being deleted"),
-            )),
-        );
+            ))
+            .json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("enrichment table [{stream_name}] is being deleted"),
+            )));
     }
 
     // Estimate the size of the payload in json format in bytes
@@ -245,12 +249,15 @@ pub async fn save_enrichment_data(
         match write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await {
             Ok(stats) => stats,
             Err(e) => {
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                return Ok(HttpResponse::InternalServerError()
+                    .append_header((
+                        ERROR_HEADER,
+                        format!("Error writing enrichment table: {}", e),
+                    ))
+                    .json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                         format!("Error writing enrichment table: {}", e),
-                    )),
-                );
+                    )));
             }
         };
 
@@ -288,6 +295,9 @@ pub async fn save_enrichment_data(
 
     if !append_data {
         enrich_meta_stats.start_time = started_at;
+    }
+    if enrich_meta_stats.start_time == 0 {
+        enrich_meta_stats.start_time = enrichment_table::get_start_time(org_id, stream_name).await;
     }
     enrich_meta_stats.end_time = now_micros();
     enrich_meta_stats.size = total_expected_size_in_bytes as i64;

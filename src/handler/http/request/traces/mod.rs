@@ -17,7 +17,6 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
 use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
-use infra::errors;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
@@ -26,7 +25,9 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::http::get_or_create_trace_id,
     },
-    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    handler::http::request::{
+        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, search::error_utils::map_error_to_http_response,
+    },
     service::{search as SearchService, traces},
 };
 
@@ -314,18 +315,7 @@ pub async fn get_latest_traces(
                 ])
                 .inc();
             log::error!("get traces latest data error: {:?}", err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => match code {
-                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                        .json(meta::http::HttpResponse::error_code(code)),
-                    _ => HttpResponse::InternalServerError()
-                        .json(meta::http::HttpResponse::error_code(code)),
-                },
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
+            return Ok(map_error_to_http_response(&err, Some(trace_id)));
         }
     };
     if resp_search.hits.is_empty() {
@@ -407,18 +397,7 @@ pub async fn get_latest_traces(
                     ])
                     .inc();
                 log::error!("get traces latest data error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code(code)),
-                        _ => HttpResponse::InternalServerError()
-                            .json(meta::http::HttpResponse::error_code(code)),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
+                return Ok(map_error_to_http_response(&err, Some(trace_id)));
             }
         };
 

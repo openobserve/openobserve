@@ -1324,7 +1324,7 @@ const useLogs = () => {
 
               notificationMsg.value = searchObj.data.errorMsg;
 
-              if (err?.request?.status >= 429) {
+              if (err?.request?.status >= 429 || err?.request?.status == 400) {
                 notificationMsg.value = err?.response?.data?.message;
                 searchObj.data.errorMsg = err?.response?.data?.message || "";
                 searchObj.data.errorDetail = err?.response?.data?.error_detail;
@@ -2229,7 +2229,7 @@ const useLogs = () => {
 
             notificationMsg.value = searchObj.data.countErrorMsg;
 
-            if (err?.request?.status >= 429) {
+            if (err?.request?.status >= 429 || err?.request?.status == 400) {
               notificationMsg.value = err?.response?.data?.message;
               searchObj.data.countErrorMsg += err?.response?.data?.message;
             }
@@ -2422,7 +2422,7 @@ const useLogs = () => {
               searchObj.data.queryResults.from += res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.hits.push(...res.data.hits);
+              await chunkedAppend(searchObj.data.queryResults.hits, res.data.hits);
             } else {
               searchObj.data.queryResults.from = res.data.from;
               searchObj.data.queryResults.scan_size = res.data.scan_size;
@@ -2566,7 +2566,7 @@ const useLogs = () => {
 
           notificationMsg.value = searchObj.data.errorMsg;
 
-          if (err?.request?.status >= 429) {
+          if (err?.request?.status >= 429 || err?.request?.status == 400) {
             notificationMsg.value = err?.response?.data?.message || "";
             searchObj.data.errorMsg = err?.response?.data?.message || "";
             searchObj.data.errorDetail =
@@ -2977,17 +2977,17 @@ const useLogs = () => {
               stream.settings = streamData.settings;
               stream.schema = streamSchema;
             }
-
             if (
-              stream.settings.max_query_range > 0 &&
+              (stream.settings.max_query_range > 0 || store.state.zoConfig.max_query_range > 0) &&
               (searchObj.data.datetime.queryRangeRestrictionInHour >
                 stream.settings.max_query_range ||
                 stream.settings.max_query_range == 0 ||
                 searchObj.data.datetime.queryRangeRestrictionInHour == -1) &&
               searchObj.data.datetime.queryRangeRestrictionInHour != 0
             ) {
-              searchObj.data.datetime.queryRangeRestrictionInHour =
-                stream.settings.max_query_range;
+              //if stream has max_query_range, then use that, otherwise use the default max_query_range from the config
+              searchObj.data.datetime.queryRangeRestrictionInHour = stream.settings.max_query_range > 0 ? stream.settings.max_query_range : store.state.zoConfig.max_query_range;
+
               searchObj.data.datetime.queryRangeRestrictionMsg = t(
                 "search.queryRangeRestrictionMsg",
                 {
@@ -3892,7 +3892,7 @@ const useLogs = () => {
             searchObj.data.errorMsg = customMessage;
           }
 
-          if (err?.request?.status >= 429) {
+          if (err?.request?.status >= 429 || err?.request?.status == 400) {
             notificationMsg.value = err?.response?.data?.message;
             searchObj.data.errorMsg = err?.response?.data?.message;
           }
@@ -5242,9 +5242,7 @@ const useLogs = () => {
         // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
         // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
         if (appendResult) {
-          searchObj.data.queryResults.hits.push(
-            ...response.content.results.hits,
-          );
+          await chunkedAppend(searchObj.data.queryResults.hits, response.content.results.hits);
 
           searchObj.data.queryResults.total += response.content.results.total;
           searchObj.data.queryResults.took += response.content.results.took;
@@ -5292,6 +5290,13 @@ const useLogs = () => {
         notificationMsg.value || "Error occurred while handling logs response.",
       );
       notificationMsg.value = "";
+    }
+  };
+
+  const chunkedAppend = async (target: any, source: any, chunkSize = 5000) => {
+    for (let i = 0; i < source.length; i += chunkSize) {
+      target.push.apply(target, source.slice(i, i + chunkSize));
+      await new Promise(resolve => setTimeout(resolve, 0)); // Let UI update
     }
   };
 

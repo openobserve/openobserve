@@ -478,5 +478,87 @@ async waitForSearchResultAndCheckText(expectedText) {
   await expect(locator).toContainText(expectedText);
 }
 
+async executeQueryWithKeyboardShortcut() {
+  // Press Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux)
+  await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+}
+
+async executeQueryWithKeyboardShortcutTest() {
+  // Set up date/time filter
+  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
+  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+
+  // Ensure the query editor is visible and clickable before typing
+  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
+  await expect(queryEditor).toBeVisible();
+  await queryEditor.click();
+  await this.page.keyboard.type("match_all('code')");
+
+  // Execute query using keyboard shortcut
+  await this.executeQueryWithKeyboardShortcut();
+
+  // Verify that the expected log table column is visible
+  await expect(this.page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+}
+
+async executeQueryWithKeyboardShortcutAfterClickingElsewhere() {
+  // Set up date/time filter
+  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
+  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+
+  // Click elsewhere on the screen first
+  await this.page.locator('[data-test="logs-search-bar"]').click();
+
+  // Ensure the query editor is visible and clickable before typing
+  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
+  await expect(queryEditor).toBeVisible();
+  await queryEditor.click();
+  await this.page.keyboard.type("match_all('code')");
+
+  // Execute query using keyboard shortcut
+  await this.executeQueryWithKeyboardShortcut();
+
+  // Verify that the expected log table column is visible
+  await expect(this.page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+}
+
+async executeQueryWithKeyboardShortcutWithDifferentQuery() {
+  // Set up date/time filter
+  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
+  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+
+  // Ensure the query editor is visible and clickable before typing
+  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
+  await expect(queryEditor).toBeVisible();
+  await queryEditor.click();
+  await this.page.keyboard.type("str_match_ignore_case(kubernetes_container_name, 'ziox')");
+
+  // Execute query using keyboard shortcut
+  await this.executeQueryWithKeyboardShortcut();
+
+  // Verify that the expected log table column is visible
+  await expect(this.page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+}
+
+async executeQueryWithKeyboardShortcutWithSQLMode() {
+  // Set up date/time filter
+  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
+  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+
+  // Enable SQL mode
+  await this.sqlModeToggle.click();
+
+  // Ensure the query editor is visible and clickable before typing
+  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
+  await expect(queryEditor).toBeVisible();
+  await queryEditor.click();
+  await this.page.keyboard.type('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate" Group by _timestamp ORDER BY _timestamp DESC');
+
+  // Execute query using keyboard shortcut
+  await this.executeQueryWithKeyboardShortcut();
+
+  // Verify that the expected log table column is visible
+  await expect(this.page.locator('[data-test="logs-search-result-bar-chart"]')).toBeVisible();
+}
 
 }
