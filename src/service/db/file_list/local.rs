@@ -19,6 +19,8 @@ use infra::errors::Result;
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
+use crate::job::files::parquet::REMOVING_FILES;
+
 static PENDING_DELETE_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::new()));
 
@@ -64,6 +66,11 @@ pub async fn filter_by_pending_delete(mut files: Vec<String>) -> Vec<String> {
     let r = PENDING_DELETE_FILES.read().await;
     files.retain(|file| !r.contains(file));
     drop(r);
+
+    let r = REMOVING_FILES.read().await;
+    files.retain(|file| !r.contains(file));
+    drop(r);
+
     files
 }
 

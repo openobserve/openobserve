@@ -91,6 +91,9 @@ use crate::{
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
+pub static REMOVING_FILES: Lazy<RwLock<HashSet<String>>> =
+    Lazy::new(|| RwLock::new(HashSet::new()));
+
 pub async fn run() -> Result<(), anyhow::Error> {
     // add the pending delete files to processing list
     let pending_delete_files = db::file_list::local::get_pending_delete().await;
@@ -569,6 +572,7 @@ async fn move_files(
                     );
                 }
             } else {
+                REMOVING_FILES.write().await.insert(file.key.clone());
                 match remove_file(wal_dir.join(&file.key)) {
                     Err(e) => {
                         log::warn!(
@@ -589,9 +593,14 @@ async fn move_files(
                                 file.key,
                                 e.to_string()
                             );
+                        } else {
+                            // remove the file from removing set
+                            REMOVING_FILES.write().await.remove(&file.key);
                         }
                     }
                     Ok(_) => {
+                        // remove the file from removing set
+                        REMOVING_FILES.write().await.remove(&file.key);
                         // delete metadata from cache
                         WAL_PARQUET_METADATA.write().await.remove(&file.key);
                         // remove the file from processing set
