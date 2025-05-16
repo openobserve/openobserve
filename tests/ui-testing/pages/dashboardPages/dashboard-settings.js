@@ -110,32 +110,9 @@ export default class DashboardSetting {
     await this.saveTab.click();
   }
 
-  //Delete tab
-  async deleteTabSetting() {
-    await this.tab.waitFor({ state: "visible" });
-    await this.tab.click();
-    await this.deletebtn.waitFor({ state: "visible" });
-    await this.deletebtn.click();
-    await this.deleteconfirmBtn.waitFor({ state: "visible" });
-    await this.deleteconfirmBtn.click();
-  }
-
   //Edit tab
   editTabnewName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
-  }
-
-  async editTabName(newName) {
-    await this.tab.waitFor({ state: "visible" });
-    await this.tab.click();
-    await this.page
-      .locator('[data-test="dashboard-tab-settings-drag"] div')
-      .filter({ hasText: "drag_indicatortestedit" });
-
-    await this.editBtn.waitFor({ state: "visible" });
-    await this.editBtn.click();
-    await this.editName.click();
-    await this.editName.fill(newName);
   }
 
   //Full screen//
@@ -154,12 +131,9 @@ export default class DashboardSetting {
   }
 
   async cancelEditedtab() {
-    await page
+    await this.page
       .locator('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]')
       .click();
-  }
-  async deleteTab() {
-    await this.page.locator('[data-test="confirm-button"]').click();
   }
   async openVariables() {
     await this.page
@@ -294,10 +268,6 @@ export default class DashboardSetting {
       .click();
   }
 
-  // async addDefaultValue() {
-  //   await this.page.locator('[data-test="dashboard-multi-select-default-value-toggle-first-value"]').click();
-  //   await this.page.locator('[data-test="dashboard-multi-select-default-value-toggle-first-value"]').fill(value);
-  // }
   async addCustomValue(value) {
     await this.page
       .locator(
@@ -332,5 +302,63 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-settings-close-btn"]')
       .click();
+  }
+
+  async updateDashboardTabName(oldTabName, updatedTabName) {
+    const page = this.page;
+
+    // Open Settings tab
+    await page
+      .locator('[data-test="dashboard-settings-tab-tab"]')
+      .waitFor({ state: "visible" });
+
+    // Locate the tab to be edited based on oldTabName
+    const tabLocator = page
+      .locator('[data-test="dashboard-tab-settings-drag"] div')
+      .filter({ hasText: oldTabName });
+
+    // Click Edit button for the tab
+    await tabLocator
+      .locator('[data-test="dashboard-tab-settings-tab-edit-btn"]')
+      .click();
+
+    // Click to enable name editing
+    const nameEditLocator = page.locator(
+      '[data-test="dashboard-tab-settings-tab-name-edit"]'
+    );
+    await nameEditLocator.click();
+
+    // Fill new tab name
+    await nameEditLocator.fill(updatedTabName);
+
+    // Save changes
+    await page
+      .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
+      .click();
+  }
+  // Delete tab
+  async deleteTab(oldTabName) {
+    const page = this.page;
+
+    // Open Settings tab
+    await page
+      .locator('[data-test="dashboard-settings-tab-tab"]')
+      .waitFor({ state: "visible" });
+
+    // Locate the tab to be deleted based on oldTabName
+    const tabLocator = page
+      .locator('[data-test="dashboard-tab-settings-drag"] div')
+      .filter({ hasText: oldTabName });
+
+    // Click delete button for the tab
+    await tabLocator
+      .locator('[data-test="dashboard-tab-settings-tab-delete-btn"]')
+      .click();
+
+    // Confirm deletion
+    await page
+      .locator('[data-test="confirm-button"]')
+      .waitFor({ state: "visible" });
+    await page.locator('[data-test="confirm-button"]').click();
   }
 }
