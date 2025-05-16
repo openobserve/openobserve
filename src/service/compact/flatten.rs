@@ -162,7 +162,8 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     log::debug!("[FLATTEN_COMPACTOR] generate flatten file for {}", file.key);
 
-    let data = storage::get(&file.key).await?;
+    let res = storage::get(&file.key).await?;
+    let data = res.bytes().await?;
     let (_, batches) = read_recordbatch_from_bytes(&data)
         .await
         .map_err(|e| anyhow::anyhow!("read_recordbatch_from_bytes error: {}", e))?;
