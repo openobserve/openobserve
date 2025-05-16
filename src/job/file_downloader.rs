@@ -161,50 +161,53 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     // worker tasks: handle priority queue download
     for _ in 0..cfg.limit.file_download_priority_queue_thread_num {
-        let shutdown_rx = shutdown_rx.clone();
+        let mut shutdown_rx = shutdown_rx.clone();
         tokio::spawn(async move {
             loop {
-                if *shutdown_rx.borrow() {
-                    log::warn!(
-                        "[FILE_CACHE_DOWNLOAD:PRIORITY_QUEUE:JOB] Received shutdown signal, exiting"
-                    );
-                    break;
-                }
-
-                let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
-                match file_info {
-                    Some((trace_id, file, file_size, cache)) => {
-                        match download_file(&trace_id, &file, file_size, cache).await {
-                            Ok(data_len) => {
-                                if data_len > 0 && data_len != file_size {
-                                    log::warn!(
-                                        "[trace_id {}] priority queue download file {} found size mismatch, expected: {}, actual: {}, will skip it",
-                                        trace_id,
-                                        file,
-                                        file_size,
-                                        data_len
-                                    );
+                tokio::select! {
+                    _ = shutdown_rx.changed() => {
+                        log::warn!(
+                            "[FILE_CACHE_DOWNLOAD:PRIORITY_QUEUE:JOB] Received shutdown signal, exiting"
+                        );
+                        break;
+                    }
+                    _ = async {
+                        let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
+                        match file_info {
+                            Some((trace_id, file, file_size, cache)) => {
+                                match download_file(&trace_id, &file, file_size, cache).await {
+                                    Ok(data_len) => {
+                                        if data_len > 0 && data_len != file_size {
+                                            log::warn!(
+                                                "[trace_id {}] priority queue download file {} found size mismatch, expected: {}, actual: {}, will skip it",
+                                                trace_id,
+                                                file,
+                                                file_size,
+                                                data_len
+                                            );
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!(
+                                            "[trace_id {}] priority queue download file {} to cache {:?} err: {}",
+                                            trace_id,
+                                            file,
+                                            cache,
+                                            e
+                                        );
+                                    }
                                 }
+
+                                // update metrics
+                                metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
+                                    .with_label_values(&[])
+                                    .dec();
                             }
-                            Err(e) => {
-                                log::error!(
-                                    "[trace_id {}] priority queue download file {} to cache {:?} err: {}",
-                                    trace_id,
-                                    file,
-                                    cache,
-                                    e
-                                );
+                            None => {
+                                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                             }
                         }
-
-                        // update metrics
-                        metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-                            .with_label_values(&[])
-                            .dec();
-                    }
-                    None => {
-                        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                    }
+                    } => {}
                 }
             }
         });
