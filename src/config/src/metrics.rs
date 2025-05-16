@@ -17,8 +17,8 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 use prometheus::{
-    CounterVec, Encoder, GaugeVec, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts,
-    Registry, TextEncoder,
+    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
+    TextEncoder,
 };
 
 pub const NAMESPACE: &str = "zo";
@@ -790,32 +790,54 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 // query disk cache metrics
-pub static QUERY_DISK_CACHE_UTILIZATION_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static QUERY_DISK_CACHE_HIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
-            "query_disk_cache_utilization_count",
-            "query disk cache utilization count".to_owned() + HELP_SUFFIX,
+            "query_disk_cache_hit_count",
+            "query disk cache hit count".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[
-            "organization",
-            "stream_type",
-            "storage_type",
-            "count_type",
-            "file_type",
-        ],
+        &["organization", "stream_type", "file_type"],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_DISK_CACHE_MISS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_disk_cache_miss_count",
+            "query disk cache miss count".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "file_type"],
     )
     .expect("Metric created")
 });
 
 // file downloader metrics
-pub static FILE_DOWNLOADER_QUEUE_SIZE: Lazy<GaugeVec> = Lazy::new(|| {
-    GaugeVec::new(
-        Opts::new("file_downloader_queue_size", "file downloader queue size")
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
-        &["queue_type"],
+pub static FILE_DOWNLOADER_NORMAL_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "file_downloader_normal_queue_size",
+            "file downloader normal queue size",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "file_downloader_priority_queue_size",
+            "file downloader priority queue size",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
     )
     .expect("Metric created")
 });
@@ -1033,11 +1055,17 @@ fn register_metrics(registry: &Registry) {
 
     // query disk cache metrics
     registry
-        .register(Box::new(QUERY_DISK_CACHE_UTILIZATION_COUNT.clone()))
+        .register(Box::new(QUERY_DISK_CACHE_HIT_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_DISK_CACHE_MISS_COUNT.clone()))
         .expect("Metric registered");
     // file downloader metrics
     registry
-        .register(Box::new(FILE_DOWNLOADER_QUEUE_SIZE.clone()))
+        .register(Box::new(FILE_DOWNLOADER_NORMAL_QUEUE_SIZE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE.clone()))
         .expect("Metric registered");
 }
 

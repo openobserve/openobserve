@@ -244,23 +244,11 @@ pub(crate) async fn create_context(
     .await?;
 
     // report cache hit and miss metrics
-    metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
-        .with_label_values(&[
-            &query.org_id,
-            &query.stream_type.to_string(),
-            "local",
-            "cache_hit",
-            "parquet",
-        ])
+    metrics::QUERY_DISK_CACHE_HIT_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
         .inc_by(cache_hits);
-    metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
-        .with_label_values(&[
-            &query.org_id,
-            &query.stream_type.to_string(),
-            "remote",
-            "cache_miss",
-            "parquet",
-        ])
+    metrics::QUERY_DISK_CACHE_MISS_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
         .inc_by(cache_misses);
 
     Ok(Some((ctx, schema, scan_stats)))
