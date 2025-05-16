@@ -91,11 +91,11 @@ impl ScheduledTriggerData {
         self.tolerance = 0;
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn to_json_string(&self) -> String {
         json::to_string(self).unwrap()
     }
 
-    pub fn from_str(s: &str) -> Result<Self, serde_json::Error> {
+    pub fn from_json_string(s: &str) -> Result<Self, serde_json::Error> {
         json::from_str(s)
     }
 }
