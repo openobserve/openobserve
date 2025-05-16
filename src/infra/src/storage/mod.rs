@@ -19,7 +19,7 @@ use bytes::buf::Buf;
 use config::{get_config, is_local_disk_storage, meta::stream::FileMeta, metrics};
 use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt};
-use object_store::{GetRange, ObjectMeta, ObjectStore, WriteMultipart, path::Path};
+use object_store::{GetRange, GetResult, ObjectMeta, ObjectStore, WriteMultipart, path::Path};
 use once_cell::sync::Lazy;
 use parquet::file::metadata::ParquetMetaDataReader;
 
@@ -68,9 +68,8 @@ pub async fn list(prefix: &str) -> object_store::Result<Vec<String>> {
     Ok(files)
 }
 
-pub async fn get(file: &str) -> object_store::Result<bytes::Bytes> {
-    let data = DEFAULT.get(&file.into()).await?;
-    data.bytes().await
+pub async fn get(file: &str) -> object_store::Result<GetResult> {
+    DEFAULT.get(&file.into()).await
 }
 
 pub async fn get_range(file: &str, range: Range<usize>) -> object_store::Result<bytes::Bytes> {
