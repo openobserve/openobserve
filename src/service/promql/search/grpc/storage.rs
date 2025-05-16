@@ -244,7 +244,7 @@ pub(crate) async fn create_context(
     .await?;
 
     // report cache hit and miss metrics
-    metrics::QUERY_DISK_CACHE_COUNT
+    metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
         .with_label_values(&[
             &query.org_id,
             &query.stream_type.to_string(),
@@ -253,7 +253,7 @@ pub(crate) async fn create_context(
             "parquet",
         ])
         .inc_by(cache_hits as f64);
-    metrics::QUERY_DISK_CACHE_COUNT
+    metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
         .with_label_values(&[
             &query.org_id,
             &query.stream_type.to_string(),

@@ -275,7 +275,7 @@ pub async fn search(
     .await?;
 
     // report cache hit and miss metrics
-    metrics::QUERY_DISK_CACHE_COUNT
+    metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
         .with_label_values(&[
             &query.org_id,
             &query.stream_type.to_string(),
@@ -284,7 +284,7 @@ pub async fn search(
             "parquet",
         ])
         .inc_by(cache_hits as f64);
-    metrics::QUERY_DISK_CACHE_COUNT
+    metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
         .with_label_values(&[
             &query.org_id,
             &query.stream_type.to_string(),
@@ -567,7 +567,7 @@ pub async fn filter_file_list_by_tantivy_index(
     .await?;
 
     // report cache hit and miss metrics
-    metrics::QUERY_DISK_CACHE_COUNT
+    metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
         .with_label_values(&[
             &query.org_id,
             &query.stream_type.to_string(),
@@ -576,7 +576,7 @@ pub async fn filter_file_list_by_tantivy_index(
             "index",
         ])
         .inc_by(cache_hits as f64);
-    metrics::QUERY_DISK_CACHE_COUNT
+    metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
         .with_label_values(&[
             &query.org_id,
             &query.stream_type.to_string(),

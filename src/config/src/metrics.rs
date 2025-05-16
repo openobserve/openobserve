@@ -790,11 +790,11 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 // query disk cache metrics
-pub static QUERY_DISK_CACHE_COUNT: Lazy<CounterVec> = Lazy::new(|| {
+pub static QUERY_DISK_CACHE_UTILIZATION_COUNT: Lazy<CounterVec> = Lazy::new(|| {
     CounterVec::new(
         Opts::new(
-            "query_disk_cache_count",
-            "query disk cache count".to_owned() + HELP_SUFFIX,
+            "query_disk_cache_utilization_count",
+            "query disk cache utilization count".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -1033,7 +1033,7 @@ fn register_metrics(registry: &Registry) {
 
     // query disk cache metrics
     registry
-        .register(Box::new(QUERY_DISK_CACHE_COUNT.clone()))
+        .register(Box::new(QUERY_DISK_CACHE_UTILIZATION_COUNT.clone()))
         .expect("Metric registered");
     // file downloader metrics
     registry
