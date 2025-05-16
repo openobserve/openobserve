@@ -68,6 +68,7 @@ use crate::common::utils::auth::check_permissions;
 use crate::common::utils::http::get_or_create_trace_id;
 use crate::{
     common::{
+        infra::config::ORGANIZATIONS,
         meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
@@ -957,13 +958,19 @@ async fn send_notification(
     start_time: Option<i64>,
     evaluation_timestamp: i64,
 ) -> Result<String, anyhow::Error> {
+    let org_name = if let Some(org) = ORGANIZATIONS.read().await.get(&alert.org_id) {
+        org.name.clone()
+    } else {
+        alert.org_id.to_string()
+    };
     let rows_tpl_val = if alert.row_template.is_empty() {
         vec!["".to_string()]
     } else {
-        process_row_template(&alert.row_template, alert, rows)
+        process_row_template(&org_name, &alert.row_template, alert, rows)
     };
     let is_email = matches!(dest_type, DestinationType::Email(_));
     let msg: String = process_dest_template(
+        &org_name,
         &template.body,
         alert,
         rows,
@@ -979,6 +986,7 @@ async fn send_notification(
 
     let email_subject = if let TemplateType::Email { title } = &template.template_type {
         process_dest_template(
+            &org_name,
             title,
             alert,
             rows,
@@ -1157,7 +1165,12 @@ async fn send_sns_notification(
     }
 }
 
-fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> Vec<String> {
+fn process_row_template(
+    org_name: &str,
+    tpl: &String,
+    alert: &Alert,
+    rows: &[Map<String, Value>],
+) -> Vec<String> {
     let alert_type = if alert.is_real_time {
         "realtime"
     } else {
@@ -1220,7 +1233,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
         };
 
         resp = resp
-            .replace("{org_name}", &alert.org_id)
+            .replace("{org_name}", org_name)
             .replace("{stream_type}", alert.stream_type.as_str())
             .replace("{stream_name}", &alert.stream_name)
             .replace("{alert_name}", &alert.name)
@@ -1267,6 +1280,7 @@ struct ProcessTemplateOptions {
 }
 
 async fn process_dest_template(
+    org_name: &str,
     tpl: &str,
     alert: &Alert,
     rows: &[Map<String, Value>],
@@ -1440,7 +1454,7 @@ async fn process_dest_template(
     let evaluation_timestamp_millis = evaluation_timestamp / 1000;
     let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
     let mut resp = tpl
-        .replace("{org_name}", &alert.org_id)
+        .replace("{org_name}", org_name)
         .replace("{stream_type}", alert.stream_type.as_str())
         .replace("{stream_name}", &alert.stream_name)
         .replace("{alert_name}", &alert.name)
