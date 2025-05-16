@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
+    loading: {{ variableItem.isLoading }} values: {{ variableItem.value }}
     <q-select
       style="min-width: 150px"
       filled
@@ -83,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
       </template>
+      <template v-slot:loading> Loading... </template>
     </q-select>
   </div>
 </template>
@@ -98,6 +100,12 @@ export default defineComponent({
   setup(props: any, { emit }) {
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
+    console.log("[Dropdown] Initial setup:", {
+      variableName: props.variableItem?.name,
+      initialValue: selectedValue.value,
+      isLoading: props.variableItem?.isLoading,
+      options: props.variableItem?.options,
+    });
 
     const options = toRef(props.variableItem, "options");
 
@@ -109,6 +117,12 @@ export default defineComponent({
     watch(
       () => props.variableItem,
       () => {
+        console.log("[Dropdown] Variable item changed:", {
+          variableName: props.variableItem?.name,
+          newOptions: props.variableItem?.options,
+          isLoading: props.variableItem?.isLoading,
+          value: props.variableItem?.value,
+        });
         options.value = props.variableItem?.options;
       },
     );
@@ -123,6 +137,11 @@ export default defineComponent({
 
     // Function to toggle select/deselect all options
     const toggleSelectAll = () => {
+      console.log("[Dropdown] Toggle select all:", {
+        variableName: props.variableItem?.name,
+        currentIsAllSelected: isAllSelected.value,
+        currentValue: selectedValue.value,
+      });
       if (!isAllSelected.value) {
         selectedValue.value = fieldsFilteredOptions.value.map(
           (option: any) => option.value,
@@ -133,6 +152,11 @@ export default defineComponent({
     };
 
     const applyChanges = () => {
+      console.log("[Dropdown] Applying changes:", {
+        variableName: props.variableItem?.name,
+        multiSelect: props.variableItem.multiSelect,
+        value: selectedValue.value,
+      });
       if (props.variableItem.multiSelect) {
         emitSelectedValues();
       }
@@ -140,20 +164,39 @@ export default defineComponent({
 
     // update selected value
     watch(selectedValue, () => {
+      console.log("[Dropdown] Selected value changed:", {
+        variableName: props.variableItem?.name,
+        newValue: selectedValue.value,
+        multiSelect: props.variableItem.multiSelect,
+      });
       if (!props.variableItem.multiSelect) {
         emitSelectedValues();
       }
     });
 
     const emitSelectedValues = () => {
+      console.log("[Dropdown] Emitting selected values:", {
+        variableName: props.variableItem?.name,
+        value: selectedValue.value,
+      });
       emit("update:modelValue", selectedValue.value);
     };
 
     // Display the selected value
     const displayValue = computed(() => {
+      console.log("[Dropdown] Calculating display value", {
+        variableName: props.variableItem?.name,
+        selectedValue: selectedValue.value,
+        multiSelect: props.variableItem.multiSelect,
+      });
       if (selectedValue.value || selectedValue.value == "") {
         if (Array.isArray(selectedValue.value)) {
           if (selectedValue.value.length > 2) {
+            console.log("[Dropdown] Display value: using ellipsis", {
+              variableName: props.variableItem?.name,
+              selectedValue: selectedValue.value,
+              multiSelect: props.variableItem.multiSelect,
+            });
             const firstTwoValues = selectedValue.value
               .slice(0, 2)
               .map((it: any) => (it === "" ? "<blank>" : it))
@@ -161,36 +204,88 @@ export default defineComponent({
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
           } else if (props.variableItem.options.length == 0) {
+            console.log("[Dropdown] Display value: no data found", {
+              variableName: props.variableItem?.name,
+              selectedValue: selectedValue.value,
+              multiSelect: props.variableItem.multiSelect,
+            });
             return "(No Data Found)";
           } else {
+            console.log("[Dropdown] Display value: not using ellipsis", {
+              variableName: props.variableItem?.name,
+              selectedValue: selectedValue.value,
+              multiSelect: props.variableItem.multiSelect,
+            });
             return selectedValue.value
               .map((it: any) => (it === "" ? "<blank>" : it))
               .join(", ");
           }
         } else if (selectedValue.value == "") {
+          console.log("[Dropdown] Display value: blank", {
+            variableName: props.variableItem?.name,
+            selectedValue: selectedValue.value,
+            multiSelect: props.variableItem.multiSelect,
+          });
           return "<blank>";
         } else {
+          console.log("[Dropdown] Display value: single value", {
+            variableName: props.variableItem?.name,
+            selectedValue: selectedValue.value,
+            multiSelect: props.variableItem.multiSelect,
+          });
           return selectedValue.value;
         }
       } else if (!props.variableItem.isLoading) {
+        console.log("[Dropdown] Display value: no data found (not loading)", {
+          variableName: props.variableItem?.name,
+          selectedValue: selectedValue.value,
+          multiSelect: props.variableItem.multiSelect,
+        });
         return "(No Data Found)";
       } else {
+        console.log("[Dropdown] Display value: loading", {
+          variableName: props.variableItem?.name,
+          selectedValue: selectedValue.value,
+          multiSelect: props.variableItem.multiSelect,
+        });
         return "";
       }
     });
-
     const loadFieldValues = () => {
+      console.log("[Dropdown] Loading field values:", {
+        variableName: props.variableItem?.name,
+        isLoading: props.variableItem.isLoading,
+        hasLoadOptions: props.loadOptions,
+        currentOptions: props.variableItem?.options,
+        hasExistingValue: !!selectedValue.value,
+        optionsLength: options.value?.length,
+      });
+
       if (props.variableItem.isLoading || !props.loadOptions) {
         return;
       }
       loadVariableTemp();
     };
-
     const loadVariableTemp = () => {
+      console.log("[Dropdown] Loading variable temp:", {
+        variableName: props.variableItem?.name,
+        currentOptions: props.variableItem.options,
+        currentValue: selectedValue.value,
+        isLoading: props.variableItem.isLoading,
+        hasLoadOptions: props.loadOptions,
+      });
+
       try {
         props.loadOptions(props.variableItem);
         options.value = props.variableItem.options;
-      } catch (error) {}
+        console.log("[Dropdown] Variable temp loaded:", {
+          variableName: props.variableItem?.name,
+          newOptions: props.variableItem.options,
+          newValue: selectedValue.value,
+        });
+      } catch (error) {
+        console.error("[Dropdown] Error loading variable temp:", error);
+      }
     };
 
     return {

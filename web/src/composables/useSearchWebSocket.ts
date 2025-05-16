@@ -202,7 +202,7 @@ const useSearchWebSocket = () => {
   const fetchQueryDataWithWebSocket = (
     data: {
       queryReq: SearchRequestPayload;
-      type: "search" | "histogram" | "pageCount";
+      type: "search" | "histogram" | "pageCount" | "values";
       isPagination: boolean;
       traceId: string;
       org_id: string;
@@ -250,7 +250,7 @@ const useSearchWebSocket = () => {
 
   const initiateSocketConnection = (data: {
     queryReq: SearchRequestPayload;
-    type: "search" | "histogram" | "pageCount";
+    type: "search" | "histogram" | "pageCount" | "values";
     isPagination: boolean;
     traceId: string;
     org_id: string;
