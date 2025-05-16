@@ -22,6 +22,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
     let db = infra::db::get_db().await;
     match msg.message_type {
         MessageType::Put => {
+            log::info!("super cluster meta queue put: {:?}", msg.key);
+            if msg.key.starts_with(ENRICHMENT_TABLE_META_STREAM_STATS_KEY) {
+                log::info!("super cluster meta queue put: {:?}", msg.key);
+            }
             db.put(&msg.key, msg.value.unwrap(), msg.need_watch, None)
                 .await?;
             // hack: notify the nodes to update the meta table stats
