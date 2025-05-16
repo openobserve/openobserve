@@ -63,13 +63,14 @@ pub async fn get_pending_delete() -> Vec<String> {
 }
 
 pub async fn filter_by_pending_delete(mut files: Vec<String>) -> Vec<String> {
-    let r = PENDING_DELETE_FILES.read().await;
-    files.retain(|file| !r.contains(file));
-    drop(r);
+    // Acquire locks in a consistent order to prevent deadlocks
+    let pending = PENDING_DELETE_FILES.read().await;
+    let removing = REMOVING_FILES.read().await;
 
-    let r = REMOVING_FILES.read().await;
-    files.retain(|file| !r.contains(file));
-    drop(r);
+    // Filter in a single pass using both sets
+    files.retain(|file| !pending.contains(file) && !removing.contains(file));
+    drop(pending);
+    drop(removing);
 
     files
 }
