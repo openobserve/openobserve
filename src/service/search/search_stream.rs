@@ -37,14 +37,11 @@ use serde_json::Map;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 
-#[cfg(feature = "enterprise")]
-use crate::service::self_reporting::audit;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, QueryDelta},
         utils::{stream::get_max_query_range, websocket::calc_queried_range},
     },
-    handler::http::request::search::error_utils::map_error_to_http_response,
     service::{
         search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
         websocket_events::{
@@ -53,7 +50,13 @@ use crate::{
         },
     },
 };
+#[cfg(feature = "enterprise")]
+use crate::{
+    handler::http::request::search::error_utils::map_error_to_http_response,
+    service::self_reporting::audit,
+};
 
+#[allow(dead_code)]
 pub struct AuditContext {
     pub method: String,
     pub path: String,
@@ -75,7 +78,7 @@ pub async fn process_search_stream_request(
     sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
     fallback_order_by_col: Option<String>,
-    audit_ctx: Option<AuditContext>,
+    _audit_ctx: Option<AuditContext>,
 ) {
     log::info!(
         "[HTTP2_STREAM] trace_id: {} Received test HTTP/2 stream request for org_id: {}",
@@ -112,10 +115,10 @@ pub async fn process_search_stream_request(
                     e.to_string()
                 );
 
-                let resp = map_error_to_http_response(&e, None).status().into();
                 // send audit response first
                 #[cfg(feature = "enterprise")]
                 {
+                    let resp = map_error_to_http_response(&e, None).status().into();
                     if get_o2_config().common.audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
@@ -124,14 +127,14 @@ pub async fn process_search_stream_request(
                             _timestamp: chrono::Utc::now().timestamp(),
                             protocol: Protocol::Http,
                             response_meta: ResponseMeta {
-                                http_method: audit_ctx.as_ref().unwrap().method.to_string(),
-                                http_path: audit_ctx.as_ref().unwrap().path.to_string(),
-                                http_query_params: audit_ctx
+                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                                http_query_params: _audit_ctx
                                     .as_ref()
                                     .unwrap()
                                     .query_params
                                     .to_string(),
-                                http_body: audit_ctx.as_ref().unwrap().body.to_string(),
+                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
                                 http_response_code: resp,
                                 error_msg: Some(e.to_string()),
                                 trace_id: Some(trace_id.to_string()),
@@ -215,10 +218,10 @@ pub async fn process_search_stream_request(
             .instrument(search_span.clone())
             .await
             {
-                let resp = map_error_to_http_response(&e, None).status().into();
                 // send audit response first
                 #[cfg(feature = "enterprise")]
                 {
+                    let resp = map_error_to_http_response(&e, None).status().into();
                     if get_o2_config().common.audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
@@ -227,14 +230,14 @@ pub async fn process_search_stream_request(
                             _timestamp: chrono::Utc::now().timestamp(),
                             protocol: Protocol::Http,
                             response_meta: ResponseMeta {
-                                http_method: audit_ctx.as_ref().unwrap().method.to_string(),
-                                http_path: audit_ctx.as_ref().unwrap().path.to_string(),
-                                http_query_params: audit_ctx
+                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                                http_query_params: _audit_ctx
                                     .as_ref()
                                     .unwrap()
                                     .query_params
                                     .to_string(),
-                                http_body: audit_ctx.as_ref().unwrap().body.to_string(),
+                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
                                 http_response_code: resp,
                                 error_msg: Some(e.to_string()),
                                 trace_id: Some(trace_id.to_string()),
@@ -279,10 +282,10 @@ pub async fn process_search_stream_request(
             .instrument(search_span.clone())
             .await
             {
-                let resp = map_error_to_http_response(&e, None).status().into();
                 // send audit response first
                 #[cfg(feature = "enterprise")]
                 {
+                    let resp = map_error_to_http_response(&e, None).status().into();
                     if get_o2_config().common.audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
@@ -291,14 +294,14 @@ pub async fn process_search_stream_request(
                             _timestamp: chrono::Utc::now().timestamp(),
                             protocol: Protocol::Http,
                             response_meta: ResponseMeta {
-                                http_method: audit_ctx.as_ref().unwrap().method.to_string(),
-                                http_path: audit_ctx.as_ref().unwrap().path.to_string(),
-                                http_query_params: audit_ctx
+                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                                http_query_params: _audit_ctx
                                     .as_ref()
                                     .unwrap()
                                     .query_params
                                     .to_string(),
-                                http_body: audit_ctx.as_ref().unwrap().body.to_string(),
+                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
                                 http_response_code: resp,
                                 error_msg: Some(e.to_string()),
                                 trace_id: Some(trace_id.to_string()),
@@ -333,10 +336,10 @@ pub async fn process_search_stream_request(
                         e
                     })
             {
-                let resp = map_error_to_http_response(&e, None).status().into();
                 // send audit response first
                 #[cfg(feature = "enterprise")]
                 {
+                    let resp = map_error_to_http_response(&e, None).status().into();
                     if get_o2_config().common.audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
@@ -345,14 +348,14 @@ pub async fn process_search_stream_request(
                             _timestamp: chrono::Utc::now().timestamp(),
                             protocol: Protocol::Http,
                             response_meta: ResponseMeta {
-                                http_method: audit_ctx.as_ref().unwrap().method.to_string(),
-                                http_path: audit_ctx.as_ref().unwrap().path.to_string(),
-                                http_query_params: audit_ctx
+                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                                http_query_params: _audit_ctx
                                     .as_ref()
                                     .unwrap()
                                     .query_params
                                     .to_string(),
-                                http_body: audit_ctx.as_ref().unwrap().body.to_string(),
+                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
                                 http_response_code: resp,
                                 error_msg: Some(e.to_string()),
                                 trace_id: Some(trace_id.to_string()),
@@ -392,10 +395,10 @@ pub async fn process_search_stream_request(
         .instrument(search_span.clone())
         .await
         {
-            let resp = map_error_to_http_response(&e, None).status().into();
             // send audit response first
             #[cfg(feature = "enterprise")]
             {
+                let resp = map_error_to_http_response(&e, None).status().into();
                 if get_o2_config().common.audit_enabled {
                     // Using spawn to handle the async call
                     audit(AuditMessage {
@@ -404,10 +407,14 @@ pub async fn process_search_stream_request(
                         _timestamp: chrono::Utc::now().timestamp(),
                         protocol: Protocol::Http,
                         response_meta: ResponseMeta {
-                            http_method: audit_ctx.as_ref().unwrap().method.to_string(),
-                            http_path: audit_ctx.as_ref().unwrap().path.to_string(),
-                            http_query_params: audit_ctx.as_ref().unwrap().query_params.to_string(),
-                            http_body: audit_ctx.as_ref().unwrap().body.to_string(),
+                            http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                            http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                            http_query_params: _audit_ctx
+                                .as_ref()
+                                .unwrap()
+                                .query_params
+                                .to_string(),
+                            http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
                             http_response_code: resp,
                             error_msg: Some(e.to_string()),
                             trace_id: Some(trace_id.to_string()),
@@ -444,10 +451,10 @@ pub async fn process_search_stream_request(
                 _timestamp: chrono::Utc::now().timestamp(),
                 protocol: Protocol::Http,
                 response_meta: ResponseMeta {
-                    http_method: audit_ctx.as_ref().unwrap().method.to_string(),
-                    http_path: audit_ctx.as_ref().unwrap().path.to_string(),
-                    http_query_params: audit_ctx.as_ref().unwrap().query_params.to_string(),
-                    http_body: audit_ctx.as_ref().unwrap().body.to_string(),
+                    http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                    http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                    http_query_params: _audit_ctx.as_ref().unwrap().query_params.to_string(),
+                    http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
                     http_response_code: 200,
                     error_msg: None,
                     trace_id: Some(trace_id.to_string()),
