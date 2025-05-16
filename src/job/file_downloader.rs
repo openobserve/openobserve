@@ -251,7 +251,7 @@ pub async fn queue_background_download(
     cache_type: file_data::CacheType,
     to_priority_queue: bool,
 ) -> Result<(), anyhow::Error> {
-    if !to_priority_queue {
+    if !to_priority_queue || !get_config().limit.file_download_enable_priority_queue {
         FILE_DOWNLOAD_CHANNEL
             .sender
             .send((
