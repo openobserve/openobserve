@@ -400,11 +400,21 @@ pub async fn search(
     );
 
     // report cache hit and miss metrics
-    metrics::FILE_DOWNLOADER_CACHE_HIT_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "local"])
+    metrics::QUERY_DISK_CACHE_COUNT
+        .with_label_values(&[
+            &query.org_id,
+            &query.stream_type.to_string(),
+            "local",
+            "cache_hit",
+        ])
         .inc_by(cache_hits as f64);
-    metrics::FILE_DOWNLOADER_CACHE_MISS_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "remote"])
+    metrics::QUERY_DISK_CACHE_COUNT
+        .with_label_values(&[
+            &query.org_id,
+            &query.stream_type.to_string(),
+            "remote",
+            "cache_miss",
+        ])
         .inc_by(cache_misses as f64);
 
     Ok((tables, scan_stats))
@@ -556,11 +566,16 @@ pub async fn filter_file_list_by_tantivy_index(
     .await?;
 
     // report cache hit and miss metrics
-    metrics::FILE_DOWNLOADER_CACHE_HIT_COUNT
+    metrics::QUERY_DISK_CACHE_COUNT
         .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "local"])
         .inc_by(cache_hits as f64);
-    metrics::FILE_DOWNLOADER_CACHE_MISS_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "remote"])
+    metrics::QUERY_DISK_CACHE_COUNT
+        .with_label_values(&[
+            &query.org_id,
+            &query.stream_type.to_string(),
+            "remote",
+            "cache_miss",
+        ])
         .inc_by(cache_misses as f64);
 
     let cached_ratio = (scan_stats.querier_memory_cached_files

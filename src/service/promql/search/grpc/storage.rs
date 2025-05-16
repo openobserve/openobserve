@@ -244,11 +244,21 @@ pub(crate) async fn create_context(
     .await?;
 
     // report cache hit and miss metrics
-    metrics::FILE_DOWNLOADER_CACHE_HIT_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "local"])
+    metrics::QUERY_DISK_CACHE_COUNT
+        .with_label_values(&[
+            &query.org_id,
+            &query.stream_type.to_string(),
+            "local",
+            "cache_hit",
+        ])
         .inc_by(cache_hits as f64);
-    metrics::FILE_DOWNLOADER_CACHE_MISS_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "remote"])
+    metrics::QUERY_DISK_CACHE_COUNT
+        .with_label_values(&[
+            &query.org_id,
+            &query.stream_type.to_string(),
+            "remote",
+            "cache_miss",
+        ])
         .inc_by(cache_misses as f64);
 
     Ok(Some((ctx, schema, scan_stats)))

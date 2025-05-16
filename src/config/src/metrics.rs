@@ -789,33 +789,21 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// query disk cache metrics
+pub static QUERY_DISK_CACHE_COUNT: Lazy<CounterVec> = Lazy::new(|| {
+    CounterVec::new(
+        Opts::new(
+            "query_disk_cache_count",
+            "query disk cache count".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "storage_type", "count_type"],
+    )
+    .expect("Metric created")
+});
+
 // file downloader metrics
-pub static FILE_DOWNLOADER_CACHE_HIT_COUNT: Lazy<CounterVec> = Lazy::new(|| {
-    CounterVec::new(
-        Opts::new(
-            "file_downloader_cache_hit_count",
-            "file downloader cache hit count".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "stream_type", "storage_type"],
-    )
-    .expect("Metric created")
-});
-
-pub static FILE_DOWNLOADER_CACHE_MISS_COUNT: Lazy<CounterVec> = Lazy::new(|| {
-    CounterVec::new(
-        Opts::new(
-            "file_downloader_cache_miss_count",
-            "file downloader cache miss count".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "stream_type", "storage_type"],
-    )
-    .expect("Metric created")
-});
-
 pub static FILE_DOWNLOADER_QUEUE_SIZE: Lazy<GaugeVec> = Lazy::new(|| {
     GaugeVec::new(
         Opts::new("file_downloader_queue_size", "file downloader queue size")
@@ -1037,13 +1025,11 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
         .expect("Metric registered");
 
+    // query disk cache metrics
+    registry
+        .register(Box::new(QUERY_DISK_CACHE_COUNT.clone()))
+        .expect("Metric registered");
     // file downloader metrics
-    registry
-        .register(Box::new(FILE_DOWNLOADER_CACHE_HIT_COUNT.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(FILE_DOWNLOADER_CACHE_MISS_COUNT.clone()))
-        .expect("Metric registered");
     registry
         .register(Box::new(FILE_DOWNLOADER_QUEUE_SIZE.clone()))
         .expect("Metric registered");
