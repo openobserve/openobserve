@@ -16,8 +16,8 @@
 use config::{
     ider,
     meta::{
-        alerts::alert::ListAlertsParams, dashboards::ListDashboardsParams,
-       
+        alerts::alert::ListAlertsParams,
+        dashboards::ListDashboardsParams,
         pipeline::components::PipelineSource,
         stream::StreamType,
         user::{UserOrg, UserRole},

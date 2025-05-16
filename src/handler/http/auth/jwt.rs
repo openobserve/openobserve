@@ -41,7 +41,10 @@ use {
 
 #[cfg(feature = "cloud")]
 use crate::{
-    common::meta::organization::{DEFAULT_ORG, Organization, USER_DEFAULT},
+    common::meta::{
+        organization::{DEFAULT_ORG, Organization, USER_DEFAULT},
+        telemetry,
+    },
     service::organization::{accept_invitation, list_orgs_by_user},
 };
 
@@ -555,7 +558,9 @@ fn format_role_name(org: &str, role: String) -> String {
 
 #[cfg(feature = "cloud")]
 pub async fn check_and_add_to_org(user_email: &str, name: &str) {
-    use config::ider;
+    use std::str::FromStr;
+
+    use config::{ider, utils::json};
     use o2_enterprise::enterprise::cloud::org_invites::list_by_invitee;
     use o2_openfga::authorizer::authz::save_org_tuples;
 
@@ -621,34 +626,39 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
     if orgs.is_err() {
         log::error!("Error fetching orgs for user: {}", user_email);
     }
-    if orgs.is_err() || orgs.unwrap().is_empty() {
-        // Create a default org for the user
-        let org = Organization {
-            // id will be overridden by the service function
-            identifier: ider::uuid(),
-            name: DEFAULT_ORG.to_string(),
-            org_type: USER_DEFAULT.to_owned(),
-        };
-        match db::organization::save_org(&org).await {
-            Ok(_) => {
-                save_org_tuples(&org.identifier).await;
-                if let Err(e) = add_admin_to_org(&org.identifier, user_email).await {
+
+    let org_name = match orgs {
+        Ok(existing_orgs) if !existing_orgs.is_empty() => existing_orgs[0].name.to_owned(),
+        _ => {
+            // Create a default org for the user
+            let org = Organization {
+                // id will be overridden by the service function
+                identifier: ider::uuid(),
+                name: DEFAULT_ORG.to_string(),
+                org_type: USER_DEFAULT.to_owned(),
+            };
+            match db::organization::save_org(&org).await {
+                Ok(_) => {
+                    save_org_tuples(&org.identifier).await;
+                    if let Err(e) = add_admin_to_org(&org.identifier, user_email).await {
+                        log::error!(
+                            "Error adding user as admin to org: {} error: {}",
+                            org.identifier,
+                            e
+                        );
+                    }
+                }
+                Err(e) => {
                     log::error!(
-                        "Error adding user as admin to org: {} error: {}",
-                        org.identifier,
+                        "Error creating default org for user: {} error: {}",
+                        user_email,
                         e
                     );
                 }
-            }
-            Err(e) => {
-                log::error!(
-                    "Error creating default org for user: {} error: {}",
-                    user_email,
-                    e
-                );
-            }
+            };
+            org.name
         }
-    }
+    };
 
     if o2cfg.enabled {
         for (_, tuples) in tuples_to_add {
@@ -662,4 +672,33 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
             }
         }
     }
+
+    // Send new user info to ActiveCampaign via segment proxy
+    log::warn!("sending track event to segment");
+    let segment_event_data = HashMap::from([
+        (
+            "first_name".to_string(),
+            json::Value::from_str(first_name).unwrap_or_default(),
+        ),
+        (
+            "last_name".to_string(),
+            json::Value::from_str(last_name).unwrap_or_default(),
+        ),
+        (
+            "email".to_string(),
+            json::Value::from_str(user_email).unwrap_or_default(),
+        ),
+        (
+            "organization".to_string(),
+            json::Value::from_str(&org_name).unwrap_or_default(),
+        ),
+    ]);
+    telemetry::Telemetry::new()
+        .send_track_event(
+            "OpenObserve - New user registered",
+            Some(segment_event_data),
+            false,
+            false,
+        )
+        .await;
 }

@@ -374,7 +374,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if cfg.common.telemetry_enabled {
         tokio::task::spawn(async move {
             meta::telemetry::Telemetry::new()
-                .event("OpenObserve - Starting server", None, false)
+                .send_track_event("OpenObserve - Starting server", None, true, false)
                 .await;
         });
     }
@@ -417,7 +417,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // stop telemetry
     if cfg.common.telemetry_enabled {
         meta::telemetry::Telemetry::new()
-            .event("OpenObserve - Server stopped", None, false)
+            .send_track_event("OpenObserve - Server stopped", None, true, true)
             .await;
     }
 
@@ -1128,7 +1128,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     // stop telemetry
     if cfg.common.telemetry_enabled {
         meta::telemetry::Telemetry::new()
-            .event("OpenObserve - Server stopped", None, false)
+            .send_track_event("OpenObserve - Server stopped", None, true, true)
             .await;
     }
 
