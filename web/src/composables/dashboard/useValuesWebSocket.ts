@@ -128,16 +128,21 @@ const useValuesWebSocket = () => {
         const fieldHit = hits.find(
           (field: any) => field.field === dashboardPanelData.name,
         );
+
         console.log("Fetching field values: fieldHit", fieldHit);
 
         if (!fieldHit) {
           return;
         }
 
+        if (fieldHit >= 0) {
+          dashboardPanelData.meta.filterValue.splice(fieldHit, 1);
+        }
         // Process the response
         const newOptions = fieldHit.values
           .map((it: any) => it.zo_sql_key)
-          .filter((it: any) => it);
+          .filter((it: any) => it)
+          .map((it: any) => String(it));
 
         console.log("Fetching field values: newOptions", newOptions);
 
@@ -245,11 +250,19 @@ const useValuesWebSocket = () => {
           type: queryReq.stream_type,
           no_count: queryReq.no_count,
         });
+        const find = dashboardPanelData.meta.filterValue.findIndex(
+          (it: any) => it.column == name,
+        );
+        if (find >= 0) {
+          dashboardPanelData.meta.filterValue.splice(find, 1);
+        }
+
         return dashboardPanelData.meta.filterValue.push({
           column: name,
           value: response?.data?.hits?.[0]?.values
             .map((it: any) => it.zo_sql_key)
-            .filter((it: any) => it),
+            .filter((it: any) => it)
+            .map((it: any) => String(it)),
         });
       } catch (error) {
         console.error("Error fetching field values:", error);
