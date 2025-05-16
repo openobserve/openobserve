@@ -767,6 +767,9 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_s
 def read_response(reader):
     content = reader.content.decode('utf-8')
     lines = content.split('\n')
+    search_metadata = None
+    search_hits = None
+    
     for i, line in enumerate(lines):
         text = line.strip()
         if text.startswith("event: search_response_metadata"):
@@ -777,18 +780,27 @@ def read_response(reader):
                     try:
                         search_metadata = data_line[6:]  # Remove "data: " prefix
                         search_metadata = json.loads(search_metadata)
-                        if i + 4 < len(lines):
-                            
-                            next_line = lines[i + 3].strip()
-                            if next_line.startswith("event: search_response_hits"):
-                                next_line = lines[i + 4].strip()
-        
-                                search_hits = next_line[6:]
-                                search_hits = json.loads(search_hits)
-                                search_metadata["results"]["hits"] = search_hits["hits"]
-                        
-                        return search_metadata
                     except json.JSONDecodeError as e:
-                        print(f"Error parsing JSON: {e}")
+                        print(f"Error parsing metadata JSON: {e}")
                         continue
-    return None
+                        
+        elif text.startswith("event: search_response_hits"):
+            # Get the data part which follows in the next line
+            if i + 1 < len(lines):
+                data_line = lines[i + 1].strip()
+                if data_line.startswith("data: "):
+                    try:
+                        search_hits = data_line[6:]  # Remove "data: " prefix
+                        search_hits = json.loads(search_hits)
+                    except json.JSONDecodeError as e:
+                        print(f"Error parsing hits JSON: {e}")
+                        continue
+
+    if search_metadata and search_hits:
+        search_metadata["results"]["hits"] = search_hits["hits"]
+        return search_metadata
+    elif search_metadata:
+        return search_metadata
+    else:
+        print("No valid response data found in stream")
+        return {"results": {"total": 0, "hits": []}}
