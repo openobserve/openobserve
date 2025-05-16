@@ -564,4 +564,29 @@ async executeQueryWithKeyboardShortcutWithSQLMode() {
   await expect(this.page.locator('[data-test="logs-search-result-bar-chart"]')).toBeVisible();
 }
 
+async executeQueryWithErrorHandling() {
+  // Fill query editor with invalid query
+  await this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox', { name: 'Editor content;Press Alt+F1' }).fill('match_all(\'invalid\')');
+  
+  // Click refresh button and verify error
+  await this.page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  await this.page.locator('[data-test="logs-search-error-message"]').click();
+  
+  // Reset filters
+  await this.page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click();
+  
+  // Toggle histogram
+  await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').first().click();
+  
+  // Click first line and refresh
+  await this.page.locator('.view-line').first().click();
+  await this.page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  
+  // Verify no data message
+  await this.page.getByText('warning No data found for').click();
+  
+  // Click on result detail
+  await this.page.locator('[data-test="logs-search-result-detail-undefined"]').click();
+}
+
 }
