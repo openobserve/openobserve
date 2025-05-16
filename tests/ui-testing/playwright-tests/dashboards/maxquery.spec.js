@@ -83,7 +83,20 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await dateTimeHelper.setRelativeTimeRange("6-w");
 
-    await page.waitForTimeout(3000);
+    // await page.waitForTimeout(3000);
+
+    const response = await page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .includes("/api/default/_search?type=logs&search_type=dashboards") &&
+        response.status() === 200
+    );
+    const data = await response.json();
+    console.log("data", data);
+
+    expect(data.hits.length).toBeGreaterThan(0);
+
     await expect(
       page.locator('[data-test="dashboard-panel-max-duration-warning"]')
     ).toBeVisible();
@@ -98,11 +111,68 @@ test.describe("dashboard multi y axis testcases", () => {
     await page.locator('[data-test="dashboard-back-btn"]').click();
 
     await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should not display max query range error message when set the max query range to 0.", async ({
+    page,
+  }) => {
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+    const streamSettingsPage = new StreamSettingsPage(page);
 
     await dashboardPage.menuItem("streams-item");
-    // await page.waitForTimeout(3000);
 
-    await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "0");
+    await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "");
+
+    await dashboardPage.menuItem("dashboards-item");
+
+    await waitForDashboardPage(page);
+
+    const randomDashboardName = `AutoDashboard-${Date.now()}`;
+    await dashboardCreate.createDashboard(randomDashboardName);
+
+    await dashboardCreate.addPanel();
+
+    await chartTypeSelector.selectChartType("bar");
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+
+    await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
+    await chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
+
+    await dateTimeHelper.setRelativeTimeRange("6-w");
+
+    await dashboardPageActions.applyDashboardBtn();
+    await dashboardPageActions.waitForChartToRender();
+    await dashboardPageActions.addPanelName(randomDashboardName);
+    await dashboardPageActions.savePanel();
+
+    await page.waitForTimeout(2000);
+    await dateTimeHelper.setRelativeTimeRange("6-w");
+
+    const response = await page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .includes("/api/default/_search?type=logs&search_type=dashboards") &&
+        response.status() === 200
+    );
+    const data = await response.json();
+    console.log("data", data);
+
+    expect(data.hits.length).toBeGreaterThan(0);
+
+    await expect(
+      page.locator('[data-test="dashboard-panel-max-duration-warning"]')
+    ).not.toBeVisible();
+
+    await dashboardPage.menuItem("streams-item");
+
+    await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "");
+
     await page.waitForTimeout(2000);
   });
 });
