@@ -15,6 +15,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::utils::json;
+
 #[derive(Debug, Clone, sqlx::Type, PartialEq, Serialize, Deserialize, Default)]
 #[repr(i32)]
 pub enum TriggerStatus {
@@ -87,5 +89,13 @@ impl ScheduledTriggerData {
     pub fn reset(&mut self) {
         self.period_end_time = None;
         self.tolerance = 0;
+    }
+
+    pub fn to_string(&self) -> String {
+        json::to_string(self).unwrap()
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, serde_json::Error> {
+        json::from_str(s)
     }
 }
