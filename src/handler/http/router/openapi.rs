@@ -190,6 +190,8 @@ use crate::{common::meta, handler::http::request};
         request::search::search_job::get_job_result,
         request::search::search_job::delete_job,
         request::search::search_job::retry_job,
+        request::search::search_stream::search_http2_stream,
+        request::search::search_stream::values_http2_stream,
     ),
     components(
         schemas(
