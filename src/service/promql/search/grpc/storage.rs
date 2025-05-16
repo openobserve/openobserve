@@ -171,6 +171,14 @@ pub(crate) async fn create_context(
         DataFusionError::Execution(e.to_string())
     })?;
 
+    // report cache hit and miss metrics
+    metrics::QUERY_DISK_CACHE_HIT_COUNT
+        .with_label_values(&[org_id, &stream_type.to_string(), "parquet"])
+        .inc_by(cache_hits);
+    metrics::QUERY_DISK_CACHE_MISS_COUNT
+        .with_label_values(&[org_id, &stream_type.to_string(), "parquet"])
+        .inc_by(cache_misses);
+
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
@@ -242,14 +250,6 @@ pub(crate) async fn create_context(
         true,
     )
     .await?;
-
-    // report cache hit and miss metrics
-    metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
-        .inc_by(cache_hits);
-    metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
-        .inc_by(cache_misses);
 
     Ok(Some((ctx, schema, scan_stats)))
 }
