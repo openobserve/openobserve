@@ -111,7 +111,7 @@ const useValuesWebSocket = () => {
   const handleSearchResponse = (
     payload: any,
     response: any,
-    dashboardPanelData: any,
+    variableObject: any,
   ) => {
     try {
       if (
@@ -119,14 +119,11 @@ const useValuesWebSocket = () => {
         response.type === "search_response"
       ) {
         console.log("Fetching field values: response", response);
-        console.log(
-          "Fetching field values: dashboardPanelData",
-          dashboardPanelData,
-        );
+        console.log("Fetching field values: variableObject", variableObject);
 
         const hits = response.content.results.hits;
         const fieldHit = hits.find(
-          (field: any) => field.field === dashboardPanelData.name,
+          (field: any) => field.field === variableObject.name,
         );
 
         console.log("Fetching field values: fieldHit", fieldHit);
@@ -135,9 +132,6 @@ const useValuesWebSocket = () => {
           return;
         }
 
-        if (fieldHit >= 0) {
-          dashboardPanelData.meta.filterValue.splice(fieldHit, 1);
-        }
         // Process the response
         const newOptions = fieldHit.values
           .map((it: any) => it.zo_sql_key)
@@ -146,43 +140,51 @@ const useValuesWebSocket = () => {
 
         console.log("Fetching field values: newOptions", newOptions);
 
-        // Create a deep clone of the dashboard panel data
-        const dashboardPanelDataClone = JSON.parse(
-          JSON.stringify(dashboardPanelData),
-        );
+        // IMPORTANT: Access the correct dashboardPanelData object
+        const dashboardPanelData = variableObject.dashboardPanelData;
 
         // Initialize filterValue array if it doesn't exist
-        if (!dashboardPanelDataClone.dashboardPanelData.meta.filterValue) {
-          dashboardPanelDataClone.dashboardPanelData.meta.filterValue = [];
+        if (!dashboardPanelData.meta.filterValue) {
+          dashboardPanelData.meta.filterValue = [];
         }
 
-        // Create a Set of existing values for efficient duplicate checking
-        const existingValues = new Set(
-          dashboardPanelDataClone.dashboardPanelData.meta.filterValue.map(
-            (item: any) => item.value || item,
-          ),
+        // Find existing entry for this column
+        const existingIndex = dashboardPanelData.meta.filterValue.findIndex(
+          (item: any) => item.column === variableObject.name,
         );
 
-        console.log("Fetching field values: existingValues", existingValues);
+        // Get existing values or initialize empty array
+        let existingValues = [];
+        if (existingIndex >= 0) {
+          existingValues =
+            dashboardPanelData.meta.filterValue[existingIndex].value || [];
+        }
 
-        // Add only new unique values
-        newOptions.forEach((option: any) => {
-          if (!existingValues.has(option)) {
-            dashboardPanelDataClone.dashboardPanelData.meta.filterValue.push(
-              option,
-            );
-            existingValues.add(option);
-          }
-        });
+        // Merge existing values with new values, removing duplicates
+        const mergedValues = [...new Set([...existingValues, ...newOptions])];
+        console.log("Fetching field values: mergedValues", mergedValues);
+        
+        // Update or add the entry
+        if (existingIndex >= 0) {
+          // Update existing entry
+          dashboardPanelData.meta.filterValue[existingIndex].value =
+            mergedValues;
+        } else {
+          // Add new entry
+          dashboardPanelData.meta.filterValue.push({
+            column: variableObject.name,
+            value: mergedValues,
+          });
+        }
 
         console.log(
           "Fetching field values: Updated filterValue:",
-          dashboardPanelDataClone.dashboardPanelData.meta.filterValue,
+          dashboardPanelData.meta.filterValue,
         );
       }
     } catch (error) {
       console.error(
-        `[WebSocket] Error processing response for ${dashboardPanelData.name}:`,
+        `[WebSocket] Error processing response for ${variableObject.name}:`,
         error,
       );
     }
