@@ -77,6 +77,7 @@ pub(crate) mod index;
 pub(crate) mod inspector;
 pub(crate) mod partition;
 pub(crate) mod request;
+pub(crate) mod search_stream;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
