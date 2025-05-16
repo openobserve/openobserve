@@ -1,45 +1,46 @@
 export default class StreamSettingsPage {
   constructor(page) {
     this.page = page;
+
+    // Global locators
+    this.searchInput = page.getByPlaceholder("Search Stream");
+    this.streamDetailButton = page.getByRole("button", {
+      name: "Stream Detail",
+    });
+    this.maxQueryInput = page.locator(
+      '[data-test="stream-details-max-query-range-input"]'
+    );
+    this.saveButton = page.locator(
+      '[data-test="schema-update-settings-button"]'
+    );
+    this.closeButton = page.locator("button", { hasText: "close" });
   }
 
   async updateStreamMaxQueryRange(streamName, newValue) {
-    const page = this.page;
-
     // Open Stream Details
-    const searchInput = page.getByPlaceholder("Search Stream");
-    await searchInput.click();
-    await searchInput.fill(streamName);
-    await page.waitForTimeout(5000); // Replace with auto-wait logic if needed
+    // Search for the stream
+    await this.searchInput.click();
+    await this.searchInput.fill(streamName);
+    await this.page.waitForTimeout(5000);
 
-    const streamDetailButton = await page.getByRole("button", {
-      name: "Stream Detail",
-    });
-    await streamDetailButton.waitFor({ state: "visible", timeout: 5000 });
-    await streamDetailButton.click();
+    // Wait for stream details to appear and click
 
-    await page.waitForTimeout(3000);
+    await this.streamDetailButton.waitFor({ state: "visible", timeout: 5000 });
+    await this.streamDetailButton.click();
+    // await page.waitForTimeout(3000);
 
-    // Edit Max Query Range
-    const maxQueryInput = page.locator(
-      '[data-test="stream-details-max-query-range-input"]'
-    );
-    await maxQueryInput.waitFor({ state: "visible", timeout: 15000 });
-    await maxQueryInput.click();
-    await maxQueryInput.fill(newValue);
+    // Wait and update max query range input
+    await this.maxQueryInput.waitFor({ state: "visible", timeout: 15000 });
+    await this.maxQueryInput.click();
+    await this.maxQueryInput.fill(newValue);
 
-    // Save changes
-    const saveButton = page.locator(
-      '[data-test="schema-update-settings-button"]'
-    );
-    await saveButton.waitFor({ state: "visible", timeout: 5000 });
-    await saveButton.click();
+    // Save the changes
+    await this.saveButton.waitFor({ state: "visible", timeout: 5000 });
+    await this.saveButton.click();
 
-    await page.waitForTimeout(3000);
-
+    // await page.waitForTimeout(3000);
     // Close the modal
-    const closeButton = page.locator("button", { hasText: "close" });
-    await closeButton.waitFor({ state: "visible", timeout: 5000 });
-    await closeButton.click();
+    await this.closeButton.waitFor({ state: "visible", timeout: 5000 });
+    await this.closeButton.click();
   }
 }
