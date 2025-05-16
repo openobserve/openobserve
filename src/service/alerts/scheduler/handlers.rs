@@ -849,7 +849,7 @@ async fn handle_derived_stream_triggers(
     let mut new_trigger_data = if trigger.data.is_empty() {
         ScheduledTriggerData::default()
     } else {
-        ScheduledTriggerData::from_str(&trigger.data).unwrap()
+        ScheduledTriggerData::from_json_string(&trigger.data).unwrap()
     };
     let Ok(pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
         let err_msg = format!(
@@ -886,7 +886,7 @@ async fn handle_derived_stream_triggers(
 
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {}", err_msg);
         new_trigger_data.reset();
-        new_trigger.data = new_trigger_data.to_string();
+        new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger).await?;
         publish_triggers_usage(trigger_data_stream).await;
         return Err(anyhow::anyhow!(
@@ -929,7 +929,7 @@ async fn handle_derived_stream_triggers(
         };
         log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {}", msg);
         new_trigger_data.reset();
-        new_trigger.data = new_trigger_data.to_string();
+        new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger).await?;
         publish_triggers_usage(trigger_data_stream).await;
         return Ok(());
@@ -968,7 +968,7 @@ async fn handle_derived_stream_triggers(
         };
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {}", err_msg);
         new_trigger_data.reset();
-        new_trigger.data = new_trigger_data.to_string();
+        new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger).await?;
         publish_triggers_usage(trigger_data_stream).await;
         return Err(anyhow::anyhow!(
