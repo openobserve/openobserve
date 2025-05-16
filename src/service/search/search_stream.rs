@@ -56,6 +56,23 @@ use crate::{
     service::self_reporting::audit,
 };
 
+// #[derive(Debug, Clone)]
+// pub struct SearchStreamerBuilder {
+//     pub org_id: String,
+//     pub user_id: String,
+//     pub trace_id: String,
+//     pub req: config::meta::search::Request,
+//     pub stream_type: StreamType,
+//     pub stream_names: Vec<String>,
+//     pub req_order_by: OrderBy,
+//     pub search_span: tracing::Span,
+//     pub sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
+//     pub values_ctx: Option<ValuesEventContext>,
+//     pub fallback_order_by_col: Option<String>,
+//     pub _audit_ctx: Option<AuditContext>,
+// }
+
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct AuditContext {
     pub method: String,
