@@ -283,7 +283,7 @@ pub async fn search(
             "cache_hit",
             "parquet",
         ])
-        .inc_by(cache_hits as f64);
+        .inc_by(cache_hits);
     metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
         .with_label_values(&[
             &query.org_id,
@@ -292,7 +292,7 @@ pub async fn search(
             "cache_miss",
             "parquet",
         ])
-        .inc_by(cache_misses as f64);
+        .inc_by(cache_misses);
 
     scan_stats.idx_took = idx_took as i64;
     scan_stats.querier_files = scan_stats.files;
@@ -427,7 +427,7 @@ pub async fn cache_files(
     files: &[(&str, i64, bool)],
     scan_stats: &mut ScanStats,
     file_type: &str,
-) -> Result<(file_data::CacheType, i64, i64), Error> {
+) -> Result<(file_data::CacheType, u64, u64), Error> {
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
@@ -575,7 +575,7 @@ pub async fn filter_file_list_by_tantivy_index(
             "cache_hit",
             "index",
         ])
-        .inc_by(cache_hits as f64);
+        .inc_by(cache_hits);
     metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
         .with_label_values(&[
             &query.org_id,
@@ -584,7 +584,7 @@ pub async fn filter_file_list_by_tantivy_index(
             "cache_miss",
             "index",
         ])
-        .inc_by(cache_misses as f64);
+        .inc_by(cache_misses);
 
     let cached_ratio = (scan_stats.querier_memory_cached_files
         + scan_stats.querier_disk_cached_files) as f64

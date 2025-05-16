@@ -790,8 +790,8 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 // query disk cache metrics
-pub static QUERY_DISK_CACHE_UTILIZATION_COUNT: Lazy<CounterVec> = Lazy::new(|| {
-    CounterVec::new(
+pub static QUERY_DISK_CACHE_UTILIZATION_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new(
             "query_disk_cache_utilization_count",
             "query disk cache utilization count".to_owned() + HELP_SUFFIX,

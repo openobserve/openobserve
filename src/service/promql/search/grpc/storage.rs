@@ -252,7 +252,7 @@ pub(crate) async fn create_context(
             "cache_hit",
             "parquet",
         ])
-        .inc_by(cache_hits as f64);
+        .inc_by(cache_hits);
     metrics::QUERY_DISK_CACHE_UTILIZATION_COUNT
         .with_label_values(&[
             &query.org_id,
@@ -261,7 +261,7 @@ pub(crate) async fn create_context(
             "cache_miss",
             "parquet",
         ])
-        .inc_by(cache_misses as f64);
+        .inc_by(cache_misses);
 
     Ok(Some((ctx, schema, scan_stats)))
 }
