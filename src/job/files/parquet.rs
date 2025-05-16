@@ -569,6 +569,7 @@ async fn move_files(
                     );
                 }
             } else {
+                db::file_list::local::add_removing(&file.key).await?;
                 match remove_file(wal_dir.join(&file.key)) {
                     Err(e) => {
                         log::warn!(
@@ -589,9 +590,14 @@ async fn move_files(
                                 file.key,
                                 e.to_string()
                             );
+                        } else {
+                            // remove the file from removing set
+                            db::file_list::local::remove_removing(&file.key).await?;
                         }
                     }
                     Ok(_) => {
+                        // remove the file from removing set
+                        db::file_list::local::remove_removing(&file.key).await?;
                         // delete metadata from cache
                         WAL_PARQUET_METADATA.write().await.remove(&file.key);
                         // remove the file from processing set
