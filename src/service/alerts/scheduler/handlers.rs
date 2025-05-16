@@ -998,11 +998,16 @@ async fn handle_derived_stream_triggers(
 
         // For derived stream, period is in minutes, so we need to convert it to seconds for
         // align_time
-        final_end_time = TriggerCondition::align_time(
+        let aligned_curr_time = TriggerCondition::align_time(
             current_time,
             derived_stream.tz_offset,
             derived_stream.trigger_condition.period * 60,
         );
+        final_end_time = if aligned_curr_time > t0 {
+            aligned_curr_time
+        } else {
+            suppossed_to_be_run_at
+        };
         // If the delay is equal to or greater than the frequency, we need to ingest data one by
         // one If the delay is less than the frequency, we need to ingest data for
         // the "next run at" period, For example, if the current time is 5:19pm,
@@ -1200,6 +1205,7 @@ async fn handle_derived_stream_triggers(
                                     dest_stream.stream_type.to_string(),
                                 )
                             };
+                            let records_len = records.len();
                             let req = cluster_rpc::IngestionRequest {
                                 org_id: org_id.clone(),
                                 stream_name: stream_name.clone(),
@@ -1211,7 +1217,8 @@ async fn handle_derived_stream_triggers(
                             match ingestion_service::ingest(req).await {
                                 Ok(resp) if resp.status_code == 200 => {
                                     log::info!(
-                                        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
+                                        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {}",
+                                        records_len
                                     );
                                 }
                                 error => {
