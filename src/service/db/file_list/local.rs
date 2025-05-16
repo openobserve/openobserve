@@ -28,6 +28,8 @@ pub async fn exist_pending_delete(file: &str) -> bool {
     PENDING_DELETE_FILES.read().await.contains(file)
 }
 
+static REMOVING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+
 pub async fn add_pending_delete(org_id: &str, account: &str, file: &str) -> Result<()> {
     // add to local db for persistence
     let ts = config::utils::time::now_micros();
@@ -83,5 +85,17 @@ pub async fn load_pending_delete() -> Result<()> {
             PENDING_DELETE_FILES.write().await.insert(file.file);
         }
     }
+    Ok(())
+}
+
+pub async fn add_removing(file: &str) -> Result<()> {
+    // add to memory cache
+    REMOVING_FILES.write().await.insert(file.to_string());
+    Ok(())
+}
+
+pub async fn remove_removing(file: &str) -> Result<()> {
+    // remove from memory cache
+    REMOVING_FILES.write().await.remove(file);
     Ok(())
 }
