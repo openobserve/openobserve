@@ -15,3 +15,6 @@
 
 pub mod cluster;
 pub mod prometheus;
+
+#[path = "opentelemetry.proto.experimental.arrow.v1.rs"]
+pub mod otel_arrow;

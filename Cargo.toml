@@ -76,6 +76,7 @@ blake3 = { version = "1.6", features = ["rayon"] }
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
+ciborium = "0.2"
 clap = { version = "4.1", default-features = false, features = [
     "std",
     "help",
@@ -111,12 +112,14 @@ log.workspace = true
 maxminddb = "0.25"
 memchr.workspace = true
 mimalloc = { version = "0.1.43", default-features = false, optional = true }
+num_enum = "0.7"
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
+paste = "1.0"
 prometheus.workspace = true
 promql-parser = "0.4"
 prost.workspace = true

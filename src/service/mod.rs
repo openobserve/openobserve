@@ -56,6 +56,7 @@ pub mod syslogs_route;
 pub mod tls;
 pub mod traces;
 pub mod users;
+pub mod otap;
 
 // format stream name
 pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {

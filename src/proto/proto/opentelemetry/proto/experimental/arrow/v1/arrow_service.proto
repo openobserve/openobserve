@@ -1,0 +1,158 @@
+// Copyright The OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//       http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// This protocol specifies the services and messages utilized by the OTel Arrow
+// Protocol. It extends the OTLP protocol by representing OTLP entities in a
+// columnar manner using Apache Arrow. The primary objective of this new
+// protocol is to optimize transport efficiency in terms of compression (phase 1),
+// memory, and CPU usage (phase 2).
+//
+// Note: This protocol is still experimental and subject to change.
+
+syntax = "proto3";
+
+package opentelemetry.proto.experimental.arrow.v1;
+
+option java_multiple_files = true;
+option java_package = "io.opentelemetry.proto.experimental.arrow.v1";
+option java_outer_classname = "ArrowServiceProto";
+
+// Note the following is temporary
+option go_package = "github.com/open-telemetry/otel-arrow/api/experimental/arrow/v1";
+
+// Each signal-specific service can be utilized to transmit `BatchArrowRecords`
+// either from an application instrumented with OpenTelemetry to a collector,
+// or between multiple collectors.
+//
+// For each service, the ArrowSIGNAL method starts a bi-directional stream
+// used to send batch of `BatchArrowRecords` from the exporter to the
+// collector. The collector returns `BatchStatus` messages to acknowledge
+// the `BatchArrowRecords` messages received.
+
+// Historical note: this code base once declared a mixed-signal protocol
+// which would allow any OpenTelemetry signal to be transmitted.  While this
+// could potentially avoid repetition of common telemetry elementrs (e.g.,
+// resource attributes), it has been removed because at this time the OpenTelemetry
+// Collector does not support mixed-signal receivers or exporters.
+
+// ArrowTracesService is a traces-only Arrow stream.
+service ArrowTracesService {
+  rpc ArrowTraces(stream BatchArrowRecords) returns (stream BatchStatus) {}
+}
+
+// ArrowTracesService is a logs-only Arrow stream.
+service ArrowLogsService {
+  rpc ArrowLogs(stream BatchArrowRecords) returns (stream BatchStatus) {}
+}
+
+// ArrowTracesService is a metrics-only Arrow stream.
+service ArrowMetricsService {
+  rpc ArrowMetrics(stream BatchArrowRecords) returns (stream BatchStatus) {}
+}
+
+// A message sent by an exporter to a collector containing a batch of Arrow
+// records.
+message BatchArrowRecords {
+  // [mandatory] Batch ID. Must be unique in the context of the stream.
+  int64 batch_id = 1;
+
+  // [mandatory] A collection of payloads containing the data of the batch.
+  repeated ArrowPayload arrow_payloads = 2;
+
+  // [optional] Headers associated with this batch, encoded using hpack.
+  bytes headers = 3;
+}
+
+// Enumeration of all the OTel Arrow payload types currently supported by the
+// OTel Arrow protocol.
+enum ArrowPayloadType {
+  UNKNOWN = 0;
+
+  // A payload representing a collection of resource attributes.
+  RESOURCE_ATTRS = 1;
+  // A payload representing a collection of scope attributes.
+  SCOPE_ATTRS = 2;
+
+  // A set of payloads representing a collection of metrics.
+  UNIVARIATE_METRICS = 10;                  // Univariate metric payload
+  NUMBER_DATA_POINTS = 11;
+  SUMMARY_DATA_POINTS = 12;
+  HISTOGRAM_DATA_POINTS = 13;
+  EXP_HISTOGRAM_DATA_POINTS = 14;
+  NUMBER_DP_ATTRS = 15;
+  SUMMARY_DP_ATTRS = 16;
+  HISTOGRAM_DP_ATTRS = 17;
+  EXP_HISTOGRAM_DP_ATTRS = 18;
+  NUMBER_DP_EXEMPLARS = 19;
+  HISTOGRAM_DP_EXEMPLARS = 20;
+  EXP_HISTOGRAM_DP_EXEMPLARS = 21;
+  NUMBER_DP_EXEMPLAR_ATTRS = 22;
+  HISTOGRAM_DP_EXEMPLAR_ATTRS = 23;
+  EXP_HISTOGRAM_DP_EXEMPLAR_ATTRS = 24;
+  MULTIVARIATE_METRICS = 25;                // Multivariate metric payload
+
+  // A set of payloads representing a collection of logs.
+  LOGS = 30;
+  LOG_ATTRS = 31;
+
+  // A set of payloads representing a collection of traces.
+  SPANS = 40;
+  SPAN_ATTRS = 41;
+  SPAN_EVENTS = 42;
+  SPAN_LINKS = 43;
+  SPAN_EVENT_ATTRS = 44;
+  SPAN_LINK_ATTRS = 45;
+}
+
+// Represents a batch of OTel Arrow entities.
+message ArrowPayload {
+  // [mandatory] A canonical ID representing the schema of the Arrow Record.
+  // This ID is used on the consumer side to determine the IPC reader to use
+  // for interpreting the corresponding record. For any NEW `schema_id`, the
+  // consumer must:
+  // 1) close the current IPC reader,
+  // 2) create a new IPC reader in order to interpret the new schema,
+  // dictionaries, and corresponding data.
+  string schema_id = 1;
+
+  // [mandatory] Type of the OTel Arrow payload.
+  ArrowPayloadType type = 2;
+
+  // [mandatory] Serialized Arrow Record Batch
+  // For a description of the Arrow IPC format see:
+  // https://arrow.apache.org/docs/format/Columnar.html#serialization-and-interprocess-communication-ipc
+  bytes record = 3;
+}
+
+// A message sent by a Collector to the exporter that opened the data stream.
+message BatchStatus {
+  int64 batch_id = 1;
+  StatusCode status_code = 2;
+  string status_message = 3;
+}
+
+// StatusCode carries certain known meanings in Arrow.  Values match
+// the gRPC code space, see https://grpc.io/docs/guides/status-codes/.
+enum StatusCode {
+  OK = 0;
+  CANCELED = 1;
+  INVALID_ARGUMENT = 3;
+  DEADLINE_EXCEEDED = 4;
+  PERMISSION_DENIED = 7;
+  RESOURCE_EXHAUSTED = 8;
+  ABORTED = 10;
+  INTERNAL = 13;
+  UNAVAILABLE = 14;
+  UNAUTHENTICATED = 16;
+}

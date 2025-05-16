@@ -39,7 +39,7 @@ use prost::Message;
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::ingestion::{IngestionStatus, StreamStatus},
-    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    handler::http::request::{CONTENT_TYPE_ARROW, CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{
         format_stream_name,
         ingestion::{
@@ -435,6 +435,7 @@ pub async fn handle_request(
         OtlpRequestType::HttpJson => (CONTENT_TYPE_JSON, "/api/otlp/v1/logs"),
         OtlpRequestType::HttpProtobuf => (CONTENT_TYPE_PROTO, "/api/otlp/v1/logs"),
         OtlpRequestType::Grpc => (CONTENT_TYPE_PROTO, "/grpc/otlp/logs"),
+        OtlpRequestType::HttpArrowStream => (CONTENT_TYPE_ARROW, "/api/otlp/v1/logs"),
     };
 
     // if no data, fast return

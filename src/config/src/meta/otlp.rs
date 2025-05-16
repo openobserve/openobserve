@@ -18,4 +18,5 @@ pub enum OtlpRequestType {
     Grpc,
     HttpJson,
     HttpProtobuf,
+    HttpArrowStream
 }
