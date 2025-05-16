@@ -826,6 +826,10 @@ pub async fn search_partition(
     let partitions =
         generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
 
+    if sql_order_by == OrderBy::Asc {
+        resp.order_by = OrderBy::Asc;
+    }
+
     resp.partitions = partitions;
     Ok(resp)
 }
