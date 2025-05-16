@@ -1430,7 +1430,7 @@ pub struct Limit {
     pub histogram_enabled: bool,
     #[env_config(
         name = "ZO_LIMIT_HITS_PER_PANEL",
-        default = 5000,
+        default = 30000,
         help = "Limit the number of panel hits per panel"
     )]
     pub limit_hits_per_panel: usize,

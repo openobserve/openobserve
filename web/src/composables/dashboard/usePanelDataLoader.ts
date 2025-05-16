@@ -81,7 +81,7 @@ export const usePanelDataLoader = (
   const store = useStore();
 
   const MAX_HITS_PER_PANEL =
-    store.state?.zoConfig?.limit_hits_per_panel ?? 5000;
+    store.state?.zoConfig?.limit_hits_per_panel ?? 30000;
 
   const LIMIT_HITS_PER_PANEL_ERROR_MESSAGE = `Showing limited results upto ${MAX_HITS_PER_PANEL} for performance`;
 
