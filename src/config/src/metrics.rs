@@ -798,7 +798,13 @@ pub static QUERY_DISK_CACHE_COUNT: Lazy<CounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type", "storage_type", "count_type"],
+        &[
+            "organization",
+            "stream_type",
+            "storage_type",
+            "count_type",
+            "file_type",
+        ],
     )
     .expect("Metric created")
 });

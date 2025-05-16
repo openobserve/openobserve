@@ -274,6 +274,26 @@ pub async fn search(
     .instrument(enter_span.clone())
     .await?;
 
+    // report cache hit and miss metrics
+    metrics::QUERY_DISK_CACHE_COUNT
+        .with_label_values(&[
+            &query.org_id,
+            &query.stream_type.to_string(),
+            "local",
+            "cache_hit",
+            "parquet",
+        ])
+        .inc_by(cache_hits as f64);
+    metrics::QUERY_DISK_CACHE_COUNT
+        .with_label_values(&[
+            &query.org_id,
+            &query.stream_type.to_string(),
+            "remote",
+            "cache_miss",
+            "parquet",
+        ])
+        .inc_by(cache_misses as f64);
+
     scan_stats.idx_took = idx_took as i64;
     scan_stats.querier_files = scan_stats.files;
     let cached_ratio = (scan_stats.querier_memory_cached_files
@@ -398,25 +418,6 @@ pub async fn search(
                 .build()
         )
     );
-
-    // report cache hit and miss metrics
-    metrics::QUERY_DISK_CACHE_COUNT
-        .with_label_values(&[
-            &query.org_id,
-            &query.stream_type.to_string(),
-            "local",
-            "cache_hit",
-        ])
-        .inc_by(cache_hits as f64);
-    metrics::QUERY_DISK_CACHE_COUNT
-        .with_label_values(&[
-            &query.org_id,
-            &query.stream_type.to_string(),
-            "remote",
-            "cache_miss",
-        ])
-        .inc_by(cache_misses as f64);
-
     Ok((tables, scan_stats))
 }
 
@@ -567,7 +568,13 @@ pub async fn filter_file_list_by_tantivy_index(
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "local"])
+        .with_label_values(&[
+            &query.org_id,
+            &query.stream_type.to_string(),
+            "local",
+            "cache_hit",
+            "index",
+        ])
         .inc_by(cache_hits as f64);
     metrics::QUERY_DISK_CACHE_COUNT
         .with_label_values(&[
@@ -575,6 +582,7 @@ pub async fn filter_file_list_by_tantivy_index(
             &query.stream_type.to_string(),
             "remote",
             "cache_miss",
+            "index",
         ])
         .inc_by(cache_misses as f64);
 

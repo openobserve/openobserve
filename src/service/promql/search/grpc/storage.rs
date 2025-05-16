@@ -250,6 +250,7 @@ pub(crate) async fn create_context(
             &query.stream_type.to_string(),
             "local",
             "cache_hit",
+            "parquet",
         ])
         .inc_by(cache_hits as f64);
     metrics::QUERY_DISK_CACHE_COUNT
@@ -258,6 +259,7 @@ pub(crate) async fn create_context(
             &query.stream_type.to_string(),
             "remote",
             "cache_miss",
+            "parquet",
         ])
         .inc_by(cache_misses as f64);
 
