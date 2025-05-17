@@ -29,6 +29,7 @@ jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pprof"]
 pyroscope = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 tokio-console = ["dep:console-subscriber"]
+otap = []
 
 [profile.release]
 debug = false
@@ -76,7 +77,7 @@ blake3 = { version = "1.6", features = ["rayon"] }
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
-ciborium = "0.2"
+ciborium = "0.2.2"
 clap = { version = "4.1", default-features = false, features = [
     "std",
     "help",

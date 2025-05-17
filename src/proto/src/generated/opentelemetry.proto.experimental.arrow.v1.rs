@@ -179,3 +179,872 @@ impl StatusCode {
         }
     }
 }
+
+/// Generated client implementations.
+pub mod arrow_traces_service_client {
+    #![allow(
+        unused_variables,
+        dead_code,
+        missing_docs,
+        clippy::wildcard_imports,
+        clippy::let_unit_value
+    )]
+    use tonic::codegen::http::Uri;
+    use tonic::codegen::*;
+    /// ArrowTracesService is a traces-only Arrow stream.
+    #[derive(Debug, Clone)]
+    pub struct ArrowTracesServiceClient<T> {
+        inner: tonic::client::Grpc<T>,
+    }
+    impl ArrowTracesServiceClient<tonic::transport::Channel> {
+        /// Attempt to create a new client by connecting to a given endpoint.
+        pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
+        where
+            D: TryInto<tonic::transport::Endpoint>,
+            D::Error: Into<StdError>,
+        {
+            let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
+            Ok(Self::new(conn))
+        }
+    }
+    impl<T> ArrowTracesServiceClient<T>
+    where
+        T: tonic::client::GrpcService<tonic::body::BoxBody>,
+        T::Error: Into<StdError>,
+        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
+    {
+        pub fn new(inner: T) -> Self {
+            let inner = tonic::client::Grpc::new(inner);
+            Self { inner }
+        }
+        pub fn with_origin(inner: T, origin: Uri) -> Self {
+            let inner = tonic::client::Grpc::with_origin(inner, origin);
+            Self { inner }
+        }
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> ArrowTracesServiceClient<InterceptedService<T, F>>
+        where
+            F: tonic::service::Interceptor,
+            T::ResponseBody: Default,
+            T: tonic::codegen::Service<
+                    http::Request<tonic::body::BoxBody>,
+                    Response = http::Response<
+                        <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
+                    >,
+                >,
+            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
+                Into<StdError> + std::marker::Send + std::marker::Sync,
+        {
+            ArrowTracesServiceClient::new(InterceptedService::new(inner, interceptor))
+        }
+        /// Compress requests with the given encoding.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
+        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.inner = self.inner.send_compressed(encoding);
+            self
+        }
+        /// Enable decompressing responses.
+        #[must_use]
+        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.inner = self.inner.accept_compressed(encoding);
+            self
+        }
+        /// Limits the maximum size of a decoded message.
+        ///
+        /// Default: `4MB`
+        #[must_use]
+        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+            self.inner = self.inner.max_decoding_message_size(limit);
+            self
+        }
+        /// Limits the maximum size of an encoded message.
+        ///
+        /// Default: `usize::MAX`
+        #[must_use]
+        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+            self.inner = self.inner.max_encoding_message_size(limit);
+            self
+        }
+        pub async fn arrow_traces(
+            &mut self,
+            request: impl tonic::IntoStreamingRequest<Message = super::BatchArrowRecords>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::BatchStatus>>,
+            tonic::Status,
+        > {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/opentelemetry.proto.experimental.arrow.v1.ArrowTracesService/ArrowTraces",
+            );
+            let mut req = request.into_streaming_request();
+            req.extensions_mut().insert(GrpcMethod::new(
+                "opentelemetry.proto.experimental.arrow.v1.ArrowTracesService",
+                "ArrowTraces",
+            ));
+            self.inner.streaming(req, path, codec).await
+        }
+    }
+}
+/// Generated client implementations.
+pub mod arrow_logs_service_client {
+    #![allow(
+        unused_variables,
+        dead_code,
+        missing_docs,
+        clippy::wildcard_imports,
+        clippy::let_unit_value
+    )]
+    use tonic::codegen::http::Uri;
+    use tonic::codegen::*;
+    /// ArrowTracesService is a logs-only Arrow stream.
+    #[derive(Debug, Clone)]
+    pub struct ArrowLogsServiceClient<T> {
+        inner: tonic::client::Grpc<T>,
+    }
+    impl ArrowLogsServiceClient<tonic::transport::Channel> {
+        /// Attempt to create a new client by connecting to a given endpoint.
+        pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
+        where
+            D: TryInto<tonic::transport::Endpoint>,
+            D::Error: Into<StdError>,
+        {
+            let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
+            Ok(Self::new(conn))
+        }
+    }
+    impl<T> ArrowLogsServiceClient<T>
+    where
+        T: tonic::client::GrpcService<tonic::body::BoxBody>,
+        T::Error: Into<StdError>,
+        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
+    {
+        pub fn new(inner: T) -> Self {
+            let inner = tonic::client::Grpc::new(inner);
+            Self { inner }
+        }
+        pub fn with_origin(inner: T, origin: Uri) -> Self {
+            let inner = tonic::client::Grpc::with_origin(inner, origin);
+            Self { inner }
+        }
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> ArrowLogsServiceClient<InterceptedService<T, F>>
+        where
+            F: tonic::service::Interceptor,
+            T::ResponseBody: Default,
+            T: tonic::codegen::Service<
+                    http::Request<tonic::body::BoxBody>,
+                    Response = http::Response<
+                        <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
+                    >,
+                >,
+            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
+                Into<StdError> + std::marker::Send + std::marker::Sync,
+        {
+            ArrowLogsServiceClient::new(InterceptedService::new(inner, interceptor))
+        }
+        /// Compress requests with the given encoding.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
+        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.inner = self.inner.send_compressed(encoding);
+            self
+        }
+        /// Enable decompressing responses.
+        #[must_use]
+        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.inner = self.inner.accept_compressed(encoding);
+            self
+        }
+        /// Limits the maximum size of a decoded message.
+        ///
+        /// Default: `4MB`
+        #[must_use]
+        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+            self.inner = self.inner.max_decoding_message_size(limit);
+            self
+        }
+        /// Limits the maximum size of an encoded message.
+        ///
+        /// Default: `usize::MAX`
+        #[must_use]
+        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+            self.inner = self.inner.max_encoding_message_size(limit);
+            self
+        }
+        pub async fn arrow_logs(
+            &mut self,
+            request: impl tonic::IntoStreamingRequest<Message = super::BatchArrowRecords>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::BatchStatus>>,
+            tonic::Status,
+        > {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/opentelemetry.proto.experimental.arrow.v1.ArrowLogsService/ArrowLogs",
+            );
+            let mut req = request.into_streaming_request();
+            req.extensions_mut().insert(GrpcMethod::new(
+                "opentelemetry.proto.experimental.arrow.v1.ArrowLogsService",
+                "ArrowLogs",
+            ));
+            self.inner.streaming(req, path, codec).await
+        }
+    }
+}
+/// Generated client implementations.
+pub mod arrow_metrics_service_client {
+    #![allow(
+        unused_variables,
+        dead_code,
+        missing_docs,
+        clippy::wildcard_imports,
+        clippy::let_unit_value
+    )]
+    use tonic::codegen::http::Uri;
+    use tonic::codegen::*;
+    /// ArrowTracesService is a metrics-only Arrow stream.
+    #[derive(Debug, Clone)]
+    pub struct ArrowMetricsServiceClient<T> {
+        inner: tonic::client::Grpc<T>,
+    }
+    impl ArrowMetricsServiceClient<tonic::transport::Channel> {
+        /// Attempt to create a new client by connecting to a given endpoint.
+        pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
+        where
+            D: TryInto<tonic::transport::Endpoint>,
+            D::Error: Into<StdError>,
+        {
+            let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
+            Ok(Self::new(conn))
+        }
+    }
+    impl<T> ArrowMetricsServiceClient<T>
+    where
+        T: tonic::client::GrpcService<tonic::body::BoxBody>,
+        T::Error: Into<StdError>,
+        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
+    {
+        pub fn new(inner: T) -> Self {
+            let inner = tonic::client::Grpc::new(inner);
+            Self { inner }
+        }
+        pub fn with_origin(inner: T, origin: Uri) -> Self {
+            let inner = tonic::client::Grpc::with_origin(inner, origin);
+            Self { inner }
+        }
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> ArrowMetricsServiceClient<InterceptedService<T, F>>
+        where
+            F: tonic::service::Interceptor,
+            T::ResponseBody: Default,
+            T: tonic::codegen::Service<
+                    http::Request<tonic::body::BoxBody>,
+                    Response = http::Response<
+                        <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
+                    >,
+                >,
+            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
+                Into<StdError> + std::marker::Send + std::marker::Sync,
+        {
+            ArrowMetricsServiceClient::new(InterceptedService::new(inner, interceptor))
+        }
+        /// Compress requests with the given encoding.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
+        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.inner = self.inner.send_compressed(encoding);
+            self
+        }
+        /// Enable decompressing responses.
+        #[must_use]
+        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.inner = self.inner.accept_compressed(encoding);
+            self
+        }
+        /// Limits the maximum size of a decoded message.
+        ///
+        /// Default: `4MB`
+        #[must_use]
+        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+            self.inner = self.inner.max_decoding_message_size(limit);
+            self
+        }
+        /// Limits the maximum size of an encoded message.
+        ///
+        /// Default: `usize::MAX`
+        #[must_use]
+        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+            self.inner = self.inner.max_encoding_message_size(limit);
+            self
+        }
+        pub async fn arrow_metrics(
+            &mut self,
+            request: impl tonic::IntoStreamingRequest<Message = super::BatchArrowRecords>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::BatchStatus>>,
+            tonic::Status,
+        > {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/opentelemetry.proto.experimental.arrow.v1.ArrowMetricsService/ArrowMetrics",
+            );
+            let mut req = request.into_streaming_request();
+            req.extensions_mut().insert(GrpcMethod::new(
+                "opentelemetry.proto.experimental.arrow.v1.ArrowMetricsService",
+                "ArrowMetrics",
+            ));
+            self.inner.streaming(req, path, codec).await
+        }
+    }
+}
+/// Generated server implementations.
+pub mod arrow_traces_service_server {
+    #![allow(
+        unused_variables,
+        dead_code,
+        missing_docs,
+        clippy::wildcard_imports,
+        clippy::let_unit_value
+    )]
+    use tonic::codegen::*;
+    /// Generated trait containing gRPC methods that should be implemented for use with ArrowTracesServiceServer.
+    #[async_trait]
+    pub trait ArrowTracesService: std::marker::Send + std::marker::Sync + 'static {
+        /// Server streaming response type for the ArrowTraces method.
+        type ArrowTracesStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::BatchStatus, tonic::Status>,
+            > + std::marker::Send
+            + 'static;
+        async fn arrow_traces(
+            &self,
+            request: tonic::Request<tonic::Streaming<super::BatchArrowRecords>>,
+        ) -> std::result::Result<tonic::Response<Self::ArrowTracesStream>, tonic::Status>;
+    }
+    /// ArrowTracesService is a traces-only Arrow stream.
+    #[derive(Debug)]
+    pub struct ArrowTracesServiceServer<T> {
+        inner: Arc<T>,
+        accept_compression_encodings: EnabledCompressionEncodings,
+        send_compression_encodings: EnabledCompressionEncodings,
+        max_decoding_message_size: Option<usize>,
+        max_encoding_message_size: Option<usize>,
+    }
+    impl<T> ArrowTracesServiceServer<T> {
+        pub fn new(inner: T) -> Self {
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
+            Self {
+                inner,
+                accept_compression_encodings: Default::default(),
+                send_compression_encodings: Default::default(),
+                max_decoding_message_size: None,
+                max_encoding_message_size: None,
+            }
+        }
+        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        where
+            F: tonic::service::Interceptor,
+        {
+            InterceptedService::new(Self::new(inner), interceptor)
+        }
+        /// Enable decompressing requests with the given encoding.
+        #[must_use]
+        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.accept_compression_encodings.enable(encoding);
+            self
+        }
+        /// Compress responses with the given encoding, if the client supports it.
+        #[must_use]
+        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.send_compression_encodings.enable(encoding);
+            self
+        }
+        /// Limits the maximum size of a decoded message.
+        ///
+        /// Default: `4MB`
+        #[must_use]
+        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+            self.max_decoding_message_size = Some(limit);
+            self
+        }
+        /// Limits the maximum size of an encoded message.
+        ///
+        /// Default: `usize::MAX`
+        #[must_use]
+        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+            self.max_encoding_message_size = Some(limit);
+            self
+        }
+    }
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for ArrowTracesServiceServer<T>
+    where
+        T: ArrowTracesService,
+        B: Body + std::marker::Send + 'static,
+        B::Error: Into<StdError> + std::marker::Send + 'static,
+    {
+        type Response = http::Response<tonic::body::BoxBody>;
+        type Error = std::convert::Infallible;
+        type Future = BoxFuture<Self::Response, Self::Error>;
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+        fn call(&mut self, req: http::Request<B>) -> Self::Future {
+            match req.uri().path() {
+                "/opentelemetry.proto.experimental.arrow.v1.ArrowTracesService/ArrowTraces" => {
+                    #[allow(non_camel_case_types)]
+                    struct ArrowTracesSvc<T: ArrowTracesService>(pub Arc<T>);
+                    impl<T: ArrowTracesService>
+                        tonic::server::StreamingService<super::BatchArrowRecords>
+                        for ArrowTracesSvc<T>
+                    {
+                        type Response = super::BatchStatus;
+                        type ResponseStream = T::ArrowTracesStream;
+                        type Future =
+                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<tonic::Streaming<super::BatchArrowRecords>>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as ArrowTracesService>::arrow_traces(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = ArrowTracesSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                _ => Box::pin(async move {
+                    let mut response = http::Response::new(empty_body());
+                    let headers = response.headers_mut();
+                    headers.insert(
+                        tonic::Status::GRPC_STATUS,
+                        (tonic::Code::Unimplemented as i32).into(),
+                    );
+                    headers.insert(
+                        http::header::CONTENT_TYPE,
+                        tonic::metadata::GRPC_CONTENT_TYPE,
+                    );
+                    Ok(response)
+                }),
+            }
+        }
+    }
+    impl<T> Clone for ArrowTracesServiceServer<T> {
+        fn clone(&self) -> Self {
+            let inner = self.inner.clone();
+            Self {
+                inner,
+                accept_compression_encodings: self.accept_compression_encodings,
+                send_compression_encodings: self.send_compression_encodings,
+                max_decoding_message_size: self.max_decoding_message_size,
+                max_encoding_message_size: self.max_encoding_message_size,
+            }
+        }
+    }
+    /// Generated gRPC service name
+    pub const SERVICE_NAME: &str = "opentelemetry.proto.experimental.arrow.v1.ArrowTracesService";
+    impl<T> tonic::server::NamedService for ArrowTracesServiceServer<T> {
+        const NAME: &'static str = SERVICE_NAME;
+    }
+}
+/// Generated server implementations.
+pub mod arrow_logs_service_server {
+    #![allow(
+        unused_variables,
+        dead_code,
+        missing_docs,
+        clippy::wildcard_imports,
+        clippy::let_unit_value
+    )]
+    use tonic::codegen::*;
+    /// Generated trait containing gRPC methods that should be implemented for use with ArrowLogsServiceServer.
+    #[async_trait]
+    pub trait ArrowLogsService: std::marker::Send + std::marker::Sync + 'static {
+        /// Server streaming response type for the ArrowLogs method.
+        type ArrowLogsStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::BatchStatus, tonic::Status>,
+            > + std::marker::Send
+            + 'static;
+        async fn arrow_logs(
+            &self,
+            request: tonic::Request<tonic::Streaming<super::BatchArrowRecords>>,
+        ) -> std::result::Result<tonic::Response<Self::ArrowLogsStream>, tonic::Status>;
+    }
+    /// ArrowTracesService is a logs-only Arrow stream.
+    #[derive(Debug)]
+    pub struct ArrowLogsServiceServer<T> {
+        inner: Arc<T>,
+        accept_compression_encodings: EnabledCompressionEncodings,
+        send_compression_encodings: EnabledCompressionEncodings,
+        max_decoding_message_size: Option<usize>,
+        max_encoding_message_size: Option<usize>,
+    }
+    impl<T> ArrowLogsServiceServer<T> {
+        pub fn new(inner: T) -> Self {
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
+            Self {
+                inner,
+                accept_compression_encodings: Default::default(),
+                send_compression_encodings: Default::default(),
+                max_decoding_message_size: None,
+                max_encoding_message_size: None,
+            }
+        }
+        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        where
+            F: tonic::service::Interceptor,
+        {
+            InterceptedService::new(Self::new(inner), interceptor)
+        }
+        /// Enable decompressing requests with the given encoding.
+        #[must_use]
+        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.accept_compression_encodings.enable(encoding);
+            self
+        }
+        /// Compress responses with the given encoding, if the client supports it.
+        #[must_use]
+        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.send_compression_encodings.enable(encoding);
+            self
+        }
+        /// Limits the maximum size of a decoded message.
+        ///
+        /// Default: `4MB`
+        #[must_use]
+        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+            self.max_decoding_message_size = Some(limit);
+            self
+        }
+        /// Limits the maximum size of an encoded message.
+        ///
+        /// Default: `usize::MAX`
+        #[must_use]
+        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+            self.max_encoding_message_size = Some(limit);
+            self
+        }
+    }
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for ArrowLogsServiceServer<T>
+    where
+        T: ArrowLogsService,
+        B: Body + std::marker::Send + 'static,
+        B::Error: Into<StdError> + std::marker::Send + 'static,
+    {
+        type Response = http::Response<tonic::body::BoxBody>;
+        type Error = std::convert::Infallible;
+        type Future = BoxFuture<Self::Response, Self::Error>;
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+        fn call(&mut self, req: http::Request<B>) -> Self::Future {
+            match req.uri().path() {
+                "/opentelemetry.proto.experimental.arrow.v1.ArrowLogsService/ArrowLogs" => {
+                    #[allow(non_camel_case_types)]
+                    struct ArrowLogsSvc<T: ArrowLogsService>(pub Arc<T>);
+                    impl<T: ArrowLogsService>
+                        tonic::server::StreamingService<super::BatchArrowRecords>
+                        for ArrowLogsSvc<T>
+                    {
+                        type Response = super::BatchStatus;
+                        type ResponseStream = T::ArrowLogsStream;
+                        type Future =
+                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<tonic::Streaming<super::BatchArrowRecords>>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as ArrowLogsService>::arrow_logs(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = ArrowLogsSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                _ => Box::pin(async move {
+                    let mut response = http::Response::new(empty_body());
+                    let headers = response.headers_mut();
+                    headers.insert(
+                        tonic::Status::GRPC_STATUS,
+                        (tonic::Code::Unimplemented as i32).into(),
+                    );
+                    headers.insert(
+                        http::header::CONTENT_TYPE,
+                        tonic::metadata::GRPC_CONTENT_TYPE,
+                    );
+                    Ok(response)
+                }),
+            }
+        }
+    }
+    impl<T> Clone for ArrowLogsServiceServer<T> {
+        fn clone(&self) -> Self {
+            let inner = self.inner.clone();
+            Self {
+                inner,
+                accept_compression_encodings: self.accept_compression_encodings,
+                send_compression_encodings: self.send_compression_encodings,
+                max_decoding_message_size: self.max_decoding_message_size,
+                max_encoding_message_size: self.max_encoding_message_size,
+            }
+        }
+    }
+    /// Generated gRPC service name
+    pub const SERVICE_NAME: &str = "opentelemetry.proto.experimental.arrow.v1.ArrowLogsService";
+    impl<T> tonic::server::NamedService for ArrowLogsServiceServer<T> {
+        const NAME: &'static str = SERVICE_NAME;
+    }
+}
+
+/// Generated server implementations.
+pub mod arrow_metrics_service_server {
+    #![allow(
+        unused_variables,
+        dead_code,
+        missing_docs,
+        clippy::wildcard_imports,
+        clippy::let_unit_value
+    )]
+    use tonic::codegen::*;
+    /// Generated trait containing gRPC methods that should be implemented for use with ArrowMetricsServiceServer.
+    #[async_trait]
+    pub trait ArrowMetricsService: std::marker::Send + std::marker::Sync + 'static {
+        /// Server streaming response type for the ArrowMetrics method.
+        type ArrowMetricsStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::BatchStatus, tonic::Status>,
+            > + std::marker::Send
+            + 'static;
+        async fn arrow_metrics(
+            &self,
+            request: tonic::Request<tonic::Streaming<super::BatchArrowRecords>>,
+        ) -> std::result::Result<tonic::Response<Self::ArrowMetricsStream>, tonic::Status>;
+    }
+    /// ArrowTracesService is a metrics-only Arrow stream.
+    #[derive(Debug)]
+    pub struct ArrowMetricsServiceServer<T> {
+        inner: Arc<T>,
+        accept_compression_encodings: EnabledCompressionEncodings,
+        send_compression_encodings: EnabledCompressionEncodings,
+        max_decoding_message_size: Option<usize>,
+        max_encoding_message_size: Option<usize>,
+    }
+    impl<T> ArrowMetricsServiceServer<T> {
+        pub fn new(inner: T) -> Self {
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
+            Self {
+                inner,
+                accept_compression_encodings: Default::default(),
+                send_compression_encodings: Default::default(),
+                max_decoding_message_size: None,
+                max_encoding_message_size: None,
+            }
+        }
+        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        where
+            F: tonic::service::Interceptor,
+        {
+            InterceptedService::new(Self::new(inner), interceptor)
+        }
+        /// Enable decompressing requests with the given encoding.
+        #[must_use]
+        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.accept_compression_encodings.enable(encoding);
+            self
+        }
+        /// Compress responses with the given encoding, if the client supports it.
+        #[must_use]
+        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.send_compression_encodings.enable(encoding);
+            self
+        }
+        /// Limits the maximum size of a decoded message.
+        ///
+        /// Default: `4MB`
+        #[must_use]
+        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+            self.max_decoding_message_size = Some(limit);
+            self
+        }
+        /// Limits the maximum size of an encoded message.
+        ///
+        /// Default: `usize::MAX`
+        #[must_use]
+        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+            self.max_encoding_message_size = Some(limit);
+            self
+        }
+    }
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for ArrowMetricsServiceServer<T>
+    where
+        T: ArrowMetricsService,
+        B: Body + std::marker::Send + 'static,
+        B::Error: Into<StdError> + std::marker::Send + 'static,
+    {
+        type Response = http::Response<tonic::body::BoxBody>;
+        type Error = std::convert::Infallible;
+        type Future = BoxFuture<Self::Response, Self::Error>;
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+        fn call(&mut self, req: http::Request<B>) -> Self::Future {
+            match req.uri().path() {
+                "/opentelemetry.proto.experimental.arrow.v1.ArrowMetricsService/ArrowMetrics" => {
+                    #[allow(non_camel_case_types)]
+                    struct ArrowMetricsSvc<T: ArrowMetricsService>(pub Arc<T>);
+                    impl<T: ArrowMetricsService>
+                        tonic::server::StreamingService<super::BatchArrowRecords>
+                        for ArrowMetricsSvc<T>
+                    {
+                        type Response = super::BatchStatus;
+                        type ResponseStream = T::ArrowMetricsStream;
+                        type Future =
+                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<tonic::Streaming<super::BatchArrowRecords>>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as ArrowMetricsService>::arrow_metrics(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = ArrowMetricsSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                _ => Box::pin(async move {
+                    let mut response = http::Response::new(empty_body());
+                    let headers = response.headers_mut();
+                    headers.insert(
+                        tonic::Status::GRPC_STATUS,
+                        (tonic::Code::Unimplemented as i32).into(),
+                    );
+                    headers.insert(
+                        http::header::CONTENT_TYPE,
+                        tonic::metadata::GRPC_CONTENT_TYPE,
+                    );
+                    Ok(response)
+                }),
+            }
+        }
+    }
+    impl<T> Clone for ArrowMetricsServiceServer<T> {
+        fn clone(&self) -> Self {
+            let inner = self.inner.clone();
+            Self {
+                inner,
+                accept_compression_encodings: self.accept_compression_encodings,
+                send_compression_encodings: self.send_compression_encodings,
+                max_decoding_message_size: self.max_decoding_message_size,
+                max_encoding_message_size: self.max_encoding_message_size,
+            }
+        }
+    }
+    /// Generated gRPC service name
+    pub const SERVICE_NAME: &str = "opentelemetry.proto.experimental.arrow.v1.ArrowMetricsService";
+    impl<T> tonic::server::NamedService for ArrowMetricsServiceServer<T> {
+        const NAME: &'static str = SERVICE_NAME;
+    }
+}

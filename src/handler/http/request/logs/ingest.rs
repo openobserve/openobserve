@@ -30,7 +30,10 @@ use crate::{
         },
     },
     handler::http::request::{CONTENT_TYPE_ARROW, CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    service::{logs::{self, otlp::handle_request}, otap::decoder::Consumer},
+    service::{
+        logs::{self, otlp::handle_request},
+        otap::decoder::Consumer,
+    },
 };
 
 /// _bulk ES compatible ingestion API
@@ -356,24 +359,25 @@ pub async fn otlp_logs_write(
             let Ok(body) = payload.to_bytes().await else {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!("Failed to create bytes from the payload"),
+                    "Failed to create bytes from the payload".to_string(),
                 )));
             };
             match ExportLogsServiceRequest::decode(body) {
-            Ok(req) => (req, OtlpRequestType::HttpProtobuf),
-            Err(e) => {
-                log::error!("[LOGS:OTLP] Invalid proto: {}", e);
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    format!("Invalid proto: {}", e),
-                )));
+                Ok(req) => (req, OtlpRequestType::HttpProtobuf),
+                Err(e) => {
+                    log::error!("[LOGS:OTLP] Invalid proto: {}", e);
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        format!("Invalid proto: {}", e),
+                    )));
+                }
             }
-            }},
+        }
         CONTENT_TYPE_JSON => {
             let Ok(body) = payload.to_bytes().await else {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!("Failed to create bytes from the payload"),
+                    "Failed to create bytes from the payload".to_string(),
                 )));
             };
             match serde_json::from_slice::<ExportLogsServiceRequest>(body.as_ref()) {
@@ -392,16 +396,21 @@ pub async fn otlp_logs_write(
             let mut req = ExportLogsServiceRequest::default();
             while let Some(chunk) = payload.next().await {
                 if let Ok(bytes) = chunk {
-                    if let Ok(mut arrow_batch) = serde_json::from_slice::<BatchArrowRecords>(bytes.as_ref()) {
+                    if let Ok(mut arrow_batch) =
+                        serde_json::from_slice::<BatchArrowRecords>(bytes.as_ref())
+                    {
                         match consumer.consume_logs_batches(&mut arrow_batch) {
                             Ok(otlp_logs) => {
-                                req.resource_logs.extend(otlp_logs.resource_logs.into_iter());
+                                req.resource_logs
+                                    .extend(otlp_logs.resource_logs.into_iter());
                             }
-                            Err(_) =>  {
-                                return Ok(HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                                    http::StatusCode::BAD_REQUEST.into(),
-                                    format!("Invalid arrow payload"),
-                                )));
+                            Err(_) => {
+                                return Ok(HttpResponse::InternalServerError().json(
+                                    MetaHttpResponse::error(
+                                        http::StatusCode::BAD_REQUEST.into(),
+                                        "Invalid arrow payload".to_string(),
+                                    ),
+                                ));
                             }
                         }
                     }

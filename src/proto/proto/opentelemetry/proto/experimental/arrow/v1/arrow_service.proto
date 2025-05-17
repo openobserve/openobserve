@@ -42,7 +42,7 @@ option go_package = "github.com/open-telemetry/otel-arrow/api/experimental/arrow
 
 // Historical note: this code base once declared a mixed-signal protocol
 // which would allow any OpenTelemetry signal to be transmitted.  While this
-// could potentially avoid repetition of common telemetry elementrs (e.g.,
+// could potentially avoid repetition of common telemetry elements (e.g.,
 // resource attributes), it has been removed because at this time the OpenTelemetry
 // Collector does not support mixed-signal receivers or exporters.
 
@@ -51,12 +51,12 @@ service ArrowTracesService {
   rpc ArrowTraces(stream BatchArrowRecords) returns (stream BatchStatus) {}
 }
 
-// ArrowTracesService is a logs-only Arrow stream.
+// ArrowLogsService is a logs-only Arrow stream.
 service ArrowLogsService {
   rpc ArrowLogs(stream BatchArrowRecords) returns (stream BatchStatus) {}
 }
 
-// ArrowTracesService is a metrics-only Arrow stream.
+// ArrowMetricsService is a metrics-only Arrow stream.
 service ArrowMetricsService {
   rpc ArrowMetrics(stream BatchArrowRecords) returns (stream BatchStatus) {}
 }

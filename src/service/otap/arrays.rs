@@ -10,18 +10,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::error;
-use arrow::array::{
-    Array, ArrayRef, ArrowPrimitiveType, BinaryArray, BooleanArray, DictionaryArray,
-    FixedSizeBinaryArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array,
-    Int64Array, PrimitiveArray, RecordBatch, StringArray, StructArray, TimestampNanosecondArray,
-    UInt8Array, UInt16Array, UInt32Array, UInt64Array,
-};
-use arrow::datatypes::{
-    ArrowDictionaryKeyType, DataType, TimeUnit, UInt8Type, UInt16Type,
+use arrow::{
+    array::{
+        Array, ArrayRef, ArrowPrimitiveType, BinaryArray, BooleanArray, DictionaryArray,
+        FixedSizeBinaryArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array,
+        Int64Array, PrimitiveArray, RecordBatch, StringArray, StructArray,
+        TimestampNanosecondArray, UInt8Array, UInt16Array, UInt32Array, UInt64Array,
+    },
+    datatypes::{ArrowDictionaryKeyType, DataType, TimeUnit, UInt8Type, UInt16Type},
 };
 use paste::paste;
 use snafu::{OptionExt, ensure};
+
+use super::error;
 
 pub trait NullableArrayAccessor {
     type Native;
@@ -302,7 +303,10 @@ where
             return Ok(Self::Native(
                 arr.as_any()
                     .downcast_ref::<T>()
-                    .expect("array can be downcast to it's native datatype"),
+                    .with_context(|| error::InvalidListArraySnafu {
+                        expect_oneof: Vec::<DataType>::new(),
+                        actual: data_type,
+                    })?,
             ));
         }
 
@@ -320,7 +324,7 @@ where
                 DataType::UInt8 => Self::Dictionary8(DictionaryArrayAccessor::new(
                     arr.as_any()
                         .downcast_ref::<DictionaryArray<UInt8Type>>()
-                        .expect("array can be downcast to DictionaryArray<UInt8Type"),
+                        .expect("array can be downcast to DictionaryArray<UInt8Type>"),
                 )?),
                 DataType::UInt16 => Self::Dictionary16(DictionaryArrayAccessor::new(
                     arr.as_any()
@@ -415,7 +419,7 @@ where
             .as_any()
             .downcast_ref::<V>()
             .with_context(|| error::InvalidListArraySnafu {
-                expect_oneof: Vec::new(),
+                expect_oneof: Vec::<DataType>::new(),
                 actual: dict.values().data_type().clone(),
             })?;
         Ok(Self { inner: dict, value })
@@ -423,11 +427,11 @@ where
 
     pub fn value_at(&self, idx: usize) -> Option<V::Native> {
         if self.inner.is_valid(idx) {
-            let offset = self
-                .inner
-                .key(idx)
-                .expect("dictionary should be valid at index");
-            self.value.value_at(offset)
+            if let Some(offset) = self.inner.key(idx) {
+                self.value.value_at(offset)
+            } else {
+                None
+            }
         } else {
             None
         }

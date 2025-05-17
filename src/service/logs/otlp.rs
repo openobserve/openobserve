@@ -436,6 +436,7 @@ pub async fn handle_request(
         OtlpRequestType::HttpProtobuf => (CONTENT_TYPE_PROTO, "/api/otlp/v1/logs"),
         OtlpRequestType::Grpc => (CONTENT_TYPE_PROTO, "/grpc/otlp/logs"),
         OtlpRequestType::HttpArrowStream => (CONTENT_TYPE_ARROW, "/api/otlp/v1/logs"),
+        OtlpRequestType::ArrowStream => (CONTENT_TYPE_ARROW, "/grpc/otlp/logs"),
     };
 
     // if no data, fast return

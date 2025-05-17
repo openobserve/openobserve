@@ -10,19 +10,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use arrow::array::RecordBatch;
-use arrow::error::ArrowError;
-use arrow::ipc::reader::StreamReader;
-use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
-use opentelemetry_proto::tonic::common::v1::any_value;
+use std::{collections::HashMap, io::Cursor};
+
+use arrow::{array::RecordBatch, error::ArrowError, ipc::reader::StreamReader};
+use opentelemetry_proto::tonic::{
+    collector::logs::v1::ExportLogsServiceRequest, common::v1::any_value,
+};
 use proto::otel_arrow::{ArrowPayload, ArrowPayloadType, BatchArrowRecords};
 use snafu::{OptionExt, ResultExt, ensure};
-use std::collections::HashMap;
-use std::io::Cursor;
-use super::logs::{logs_from, RelatedData as LogsRelatedData};
 
-use super::error;
-use super::store::ParentId;
+use super::{
+    error,
+    logs::{RelatedData as LogsRelatedData, logs_from},
+    store::ParentId,
+};
 
 /// Wrapper for [RecordBatch].
 pub struct RecordMessage {
@@ -42,7 +43,7 @@ impl StreamConsumer {
     fn new(payload: ArrowPayloadType, initial_bytes: Vec<u8>) -> error::Result<Self> {
         let data = Cursor::new(initial_bytes);
         let stream_reader =
-            StreamReader::try_new(data.clone(), None).context(error::BuildStreamReaderSnafu)?;
+            StreamReader::try_new(data, None).context(error::BuildStreamReaderSnafu)?;
         Ok(Self {
             payload_type: payload,
             stream_reader,
@@ -108,7 +109,7 @@ impl Consumer {
                     record,
                 });
             } else {
-                //todo: handle stream reader finished
+                // TODO: handle stream reader finished
             }
         }
         Ok(records)

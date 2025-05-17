@@ -56,6 +56,15 @@ pub mod syslogs_route;
 pub mod tls;
 pub mod traces;
 pub mod users;
+
+/// TODO: This can be removed in the future once
+/// - [otel-arrow](https://github.com/open-telemetry/otel-arrow) becomes stable, and
+/// - we have upgraded versions of [`opentelemetry`], [`tonic`] and related crates to be in sync
+///   with otel-arrow.
+///
+/// Presently, otel-arrow uses opentelemetry-proto as a submodule viz a newer version than what O2
+/// does Upgrading dependencies in O2 shall be done as a separate task because of the breaking
+/// changes.
 pub mod otap;
 
 // format stream name

@@ -10,12 +10,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use arrow::datatypes::DataType;
-use arrow::error::ArrowError;
+use std::num::TryFromIntError;
+
+use arrow::{datatypes::DataType, error::ArrowError};
 use num_enum::TryFromPrimitiveError;
-// use num_enum::TryFromPrimitiveError;
 use snafu::{Location, Snafu};
-use std::{ num::TryFromIntError};
 
 use super::store::AttributeValueType;
 
@@ -114,7 +113,7 @@ pub enum Error {
         location: Location,
     },
 
-    #[snafu(display("Invalid trace id in exemplar data, message: {}", message))]
+    #[snafu(display("Invalid Quantile type in exemplar data, message: {}", message))]
     InvalidQuantileType {
         message: String,
         #[snafu(implicit)]

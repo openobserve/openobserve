@@ -1,26 +1,34 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
-use opentelemetry_proto::tonic::common::v1::any_value::Value;
-use opentelemetry_proto::tonic::common::v1::{AnyValue, InstrumentationScope};
-use proto::otel_arrow::ArrowPayloadType;
-use arrow::array::{
-    Array, BooleanArray, Float64Array, Int64Array, RecordBatch, StructArray,
-    TimestampNanosecondArray, UInt8Array, UInt16Array, UInt32Array,
-};
-use arrow::datatypes::{DataType, Fields};
-use snafu::{OptionExt, ResultExt, ensure};
-
-use super::arrays::{get_required_array, get_timestamp_nanosecond_array_opt, get_u16_array, get_u32_array_opt, ByteArrayAccessor, Int32ArrayAccessor, NullableArrayAccessor, StringArrayAccessor, StructColumnAccessor};
-use super::consts;
-use super::error::Error;
-use super::store::{decode_pcommon_val, AttributeValueType};
-use super::{decoder::RecordMessage, error, store::Attribute16Store};
-
-use arrow::datatypes::Field;
 use std::sync::LazyLock;
 
+use arrow::{
+    array::{
+        Array, BooleanArray, Float64Array, Int64Array, RecordBatch, StructArray,
+        TimestampNanosecondArray, UInt8Array, UInt16Array, UInt32Array,
+    },
+    datatypes::{DataType, Field, Fields},
+};
+use opentelemetry_proto::tonic::{
+    collector::logs::v1::ExportLogsServiceRequest,
+    common::v1::{AnyValue, InstrumentationScope, any_value::Value},
+};
+use proto::otel_arrow::ArrowPayloadType;
+use snafu::{OptionExt, ResultExt, ensure};
+
+use super::{
+    arrays::{
+        ByteArrayAccessor, Int32ArrayAccessor, NullableArrayAccessor, StringArrayAccessor,
+        StructColumnAccessor, get_required_array, get_timestamp_nanosecond_array_opt,
+        get_u16_array, get_u32_array_opt,
+    },
+    consts,
+    decoder::RecordMessage,
+    error,
+    error::Error,
+    store::{Attribute16Store, AttributeValueType, decode_pcommon_val},
+};
 
 #[derive(Default)]
 pub struct RelatedData {
@@ -33,6 +41,10 @@ pub struct RelatedData {
 
 impl RelatedData {
     pub fn log_record_id_from_delta(&mut self, delta: u16) -> u16 {
+        self.log_record_id = self
+            .log_record_id
+            .checked_add(delta)
+            .expect("log_record_id overflow");
         self.log_record_id += delta;
         self.log_record_id
     }
@@ -68,7 +80,6 @@ impl RelatedData {
         Ok((related_data, logs_record_idx))
     }
 }
-
 
 struct LogsArrays<'a> {
     id: &'a UInt16Array,
@@ -218,7 +229,6 @@ impl<'a> TryFrom<&'a StructArray> for LogBodyArrays<'a> {
     }
 }
 
-
 pub struct ResourceArrays<'a> {
     pub id: &'a UInt16Array,
     pub dropped_attributes_count: Option<&'a UInt32Array>,
@@ -307,13 +317,13 @@ impl<'a> TryFrom<&'a RecordBatch> for ScopeArrays<'a> {
     type Error = error::Error;
 
     fn try_from(rb: &'a RecordBatch) -> Result<Self, Self::Error> {
-        let struct_array = get_required_array(rb, consts::RESOURCE)?;
-        let scope_array = struct_array
+        let scope_arrays = get_required_array(rb, consts::SCOPE)?;
+        let scope_array = scope_arrays
             .as_any()
             .downcast_ref::<StructArray>()
             .with_context(|| error::ColumnDataTypeMismatchSnafu {
                 name: consts::RESOURCE,
-                actual: struct_array.data_type().clone(),
+                actual: scope_arrays.data_type().clone(),
                 expect: Self::data_type().clone(),
             })?;
         let struct_col_accessor = StructColumnAccessor::new(scope_array);
@@ -432,22 +442,28 @@ pub fn logs_from(
             logs_arrays.observed_time_unix_nano.value_at_or_default(idx) as u64;
 
         if let Some(trace_id_bytes) = logs_arrays.trace_id.value_at(idx) {
-            ensure!(trace_id_bytes.len() == 16, error::InvalidTraceIdSnafu {
-                message: format!(
-                    "log_id = {}, index = {}, trace_id = {:?}",
-                    log_id, idx, trace_id_bytes
-                ),
-            });
+            ensure!(
+                trace_id_bytes.len() == 16,
+                error::InvalidTraceIdSnafu {
+                    message: format!(
+                        "log_id = {}, index = {}, trace_id = {:?}",
+                        log_id, idx, trace_id_bytes
+                    ),
+                }
+            );
             current_log_record.trace_id = trace_id_bytes
         }
 
         if let Some(span_id_bytes) = logs_arrays.span_id.value_at(idx) {
-            ensure!(span_id_bytes.len() == 8, error::InvalidSpanIdSnafu {
-                message: format!(
-                    "log_id = {}, index = {}, span_id = {:?}",
-                    log_id, idx, span_id_bytes
-                ),
-            });
+            ensure!(
+                span_id_bytes.len() == 8,
+                error::InvalidSpanIdSnafu {
+                    message: format!(
+                        "log_id = {}, index = {}, span_id = {:?}",
+                        log_id, idx, span_id_bytes
+                    ),
+                }
+            );
             current_log_record.span_id = span_id_bytes;
         }
 

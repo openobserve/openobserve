@@ -10,20 +10,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use arrow::array::{ArrowPrimitiveType, PrimitiveArray, RecordBatch};
+use std::{
+    collections::HashMap,
+    hash::Hash,
+    ops::{Add, AddAssign},
+};
+
+use arrow::{
+    array::{ArrowPrimitiveType, PrimitiveArray, RecordBatch},
+    datatypes::{UInt16Type, UInt32Type},
+};
 use num_enum::TryFromPrimitive;
-use opentelemetry_proto::tonic::common::v1::{AnyValue, ArrayValue, KeyValueList};
-use opentelemetry_proto::tonic::common::v1::{any_value::Value, KeyValue};
+use opentelemetry_proto::tonic::common::v1::{
+    AnyValue, ArrayValue, KeyValue, KeyValueList, any_value::Value,
+};
 use snafu::{OptionExt, ResultExt};
-use std::collections::HashMap;
-use arrow::datatypes::{UInt16Type, UInt32Type};
-use std::hash::Hash;
-use std::ops::{Add, AddAssign};
 
-use super::arrays::{get_bool_array_opt, get_f64_array_opt, get_u8_array, ByteArrayAccessor, Int64ArrayAccessor, MaybeDictArrayAccessor, NullableArrayAccessor, StringArrayAccessor};
-use super::decoder::{Attrs16ParentIdDecoder, Attrs32ParentIdDecoder, AttrsParentIdDecoder};
-use super::{consts, error};
-
+use super::{
+    arrays::{
+        ByteArrayAccessor, Int64ArrayAccessor, MaybeDictArrayAccessor, NullableArrayAccessor,
+        StringArrayAccessor, get_bool_array_opt, get_f64_array_opt, get_u8_array,
+    },
+    consts,
+    decoder::{Attrs16ParentIdDecoder, Attrs32ParentIdDecoder, AttrsParentIdDecoder},
+    error,
+};
 
 /// Decode bytes from a serialized attribute into pcommon value.
 ///
@@ -70,14 +81,14 @@ impl TryFrom<ciborium::Value> for MaybeValue {
                     })
                     .collect();
                 Some(Value::ArrayValue(ArrayValue { values: vals? }))
-            },
+            }
             ciborium::Value::Map(kv_vals) => {
                 let kvs: error::Result<Vec<_>> = kv_vals
                     .into_iter()
                     .map(|(k, v)| {
                         if let ciborium::Value::Text(key) = k {
                             match MaybeValue::try_from(v) {
-                                Ok(val) => Ok(KeyValue{
+                                Ok(val) => Ok(KeyValue {
                                     key,
                                     value: Some(AnyValue { value: val.into() }),
                                 }),
@@ -88,10 +99,8 @@ impl TryFrom<ciborium::Value> for MaybeValue {
                         }
                     })
                     .collect();
-                Some(Value::KvlistValue(KeyValueList{
-                    values: kvs?,
-                }))
-            },
+                Some(Value::KvlistValue(KeyValueList { values: kvs? }))
+            }
             other => {
                 return error::UnsupportedSerializedAttributeValueSnafu { actual: other }.fail();
             }
@@ -122,7 +131,6 @@ impl ParentId for u32 {
         Attrs32ParentIdDecoder::default()
     }
 }
-
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, TryFromPrimitive)]
 #[repr(u8)]
@@ -219,7 +227,7 @@ where
                         continue;
                     }
 
-                    let decoded_result = decode_pcommon_val(&bytes.expect("expected Some"))?;
+                    let decoded_result = decode_pcommon_val(&bytes.unwrap())?;
                     match decoded_result {
                         Some(value) => value,
                         None => continue,
@@ -249,7 +257,7 @@ where
                 &value,
             );
             let attributes = store.attribute_by_ids.entry(parent_id).or_default();
-            //todo: support assigning ArrayValue and KvListValue by deep copy as in https://github.com/open-telemetry/opentelemetry-collector/blob/fbf6d103eea79e72ff6b2cc3a2a18fc98a836281/pdata/pcommon/value.go#L323
+            // todo: support assigning ArrayValue and KvListValue by deep copy as in https://github.com/open-telemetry/opentelemetry-collector/blob/fbf6d103eea79e72ff6b2cc3a2a18fc98a836281/pdata/pcommon/value.go#L323
             *attributes.find_or_append(&key) = Some(AnyValue { value: Some(value) });
         }
 

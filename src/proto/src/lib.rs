@@ -15,7 +15,7 @@
 
 mod generated;
 
-pub use generated::{cluster as cluster_rpc, prometheus as prometheus_rpc, otel_arrow};
+pub use generated::{cluster as cluster_rpc, otel_arrow, prometheus as prometheus_rpc};
 
 impl From<Vec<serde_json::Value>> for cluster_rpc::IngestionData {
     fn from(usages: Vec<serde_json::Value>) -> Self {
