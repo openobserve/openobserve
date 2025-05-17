@@ -22,6 +22,7 @@ use config::{
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
+    metrics,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -39,16 +40,19 @@ use itertools::Itertools;
 use promql_parser::label::{MatchOp, Matchers};
 use tracing::Instrument;
 
-use crate::service::{
-    db, file_list,
-    search::{
-        datafusion::exec::register_table,
-        grpc::{
-            QueryParams,
-            storage::{cache_files, filter_file_list_by_tantivy_index},
+use crate::{
+    job::should_prioritize_file,
+    service::{
+        db, file_list,
+        search::{
+            datafusion::exec::register_table,
+            grpc::{
+                QueryParams,
+                storage::{cache_files, filter_file_list_by_tantivy_index},
+            },
+            index::{Condition, IndexCondition},
+            match_source,
         },
-        index::{Condition, IndexCondition},
-        match_source,
     },
 };
 
@@ -145,11 +149,17 @@ pub(crate) async fn create_context(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let cache_type = cache_files(
+    let (cache_type, cache_hits, cache_misses) = cache_files(
         trace_id,
         &files
             .iter()
-            .map(|f| (f.key.as_ref(), f.meta.compressed_size))
+            .map(|f| {
+                (
+                    f.key.as_ref(),
+                    f.meta.compressed_size,
+                    should_prioritize_file(&f.meta),
+                )
+            })
             .collect_vec(),
         &mut scan_stats,
         "parquet",
@@ -160,6 +170,14 @@ pub(crate) async fn create_context(
         log::error!("[trace_id {trace_id}] promql->search->storage: cache files error: {e}");
         DataFusionError::Execution(e.to_string())
     })?;
+
+    // report cache hit and miss metrics
+    metrics::QUERY_DISK_CACHE_HIT_COUNT
+        .with_label_values(&[org_id, &stream_type.to_string(), "parquet"])
+        .inc_by(cache_hits);
+    metrics::QUERY_DISK_CACHE_MISS_COUNT
+        .with_label_values(&[org_id, &stream_type.to_string(), "parquet"])
+        .inc_by(cache_misses);
 
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
@@ -202,7 +220,7 @@ pub(crate) async fn create_context(
     let index_condition = convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
     if !index_condition.conditions.is_empty() && cfg.common.inverted_index_enabled {
         let (idx_took, ..) =
-            filter_file_list_by_tantivy_index(query, &mut files, Some(index_condition), None)
+            filter_file_list_by_tantivy_index(query.clone(), &mut files, Some(index_condition), None)
                 .await
                 .map_err(|e| {
                     log::error!(
@@ -232,6 +250,7 @@ pub(crate) async fn create_context(
         true,
     )
     .await?;
+
     Ok(Some((ctx, schema, scan_stats)))
 }
 
