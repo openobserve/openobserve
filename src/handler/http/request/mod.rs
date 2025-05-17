@@ -45,3 +45,4 @@ pub mod ws;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+pub const CONTENT_TYPE_ARROW: &str = "application/vnd.apache.arrow.stream";
