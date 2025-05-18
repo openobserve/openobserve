@@ -110,7 +110,22 @@ pub async fn search_http2_stream(
     );
 
     // Get query params
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let Ok(query) = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()) else {
+        #[cfg(feature = "enterprise")]
+        {
+            report_to_audit(
+                user_id,
+                org_id,
+                trace_id,
+                400,
+                Some("Invalid query parameters".to_string()),
+                &in_req,
+                body_bytes,
+            )
+            .await;
+        }
+        return MetaHttpResponse::bad_request("Invalid query parameters");
+    };
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     #[cfg(feature = "enterprise")]
