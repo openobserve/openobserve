@@ -22,6 +22,7 @@ use std::{
     ops::Range,
 };
 
+use bytes::Bytes;
 use config::utils::time::get_ymdh_from_micros;
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
@@ -44,6 +45,11 @@ enum CacheStrategy {
         Vec<LruCache<String, usize>>,
         HashSet<String>,
     ),
+}
+
+enum FileType {
+    Parquet,
+    Ttv,
 }
 
 impl CacheStrategy {
@@ -192,6 +198,30 @@ pub async fn download(
     }
 }
 
+async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Error> {
+    match ftype {
+        FileType::Parquet => {
+            let b = Bytes::copy_from_slice(bytes);
+            let mut reader = parquet::file::metadata::ParquetMetaDataReader::new();
+            reader.try_parse(&b)?;
+        }
+        FileType::Ttv => {
+            if bytes.len() < 12 {
+                return Err(anyhow::anyhow!("invalid puffin file"));
+            }
+            let footer = &bytes[bytes.len() - 12..bytes.len()];
+            if footer[8..12] != [0x50, 0x46, 0x41, 0x31] {
+                return Err(anyhow::anyhow!("puffin footer magic mismatch"));
+            }
+            let payload_size = i32::from_le_bytes(footer[0..4].try_into().unwrap());
+            if bytes.len() < 12 + payload_size as usize {
+                return Err(anyhow::anyhow!("payload size mismatch"));
+            }
+        }
+    }
+    Ok(())
+}
+
 async fn download_from_storage(
     account: &str,
     file: &str,
@@ -199,37 +229,94 @@ async fn download_from_storage(
 ) -> Result<(usize, bytes::Bytes), anyhow::Error> {
     let mut data_len = 0;
     let mut data_bytes = bytes::Bytes::new();
+    let mut retry_time = 1;
+    let mut expected_blob_size = 0;
     for i in 0..DOWNLOAD_RETRY_TIMES {
-        let data = crate::storage::get_bytes(account, file).await?;
-        if data.is_empty() {
+        // get the initial headers
+        let res = crate::storage::get(account, file).await?;
+        // this is the size blob store has
+        expected_blob_size = res.meta.size;
+        if expected_blob_size == 0 {
             return Err(anyhow::anyhow!("file {} data size is zero", file));
         }
+
+        // download the actual bytes
+        let data = res.bytes().await?;
         data_len = data.len();
         data_bytes = data;
-        match size {
-            None => break,
-            Some(size) => {
-                if data_len == size {
-                    break;
-                } else {
-                    let msg = if i == DOWNLOAD_RETRY_TIMES - 1 {
-                        format!("after {} retries", DOWNLOAD_RETRY_TIMES)
-                    } else {
-                        "will retry".to_string()
-                    };
+
+        // if the downloaded length is not equal to what the blog store
+        // sent in headers, we might have a partial download, so we log
+        // and retry
+        if data_len != expected_blob_size {
+            let msg = if i == DOWNLOAD_RETRY_TIMES - 1 {
+                format!("after {} retries", DOWNLOAD_RETRY_TIMES)
+            } else {
+                "will retry".to_string()
+            };
+            log::warn!(
+                "download file {} found size mismatch with blob store header, expected: {}, actual: {}, {}",
+                file,
+                expected_blob_size,
+                data_len,
+                msg
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(retry_time)).await;
+            retry_time *= 2;
+            continue;
+        }
+    }
+
+    // now the size we downloaded matches what blob store has or tried the max attempts, we check
+    // if it matches with what we have in db or not. Also because the size matches blob store/we
+    // have exceeded try attempts, there is no sense in retrying here, because that is the size
+    // we are going to get every time.
+    match size {
+        None => Ok((data_len, data_bytes)),
+        Some(size) => {
+            if data_len == size {
+                Ok((data_len, data_bytes))
+            } else {
+                // the entry in db does not match what there is actually in the blob store
+                // so we check if the footer is valid. If it is, then the db entry is invalid
+                // and we reset it. If footer is invalid, the the store has a corrupted file
+                // so we mark it as deleted, and return error.
+                let valid_parquet = file.ends_with(".parquet")
+                    && validate_file(&data_bytes, FileType::Parquet).await.is_ok();
+                let valid_ttv = file.ends_with(".ttv")
+                    && validate_file(&data_bytes, FileType::Ttv).await.is_ok();
+                if valid_parquet || valid_ttv {
                     log::warn!(
-                        "download file {} found size mismatch, expected: {}, actual: {}, {}",
+                        "download file {} found size mismatch, remote : {}, db: {}, correcting db as valid file",
                         file,
+                        expected_blob_size,
                         size,
-                        data_len,
-                        msg
                     );
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    // only update for parquet files, not ttv files
+                    if file.ends_with(".parquet") {
+                        crate::file_list::update_compressed_size(file, data_len as i64).await?;
+                        crate::file_list::LOCAL_CACHE
+                            .update_compressed_size(file, data_len as i64)
+                            .await?;
+                    }
+                    Ok((data_len, data_bytes))
+                } else {
+                    log::warn!(
+                        "download file {} found corrupt file, remote: {}, db: {}, deleting entry from file_list ",
+                        file,
+                        expected_blob_size,
+                        size
+                    );
+                    // only update for parquet files, not ttv files
+                    if file.ends_with(".parquet") {
+                        crate::file_list::remove(file).await?;
+                        crate::file_list::LOCAL_CACHE.remove(file).await?;
+                    }
+                    Err(anyhow::anyhow!("file {file} is corrupted in blob store"))
                 }
             }
         }
     }
-    Ok((data_len, data_bytes))
 }
 
 /// set the data to the cache
