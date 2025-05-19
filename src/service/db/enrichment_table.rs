@@ -42,6 +42,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         sql: format!("SELECT * FROM \"{name}\""),
         start_time,
         end_time,
+        size: -1, // -1 means no limit, enrichment table should not be limited
         ..Default::default()
     };
 
@@ -56,6 +57,11 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         use_cache: None,
         local_mode: Some(true),
     };
+    log::debug!(
+        "get enrichment table {} data req start time: {}",
+        name,
+        start_time
+    );
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
@@ -231,6 +237,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let data = super::enrichment_table::get(org_id, stream_name)
                     .await
                     .unwrap();
+                log::debug!(
+                    "enrichment table: {} cache data length: {}",
+                    item_key,
+                    data.len()
+                );
                 ENRICHMENT_TABLES.insert(
                     item_key.to_owned(),
                     StreamTable {
