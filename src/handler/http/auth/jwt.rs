@@ -46,6 +46,7 @@ use crate::{
         telemetry,
     },
     service::organization::{accept_invitation, list_orgs_by_user},
+    service::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
 };
 
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
@@ -645,6 +646,15 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
                             e
                         );
                     }
+                    enqueue_cloud_event(CloudEvent {
+                        org_id: org.identifier.clone(),
+                        org_name: org.name.clone(),
+                        org_type: org.org_type.clone(),
+                        user: Some(user_email.to_string()),
+                        event: EventType::OrgCreated,
+                        subscription_type: None,
+                    })
+                    .await;
                 }
                 Err(e) => {
                     log::error!(

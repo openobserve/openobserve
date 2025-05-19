@@ -856,6 +856,7 @@ pub struct Common {
     pub print_key_event: bool,
     #[env_config(name = "ZO_PRINT_KEY_SQL", default = false)]
     pub print_key_sql: bool,
+    // usage reporting
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
     #[env_config(
@@ -880,6 +881,30 @@ pub struct Common {
     )]
     // in seconds
     pub usage_publish_interval: i64,
+    // cloud events reporting
+    #[env_config(name = "ZO_CLOUD_EVENTS_REPORTING_ENABLED", default = false)]
+    pub cloud_events_enabled: bool,
+    #[env_config(
+        name = "ZO_CLOUD_EVENTS_REPORTING_MODE",
+        default = "local",
+        help = "possible values - 'local', 'remote', 'both'"
+    )]
+    pub cloud_events_reporting_mode: String,
+    #[env_config(
+        name = "ZO_CLOUD_EVENTS_REPORTING_URL",
+        default = "http://localhost:5080/api/_meta/cloud_events/_json"
+    )]
+    pub cloud_events_reporting_url: String,
+    #[env_config(name = "ZO_CLOUD_EVENTS_REPORTING_CREDS", default = "")]
+    pub cloud_events_reporting_creds: String,
+    #[env_config(
+        name = "ZO_CLOUD_EVENTS_PUBLISH_INTERVAL",
+        default = 60,
+        help = "duration in seconds after last reporting usage will be published"
+    )]
+    // in seconds
+    pub cloud_events_publish_interval: i64,
+    // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
     #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]

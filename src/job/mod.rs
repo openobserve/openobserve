@@ -124,6 +124,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { self_reporting::run_audit_publish().await });
+    #[cfg(feature = "cloud")]
+    tokio::task::spawn(async move { self_reporting::cloud_events::flush_cloud_events().await });
+
     #[cfg(feature = "enterprise")]
     {
         tokio::task::spawn(async move { db::ofga::watch().await });
