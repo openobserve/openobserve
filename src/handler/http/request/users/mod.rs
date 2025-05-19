@@ -184,7 +184,12 @@ pub async fn update(
             )),
         );
     }
-    if user.change_password && user.new_password.as_deref().map_or(false, |pass| pass.len() < 8) {
+    if user.change_password
+        && user
+            .new_password
+            .as_deref()
+            .is_some_and(|pass| pass.len() < 8)
+    {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
