@@ -570,7 +570,7 @@ const useLogs = () => {
       await loadStreamLists();
       return;
     } catch (e: any) {
-      console.log("Error while getting stream list");
+      console.error("Error while getting stream list", e);
     }
   };
 
