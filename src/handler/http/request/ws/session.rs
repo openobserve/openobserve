@@ -240,7 +240,7 @@ pub async fn handle_text_message(
                         return;
                     };
 
-                    log::info!("[WS_HANDLER]: trace_id: {}, Cancelling search", trace_id,);
+                    log::info!("[WS_HANDLER]: trace_id: {}, Cancelling search", trace_id);
 
                     let res = handle_cancel(&trace_id, &org_id).await;
                     let _ = send_message_2(req_id, res, response_tx.clone()).await;

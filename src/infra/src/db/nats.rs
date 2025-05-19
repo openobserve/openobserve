@@ -582,7 +582,7 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
     let mut consumer = kv
         .stream
         .create_consumer(jetstream::consumer::push::OrderedConfig {
-            deliver_subject: ider::generate(),
+            deliver_subject: ider::uuid(),
             description: Some("kv history consumer".to_string()),
             headers_only: true,
             replay_policy: jetstream::consumer::ReplayPolicy::Instant,

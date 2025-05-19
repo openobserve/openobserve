@@ -771,7 +771,7 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
         return Ok(());
     }
     log::info!("[POSTGRES] deleting index {} on table {}", idx_name, table);
-    let sql = format!("DROP INDEX IF EXISTS {};", idx_name,);
+    let sql = format!("DROP INDEX IF EXISTS {};", idx_name);
     DB_QUERY_NUMS.with_label_values(&["drop", table, ""]).inc();
     let start = std::time::Instant::now();
     sqlx::query(&sql).execute(&client).await?;
