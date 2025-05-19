@@ -925,7 +925,7 @@ pub async fn merge_files(
                 files,
                 latest_schema
             );
-            return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}",)).into());
+            return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}")).into());
         }
     };
 

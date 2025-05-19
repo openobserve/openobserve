@@ -176,6 +176,6 @@ async fn adapt_tantivy_result(
     let array = vec![Arc::new(Int64Array::from(vec![total_hits as i64])) as Arc<dyn Array>];
 
     RecordBatch::try_new(schema, array).map_err(|e| {
-        DataFusionError::Internal(format!("TantivyCountExec create record batch error: {e}",))
+        DataFusionError::Internal(format!("TantivyCountExec create record batch error: {e}"))
     })
 }
