@@ -270,8 +270,20 @@ async fn download_from_node(
 
     let file_size_map = files
         .iter()
-        .map(|(_, f, s)| (f, *s))
+        .filter_map(|(_, f, s)| {
+            if *s > cfg.cache_latest_files.download_node_size * 1024 * 1024 {
+                None
+            } else {
+                Some((f, *s))
+            }
+        })
         .collect::<HashMap<_, _>>();
+    if file_size_map.is_empty() {
+        return Ok(files
+            .iter()
+            .map(|(a, f, s)| (a.clone(), f.clone(), *s))
+            .collect());
+    }
     let request = Request::new(SimpleFileList {
         files: files.iter().map(|(_, f, _)| f.to_string()).collect(),
     });
