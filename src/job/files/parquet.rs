@@ -576,7 +576,7 @@ async fn move_files(
                 true
             };
             drop(wal_lock);
-            
+
             if can_delete {
                 match remove_file(wal_dir.join(&file.key)) {
                     Err(e) => {
