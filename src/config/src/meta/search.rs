@@ -316,6 +316,12 @@ impl Iterator for ResponseChunkIterator {
             let hit = &self.remaining_hits[0];
             let hit_size = crate::utils::json::estimate_json_bytes(hit);
 
+            if hit_size > self.chunk_size {
+                return Some(ResponseChunk::Hits {
+                    hits: vec![hit.to_owned()],
+                });
+            }
+
             // If adding this hit would exceed target size, break
             if !current_chunk.is_empty() && current_chunk_size + hit_size > self.chunk_size {
                 break;
@@ -1535,16 +1541,23 @@ impl StreamResponses {
                                 streaming_aggs,
                                 time_offset: time_offset.clone(),
                             };
+                            let data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
+                                log::error!("Failed to serialize metadata: {:?}", metadata);
+                                String::new()
+                            });
                             (
                                 "search_response_metadata",
-                                serde_json::to_string(&metadata).unwrap_or_default(),
+                                data,
                             )
                         }
                         ResponseChunk::Hits { hits } => {
-                            let hits_chunk = StreamResponses::SearchResponseHits { hits };
+                            let data = serde_json::to_string(&StreamResponses::SearchResponseHits { hits }).unwrap_or_else(|e| {
+                                log::error!("Failed to serialize hits: {:?}", e);
+                                String::new()
+                            });
                             (
                                 "search_response_hits",
-                                serde_json::to_string(&hits_chunk).unwrap_or_default(),
+                                data,
                             )
                         }
                     };

@@ -292,7 +292,7 @@ enum ContentEncoder {
     Deflate(ZlibEncoder<Writer>),
     Gzip(GzEncoder<Writer>),
     Brotli(Box<brotli::CompressorWriter<Writer>>),
-    // Wwe need explicit 'static lifetime here because ZstdEncoder needs a lifetime argument and
+    // We need explicit 'static lifetime here because ZstdEncoder needs a lifetime argument and
     // we use `spawn_blocking` in `Encoder::poll_next` that requires `FnOnce() -> R + Send +
     // 'static`.
     Zstd(ZstdEncoder<'static, Writer>),

@@ -1116,7 +1116,7 @@ async fn process_delta(
                 original_req_end_time - cache_req_duration,
                 original_req_end_time,
             );
-            // passs original start_time and end_time partition end time
+            // pass original start_time and end_time partition end time
             let _ = send_partial_search_resp(
                 trace_id,
                 "reached max query range limit",
@@ -1291,10 +1291,15 @@ async fn send_cached_responses(
             req.query.end_time,
             cache_order_by,
         );
-        sender
+        if let Err(e) = sender
             .send(Ok(StreamResponses::Progress { percent }))
             .await
-            .unwrap();
+        {
+            log::error!("Error sending progress update: {}", e);
+            return Err(infra::errors::Error::Message(
+                "Error sending progress update".to_string(),
+            ));
+        }
     }
 
     Ok(())
