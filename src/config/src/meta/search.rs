@@ -1544,20 +1544,18 @@ impl StreamResponses {
                                 log::error!("Failed to serialize metadata: {:?}", metadata);
                                 String::new()
                             });
-                            (
-                                "search_response_metadata",
-                                data,
-                            )
+                            ("search_response_metadata", data)
                         }
                         ResponseChunk::Hits { hits } => {
-                            let data = serde_json::to_string(&StreamResponses::SearchResponseHits { hits }).unwrap_or_else(|e| {
-                                log::error!("Failed to serialize hits: {:?}", e);
-                                String::new()
-                            });
-                            (
-                                "search_response_hits",
-                                data,
-                            )
+                            let data =
+                                serde_json::to_string(&StreamResponses::SearchResponseHits {
+                                    hits,
+                                })
+                                .unwrap_or_else(|e| {
+                                    log::error!("Failed to serialize hits: {:?}", e);
+                                    String::new()
+                                });
+                            ("search_response_hits", data)
                         }
                     };
 
