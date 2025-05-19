@@ -93,12 +93,44 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         .await
         .unwrap_or_default();
 
+    #[cfg(not(feature = "cloud"))]
+    let free_trial_expiry = None;
+    #[cfg(feature = "cloud")]
+    let trial_period_expiry = {
+        use o2_enterprise::enterprise::{
+            cloud::billings, common::infra::config::get_config as get_o2_config,
+        };
+        let o2_config = get_o2_config();
+
+        // if trial period check is disabled, everything is free trial period
+        if !o2_config.common.trial_period_enabled || org_id == "_meta" {
+            None
+        } else {
+            // first check if the org is
+            let subscription = billings::get_billing_by_org_id(org_id).await.ok();
+            match subscription {
+                None | Some(None) => match infra::table::organizations::get(org_id).await {
+                    Ok(org) => Some(org.trial_ends_at),
+                    Err(_) => None,
+                },
+                Some(Some(s)) if s.subscription_type.is_free_sub() => {
+                    match infra::table::organizations::get(org_id).await {
+                        Ok(org) => Some(org.trial_ends_at),
+                        Err(_) => None,
+                    }
+                }
+                _ => None,
+            }
+        }
+    };
+
     OrgSummary {
         streams: stream_summary,
         pipelines: pipeline_summary,
         alerts: alert_summary,
         total_functions: functions.len() as i64,
         total_dashboards: dashboards.len() as i64,
+        trial_period_expiry,
     }
 }
 
