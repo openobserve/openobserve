@@ -13,11 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod check_keep_alive;
-mod compress;
-mod encoding;
-mod slow_log;
+use std::io;
 
-pub use check_keep_alive::check_keep_alive;
-pub use compress::Compress;
-pub use slow_log::SlowLog;
+use bytes::{Bytes, BytesMut};
+
+mod encoder;
+
+pub use self::encoder::Encoder;
+
+/// Special-purpose writer for streaming (de-)compression.
+///
+/// Pre-allocates 8KiB of capacity.
+struct Writer {
+    buf: BytesMut,
+}
+
+impl Writer {
+    fn new() -> Writer {
+        Writer {
+            buf: BytesMut::with_capacity(8192),
+        }
+    }
+
+    fn take(&mut self) -> Bytes {
+        self.buf.split().freeze()
+    }
+}
+
+impl io::Write for Writer {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.buf.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}

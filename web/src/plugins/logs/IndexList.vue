@@ -676,6 +676,7 @@ import {
   useLocalInterestingFields,
   generateTraceContext,
   isWebSocketEnabled,
+  isStreamingEnabled,
   b64EncodeStandard,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
@@ -689,6 +690,8 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import searchService from "@/services/search";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 
 interface Filter {
   fieldName: string;
@@ -734,6 +737,8 @@ export default defineComponent({
       sendSearchMessageBasedOnRequestId,
       cancelSearchQueryBasedOnRequestId,
     } = useSearchWebSocket();
+
+    const { fetchQueryDataWithHttpStream } = useHttpStreaming();
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
@@ -1007,7 +1012,7 @@ export default defineComponent({
             query_context = query_context == undefined ? "" : query_context;
 
             // Implement websocket based field values, check getQueryData in useLogs for websocket enabled
-            if (isWebSocketEnabled()) {
+            if (isWebSocketEnabled() || isStreamingEnabled()) {
               fetchValuesWithWebsocket({
                 fields: [name],
                 size: 10,
@@ -1275,20 +1280,34 @@ export default defineComponent({
         isPagination: false,
         traceId: generateTraceContext().traceId,
         org_id: searchObj.organizationIdentifier,
+        meta: payload,
       };
       initializeWebSocketConnection(wsPayload);
 
       addTraceId(payload.fields[0], wsPayload.traceId);
     };
 
-    const initializeWebSocketConnection = (payload: any): string => {
-      return fetchQueryDataWithWebSocket(payload, {
-        open: sendSearchMessage,
-        close: handleSearchClose,
-        error: handleSearchError,
-        message: handleSearchResponse,
-        reset: handleSearchReset,
-      }) as string;
+    const initializeWebSocketConnection = (payload: any) => {
+      if (isWebSocketEnabled()) {
+        fetchQueryDataWithWebSocket(payload, {
+          open: sendSearchMessage,
+          close: handleSearchClose,
+          error: handleSearchError,
+          message: handleSearchResponse,
+          reset: handleSearchReset,
+        }) as string;
+        return;
+      }
+
+      if (isStreamingEnabled()) {
+        fetchQueryDataWithHttpStream(payload, {
+          data: handleSearchResponse,
+          error: handleSearchError,
+          complete: handleSearchClose,
+          reset: handleSearchReset,
+        });
+        return;
+      }
     };
 
     const sendSearchMessage = (queryReq: any) => {
