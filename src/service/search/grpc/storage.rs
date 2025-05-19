@@ -27,7 +27,7 @@ use config::{
         search::{ScanStats, StorageType},
         stream::{FileKey, StreamType},
     },
-    metrics::QUERY_PARQUET_CACHE_RATIO_NODE,
+    metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
     utils::{
         file::is_exists,
         inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
@@ -49,7 +49,7 @@ use tokio::sync::Semaphore;
 use tracing::Instrument;
 
 use crate::{
-    job,
+    job::{self, should_prioritize_file},
     service::{
         db, file_list,
         search::{
@@ -256,17 +256,31 @@ pub async fn search(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let cache_type = cache_files(
+    let (cache_type, cache_hits, cache_misses) = cache_files(
         &query.trace_id,
         &files
             .iter()
-            .map(|f| (f.key.as_ref(), f.meta.compressed_size))
+            .map(|f| {
+                (
+                    f.key.as_ref(),
+                    f.meta.compressed_size,
+                    should_prioritize_file(&f.meta),
+                )
+            })
             .collect_vec(),
         &mut scan_stats,
         "parquet",
     )
     .instrument(enter_span.clone())
     .await?;
+
+    // report cache hit and miss metrics
+    metrics::QUERY_DISK_CACHE_HIT_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
+        .inc_by(cache_hits);
+    metrics::QUERY_DISK_CACHE_MISS_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
+        .inc_by(cache_misses);
 
     scan_stats.idx_took = idx_took as i64;
     scan_stats.querier_files = scan_stats.files;
@@ -392,32 +406,36 @@ pub async fn search(
                 .build()
         )
     );
-
     Ok((tables, scan_stats))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 pub async fn cache_files(
     trace_id: &str,
-    files: &[(&str, i64)],
+    files: &[(&str, i64, bool)],
     scan_stats: &mut ScanStats,
     file_type: &str,
-) -> Result<file_data::CacheType, Error> {
+) -> Result<(file_data::CacheType, u64, u64), Error> {
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
-    for (file, _) in files.iter() {
+    let (mut cache_hits, mut cache_misses) = (0, 0);
+    for (file, ..) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
+            cache_hits += 1;
         } else if file_data::disk::exist(file).await {
             scan_stats.querier_disk_cached_files += 1;
             cached_files.insert(file);
+            cache_hits += 1;
+        } else {
+            cache_misses += 1;
         }
     }
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
-        return Ok(file_data::CacheType::None);
+        return Ok((file_data::CacheType::None, cache_hits, cache_misses));
     }
 
     // check cache size
@@ -435,25 +453,32 @@ pub async fn cache_files(
         file_data::CacheType::Disk
     } else {
         // no cache, the files are too big than cache size
-        return Ok(file_data::CacheType::None);
+        return Ok((file_data::CacheType::None, cache_hits, cache_misses));
     };
 
     let trace_id = trace_id.to_string();
     let files = files
         .iter()
-        .filter_map(|(f, size)| {
+        .filter_map(|(f, size, to_priority_queue)| {
             if cached_files.contains(f) {
                 None
             } else {
-                Some((f.to_string(), *size))
+                Some((f.to_string(), *size, *to_priority_queue))
             }
         })
         .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
         let files_num = files.len();
-        for (file, size) in files {
-            if let Err(e) = job::queue_background_download(&trace_id, &file, size, cache_type).await
+        for (file, size, to_priority_queue) in files {
+            if let Err(e) = job::queue_background_download(
+                &trace_id,
+                &file,
+                size,
+                cache_type,
+                to_priority_queue,
+            )
+            .await
             {
                 log::error!(
                     "[trace_id {trace_id}] error in queuing file {file} for background download: {e}"
@@ -472,9 +497,9 @@ pub async fn cache_files(
     // if cached file less than 50% of the total files, return None
     if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num / 2
     {
-        Ok(file_data::CacheType::None)
+        Ok((file_data::CacheType::None, cache_hits, cache_misses))
     } else {
-        Ok(cache_type)
+        Ok((cache_type, cache_hits, cache_misses))
     }
 }
 
@@ -512,16 +537,30 @@ pub async fn filter_file_list_by_tantivy_index(
         })
         .collect_vec();
     scan_stats.querier_files = index_file_names.len() as i64;
-    let cache_type = cache_files(
+    let (cache_type, cache_hits, cache_misses) = cache_files(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, meta)| (ttv_file.as_str(), meta.meta.index_size))
+            .map(|(ttv_file, meta)| {
+                (
+                    ttv_file.as_str(),
+                    meta.meta.index_size,
+                    should_prioritize_file(&meta.meta),
+                )
+            })
             .collect_vec(),
         &mut scan_stats,
         "index",
     )
     .await?;
+
+    // report cache hit and miss metrics
+    metrics::QUERY_DISK_CACHE_HIT_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "index"])
+        .inc_by(cache_hits);
+    metrics::QUERY_DISK_CACHE_MISS_COUNT
+        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "index"])
+        .inc_by(cache_misses);
 
     let cached_ratio = (scan_stats.querier_memory_cached_files
         + scan_stats.querier_disk_cached_files) as f64

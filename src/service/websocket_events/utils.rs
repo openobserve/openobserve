@@ -15,6 +15,7 @@
 
 use actix_web::http::StatusCode;
 use config::meta::{
+    search::TimeOffset,
     sql::OrderBy,
     websocket::{SearchEventReq, ValuesEventReq},
 };
@@ -181,13 +182,6 @@ impl WsClientEvents {
             _ => {}
         }
     }
-}
-
-/// To represent the query start and end time based of partition or cache
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TimeOffset {
-    pub start_time: i64,
-    pub end_time: i64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

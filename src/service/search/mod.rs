@@ -77,6 +77,7 @@ pub(crate) mod index;
 pub(crate) mod inspector;
 pub(crate) mod partition;
 pub(crate) mod request;
+pub(crate) mod search_stream;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
@@ -825,6 +826,10 @@ pub async fn search_partition(
     // Generate partitions
     let partitions =
         generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
+
+    if sql_order_by == OrderBy::Asc {
+        resp.order_by = OrderBy::Asc;
+    }
 
     resp.partitions = partitions;
     Ok(resp)
