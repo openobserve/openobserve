@@ -122,6 +122,7 @@ pub struct OrgSummary {
     pub alerts: AlertSummary,
     pub total_functions: i64,
     pub total_dashboards: i64,
+    pub trial_period_expiry: Option<i64>,
 }
 
 #[derive(Default, Serialize, Deserialize, ToSchema)]
