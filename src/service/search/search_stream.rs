@@ -66,8 +66,8 @@ use crate::{
 //     pub stream_names: Vec<String>,
 //     pub req_order_by: OrderBy,
 //     pub search_span: tracing::Span,
-//     pub sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
-//     pub values_ctx: Option<ValuesEventContext>,
+//     pub sender: mpsc::Sender<Result<config::meta::search::StreamResponses,
+// infra::errors::Error>>,     pub values_ctx: Option<ValuesEventContext>,
 //     pub fallback_order_by_col: Option<String>,
 //     pub _audit_ctx: Option<AuditContext>,
 // }
@@ -1291,10 +1291,7 @@ async fn send_cached_responses(
             req.query.end_time,
             cache_order_by,
         );
-        if let Err(e) = sender
-            .send(Ok(StreamResponses::Progress { percent }))
-            .await
-        {
+        if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
             log::error!("Error sending progress update: {}", e);
             return Err(infra::errors::Error::Message(
                 "Error sending progress update".to_string(),
