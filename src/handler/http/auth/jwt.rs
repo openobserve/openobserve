@@ -558,8 +558,6 @@ fn format_role_name(org: &str, role: String) -> String {
 
 #[cfg(feature = "cloud")]
 pub async fn check_and_add_to_org(user_email: &str, name: &str) {
-    use std::str::FromStr;
-
     use config::{ider, utils::json};
     use o2_enterprise::enterprise::cloud::org_invites::list_by_invitee;
     use o2_openfga::authorizer::authz::save_org_tuples;
@@ -689,6 +687,10 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
             json::Value::String(user_email.to_string()),
         ),
         ("organization".to_string(), json::Value::String(org_name)),
+        (
+            "created_at".to_string(),
+            json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
+        ),
     ]);
     telemetry::Telemetry::new()
         .send_track_event(
