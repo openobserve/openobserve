@@ -552,7 +552,9 @@ async fn move_files(
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {
-            if wal::lock_files_exists(&file.key) {
+            // use same lock to combine the operations of check lock and add to removing list
+            let wal_lock = infra::local_lock::lock("wal").await?;
+            let can_delete = if wal::lock_files_exists(&file.key) {
                 log::warn!(
                     "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {}",
                     file.key
@@ -568,8 +570,14 @@ async fn move_files(
                         e.to_string()
                     );
                 }
+                false
             } else {
                 db::file_list::local::add_removing(&file.key).await?;
+                true
+            };
+            drop(wal_lock);
+            
+            if can_delete {
                 match remove_file(wal_dir.join(&file.key)) {
                     Err(e) => {
                         log::warn!(
@@ -590,14 +598,9 @@ async fn move_files(
                                 file.key,
                                 e.to_string()
                             );
-                        } else {
-                            // remove the file from removing set
-                            db::file_list::local::remove_removing(&file.key).await?;
                         }
                     }
                     Ok(_) => {
-                        // remove the file from removing set
-                        db::file_list::local::remove_removing(&file.key).await?;
                         // delete metadata from cache
                         WAL_PARQUET_METADATA.write().await.remove(&file.key);
                         // remove the file from processing set
@@ -608,6 +611,9 @@ async fn move_files(
                             .sub(file.meta.compressed_size);
                     }
                 }
+
+                // remove the file from removing set
+                db::file_list::local::remove_removing(&file.key).await?;
             }
 
             // metrics
