@@ -5029,6 +5029,11 @@ const useLogs = () => {
       }
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
+      
+      if(shouldGetPageCount(queryReq, fnParsedSQL())) {
+        queryReq.query.size = queryReq.query.size + 1;
+      }
+
       const requestId = initializeSearchConnection(payload);
 
       if (!requestId) {
@@ -5700,7 +5705,6 @@ const useLogs = () => {
       ////// Update results ///////
       updateResult(queryReq, response, isPagination, appendResult);
     
-
       // If its a pagination request, then append
       if (!isPagination) {
         searchObj.data.queryResults.pagination = [];
