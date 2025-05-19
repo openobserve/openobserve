@@ -34,7 +34,7 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_aggregate_query},
+        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
         time::now_micros,
     },
 };
@@ -612,10 +612,18 @@ pub async fn search_partition(
         && is_simple_aggregate_query(&req.sql).unwrap_or(false)
         && cfg.common.feature_query_streaming_aggs;
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
+    let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
+    // TODO: check if req if http or websocket or sse
+    let is_http_distinct = is_simple_distinct;
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
         skip_get_file_list = false;
+    }
+
+    // if http distinct, we should skip file list
+    if is_http_distinct {
+        skip_get_file_list = true;
     }
 
     // check if we need to use streaming_output
