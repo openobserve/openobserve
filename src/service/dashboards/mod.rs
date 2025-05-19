@@ -623,7 +623,7 @@ async fn filter_permitted_dashboards(
             user_id,
             AuthExtractor {
                 org_id: org_id.to_string(),
-                o2_type: format!("{}:{folder_id}", OFGA_MODELS.get("folders").unwrap().key,),
+                o2_type: format!("{}:{folder_id}", OFGA_MODELS.get("folders").unwrap().key),
                 method: "GET".to_string(),
                 bypass_check: false,
                 parent_id: "".to_string(),

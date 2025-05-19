@@ -1315,3 +1315,4 @@ mod search_history_utils {
         }
     }
 }
+
