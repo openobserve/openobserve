@@ -22,6 +22,8 @@ use tokio::sync::RwLock;
 static PENDING_DELETE_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::new()));
 
+static REMOVING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+
 pub async fn exist_pending_delete(file: &str) -> bool {
     PENDING_DELETE_FILES.read().await.contains(file)
 }
@@ -61,9 +63,15 @@ pub async fn get_pending_delete() -> Vec<String> {
 }
 
 pub async fn filter_by_pending_delete(mut files: Vec<String>) -> Vec<String> {
-    let r = PENDING_DELETE_FILES.read().await;
-    files.retain(|file| !r.contains(file));
-    drop(r);
+    // Acquire locks in a consistent order to prevent deadlocks
+    let pending = PENDING_DELETE_FILES.read().await;
+    let removing = REMOVING_FILES.read().await;
+
+    // Filter in a single pass using both sets
+    files.retain(|file| !pending.contains(file) && !removing.contains(file));
+    drop(pending);
+    drop(removing);
+
     files
 }
 
@@ -75,5 +83,17 @@ pub async fn load_pending_delete() -> Result<()> {
             PENDING_DELETE_FILES.write().await.insert(file.file);
         }
     }
+    Ok(())
+}
+
+pub async fn add_removing(file: &str) -> Result<()> {
+    // add to memory cache
+    REMOVING_FILES.write().await.insert(file.to_string());
+    Ok(())
+}
+
+pub async fn remove_removing(file: &str) -> Result<()> {
+    // remove from memory cache
+    REMOVING_FILES.write().await.remove(file);
     Ok(())
 }
