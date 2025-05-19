@@ -579,7 +579,7 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
-    is_non_streaming_req: bool,
+    is_http_req: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -614,7 +614,7 @@ pub async fn search_partition(
         && cfg.common.feature_query_streaming_aggs;
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
     let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
-    let is_http_distinct = is_simple_distinct && is_non_streaming_req;
+    let is_http_distinct = is_simple_distinct && is_http_req;
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
