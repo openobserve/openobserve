@@ -674,24 +674,21 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
     }
 
     // Send new user info to ActiveCampaign via segment proxy
-    log::warn!("sending track event to segment");
+    log::info!("sending track event to segment");
     let segment_event_data = HashMap::from([
         (
             "first_name".to_string(),
-            json::Value::from_str(first_name).unwrap_or_default(),
+            json::Value::String(first_name.to_string()),
         ),
         (
             "last_name".to_string(),
-            json::Value::from_str(last_name).unwrap_or_default(),
+            json::Value::String(last_name.to_string()),
         ),
         (
             "email".to_string(),
-            json::Value::from_str(user_email).unwrap_or_default(),
+            json::Value::String(user_email.to_string()),
         ),
-        (
-            "organization".to_string(),
-            json::Value::from_str(&org_name).unwrap_or_default(),
-        ),
+        ("organization".to_string(), json::Value::String(org_name)),
     ]);
     telemetry::Telemetry::new()
         .send_track_event(
