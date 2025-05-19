@@ -313,10 +313,6 @@ const {
 
 const {
   fetchQueryDataWithHttpStream,
-  cancelStreamQueryBasedOnRequestId,
-  closeStreamWithError,
-  closeStream,
-  resetAuthToken,
 } = useStreamingSearch();
 
 const searchPartitionMap = reactive<{ [key: string]: number }>({});
@@ -5259,12 +5255,12 @@ const useLogs = () => {
       } else {
         searchObj.data.queryResults.hits = response.content.results.hits;
       }
-    }
+      
 
-    //       // We are storing time_offset for the context of pagecount, to get the partial pagecount
-    // if (searchObj.data.queryResults) {
-    //   searchObj.data.queryResults.time_offset = response.content?.time_offset;
-    // }
+      if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (searchObj.data.queryResults.hits.length === payload.queryReq.query.size)) {
+        searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(0, payload.queryReq.query.size - 1);
+      }
+    }
 
     processPostPaginationData();
   }
@@ -5327,6 +5323,10 @@ const useLogs = () => {
         } else {
           searchObj.data.queryResults = response.content.results;
         }
+      }
+
+      if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total === payload.queryReq.query.size)) {
+        searchObj.data.queryResults.pageCountTotal = payload.queryReq.query.size * searchObj.data.resultGrid.currentPage;
       }
     }
 
@@ -5464,7 +5464,6 @@ const useLogs = () => {
     } else {
       searchObj.data.queryResults.aggs.push(...response.content.results.hits);
     }
-
 
     // if total records in partition is greater than recordsPerPage then we need to update pagination
     // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
@@ -5866,18 +5865,19 @@ const useLogs = () => {
     searchObj.data.histogram.errorDetail = "";
   };
 
+  const shouldShowHistogram = (parsedSQL: any) => {
+    return (isHistogramDataMissing(searchObj) &&
+    isHistogramEnabled(searchObj) &&
+    isSingleStreamSelected(searchObj) &&
+    (!searchObj.meta.sqlMode ||
+      isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
+  (isHistogramEnabled(searchObj) &&
+    isSingleStreamSelected(searchObj) &&
+    !searchObj.meta.sqlMode);
+  }
+
   const processHistogramRequest = async (queryReq: SearchRequestPayload) => {
     const parsedSQL: any = fnParsedSQL();
-
-    const shouldShowHistogram =
-      (isHistogramDataMissing(searchObj) &&
-        isHistogramEnabled(searchObj) &&
-        isSingleStreamSelected(searchObj) &&
-        (!searchObj.meta.sqlMode ||
-          isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
-      (isHistogramEnabled(searchObj) &&
-        isSingleStreamSelected(searchObj) &&
-        !searchObj.meta.sqlMode);
 
     if (searchObj.data.stream.selectedStream.length > 1) {
       const errMsg = "Histogram is not available for multi stream search.";
@@ -5888,9 +5888,13 @@ const useLogs = () => {
       return;
     }
 
+    const isFromZero = queryReq.query.from == 0 &&
+    searchObj.data.queryResults.hits?.length > 0
+
+    const _shouldShowHistogram = shouldShowHistogram(parsedSQL);
 
     searchObj.data.queryResults.aggs = [];
-    if (shouldShowHistogram) {
+    if (_shouldShowHistogram) {
       searchObj.meta.refreshHistogram = false;
       if (searchObj.data.queryResults.hits?.length > 0) {
         searchObjDebug["histogramStartTime"] = performance.now();
@@ -5920,15 +5924,7 @@ const useLogs = () => {
       resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT and LIMIT queries.", -1);
       searchObj.meta.histogramDirtyFlag = false;
     } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
-      let aggFlag = false;
-      if (parsedSQL) {
-        aggFlag = hasAggregation(parsedSQL?.columns);
-      }
-      if (
-        queryReq.query.from == 0 &&
-        searchObj.data.queryResults.hits?.length > 0 &&
-        !aggFlag
-      ) {
+      if (shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
           getPageCountThroughSocket(queryReq);
@@ -5950,15 +5946,7 @@ const useLogs = () => {
       }
       searchObj.meta.histogramDirtyFlag = false;
     } else {
-      let aggFlag = false;
-      if (parsedSQL) {
-        aggFlag = hasAggregation(parsedSQL?.columns);
-      }
-      if (
-        queryReq.query.from == 0 &&
-        searchObj.data.queryResults.hits?.length > 0 &&
-        !aggFlag
-      ) {
+      if(shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
           getPageCountThroughSocket(queryReq);
@@ -5988,7 +5976,7 @@ const useLogs = () => {
   }
 
   function isHistogramDataMissing(searchObj: any) {
-    return searchObj.data.queryResults.aggs === undefined;
+    return searchObj.data.queryResults.aggs === undefined || searchObj.data.queryResults.aggs.length === 0;
   }
 
   const handleSearchClose = (payload: any, response: any) => {
@@ -6106,6 +6094,13 @@ const useLogs = () => {
     return errorMsg;
   };
 
+  const getAggsTotal = () => {
+    return (searchObj.data.queryResults.aggs || []).reduce(
+      (acc: number, item: { zo_sql_num: number; }) => acc + item.zo_sql_num,
+      0,
+    );
+  };
+
   const refreshPagination = (regenrateFlag: boolean = false) => {
     try {
       const { rowsPerPage } = searchObj.meta.resultGrid;
@@ -6117,17 +6112,12 @@ const useLogs = () => {
       let total = 0;
       let totalPages = 0;
 
-      total = (searchObj.data.queryResults.aggs || []).reduce(
-        (
-          acc: number,
-          item: {
-            zo_sql_num: number;
-          },
-        ) => {
-          return acc + item.zo_sql_num;
-        },
-        0,
-      );
+      total = getAggsTotal();
+
+      if((searchObj.data.queryResults.pageCountTotal || -1) > total) {
+        total = searchObj.data.queryResults.pageCountTotal;
+      }
+      
 
       searchObj.data.queryResults.total = total;
       searchObj.data.queryResults.pagination = [];
@@ -6181,6 +6171,20 @@ const useLogs = () => {
       return false;
     }
   };
+
+  const shouldGetPageCount = (queryReq: any, parsedSQL: any) => {
+    if(shouldShowHistogram(parsedSQL) || (searchObj.meta.sqlMode && isLimitQuery(parsedSQL))) {
+      return false;
+    }
+    let aggFlag = false;
+    if (parsedSQL) {
+      aggFlag = hasAggregation(parsedSQL?.columns);
+    }
+    if (!aggFlag) {
+      return true;
+    }
+    return false;
+  }
 
   const getPageCountThroughSocket = async (queryReq: any) => {
     if (
