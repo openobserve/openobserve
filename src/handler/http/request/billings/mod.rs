@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use actix_web::{HttpRequest, HttpResponse, Responder, get, post, web};
 use config::{get_config, utils::json};
-use o2_enterprise::enterprise::cloud::billings as o2_cloud_billings;
+use o2_enterprise::enterprise::cloud::billings::{self as o2_cloud_billings};
 
 use crate::{
     common::{
@@ -27,7 +27,10 @@ use crate::{
     handler::http::models::billings::{
         CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody, ListSubscriptionResponseBody,
     },
-    service::organization,
+    service::{
+        organization,
+        self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
+    },
 };
 
 pub mod org_usage;
@@ -63,9 +66,10 @@ pub async fn create_checkout_session(
         return o2_cloud_billings::BillingError::SubTypeMissing.into_http_response();
     };
 
-    if organization::get_org(&org_id).await.is_none() {
-        return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
-    }
+    let org = match organization::get_org(&org_id).await {
+        None => return o2_cloud_billings::BillingError::OrgNotFound.into_http_response(),
+        Some(org) => org,
+    };
 
     match o2_cloud_billings::create_checkout_session(
         &get_config().common.web_url,
@@ -78,12 +82,30 @@ pub async fn create_checkout_session(
         Err(err) => err.into_http_response(),
         Ok(o2_cloud_billings::CheckoutResult::RedirectUrl(redirect_url)) => {
             log::debug!("redirect url: {redirect_url}");
+            enqueue_cloud_event(CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: Some(email.to_string()),
+                event: EventType::SubscriptionChanged,
+                subscription_type: Some(sub_type.to_owned()),
+            })
+            .await;
             RedirectResponseBuilder::new(&redirect_url)
                 .build()
                 .redirect_http()
         }
         Ok(o2_cloud_billings::CheckoutResult::Session(checkout_session)) => {
             log::debug!("created checkout session");
+            enqueue_cloud_event(CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: Some(email.to_string()),
+                event: EventType::CheckoutSessionCreated,
+                subscription_type: Some(sub_type.to_owned()),
+            })
+            .await;
             MetaHttpResponse::json(checkout_session)
         }
     }
@@ -116,9 +138,10 @@ pub async fn process_session_detail(
         return o2_cloud_billings::BillingError::InvalidStatus.into_http_response();
     }
 
-    if organization::get_org(&org_id).await.is_none() {
-        return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
-    }
+    let org = match organization::get_org(&org_id).await {
+        None => return o2_cloud_billings::BillingError::OrgNotFound.into_http_response(),
+        Some(org) => org,
+    };
 
     log::debug!("handling checkout session detail");
     match o2_cloud_billings::process_checkout_session_details(
@@ -135,6 +158,15 @@ pub async fn process_session_detail(
                 &get_config().common.web_url,
                 &org_id
             );
+            enqueue_cloud_event(CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: None,
+                event: EventType::SubscriptionCreated,
+                subscription_type: Some(query.plan.clone()),
+            })
+            .await;
             RedirectResponseBuilder::new(&redirect_url)
                 .build()
                 .redirect_http()
@@ -164,13 +196,23 @@ pub async fn unsubscribe(path: web::Path<String>, user_email: UserEmail) -> impl
     let org_id = path.into_inner();
     let email = user_email.user_id.as_str();
 
-    if organization::get_org(&org_id).await.is_none() {
-        return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
-    }
+    let org = match organization::get_org(&org_id).await {
+        Some(org) => org,
+        None => return o2_cloud_billings::BillingError::OrgNotFound.into_http_response(),
+    };
 
     match o2_cloud_billings::unsubscribe(&org_id, email).await {
         Err(err) => err.into_http_response(),
         Ok(()) => {
+            enqueue_cloud_event(CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: Some(user_email.user_id.to_string()),
+                event: EventType::SubscriptionDeleted,
+                subscription_type: None,
+            })
+            .await;
             HttpResponse::Ok().body("Subscription will be cancelled at the end of billing cycle.")
         }
     }
@@ -316,9 +358,27 @@ pub async fn handle_stripe_event(
     };
 
     match o2_cloud_billings::handle_strip_wb_event(signature, &payload_str).await {
-        Ok(()) => HttpResponse::Ok().json(json::json!({
-            "status": "success"
-        })),
+        Ok(orgs) => {
+            for (org_id, sub_type) in orgs {
+                let org = match organization::get_org(&org_id).await {
+                    None => continue,
+                    Some(org) => org,
+                };
+                enqueue_cloud_event(CloudEvent {
+                    org_id: org.identifier.clone(),
+                    org_name: org.name.clone(),
+                    org_type: org.org_type.clone(),
+                    user: None,
+                    event: EventType::SubscriptionDeleted,
+                    subscription_type: Some(sub_type.to_string()),
+                })
+                .await;
+            }
+
+            HttpResponse::Ok().json(json::json!({
+                "status": "success"
+            }))
+        }
         Err(err) => err.into_http_response(),
     }
 }
