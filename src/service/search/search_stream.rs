@@ -66,8 +66,7 @@ use crate::{
 //     pub stream_names: Vec<String>,
 //     pub req_order_by: OrderBy,
 //     pub search_span: tracing::Span,
-//     pub sender: mpsc::Sender<Result<config::meta::search::StreamResponses,
-// infra::errors::Error>>,
+//     pub sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
 //     pub values_ctx: Option<ValuesEventContext>,
 //     pub fallback_order_by_col: Option<String>,
 //     pub _audit_ctx: Option<AuditContext>,
@@ -579,19 +578,7 @@ pub async fn do_partitioned_search(
         // do not use cache for partitioned search without cache
         let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
 
-        let total_hits = search_res.total as i64;
-
-        if total_hits > req.query.size {
-            log::info!(
-                "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
-                trace_id,
-                req.query.size
-            );
-            search_res.hits.truncate(req.query.size as usize);
-            curr_res_size += req.query.size;
-        } else {
-            curr_res_size += total_hits;
-        }
+        curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
             search_res = order_search_results(search_res, fallback_order_by_col.clone());
@@ -721,7 +708,6 @@ async fn get_partitions(
         Some(user_id),
         stream_type,
         &search_partition_req,
-        false,
         false,
     )
     .instrument(tracing::info_span!(
@@ -1027,20 +1013,7 @@ async fn process_delta(
 
         // use cache for delta search
         let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
-
-        let total_hits = search_res.total as i64;
-
-        if total_hits > req.query.size {
-            log::info!(
-                "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
-                trace_id,
-                req.query.size
-            );
-            search_res.hits.truncate(req.query.size as usize);
-            *curr_res_size += req.query.size;
-        } else {
-            *curr_res_size += total_hits;
-        }
+        *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
             "[HTTP2_STREAM]: Found {} hits, for trace_id: {}",
@@ -1318,7 +1291,10 @@ async fn send_cached_responses(
             req.query.end_time,
             cache_order_by,
         );
-        if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
+        if let Err(e) = sender
+            .send(Ok(StreamResponses::Progress { percent }))
+            .await
+        {
             log::error!("Error sending progress update: {}", e);
             return Err(infra::errors::Error::Message(
                 "Error sending progress update".to_string(),
