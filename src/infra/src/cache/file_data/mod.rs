@@ -293,6 +293,9 @@ async fn download_from_storage(
                         size,
                     );
                     crate::file_list::update_compressed_size(file, data_len as i64).await?;
+                    crate::file_list::LOCAL_CACHE
+                        .update_compressed_size(file, data_len as i64)
+                        .await?;
                     Ok((data_len, data_bytes))
                 } else {
                     log::warn!(
@@ -302,6 +305,7 @@ async fn download_from_storage(
                         size
                     );
                     crate::file_list::remove(file).await?;
+                    crate::file_list::LOCAL_CACHE.remove(file).await?;
                     Err(anyhow::anyhow!("file {file} is corrupted in blob store"))
                 }
             }
