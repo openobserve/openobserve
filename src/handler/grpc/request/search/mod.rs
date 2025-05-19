@@ -258,6 +258,9 @@ impl Search for Searcher {
         let path = req.into_inner().path;
         let res = infra::storage::get(&path)
             .await
+            .map_err(|e| Status::internal(format!("failed to get result: {e}")))?
+            .bytes()
+            .await
             .map_err(|e| Status::internal(format!("failed to get result: {e}")))?;
         Ok(Response::new(GetResultResponse {
             response: res.to_vec(),

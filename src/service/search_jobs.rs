@@ -259,7 +259,7 @@ async fn filter_partition_job(
         // if the result_path is not none, means the partition job is done
         if partition_job.result_path.is_some() {
             let path = partition_job.result_path.as_ref().unwrap();
-            let buf = storage::get(path).await?;
+            let buf = storage::get(path).await?.bytes().await?;
             let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
             need -= res.total as i64;
         } else {
@@ -432,7 +432,7 @@ pub async fn get_result(
     size: i64,
 ) -> Result<Response, anyhow::Error> {
     if *cluster == config::get_cluster_name() {
-        let buf = storage::get(path).await?;
+        let buf = storage::get(path).await?.bytes().await?;
         let mut res: Response = json::from_slice::<Response>(&buf)?;
         res.pagination(from, size);
         return Ok(res);
