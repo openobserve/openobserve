@@ -64,6 +64,7 @@ pub mod query_manager;
 pub mod saved_view;
 pub mod search_inspector;
 pub mod search_job;
+pub mod search_stream;
 pub(crate) mod utils;
 
 async fn can_use_distinct_stream(
@@ -886,6 +887,8 @@ pub async fn build_search_request_per_field(
     };
 
     let sql = if no_count {
+            // we use min(0) as a hack to do streaming aggregation but actually return 0,
+            // essentially we are not counting the values
         format!(
             "SELECT \"{field}\" AS zo_sql_key, min(0) FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {top_k}"
         )
