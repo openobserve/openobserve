@@ -1428,6 +1428,12 @@ pub struct Limit {
         default = true
     )]
     pub histogram_enabled: bool,
+    #[env_config(
+        name = "ZO_LIMIT_HITS_PER_PANEL",
+        default = 30000,
+        help = "Limit the number of panel hits per panel"
+    )]
+    pub limit_hits_per_panel: usize,
 }
 
 #[derive(EnvConfig)]
@@ -2021,6 +2027,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // reset to default if given zero
     if cfg.limit.max_dashboard_series == 0 {
         cfg.limit.max_dashboard_series = 100;
+    }
+
+    // reset to default if given zero
+    if cfg.limit.limit_hits_per_panel == 0 {
+        cfg.limit.limit_hits_per_panel = 5000;
     }
 
     // check for uds

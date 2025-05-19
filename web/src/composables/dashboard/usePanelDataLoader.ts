@@ -58,6 +58,8 @@ const adjustTimestampByTimeRangeGap = (
   return timestamp - timeRangeGapSeconds * 1000;
 };
 
+// max raw size = 100KB
+
 export const usePanelDataLoader = (
   panelSchema: any,
   selectedTimeObj: any,
@@ -77,6 +79,11 @@ export const usePanelDataLoader = (
   let runCount = 0;
 
   const store = useStore();
+
+  const MAX_HITS_PER_PANEL =
+    store.state?.zoConfig?.limit_hits_per_panel ?? 30000;
+
+  const LIMIT_HITS_PER_PANEL_ERROR_MESSAGE = `Showing limited results upto ${MAX_HITS_PER_PANEL} for performance`;
 
   const {
     fetchQueryDataWithWebSocket,
@@ -325,7 +332,6 @@ export const usePanelDataLoader = (
 
   const cancelQueryAbort = () => {
     state.loading = false;
-
     state.isOperationCancelled = true;
 
     if (isWebSocketEnabled() && state.searchRequestTraceIds) {
@@ -535,16 +541,81 @@ export const usePanelDataLoader = (
 
           // if order by is desc, append new partition response at end
           if (order_by.toLowerCase() === "desc") {
-            state.data[currentQueryIndex] = [
-              ...(state.data[currentQueryIndex] ?? []),
-              ...searchRes.data.hits,
-            ];
+            const hitsLength = searchRes?.data?.hits?.length;
+
+            // if the hits length is greater than the max hits per panel,
+            //  then break the hits and append based on remaining raw size
+            // else append the hits
+            if (
+              (state?.data?.[currentQueryIndex]?.length ?? 0) + hitsLength >
+              MAX_HITS_PER_PANEL
+            ) {
+              const remainingHits = Math.max(
+                MAX_HITS_PER_PANEL -
+                  (state?.data?.[currentQueryIndex]?.length ?? 0),
+                0,
+              );
+
+              const hits = searchRes.data.hits.slice(0, remainingHits);
+
+              state.data[currentQueryIndex] = [
+                ...(state.data[currentQueryIndex] ?? []),
+                ...hits,
+              ];
+
+              // update result metadata
+              state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
+
+              // add function error
+              state.resultMetaData[currentQueryIndex].function_error =
+                LIMIT_HITS_PER_PANEL_ERROR_MESSAGE;
+
+              break;
+            } else {
+              state.data[currentQueryIndex] = [
+                ...(state.data[currentQueryIndex] ?? []),
+                ...searchRes.data.hits,
+              ];
+            }
           } else {
-            // else append new partition response at start
-            state.data[currentQueryIndex] = [
-              ...searchRes.data.hits,
-              ...(state.data[currentQueryIndex] ?? []),
-            ];
+            const hitsLength = searchRes?.data?.hits?.length;
+
+            // if the hits length is greater than the max hits per panel,
+            //  then break the hits and append based on remaining raw size
+            // else append the hits
+            if (
+              (state?.data?.[currentQueryIndex]?.length ?? 0) + hitsLength >
+              MAX_HITS_PER_PANEL
+            ) {
+              const remainingHits = Math.max(
+                MAX_HITS_PER_PANEL -
+                  (state?.data?.[currentQueryIndex]?.length ?? 0),
+                0,
+              );
+
+              const hits = searchRes.data.hits.slice(
+                hitsLength - remainingHits,
+              );
+
+              state.data[currentQueryIndex] = [
+                ...hits,
+                ...(state.data[currentQueryIndex] ?? []),
+              ];
+
+              // update result metadata
+              state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
+
+              // add function error
+              state.resultMetaData[currentQueryIndex].function_error =
+                LIMIT_HITS_PER_PANEL_ERROR_MESSAGE;
+
+              break;
+            } else {
+              state.data[currentQueryIndex] = [
+                ...(state.data[currentQueryIndex] ?? []),
+                ...searchRes.data.hits,
+              ];
+            }
           }
 
           // update result metadata
@@ -641,16 +712,82 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
-      // else append new partition response at start
-      state.data[payload?.queryReq?.currentQueryIndex] = [
-        ...(searchRes?.content?.results?.hits ?? {}),
-        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
-      ];
+      const hitsLength = searchRes?.content?.results?.hits?.length;
+
+      // if the hits length is greater than the max hits per panel,
+      //  then break the hits and append based on remaining raw size
+      // else append the hits
+      if (
+        (state?.data?.[payload?.queryReq?.currentQueryIndex]?.length ?? 0) +
+          hitsLength >
+        MAX_HITS_PER_PANEL
+      ) {
+        const remainingHits = Math.max(
+          MAX_HITS_PER_PANEL -
+            (state?.data?.[payload?.queryReq?.currentQueryIndex]?.length ?? 0),
+          0,
+        );
+
+        const hits = searchRes?.content?.results?.hits?.slice(
+          hitsLength - remainingHits,
+        );
+
+        // else append new partition response at start
+        state.data[payload?.queryReq?.currentQueryIndex] = [
+          ...(hits ?? {}),
+          ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+        ];
+
+        // update result metadata and add function error and return
+        state.resultMetaData[payload?.queryReq?.currentQueryIndex] =
+          searchRes?.content?.results ?? {};
+
+        state.resultMetaData[
+          payload?.queryReq?.currentQueryIndex
+        ].function_error = LIMIT_HITS_PER_PANEL_ERROR_MESSAGE;
+        return;
+      } else {
+        state.data[payload?.queryReq?.currentQueryIndex] = [
+          ...(searchRes?.content?.results?.hits ?? {}),
+          ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+        ];
+      }
     } else {
-      state.data[payload?.queryReq?.currentQueryIndex] = [
-        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ];
+      const hitsLength = searchRes?.content?.results?.hits?.length;
+
+      if (
+        (state?.data?.[payload?.queryReq?.currentQueryIndex]?.length ?? 0) +
+          hitsLength >
+        MAX_HITS_PER_PANEL
+      ) {
+        const remainingHits = Math.max(
+          MAX_HITS_PER_PANEL -
+            (state?.data?.[payload?.queryReq?.currentQueryIndex]?.length ?? 0),
+          0,
+        );
+
+        const hits = searchRes?.content?.results?.hits?.slice(0, remainingHits);
+
+        state.data[payload?.queryReq?.currentQueryIndex] = [
+          ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+          ...(hits ?? {}),
+        ];
+
+        // update result metadata and add function error and return
+        state.resultMetaData[payload?.queryReq?.currentQueryIndex] =
+          searchRes?.content?.results ?? {};
+
+        // add function error
+        state.resultMetaData[
+          payload?.queryReq?.currentQueryIndex
+        ].function_error = LIMIT_HITS_PER_PANEL_ERROR_MESSAGE;
+        return;
+      } else {
+        state.data[payload?.queryReq?.currentQueryIndex] = [
+          ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+          ...(searchRes?.content?.results?.hits ?? {}),
+        ];
+      }
     }
 
     // update result metadata
