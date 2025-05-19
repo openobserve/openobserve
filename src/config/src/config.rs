@@ -448,6 +448,24 @@ pub struct WebSocket {
         help = "Maximum allowed continuation size in MB"
     )]
     pub max_continuation_size: usize,
+    #[env_config(
+        name = "ZO_WEBSOCKET_CHANNEL_BUFFER_SIZE",
+        default = 100,
+        help = "Maximum allowed number of messages in buffer"
+    )]
+    pub max_channel_buffer_size: usize,
+    #[env_config(
+        name = "ZO_STREAMING_RESPONSE_CHUNK_SIZE_MB",
+        default = 1,
+        help = "Size in MB for each chunk when streaming search responses"
+    )]
+    pub streaming_response_chunk_size: usize,
+    #[env_config(
+        name = "ZO_STREAMING_ENABLED",
+        default = false,
+        help = "Enable streaming"
+    )]
+    pub streaming_enabled: bool,
 }
 
 #[derive(EnvConfig)]

@@ -198,6 +198,10 @@ fn default_enable_websocket_search() -> bool {
     false
 }
 
+fn default_enable_streaming_search() -> bool {
+    false
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -212,6 +216,8 @@ pub struct OrganizationSettingPayload {
     pub toggle_ingestion_logs: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_websocket_search: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_streaming_search: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_auto_refresh_interval: Option<u32>,
 }
@@ -230,6 +236,8 @@ pub struct OrganizationSetting {
     pub toggle_ingestion_logs: bool,
     #[serde(default = "default_enable_websocket_search")]
     pub enable_websocket_search: bool,
+    #[serde(default = "default_enable_streaming_search")]
+    pub enable_streaming_search: bool,
     #[serde(default = "default_auto_refresh_interval")]
     pub min_auto_refresh_interval: u32,
 }
@@ -242,6 +250,7 @@ impl Default for OrganizationSetting {
             span_id_field_name: default_span_id_field_name(),
             toggle_ingestion_logs: default_toggle_ingestion_logs(),
             enable_websocket_search: default_enable_websocket_search(),
+            enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
         }
     }
