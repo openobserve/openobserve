@@ -104,10 +104,12 @@ import {
   b64EncodeUnicode,
   escapeSingleQuotes,
   generateTraceContext,
+  isStreamingEnabled,
   isWebSocketEnabled,
 } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -141,6 +143,8 @@ export default defineComponent({
 
     // currently executing promise
     const currentlyExecutingPromises: any = {};
+
+    const { fetchQueryDataWithHttpStream } = useHttpStreaming();
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
     const variableFirstResponseProcessed = ref<{ [key: string]: boolean }>({});
@@ -264,6 +268,11 @@ export default defineComponent({
       response: any,
       variableObject: any,
     ) => {
+      console.log(`[Http Streaming] Received response:`, {
+        payload,
+        response,
+      });
+
       if (!variableObject) {
         console.error("Variable object is undefined");
         return;
@@ -282,12 +291,34 @@ export default defineComponent({
         return;
       }
 
+      // HTTP2 streaming: set isLoading to false on [[DONE]]
+      // if (response.type === "message" && response === "[[DONE]]") {
+      //   variableObject.isLoading = false;
+      //   variableObject.isVariableLoadingPending = false;
+      //   emitVariablesData();
+      //   return;
+      // }
+
+      // // WebSocket: set isLoading to false on end
+      // if (response.type === "end") {
+      //   variableObject.isLoading = false;
+      //   variableObject.isVariableLoadingPending = false;
+      //   emitVariablesData();
+      //   return;
+      // }
+
       try {
         if (
           response.content?.results?.hits?.length &&
-          response.type === "search_response"
+          (response.type === "search_response" ||
+            response.type === "search_response_hits")
         ) {
           const hits = response.content.results.hits;
+          console.log(
+            `[Http Streaming] Hits for ${variableObject.name}:`,
+            hits,
+          );
+
           const fieldHit = hits.find(
             (field: any) => field.field === variableObject.query_data.field,
           );
@@ -464,14 +495,38 @@ export default defineComponent({
     const initializeWebSocketConnection = (
       payload: any,
       variableObject: any,
-    ): string => {
-      return fetchQueryDataWithWebSocket(payload, {
-        open: sendSearchMessage,
-        close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
-        error: (p: any, r: any) => handleSearchError(p, r, variableObject),
-        message: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
-        reset: handleSearchReset,
-      }) as string;
+    ): any => {
+      if (isWebSocketEnabled()) {
+        fetchQueryDataWithWebSocket(payload, {
+          open: sendSearchMessage,
+          close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
+          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
+          message: (p: any, r: any) =>
+            handleSearchResponse(p, r, variableObject),
+          reset: handleSearchReset,
+        }) as string;
+        return;
+      }
+
+      if (isStreamingEnabled()) {
+        console.log(
+          `[HTTP Streaming] Starting fetch for ${variableObject.name}:`,
+          {
+            isLoading: variableObject.isLoading,
+            isVariableLoadingPending: variableObject.isVariableLoadingPending,
+            currentValue: variableObject.value,
+            options: variableObject.options,
+          },
+        );
+
+        fetchQueryDataWithHttpStream(payload, {
+          data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
+          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
+          complete: (p: any, r: any) => handleSearchClose(p, r, variableObject),
+          reset: handleSearchReset,
+        });
+        return;
+      }
     };
 
     const fetchFieldValuesWithWebsocket = (
@@ -522,8 +577,9 @@ export default defineComponent({
         isPagination: false,
         traceId: generateTraceContext().traceId,
         org_id: store.state.selectedOrganization.identifier,
+        meta: payload,
       };
-
+      console.log("wsPayload", wsPayload);
       try {
         // Start new connection
         initializeWebSocketConnection(wsPayload, variableObject);
@@ -1019,7 +1075,7 @@ export default defineComponent({
               `[WebSocket] handleVariableType: built query context for ${variableObject.name}`,
             );
 
-            if (isWebSocketEnabled()) {
+            if (isWebSocketEnabled() || isStreamingEnabled()) {
               // For WebSocket, we don't need to wait for the response here
               // as it will be handled by the WebSocket handlers
               fetchFieldValuesWithWebsocket(variableObject, queryContext);
