@@ -593,10 +593,16 @@ fn filter_nodes_with_group(
 ) -> Option<Vec<Node>> {
     let mut nodes = nodes?;
     match group {
-        Some(RoleGroup::Interactive) => nodes
-            .retain(|n| n.role_group == RoleGroup::None || n.role_group == RoleGroup::Interactive),
-        Some(RoleGroup::Background) => nodes
-            .retain(|n| n.role_group == RoleGroup::None || n.role_group == RoleGroup::Background),
+        Some(RoleGroup::Interactive) => nodes.retain(|n| {
+            !n.is_querier()
+                || n.role_group == RoleGroup::None
+                || n.role_group == RoleGroup::Interactive
+        }),
+        Some(RoleGroup::Background) => nodes.retain(|n| {
+            !n.is_querier()
+                || n.role_group == RoleGroup::None
+                || n.role_group == RoleGroup::Background
+        }),
         _ => {}
     };
     Some(nodes)
