@@ -1,18 +1,18 @@
 import { ref } from "vue";
 import useSearchWebSocket from "../useSearchWebSocket";
+import useHttpStreaming from "../useStreamingSearch";
 import { useStore } from "vuex";
 import {
   generateTraceContext,
   isWebSocketEnabled,
+  isStreamingEnabled,
 } from "../../utils/zincutils";
 import StreamService from "../../services/stream";
-import stream from "../../services/stream";
 
 const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
 const useValuesWebSocket = () => {
   const store = useStore();
-  const searchResults = ref<any[]>([]);
 
   // ------------- Start WebSocket Implementation -------------
   const {
@@ -20,6 +20,8 @@ const useValuesWebSocket = () => {
     sendSearchMessageBasedOnRequestId,
     cancelSearchQueryBasedOnRequestId,
   } = useSearchWebSocket();
+
+  const { fetchQueryDataWithHttpStream } = useHttpStreaming();
 
   // Utility functions
   const addTraceId = (field: string, traceId: string) => {
@@ -116,7 +118,8 @@ const useValuesWebSocket = () => {
     try {
       if (
         response.content?.results?.hits?.length &&
-        response.type === "search_response"
+        (response.type === "search_response" ||
+          response.type === "search_response_hits")
       ) {
         console.log("Fetching field values: response", response);
         console.log("Fetching field values: variableObject", variableObject);
@@ -163,7 +166,7 @@ const useValuesWebSocket = () => {
         // Merge existing values with new values, removing duplicates
         const mergedValues = [...new Set([...existingValues, ...newOptions])];
         console.log("Fetching field values: mergedValues", mergedValues);
-        
+
         // Update or add the entry
         if (existingIndex >= 0) {
           // Update existing entry
@@ -193,14 +196,37 @@ const useValuesWebSocket = () => {
   const initializeWebSocketConnection = (
     payload: any,
     variableObject: any,
-  ): string => {
-    return fetchQueryDataWithWebSocket(payload, {
-      open: sendSearchMessage,
-      close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
-      error: (p: any, r: any) => handleSearchError(p, r, variableObject),
-      message: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
-      reset: handleSearchReset,
-    }) as string;
+  ): any => {
+    if (isWebSocketEnabled()) {
+      fetchQueryDataWithWebSocket(payload, {
+        open: sendSearchMessage,
+        close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
+        error: (p: any, r: any) => handleSearchError(p, r, variableObject),
+        message: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
+        reset: handleSearchReset,
+      }) as string;
+      return;
+    }
+
+    if (isStreamingEnabled()) {
+      console.log(
+        `[HTTP Streaming] Starting fetch for ${variableObject.name}:`,
+        {
+          isLoading: variableObject.isLoading,
+          isVariableLoadingPending: variableObject.isVariableLoadingPending,
+          currentValue: variableObject.value,
+          options: variableObject.options,
+        },
+      );
+
+      fetchQueryDataWithHttpStream(payload, {
+        data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
+        error: (p: any, r: any) => handleSearchError(p, r, variableObject),
+        complete: (p: any, r: any) => handleSearchClose(p, r, variableObject),
+        reset: handleSearchReset,
+      });
+      return;
+    }
   };
 
   // ------------- End WebSocket Implementation -------------
@@ -230,6 +256,33 @@ const useValuesWebSocket = () => {
         isPagination: false,
         traceId: generateTraceContext().traceId,
         org_id: store.state.selectedOrganization.identifier,
+      };
+
+      const res = initializeWebSocketConnection(wsPayload, {
+        name: name,
+        dashboardPanelData: dashboardPanelData,
+      });
+      console.log("Fetching field values: res websocket", res);
+
+      return res;
+    } else if (isStreamingEnabled()) {
+      const wsPayload = {
+        queryReq: {
+          stream_name: queryReq.stream_name,
+          start_time: queryReq.start_time,
+          end_time: queryReq.end_time,
+          fields: queryReq.fields,
+          size: queryReq.size,
+          stream_type: queryReq.type,
+          use_cache: (window as any).use_cache ?? true,
+          no_count: queryReq.no_count,
+          sql: "",
+        },
+        type: "values",
+        isPagination: false,
+        traceId: generateTraceContext().traceId,
+        org_id: store.state.selectedOrganization.identifier,
+        meta: queryReq,
       };
 
       const res = initializeWebSocketConnection(wsPayload, {
