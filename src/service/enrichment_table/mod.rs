@@ -255,7 +255,7 @@ pub async fn save_enrichment_data(
             }
         };
 
-    let mut enrich_meta_stats = enrichment_table::get_meta_table_stats(org_id, stream_name)
+    let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, stream_name)
         .await
         .unwrap_or_default();
 
@@ -263,13 +263,15 @@ pub async fn save_enrichment_data(
         enrich_meta_stats.start_time = started_at;
     }
     if enrich_meta_stats.start_time == 0 {
-        enrich_meta_stats.start_time = enrichment_table::get_start_time(org_id, stream_name).await;
+        enrich_meta_stats.start_time =
+            db::enrichment_table::get_start_time(org_id, stream_name).await;
     }
     enrich_meta_stats.end_time = now_micros();
     enrich_meta_stats.size = total_expected_size_in_bytes as i64;
     // The stream_stats table takes some time to update, so we need to update the enrichment table
     // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
-    let _ = enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
+    let _ =
+        db::enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
 
     // notify update
     if !schema.fields().is_empty() {
