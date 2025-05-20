@@ -46,9 +46,7 @@ use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     handler::http::router::ERROR_HEADER,
     service::{
-        compact::retention,
-        db::{self, enrichment_table},
-        format_stream_name,
+        db, format_stream_name,
         ingestion::write_file,
         schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
@@ -115,7 +113,7 @@ pub async fn save_enrichment_data(
     }
 
     let current_size_in_bytes = if append_data {
-        enrichment_table::get_table_size(org_id, stream_name).await
+        db::enrichment_table::get_table_size(org_id, stream_name).await
     } else {
         // If we are not appending data, we do not need to check the current size
         // we will simply use the payload size to check if it exceeds the max size
@@ -289,7 +287,7 @@ pub async fn save_enrichment_data(
     )
     .await;
 
-    let mut enrich_meta_stats = enrichment_table::get_meta_table_stats(org_id, stream_name)
+    let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, stream_name)
         .await
         .unwrap_or_default();
 
@@ -297,13 +295,15 @@ pub async fn save_enrichment_data(
         enrich_meta_stats.start_time = started_at;
     }
     if enrich_meta_stats.start_time == 0 {
-        enrich_meta_stats.start_time = enrichment_table::get_start_time(org_id, stream_name).await;
+        enrich_meta_stats.start_time =
+            db::enrichment_table::get_start_time(org_id, stream_name).await;
     }
     enrich_meta_stats.end_time = now_micros();
     enrich_meta_stats.size = total_expected_size_in_bytes as i64;
     // The stream_stats table takes some time to update, so we need to update the enrichment table
     // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
-    let _ = enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
+    let _ =
+        db::enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
         StatusCode::OK.into(),
@@ -318,8 +318,11 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
         log::error!("Error deleting stream schema: {}", e);
     }
 
-    if let Err(e) = retention::delete_all(org_id, stream_type, stream_name).await {
-        log::error!("Error deleting stream {}", e);
+    // create delete for compactor
+    if let Err(e) =
+        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
+    {
+        log::error!("Error creating stream retention job: {}", e);
     }
 
     // delete stream schema cache
@@ -343,7 +346,7 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     }
 
     // delete stream key
-    if let Err(e) = enrichment_table::delete(org_id, stream_name).await {
+    if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table: {}", e);
     }
 
