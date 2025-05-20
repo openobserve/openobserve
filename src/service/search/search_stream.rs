@@ -578,10 +578,14 @@ pub async fn do_partitioned_search(
         // do not use cache for partitioned search without cache
         let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
 
-        let total_hits = search_res.total;
+        let total_hits = search_res.total as i64;
 
         if total_hits > req.query.size {
-            log::info!("[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results", trace_id, req.query.size);
+            log::info!(
+                "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
+                trace_id,
+                req.query.size
+            );
             search_res.hits.truncate(req.query.size as usize);
             curr_res_size += req.query.size;
         } else {
@@ -1023,14 +1027,18 @@ async fn process_delta(
         // use cache for delta search
         let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
 
-        let total_hits = search_res.total;
+        let total_hits = search_res.total as i64;
 
         if total_hits > req.query.size {
-            log::info!("[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results", trace_id, req.query.size);
+            log::info!(
+                "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
+                trace_id,
+                req.query.size
+            );
             search_res.hits.truncate(req.query.size as usize);
-            curr_res_size += req.query.size;
+            *curr_res_size += req.query.size;
         } else {
-            curr_res_size += total_hits;
+            *curr_res_size += total_hits;
         }
 
         log::info!(
