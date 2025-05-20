@@ -291,21 +291,17 @@ export default defineComponent({
         return;
       }
 
-      // HTTP2 streaming: set isLoading to false on [[DONE]]
-      // if (response.type === "message" && response === "[[DONE]]") {
-      //   variableObject.isLoading = false;
-      //   variableObject.isVariableLoadingPending = false;
-      //   emitVariablesData();
-      //   return;
-      // }
-
-      // // WebSocket: set isLoading to false on end
-      // if (response.type === "end") {
-      //   variableObject.isLoading = false;
-      //   variableObject.isVariableLoadingPending = false;
-      //   emitVariablesData();
-      //   return;
-      // }
+      // Handle completion
+      if (
+        (response.type === "event_progress" &&
+          response.content.percent === 100) ||
+        response.type === "end"
+      ) {
+        variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
+        emitVariablesData();
+        return;
+      }
 
       try {
         if (
