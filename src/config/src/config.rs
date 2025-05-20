@@ -1995,6 +1995,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.file_download_thread_num = std::cmp::max(1, cpu_num / 2);
     }
 
+    if cfg.limit.file_download_priority_queue_thread_num == 0 {
+        cfg.limit.file_download_priority_queue_thread_num = std::cmp::max(1, cpu_num / 2);
+    }
+
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
         if cfg.common.local_mode {
