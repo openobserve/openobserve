@@ -149,7 +149,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
 
     // *********** custom rules ***********
     // should after ExtractEquijoinPredicate and PushDownFilter, because LimitJoinRightSide will
-    // require the join's on columns, and if filer have join keys, it shouldbe pushed down
+    // require the join's on columns, and if filter have join keys, it should be pushed down
     if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows > 0
     {
         rules.push(Arc::new(LimitJoinRightSide::new(
