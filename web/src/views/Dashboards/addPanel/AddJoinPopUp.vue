@@ -15,11 +15,20 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div data-test="dashboard-join-pop-up" style="width: 500px">
-    <div>
-      <div
-        class="tw-flex tw-flex-row tw-w-full tw-gap-10 items-center q-table__title q-mr-md"
-      >
+  <div data-test="dashboard-join-pop-up" style="width: 624px">
+    <div
+      style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      "
+    >
+      <div style="flex: 1; gap: 8px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <LeftJoinSvg />
+          <label>Join</label>
+        </div>
         <q-select
           dense
           filled
@@ -27,19 +36,88 @@
           :options="[]"
           :disable="true"
           label="Joining Stream"
-          class="q-py-md tw-w-1/3"
+          style="width: 100%"
           data-test="dashboard-config-panel-join-from"
         />
+      </div>
+      <div
+        style="display: flex; align-items: center; gap: 8px; padding-top: 21px"
+      >
+        <LeftJoinLineSvg />
+      </div>
 
-        <q-select
-          filled
-          dense
-          v-model="modelValue.joinType"
-          :options="joinOptions"
-          label="With Join Type"
-          class="q-py-md tw-w-1/3"
-          data-test="dashboard-config-panel-join-type"
-        />
+      <div>
+        <label for="joinType">Join type</label>
+        <div
+          style="
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              cursor: pointer;
+            "
+            @click="modelValue.joinType = 'left'"
+          >
+            <LeftJoinTypeSvg :shouldFill="modelValue.joinType === 'left'" />
+            <div
+              :class="[modelValue.joinType === 'left' ? 'text-primary' : '']"
+            >
+              Left
+            </div>
+          </div>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              cursor: pointer;
+            "
+            @click="modelValue.joinType = 'inner'"
+          >
+            <InnerJoinTypeSvg :shouldFill="modelValue.joinType === 'inner'" />
+            <div
+              :class="[modelValue.joinType === 'inner' ? 'text-primary' : '']"
+            >
+              Inner
+            </div>
+          </div>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              cursor: pointer;
+            "
+            @click="modelValue.joinType = 'right'"
+          >
+            <RightJoinTypeSvg :shouldFill="modelValue.joinType === 'right'" />
+            <div
+              :class="[modelValue.joinType === 'right' ? 'text-primary' : '']"
+            >
+              Right
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="display: flex; align-items: center; gap: 8px; padding-top: 21px"
+      >
+        <RightJoinLineSvg />
+      </div>
+
+      <div style="flex: 1">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <RightJoinSvg />
+          <label>On</label>
+        </div>
 
         <q-select
           filled
@@ -49,7 +127,7 @@
           emit-value
           map-options
           label="On Stream"
-          class="q-py-md tw-w-1/3"
+          style="width: 100%"
           data-test="dashboard-config-panel-join-to"
           use-input
           input-debounce="0"
@@ -59,83 +137,98 @@
           @filter="filterStreamOptions"
         />
       </div>
+    </div>
 
-      <q-separator />
-
-      <div>
-        <span class="tw-w-full tw-text-center tw-mt-5 tw-text-lg">On</span>
-        <div
-          v-for="(arg, argIndex) in modelValue.conditions"
-          :key="argIndex + JSON.stringify(arg)"
-          class="tw-w-full tw-flex tw-flex-col"
+    <div style="margin-bottom: 10px">
+      <div style="margin-bottom: 10px">
+        <h3
+          style="
+            font-size: 14px;
+            font-style: normal;
+            font-weight: 600;
+            line-height: normal;
+          "
         >
-          <div>
-            <div>
-              <label :for="'arg-' + argIndex"
-                >condition {{ argIndex + 1 }}</label
-              >
-            </div>
-            <div class="tw-flex tw-gap-x-3">
-              <!-- Left field selector using StreamFieldSelect -->
-              <div class="tw-w-1/3">
-                <StreamFieldSelect
-                  :streams="getStreamsBasedJoinIndex()"
-                  v-model="modelValue.conditions[argIndex].leftField"
-                  :data-test="`dashboard-join-condition-leftField-${argIndex}`"
-                />
-              </div>
+          Joining Clause
+        </h3>
+        <p
+          style="
+            font-size: 12px;
+            font-style: normal;
+            font-weight: 400;
+            line-height: normal;
+          "
+        >
+          Select the fields that need to be correlated within the joining
+          streams
+        </p>
+      </div>
 
-              <!-- operator selector -->
-              <q-select
-                behavior="menu"
-                borderless
-                v-model="modelValue.conditions[argIndex].operation"
-                :options="operationOptions"
-                dense
-                filled
-                label="Select Operation"
-                :data-test="`dashboard-join-condition-operation-${argIndex}`"
-                class="tw-w-1/3"
-              />
-
-              <!-- Right field selector using StreamFieldSelect -->
-              <div class="tw-w-1/3">
-                <StreamFieldSelect
-                  :streams="[
-                    {
-                      stream: modelValue.stream,
-                      streamAlias: modelValue.streamAlias,
-                    },
-                  ]"
-                  v-model="modelValue.conditions[argIndex].rightField"
-                  :data-test="`dashboard-join-condition-rightField-${argIndex}`"
-                />
-              </div>
-
-              <!-- Remove argument button -->
-              <!-- only allow if more than 1 -->
-              <q-btn
-                v-if="modelValue.conditions.length > 1"
-                :data-test="`dashboard-join-condition-remove-${argIndex}`"
-                icon="close"
-                dense
-                flat
-                round
-                @click="removeCondition(argIndex)"
-                class="tw-h-10 tw-w-10"
-              />
-            </div>
+      <div
+        v-for="(arg, argIndex) in modelValue.conditions"
+        :key="argIndex + JSON.stringify(arg)"
+        style="
+          margin-bottom: 10px;
+          padding: 10px;
+          border: 1px solid #eee;
+          border-radius: 4px;
+        "
+      >
+        <div>Clause {{ argIndex + 1 }}</div>
+        <div style="display: flex; align-items: center">
+          <div style="flex: 1; margin-right: 10px">
+            <StreamFieldSelect
+              :streams="getStreamsBasedJoinIndex()"
+              v-model="modelValue.conditions[argIndex].leftField"
+              :data-test="`dashboard-join-condition-left-field-${argIndex}`"
+            />
           </div>
+
+          <div style="flex: 1; margin-right: 10px">
+            <!-- operator selector -->
+            <q-select
+              behavior="menu"
+              borderless
+              v-model="modelValue.conditions[argIndex].operation"
+              :options="operationOptions"
+              dense
+              filled
+              label="Select Operation"
+              :data-test="`dashboard-join-condition-operation-${argIndex}`"
+            />
+          </div>
+
+          <div style="flex: 1; margin-right: 10px">
+            <StreamFieldSelect
+              :streams="[
+                {
+                  stream: modelValue.stream,
+                  streamAlias: modelValue.streamAlias,
+                },
+              ]"
+              v-model="modelValue.conditions[argIndex].rightField"
+            />
+          </div>
+
+          <q-btn
+            @click="addCondition(argIndex)"
+            no-caps
+            dense
+            flat
+            icon="add"
+          />
+
+          <q-btn
+            :data-test="`dashboard-join-condition-remove-${argIndex}`"
+            icon="close"
+            dense
+            flat
+            round
+            :disable="modelValue.conditions.length === 1"
+            @click="removeCondition(argIndex)"
+            class="tw-h-10 tw-w-10"
+          />
         </div>
-        <q-btn
-          @click="addCondition()"
-          color="primary"
-          label="+ Add Condition"
-          padding="5px 14px"
-          class="tw-mt-3"
-          no-caps
-          dense
-        />
       </div>
     </div>
   </div>
@@ -149,12 +242,25 @@ import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
-
+import LeftJoinSvg from "@/components/icons/LeftJoinSvg.vue";
+import LeftJoinTypeSvg from "@/components/icons/LeftJoinTypeSvg.vue";
+import LeftJoinLineSvg from "@/components/icons/LeftJoinLineSvg.vue";
+import RightJoinSvg from "@/components/icons/RightJoinSvg.vue";
+import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
+import RightJoinLineSvg from "@/components/icons/RightJoinLineSvg.vue";
+import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
 export default defineComponent({
   name: "AddJoinPopUp",
 
   components: {
     StreamFieldSelect,
+    LeftJoinSvg,
+    LeftJoinTypeSvg,
+    LeftJoinLineSvg,
+    RightJoinSvg,
+    RightJoinTypeSvg,
+    RightJoinLineSvg,
+    InnerJoinTypeSvg,
   },
 
   props: {
@@ -273,8 +379,8 @@ export default defineComponent({
       props.modelValue.conditions.splice(argIndex, 1);
     };
 
-    const addCondition = () => {
-      props.modelValue.conditions.push({
+    const addCondition = (index: number = 0) => {
+      props.modelValue.conditions.splice(index + 1, 0, {
         leftField: {
           streamAlias: "",
           field: "",

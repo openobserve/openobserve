@@ -35,7 +35,13 @@
             <div style="display: flex; flex-direction: column; gap: 14px">
               <div>
                 <div class="text-label-normal">Label</div>
-                <input v-model="fields.label" class="edit-input" />
+                <input
+                  v-model="fields.label"
+                  :class="[
+                    store.state.theme === 'dark' ? 'bg-grey-10' : '',
+                    'edit-input',
+                  ]"
+                />
               </div>
               <div v-if="!customQuery && !fields.isDerived">
                 <SortByBtnGrp :fieldObj="fields" />
@@ -68,7 +74,7 @@ import RawQueryBuilder from "./RawQueryBuilder.vue";
 import SelectFunction from "./SelectFunction.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useI18n } from "vue-i18n";
-
+import { useStore } from "vuex";
 export default {
   name: "DynamicFunctionPopUp",
   components: { RawQueryBuilder, SelectFunction, SortByBtnGrp },
@@ -101,6 +107,8 @@ export default {
 
     const fields = ref(props.modelValue);
 
+    const store = useStore();
+
     watch(
       () => fields.value,
       (value) => {
@@ -125,9 +133,10 @@ export default {
     };
 
     return {
+      store,
+      t,
       fields,
       onFieldTypeChange,
-      t,
     };
   },
 };
@@ -139,7 +148,6 @@ export default {
 }
 
 .text-label-bold {
-  color: #000;
   font-family: "Nunito Sans";
   font-size: 13px;
   font-style: normal;
@@ -148,7 +156,6 @@ export default {
 }
 
 .text-label-normal {
-  color: #000;
   font-family: "Nunito Sans";
   font-size: 13px;
   font-style: normal;
@@ -158,8 +165,8 @@ export default {
 
 .edit-input {
   flex: 1;
-  border: 1px solid #e9e9e9;
-  background: #fff;
+  border: 1px solid var(--q-primary);
+  border-radius: 4px;
   padding: 2px;
   outline: none;
   min-width: 0;

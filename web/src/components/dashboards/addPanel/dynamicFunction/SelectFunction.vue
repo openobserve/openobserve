@@ -8,7 +8,6 @@
       input-debounce="0"
       behavior="menu"
       use-input
-      filled
       borderless
       dense
       hide-selected
@@ -18,7 +17,7 @@
       option-value="value"
       emit-value
       map-options
-      class="tw-w-52"
+      class="tw-w-72 tw-border tw-border-solid tw-border-gray-200 tw-pl-2"
     >
       <!-- <template v-slot:append>
           <q-icon
@@ -60,7 +59,8 @@
             dense
             filled
             label="Select Type"
-            class="tw-w-40 tw-min-w-40"
+            class="tw-w-40 tw-min-w-40 tw-h-10 tw-text-white"
+            style="background: #6571BD;"
             :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
           />
 
