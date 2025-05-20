@@ -194,29 +194,13 @@ async fn handle_alert_triggers(
 
     #[cfg(feature = "cloud")]
     {
-        // TODO (YJDoc2) : if we enabled alert, does the trigger gets reset?
         if !is_org_in_free_trial_period(&trigger.org).await? {
-            let mut alert = alert;
-            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-            alert.enabled = false;
             log::info!(
-                "disabling alert {} id {} in org {} because free trial expiry",
+                "skipping alert {} id {} in org {} because free trial expiry",
                 alert.name,
                 trigger.module_key,
                 trigger.org
             );
-            alert::update(client, &trigger.org, None, alert.clone()).await?;
-            let mut new_trigger = db::scheduler::Trigger {
-                next_run_at: Utc::now().timestamp_micros(),
-                is_realtime: alert.is_real_time,
-                is_silenced: true,
-                status: db::scheduler::TriggerStatus::Waiting,
-                retries: 0,
-                ..trigger.clone()
-            };
-            // update trigger, check on next week
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger).await?;
             return Ok(());
         }
     }
@@ -674,17 +658,11 @@ async fn handle_report_triggers(
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
-            let mut report = report;
-            report.enabled = false;
             log::info!(
-                "disabling report {}  in org {} because free trial expiry",
+                "skipping report {}  in org {} because free trial expiry",
                 report_name,
                 trigger.org
             );
-            db::dashboards::reports::set(org_id, &report, false).await?;
-            // update trigger, check on next week
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger).await?;
             return Ok(());
         }
     }
@@ -964,18 +942,12 @@ async fn handle_derived_stream_triggers(
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
-            let mut pipeline = pipeline;
-            pipeline.enabled = false;
             log::info!(
-                "disabling pipeline {} id {} in org {} because free trial expiry",
+                "skipping pipeline {} id {} in org {} because free trial expiry",
                 pipeline.name,
                 pipeline_id,
                 trigger.org
             );
-            pipeline::update(&pipeline, None).await?;
-            // update trigger, check on next day
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger).await?;
             return Ok(());
         }
     }
