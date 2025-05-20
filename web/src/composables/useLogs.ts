@@ -3665,7 +3665,8 @@ const useLogs = () => {
 
       let plusSign: string = "";
       if (
-        searchObj.data.queryResults?.partitionDetail?.partitions?.length > 1 &&
+        searchObj.data.queryResults?.partitionDetail?.partitions?.length > 1 && 
+        endCount < totalCount &&
         searchObj.meta.showHistogram == false
       ) {
         plusSign = "+";
