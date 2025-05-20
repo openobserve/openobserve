@@ -693,61 +693,9 @@ test.describe("dashboard filter testcases", () => {
       "filter"
     );
 
-    // const button = page.locator(
-    //   '[data-test="dashboard-if-no-panel-add-panel-btn"]'
-    // );
-    // await expect(button).toBeVisible();
-
-    // await page.waitForTimeout(1000);
-    // await button.click();
-
-    // await page.waitForTimeout(2000);
-
-    // await page
-    //   .locator('[data-test="index-dropdown-stream"]')
-    //   .waitFor({ state: "visible" });
-    // await page.locator('[data-test="index-dropdown-stream"]').click();
-
-    // await page.waitForTimeout(2000);
-
-    // await page
-    //   .getByRole("option", { name: "e2e_automate", exact: true })
-    //   .click();
-
-    // await page
-    //   .locator(
-    //     '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-x-data"]'
-    //   )
-    //   .click();
-    // await page
-    //   .locator(
-    //     '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
-    //   )
-    //   .click();
-    // await page
-    //   .locator(
-    //     '[data-test="field-list-item-logs-e2e_automate-kubernetes_namespace_name"] [data-test="dashboard-add-filter-data"]'
-    //   )
-    //   .click();
-    //  await page
-    //   .locator(
-    //     '[data-test="dashboard-add-condition-label-0-kubernetes_namespace_name"]'
-    //   )
-    //   .click();
-
-    // await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
-    //   timeout: 5000,
-    // });
-    // await page.locator('[data-test="date-time-btn"]').click();
-    // await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    // await page.locator('[data-test="date-time-apply-btn"]').click();
     await dashboardRefresh.setRelative("6", "w");
 
     await dashboardActions.waitForChartToRender();
-
-    // await page.waitForTimeout(3000);
-
-    //  List if item pass the value in Array
 
     await chartTypeSelector.selectListFilterItems(
       0,
@@ -755,32 +703,6 @@ test.describe("dashboard filter testcases", () => {
       ["ingress-nginx", "kube-system"]
     );
     await dashboardActions.applyDashboardBtn();
-
-    // await page
-    //   .locator(
-    //     '[data-test="dashboard-add-condition-label-0-kubernetes_namespace_name"]'
-    //   )
-    //   .click();
-
-    // await page
-    //   .locator('[data-test="dashboard-add-condition-list-tab"]')
-    //   .waitFor({ state: "visible" });
-    // await page
-    //   .locator('[data-test="dashboard-add-condition-list-tab"]')
-    //   .click();
-
-    // await page.waitForTimeout(2000);
-
-    // await page
-    //   .getByRole("option", { name: "ingress-nginx" })
-    //   .locator('[data-test="dashboard-add-condition-list-item"]')
-    //   .click();
-    // await page
-    //   .getByRole("option", { name: "kube-system" })
-    //   .locator('[data-test="dashboard-add-condition-list-item"]')
-    //   .click();
-
-    // await page.locator('[data-test="dashboard-apply"]').click();
 
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
@@ -800,6 +722,74 @@ test.describe("dashboard filter testcases", () => {
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
     // Save the dashboard panel
+    await dashboardActions.savePanel();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await dashboardCreate.searchDashboard(randomDashboardName);
+    await dashboardCreate.deleteDashboard(randomDashboardName);
+  });
+
+  test("Should  apply the  filter using the field button", async ({ page }) => {
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardDrilldown = new DashboardDrilldownPage(page);
+    const dashboardPanel = new DashboardPanel(page);
+    const dashboardSetting = new DashboardSetting(page);
+    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const variableName = new DashboardVariables(page);
+    const dashboardRefresh = new DashboardTimeRefresh(page);
+
+    // Navigate to dashboards
+    await dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await dashboardCreate.createDashboard(randomDashboardName);
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .waitFor({
+        state: "visible",
+      });
+    await dashboardSetting.openSetting();
+    await variableName.addDashboardVariable(
+      "variablename",
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name"
+    );
+
+    await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+    await chartTypeSelector.searchAndAddField("_timestamp", "y");
+
+    await dashboardActions.applyDashboardBtn();
+
+    await dashboardRefresh.setRelative("6", "w");
+
+    await dashboardActions.waitForChartToRender();
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_namespace_name",
+      "filter"
+    );
+
+    await expect(
+      page.locator(
+        '[data-test="dashboard-add-condition-label-0-kubernetes_namespace_name"]'
+      )
+    ).toBeVisible();
+    await page.locator('[data-test="dashboard-add-condition-remove"]').click();
+
+    await dashboardActions.applyDashboardBtn();
+
+    // Save the dashboard panel
+
     await dashboardActions.savePanel();
 
     // Delete the dashboard
