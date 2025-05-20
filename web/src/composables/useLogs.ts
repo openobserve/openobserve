@@ -1457,10 +1457,13 @@ const useLogs = () => {
         // partitionDetail.partitions.forEach((item: any, index: number) => {
         for (const [index, item] of partitionDetail.partitions.entries()) {
           total = partitionDetail.partitionTotal[index];
-          totalPages = Math.ceil(total / rowsPerPage);
+          
           if (!partitionDetail.paginations[pageNumber]) {
             partitionDetail.paginations[pageNumber] = [];
           }
+
+          totalPages = getPartitionTotalPages(total);
+          
           if (totalPages > 0) {
             partitionFrom = 0;
             for (let i = 0; i < totalPages; i++) {
@@ -1565,6 +1568,29 @@ const useLogs = () => {
       return false;
     }
   };
+
+  /**
+   * This function is used to get the total pages for the single partition 
+   * This method handles the case where previous partition is not fully loaded and we are loading the next partition
+   * In this case, we need to add the size of the previous partition to the total size of the current partition for accurate total pages
+   * @param total - The total number of records in the partition
+   * @returns The total number of pages for the partition
+   */
+  const getPartitionTotalPages = (total: number) => {
+    const lastPage = searchObj.data.queryResults.partitionDetail.paginations?.length - 1;
+
+    let lastPartitionSize = 0;
+    let partitionTotal = 0;
+    for (const item of searchObj.data.queryResults.partitionDetail.paginations[lastPage]) {
+      lastPartitionSize += item.size;
+    }
+
+    if (lastPartitionSize < searchObj.meta.resultGrid.rowsPerPage) {
+        partitionTotal = total + lastPartitionSize;
+    }
+
+    return Math.ceil(partitionTotal / searchObj.meta.resultGrid.rowsPerPage);
+  }
 
   const getQueryData = async (isPagination = false) => {
     try {
