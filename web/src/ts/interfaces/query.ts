@@ -43,7 +43,7 @@ export interface HistogramQueryPayload {
 }
 
 export interface WebSocketSearchResponse {
-  type: "search_response" | "cancel_response";
+  type: "search_response" | "cancel_response" | "error" | "end" | "progress" | "search_response_metadata" | "search_response_hits";
   content: {
     results: {
       hits: any[];
@@ -53,8 +53,15 @@ export interface WebSocketSearchResponse {
       new_start_time?: number;
       new_end_time?: number;
       scan_size?: number;
+      from?: number;
+      aggs?: any;
+      result_cache_ratio?: number;
     };
     streaming_aggs?: boolean;
+    total?: number;
+    time_offset?: string;
+    traceId: string;
+    type?: string;
   };
 }
 
@@ -80,9 +87,50 @@ export interface ErrorContent {
   trace_id?: string;
   code?: number;
   error_detail?: string;
+  error?: string;
 }
 
 export interface WebSocketErrorResponse {
   content: ErrorContent;
   type: "error";
+}
+
+// HTTP2 Streaming interfaces
+export interface StreamingSource {
+  [traceId: string]: EventSource;
+}
+
+export interface StreamingSearchResponse {
+  hits: any[];
+  total: number;
+  took: number;
+  function_error?: string;
+  new_start_time?: number;
+  new_end_time?: number;
+  scan_size?: number;
+  time_offset?: string;
+  cached_ratio?: number;
+  streaming_aggs?: boolean;
+}
+
+export interface StreamingSearchEvent {
+  data: string; // JSON string of StreamingSearchResponse
+  type: "message" | "error" | "open" | "end";
+  lastEventId?: string;
+}
+
+export interface StreamingSearchPayload {
+  queryReq: SearchRequestPayload;
+  type: "search" | "histogram" | "pageCount" | "values";
+  isPagination: boolean;
+  traceId: string;
+  org_id: string;
+  meta?: any;
+}
+
+export interface StreamingErrorResponse {
+  message: string;
+  trace_id?: string;
+  code?: number;
+  error_detail?: string;
 }
