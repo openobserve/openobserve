@@ -21,7 +21,7 @@ export default class StreamSettingsPage {
     // Search for the stream
     await this.searchInput.click();
     await this.searchInput.fill(streamName);
-    await this.page.waitForTimeout(5000);
+    await this.page.waitForTimeout(2000);
 
     // Wait for stream details to appear and click
 
@@ -38,7 +38,6 @@ export default class StreamSettingsPage {
     await this.saveButton.waitFor({ state: "visible", timeout: 5000 });
     await this.saveButton.click();
 
-    // await page.waitForTimeout(3000);
     // Close the modal
     await this.closeButton.waitFor({ state: "visible", timeout: 5000 });
     await this.closeButton.click();
