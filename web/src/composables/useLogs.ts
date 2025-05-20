@@ -1473,7 +1473,9 @@ const useLogs = () => {
 
               // if (i === 0 && partitionDetail.paginations.length > 0) {
               lastPartitionSize = 0;
-              if (pageNumber > 0) {
+
+              // if the pagination array is not empty, then we need to get the last page and add the size of the last page to the last partition size
+              if (partitionDetail.paginations[pageNumber]?.length) {
                 lastPage = partitionDetail.paginations.length - 1;
 
                 // partitionDetail.paginations[lastPage].forEach((item: any) => {
