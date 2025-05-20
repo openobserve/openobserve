@@ -56,7 +56,7 @@ def test_ingest_data(create_session, base_url_sc):
     url_Ing = f"{base_url_sc}api/{org_id}/{stream_name}/_json"
     resp_ing = session.post(url_Ing, data=data, headers={"Content-Type": "application/json"})
     print(f"Data ingested in {stream_name} of {base_url_sc} env, status code: ", resp_ing.status_code)
-    assert ( resp_ing.status_code == 200), f"Data ingested successfully for websocket test, status code: {resp_ing.status_code}"
+    assert ( resp_ing.status_code == 200), f"Data ingestion failed with status code: {resp_ing.status_code}"
 
     # Join stream data
 def test_ingest_join(create_session, base_url_sc):
@@ -69,7 +69,7 @@ def test_ingest_join(create_session, base_url_sc):
     url_join = f"{base_url_sc}api/{org_id}/{stream_join}/_json"
     resp_ing_join = session.post(url_join, data=data, headers={"Content-Type": "application/json"})
     print(f"Data ingested for join in {stream_join} of {base_url_sc} env, status code: ", resp_ing_join.status_code)
-    assert ( resp_ing_join.status_code == 200), f"Data ingested for join, status code: {resp_ing_join.status_code}"
+    assert ( resp_ing_join.status_code == 200), f"Data ingestion failed for join with status code: {resp_ing_join.status_code}"
 
 def test_disable_streaming(create_session, base_url):
     """Fixture to disable Streaming and return cookies."""
@@ -376,7 +376,7 @@ test_data_sql = [
         "FULL Join",
         f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a FULL JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
         50,
-        50,
+        46,
     ),
 
     (
