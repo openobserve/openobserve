@@ -1142,6 +1142,8 @@ export default defineComponent({
             orgSettings?.data?.data?.toggle_ingestion_logs ?? false,
           enable_websocket_search:
             orgSettings?.data?.data?.enable_websocket_search ?? false,
+          enable_streaming_search:
+            orgSettings?.data?.data?.enable_streaming_search ?? false,
         });
       } catch (error) {
         console.error("Error in getOrganizationSettings:", error);

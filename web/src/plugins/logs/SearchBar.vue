@@ -658,7 +658,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 v-if="
                   config.isEnterprise == 'true' &&
-                  !!searchObj.data.searchRequestTraceIds.length &&
+                  (!!searchObj.data.searchRequestTraceIds.length ||
+                    !!searchObj.data.searchWebSocketTraceIds.length) &&
                   (searchObj.loading == true ||
                     searchObj.loadingHistogram == true)
                 "
@@ -1721,6 +1722,14 @@ export default defineComponent({
           }
         }
       }
+      if (
+        searchObj.meta.sqlMode === false &&
+        value.toLowerCase().includes("select") &&
+        value.toLowerCase().includes("from")
+      ) {
+        searchObj.meta.sqlMode = true;
+        searchObj.meta.sqlModeManualTrigger = true;
+      }
 
       if (value != "" && searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL();
@@ -1738,9 +1747,12 @@ export default defineComponent({
         if (searchObj.meta.sqlMode === true) {
           searchObj.data.parsedQuery = parser.astify(value);
           if (searchObj.data.parsedQuery?.from?.length > 0) {
-            //this condition is to handle the with queries so for WITH queries the table name is not present in the from array it will be there in the with array 
+            //this condition is to handle the with queries so for WITH queries the table name is not present in the from array it will be there in the with array
             //the table which is there in from array is the temporary array
-            const tableName: string = !searchObj.data.parsedQuery.with ? searchObj.data.parsedQuery.from[0].table || searchObj.data.parsedQuery.from[0].expr?.ast?.from?.[0]?.table : "";
+            const tableName: string = !searchObj.data.parsedQuery.with
+              ? searchObj.data.parsedQuery.from[0].table ||
+                searchObj.data.parsedQuery.from[0].expr?.ast?.from?.[0]?.table
+              : "";
             if (
               !searchObj.data.stream.selectedStream.includes(tableName) &&
               tableName !== streamName
