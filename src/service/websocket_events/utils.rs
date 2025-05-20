@@ -15,6 +15,7 @@
 
 use actix_web::http::StatusCode;
 use config::meta::{
+    search::TimeOffset,
     sql::OrderBy,
     websocket::{SearchEventReq, ValuesEventReq},
 };
@@ -324,13 +325,6 @@ impl WsClientEvents {
     }
 }
 
-/// To represent the query start and end time based of partition or cache
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TimeOffset {
-    pub start_time: i64,
-    pub end_time: i64,
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(
     tag = "type",
@@ -384,8 +378,7 @@ impl WsServerEvents {
             errors::Error::ErrorCode(code) => {
                 let message = code.get_message();
                 let error_detail = code.get_error_detail();
-                let http_response =
-                    map_error_to_http_response(err, trace_id.clone().unwrap_or_default());
+                let http_response = map_error_to_http_response(err, trace_id.clone());
                 WsServerEvents::Error {
                     code: http_response.status().into(),
                     message,
