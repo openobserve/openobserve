@@ -2687,7 +2687,6 @@ export const convertSQLData = async (
     });
   }
 
-  console.log("missingValueData", JSON.parse(JSON.stringify(missingValueData)));
 
   return {
     options,
