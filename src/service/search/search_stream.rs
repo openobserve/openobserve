@@ -67,7 +67,8 @@ use crate::{
 //     pub req_order_by: OrderBy,
 //     pub search_span: tracing::Span,
 //     pub sender: mpsc::Sender<Result<config::meta::search::StreamResponses,
-// infra::errors::Error>>,     pub values_ctx: Option<ValuesEventContext>,
+// infra::errors::Error>>,
+//     pub values_ctx: Option<ValuesEventContext>,
 //     pub fallback_order_by_col: Option<String>,
 //     pub _audit_ctx: Option<AuditContext>,
 // }
