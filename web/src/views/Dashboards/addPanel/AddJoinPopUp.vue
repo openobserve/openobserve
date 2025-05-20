@@ -139,6 +139,30 @@
       </div>
     </div>
 
+    <div class="tw-flex tw-items-center tw-gap-4">
+      <div class="tw-border-t tw-border-gray-200 tw-flex-1"></div>
+      <div
+        class="tw-py-2 tw-text-center tw-text-xs tw-text-gray-700"
+        v-if="
+          modelValue.stream &&
+          modelValue.streamAlias &&
+          modelValue.joinType &&
+          mainStream
+        "
+      >
+        Joining <span className="tw-font-semibold">{{ mainStream }}</span> with
+        <span className="tw-font-semibold">{{ modelValue.stream }}</span> with
+        <span className="tw-text-indigo-600"
+          >{{
+            modelValue?.joinType?.charAt(0)?.toUpperCase() +
+            modelValue?.joinType?.slice(1)
+          }}
+          Join</span
+        >
+      </div>
+      <div class="tw-border-t tw-border-gray-200 tw-flex-1"></div>
+    </div>
+
     <div style="margin-bottom: 10px">
       <div style="margin-bottom: 10px">
         <h3
