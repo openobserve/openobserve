@@ -5291,11 +5291,11 @@ const useLogs = () => {
       
 
 
-      updatePageCountTotal(payload.queryReq, searchObj.data.queryResults.hits.length);
+      updatePageCountTotal(payload.queryReq, response.content.results.hits.length, searchObj.data.queryResults.hits.length);
       trimPageCountExtraHit(payload.queryReq, searchObj.data.queryResults.hits.length);
     }
 
-    if (isPagination) refreshPagination(true);
+    refreshPagination(true);
 
     processPostPaginationData();
   }
@@ -5374,12 +5374,12 @@ const useLogs = () => {
     if (isPagination) refreshPagination(true);
   }
 
-  const updatePageCountTotal = (queryReq: SearchRequestPayload, total: any) => {
+  const updatePageCountTotal = (queryReq: SearchRequestPayload, currentHits: number, total: any) => {
     try {
       if(shouldGetPageCount(queryReq, fnParsedSQL()) && (total === queryReq.query.size)) {
         searchObj.data.queryResults.pageCountTotal = (searchObj.meta.resultGrid.rowsPerPage * searchObj.data.resultGrid.currentPage) + 1;
-      } else if(shouldGetPageCount(queryReq, fnParsedSQL()) && (searchObj.data.queryResults.hits != queryReq.query.size)){
-        searchObj.data.queryResults.pageCountTotal = ((searchObj.meta.resultGrid.rowsPerPage) * Math.max(searchObj.data.resultGrid.currentPage-1,0)) + queryResults.total;
+      } else if(shouldGetPageCount(queryReq, fnParsedSQL()) && (total !== queryReq.query.size)){
+        searchObj.data.queryResults.pageCountTotal = ((searchObj.meta.resultGrid.rowsPerPage) * Math.max(searchObj.data.resultGrid.currentPage-1,0)) + currentHits;
       }
     } catch(e: any) {
       console.error("Error while updating page count total", e);
@@ -5387,14 +5387,23 @@ const useLogs = () => {
   }
 
   const trimPageCountExtraHit = (queryReq: SearchRequestPayload, total: any) => {
-    if(shouldGetPageCount(queryReq, fnParsedSQL()) && (total === queryReq.query.size)) {
-      searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(0, searchObj.data.queryResults.hits.length- 1);
+    try{
+      if(shouldGetPageCount(queryReq, fnParsedSQL()) && (total === queryReq.query.size)) {
+        searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(0, searchObj.data.queryResults.hits.length- 1);
+      }
+    } catch(e: any) {
+      console.error("Error while trimming page count extra hit", e);
     }
   }
 
   const updatePageCountSearchSize = (queryReq: SearchRequestPayload) => {
-    if(shouldGetPageCount(queryReq, fnParsedSQL())) {
-      queryReq.query.size = queryReq.query.size + 1;
+    try{
+      if(shouldGetPageCount(queryReq, fnParsedSQL())) {
+        queryReq.query.size = queryReq.query.size + 1;
+      }
+    } catch(e: any) {
+      console.error("Error while updating page count search size", e);
+      return queryReq.query.size;
     }
   }
 
