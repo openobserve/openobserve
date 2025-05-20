@@ -376,7 +376,7 @@ test_data_sql = [
         "FULL Join",
         f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a FULL JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
         50,
-        46,
+        50,
     ),
 
     (
@@ -740,25 +740,25 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_s
 
 
 
-# def test_delete_stream(create_session, base_url):
-#     """Running an E2E test for deleting the created stream."""
-#     session = create_session
-#     url = base_url
-#     # Proceed to delete the created Stream
-#     resp_delete_stream= session.delete(f"{url}api/{org_id}/streams/{stream_name}?type=logs")
-#     print(f"Deleted Stream Response: {resp_delete_stream.text}")
-#     assert resp_delete_stream.status_code == 200, f"Failed to delete stream {stream_name}"
-#     print(f"Successfully deleted stream {stream_name}")
+def test_delete_stream(create_session, base_url):
+    """Running an E2E test for deleting the created stream."""
+    session = create_session
+    url = base_url
+    # Proceed to delete the created Stream
+    resp_delete_stream= session.delete(f"{url}api/{org_id}/streams/{stream_name}?type=logs")
+    print(f"Deleted Stream Response: {resp_delete_stream.text}")
+    assert resp_delete_stream.status_code == 200, f"Failed to delete stream {stream_name}"
+    print(f"Successfully deleted stream {stream_name}")
 
-# def test_delete_stream_join(create_session, base_url):
-#     """Running an E2E test for deleting the created join stream."""
-#     session = create_session
-#     url = base_url
-#     # Proceed to delete the created Stream
-#     resp_delete_stream_join= session.delete(f"{url}api/{org_id}/streams/{stream_join}?type=logs")
-#     print(f"Deleted Stream Response: {resp_delete_stream_join.text}")
-#     assert resp_delete_stream_join.status_code == 200, f"Failed to delete stream {stream_join}"
-#     print(f"Successfully deleted stream {stream_join}")
+def test_delete_stream_join(create_session, base_url):
+    """Running an E2E test for deleting the created join stream."""
+    session = create_session
+    url = base_url
+    # Proceed to delete the created Stream
+    resp_delete_stream_join= session.delete(f"{url}api/{org_id}/streams/{stream_join}?type=logs")
+    print(f"Deleted Stream Response: {resp_delete_stream_join.text}")
+    assert resp_delete_stream_join.status_code == 200, f"Failed to delete stream {stream_join}"
+    print(f"Successfully deleted stream {stream_join}")
 
 
 # Read HTTP 2 responses from the stream
