@@ -1,11 +1,8 @@
 import os  # For environment variables
-import websocket  # For WebSocket connection
 import json # For JSON parsing
-import base64 # For encoding user credentials
 from datetime import datetime, timezone, timedelta # For timestamp conversion
 import time # For sleep
 from pathlib import Path # For file paths
-import uuid # For generating UUIDs
 import pytest # For fixtures
 import random
 import string
