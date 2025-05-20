@@ -158,6 +158,10 @@ pub async fn delete(
         )
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
+        // sync to other regions to delete data of this stream
+        o2_enterprise::enterprise::super_cluster::queue::stream_delete(&key)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
     }
 
     Ok(())
