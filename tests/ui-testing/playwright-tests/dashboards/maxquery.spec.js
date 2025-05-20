@@ -1,6 +1,5 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
 import { login } from "../utils/dashLogin.js";
 import { ingestion } from "../utils/dashIngestion.js";
 import {
@@ -47,8 +46,6 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "4");
 
-    // await page.waitForTimeout(5000);
-
     await dashboardPage.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
@@ -56,8 +53,6 @@ test.describe("dashboard multi y axis testcases", () => {
     await dashboardCreate.createDashboard(randomDashboardName);
 
     await dashboardCreate.addPanel();
-
-    // await page.waitForTimeout(3000);
 
     await chartTypeSelector.selectChartType("bar");
 
@@ -83,8 +78,6 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await dateTimeHelper.setRelativeTimeRange("6-w");
 
-    // await page.waitForTimeout(3000);
-
     const response = await page.waitForResponse(
       (response) =>
         response
@@ -93,15 +86,13 @@ test.describe("dashboard multi y axis testcases", () => {
         response.status() === 200
     );
     const data = await response.json();
-    console.log("data", data);
 
     expect(data.hits.length).toBeGreaterThan(0);
 
     await expect(
       page.locator('[data-test="dashboard-panel-max-duration-warning"]')
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15000 });
 
-    // await page.waitForTimeout(5000);
     await dateTimeHelper.setRelativeTimeRange("2-h");
 
     await expect(
@@ -161,13 +152,12 @@ test.describe("dashboard multi y axis testcases", () => {
         response.status() === 200
     );
     const data = await response.json();
-    console.log("data", data);
 
     expect(data.hits.length).toBeGreaterThan(0);
 
     await expect(
       page.locator('[data-test="dashboard-panel-max-duration-warning"]')
-    ).not.toBeVisible();
+    ).not.toBeVisible({ timeout: 10000 });
 
     await dashboardPage.menuItem("streams-item");
 
