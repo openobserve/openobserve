@@ -109,6 +109,9 @@ pub async fn search_http2_stream(
         org_id
     );
 
+    #[cfg(feature = "enterprise")]
+    let body_bytes = String::from_utf8_lossy(&body).to_string();
+
     // Get query params
     let Ok(query) = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()) else {
         #[cfg(feature = "enterprise")]
@@ -127,9 +130,6 @@ pub async fn search_http2_stream(
         return MetaHttpResponse::bad_request("Invalid query parameters");
     };
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-
-    #[cfg(feature = "enterprise")]
-    let body_bytes = String::from_utf8_lossy(&body).to_string();
 
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
