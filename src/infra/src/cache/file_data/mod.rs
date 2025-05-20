@@ -264,7 +264,17 @@ async fn download_from_storage(
             tokio::time::sleep(tokio::time::Duration::from_secs(retry_time)).await;
             retry_time *= 2;
             continue;
+        } else {
+            // size matches
+            break;
         }
+    }
+    // if even after retries, the download size does not match, we skip it
+    // no point in validating or setting the value
+    if data_len != expected_blob_size {
+        return Err(anyhow::anyhow!(
+            "file {file} could not be downloaded completely: expected {expected_blob_size}, got {data_len} skipping"
+        ));
     }
 
     // now the size we downloaded matches what blob store has or tried the max attempts, we check
