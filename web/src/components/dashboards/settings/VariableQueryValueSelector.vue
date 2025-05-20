@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    loading: {{ variableItem.isLoading }} values: {{ variableItem.value }}
+    loading: {{ variableItem.isLoading }} values:
+    {{ variableItem.value }} isVariableLoadingPending:
+    {{ variableItem.isVariableLoadingPending }} options:
+    {{ variableItem.options.map((it) => it.label) }}
     <q-select
       style="min-width: 150px"
       filled
