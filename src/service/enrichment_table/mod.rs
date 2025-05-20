@@ -120,15 +120,11 @@ pub async fn save_enrichment_data(
         0.0
     };
     let enrichment_table_max_size = cfg.limit.enrichment_table_max_size as f64;
-    log::info!(
-        "enrichment table [{stream_name}] saving stats: {:?} vs max_table_size {}",
-        current_size_in_bytes,
-        enrichment_table_max_size
-    );
     let total_expected_size_in_bytes = current_size_in_bytes + bytes_in_payload as f64;
     let total_expected_size_in_mb = total_expected_size_in_bytes / SIZE_IN_MB;
-    log::debug!(
-        "enrichment table [{stream_name}] total expected storage size in mb: {} and max storage size in mb: {}",
+    log::info!(
+        "enrichment table [{stream_name}] current stats in bytes: {:?} vs total expected size in mb: {} vs max_table_size in mb: {}",
+        current_size_in_bytes,
         total_expected_size_in_mb,
         enrichment_table_max_size
     );
@@ -258,6 +254,22 @@ pub async fn save_enrichment_data(
                     )));
             }
         };
+
+    let mut enrich_meta_stats = enrichment_table::get_meta_table_stats(org_id, stream_name)
+        .await
+        .unwrap_or_default();
+
+    if !append_data {
+        enrich_meta_stats.start_time = started_at;
+    }
+    if enrich_meta_stats.start_time == 0 {
+        enrich_meta_stats.start_time = enrichment_table::get_start_time(org_id, stream_name).await;
+    }
+    enrich_meta_stats.end_time = now_micros();
+    enrich_meta_stats.size = total_expected_size_in_bytes as i64;
+    // The stream_stats table takes some time to update, so we need to update the enrichment table
+    // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
+    let _ = enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
 
     // notify update
     if !schema.fields().is_empty() {
