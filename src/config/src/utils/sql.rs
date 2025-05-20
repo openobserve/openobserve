@@ -75,7 +75,12 @@ pub fn is_simple_distinct_query(query: &str) -> Result<bool, sqlparser::parser::
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
         if let Statement::Query(query) = statement {
-            if has_distinct(query) && !has_group_by(query) {
+            if has_distinct(query)
+                && !has_group_by(query)
+                && !has_join(query)
+                && !has_subquery(statement)
+                && !has_union(query)
+            {
                 return Ok(true);
             }
         }
