@@ -239,12 +239,12 @@ test.describe("dashboard filter testcases", () => {
 
     await dashboardActions.applyDashboardBtn();
     await dashboardActions.waitForChartToRender();
-    await page.waitForTimeout(2000);
 
     // Verify query inspector
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
       .click();
+    await page.waitForTimeout(2000);
 
     await expect(
       page.getByRole("cell", {
@@ -252,6 +252,12 @@ test.describe("dashboard filter testcases", () => {
         exact: true,
       })
     ).toBeVisible();
+    // await expect(
+    //   page.getByRole("cell", {
+    //     name: 'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+    //     exact: true,
+    //   })
+    // ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
