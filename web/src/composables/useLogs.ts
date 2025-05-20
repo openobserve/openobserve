@@ -1954,6 +1954,7 @@ const useLogs = () => {
       }
       searchObjDebug["queryDataEndTime"] = performance.now();
     } catch (e: any) {
+      console.error(`${notificationMsg.value || "Error occurred during the search operation."}`, e);
       searchObj.loading = false;
       showErrorNotification(
         notificationMsg.value || "Error occurred during the search operation.",
@@ -5059,9 +5060,7 @@ const useLogs = () => {
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       
-      if(shouldGetPageCount(queryReq, fnParsedSQL())) {
-        queryReq.query.size = queryReq.query.size + 1;
-      }
+      updatePageCountSearchSize(queryReq);
 
       const requestId = initializeSearchConnection(payload);
 
@@ -5296,10 +5295,12 @@ const useLogs = () => {
       }
       
 
-      if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (searchObj.data.queryResults.hits.length === payload.queryReq.query.size)) {
-        searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(0, payload.queryReq.query.size - 1);
-      }
+
+      updatePageCountTotal(payload.queryReq, searchObj.data.queryResults.hits.length);
+      trimPageCountExtraHit(payload.queryReq, searchObj.data.queryResults.hits.length);
     }
+
+    if (isPagination) refreshPagination(true);
 
     processPostPaginationData();
   }
@@ -5380,6 +5381,30 @@ const useLogs = () => {
     }
     
     if (isPagination) refreshPagination(true);
+  }
+
+  const updatePageCountTotal = (queryReq: SearchRequestPayload, total: any) => {
+    try {
+      if(shouldGetPageCount(queryReq, fnParsedSQL()) && (total === queryReq.query.size)) {
+        searchObj.data.queryResults.pageCountTotal = (searchObj.meta.resultGrid.rowsPerPage * searchObj.data.resultGrid.currentPage) + 1;
+      } else if(shouldGetPageCount(queryReq, fnParsedSQL()) && (searchObj.data.queryResults.hits != queryReq.query.size)){
+        searchObj.data.queryResults.pageCountTotal = ((searchObj.meta.resultGrid.rowsPerPage) * Math.max(searchObj.data.resultGrid.currentPage-1,0)) + queryResults.total;
+      }
+    } catch(e: any) {
+      console.error("Error while updating page count total", e);
+    }
+  }
+
+  const trimPageCountExtraHit = (queryReq: SearchRequestPayload, total: any) => {
+    if(shouldGetPageCount(queryReq, fnParsedSQL()) && (total === queryReq.query.size)) {
+      searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(0, searchObj.data.queryResults.hits.length- 1);
+    }
+  }
+
+  const updatePageCountSearchSize = (queryReq: SearchRequestPayload) => {
+    if(shouldGetPageCount(queryReq, fnParsedSQL())) {
+      queryReq.query.size = queryReq.query.size + 1;
+    }
   }
 
   const handleHistogramStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
@@ -6019,7 +6044,7 @@ const useLogs = () => {
   }
 
   function isHistogramDataMissing(searchObj: any) {
-    return searchObj.data.queryResults.aggs === undefined || searchObj.data.queryResults.aggs.length === 0;
+    return !searchObj.data.queryResults?.aggs?.length;
   }
 
   const handleSearchClose = (payload: any, response: any) => {
