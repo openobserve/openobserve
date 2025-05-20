@@ -1291,10 +1291,7 @@ async fn send_cached_responses(
             req.query.end_time,
             cache_order_by,
         );
-        if let Err(e) = sender
-            .send(Ok(StreamResponses::Progress { percent }))
-            .await
-        {
+        if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
             log::error!("Error sending progress update: {}", e);
             return Err(infra::errors::Error::Message(
                 "Error sending progress update".to_string(),
