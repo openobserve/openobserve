@@ -12,7 +12,10 @@ import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
 import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
 import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
-import { waitForDashboardPage } from "../utils/dashCreation.js";
+import {
+  waitForDashboardPage,
+  deleteDashboard,
+} from "../utils/dashCreation.js";
 
 const dashboardName = `Dashboard_${Date.now()}`;
 
@@ -48,15 +51,8 @@ test.describe("dashboard UI testcases", () => {
     dashboardPanel = new DashboardPanel(page);
     const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
 
-    await page
-      .locator('[data-test="menu-link-\\/dashboards-item"]')
-      .waitFor({ state: "visible" });
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
-
-    await page
-      .locator('[data-test="dashboard-folder-tab-default"]')
-      .waitFor({ state: "visible" });
     await dashboardCreate.createDashboard(dashboardName);
     await dashboardCreate.addPanel();
     await dashboardActions.addPanelName(panelName);
@@ -84,12 +80,11 @@ test.describe("dashboard UI testcases", () => {
     await dashboardPanel.deletePanel(panelName);
 
     await dashboardCreate.backToDashboardList();
-    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
-      state: "visible",
-    });
-    // await dashboardCreate.searchDashboard(dashboardName);
-    // await dashboardCreate.deleteDashboard(dashboardName);
-    // await page.waitForTimeout(5000);
+    await deleteDashboard(page, dashboardName);
+
+
+   
+    await das
   });
 
   test("should add and cancel the breakdown field with different times and timezones and ensure it displays the correct output", async ({
@@ -133,12 +128,8 @@ test.describe("dashboard UI testcases", () => {
     });
     await dashboardPanel.deletePanel(panelName);
     await dashboardCreate.backToDashboardList();
-    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
-      state: "visible",
-    });
-    await dashboardCreate.searchDashboard(dashboardName);
-    await dashboardCreate.deleteDashboard(dashboardName);
-    await page.waitForTimeout(5000);
+    await deleteDashboard(page, dashboardName);
+
   });
 
   test("should update the breakdown field correctly to match the existing one according to the chart type when changing the chart type.", async ({
@@ -205,6 +196,8 @@ test.describe("dashboard UI testcases", () => {
 
     // Delete the panel and confirm
     await dashboardPanel.deletePanel(panelName);
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 
   test("should create the panel successfully after adding a breakdown", async ({
@@ -255,6 +248,8 @@ test.describe("dashboard UI testcases", () => {
 
     // Delete the panel and confirm
     await dashboardPanel.deletePanel(panelName);
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 
   test("should clear the selections after adding a breakdown and refreshing the page.", async ({
@@ -347,6 +342,8 @@ test.describe("dashboard UI testcases", () => {
 
     // Delete the panel and confirm
     await dashboardPanel.deletePanel(panelName);
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 
   test("should redirect to the list of dashboard pages when discarding changes", async ({
@@ -426,6 +423,8 @@ test.describe("dashboard UI testcases", () => {
 
     // Delete the panel and confirm
     await dashboardPanel.deletePanel(panelName);
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 
   test("should correctly handle and display string and numeric values when no value replacement occurs", async ({
@@ -476,5 +475,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Delete the panel and confirm
     await dashboardPanel.deletePanel(panelName);
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 });
