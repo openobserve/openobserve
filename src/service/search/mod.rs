@@ -34,7 +34,7 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_aggregate_query},
+        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
         time::now_micros,
     },
 };
@@ -578,6 +578,7 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
+    is_http_req: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -611,10 +612,17 @@ pub async fn search_partition(
         && is_simple_aggregate_query(&req.sql).unwrap_or(false)
         && cfg.common.feature_query_streaming_aggs;
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
+    let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
+    let is_http_distinct = is_simple_distinct && is_http_req;
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
         skip_get_file_list = false;
+    }
+
+    // if http distinct, we should skip file list
+    if is_http_distinct {
+        skip_get_file_list = true;
     }
 
     // check if we need to use streaming_output
@@ -638,7 +646,8 @@ pub async fn search_partition(
         let stream_type = stream.get_stream_type(stream_type);
         let stream_name = stream.stream_name();
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let use_stream_stats_for_partition = stream_settings.approx_partition;
+        let use_stream_stats_for_partition = cfg.common.use_stream_settings_for_partitions_enabled
+            || stream_settings.approx_partition;
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
@@ -1176,6 +1185,7 @@ pub async fn search_partition_multi(
                 streaming_output: req.streaming_output,
             },
             false,
+            true,
         )
         .await
         {

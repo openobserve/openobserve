@@ -1256,6 +1256,7 @@ pub async fn search_partition(
         stream_type,
         &req,
         false,
+        true,
     )
     .instrument(http_span)
     .await;

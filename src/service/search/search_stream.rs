@@ -710,6 +710,7 @@ async fn get_partitions(
         stream_type,
         &search_partition_req,
         false,
+        false,
     )
     .instrument(tracing::info_span!(
         "src::handler::http::request::search::test_stream::get_partitions"
