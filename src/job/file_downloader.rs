@@ -75,7 +75,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // handle normal queue download
     // move files
-    for _ in 0..cfg.limit.file_download_thread_num {
+    for thread in 0..cfg.limit.file_download_thread_num {
         let rx = FILE_DOWNLOAD_CHANNEL.receiver.clone();
         tokio::spawn(async move {
             loop {
@@ -86,7 +86,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((trace_id, file, file_size, cache)) => {
-                        match download_file(&trace_id, &file, file_size, cache).await {
+                        match download_file(thread, &trace_id, &file, file_size, cache).await {
                             Ok(data_len) => {
                                 if data_len > 0 && data_len != file_size {
                                     log::warn!(
@@ -95,20 +95,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                         file_size,
                                         data_len,
                                     );
-                                    // update database
-                                    // if let Err(e) = infra::file_list::update_compressed_size(
-                                    //     &file,
-                                    //     data_len as i64,
-                                    // )
-                                    // .await
-                                    // {
-                                    //     log::error!(
-                                    //         "[trace_id {trace_id}] search->storage: update file
-                                    // size for file {} err: {}",
-                                    //         file,
-                                    //         e,
-                                    //     );
-                                    // }
                                 }
                             }
                             Err(e) => {
@@ -160,7 +146,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     });
 
     // worker tasks: handle priority queue download
-    for _ in 0..cfg.limit.file_download_priority_queue_thread_num {
+    for thread in 0..cfg.limit.file_download_priority_queue_thread_num {
         let mut shutdown_rx = shutdown_rx.clone();
         tokio::spawn(async move {
             loop {
@@ -175,7 +161,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
                         match file_info {
                             Some((trace_id, file, file_size, cache)) => {
-                                match download_file(&trace_id, &file, file_size, cache).await {
+                                match download_file(thread, &trace_id, &file, file_size, cache).await {
                                     Ok(data_len) => {
                                         if data_len > 0 && data_len != file_size {
                                             log::warn!(
@@ -216,6 +202,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn download_file(
+    thread: usize,
     trace_id: &str,
     file_name: &str,
     file_size: usize,
@@ -223,7 +210,8 @@ async fn download_file(
 ) -> Result<usize, anyhow::Error> {
     let cfg = get_config();
     let size = if file_size > 0 { Some(file_size) } else { None };
-    match cache_type {
+    let start = std::time::Instant::now();
+    let ret = match cache_type {
         file_data::CacheType::Memory => {
             let mut disk_exists = false;
             let mem_exists = file_data::memory::exist(file_name).await;
@@ -245,7 +233,13 @@ async fn download_file(
             }
         }
         _ => Ok(0),
-    }
+    };
+    log::debug!(
+        "[FILE_CACHE_DOWNLOAD:JOB:{thread}] [trace_id {trace_id}] download_file: {file_name}, ret: {:?}, took: {} ms",
+        ret,
+        start.elapsed().as_millis()
+    );
+    ret
 }
 
 pub async fn queue_background_download(
@@ -255,6 +249,9 @@ pub async fn queue_background_download(
     max_ts: i64,
     cache_type: file_data::CacheType,
 ) -> Result<(), anyhow::Error> {
+    log::debug!(
+        "[FILE_CACHE_DOWNLOAD:JOB] [trace_id {trace_id}] queue_background_download: {file}, size: {size}, ts: {max_ts}"
+    );
     let cfg = get_config();
     if cfg.limit.file_download_enable_priority_queue
         && should_prioritize_file(max_ts, cfg.limit.file_download_priority_queue_window_secs)
