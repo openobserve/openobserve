@@ -159,10 +159,8 @@ test.describe("dashboard multi y axis testcases", () => {
       page.locator('[data-test="dashboard-panel-max-duration-warning"]')
     ).not.toBeVisible({ timeout: 10000 });
 
-    await dashboardPage.menuItem("streams-item");
+    await page.locator('[data-test="dashboard-back-btn"]').click();
 
-    await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "");
-
-    await page.waitForTimeout(2000);
+    await deleteDashboard(page, randomDashboardName);
   });
 });
