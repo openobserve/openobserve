@@ -120,11 +120,11 @@ test.describe("dashboard UI testcases", () => {
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
-      "firstcolumn"
+      "x"
     );
     await chartTypeSelector.searchAndAddField(
       "kubernetes_pod_name",
-      "othercolumn"
+      "y"
     );
 
     await dashboardPanelConfigs.openConfigPanel();
@@ -158,11 +158,11 @@ test.describe("dashboard UI testcases", () => {
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
-      "firstcolumn"
+      "x"
     );
     await chartTypeSelector.searchAndAddField(
       "kubernetes_pod_name",
-      "othercolumn"
+      "y"
     );
     await dashboardPanelConfigs.openConfigPanel();
     await dashboardPanelConfigs.selectTranspose();
