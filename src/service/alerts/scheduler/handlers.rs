@@ -42,6 +42,8 @@ use infra::{
 };
 use proto::cluster_rpc;
 
+#[cfg(feature = "cloud")]
+use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{
     alerts::{
         alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
@@ -50,7 +52,6 @@ use crate::service::{
     dashboards::reports::SendReport,
     db::{self, alerts::alert::set_without_updating_trigger},
     ingestion::ingestion_service,
-    organization::is_org_in_free_trial_period,
     pipeline::batch_execution::ExecutablePipeline,
     self_reporting::publish_triggers_usage,
 };

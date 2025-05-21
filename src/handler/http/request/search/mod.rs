@@ -34,6 +34,8 @@ use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
 
+#[cfg(feature = "cloud")]
+use crate::service::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::get_cipher_key_names;
 use crate::{
@@ -52,7 +54,6 @@ use crate::{
     service::{
         db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-        organization::is_org_in_free_trial_period,
         search as SearchService,
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
