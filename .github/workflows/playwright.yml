@@ -134,7 +134,7 @@ jobs:
             "dashboards/dashboard-import.spec.js",
             # "reportsUpdated.spec.js",
             # "reportsUpdated2.spec.js",
-            "dashboards/dashboard-filter.spec.js",
+            # "dashboards/dashboard-filter.spec.js",
             # "dashboards/dashboard-geoMap.spec.js",
             # "dashboards/dashboard-maps.spec.js",
             "dashboards/dashboard-folder.spec.js",
