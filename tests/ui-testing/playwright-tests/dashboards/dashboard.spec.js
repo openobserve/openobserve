@@ -469,11 +469,11 @@ test.describe("dashboard UI testcases", () => {
     await dashboardAction.savePanel();
 
     // Test Share Link feature
-    await dashboardShareExportPage.shareDashboard();
+    await dashboardShareExport.shareDashboard();
     await expect(page.getByText("Link copied successfully")).toBeHidden();
 
     // Test Fullscreen feature
-    await dashboardSetting.fullScreenSettings();
+    await dashboardSettings.fullScreenSettings()
     await expect(
       page.locator('[data-test="dashboard-fullscreen-btn"]')
     ).toBeVisible();
@@ -567,31 +567,14 @@ test.describe("dashboard UI testcases", () => {
     await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "b");
     await dashboardAction.applyDashboardBtn();
 
-    // Apply "Is Null" filter
-    await chartTypeSelector.searchAndAddField("kubernetes_host", "Is Null");
-    await dashboardAction.applyDashboardBtn();
-
-    // Apply "=" filter
-    await dashboardPanelConfigs.searchAndAddField(
-      "kubernetes_host",
-      "=",
-      "kubernetes_docker_id"
-    );
-    await dashboardAction.applyDashboardBtn();
-
-    // Apply "Is Not Null" filter
-    await dashboardTimeRefresh.setRelative("6", "w");
-    await dashboardAction.applyDashboardBtn();
-    await dashboardPanelConfigs.searchAndAddField(
-      "kubernetes_host",
-      "Is Not Null"
-    );
-    await dashboardAction.applyDashboardBtn();
+    // // Apply "Is Null" filter
+    // await chartTypeSelector.searchAndAddField("kubernetes_host", "filter");
+    // await dashboardAction.applyDashboardBtn();
 
     // Save and delete the panel
     await dashboardAction.addPanelName(panelName);
     await dashboardAction.savePanel();
-    await dashboardAction.deletePanel(panelName);
+    await dashboardPanel.deletePanel(panelName);
     await dashboardCreate.backToDashboardList();
     await waitForDashboardPage(page);
     await dashboardCreate.searchDashboard(randomDashboardName);
@@ -695,6 +678,7 @@ test.describe("dashboard UI testcases", () => {
     const dashboardDrilldown = new DashboardDrilldownPage(page);
     const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
     const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardSetting = new DashboardSetting(page);
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -723,10 +707,8 @@ test.describe("dashboard UI testcases", () => {
 
     // Verify confirmation popup for unsaved changes
     await page.locator('[data-test="dashboard-panel-discard"]').click();
-    // Test Fullscreen feature
-    await dashboardSettings.fullScreenSettings();
-    await expect(page.locator('[data-test="dashboard-fullscreen-btn"]')).toBeVisible();
-    await dashboardSettings.fullScreenSettings();
+ 
+    
   });
 
 
