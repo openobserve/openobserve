@@ -147,9 +147,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     }
                     break;
                 }
-                Some((trace_id, file, file_size, cache)) => {
+                Some((account, file, file_size, cache)) => {
                     PRIORITY_FILE_DOWNLOAD_CHANNEL
-                        .push((trace_id, file, file_size, cache))
+                        .push((account, file, file_size, cache))
                         .await;
                 }
             }
@@ -171,26 +171,24 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     _ = async {
                         let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
                         match file_info {
-                            Some((trace_id, file, file_size, cache)) => {
-                                match download_file(&trace_id, &file, file_size, cache).await {
+                            Some((account, file, file_size, cache)) => {
+                                match download_file(&account, &file, file_size, cache).await {
                                     Ok(data_len) => {
                                         if data_len > 0 && data_len != file_size {
                                             log::warn!(
-                                                "[trace_id {}] priority queue download file {} found size mismatch, expected: {}, actual: {}, will skip it",
-                                                trace_id,
+                                                "[FileDownloader::PriorityQueue] download file {} found size mismatch, expected: {}, actual: {}, will skip it",
                                                 file,
                                                 file_size,
-                                                data_len
+                                                data_len,
                                             );
                                         }
                                     }
                                     Err(e) => {
                                         log::error!(
-                                            "[trace_id {}] priority queue download file {} to cache {:?} err: {}",
-                                            trace_id,
+                                            "[FileDownloader::PriorityQueue] download file {} to cache {:?} err: {}",
                                             file,
                                             cache,
-                                            e
+                                            e,
                                         );
                                     }
                                 }
@@ -253,7 +251,7 @@ pub async fn queue_download(
     if !to_priority_queue || !get_config().limit.file_download_enable_priority_queue {
         FILE_DOWNLOAD_CHANNEL
             .sender
-            .send((account, file.to_owned(), size as usize, cache_type))
+            .send((account, file, size as usize, cache_type))
             .await?;
 
         // update metrics
