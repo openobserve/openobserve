@@ -1,6 +1,10 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
+import {
+  waitForDashboardPage,
+  deleteDashboard,
+} from "../utils/dashCreation.js";
 import { login } from "../utils/dashLogin.js";
 import { ingestion } from "../utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
@@ -12,8 +16,6 @@ import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
 import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
 import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
-import { waitForDashboardPage } from "../utils/dashCreation.js";
-import { DashboardPage } from "../../pages/dashboardPage.js";
 import DashboardShareExportPage from "../../pages/dashboardPages/dashboard-share-export.js";
 import DashboardSetting from "../../pages/dashboardPages/dashboard-settings.js";
 
@@ -63,8 +65,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should create a duplicate of the dashboard", async ({ page }) => {
@@ -119,9 +120,12 @@ test.describe("dashboard UI testcases", () => {
     await dashboardActions.addPanelName(panelName);
     await dashboardActions.savePanel();
     await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
 
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+
+
+    // await dashboardCreate.searchDashboard(randomDashboardName);
+    // await dashboardCreate.deleteDashboard(randomDashboardName);
   });
 
   test("should update the data when changing the time between both absolute and relative time using the Kolkata time zone.", async ({
@@ -157,9 +161,7 @@ test.describe("dashboard UI testcases", () => {
     await dashboardActions.addPanelName(panelName);
     await dashboardActions.savePanel();
     await dashboardCreate.backToDashboardList();
-
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should update the chart with the results of a custom SQL query", async ({
@@ -202,8 +204,7 @@ test.describe("dashboard UI testcases", () => {
     await dashboardActions.savePanel();
     await dashboardCreate.backToDashboardList();
 
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should display the correct and updated chart when changing the chart type", async ({
@@ -242,8 +243,7 @@ test.describe("dashboard UI testcases", () => {
     await dashboardActions.savePanel();
     await dashboardCreate.backToDashboardList();
 
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should navigate to another dashboard using the DrillDown feature.", async ({
@@ -297,8 +297,7 @@ test.describe("dashboard UI testcases", () => {
     await dashboardActions.addPanelName(panelName);
     await dashboardActions.savePanel();
     await dashboardCreate.backToDashboardList();
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test.skip("should dynamically update the filtered data when applying the dynamic filter on the dashboard", async ({
@@ -359,8 +358,7 @@ test.describe("dashboard UI testcases", () => {
     await dashboardPanel.deletePanel(panelName);
     await dashboardCreate.backToDashboardList();
     await waitForDashboardPage(page);
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should create and save the dashboard with different relative times and timezones on both the Gauge and Table charts", async ({
@@ -417,8 +415,7 @@ test.describe("dashboard UI testcases", () => {
     // Delete the panel
     await dashboardCreate.backToDashboardList();
     // await waitForDashboardPage(page);
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should have the Date and Time filter, Page Refresh, and Share Link features working correctly on the Dashboard panel page", async ({
@@ -528,8 +525,7 @@ test.describe("dashboard UI testcases", () => {
     // Delete the panel
     await dashboardPanel.deletePanel(panelName);
     await dashboardCreate.backToDashboardList();
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test.skip("should apply various filter operators to the dashboard field and display the correct results", async ({
@@ -577,8 +573,7 @@ test.describe("dashboard UI testcases", () => {
     await dashboardPanel.deletePanel(panelName);
     await dashboardCreate.backToDashboardList();
     await waitForDashboardPage(page);
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard();
+    await deleteDashboard(page, randomDashboardName);
   });
   test("should display an error message when a required field is missing", async ({
     page,
@@ -669,8 +664,7 @@ test.describe("dashboard UI testcases", () => {
     await dashboardAction.addPanelName(panelName);
     await dashboardAction.savePanel();
     await dashboardCreate.backToDashboardList();
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should display a confirmation popup message for unsaved changes when clicking the Discard button", async ({
