@@ -1088,11 +1088,11 @@ pub struct Common {
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
     #[env_config(
-        name = "ZO_ENABLE_USE_STREAM_SETTINGS_FOR_PARTITIONS",
+        name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
         default = false,
         help = "Enable to use stream settings for partitions. This will apply for all streams"
     )]
-    pub enable_use_stream_settings_for_partitions: bool,
+    pub use_stream_settings_for_partitions_enabled: bool,
 }
 
 #[derive(EnvConfig)]
