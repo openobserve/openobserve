@@ -85,6 +85,7 @@ export default createStore({
     allApiLimitsByOrgId: {},
     allRoleLimitsByOrgIdByRole: {},
     modulesToDisplay: {},
+    isAiChatEnabled: false,
   },
   mutations: {
     login(state, payload) {
