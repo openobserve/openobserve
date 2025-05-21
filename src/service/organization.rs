@@ -38,6 +38,7 @@ use {
     o2_enterprise::enterprise::cloud::{OrgInviteStatus, org_invites},
 };
 
+#[cfg(feature = "cloud")]
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
     common::{
@@ -104,7 +105,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         let o2_config = get_o2_config();
 
         // if trial period check is disabled, everything is free trial period
-        if !o2_config.common.trial_period_enabled || org_id == "_meta" {
+        if !o2_config.cloud.trial_period_enabled || org_id == "_meta" {
             None
         } else {
             // first check if the org is
@@ -419,23 +420,25 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("Cannot delete default organization"));
     }
 
-    let org = match get_org(org_id).await {
-        Some(org) => org,
-        None => return Err(anyhow::anyhow!("Organization does not exist")),
-    };
     match db::organization::delete_org(org_id).await {
         Ok(_) => {
             delete_org_tuples(org_id).await;
             #[cfg(feature = "cloud")]
-            enqueue_cloud_event(CloudEvent {
-                org_id: org.identifier.clone(),
-                org_name: org.name.clone(),
-                org_type: org.org_type.clone(),
-                user: None,
-                subscription_type: None,
-                event: EventType::OrgDeleted,
-            })
-            .await;
+            {
+                let org = match get_org(org_id).await {
+                    Some(org) => org,
+                    None => return Err(anyhow::anyhow!("Organization does not exist")),
+                };
+                enqueue_cloud_event(CloudEvent {
+                    org_id: org.identifier.clone(),
+                    org_name: org.name.clone(),
+                    org_type: org.org_type.clone(),
+                    user: None,
+                    subscription_type: None,
+                    event: EventType::OrgDeleted,
+                })
+                .await;
+            }
             Ok(())
         }
         Err(e) => {
@@ -656,7 +659,7 @@ pub async fn is_org_in_free_trial_period(org_id: &str) -> Result<bool, anyhow::E
     let o2_config = get_o2_config();
 
     // if trial period check is disabled, everything is free trial period
-    if !o2_config.common.trial_period_enabled {
+    if !o2_config.cloud.trial_period_enabled {
         return Ok(true);
     }
 
