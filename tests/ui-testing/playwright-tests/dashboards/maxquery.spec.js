@@ -116,7 +116,7 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await dashboardPage.menuItem("streams-item");
 
-    await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "");
+    await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "0");
 
     await dashboardPage.menuItem("dashboards-item");
 
@@ -141,7 +141,6 @@ test.describe("dashboard multi y axis testcases", () => {
     await dashboardPageActions.addPanelName(randomDashboardName);
     await dashboardPageActions.savePanel();
 
-    await page.waitForTimeout(2000);
     await dateTimeHelper.setRelativeTimeRange("6-w");
 
     const response = await page.waitForResponse(
