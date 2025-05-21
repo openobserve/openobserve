@@ -15,7 +15,7 @@
 
 use std::{collections::VecDeque, sync::Arc};
 
-use config::{get_config, meta::stream::FileMeta, metrics};
+use config::{get_config, metrics, utils::time::now_micros};
 use infra::cache::file_data;
 use once_cell::sync::Lazy;
 use tokio::sync::{
@@ -75,7 +75,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // handle normal queue download
     // move files
-    for _ in 0..cfg.limit.file_download_thread_num {
+    for thread in 0..cfg.limit.file_download_thread_num {
         let rx = FILE_DOWNLOAD_CHANNEL.receiver.clone();
         tokio::spawn(async move {
             loop {
@@ -86,7 +86,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((trace_id, file, file_size, cache)) => {
-                        match download_file(&trace_id, &file, file_size, cache).await {
+                        match download_file(thread, &trace_id, &file, file_size, cache).await {
                             Ok(data_len) => {
                                 if data_len > 0 && data_len != file_size {
                                     log::warn!(
@@ -95,20 +95,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                         file_size,
                                         data_len,
                                     );
-                                    // update database
-                                    // if let Err(e) = infra::file_list::update_compressed_size(
-                                    //     &file,
-                                    //     data_len as i64,
-                                    // )
-                                    // .await
-                                    // {
-                                    //     log::error!(
-                                    //         "[trace_id {trace_id}] search->storage: update file
-                                    // size for file {} err: {}",
-                                    //         file,
-                                    //         e,
-                                    //     );
-                                    // }
                                 }
                             }
                             Err(e) => {
@@ -160,7 +146,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     });
 
     // worker tasks: handle priority queue download
-    for _ in 0..cfg.limit.file_download_priority_queue_thread_num {
+    for thread in 0..cfg.limit.file_download_priority_queue_thread_num {
         let mut shutdown_rx = shutdown_rx.clone();
         tokio::spawn(async move {
             loop {
@@ -175,7 +161,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
                         match file_info {
                             Some((trace_id, file, file_size, cache)) => {
-                                match download_file(&trace_id, &file, file_size, cache).await {
+                                match download_file(thread, &trace_id, &file, file_size, cache).await {
                                     Ok(data_len) => {
                                         if data_len > 0 && data_len != file_size {
                                             log::warn!(
@@ -216,13 +202,16 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn download_file(
+    thread: usize,
     trace_id: &str,
     file_name: &str,
     file_size: usize,
     cache_type: file_data::CacheType,
 ) -> Result<usize, anyhow::Error> {
     let cfg = get_config();
-    match cache_type {
+    let size = if file_size > 0 { Some(file_size) } else { None };
+    let start = std::time::Instant::now();
+    let ret = match cache_type {
         file_data::CacheType::Memory => {
             let mut disk_exists = false;
             let mem_exists = file_data::memory::exist(file_name).await;
@@ -231,45 +220,42 @@ async fn download_file(
                 disk_exists = file_data::disk::exist(file_name).await;
             }
             if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
-                file_data::memory::download(trace_id, file_name, Some(file_size)).await
+                file_data::memory::download(trace_id, file_name, size).await
             } else {
                 Ok(0)
             }
         }
         file_data::CacheType::Disk => {
             if !file_data::disk::exist(file_name).await {
-                file_data::disk::download(trace_id, file_name, Some(file_size)).await
+                file_data::disk::download(trace_id, file_name, size).await
             } else {
                 Ok(0)
             }
         }
         _ => Ok(0),
-    }
+    };
+    log::debug!(
+        "[FILE_CACHE_DOWNLOAD:JOB:{thread}] [trace_id {trace_id}] download_file: {file_name}, ret: {:?}, took: {} ms",
+        ret,
+        start.elapsed().as_millis()
+    );
+    ret
 }
 
 pub async fn queue_background_download(
     trace_id: &str,
     file: &str,
     size: i64,
+    max_ts: i64,
     cache_type: file_data::CacheType,
-    to_priority_queue: bool,
 ) -> Result<(), anyhow::Error> {
-    if !to_priority_queue || !get_config().limit.file_download_enable_priority_queue {
-        FILE_DOWNLOAD_CHANNEL
-            .sender
-            .send((
-                trace_id.to_owned(),
-                file.to_owned(),
-                size as usize,
-                cache_type,
-            ))
-            .await?;
-
-        // update metrics
-        metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
-            .with_label_values(&[])
-            .inc();
-    } else {
+    log::debug!(
+        "[FILE_CACHE_DOWNLOAD:JOB] [trace_id {trace_id}] queue_background_download: {file}, size: {size}, ts: {max_ts}"
+    );
+    let cfg = get_config();
+    if cfg.limit.file_download_enable_priority_queue
+        && should_prioritize_file(max_ts, cfg.limit.file_download_priority_queue_window_secs)
+    {
         PRIORITY_FILE_DOWNLOAD_CHANNEL
             .sender
             .send((
@@ -284,16 +270,28 @@ pub async fn queue_background_download(
         metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
             .with_label_values(&[])
             .inc();
+    } else {
+        FILE_DOWNLOAD_CHANNEL
+            .sender
+            .send((
+                trace_id.to_owned(),
+                file.to_owned(),
+                size as usize,
+                cache_type,
+            ))
+            .await?;
+
+        // update metrics
+        metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
+            .with_label_values(&[])
+            .inc();
     }
     Ok(())
 }
 
-pub fn should_prioritize_file(file_meta: &FileMeta) -> bool {
-    let cfg = get_config();
-    let window_micros = (cfg.limit.file_download_priority_queue_window_secs * 1_000_000) as i64;
-    let now = chrono::Utc::now().timestamp_micros();
-    // Check if the file's timestamp range overlaps with the current time window.
-    // A file is prioritized if its data is "fresh" - containing events from the recent past
-    // through the near future relative to current time, within the configured window.
-    file_meta.min_ts > now - window_micros && file_meta.max_ts < now + window_micros
+// if the file timestamp is in the past window, it should be prioritized
+fn should_prioritize_file(ts: i64, window_secs: i64) -> bool {
+    let window_micros = window_secs * 1_000_000;
+    let now = now_micros();
+    ts > now - window_micros
 }

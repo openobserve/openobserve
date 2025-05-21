@@ -40,19 +40,16 @@ use itertools::Itertools;
 use promql_parser::label::{MatchOp, Matchers};
 use tracing::Instrument;
 
-use crate::{
-    job::should_prioritize_file,
-    service::{
-        db, file_list,
-        search::{
-            datafusion::exec::register_table,
-            grpc::{
-                QueryParams,
-                storage::{cache_files, filter_file_list_by_tantivy_index},
-            },
-            index::{Condition, IndexCondition},
-            match_source,
+use crate::service::{
+    db, file_list,
+    search::{
+        datafusion::exec::register_table,
+        grpc::{
+            QueryParams,
+            storage::{cache_files, filter_file_list_by_tantivy_index},
         },
+        index::{Condition, IndexCondition},
+        match_source,
     },
 };
 
@@ -153,13 +150,7 @@ pub(crate) async fn create_context(
         trace_id,
         &files
             .iter()
-            .map(|f| {
-                (
-                    f.key.as_ref(),
-                    f.meta.compressed_size,
-                    should_prioritize_file(&f.meta),
-                )
-            })
+            .map(|f| (f.key.as_ref(), f.meta.compressed_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "parquet",
