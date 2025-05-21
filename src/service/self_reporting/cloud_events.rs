@@ -1,4 +1,5 @@
-use config::{META_ORG_ID, get_config, meta::stream::StreamType, utils::json};
+use config::{META_ORG_ID, meta::stream::StreamType, utils::json};
+use o2_enterprise::enterprise::common::infra::config::get_config;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use serde::{Deserialize, Serialize};
@@ -52,15 +53,15 @@ async fn _inner_flush() {
 
     let mut requeue = false;
 
-    if &cfg.common.cloud_events_reporting_mode != "local"
-        && !cfg.common.cloud_events_reporting_url.is_empty()
-        && !cfg.common.cloud_events_reporting_creds.is_empty()
+    if &cfg.cloud.cloud_events_reporting_mode != "local"
+        && !cfg.cloud.cloud_events_reporting_url.is_empty()
+        && !cfg.cloud.cloud_events_reporting_creds.is_empty()
     {
-        let url = url::Url::parse(&cfg.common.cloud_events_reporting_url).unwrap();
-        let creds = if cfg.common.cloud_events_reporting_creds.starts_with("Basic") {
-            cfg.common.cloud_events_reporting_creds.to_string()
+        let url = url::Url::parse(&cfg.cloud.cloud_events_reporting_url).unwrap();
+        let creds = if cfg.cloud.cloud_events_reporting_creds.starts_with("Basic") {
+            cfg.cloud.cloud_events_reporting_creds.to_string()
         } else {
-            format!("Basic {}", &cfg.common.cloud_events_reporting_creds)
+            format!("Basic {}", &cfg.cloud.cloud_events_reporting_creds)
         };
         match reqwest::Client::builder()
             .build()
@@ -81,7 +82,7 @@ async fn _inner_flush() {
                             .await
                             .unwrap_or_else(|_| resp_status.to_string())
                     );
-                    if &cfg.common.cloud_events_reporting_mode != "both" {
+                    if &cfg.cloud.cloud_events_reporting_mode != "both" {
                         // on error in ingesting usage data, push back the data
                         requeue = true;
                     }
@@ -92,7 +93,7 @@ async fn _inner_flush() {
                     "[SELF-REPORTING] Error in ingesting cloud events data to external URL {:?}",
                     e
                 );
-                if &cfg.common.cloud_events_reporting_mode != "both" {
+                if &cfg.cloud.cloud_events_reporting_mode != "both" {
                     // on error in ingesting usage data, push back the data
                     requeue = true;
                 }
@@ -100,7 +101,7 @@ async fn _inner_flush() {
         }
     }
 
-    if &cfg.common.cloud_events_reporting_mode != "remote" {
+    if &cfg.cloud.cloud_events_reporting_mode != "remote" {
         let req = cluster_rpc::IngestionRequest {
             org_id: META_ORG_ID.to_owned(),
             stream_name: CLOUD_EVENT_STREAM.to_owned(),
@@ -130,7 +131,7 @@ pub async fn flush_cloud_events() {
     let cfg = get_config();
 
     let mut audit_interval = tokio::time::interval(tokio::time::Duration::from_secs(
-        cfg.common.cloud_events_publish_interval.try_into().unwrap(),
+        cfg.cloud.cloud_events_publish_interval.try_into().unwrap(),
     ));
     audit_interval.tick().await; // trigger the first run
     loop {
