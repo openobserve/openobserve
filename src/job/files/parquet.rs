@@ -1583,12 +1583,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         tantivy_schema_builder.add_text_field(field, index_opts);
     }
     // add _timestamp field to tantivy schema
-    let index_opts = tantivy::schema::NumericOptions::default()
-        .set_coerce()   // coerce values if not a number
-        .set_stored()   // persist values into the Tantivy's store
-        .set_fast() // designate the field as a FAST field for random access
-        .set_indexed(); //generate a posting list -> searchable field
-    tantivy_schema_builder.add_i64_field(TIMESTAMP_COL_NAME, index_opts);
+    tantivy_schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
     let tantivy_schema = tantivy_schema_builder.build();
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
