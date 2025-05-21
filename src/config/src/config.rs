@@ -1191,6 +1191,12 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
+    pub file_download_priority_queue_thread_num: usize,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
+    pub file_download_priority_queue_window_secs: u64,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_ENABLE_PRIORITY_QUEUE", default = true)]
+    pub file_download_enable_priority_queue: bool,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
     #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
@@ -1987,6 +1993,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.limit.file_download_thread_num == 0 {
         cfg.limit.file_download_thread_num = std::cmp::max(1, cpu_num / 2);
+    }
+
+    if cfg.limit.file_download_priority_queue_thread_num == 0 {
+        cfg.limit.file_download_priority_queue_thread_num = std::cmp::max(1, cpu_num / 2);
     }
 
     // HACK for move_file_thread_num equal to CPU core
