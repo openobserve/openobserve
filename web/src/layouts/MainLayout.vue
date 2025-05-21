@@ -101,6 +101,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >Upgrade to PRO Plan</q-btn
           >
         </div>
+                <!-- Add O2 AI Button -->
+            <q-btn
+            :ripple="false"
+            @click="toggleAIChat"
+            data-test="menu-link-ai-item"
+            no-caps
+            :borderless="true"
+            flat
+            dense
+            class="o2-button"
+        >
+          <div class="row items-center no-wrap tw-gap-2">
+            <img src="../assets/images/common/ai_icon.svg" class="header-icon" />
+            <span>Ask O2</span>
+          </div>
+        </q-btn>
         <div
           data-test="navbar-organizations-select"
           class="q-mx-sm current-organization"
@@ -154,6 +170,8 @@ class="padding-none" />
         </div> -->
 
         <ThemeSwitcher></ThemeSwitcher>
+
+
 
         <q-btn
           round
@@ -375,6 +393,7 @@ class="padding-none" />
             </q-list>
           </q-menu>
         </q-btn>
+        
       </q-toolbar>
     </q-header>
 
@@ -395,21 +414,37 @@ class="padding-none" />
         />
       </q-list>
     </q-drawer>
-    <q-page-container
+    <div class="row full-height no-wrap">
+    <!-- Left Panel -->
+    <div
+      class="col"
+      v-show="isLoading"
       :key="store.state.selectedOrganization?.identifier"
-      v-if="isLoading"
     >
-      <router-view v-slot="{ Component }">
-        <template v-if="$route.meta.keepAlive">
-          <keep-alive>
+      <q-page-container>
+        <router-view v-slot="{ Component }">
+          <template v-if="$route.meta.keepAlive">
+            <keep-alive>
+              <component :is="Component" />
+            </keep-alive>
+          </template>
+          <template v-else>
             <component :is="Component" />
-          </keep-alive>
-        </template>
-        <template v-else>
-          <component :is="Component" />
-        </template>
-      </router-view>
-    </q-page-container>
+          </template>
+        </router-view>
+      </q-page-container>
+    </div>
+
+    <!-- Right Panel (AI Chat) -->
+    <div
+      class="col-auto"
+      v-show="isAIChatOpen"
+      style="width: 25%; max-width: 100%; min-width: 75px;  "
+      :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
+    >
+      <O2AIChat :is-open="isAIChatOpen" @close="toggleAIChat" />
+    </div>
+  </div>
   </q-layout>
 </template>
 
@@ -490,6 +525,7 @@ import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import O2AIChat from '@/components/O2AIChat.vue';
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -524,6 +560,7 @@ export default defineComponent({
     SlackIcon,
     ManagementIcon,
     ThemeSwitcher,
+    O2AIChat,
   },
   methods: {
     navigateToDocs() {
@@ -797,7 +834,7 @@ export default defineComponent({
         }
       }
     };
-
+    const splitterModel = ref(100);
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
@@ -1190,6 +1227,13 @@ export default defineComponent({
       window.open(slackURL, "_blank");
     };
 
+    const isAIChatOpen = ref(false);
+
+    const toggleAIChat = () => {
+      isAIChatOpen.value = !isAIChatOpen.value;
+      splitterModel.value = isAIChatOpen.value ? 75 : 100;
+    };
+
     return {
       t,
       router,
@@ -1217,6 +1261,9 @@ export default defineComponent({
       openSlack,
       outlinedSettings,
       closeSocket,
+      isAIChatOpen,
+      splitterModel,
+      toggleAIChat,
     };
   },
   computed: {
@@ -1535,5 +1582,32 @@ export default defineComponent({
 
 .header-icon {
   opacity: 0.7;
+}
+
+body.ai-chat-open {
+  .q-layout {
+    width: 75%;
+    transition: width 0.3s ease;
+  }
+}
+
+.q-layout {
+  width: 100%;
+  transition: width 0.3s ease;
+}
+
+.o2-button{
+  background-color: #5960b2;
+   border-radius: 4px;
+    padding: 0px 8px;
+     color: white;
+}
+.dark-mode-chat-container{
+  border-left: 1.5px solid #232323FF ;
+}
+.light-mode-chat-container{
+border-left: 1.5px solid #F7F7F7;
+
+
 }
 </style>
