@@ -33,6 +33,8 @@ use hashbrown::HashMap;
 use infra::errors;
 use tracing::{Instrument, Span};
 
+#[cfg(feature = "cloud")]
+use crate::service::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::get_cipher_key_names;
 use crate::{
@@ -47,10 +49,7 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    service::{
-        organization::is_org_in_free_trial_period, search as SearchService,
-        self_reporting::report_request_usage_stats,
-    },
+    service::{search as SearchService, self_reporting::report_request_usage_stats},
 };
 
 /// SearchStreamData

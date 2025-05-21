@@ -47,6 +47,7 @@ use {
     tracing::Span,
 };
 
+#[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
 
 // 1. submit
