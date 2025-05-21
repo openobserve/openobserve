@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="secondary"
             no-caps
             :label="t(`actions.add`)"
-            @click="openAddScriptDrawer"
+            @click="openAddAction"
           />
 
           <QTablePagination
@@ -238,20 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card>
       </q-dialog>
     </template>
-
-    <q-dialog
-      v-model="showAddScriptDrawer"
-      position="right"
-      full-height
-      maximized
-    >
-      <AddScript
-        class="!tw-w-[450px]"
-        :class="store.state.theme === 'dark' ? 'q-dark' : 'tw-bg-white'"
-        @update:list="refreshList"
-        @cancel:hideform="showAddScriptDrawer = false"
-      />
-    </q-dialog>
   </div>
 </template>
 
@@ -316,9 +302,6 @@ export default defineComponent({
     QTablePagination,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),
-    ),
-    AddScript: defineAsyncComponent(
-      () => import("@/components/actionScripts/AddScript.vue"),
     ),
     NoData,
     ConfirmDialog,
@@ -685,7 +668,7 @@ export default defineComponent({
         });
       }
     };
-    const openAddScriptDrawer = () => {
+    const openAddAction = () => {
       router.push({
         name: "actionScripts",
         query: {
@@ -710,7 +693,13 @@ export default defineComponent({
 
       if (!props.row) {
         isUpdated.value = false;
-        openAddScriptDrawer();
+        router.push({
+          name: "actionScripts",
+          query: {
+            action: "add",
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
         return;
       } else {
         isUpdated.value = true;
@@ -881,24 +870,6 @@ export default defineComponent({
       });
     };
 
-    // Compute the drawer visibility based on the router query
-    const showAddScriptDrawer = computed({
-      get: () => {
-        return router.currentRoute.value.query.action === "add";
-      },
-      set: (value) => {
-        if (!value) {
-          // If drawer is closing, update the route
-          router.push({
-            name: "actionScripts",
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          });
-        }
-      },
-    });
-
     // const refreshDestination = async () => {
     //   await getDestinations();
     // };
@@ -988,8 +959,7 @@ export default defineComponent({
       alertStateLoadingMap,
       templates,
       routeTo,
-      openAddScriptDrawer,
-      showAddScriptDrawer,
+      openAddAction,
     };
   },
 });

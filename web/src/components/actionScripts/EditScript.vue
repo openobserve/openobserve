@@ -454,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <iframe
                       v-if="originalActionScriptData.length"
                       id="vscode-iframe"
-                      :src="`${store.state.API_ENDPOINT}/web/vscode?id=${actionId || 'untitled'}&name=${formData.name || 'untitled'}`"
+                      :src="`${store.state.API_ENDPOINT}/web/vscode?origin=${encodeURIComponent(store.state.API_ENDPOINT + '?id=' + actionId + '&name=' + formData.name)}`"
                       sandbox="allow-scripts allow-same-origin"
                       class="q-mt-md"
                       style="
@@ -966,7 +966,7 @@ const saveActionSetup = async () => {
         "Action setup created successfully. Please complete the action details.",
       timeout: 3000,
     });
-  } catch (error) {
+  } catch (error: any) {
     q.notify({
       type: "negative",
       message: error?.response?.data?.message || "Error creating action setup.",
