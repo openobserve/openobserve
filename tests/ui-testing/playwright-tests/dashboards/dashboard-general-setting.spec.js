@@ -56,9 +56,11 @@ test.describe("dashboard general setting", () => {
 
     await dashboardCreate.createDashboard(randomDashboardName);
 
-    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
-      state: "visible",
-    });
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .waitFor({
+        state: "visible",
+      });
 
     await dashboardSetting.openSetting();
 
@@ -73,7 +75,7 @@ test.describe("dashboard general setting", () => {
     await expect(page.getByText("Dashboard updated successfully")).toBeVisible({
       timeout: 30000,
     });
-    await dashboardSetting.closeSettingDashboard();
+    
   });
 
   test("should verify that dynamic toggle is disabled", async ({ page }) => {
@@ -95,7 +97,9 @@ test.describe("dashboard general setting", () => {
     await dashboardCreate.createDashboard(randomDashboardName);
     await waitForDashboardPage;
 
-    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
+    await page
+    .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+    .waitFor({
       state: "visible",
     });
     await dashboardSetting.openSetting(); // Ensure settings are opened
