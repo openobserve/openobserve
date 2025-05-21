@@ -1016,14 +1016,6 @@ pub fn gather() -> String {
     TextEncoder::new()
         .encode(&registry.gather(), &mut buffer)
         .unwrap();
-
-    // process metrics
-    let mut process_metrics = vec![];
-    TextEncoder::new()
-        .encode(&prometheus::gather(), &mut process_metrics)
-        .unwrap();
-    buffer.extend_from_slice(&process_metrics);
-
     String::from_utf8(buffer).unwrap()
 }
 

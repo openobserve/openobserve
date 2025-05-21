@@ -15,7 +15,7 @@
 
 use std::{cmp::Reverse, collections::BinaryHeap, io::Error};
 
-use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, post, web};
 use arrow_schema::Schema;
 use chrono::Utc;
 use config::{
@@ -28,6 +28,7 @@ use config::{
     },
     utils::{base64, json, time::now_micros},
 };
+use error_utils::map_error_to_http_response;
 use hashbrown::HashMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
@@ -39,7 +40,7 @@ use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::search::sql::get_cipher_key_names;
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse},
+        meta::http::HttpResponse as MetaHttpResponse,
         utils::{
             functions,
             http::{
@@ -65,6 +66,7 @@ pub mod query_manager;
 pub mod saved_view;
 pub mod search_inspector;
 pub mod search_job;
+pub mod search_stream;
 pub(crate) mod utils;
 
 async fn can_use_distinct_stream(
@@ -272,12 +274,7 @@ pub async fn search(
     let stream_names = match resolve_stream_names(&req.query.sql) {
         Ok(v) => v.clone(),
         Err(e) => {
-            return Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            );
+            return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
         }
     };
 
@@ -311,12 +308,18 @@ pub async fn search(
 
     #[cfg(feature = "enterprise")]
     {
+        use actix_http::StatusCode;
+
+        use crate::common::meta;
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error(StatusCode::BAD_REQUEST.into(), e.to_string()),
-                ));
+                return Ok(
+                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                        StatusCode::BAD_REQUEST.into(),
+                        e.to_string(),
+                    )),
+                );
             }
         };
         if !keys_used.is_empty() {
@@ -396,7 +399,10 @@ pub async fn search(
                 "",
             );
             log::error!("[trace_id {trace_id}] search error: {}", err);
-            Ok(error_utils::map_error_to_http_response(&err, trace_id))
+            Ok(error_utils::map_error_to_http_response(
+                &err,
+                Some(trace_id),
+            ))
         }
     }
 }
@@ -492,7 +498,10 @@ pub async fn around_v1(
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
             log::error!("search around error: {:?}", err);
-            Ok(error_utils::map_error_to_http_response(&err, trace_id))
+            Ok(error_utils::map_error_to_http_response(
+                &err,
+                Some(trace_id),
+            ))
         }
     }
 }
@@ -598,7 +607,10 @@ pub async fn around_v2(
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
             log::error!("search around error: {:?}", err);
-            Ok(error_utils::map_error_to_http_response(&err, trace_id))
+            Ok(error_utils::map_error_to_http_response(
+                &err,
+                Some(trace_id),
+            ))
         }
     }
 }
@@ -882,8 +894,10 @@ pub async fn build_search_request_per_field(
     let mut requests = Vec::new();
     for field in fields {
         let sql = if no_count {
+            // we use min(0) as a hack to do streaming aggregation but actually return 0,
+            // essentially we are not counting the values
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
+                "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
             )
         } else {
             format!(
@@ -1132,7 +1146,10 @@ async fn values_v1(
             Err(err) => {
                 http_report_metrics(start, org_id, stream_type, "500", "_values/v1", "", "");
                 log::error!("search values error: {:?}", err);
-                return Ok(error_utils::map_error_to_http_response(&err, trace_id));
+                return Ok(error_utils::map_error_to_http_response(
+                    &err,
+                    Some(trace_id),
+                ));
             }
         };
         query_results.push((field.to_string(), resp_search));
@@ -1386,7 +1403,10 @@ pub async fn search_partition(
                 "",
             );
             log::error!("search error: {:?}", err);
-            Ok(error_utils::map_error_to_http_response(&err, trace_id))
+            Ok(error_utils::map_error_to_http_response(
+                &err,
+                Some(trace_id),
+            ))
         }
     }
 }
@@ -1522,7 +1542,10 @@ pub async fn search_history(
                 "",
             );
             log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
-            return Ok(error_utils::map_error_to_http_response(&err, trace_id));
+            return Ok(error_utils::map_error_to_http_response(
+                &err,
+                Some(trace_id),
+            ));
         }
     };
 

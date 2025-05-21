@@ -24,7 +24,7 @@ use {
     crate::service::search_jobs::{get_result, merge_response},
     crate::{
         common::{
-            meta::{self, http::HttpResponse as MetaHttpResponse},
+            meta::http::HttpResponse as MetaHttpResponse,
             utils::http::{
                 get_or_create_trace_id, get_search_event_context_from_request,
                 get_stream_type_from_request, get_use_cache_from_request,
@@ -47,6 +47,8 @@ use {
     tracing::Span,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
 
@@ -158,12 +160,7 @@ pub async fn submit_job(
         let stream_names = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v.clone(),
             Err(e) => {
-                return Ok(HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        e.to_string(),
-                    ),
-                ));
+                return Ok(map_error_to_http_response(&e.into(), Some(trace_id)));
             }
         };
 

@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, post, web};
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
@@ -49,6 +49,7 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
+    handler::http::request::search::error_utils::map_error_to_http_response,
     service::{search as SearchService, self_reporting::report_request_usage_stats},
 };
 
@@ -210,12 +211,7 @@ pub async fn search_multi(
         let stream_name = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v[0].clone(),
             Err(e) => {
-                return Ok(HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        e.to_string(),
-                    ),
-                ));
+                return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
             }
         };
         vrl_stream_name = stream_name.clone();
@@ -286,12 +282,7 @@ pub async fn search_multi(
             let keys_used = match get_cipher_key_names(&req.query.sql) {
                 Ok(v) => v,
                 Err(e) => {
-                    return Ok(HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error(
-                            StatusCode::INTERNAL_SERVER_ERROR.into(),
-                            e.to_string(),
-                        ),
-                    ));
+                    return Ok(map_error_to_http_response(&e, Some(trace_id)));
                 }
             };
             if !keys_used.is_empty() {
@@ -789,15 +780,7 @@ pub async fn _search_partition_multi(
                 ])
                 .inc();
             log::error!("search error: {:?}", err);
-            Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_trace_id(&code, Some(trace_id)),
-                ),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            })
+            Ok(map_error_to_http_response(&err, Some(trace_id)))
         }
     }
 }
@@ -936,25 +919,7 @@ pub async fn around_multi(
                     ])
                     .inc();
                 log::error!("multi search around error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                &code,
-                                Some(trace_id),
-                            )),
-                        _ => HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                &code,
-                                Some(trace_id),
-                            ),
-                        ),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
+                return Ok(map_error_to_http_response(&err, Some(trace_id)));
             }
         };
 

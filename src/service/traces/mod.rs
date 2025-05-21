@@ -49,12 +49,11 @@ use crate::{
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
+    handler::http::router::ERROR_HEADER,
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{
-            SERVICE, SERVICE_NAME, TriggerAlertData, evaluate_trigger, grpc::get_val, write_file,
-        },
+        ingestion::{TriggerAlertData, evaluate_trigger, grpc::get_val, write_file},
         logs::O2IngestJsonData,
         metadata::{
             MetadataItem, MetadataType,
@@ -68,6 +67,8 @@ use crate::{
     },
 };
 
+const SERVICE_NAME: &str = "service.name";
+const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
@@ -154,12 +155,12 @@ pub async fn handle_otlp_request(
     let started_at = Utc::now().timestamp_micros();
 
     if !LOCAL_NODE.is_ingester() {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, "not an ingester".to_string()))
+            .json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 "not an ingester".to_string(),
-            )),
-        );
+            )));
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty()
@@ -434,7 +435,9 @@ pub async fn handle_otlp_request(
                                 "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {}",
                                 trace_id
                             );
-                            return Ok(HttpResponse::InternalServerError().json(
+                            return Ok(HttpResponse::InternalServerError()
+                            .append_header((ERROR_HEADER, format!("[trace_id: {trace_id}] stream did not receive a valid json object")))
+                            .json(
                                 MetaHttpResponse::error(
                                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                                     "stream did not receive a valid json object".into(),
@@ -519,12 +522,15 @@ pub async fn handle_otlp_request(
                                 log::error!(
                                     "[TRACES:OTLP] stream did not receive a valid json object"
                                 );
-                                return Ok(HttpResponse::InternalServerError().json(
-                                    MetaHttpResponse::error(
+                                return Ok(HttpResponse::InternalServerError()
+                                    .append_header((
+                                        ERROR_HEADER,
+                                        "stream did not receive a valid json object",
+                                    ))
+                                    .json(MetaHttpResponse::error(
                                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                                         "stream did not receive a valid json object".into(),
-                                    ),
-                                ));
+                                    )));
                             }
                         };
 
@@ -562,12 +568,12 @@ pub async fn handle_otlp_request(
     if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
     {
         log::error!("Error while writing traces: {}", e);
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
+            .json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("error while writing trace data: {e}",),
-            )),
-        );
+                format!("error while writing trace data: {e}"),
+            )));
     }
 
     let time = start.elapsed().as_secs_f64();
@@ -609,12 +615,12 @@ pub async fn ingest_json(
     let started_at = Utc::now().timestamp_micros();
 
     if !LOCAL_NODE.is_ingester() {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, "not an ingester".to_string()))
+            .json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 "not an ingester".to_string(),
-            )),
-        );
+            )));
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty()
@@ -705,12 +711,17 @@ pub async fn ingest_json(
                     "[TRACES:JSON] stream did not receive a valid json object, trace_id: {}",
                     &trace_id
                 );
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                return Ok(HttpResponse::InternalServerError()
+                    .append_header((
+                        ERROR_HEADER,
+                        format!(
+                            "[trace_id: {trace_id}] stream did not receive a valid json object"
+                        ),
+                    ))
+                    .json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                         "stream did not receive a valid json object".into(),
-                    )),
-                );
+                    )));
             }
         };
 
@@ -733,12 +744,12 @@ pub async fn ingest_json(
     if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
     {
         log::error!("Error while writing traces: {}", e);
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
+            .json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("error while writing trace data: {e}",),
-            )),
-        );
+                format!("error while writing trace data: {e}"),
+            )));
     }
 
     let time = start.elapsed().as_secs_f64();

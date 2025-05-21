@@ -54,6 +54,9 @@ pub struct DerivedStream {
     pub tz_offset: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delay: Option<i32>,
+    /// The datetime from when the pipeline should check for ingested data
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_at: Option<i64>,
 }
 
 impl DerivedStream {

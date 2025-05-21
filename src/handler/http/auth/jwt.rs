@@ -41,7 +41,10 @@ use {
 
 #[cfg(feature = "cloud")]
 use crate::{
-    common::meta::organization::{DEFAULT_ORG, Organization, USER_DEFAULT},
+    common::meta::{
+        organization::{DEFAULT_ORG, Organization, USER_DEFAULT},
+        telemetry,
+    },
     service::organization::{accept_invitation, list_orgs_by_user},
     service::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
 };
@@ -556,7 +559,7 @@ fn format_role_name(org: &str, role: String) -> String {
 
 #[cfg(feature = "cloud")]
 pub async fn check_and_add_to_org(user_email: &str, name: &str) {
-    use config::ider;
+    use config::{ider, utils::json};
     use o2_enterprise::enterprise::cloud::org_invites::list_by_invitee;
     use o2_openfga::authorizer::authz::save_org_tuples;
 
@@ -622,43 +625,48 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
     if orgs.is_err() {
         log::error!("Error fetching orgs for user: {}", user_email);
     }
-    if orgs.is_err() || orgs.unwrap().is_empty() {
-        // Create a default org for the user
-        let org = Organization {
-            // id will be overridden by the service function
-            identifier: ider::uuid(),
-            name: DEFAULT_ORG.to_string(),
-            org_type: USER_DEFAULT.to_owned(),
-        };
-        match db::organization::save_org(&org).await {
-            Ok(_) => {
-                save_org_tuples(&org.identifier).await;
-                if let Err(e) = add_admin_to_org(&org.identifier, user_email).await {
+
+    let org_name = match orgs {
+        Ok(existing_orgs) if !existing_orgs.is_empty() => existing_orgs[0].name.to_owned(),
+        _ => {
+            // Create a default org for the user
+            let org = Organization {
+                // id will be overridden by the service function
+                identifier: ider::uuid(),
+                name: DEFAULT_ORG.to_string(),
+                org_type: USER_DEFAULT.to_owned(),
+            };
+            match db::organization::save_org(&org).await {
+                Ok(_) => {
+                    save_org_tuples(&org.identifier).await;
+                    if let Err(e) = add_admin_to_org(&org.identifier, user_email).await {
+                        log::error!(
+                            "Error adding user as admin to org: {} error: {}",
+                            org.identifier,
+                            e
+                        );
+                    }
+                    enqueue_cloud_event(CloudEvent {
+                        org_id: org.identifier.clone(),
+                        org_name: org.name.clone(),
+                        org_type: org.org_type.clone(),
+                        user: Some(user_email.to_string()),
+                        event: EventType::OrgCreated,
+                        subscription_type: None,
+                    })
+                    .await;
+                }
+                Err(e) => {
                     log::error!(
-                        "Error adding user as admin to org: {} error: {}",
-                        org.identifier,
+                        "Error creating default org for user: {} error: {}",
+                        user_email,
                         e
                     );
                 }
-                enqueue_cloud_event(CloudEvent {
-                    org_id: org.identifier.clone(),
-                    org_name: org.name.clone(),
-                    org_type: org.org_type.clone(),
-                    user: Some(user_email.to_string()),
-                    event: EventType::OrgCreated,
-                    subscription_type: None,
-                })
-                .await;
-            }
-            Err(e) => {
-                log::error!(
-                    "Error creating default org for user: {} error: {}",
-                    user_email,
-                    e
-                );
-            }
+            };
+            org.name
         }
-    }
+    };
 
     if o2cfg.enabled {
         for (_, tuples) in tuples_to_add {
@@ -672,4 +680,34 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
             }
         }
     }
+
+    // Send new user info to ActiveCampaign via segment proxy
+    log::info!("sending track event to segment");
+    let segment_event_data = HashMap::from([
+        (
+            "first_name".to_string(),
+            json::Value::String(first_name.to_string()),
+        ),
+        (
+            "last_name".to_string(),
+            json::Value::String(last_name.to_string()),
+        ),
+        (
+            "email".to_string(),
+            json::Value::String(user_email.to_string()),
+        ),
+        ("organization".to_string(), json::Value::String(org_name)),
+        (
+            "created_at".to_string(),
+            json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
+        ),
+    ]);
+    telemetry::Telemetry::new()
+        .send_track_event(
+            "OpenObserve - New user registered",
+            Some(segment_event_data),
+            false,
+            false,
+        )
+        .await;
 }
