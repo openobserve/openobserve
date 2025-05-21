@@ -18,7 +18,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
     .locator("div.q-item")
     .getByText(`${stream}`)
     .first()
-    .click({ force: true });
+    .click();
 };
 
 test.describe("logs testcases", () => {
@@ -59,11 +59,12 @@ test.describe("logs testcases", () => {
       .fill(".vrl12=123");
     await logsVisualise.applyQueryButtonVisualise();
 
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-vrl12"] [data-test="dashboard-add-b-data"]'
-      )
-      .click();
+    const breakdownFieldLocator = page.locator(
+      '[data-test="field-list-item-logs-e2e_automate-vrl12"] [data-test="dashboard-add-b-data"]'
+    );
+    await breakdownFieldLocator.waitFor({ state: "visible", timeout: 5000 });
+    await breakdownFieldLocator.waitFor({ state: "attached", timeout: 5000 });
+    await breakdownFieldLocator.click();
 
     await logsVisualise.applyQueryButtonVisualise();
 
@@ -78,14 +79,9 @@ test.describe("logs testcases", () => {
   }) => {
     const logsVisualise = new LogsVisualise(page);
     await logsVisualise.setRelative("6", "d");
-    // await page.locator('[data-test="date-time-btn"]').click();
-    // await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await logsVisualise.logsApplyQueryButton();
-    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await logsVisualise.openVisualiseTab();
-    // await page.locator('[data-test="logs-visualize-toggle"]').click();
-
-    // await page.waitForTimeout(2000);
+   
 
     await page
       .locator(
@@ -103,31 +99,16 @@ test.describe("logs testcases", () => {
       .fill(".vrL=1000");
     await logsVisualise.applyQueryButtonVisualise();
 
-    // await page
-    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-    //   .click();
-
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
       )
       .click();
     await logsVisualise.applyQueryButtonVisualise();
-    // await page
-    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-    //   .click();
     await logsVisualise.showQueryToggle();
     await logsVisualise.applyQueryButtonVisualise();
-
-    await page.waitForTimeout(500); // Waits for 500ms before the second click
+    await page.waitForTimeout(500); 
     await logsVisualise.applyQueryButtonVisualise();
-
-    // await page
-    //   .locator('text="There are some errors, please fix them and try again"')
-    //   .waitFor({ state: "visible" });
-
-    // await page.locator("#q-notify").getByRole("button").click();
-    // await expect(page.getByText("Please update Y-Axis")).toBeVisible();
     await page.locator('[data-test="dashboard-y-item-vrl-remove"]').click();
     await logsVisualise.applyQueryButtonVisualise();
   });
@@ -342,9 +323,7 @@ test.describe("logs testcases", () => {
       const logsVisualise = new LogsVisualise(page);
       await logsVisualise.setRelative("6", "d");
       await logsVisualise.logsApplyQueryButton();
-      // await page.locator('[data-test="date-time-btn"]').click();
-      // await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-      // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+      
       await logsVisualise.openVisualiseTab();
       // await page.locator('[data-test="logs-visualize-toggle"]').click();
   
@@ -375,22 +354,13 @@ test.describe("logs testcases", () => {
 
       await logsVisualise.applyQueryButtonVisualise();
   
-      // await page
-      //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      //   .waitFor({ state: "visible" });
-  
-      // await page
-      //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      //   .click();
+     
       await page
         .locator(
           '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
         )
         .click();
   
-      // await page
-      //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      //   .click();
       await logsVisualise.applyQueryButtonVisualise();
   
       // Change chart types and check for errors each time
