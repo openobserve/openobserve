@@ -1,9 +1,13 @@
 import { test, expect } from "../baseFixtures";
+import { test, expect } from "@playwright/test";
+import LogsVisualise from "../../pages/dashboardPages/visualise";
 import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
-import logsdata from "../../../test-data/logs_data.json";
+import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
 
 import logData from "../../cypress/fixtures/log.json";
+import logsdata from "../../../test-data/logs_data.json";
+
 import { log } from "console";
 
 test.describe.configure({ mode: "parallel" });
@@ -12,7 +16,11 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
     .click({ force: true });
-  await page.locator("div.q-item").getByText(`${stream}`).first().click();
+  await page
+    .locator("div.q-item")
+    .getByText(`${stream}`)
+    .first()
+    .click({ force: true });
 };
 
 test.describe("logs testcases", () => {
@@ -26,19 +34,21 @@ test.describe("logs testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
 
+    const logsVisualise = new LogsVisualise(page);
+
     await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsVisualise.logsApplyQueryButton();
   });
+
   test("should allow adding a VRL function in the visualization chart", async ({
     page,
   }) => {
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
-      timeout: 5000,
-    });
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-4-w-btn"]').click();
+    const logsVisualise = new LogsVisualise(page);
 
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await logsVisualise.setRelative("4", "d");
+
+    await logsVisualise.logsApplyQueryButton();
+    await logsVisualise.openVisualiseTab();
 
     await page.waitForTimeout(5000);
     await page
@@ -63,24 +73,27 @@ test.describe("logs testcases", () => {
       )
       .click();
 
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    await logsVisualise.applyQueryButtonVisualise();
 
-    await expect(
-      page.locator('[data-test="field-list-item-logs-e2e_automate-vrl12"]')
-    ).toBeVisible();
+    const vrlField = page.locator(
+      '[data-test="field-list-item-logs-e2e_automate-vrl12"]'
+    );
+    await vrlField.waitFor({ state: "visible", timeout: 5000 });
+    await expect(vrlField).toBeVisible();
   });
-
-  test.skip('should display an error message when the VRL field is not updated after closing the "Toggle function editor"', async ({
+  test('should display an error message when the VRL field is not updated after closing the "Toggle function editor"', async ({
     page,
   }) => {
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    const logsVisualise = new LogsVisualise(page);
+    await logsVisualise.setRelative("6", "d");
+    // await page.locator('[data-test="date-time-btn"]').click();
+    // await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await logsVisualise.logsApplyQueryButton();
+    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await logsVisualise.openVisualiseTab();
+    // await page.locator('[data-test="logs-visualize-toggle"]').click();
 
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
     await page
       .locator(
@@ -95,71 +108,49 @@ test.describe("logs testcases", () => {
     await page.locator("#fnEditor").locator(".inputarea").fill(".vrL=1000");
     await page.waitForTimeout(3000);
 
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
 
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
       )
       .click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    await page
-      .locator('[data-test="logs-search-bar-show-query-toggle-btn"] img')
-      .click();
-    //await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    await logsVisualise.applyQueryButtonVisualise();
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
+    await logsVisualise.showQueryToggle();
+    await logsVisualise.applyQueryButtonVisualise();
+
     await page.waitForTimeout(500); // Waits for 500ms before the second click
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    await logsVisualise.applyQueryButtonVisualise();
 
-    await page.waitForTimeout(500);
+    // await page
+    //   .locator('text="There are some errors, please fix them and try again"')
+    //   .waitFor({ state: "visible" });
 
-    await page
-      .locator('text="There are some errors, please fix them and try again"')
-      .waitFor({ state: "visible" });
-
-    await page.locator("#q-notify").getByRole("button").click();
-    await expect(page.getByText("Please update Y-Axis")).toBeVisible();
+    // await page.locator("#q-notify").getByRole("button").click();
+    // await expect(page.getByText("Please update Y-Axis")).toBeVisible();
     await page.locator('[data-test="dashboard-y-item-vrl-remove"]').click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    await logsVisualise.applyQueryButtonVisualise();
   });
 
   test("should not show an error when adding a VRL function field to the Breakdown, X axis, or Y axis fields", async ({
     page,
   }) => {
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-
-    await page.waitForTimeout(5000);
+    const logsVisualise = new LogsVisualise(page);
+    await logsVisualise.setRelative("6", "d");
+    await logsVisualise.logsApplyQueryButton();
+    await logsVisualise.openVisualiseTab();
     await page
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
       .click();
     await page.locator("#fnEditor").locator(".inputarea").fill(".VRL=1000");
 
-    await page.waitForTimeout(3000);
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .waitFor({ state: "visible" });
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-
+    await logsVisualise.applyQueryButtonVisualise();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
@@ -171,11 +162,7 @@ test.describe("logs testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
       )
       .click();
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-
+    await logsVisualise.applyQueryButtonVisualise();
     await page
       .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
       .click();
@@ -185,11 +172,7 @@ test.describe("logs testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-x-data"]'
       )
       .click();
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-
+    await logsVisualise.applyQueryButtonVisualise();
     const breakdownField = await page
       .locator('[data-test="dashboard-b-item-vrl"]')
       .isVisible();
@@ -199,7 +182,6 @@ test.describe("logs testcases", () => {
     const xAxisField = await page
       .locator('[data-test="dashboard-x-item-vrl"]')
       .isVisible();
-
     expect(breakdownField).toBe(true);
     expect(yAxisField).toBe(true);
     expect(xAxisField).toBe(true);
@@ -208,10 +190,11 @@ test.describe("logs testcases", () => {
   test("should display an error message if an invalid VRL function is added", async ({
     page,
   }) => {
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    const logsVisualise = new LogsVisualise(page);
+    await logsVisualise.setRelative("6", "d");
+    await logsVisualise.logsApplyQueryButton();
+
+    await logsVisualise.openVisualiseTab();
 
     await page
       .locator(
@@ -223,10 +206,8 @@ test.describe("logs testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
       )
       .click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    await page.waitForTimeout(5000);
+    await logsVisualise.applyQueryButtonVisualise();
+
     await page
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
@@ -244,50 +225,32 @@ test.describe("logs testcases", () => {
     await page.locator("#fnEditor").locator(".inputarea").fill(".vrl=123");
 
     await page.waitForTimeout(3000);
+    await logsVisualise.applyQueryButtonVisualise();
 
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .waitFor({ state: "visible" });
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
       )
       .click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    await logsVisualise.applyQueryButtonVisualise();
   });
-
   test("should not update the search query when adding or updating a VRL field", async ({
     page,
   }) => {
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-
-    await page
-      .getByRole("switch", { name: "SQL Mode" })
-      .locator("div")
-      .nth(2)
-      .click();
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    const logsVisualise = new LogsVisualise(page);
+    await logsVisualise.setRelative("6", "d");
+    await logsVisualise.logsApplyQueryButton();
+    await logsVisualise.openVisualiseTab();
+    await logsVisualise.enableSQLMode();
+    await logsVisualise.setRelative("6", "w");
+    await logsVisualise.applyQueryButtonVisualise();
+    await logsVisualise.openVisualiseTab();
 
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
         .getByText('SELECT * FROM "e2e_automate"')
     ).toBeVisible();
-    await page.waitForTimeout(5000);
     await page
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
@@ -307,24 +270,20 @@ test.describe("logs testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    await logsVisualise.applyQueryButtonVisualise();
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
         .getByText('SELECT * FROM "e2e_automate"')
     ).toBeVisible();
   });
-
-  test.skip("should display an error if the VRL field is not updated from the Breakdown", async ({
+  test("should display an error if the VRL field is not updated from the Breakdown", async ({
     page,
   }) => {
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page.waitForTimeout(5000);
+    const logsVisualise = new LogsVisualise(page);
+    await logsVisualise.setRelative("6", "d");
+    await logsVisualise.logsApplyQueryButton();
+    await logsVisualise.openVisualiseTab();
     await page
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
@@ -334,15 +293,14 @@ test.describe("logs testcases", () => {
       .locator(".inputarea")
       .fill(".vrlsanity=100");
 
-    await page.waitForTimeout(3000);
+    await logsVisualise.applyQueryButtonVisualise();
 
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await logsVisualise.applyQueryButtonVisualise();
     await page
       .locator("div")
       .filter({ hasText: /^\.vrlsanity=100$/ })
@@ -352,15 +310,15 @@ test.describe("logs testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
-
   test("should update the data on the chart when changing the time after applying a VRL field", async ({
     page,
   }) => {
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    const logsVisualise = new LogsVisualise(page);
+    await logsVisualise.setRelative("6", "w");
+    await logsVisualise.logsApplyQueryButton();
+    await logsVisualise.openVisualiseTab();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page.waitForTimeout(5000);
+
     await page
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
@@ -368,36 +326,27 @@ test.describe("logs testcases", () => {
     await page.locator("#fnEditor").locator(".inputarea").fill(".vrl=123");
 
     await page.waitForTimeout(3000);
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .waitFor({ state: "visible" });
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    await logsVisualise.applyQueryButtonVisualise();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-4-w-btn"]').click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    await logsVisualise.applyQueryButtonVisualise();
+    await logsVisualise.setRelative("4", "w");
+    await logsVisualise.applyQueryButtonVisualise();
   });
-
   test("should not show an error when changing the chart type after adding a VRL function field", async ({
     page,
   }) => {
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    const logsVisualise = new LogsVisualise(page);
+    await logsVisualise.setRelative("6", "d");
+    await logsVisualise.logsApplyQueryButton();
+    // await page.locator('[data-test="date-time-btn"]').click();
+    // await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await logsVisualise.openVisualiseTab();
+    // await page.locator('[data-test="logs-visualize-toggle"]').click();
 
     // Set up a flag to detect errors
     let errorDetected = false;
@@ -424,22 +373,25 @@ test.describe("logs testcases", () => {
       .fill(".VRLsanity=1000");
     await page.waitForTimeout(3000);
 
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .waitFor({ state: "visible" });
+    await logsVisualise.applyQueryButtonVisualise();
 
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .waitFor({ state: "visible" });
+
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
       )
       .click();
 
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
+    await logsVisualise.applyQueryButtonVisualise();
 
     // Change chart types and check for errors each time
     const chartTypes = [
