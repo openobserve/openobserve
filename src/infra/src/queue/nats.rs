@@ -81,8 +81,8 @@ impl super::Queue for NatsQueue {
         };
         _ = jetstream.get_or_create_stream(config).await
             .map_err(|e| {
-                log::error!("nats stream {} not found: {}", topic_name, e);
-                Error::Message(format!("nats stream {} not found: {}", topic_name, e))
+                log::error!("Failed to create/get nats stream {}: {}", topic_name, e);
+                Error::Message(format!("Failed to create/get nats stream {}: {}", topic_name, e))
             })?;
         Ok(())
     }
@@ -108,8 +108,8 @@ impl super::Queue for NatsQueue {
             let jetstream = jetstream::new(client);
             let stream = jetstream.get_stream(&stream_name).await
                 .map_err(|e| {
-                    log::error!("nats stream {} not found: {}", stream_name, e);
-                    Error::Message(format!("nats stream {} not found: {}", stream_name, e))
+                    log::error!("Failed to get nats stream {}: {}", stream_name, e);
+                    Error::Message(format!("Failed to get nats stream {}: {}", stream_name, e))
             })?;
             let config = jetstream::consumer::pull::Config {
                 name: Some(consumer_name.to_string()),
@@ -125,18 +125,21 @@ impl super::Queue for NatsQueue {
                 .get_or_create_consumer(&consumer_name, config)
                 .await
                 .map_err(|e| {
-                    log::error!("nats consumer {} not found: {}", consumer_name, e);
-                    Error::Message(format!("nats consumer {} not found: {}", consumer_name, e))
+                    log::error!("Failed to create/get nats consumer {}: {}", consumer_name, e);
+                    Error::Message(format!("Failed to create/get nats consumer {}: {}", consumer_name, e))
                 })?;
             // Consume messages from the consumer
-            let mut messages = consumer.messages().await?;
+            let mut messages = consumer.messages().await.map_err(|e| {
+                log::error!("Failed to get nats consumer messages: {}", e);
+                Error::Message(format!("Failed to get nats consumer messages: {}", e))
+            })?;
             while let Ok(Some(message)) = messages.try_next().await {
                 let message = super::Message::Nats(message);
                 tx.send(message)
                     .await
                     .map_err(|e| {
-                        log::error!("nats message send error: {}", e);
-                        Error::Message(format!("nats message send error: {}", e))
+                        log::error!("Failed to send nats message: {}", e);
+                        Error::Message(format!("Failed to send nats message: {}", e))
                     })?;
             }
             Ok(())
