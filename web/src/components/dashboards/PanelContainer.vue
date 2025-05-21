@@ -543,6 +543,7 @@ export default defineComponent({
       encodedQuery: string,
       queryDetails: any,
       currentUrl: string,
+      vrlFunctionQueryEncoded: string,
     ) => {
       const logsUrl = new URL(currentUrl + "/logs");
       logsUrl.searchParams.set(
@@ -558,6 +559,7 @@ export default defineComponent({
         "to",
         metaData.value.queries[0]?.endTime.toString(),
       );
+      logsUrl.searchParams.set("functionContent", vrlFunctionQueryEncoded);
       logsUrl.searchParams.set("sql_mode", "true");
       logsUrl.searchParams.set("query", encodedQuery);
       logsUrl.searchParams.set(
@@ -612,6 +614,9 @@ export default defineComponent({
 
       const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
 
+      const vrlFunctionQuery = queryDetails.queries[0]?.vrlFunctionQuery;
+      const vrlFunctionQueryEncoded: any = b64EncodeUnicode(vrlFunctionQuery);
+
       const pos = window.location.pathname.indexOf("/web/");
       const currentUrl =
         pos > -1
@@ -625,6 +630,7 @@ export default defineComponent({
         encodedQuery,
         queryDetails,
         currentUrl,
+        vrlFunctionQueryEncoded,
       );
 
       window.open(logsUrl.toString(), "_blank");

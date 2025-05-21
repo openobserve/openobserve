@@ -676,8 +676,9 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.order_by
-        ?.toLowerCase() === "asc"
+      state?.resultMetaData?.[
+        payload?.meta?.currentQueryIndex
+      ]?.order_by?.toLowerCase() === "asc"
     ) {
       // else append new partition response at start
       state.data[payload?.meta?.currentQueryIndex] = [
@@ -699,7 +700,7 @@ export const usePanelDataLoader = (
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (payload: any, response: any) => {
     try {
-      console.log("panel data loader response", payload.traceId, response);
+      // console.log("panel data loader response", payload.traceId, response);
 
       if (response.type === "search_response_metadata") {
         handleStreamingHistogramMetadata(payload, response);
