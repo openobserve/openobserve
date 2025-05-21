@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >{{
                           props.row.conditions != "" &&
                           props.row.conditions != "--"
-                            ? (props.row.type == 'sql' ? props.row.conditions : `if ${props.row.conditions}`)
+                            ? (props.row.type == 'sql' ? props.row.conditions : props.row.conditions.length != 2  ? `if ${props.row.conditions}` : 'No condition')
                             : "No condition"
                         }} </pre
                       >
