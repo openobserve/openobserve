@@ -594,7 +594,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ratelimit::list_role_ratelimit)
         .service(ratelimit::update_ratelimit)
         .service(ratelimit::api_modules)
-        .service(actions::operations::test_action);
+        .service(actions::operations::test_action)
+        .service(ai::chat)
+        .service(ai::chat_stream);
 
     #[cfg(feature = "cloud")]
     let service = service
