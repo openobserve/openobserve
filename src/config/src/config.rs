@@ -1107,6 +1107,12 @@ pub struct Common {
     pub file_list_dump_min_hour: usize,
     #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
     pub file_list_dump_debug_check: bool,
+    #[env_config(
+        name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
+        default = false,
+        help = "Enable to use stream settings for partitions. This will apply for all streams"
+    )]
+    pub use_stream_settings_for_partitions_enabled: bool,
 }
 
 #[derive(EnvConfig)]

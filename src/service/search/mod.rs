@@ -646,7 +646,8 @@ pub async fn search_partition(
         let stream_type = stream.get_stream_type(stream_type);
         let stream_name = stream.stream_name();
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let use_stream_stats_for_partition = stream_settings.approx_partition;
+        let use_stream_stats_for_partition = cfg.common.use_stream_settings_for_partitions_enabled
+            || stream_settings.approx_partition;
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
