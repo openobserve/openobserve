@@ -608,7 +608,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(billings::unsubscribe)
         .service(billings::create_billing_portal_session)
         .service(billings::org_usage::get_org_quota_threshold)
-        .service(billings::org_usage::get_org_usage);
+        .service(billings::org_usage::get_org_usage)
+        .service(organization::org::all_organizations)
+        .service(organization::org::extend_trial_period);
 
     svc.service(service);
 }

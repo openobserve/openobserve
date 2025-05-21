@@ -111,8 +111,33 @@ pub struct OrgDetails {
 }
 
 #[derive(Serialize, ToSchema)]
+pub struct AllOrgListDetails {
+    pub id: i64,
+    pub identifier: String,
+    pub name: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    #[serde(rename = "type")]
+    pub org_type: String,
+    #[serde(default)]
+    pub plan: i32,
+    pub trial_expires_at: Option<i64>,
+}
+
+#[derive(Serialize, ToSchema)]
 pub struct OrganizationResponse {
     pub data: Vec<OrgDetails>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct AllOrganizationResponse {
+    pub data: Vec<AllOrgListDetails>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ExtendTrialPeriodRequest {
+    pub org_id: String,
+    pub new_end_date: i64,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
