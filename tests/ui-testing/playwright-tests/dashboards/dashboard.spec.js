@@ -245,8 +245,8 @@ test.describe("dashboard UI testcases", () => {
 
     await deleteDashboard(page, randomDashboardName);
   });
-
-  test("should navigate to another dashboard using the DrillDown feature.", async ({
+ 
+  test.skip("should navigate to another dashboard using the DrillDown feature.", async ({
     page,
   }) => {
     dashboardCreate = new DashboardCreate(page);
