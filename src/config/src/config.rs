@@ -1087,6 +1087,12 @@ pub struct Common {
     pub min_auto_refresh_interval: u32,
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
+    #[env_config(
+        name = "ZO_ENABLE_USE_STREAM_SETTINGS_FOR_PARTITIONS",
+        default = false,
+        help = "Enable to use stream settings for partitions. This will apply for all streams"
+    )]
+    pub enable_use_stream_settings_for_partitions: bool,
 }
 
 #[derive(EnvConfig)]
