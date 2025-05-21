@@ -1,70 +1,73 @@
 <template>
-  <div>
-    <!-- active-color="primary" -->
-    <!-- narrow-indicator -->
-    <!-- class="text-grey" -->
-    <!-- indicator-color="primary" -->
-    <q-tabs
-      v-model="fields.type"
-      @update:modelValue="onFieldTypeChange"
-      dense
-      data-test="dynamic-function-popup-tabs"
-      :align="'left'"
-    >
-      <q-tab
-        name="build"
-        label="Build"
-        data-test="dynamic-function-popup-tab-build"
-        class="tab-item-bold"
-      />
-      <q-tab
-        name="raw"
-        label="Raw"
-        data-test="dynamic-function-popup-tab-raw"
-        class="tab-item-bold"
-      />
-    </q-tabs>
+  <div class="tw-flex tw-gap-2">
+    <div style="width: 134px; padding-right: 12px; padding-top: 12px">
+      <div class="text-label-bold tw-pb-3">Property</div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div>
+          <div class="text-label-normal tw-text-sm">Label</div>
+          <input
+            v-model="fields.label"
+            :class="[
+              store.state.theme === 'dark' ? 'bg-grey-10' : '',
+              'edit-input',
+            ]"
+          />
+        </div>
+        <div v-if="!customQuery && !fields.isDerived">
+          <SortByBtnGrp :fieldObj="fields" />
+        </div>
+      </div>
+    </div>
 
-    <q-separator />
+    <div>
+      <!-- active-color="primary" -->
+      <!-- narrow-indicator -->
+      <!-- class="text-grey" -->
+      <!-- indicator-color="primary" -->
+      <q-tabs
+        v-model="fields.type"
+        @update:modelValue="onFieldTypeChange"
+        dense
+        data-test="dynamic-function-popup-tabs"
+        :align="'left'"
+      >
+        <q-tab
+          name="build"
+          label="Build"
+          data-test="dynamic-function-popup-tab-build"
+          class="tab-item-bold"
+        />
+        <q-tab
+          name="raw"
+          label="Raw"
+          data-test="dynamic-function-popup-tab-raw"
+          class="tab-item-bold"
+        />
+      </q-tabs>
 
-    <q-tab-panels v-model="fields.type" animated>
-      <q-tab-panel name="build" style="padding: 0px; padding-top: 8px">
-        <div style="display: flex">
-          <div style="width: 134px; padding-right: 12px">
-            <div class="text-label-bold tw-pb-3">Property</div>
-            <div style="display: flex; flex-direction: column; gap: 14px">
-              <div>
-                <div class="text-label-normal">Label</div>
-                <input
-                  v-model="fields.label"
-                  :class="[
-                    store.state.theme === 'dark' ? 'bg-grey-10' : '',
-                    'edit-input',
-                  ]"
-                />
-              </div>
-              <div v-if="!customQuery && !fields.isDerived">
-                <SortByBtnGrp :fieldObj="fields" />
-              </div>
+      <q-separator />
+
+      <q-tab-panels v-model="fields.type" animated>
+        <q-tab-panel name="build" style="padding: 0px; padding-top: 8px">
+          <div style="display: flex">
+            <div style="width: calc(100% - 134px)">
+              <div class="text-label-bold tw-pb-3">Configuration</div>
+              <SelectFunction
+                v-model="fields"
+                data-test="dynamic-function-popup-select-function"
+                :allowAggregation="allowAggregation"
+              />
             </div>
           </div>
-          <div style="width: calc(100% - 134px)">
-            <div class="text-label-bold tw-pb-3">Configuration</div>
-            <SelectFunction
-              v-model="fields"
-              data-test="dynamic-function-popup-select-function"
-              :allowAggregation="allowAggregation"
-            />
-          </div>
-        </div>
-      </q-tab-panel>
-      <q-tab-panel name="raw">
-        <RawQueryBuilder
-          v-model="fields"
-          data-test="dynamic-function-popup-raw-query-builder"
-        />
-      </q-tab-panel>
-    </q-tab-panels>
+        </q-tab-panel>
+        <q-tab-panel name="raw">
+          <RawQueryBuilder
+            v-model="fields"
+            data-test="dynamic-function-popup-raw-query-builder"
+          />
+        </q-tab-panel>
+      </q-tab-panels>
+    </div>
   </div>
 </template>
 
