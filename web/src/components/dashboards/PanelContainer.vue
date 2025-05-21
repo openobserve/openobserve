@@ -558,6 +558,10 @@ export default defineComponent({
         "to",
         metaData.value.queries[0]?.endTime.toString(),
       );
+      logsUrl.searchParams.set(
+        "functionContent",
+        b64EncodeUnicode(queryDetails.queries[0].vrlFunctionQuery),
+      );
       logsUrl.searchParams.set("sql_mode", "true");
       logsUrl.searchParams.set("query", encodedQuery);
       logsUrl.searchParams.set(
