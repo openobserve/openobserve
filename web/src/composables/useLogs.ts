@@ -1474,6 +1474,11 @@ const useLogs = () => {
                   : rowsPerPage;
               from = partitionFrom;
 
+
+              if (total < recordSize) {
+                recordSize = total;
+              }
+
               // if (i === 0 && partitionDetail.paginations.length > 0) {
               lastPartitionSize = 0;
 
@@ -1489,7 +1494,12 @@ const useLogs = () => {
                 if (lastPartitionSize != rowsPerPage) {
                   recordSize = rowsPerPage - lastPartitionSize;
                 }
+
+                if (total < recordSize) {
+                  recordSize = total;
+                }
               }
+
               if (!partitionDetail.paginations[pageNumber]) {
                 partitionDetail.paginations[pageNumber] = [];
               }
