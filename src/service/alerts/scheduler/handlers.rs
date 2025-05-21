@@ -1004,7 +1004,7 @@ async fn handle_derived_stream_triggers(
         // For derived stream, period is in minutes, so we need to convert it to seconds for
         // align_time
         let aligned_curr_time = TriggerCondition::align_time(
-            current_time,
+            current_time - user_defined_delay,
             derived_stream.tz_offset,
             derived_stream.trigger_condition.period * 60,
         );
@@ -1042,8 +1042,7 @@ async fn handle_derived_stream_triggers(
         // Go to the next nun at, but use the same trigger start time
         new_trigger.next_run_at = derived_stream
             .trigger_condition
-            .get_aligned_next_trigger_time(false, derived_stream.tz_offset, false)?
-            + user_defined_delay;
+            .get_aligned_next_trigger_time(false, derived_stream.tz_offset, false)?;
         // Start over next time
         new_trigger.retries = 0;
         db::scheduler::update_trigger(new_trigger).await?;
@@ -1316,7 +1315,7 @@ async fn handle_derived_stream_triggers(
             if let Some(start_time) = start {
                 new_trigger.data = json::to_string(&ScheduledTriggerData {
                     // updated start_time as end_time
-                    period_end_time: Some(start_time + user_defined_delay),
+                    period_end_time: Some(start_time),
                     tolerance: 0,
                     last_satisfied_at: None,
                 })
@@ -1333,8 +1332,7 @@ async fn handle_derived_stream_triggers(
                 // Go to the next nun at, but use the same trigger start time
                 new_trigger.next_run_at = derived_stream
                     .trigger_condition
-                    .get_aligned_next_trigger_time(false, derived_stream.tz_offset, false)?
-                    + user_defined_delay;
+                    .get_aligned_next_trigger_time(false, derived_stream.tz_offset, false)?;
 
                 // If the trigger didn't fail, we need to reset the `retries` count.
                 // Only cumulative failures should be used to check with `max_retries`

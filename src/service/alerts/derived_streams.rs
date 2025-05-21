@@ -150,22 +150,13 @@ pub async fn save(
     )
     .await
     {
-        Ok(existing_trigger) => {
-            let original_next_run_at = existing_trigger.next_run_at;
+        Ok(mut existing_trigger) => {
             let next_run_at = get_next_run_at(
                 derived_stream.delay.unwrap_or_default(),
-                Some(original_next_run_at),
+                Some(existing_trigger.next_run_at),
             )?;
-            let trigger = db::scheduler::Trigger {
-                org: derived_stream.org_id.to_string(),
-                module: db::scheduler::TriggerModule::DerivedStream,
-                module_key: trigger_module_key,
-                next_run_at,
-                is_realtime: false,
-                is_silenced: false,
-                ..Default::default()
-            };
-            db::scheduler::update_trigger(trigger)
+            existing_trigger.next_run_at = next_run_at;
+            db::scheduler::update_trigger(existing_trigger)
                 .await
                 .map_err(|_| anyhow::anyhow!("Trigger already exists, but failed to update"))
         }
