@@ -95,7 +95,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         .unwrap_or_default();
 
     #[cfg(not(feature = "cloud"))]
-    let free_trial_expiry = None;
+    let trial_period_expiry = None;
     #[cfg(feature = "cloud")]
     let trial_period_expiry = {
         use o2_enterprise::enterprise::{
