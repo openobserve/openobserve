@@ -333,6 +333,7 @@ test.describe("dashboard UI testcases", () => {
       "kubernetes_annotations_kubernetes_io_psp",
       "y"
     );
+    
     await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "b");
 
     await dashboardAction.applyDashboardBtn();
