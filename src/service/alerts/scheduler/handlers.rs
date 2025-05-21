@@ -44,11 +44,11 @@ use proto::cluster_rpc;
 
 use crate::service::{
     alerts::{
-        alert::{self, AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
+        alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
         derived_streams::DerivedStreamExt,
     },
     dashboards::reports::SendReport,
-    db::{self, alerts::alert::set_without_updating_trigger, pipeline},
+    db::{self, alerts::alert::set_without_updating_trigger},
     ingestion::ingestion_service,
     organization::is_org_in_free_trial_period,
     pipeline::batch_execution::ExecutablePipeline,

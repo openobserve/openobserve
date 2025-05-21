@@ -34,9 +34,10 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                ClusterInfo, ClusterInfoResponse, NodeListResponse, OrgDetails, OrgRenameBody,
-                OrgUser, Organization, OrganizationResponse, PasscodeResponse,
-                RumIngestionResponse, THRESHOLD,
+                AllOrgListDetails, AllOrganizationResponse, ClusterInfo, ClusterInfoResponse,
+                ExtendTrialPeriodRequest, NodeListResponse, OrgDetails, OrgRenameBody, OrgUser,
+                Organization, OrganizationResponse, PasscodeResponse, RumIngestionResponse,
+                THRESHOLD,
             },
         },
         utils::auth::{UserEmail, is_root_user},
@@ -125,6 +126,83 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
     }
     orgs.sort_by(|a, b| a.name.cmp(&b.name));
     let org_response = OrganizationResponse { data: orgs };
+
+    Ok(HttpResponse::Ok().json(org_response))
+}
+
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetAllOrganizations",
+    security(
+        ("Authorization"= [])
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = AllOrganizationResponse),
+    )
+)]
+#[get("/{org_id}/organizations/all")]
+pub async fn all_organizations(
+    org_id: web::Path<String>,
+    user_email: UserEmail,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let user_id = user_email.user_id.as_str();
+    let org = org_id.into_inner();
+    if org != "_meta" {
+        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            http::StatusCode::UNAUTHORIZED.into(),
+            "not authorized to access this resource".to_string(),
+        )));
+    }
+
+    let mut orgs = vec![];
+    let mut org_names = HashSet::new();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let limit = query
+        .get("page_size")
+        .unwrap_or(&"100".to_string())
+        .parse::<i64>()
+        .ok();
+
+    let all_orgs = match infra::table::organizations::list(limit).await {
+        Ok(orgs) => orgs,
+        Err(e) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    e.to_string(),
+                )),
+            );
+        }
+    };
+
+    let mut id = 1;
+    for org in all_orgs {
+        let org_subscription: i32 =
+            cloud_billings::get_org_subscription_type(org.identifier.as_str(), user_id)
+                .await
+                .map(|sub_type| sub_type as i32)
+                .unwrap_or_default();
+        let org = AllOrgListDetails {
+            id,
+            identifier: org.identifier.clone(),
+            name: org.org_name,
+            org_type: org.org_type.to_string(),
+            plan: org_subscription,
+            created_at: org.created_at,
+            updated_at: org.updated_at,
+            trial_expires_at: Some(org.trial_ends_at),
+        };
+        if !org_names.contains(&org.identifier) {
+            org_names.insert(org.identifier.clone());
+            orgs.push(org);
+            id += 1;
+        }
+    }
+    orgs.sort_by(|a, b| a.name.cmp(&b.name));
+    let org_response = AllOrganizationResponse { data: orgs };
 
     Ok(HttpResponse::Ok().json(org_response))
 }
@@ -368,6 +446,57 @@ async fn create_org(
     let result = organization::create_org(&mut org, &user_email.user_id).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(org)),
+        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            err.to_string(),
+        ))),
+    }
+}
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "ExtendTrialPeriod",
+    security(
+        ("Authorization"= [])
+    ),
+    request_body(content = ExtendTrialPeriodRequest, description = "Extend free trial request", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "text"),
+    )
+)]
+#[post("/{org_id}/extend_free_trial")]
+async fn extend_trial_period(
+    org_id: web::Path<String>,
+    req: web::Json<ExtendTrialPeriodRequest>,
+) -> Result<HttpResponse, Error> {
+    let req = req.into_inner();
+    let org = org_id.into_inner();
+    if org != "_meta" {
+        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            http::StatusCode::UNAUTHORIZED.into(),
+            "not authorized to access this resource".to_string(),
+        )));
+    }
+
+    let org = match infra::table::organizations::get(&req.org_id).await {
+        Ok(org) => org,
+        Err(e) => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND.into(),
+                e.to_string(),
+            )));
+        }
+    };
+    if org.trial_ends_at > req.new_end_date {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "new end date cannot be earlier than existing".to_string(),
+        )));
+    }
+
+    match infra::table::organizations::set_trial_period_end(&req.org_id, req.new_end_date).await {
+        Ok(_) => Ok(HttpResponse::Ok().body("success")),
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
             err.to_string(),

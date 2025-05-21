@@ -116,6 +116,25 @@ pub async fn add(
     Ok(())
 }
 
+pub async fn set_trial_period_end(org_id: &str, new_end: i64) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::update_many()
+        .col_expr(Column::TrialEndsAt, Expr::value(new_end))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
+        .filter(Column::Identifier.eq(org_id))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(())
+}
+
 pub async fn rename(org_id: &str, new_name: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
