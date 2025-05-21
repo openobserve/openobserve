@@ -48,22 +48,19 @@ use tantivy::Directory;
 use tokio::sync::Semaphore;
 use tracing::Instrument;
 
-use crate::{
-    job::{self, should_prioritize_file},
-    service::{
-        db, file_list,
-        search::{
-            datafusion::exec,
-            generate_search_schema_diff,
-            index::IndexCondition,
-            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-            tantivy::puffin_directory::{
-                caching_directory::CachingDirectory,
-                convert_puffin_file_to_tantivy_dir,
-                footer_cache::FooterCache,
-                reader::{PuffinDirReader, warm_up_terms},
-                reader_cache,
-            },
+use crate::service::{
+    db, file_list,
+    search::{
+        datafusion::exec,
+        generate_search_schema_diff,
+        index::IndexCondition,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        tantivy::puffin_directory::{
+            caching_directory::CachingDirectory,
+            convert_puffin_file_to_tantivy_dir,
+            footer_cache::FooterCache,
+            reader::{PuffinDirReader, warm_up_terms},
+            reader_cache,
         },
     },
 };
@@ -260,13 +257,7 @@ pub async fn search(
         &query.trace_id,
         &files
             .iter()
-            .map(|f| {
-                (
-                    f.key.as_ref(),
-                    f.meta.compressed_size,
-                    should_prioritize_file(&f.meta),
-                )
-            })
+            .map(|f| (f.key.as_ref(), f.meta.compressed_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "parquet",
@@ -412,7 +403,7 @@ pub async fn search(
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 pub async fn cache_files(
     trace_id: &str,
-    files: &[(&str, i64, bool)],
+    files: &[(&str, i64, i64)],
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> Result<(file_data::CacheType, u64, u64), Error> {
@@ -459,26 +450,20 @@ pub async fn cache_files(
     let trace_id = trace_id.to_string();
     let files = files
         .iter()
-        .filter_map(|(f, size, to_priority_queue)| {
+        .filter_map(|(f, size, ts)| {
             if cached_files.contains(f) {
                 None
             } else {
-                Some((f.to_string(), *size, *to_priority_queue))
+                Some((f.to_string(), *size, *ts))
             }
         })
         .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
         let files_num = files.len();
-        for (file, size, to_priority_queue) in files {
-            if let Err(e) = job::queue_background_download(
-                &trace_id,
-                &file,
-                size,
-                cache_type,
-                to_priority_queue,
-            )
-            .await
+        for (file, size, ts) in files {
+            if let Err(e) =
+                crate::job::queue_background_download(&trace_id, &file, size, ts, cache_type).await
             {
                 log::error!(
                     "[trace_id {trace_id}] error in queuing file {file} for background download: {e}"
@@ -541,13 +526,7 @@ pub async fn filter_file_list_by_tantivy_index(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, meta)| {
-                (
-                    ttv_file.as_str(),
-                    meta.meta.index_size,
-                    should_prioritize_file(&meta.meta),
-                )
-            })
+            .map(|(ttv_file, meta)| (ttv_file.as_str(), meta.meta.index_size, meta.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "index",
