@@ -989,7 +989,6 @@ async fn handle_derived_stream_triggers(
         })
         .unwrap_or_default();
     let supposed_to_be_run_at = trigger.next_run_at - user_defined_delay;
-    let delay = current_time - user_defined_delay - supposed_to_be_run_at; // delay is in microseconds
     let mut final_end_time = supposed_to_be_run_at;
     let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
         .unwrap()
