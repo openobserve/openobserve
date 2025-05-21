@@ -28,44 +28,55 @@
           />
         </template> -->
     </q-select>
+    <div class="tw-w-full tw-p-3 tw-flex tw-gap-2">
+      <!-- <SubTaskArrow /> -->
 
-    <!-- {{ JSON.stringify(fields.args) }} -->
-    <!-- Loop through the args for the first n-1 arguments -->
-    <div
-      v-for="(arg, argIndex) in fields.args"
-      :key="argIndex"
-      class="tw-w-full tw-flex tw-flex-col"
-    >
-      <div>
-        <div>
-          <label :for="'arg-' + argIndex">Parameters {{ argIndex + 1 }}</label>
-        </div>
-        <div class="tw-flex tw-gap-x-3">
-          <!-- type selector -->
-          <q-select
-            v-model="fields.args[argIndex].type"
-            @update:model-value="onArgTypeChange(fields.args[argIndex])"
-            :options="
-              getSupportedTypeBasedOnFunctionNameAndIndex(
-                fields.functionName,
-                argIndex,
-              )
-            "
-            option-label="label"
-            option-value="value"
-            behavior="menu"
-            map-options
-            emit-value
-            dense
-            filled
-            label="Select Type"
-            class="tw-w-40 tw-min-w-40 tw-h-10 tw-text-white"
-            style="background: #6571BD;"
-            :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
-          />
+      <!-- {{ JSON.stringify(fields.args) }} -->
+      <!-- Loop through the args for the first n-1 arguments -->
+      <div class="tw-w-full">
+        <div
+          v-for="(arg, argIndex) in fields.args"
+          :key="argIndex"
+          class="tw-w-full tw-flex tw-flex-col"
+        >
+          <div class="tw-flex">
+            <div class="tw-mr-2 tw-relative">
+              <SubTaskArrow class="tw-absolute" />
+              <div
+                class="tw-h-full tw-border-l-[1px] tw-border-[#001495] tw-opacity-50 tw-relative"
+              ></div>
+            </div>
+            <div>
+              <div class="tw-flex tw-items-center tw-gap-x-2">
+                <label :for="'arg-' + argIndex"
+                  >Parameters {{ argIndex + 1 }}</label
+                >
+              </div>
+              <div class="tw-flex tw-gap-x-3">
+                <!-- type selector -->
+                <q-select
+                  v-model="fields.args[argIndex].type"
+                  @update:model-value="onArgTypeChange(fields.args[argIndex])"
+                  :options="
+                    getSupportedTypeBasedOnFunctionNameAndIndex(
+                      fields.functionName,
+                      argIndex,
+                    )
+                  "
+                  option-label="label"
+                  option-value="value"
+                  behavior="menu"
+                  map-options
+                  emit-value
+                  dense
+                  filled
+                  label="Select Type"
+                  class="tw-w-40 tw-min-w-40 tw-h-10 tw-text-white"
+                  :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
+                />
 
-          <!-- Render different input types based on validation -->
-          <!-- <q-select
+                <!-- Render different input types based on validation -->
+                <!-- <q-select
             v-model="fields.args[argIndex].value"
             :options="filteredSchemaOptions"
             label="Select Field"
@@ -81,75 +92,81 @@
             @filter="filterStreamFn"
             :required="isRequired(fields.functionName, argIndex)"
             class="tw-w-52"
-          /> -->
+             /> -->
 
-          <!-- Left field selector using StreamFieldSelect -->
-          <div class="tw-w-52" v-if="fields.args[argIndex]?.type === 'field'">
-            <StreamFieldSelect
-              :streams="getAllSelectedStreams()"
-              v-model="fields.args[argIndex].value"
-              :data-test="`dashboard-function-dropdown-arg-field-selector-${argIndex}`"
-            />
+                <!-- Left field selector using StreamFieldSelect -->
+                <div
+                  class="tw-w-52"
+                  v-if="fields.args[argIndex]?.type === 'field'"
+                >
+                  <StreamFieldSelect
+                    :streams="getAllSelectedStreams()"
+                    v-model="fields.args[argIndex].value"
+                    :data-test="`dashboard-function-dropdown-arg-field-selector-${argIndex}`"
+                  />
+                </div>
+
+                <q-input
+                  v-if="fields.args[argIndex]?.type === 'string'"
+                  type="text"
+                  v-model="fields.args[argIndex].value"
+                  placeholder="Enter string"
+                  :required="isRequired(fields.functionName, argIndex)"
+                  class="tw-w-52"
+                  dense
+                  :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
+                />
+
+                <q-input
+                  v-if="fields.args[argIndex]?.type === 'number'"
+                  type="number"
+                  v-model="fields.args[argIndex].value"
+                  placeholder="Enter number"
+                  :required="isRequired(fields.functionName, argIndex)"
+                  class="tw-w-52"
+                  dense
+                  :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
+                />
+
+                <SelectFunction
+                  v-if="fields.args[argIndex]?.type === 'function'"
+                  class="tw-ml-4"
+                  v-model="fields.args[argIndex].value"
+                  :allowAggregation="allowAggregation"
+                  :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
+                />
+
+                <!-- histogram interval for sql queries -->
+                <HistogramIntervalDropDown
+                  v-if="fields.args[argIndex]?.type === 'histogramInterval'"
+                  :model-value="fields.args[argIndex].value"
+                  @update:modelValue="
+                    (newValue: any) => {
+                      fields.args[argIndex].value = newValue.value;
+                    }
+                  "
+                  class="tw-w-52"
+                  :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
+                />
+
+                <!-- Remove argument button -->
+                <q-btn
+                  v-if="canRemoveArgument(fields.functionName, argIndex)"
+                  icon="close"
+                  dense
+                  flat
+                  round
+                  @click="removeArgument(argIndex)"
+                  class="tw-h-10 tw-w-10"
+                  :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
+                />
+              </div>
+            </div>
           </div>
-
-          <q-input
-            v-if="fields.args[argIndex]?.type === 'string'"
-            type="text"
-            v-model="fields.args[argIndex].value"
-            placeholder="Enter string"
-            :required="isRequired(fields.functionName, argIndex)"
-            class="tw-w-52"
-            dense
-            :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
-          />
-
-          <q-input
-            v-if="fields.args[argIndex]?.type === 'number'"
-            type="number"
-            v-model="fields.args[argIndex].value"
-            placeholder="Enter number"
-            :required="isRequired(fields.functionName, argIndex)"
-            class="tw-w-52"
-            dense
-            :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
-          />
-
-          <SelectFunction
-            v-if="fields.args[argIndex]?.type === 'function'"
-            class="tw-ml-4"
-            v-model="fields.args[argIndex].value"
-            :allowAggregation="allowAggregation"
-            :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
-          />
-
-          <!-- histogram interval for sql queries -->
-          <HistogramIntervalDropDown
-            v-if="fields.args[argIndex]?.type === 'histogramInterval'"
-            :model-value="fields.args[argIndex].value"
-            @update:modelValue="
-              (newValue: any) => {
-                fields.args[argIndex].value = newValue.value;
-              }
-            "
-            class="tw-w-52"
-            :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
-          />
-
-          <!-- Remove argument button -->
-          <q-btn
-            v-if="canRemoveArgument(fields.functionName, argIndex)"
-            icon="close"
-            dense
-            flat
-            round
-            @click="removeArgument(argIndex)"
-            class="tw-h-10 tw-w-10"
-            :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
-          />
         </div>
-      </div>
 
-      <!-- Add more arguments if allowed -->
+        <!-- Add more arguments if allowed -->
+      </div>
     </div>
     <q-btn
       v-if="canAddArgument(fields.functionName)"
@@ -173,10 +190,11 @@ import { useSelectAutoComplete } from "@/composables/useSelectAutocomplete";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
 import { addMissingArgs } from "@/utils/dashboard/convertDataIntoUnitValue";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
+import SubTaskArrow from "@/components/icons/SubTaskArrow.vue";
 
 export default {
   name: "SelectFunction",
-  components: { HistogramIntervalDropDown, StreamFieldSelect },
+  components: { HistogramIntervalDropDown, StreamFieldSelect, SubTaskArrow },
   props: {
     modelValue: {
       type: Object,
