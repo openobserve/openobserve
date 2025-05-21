@@ -122,7 +122,7 @@ jobs:
             "dashboards/custom-charts.spec.js",
             "dashboards/dashboardtype.spec.js",
             "dashboards/dashboard.spec.js",
-            # "dashboards/dashboard2.spec.js",
+            "dashboards/dashboard2.spec.js",
             # "dashboards/visualize.spec.js",
             # "unflattened.spec.js",
             # "secondsPrecisionAdded.spec.js",
