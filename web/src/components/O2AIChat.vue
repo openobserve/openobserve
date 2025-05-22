@@ -2,14 +2,14 @@
   <div class="chat-container" :class="[{ 'chat-open': isOpen }, store.state.theme == 'dark' ? 'dark-mode' : 'light-mode']" 
   >
     <div v-if="isOpen" class="chat-content-wrapper" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-      <div class="chat-header" style="height: 100px;">
+      <div class="chat-header" style="height: 82.5px;">
         <div class="chat-title tw-flex tw-justify-between tw-items-center tw-w-full">
 
           <div >
             <q-avatar size="24px" class="q-mr-sm">
-              <img src="/src/assets/images/common/o2_ai_logo.svg" />
+              <img :src="store.state.theme == 'dark' ? '/src/assets/images/common/o2_ai_logo_dark.svg' : '/src/assets/images/common/o2_ai_logo.svg'" />
             </q-avatar>
-            <span>O2 AI Assistant</span>
+            <span>O2 AI</span>
           </div>
 
           <div>
@@ -40,7 +40,7 @@
           </div>
         </div>
       </div>
-      <q-separator />
+      <q-separator class="tw-bg-[#DBDBDB]" />
       
       <!-- History Panel -->
       <q-dialog v-model="showHistory" position="right">
@@ -79,7 +79,7 @@
         <div class="messages-container " ref="messagesContainer">
           <div v-if="chatMessages.length === 0" class="welcome-section ">
             <div class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full ">
-              <img src="/src/assets/images/common/o2_ai_logo.svg" />
+              <img :src="store.state.theme == 'dark' ? '/src/assets/images/common/o2_ai_logo_dark.svg' : '/src/assets/images/common/o2_ai_logo.svg'" />
               <span class="tw-text-[14px] tw-font-[600] tw-text-center">Build Queries faster with O2 AI</span>
               <span class="tw-text-[12px] tw-text-center tw-font-[400]">O2 is powered by AI, so mistakes are possible.Review output carefully before using.</span>
             </div>
@@ -174,7 +174,7 @@
               dense
               :borderless="true"
               class="tw-w-24 model-selector"
-              style="max-width: 100px;"
+              style="max-width: 100px; height: 36px;"
             >
               <template v-slot:selected-item="scope">
                 <div
@@ -190,13 +190,13 @@
             color="primary"
             :disable="isLoading || !inputMessage.trim()"
             @click="sendMessage"
-            class="tw-px-4 tw-py-2 tw-rounded-md no-border"
+            class="tw-px-2 tw-rounded-md no-border"
             no-caps
 
           >
             <div class="tw-flex tw-items-center tw-gap-2">
               <img src="/src/assets/images/common/ai_icon.svg" class="tw-w-4 tw-h-4" />
-              <span>Generate</span>
+              <span class="tw-text-[12px]">Generate</span>
             </div>
           </q-btn>
         </div>
@@ -213,6 +213,7 @@ import { marked } from 'marked';
 import { MarkedOptions } from 'marked';
 import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
+import useAiChat from '@/composables/useAiChat';
 
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 
@@ -234,6 +235,8 @@ interface ChatHistoryEntry {
 const DB_NAME = 'o2ChatDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'chatHistory';
+
+const { fetchAiChat } = useAiChat();
 
 const initDB = () => {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -386,51 +389,78 @@ export default defineComponent({
       try {
         while (true) {
           const { done, value } = await reader.read();
-
           if (done) break;
 
           // Append new chunk to existing buffer
           buffer += decoder.decode(value, { stream: true });
           
-          // Split buffer into lines and process each complete line
+          // Process each line that starts with 'data: '
           const lines = buffer.split('\n');
-          // Keep the last (potentially incomplete) line in the buffer
-          buffer = lines.pop() || '';
+          buffer = lines.pop() || ''; // Keep last potentially incomplete line
           
           for (const line of lines) {
             if (line.trim().startsWith('data: ')) {
               try {
-                // Extract the JSON part, handling potential whitespace
-                const jsonStr = line.slice(line.indexOf('{'));
-                const data = JSON.parse(jsonStr);
+                // Extract everything after 'data: ' and before any line break
+                const jsonStr = line.substring(line.indexOf('{'));
                 
-                if (data.content) {
-                  currentStreamingMessage.value += data.content;
-                  // Update the last message's content
-                  if (chatMessages.value.length > 0) {
-                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                    lastMessage.content = currentStreamingMessage.value;
-                    messageComplete = true;
+                // Skip empty or invalid JSON strings
+                if (!jsonStr || !jsonStr.trim()) continue;
+                
+                // Try to parse the JSON, handling potential errors
+                try {
+                  const data = JSON.parse(jsonStr);
+                  if (data && typeof data.content === 'string') {
+                    // Format code blocks with proper line breaks
+                    let content = data.content;
+                    
+                    // Add line break after opening backticks if not present
+                    content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
+                    
+                    // Add line break before closing backticks if not present
+                    content = content.replace(/([^`])\s*```/g, '$1\n```');
+                    
+                    currentStreamingMessage.value += content;
+                    if (chatMessages.value.length > 0) {
+                      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      lastMessage.content = currentStreamingMessage.value;
+                      messageComplete = true;
+                    }
+                    await scrollToBottom();
                   }
-                  await scrollToBottom();
+                } catch (jsonError) {
+                  console.debug('JSON parse error:', jsonError, 'for line:', jsonStr);
+                  continue;
                 }
               } catch (e) {
-                console.error('Error parsing JSON:', e, 'from line:', line);
+                console.debug('Error processing line:', e, 'Line:', line);
+                continue;
               }
             }
           }
         }
 
-        // Process any remaining data in the buffer
+        // Process any remaining complete data in buffer
         if (buffer.trim()) {
           const lines = buffer.split('\n');
           for (const line of lines) {
             if (line.trim().startsWith('data: ')) {
               try {
-                const jsonStr = line.slice(line.indexOf('{'));
+                const jsonStr = line.substring(line.indexOf('{'));
+                if (!jsonStr || !jsonStr.trim()) continue;
+                
                 const data = JSON.parse(jsonStr);
-                if (data.content) {
-                  currentStreamingMessage.value += data.content;
+                if (data && typeof data.content === 'string') {
+                  // Format code blocks with proper line breaks
+                  let content = data.content;
+                  
+                  // Add line break after opening backticks if not present
+                  content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
+                  
+                  // Add line break before closing backticks if not present
+                  content = content.replace(/([^`])\s*```/g, '$1\n```');
+                  
+                  currentStreamingMessage.value += content;
                   if (chatMessages.value.length > 0) {
                     const lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     lastMessage.content = currentStreamingMessage.value;
@@ -439,7 +469,8 @@ export default defineComponent({
                   await scrollToBottom();
                 }
               } catch (e) {
-                console.error('Error parsing JSON:', e, 'from line:', line);
+                console.debug('Error processing remaining buffer:', e);
+                continue;
               }
             }
           }
@@ -595,21 +626,13 @@ export default defineComponent({
           role: 'assistant',
           content: ''
         });
-
-        const response = await fetch('http://localhost:8000/api/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive'
-          },
-          body: JSON.stringify({
-            messages: chatMessages.value.slice(0, -1),
-            model: selectedModel.value,
-            provider: selectedProvider.value
-          }),
-        });
+        let response: any;
+        try { 
+          response = await fetchAiChat(chatMessages.value.slice(0, -1),"",store.state.org_id);
+        } catch (error) {
+          console.error('Error fetching AI chat:', error);
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -697,14 +720,20 @@ export default defineComponent({
       
       for (const token of tokens) {
         if (token.type === 'code') {
+          // Remove comments at the beginning of code blocks
+          let codeText = token.text.trim();
+          while (codeText.startsWith('--') || codeText.startsWith('//') || codeText.startsWith('#')) {
+            codeText = codeText.split('\n').slice(1).join('\n').trim();
+          }
+          
           const highlightedContent = token.lang && hljs.getLanguage(token.lang)
-            ? hljs.highlight(token.text, { language: token.lang }).value
-            : hljs.highlightAuto(token.text).value;
+            ? hljs.highlight(codeText, { language: token.lang }).value
+            : hljs.highlightAuto(codeText).value;
 
           blocks.push({
             type: 'code',
             language: token.lang || '',
-            content: token.text,
+            content: codeText,
             highlightedContent
           });
         } else {
@@ -844,7 +873,7 @@ export default defineComponent({
 
 
   .chat-header {
-    padding: 12px;
+    padding: 0px 12px 4px 12px;
     display: flex;
     justify-content: space-between;
     align-items: end;
@@ -1021,6 +1050,7 @@ export default defineComponent({
         background-color: #ffffff;
         border: 0.5px solid #00000024 ;
         border-top: none;
+        color: black;
       }
     }
 
@@ -1085,7 +1115,7 @@ export default defineComponent({
   .model-selector{
     background-color: #262626;
     border: 1px solid #3b3b3b;
-    padding: 0px 4px;
+    padding: 0px 6px;
   }
 
 }

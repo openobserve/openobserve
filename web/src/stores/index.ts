@@ -224,6 +224,9 @@ export default createStore({
     setModulesToDisplay(state, payload) {
       state.modulesToDisplay = payload;
     },
+    setIsAiChatEnabled(state, payload) {
+      state.isAiChatEnabled = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -360,6 +363,9 @@ export default createStore({
     },
     setModulesToDisplay(context, payload) {
       context.commit("setModulesToDisplay", payload);
+    },
+    setIsAiChatEnabled(context, payload) {
+      context.commit("setIsAiChatEnabled", payload);
     },
   },
   modules: {},
