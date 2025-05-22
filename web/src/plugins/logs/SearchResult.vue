@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           class="q-pb-lg"
-          style=" left: 45%; margin: 30px 0px"
+           style="top: 50px; position: absolute; left: 50%"
           v-if="histogramLoader"
         >
           <q-spinner-hourglass
