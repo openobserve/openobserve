@@ -1077,7 +1077,7 @@ async fn handle_derived_stream_triggers(
             false,
             derived_stream.tz_offset,
             false,
-        )? + user_defined_delay;
+        )?;
         // Start over next time
         new_trigger.retries = 0;
         db::scheduler::update_trigger(new_trigger).await?;
@@ -1350,7 +1350,7 @@ async fn handle_derived_stream_triggers(
             if let Some(start_time) = start {
                 new_trigger.data = json::to_string(&ScheduledTriggerData {
                     // updated start_time as end_time
-                    period_end_time: Some(start_time + user_defined_delay),
+                    period_end_time: Some(start_time),
                     tolerance: 0,
                     last_satisfied_at: None,
                 })
@@ -1369,7 +1369,7 @@ async fn handle_derived_stream_triggers(
                     false,
                     derived_stream.tz_offset,
                     false,
-                )? + user_defined_delay;
+                )?;
 
                 // If the trigger didn't fail, we need to reset the `retries` count.
                 // Only cumulative failures should be used to check with `max_retries`
