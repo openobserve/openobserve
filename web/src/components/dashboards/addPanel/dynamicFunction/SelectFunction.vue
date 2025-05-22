@@ -43,7 +43,8 @@
             <div class="tw-mr-2 tw-relative">
               <SubTaskArrow class="tw-absolute" />
               <div
-                class="tw-h-full tw-border-l-[1px] tw-border-[#001495] tw-opacity-50 tw-relative"
+                v-if="argIndex !== fields.args.length - 1"
+                class="tw-border-l-[1px] tw-border-[#001495] tw-opacity-50 tw-relative tw-h-full"
               ></div>
             </div>
             <div>
