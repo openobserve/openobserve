@@ -14,11 +14,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
     .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click();
+  await page.locator("div.q-item").getByText(`${stream}`).first().click();
 };
 
 test.describe("logs testcases", () => {
@@ -62,8 +58,8 @@ test.describe("logs testcases", () => {
     const breakdownFieldLocator = page.locator(
       '[data-test="field-list-item-logs-e2e_automate-vrl12"] [data-test="dashboard-add-b-data"]'
     );
-    await breakdownFieldLocator.waitFor({ state: "visible", timeout: 5000 });
-    await breakdownFieldLocator.waitFor({ state: "attached", timeout: 5000 });
+    await breakdownFieldLocator.waitFor({ state: "visible" });
+    await breakdownFieldLocator.waitFor({ state: "attached" });
     await breakdownFieldLocator.click();
 
     await logsVisualise.applyQueryButtonVisualise();
@@ -81,7 +77,6 @@ test.describe("logs testcases", () => {
     await logsVisualise.setRelative("6", "d");
     await logsVisualise.logsApplyQueryButton();
     await logsVisualise.openVisualiseTab();
-   
 
     await page
       .locator(
@@ -103,11 +98,16 @@ test.describe("logs testcases", () => {
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
       )
+      .waitFor({ state: "visible" });
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
+      )
       .click();
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.showQueryToggle();
     await logsVisualise.applyQueryButtonVisualise();
-    await page.waitForTimeout(500); 
+    await page.waitForTimeout(500);
     await logsVisualise.applyQueryButtonVisualise();
     await page.locator('[data-test="dashboard-y-item-vrl-remove"]').click();
     await logsVisualise.applyQueryButtonVisualise();
@@ -130,6 +130,11 @@ test.describe("logs testcases", () => {
       .fill(".VRL=1000");
 
     await logsVisualise.applyQueryButtonVisualise();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
+      )
+      .waitFor({ state: "visible" });
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
@@ -245,6 +250,11 @@ test.describe("logs testcases", () => {
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
       )
+      .waitFor({ state: "visible" });
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
+      )
       .click();
     await logsVisualise.applyQueryButtonVisualise();
     await expect(
@@ -271,6 +281,11 @@ test.describe("logs testcases", () => {
 
     await logsVisualise.applyQueryButtonVisualise();
 
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-b-data"]'
+      )
+      .waitFor({ state: "visible" });
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-b-data"]'
@@ -312,77 +327,87 @@ test.describe("logs testcases", () => {
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
       )
+      .waitFor({ state: "visible" });
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
+      )
       .click();
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.setRelative("4", "w");
     await logsVisualise.applyQueryButtonVisualise();
   });
   test("should not show an error when changing the chart type after adding a VRL function field", async ({
-      page,
-    }) => {
-      const logsVisualise = new LogsVisualise(page);
-      await logsVisualise.setRelative("6", "d");
-      await logsVisualise.logsApplyQueryButton();
-      
-      await logsVisualise.openVisualiseTab();
-      // await page.locator('[data-test="logs-visualize-toggle"]').click();
-  
-      // Set up a flag to detect errors
-      let errorDetected = false;
-  
-      // Listen for console messages and check for errors
-      page.on("console", (msg) => {
-        if (msg.type() === "error") {
-          const errorText = msg.text();
-          // Check if the error matches a known pattern (customize regex as needed)
-          if (/Error|Failure|Cannot|Invalid/i.test(errorText)) {
-            errorDetected = true;
-          }
-        }
-      });
-  
-      await page.waitForTimeout(5000);
-      await page
-        .locator('[data-test="logs-vrl-function-editor"]')
-        .first()
-        .click();
-      await page
-        .locator("#fnEditor")
-        .getByLabel("Editor content;Press Alt+F1")
-        .fill(".VRLsanity=1000");
-      await page.waitForTimeout(3000);
+    page,
+  }) => {
+    const logsVisualise = new LogsVisualise(page);
+    await logsVisualise.setRelative("6", "d");
+    await logsVisualise.logsApplyQueryButton();
 
-      await logsVisualise.applyQueryButtonVisualise();
-  
-     
-      await page
-        .locator(
-          '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
-        )
-        .click();
-  
-      await logsVisualise.applyQueryButtonVisualise();
-  
-      // Change chart types and check for errors each time
-      const chartTypes = [
-        '[data-test="selected-chart-area-item"] img',
-        '[data-test="selected-chart-area-stacked-item"] img',
-        '[data-test="selected-chart-h-bar-item"] img',
-        '[data-test="selected-chart-scatter-item"] img',
-        '[data-test="selected-chart-h-stacked-item"] img',
-        '[data-test="selected-chart-heatmap-item"] img',
-        '[data-test="selected-chart-pie-item"] img',
-        '[data-test="selected-chart-table-item"] img',
-        '[data-test="selected-chart-gauge-item"] img',
-      ];
-  
-      for (const chartType of chartTypes) {
-        await page.locator(chartType).click();
-  
-        await page.waitForTimeout(1000);
+    await logsVisualise.openVisualiseTab();
+    // await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    // Set up a flag to detect errors
+    let errorDetected = false;
+
+    // Listen for console messages and check for errors
+    page.on("console", (msg) => {
+      if (msg.type() === "error") {
+        const errorText = msg.text();
+        // Check if the error matches a known pattern (customize regex as needed)
+        if (/Error|Failure|Cannot|Invalid/i.test(errorText)) {
+          errorDetected = true;
+        }
       }
-  
-      // Assertion: Fail the test if an error was detected
-      expect(errorDetected).toBe(false);
     });
+
+    await page.waitForTimeout(5000);
+    await page
+      .locator('[data-test="logs-vrl-function-editor"]')
+      .first()
+      .click();
+    await page
+      .locator("#fnEditor")
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(".VRLsanity=1000");
+    await page.waitForTimeout(3000);
+
+    await logsVisualise.applyQueryButtonVisualise();
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
+      )
+      .waitFor({ state: "visible" });
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+
+    await logsVisualise.applyQueryButtonVisualise();
+
+    // Change chart types and check for errors each time
+    const chartTypes = [
+      '[data-test="selected-chart-area-item"] img',
+      '[data-test="selected-chart-area-stacked-item"] img',
+      '[data-test="selected-chart-h-bar-item"] img',
+      '[data-test="selected-chart-scatter-item"] img',
+      '[data-test="selected-chart-h-stacked-item"] img',
+      '[data-test="selected-chart-heatmap-item"] img',
+      '[data-test="selected-chart-pie-item"] img',
+      '[data-test="selected-chart-table-item"] img',
+      '[data-test="selected-chart-gauge-item"] img',
+    ];
+
+    for (const chartType of chartTypes) {
+      await page.locator(chartType).click();
+
+      await page.waitForTimeout(1000);
+    }
+
+    // Assertion: Fail the test if an error was detected
+    expect(errorDetected).toBe(false);
+  });
 });
