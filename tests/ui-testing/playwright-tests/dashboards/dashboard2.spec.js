@@ -82,7 +82,7 @@ test.describe("dashboard UI testcases", () => {
     await dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
 
-
+   
   });
 
   test("should add and cancel the breakdown field with different times and timezones and ensure it displays the correct output", async ({
