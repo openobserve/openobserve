@@ -23,7 +23,7 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 
-/// (account, file, size, cache_type)
+/// (trace_id, account, file, size, cache_type)
 type FileInfo = (String, String, String, usize, file_data::CacheType);
 
 struct DownloadQueue {
