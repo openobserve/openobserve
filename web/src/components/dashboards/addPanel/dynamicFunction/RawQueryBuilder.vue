@@ -1,27 +1,22 @@
 <template>
-  <div>
-    <div class="q-mb-sm rawQuery">Query</div>
-    <q-input
-      outlined
-      v-model="fields.rawQuery"
-      filled
-      autogrow
-      class="showLabelOnTop"
-      data-test="dynamic-function-popup-raw-query-input"
-    />
-    <q-input
-      v-model="fields.alias"
-      label="Alias"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      disable
-      filled
-      dense
-      label-slot
-      data-test="dynamic-function-popup-raw-query-alias-input"
-    />
+  <div style="width: 100%">
+    <div class="query-section">
+      <div class="query-label">Query</div>
+
+      <textarea
+        style="
+          min-width: 100%;
+          max-width: 100%;
+          resize: vertical;
+          border: 1px solid;
+          border-radius: 4px;
+          padding: 2px;
+        "
+        v-model="fields.rawQuery"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+        data-test="dashboard-drilldown-url-textarea"
+      ></textarea>
+    </div>
   </div>
 </template>
 
@@ -70,12 +65,25 @@ export default {
   },
 };
 </script>
+
 <style scoped>
-.rawQuery {
-  margin-top: 5px;
-  margin-bottom: 5px;
+.query-section {
+  margin-bottom: 20px;
+}
+
+.query-label {
   font-size: 14px;
   font-weight: 600;
   color: #666666;
+  margin-bottom: 5px;
+}
+
+.query-input {
+  width: 100%;
+  min-height: 100px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  resize: vertical;
 }
 </style>

@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-menu
                       :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
                       class="field-function-menu-popup"
+                      style="width: 771px !important"
                     >
                       <div style="padding: 3px 16px 16px 16px">
                         <div>
@@ -206,7 +207,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                           />
                         </div> -->
-                        
                       </div>
                     </q-menu>
                   </q-btn>
@@ -1950,7 +1950,7 @@ export default defineComponent({
 }
 
 .field-function-menu-popup {
-  width: 771px;
+  width: 771px !important;
   height: 323px;
   border-radius: 4px;
   border: 1px solid #d5d5d5;

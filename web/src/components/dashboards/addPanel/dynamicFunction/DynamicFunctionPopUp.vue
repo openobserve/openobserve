@@ -13,13 +13,24 @@
             ]"
           />
         </div>
+        <div>
+          <div class="text-label-normal tw-text-sm">Alias</div>
+          <input
+            v-model="fields.alias"
+            disabled
+            :class="[
+              store.state.theme === 'dark' ? 'bg-grey-10' : '',
+              'edit-input',
+            ]"
+          />
+        </div>
         <div v-if="!customQuery && !fields.isDerived">
           <SortByBtnGrp :fieldObj="fields" />
         </div>
       </div>
     </div>
 
-    <div>
+    <div style="width: calc(100% - 134px)">
       <!-- active-color="primary" -->
       <!-- narrow-indicator -->
       <!-- class="text-grey" -->
@@ -60,11 +71,15 @@
             </div>
           </div>
         </q-tab-panel>
-        <q-tab-panel name="raw">
-          <RawQueryBuilder
-            v-model="fields"
-            data-test="dynamic-function-popup-raw-query-builder"
-          />
+        <q-tab-panel name="raw" style="padding: 0px; padding-top: 8px">
+          <div style="display: flex; width: 100%">
+            <div style="width: calc(100% - 134px)">
+              <RawQueryBuilder
+                v-model="fields"
+                data-test="dynamic-function-popup-raw-query-builder"
+              />
+            </div>
+          </div>
         </q-tab-panel>
       </q-tab-panels>
     </div>
