@@ -1851,7 +1851,7 @@ pub struct Pipeline {
     #[env_config(
         name = "ZO_PIPELINE_STORE_ORIGINAL_DATA",
         default = false,
-        help = "pipeline exporter client max connections"
+        help = "default store_original_data behavior when stream create using pipeline"
     )]
     pub store_original_data: bool,
 }
