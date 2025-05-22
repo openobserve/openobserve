@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @popup-hide="onPopupHide"
       @update:model-value="onUpdateValue"
       ref="selectRef"
-      >
+    >
       <!-- transition-show="scale"
       transition-hide="scale" -->
       <template v-slot:no-option>
@@ -205,6 +205,24 @@ export default defineComponent({
         }
       },
       { deep: true },
+    );
+
+    // Add watch for modelValue changes
+    watch(
+      () => props.modelValue,
+      (newVal) => {
+        selectedValue.value = newVal;
+      },
+      { immediate: true },
+    );
+
+    // Add watch for variableItem value changes
+    watch(
+      () => props.variableItem.value,
+      (newVal) => {
+        selectedValue.value = newVal;
+      },
+      { immediate: true },
     );
 
     return {
