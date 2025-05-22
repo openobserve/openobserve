@@ -80,6 +80,8 @@ async fn upgrade_resource_names() -> Result<(), anyhow::Error> {
 }
 
 pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
+    // we init client here to avoid deadlocks
+    ORM_CLIENT.get_or_init(connect_to_orm).await;
     let db_schema_version = match infra::get_db_schema_version().await {
         Ok(v) => v,
         Err(e) => {
@@ -101,7 +103,6 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
 
     infra::db_init().await?;
     // we initialize both clients here to avoid potential deadlock afterwards
-    ORM_CLIENT.get_or_init(connect_to_orm).await;
     ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     // check version upgrade
     let old_version = version::get().await.unwrap_or("v0.0.0".to_string());
