@@ -158,6 +158,10 @@ export default class LogsVisualise {
   async chartRender(x,y) {
     await this.page
       .locator('[data-test="chart-renderer"] canvas')
+      .first()
+      .waitFor({ state: "enabled" });
+    await this.page
+      .locator('[data-test="chart-renderer"] canvas')
       .last()
       .click({
         position: {
