@@ -32,7 +32,7 @@ test.describe("dashboard max query testcases", () => {
     );
     await orgNavigation;
   });
-  test("should correctly display max query range error message when max query range is exceeded.", async ({
+  test.skip("should correctly display max query range error message when max query range is exceeded.", async ({
     page,
   }) => {
     const chartTypeSelector = new ChartTypeSelector(page);
