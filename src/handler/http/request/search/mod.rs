@@ -709,7 +709,6 @@ pub async fn build_search_request_per_field(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(config::meta::search::Request, StreamType), Error> {
-) -> Result<(config::meta::search::Request, StreamType), Error> {
     let query_fn = req
         .vrl_fn
         .as_ref()
@@ -763,11 +762,8 @@ pub async fn build_search_request_per_field(
     };
 
     let top_k = req.size.unwrap_or(get_config().limit.query_default_limit);
-    let top_k = req.size.unwrap_or(get_config().limit.query_default_limit);
 
     let mut query = config::meta::search::Query {
-        sql: base64::decode_url(&req.sql).unwrap_or_default(), /* Will be populated per field in
-                                                                * the loop below */
         sql: base64::decode_url(&req.sql).unwrap_or_default(), /* Will be populated per field in
                                                                 * the loop below */
         from: 0,
@@ -781,11 +777,9 @@ pub async fn build_search_request_per_field(
     let (sql_where, can_use_distinct_stream) = match req.filter.as_ref() {
         None => {
             if !req.sql.is_empty() {
-            if !req.sql.is_empty() {
                 query.uses_zo_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
-                    .any(|fn_name| query.sql.contains(&format!("{}(", fn_name)));
                     .any(|fn_name| query.sql.contains(&format!("{}(", fn_name)));
 
                 let Ok(sql) = crate::service::search::sql::Sql::new(
@@ -807,14 +801,6 @@ pub async fn build_search_request_per_field(
                         Err(e) => {
                             return Err(Error::other(e));
                         }
-                    }
-                } else {
-                    // we don't need to pick up where clause from sql for complex queries
-                    // this is the business logic for complex queries, since its hard to parse
-                    // the where clause from the sql and make a filter out of it
-                    "".to_string()
-                };
-
                     }
                 } else {
                     // we don't need to pick up where clause from sql for complex queries
@@ -858,7 +844,6 @@ pub async fn build_search_request_per_field(
                     stream_name,
                     stream_type,
                     &field,
-                    &field,
                     &query,
                     start_time,
                 )
@@ -871,7 +856,6 @@ pub async fn build_search_request_per_field(
 
     let timeout = req.timeout.unwrap_or(0);
 
-    let mut req = config::meta::search::Request {
     let mut req = config::meta::search::Request {
         query,
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -902,7 +886,6 @@ pub async fn build_search_request_per_field(
         stream_type
     };
 
-    let sql = if no_count {
     let sql = if no_count {
             // we use min(0) as a hack to do streaming aggregation but actually return 0,
             // essentially we are not counting the values
@@ -1157,7 +1140,7 @@ async fn values_v1(
         Err(err) => {
             http_report_metrics(start, org_id, stream_type, "500", "_values/v1", "", "");
             log::error!("search values error: {:?}", err);
-            return Ok(error_utils::map_error_to_http_response(&err, trace_id));
+            return Ok(error_utils::map_error_to_http_response(&err, Some(trace_id)));
         }
     };
 

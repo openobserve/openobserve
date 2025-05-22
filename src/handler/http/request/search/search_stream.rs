@@ -555,14 +555,12 @@ pub async fn values_http2_stream(
             return http_response;
         }
     };
-    let no_count = values_req.no_count;
-    let top_k = values_req.size;
 
     // Get use_cache from query params
     values_req.use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
 
     // Build search requests per field and use only the first one
-    let reqs = match build_search_request_per_field(
+    let (req, stream_type) = match build_search_request_per_field(
         &values_req,
         &org_id,
         stream_type,
@@ -594,27 +592,6 @@ pub async fn values_http2_stream(
             return http_response;
         }
     };
-    if reqs.is_empty() {
-        let http_response = MetaHttpResponse::bad_request("No valid fields to process");
-        // Add audit before closing
-        #[cfg(feature = "enterprise")]
-        {
-            report_to_audit(
-                user_id,
-                org_id,
-                trace_id,
-                http_response.status().into(),
-                Some("No valid fields to process".to_string()),
-                &in_req,
-                body_bytes.clone(),
-            )
-            .await;
-        }
-        return http_response;
-    }
-
-    // Take only the first request
-    let (req, stream_type, field_name) = reqs.into_iter().next().unwrap();
 
     // Get stream name directly from the values request
     let stream_names = vec![values_req.stream_name.clone()];
@@ -654,9 +631,7 @@ pub async fn values_http2_stream(
         mpsc::channel::<Result<config::meta::search::StreamResponses, infra::errors::Error>>(100);
 
     let values_event_context = ValuesEventContext {
-        field: field_name,
-        top_k,
-        no_count,
+        field: values_req.field,
     };
 
     #[cfg(feature = "enterprise")]
