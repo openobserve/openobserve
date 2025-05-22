@@ -81,7 +81,7 @@ export default class ChartTypeSelector {
 
     // Now locate the button within that field item
     const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
-    await button.waitFor({ state: "enabled" });
+    // await button.waitFor({ state: "enabled" });
 
     // Click the button
     await button.click();
