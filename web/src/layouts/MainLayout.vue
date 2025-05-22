@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  
   <q-layout
     view="hHh Lpr lff"
     :class="[store.state.printMode === true ? 'printMode' : '']"
@@ -100,8 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="router.replace('/billings/plans')"
             >Upgrade to PRO Plan</q-btn
           >
-        </div>
-                <!-- Add O2 AI Button -->
+        </div>   
             <q-btn
             :ripple="false"
             @click="toggleAIChat"
@@ -112,9 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             class="o2-button"
         >
-          <div class="row items-center no-wrap tw-gap-2">
+          <div class="row items-center no-wrap tw-gap-2 q-px-sm">
             <img src="../assets/images/common/ai_icon.svg" class="header-icon" />
-            <span>Ask O2</span>
           </div>
         </q-btn>
         <div
@@ -396,6 +395,7 @@ class="padding-none" />
         
       </q-toolbar>
     </q-header>
+    
 
     <q-drawer
       v-model="drawer"
@@ -419,6 +419,7 @@ class="padding-none" />
     <div
       class="col"
       v-show="isLoading"
+      :style="{ width: store.state.isAiChatEnabled ? '75%' : '100%' }"
       :key="store.state.selectedOrganization?.identifier"
     >
       <q-page-container>
@@ -436,13 +437,14 @@ class="padding-none" />
     </div>
 
     <!-- Right Panel (AI Chat) -->
+
     <div
       class="col-auto"
-      v-show="isAIChatOpen"
+      v-show="store.state.isAiChatEnabled"
       style="width: 25%; max-width: 100%; min-width: 75px;  "
       :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
-      <O2AIChat :is-open="isAIChatOpen" @close="toggleAIChat" />
+      <O2AIChat :is-open="store.state.isAiChatEnabled" @close="toggleAIChat" />
     </div>
   </div>
   </q-layout>
@@ -1227,11 +1229,9 @@ export default defineComponent({
       window.open(slackURL, "_blank");
     };
 
-    const isAIChatOpen = ref(false);
-
     const toggleAIChat = () => {
-      isAIChatOpen.value = !isAIChatOpen.value;
-      splitterModel.value = isAIChatOpen.value ? 75 : 100;
+      const isEnabled = !store.state.isAiChatEnabled;
+      store.dispatch("setIsAiChatEnabled", isEnabled);
     };
 
     return {
@@ -1261,7 +1261,6 @@ export default defineComponent({
       openSlack,
       outlinedSettings,
       closeSocket,
-      isAIChatOpen,
       splitterModel,
       toggleAIChat,
     };
