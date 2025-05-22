@@ -1194,7 +1194,7 @@ pub struct Limit {
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
     pub file_download_priority_queue_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
-    pub file_download_priority_queue_window_secs: u64,
+    pub file_download_priority_queue_window_secs: i64,
     #[env_config(name = "ZO_FILE_DOWNLOAD_ENABLE_PRIORITY_QUEUE", default = true)]
     pub file_download_enable_priority_queue: bool,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
@@ -1532,7 +1532,7 @@ pub struct CacheLatestFiles {
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
     pub download_from_node: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_NODE_SIZE", default = 100)] // MB
-    pub download_node_size: usize,
+    pub download_node_size: i64,
 }
 
 #[derive(EnvConfig)]

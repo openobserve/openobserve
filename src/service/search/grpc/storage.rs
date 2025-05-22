@@ -48,22 +48,19 @@ use tantivy::Directory;
 use tokio::sync::Semaphore;
 use tracing::Instrument;
 
-use crate::{
-    job::{self, should_prioritize_file},
-    service::{
-        db, file_list,
-        search::{
-            datafusion::exec,
-            generate_search_schema_diff,
-            index::IndexCondition,
-            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-            tantivy::puffin_directory::{
-                caching_directory::CachingDirectory,
-                convert_puffin_file_to_tantivy_dir,
-                footer_cache::FooterCache,
-                reader::{PuffinDirReader, warm_up_terms},
-                reader_cache,
-            },
+use crate::service::{
+    db, file_list,
+    search::{
+        datafusion::exec,
+        generate_search_schema_diff,
+        index::IndexCondition,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        tantivy::puffin_directory::{
+            caching_directory::CachingDirectory,
+            convert_puffin_file_to_tantivy_dir,
+            footer_cache::FooterCache,
+            reader::{PuffinDirReader, warm_up_terms},
+            reader_cache,
         },
     },
 };
@@ -260,14 +257,7 @@ pub async fn search(
         &query.trace_id,
         &files
             .iter()
-            .map(|f| {
-                (
-                    &f.account,
-                    &f.key,
-                    f.meta.compressed_size,
-                    should_prioritize_file(&f.meta),
-                )
-            })
+            .map(|f| (&f.account, &f.key, f.meta.compressed_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "parquet",
@@ -414,14 +404,14 @@ pub async fn search(
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 pub async fn cache_files(
     trace_id: &str,
-    files: &[(&String, &String, i64, bool)],
+    files: &[(&String, &String, i64, i64)],
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> Result<(file_data::CacheType, u64, u64), Error> {
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
-    for (_account, file, _size, _to_priority_queue) in files.iter() {
+    for (_account, file, _size, _ts) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
@@ -461,26 +451,27 @@ pub async fn cache_files(
     let trace_id = trace_id.to_string();
     let files = files
         .iter()
-        .filter_map(|(account, file, size, to_priority_queue)| {
+        .filter_map(|(account, file, size, ts)| {
             if cached_files.contains(&file) {
                 None
             } else {
-                Some((
-                    account.to_string(),
-                    file.to_string(),
-                    *size,
-                    *to_priority_queue,
-                ))
+                Some((account.to_string(), file.to_string(), *size, *ts))
             }
         })
         .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
         let files_num = files.len();
-        for (account, file, size, to_priority_queue) in files {
-            if let Err(e) =
-                job::queue_download(account, file.clone(), size, cache_type, to_priority_queue)
-                    .await
+        for (account, file, size, ts) in files {
+            if let Err(e) = crate::job::queue_download(
+                trace_id.clone(),
+                account,
+                file.clone(),
+                size,
+                ts,
+                cache_type,
+            )
+            .await
             {
                 log::error!(
                     "[trace_id {trace_id}] error in queuing file {file} for background download: {e}"
@@ -543,14 +534,7 @@ pub async fn filter_file_list_by_tantivy_index(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, f)| {
-                (
-                    &f.account,
-                    ttv_file,
-                    f.meta.index_size,
-                    should_prioritize_file(&f.meta),
-                )
-            })
+            .map(|(ttv_file, f)| (&f.account, ttv_file, f.meta.index_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "index",
