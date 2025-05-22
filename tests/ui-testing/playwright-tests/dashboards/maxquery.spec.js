@@ -19,7 +19,7 @@ const randomDashboardName =
 
 test.describe.configure({ mode: "parallel" });
 
-test.describe("dashboard multi y axis testcases", () => {
+test.describe("dashboard max query testcases", () => {
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
     await login(page);
@@ -156,7 +156,8 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await expect(
       page.locator('[data-test="dashboard-panel-max-duration-warning"]')
-    ).not.toBeVisible({ timeout: 10000 });
+    ).not.toBeVisible();
+    ({ timeout: 10000 });
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
 
