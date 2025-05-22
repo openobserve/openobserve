@@ -20,15 +20,15 @@ use actix_web::{
     cookie::{Cookie, SameSite},
     get, head,
     http::header,
-    put, web,
+    post, put, web,
 };
 use arrow_schema::Schema;
 use config::{
-    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
-    cluster::LOCAL_NODE,
-    get_config, get_instance_id,
-    meta::{cluster::NodeStatus, function::ZoFunction},
-    utils::{json, schema_ext::SchemaExt},
+    cluster::LOCAL_NODE, get_config, get_instance_id, meta::{
+        cluster::{NodeStatus, Role, RoleGroup},
+        function::ZoFunction,
+        search::{HashFileRequest, HashFileResponse},
+    }, utils::{json, schema_ext::SchemaExt}, Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME
 };
 use hashbrown::HashMap;
 use infra::{
@@ -817,4 +817,34 @@ async fn list_node() -> Result<HttpResponse, Error> {
 async fn node_metrics() -> Result<HttpResponse, Error> {
     let metrics = config::utils::sysinfo::get_node_metrics();
     Ok(MetaHttpResponse::json(metrics))
+}
+
+#[post("/consistent_hash")]
+async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpResponse, Error> {
+    let mut ret = HashFileResponse::default();
+    for file in body.files.iter() {
+        let mut nodes = HashMap::new();
+        nodes.insert(
+            "querier_interactive".to_string(),
+            cluster::get_node_from_consistent_hash(
+                file,
+                &Role::Querier,
+                Some(RoleGroup::Interactive),
+            )
+            .await
+            .unwrap_or_default(),
+        );
+        nodes.insert(
+            "querier_background".to_string(),
+            cluster::get_node_from_consistent_hash(
+                file,
+                &Role::Querier,
+                Some(RoleGroup::Background),
+            )
+            .await
+            .unwrap_or_default(),
+        );
+        ret.files.insert(file.clone(), nodes);
+    }
+    Ok(MetaHttpResponse::json(ret))
 }
