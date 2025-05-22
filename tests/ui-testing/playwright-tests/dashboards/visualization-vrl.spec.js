@@ -1,7 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
-import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
 import logsdata from "../../../test-data/logs_data.json";
 
 import logData from "../../cypress/fixtures/log.json";
