@@ -122,10 +122,6 @@ test.describe("dashboard UI testcases", () => {
     await dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
 
-
-
-    // await dashboardCreate.searchDashboard(randomDashboardName);
-    // await dashboardCreate.deleteDashboard(randomDashboardName);
   });
 
   test("should update the data when changing the time between both absolute and relative time using the Kolkata time zone.", async ({
