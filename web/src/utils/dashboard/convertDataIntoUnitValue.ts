@@ -631,27 +631,27 @@ const validateChartFieldsConfiguration = (
   // need to validate all the fields based on the selected aggregation function
   // get all the fields that are not derived and type is build
   const aggregationFunctionError = [
-    ...fields?.y,
-    ...fields?.x,
-    ...fields?.breakdown,
-    ...fields?.z,
-    fields?.source,
-    fields?.target,
-    fields?.value,
-    fields?.name,
-    fields?.value_for_maps,
-    fields?.latitude,
-    fields?.longitude,
-  ].filter((it: any) => it && !it.isDerived && it.type == "build");
+    ...(fields?.y ?? []),
+    ...(fields?.x ?? []),
+    ...(fields?.breakdown ?? []),
+    ...(fields?.z ?? []),
+    fields?.source ?? null,
+    fields?.target ?? null,
+    fields?.value ?? null,
+    fields?.name ?? null,
+    fields?.value_for_maps ?? null,
+    fields?.latitude ?? null,
+    fields?.longitude ?? null,
+  ]?.filter((it: any) => it && !it?.isDerived && it?.type == "build");
 
-  if (aggregationFunctionError.length) {
+  if (aggregationFunctionError?.length) {
     //  loop on each fields config
     // compare with function validation schema
     // if validation fails, push error
-    aggregationFunctionError.forEach((it: any) => {
+    aggregationFunctionError?.forEach((it: any) => {
       // get the selected function schema
-      const selectedFunction: any = functionValidation.find(
-        (fn: any) => fn.functionName === it.functionName,
+      const selectedFunction: any = functionValidation?.find(
+        (fn: any) => fn?.functionName === it?.functionName,
       );
 
       // if function is not found, push error
