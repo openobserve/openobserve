@@ -25,7 +25,7 @@ use config::{
 };
 use futures_util::StreamExt;
 use hashbrown::{HashMap, HashSet};
-use infra::cache::file_data::disk;
+use infra::cache::file_data::{CacheType, TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
 use opentelemetry::global;
 use proto::cluster_rpc::{
     EmptyResponse, FileContent, FileContentResponse, FileList, SimpleFileList,
@@ -78,7 +78,8 @@ impl Event for Eventer {
                     files_to_download.push((
                         item.account.clone(),
                         item.key.clone(),
-                        item.meta.compressed_size as usize,
+                        item.meta.compressed_size,
+                        item.meta.max_ts,
                     ));
                 }
 
@@ -89,7 +90,8 @@ impl Event for Eventer {
                         files_to_download.push((
                             item.account.clone(),
                             ttv_file,
-                            item.meta.index_size as usize,
+                            item.meta.index_size,
+                            item.meta.max_ts,
                         ));
                     }
                 }
@@ -111,17 +113,33 @@ impl Event for Eventer {
                 }
 
                 // Fallback to individual downloads for failed files
-                for (account, file, size) in failed_files {
-                    let size = if size > 0 { Some(size) } else { None };
-                    if let Err(e) = infra::cache::file_data::download(&account, &file, size).await {
+                for (account, file, size, ts) in failed_files {
+                    if let Err(e) = crate::job::queue_download(
+                        TRACE_ID_FOR_CACHE_LATEST_FILE.to_string(),
+                        account,
+                        file,
+                        size,
+                        ts,
+                        CacheType::Disk,
+                    )
+                    .await
+                    {
                         log::error!("[gRPC:Event] Failed to cache file data: {}", e);
                     }
                 }
             } else {
                 // Direct download when download_from_node_enabled is false
-                for (account, file, size) in files_to_download {
-                    let size = if size > 0 { Some(size) } else { None };
-                    if let Err(e) = infra::cache::file_data::download(&account, &file, size).await {
+                for (account, file, size, ts) in files_to_download {
+                    if let Err(e) = crate::job::queue_download(
+                        TRACE_ID_FOR_CACHE_LATEST_FILE.to_string(),
+                        account,
+                        file,
+                        size,
+                        ts,
+                        CacheType::Disk,
+                    )
+                    .await
+                    {
                         log::error!("[gRPC:Event] Failed to cache file data: {}", e);
                     }
                 }
@@ -249,8 +267,8 @@ async fn handle_file_chunked(
 
 async fn download_from_node(
     addr: &str,
-    files: &[(String, String, usize)],
-) -> Result<Vec<(String, String, usize)>> {
+    files: &[(String, String, i64, i64)],
+) -> Result<Vec<(String, String, i64, i64)>> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     log::debug!(
@@ -270,22 +288,22 @@ async fn download_from_node(
 
     let file_size_map = files
         .iter()
-        .filter_map(|(_, f, s)| {
+        .filter_map(|(_, f, s, _)| {
             if *s > cfg.cache_latest_files.download_node_size * 1024 * 1024 {
                 None
             } else {
-                Some((f, *s))
+                Some((f, *s as usize))
             }
         })
         .collect::<HashMap<_, _>>();
     if file_size_map.is_empty() {
         return Ok(files
             .iter()
-            .map(|(a, f, s)| (a.clone(), f.clone(), *s))
+            .map(|(a, f, s, ts)| (a.clone(), f.clone(), *s, *ts))
             .collect());
     }
     let request = Request::new(SimpleFileList {
-        files: files.iter().map(|(_, f, _)| f.to_string()).collect(),
+        files: files.iter().map(|(_, f, ..)| f.to_string()).collect(),
     });
 
     let resp = client
@@ -358,7 +376,7 @@ async fn download_from_node(
     // Return list of failed files
     let failed_files: Vec<_> = files
         .iter()
-        .filter(|(_, f, _)| !downloaded_files.contains(f))
+        .filter(|(_, f, ..)| !downloaded_files.contains(f))
         .cloned()
         .collect();
 

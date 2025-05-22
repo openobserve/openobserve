@@ -29,6 +29,7 @@ use hashlink::lru_cache::LruCache;
 
 const DOWNLOAD_RETRY_TIMES: usize = 3;
 const INITIAL_CACHE_SIZE: usize = 128;
+pub const TRACE_ID_FOR_CACHE_LATEST_FILE: &str = "cache_latest_file";
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CacheType {

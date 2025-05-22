@@ -43,7 +43,7 @@ mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
 
-pub use file_downloader::{queue_download, should_prioritize_file};
+pub use file_downloader::queue_download;
 pub use file_list_dump::FILE_LIST_SCHEMA;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
