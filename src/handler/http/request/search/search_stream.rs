@@ -52,8 +52,8 @@ use crate::{
 };
 #[cfg(feature = "enterprise")]
 use crate::{
-    handler::http::request::search::utils::check_stream_permissions, service::self_reporting::audit,
-    service::search::search_stream::AuditContext,
+    handler::http::request::search::utils::check_stream_permissions,
+    service::search::search_stream::AuditContext, service::self_reporting::audit,
 };
 /// Search HTTP2 streaming endpoint
 ///
@@ -109,6 +109,9 @@ pub async fn search_http2_stream(
         org_id
     );
 
+    #[cfg(feature = "enterprise")]
+    let body_bytes = String::from_utf8_lossy(&body).to_string();
+
     // Get query params
     let Ok(query) = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()) else {
         #[cfg(feature = "enterprise")]
@@ -128,18 +131,13 @@ pub async fn search_http2_stream(
     };
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-    #[cfg(feature = "enterprise")]
-    let body_bytes = String::from_utf8_lossy(&body).to_string();
-
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => {
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
-            
             let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
-            
             // Add audit before closing
             #[cfg(feature = "enterprise")]
             {
@@ -161,9 +159,9 @@ pub async fn search_http2_stream(
     if let Err(e) = req.decode() {
         #[cfg(feature = "enterprise")]
         let error_message = e.to_string();
-        
+
         let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
-        
+
         // Add audit before closing
         #[cfg(feature = "enterprise")]
         {
@@ -192,9 +190,9 @@ pub async fn search_http2_stream(
             Err(e) => {
                 #[cfg(feature = "enterprise")]
                 let error_message = e.to_string();
-                
+
                 let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
-                
+
                 // Add audit before closing
                 #[cfg(feature = "enterprise")]
                 {
@@ -230,9 +228,9 @@ pub async fn search_http2_stream(
         Err(e) => {
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
-            
+
             let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
-            
+
             // Add audit before closing
             #[cfg(feature = "enterprise")]
             {
@@ -287,12 +285,12 @@ pub async fn search_http2_stream(
         Ok(v) => v,
         Err(e) => {
             log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
-            
+
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
-            
+
             let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
-            
+
             // Add audit before closing
             #[cfg(feature = "enterprise")]
             {
@@ -535,9 +533,9 @@ pub async fn values_http2_stream(
         Err(e) => {
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
-            
+
             let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
-            
+
             // Add audit before closing
             #[cfg(feature = "enterprise")]
             {
@@ -572,9 +570,9 @@ pub async fn values_http2_stream(
         Err(e) => {
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
-            
+
             let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
-            
+
             // Add audit before closing
             #[cfg(feature = "enterprise")]
             {
