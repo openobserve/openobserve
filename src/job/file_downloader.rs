@@ -25,6 +25,28 @@ use tokio::sync::{
 
 type FileInfo = (String, String, usize, file_data::CacheType);
 
+mod processing_files {
+    use hashbrown::HashSet;
+    use parking_lot::RwLock;
+
+    use super::*;
+
+    static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> =
+        Lazy::new(|| RwLock::new(HashSet::new()));
+
+    pub fn is_processing(file_name: &str) -> bool {
+        PROCESSING_FILES.read().contains(file_name)
+    }
+
+    pub fn add(file_name: &str) {
+        PROCESSING_FILES.write().insert(file_name.to_string());
+    }
+
+    pub fn remove(file_name: &str) {
+        PROCESSING_FILES.write().remove(file_name);
+    }
+}
+
 struct DownloadQueue {
     sender: Sender<FileInfo>,
     receiver: Arc<Mutex<Receiver<FileInfo>>>,
@@ -86,6 +108,19 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((trace_id, file, file_size, cache)) => {
+                        // check if the file is already being downloaded
+                        if processing_files::is_processing(&file) {
+                            log::warn!(
+                                "[trace_id {trace_id}] [thread {thread}] search->storage: file {} is already being downloaded, will skip it",
+                                file
+                            );
+                            continue;
+                        }
+
+                        // add the file to processing set
+                        processing_files::add(&file);
+
+                        // download the file
                         match download_file(thread, &trace_id, &file, file_size, cache).await {
                             Ok(data_len) => {
                                 if data_len > 0 && data_len != file_size {
@@ -106,6 +141,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 );
                             }
                         }
+
+                        // remove the file from processing set
+                        processing_files::remove(&file);
 
                         // update metrics
                         metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
@@ -161,6 +199,19 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
                         match file_info {
                             Some((trace_id, file, file_size, cache)) => {
+                                 // check if the file is already being downloaded
+                                if processing_files::is_processing(&file) {
+                                    log::warn!(
+                                        "[trace_id {trace_id}] [thread {thread}] search->storage: file {} is already being downloaded, will skip it",
+                                        file
+                                    );
+                                    return;
+                                }
+
+                                // add the file to processing set
+                                processing_files::add(&file);
+
+                                // download the file
                                 match download_file(thread, &trace_id, &file, file_size, cache).await {
                                     Ok(data_len) => {
                                         if data_len > 0 && data_len != file_size {
@@ -183,6 +234,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                         );
                                     }
                                 }
+
+                                // remove the file from processing set
+                                processing_files::remove(&file);
 
                                 // update metrics
                                 metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
