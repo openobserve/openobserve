@@ -16,11 +16,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
     .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click();
+  await page.locator("div.q-item").getByText(`${stream}`).first().click();
 };
 
 test.describe("logs testcases", () => {
@@ -69,14 +65,14 @@ test.describe("logs testcases", () => {
     await logsVisualise.applyQueryButtonVisualise();
 
     // await page
-      // .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      // .click();
+    // .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    // .click();
 
     const breakdownFieldLocator = page.locator(
       '[data-test="field-list-item-logs-e2e_automate-vrl12"] [data-test="dashboard-add-b-data"]'
     );
-    await breakdownFieldLocator.waitFor({ state: "visible", timeout: 5000 });
-    await breakdownFieldLocator.waitFor({ state: "attached", timeout: 5000 });
+    await breakdownFieldLocator.waitFor({ state: "visible" });
+    await breakdownFieldLocator.waitFor({ state: "attached" });
     await breakdownFieldLocator.click();
 
     await logsVisualise.applyQueryButtonVisualise();
@@ -94,7 +90,6 @@ test.describe("logs testcases", () => {
     await logsVisualise.setRelative("6", "d");
     await logsVisualise.logsApplyQueryButton();
     await logsVisualise.openVisualiseTab();
-   
 
     await page
       .locator(
@@ -115,7 +110,13 @@ test.describe("logs testcases", () => {
     // await page
     //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
     //   .click();
+    await logsVisualise.applyQueryButtonVisualise();
 
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
+      )
+      .waitFor({ state: "visible" });
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
@@ -124,7 +125,7 @@ test.describe("logs testcases", () => {
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.showQueryToggle();
     await logsVisualise.applyQueryButtonVisualise();
-    await page.waitForTimeout(500); 
+    await page.waitForTimeout(500);
     await logsVisualise.applyQueryButtonVisualise();
     await page.locator('[data-test="dashboard-y-item-vrl-remove"]').click();
     await logsVisualise.applyQueryButtonVisualise();
@@ -147,6 +148,11 @@ test.describe("logs testcases", () => {
       .fill(".VRL=1000");
 
     await logsVisualise.applyQueryButtonVisualise();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
+      )
+      .waitFor({ state: "visible" });
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
@@ -271,8 +277,15 @@ test.describe("logs testcases", () => {
       .waitFor({ state: "visible" });
 
     await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
+      .locator("#fnEditor")
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(".vrl=100");
+    await logsVisualise.applyQueryButtonVisualise();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
+      )
+      .waitFor({ state: "visible" });
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
@@ -303,6 +316,11 @@ test.describe("logs testcases", () => {
 
     await logsVisualise.applyQueryButtonVisualise();
 
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-b-data"]'
+      )
+      .waitFor({ state: "visible" });
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-b-data"]'
@@ -345,6 +363,11 @@ test.describe("logs testcases", () => {
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
       )
+      .waitFor({ state: "visible" });
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
+      )
       .click();
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.setRelative("4", "w");
@@ -356,9 +379,7 @@ test.describe("logs testcases", () => {
     const logsVisualise = new LogsVisualise(page);
     await logsVisualise.setRelative("6", "d");
     await logsVisualise.logsApplyQueryButton();
-    // await page.locator('[data-test="date-time-btn"]').click();
-    // await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
     await logsVisualise.openVisualiseTab();
     // await page.locator('[data-test="logs-visualize-toggle"]').click();
 
@@ -386,58 +407,21 @@ test.describe("logs testcases", () => {
       .locator(".cm-content")
       .fill(".VRLsanity=1000");
     await page.waitForTimeout(3000);
-      page,
-    }) => {
-      const logsVisualise = new LogsVisualise(page);
-      await logsVisualise.setRelative("6", "d");
-      await logsVisualise.logsApplyQueryButton();
-      
-      await logsVisualise.openVisualiseTab();
-      // await page.locator('[data-test="logs-visualize-toggle"]').click();
-  
-      // Set up a flag to detect errors
-      let errorDetected = false;
-  
-      // Listen for console messages and check for errors
-      page.on("console", (msg) => {
-        if (msg.type() === "error") {
-          const errorText = msg.text();
-          // Check if the error matches a known pattern (customize regex as needed)
-          if (/Error|Failure|Cannot|Invalid/i.test(errorText)) {
-            errorDetected = true;
-          }
-        }
-      });
-  
-      await page.waitForTimeout(5000);
-      await page
-        .locator('[data-test="logs-vrl-function-editor"]')
-        .first()
-        .click();
-      await page
-        .locator("#fnEditor")
-        .locator('.inputarea')
-        .fill(".VRLsanity=1000");
-      await page.waitForTimeout(3000);
 
     await logsVisualise.applyQueryButtonVisualise();
 
-    // await page
-    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-    //   .waitFor({ state: "visible" });
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
+      )
+      .waitFor({ state: "visible" });
 
-    // await page
-    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-    //   .click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
       )
       .click();
 
-    // await page
-    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-    //   .click();
     await logsVisualise.applyQueryButtonVisualise();
 
     // Change chart types and check for errors each time
