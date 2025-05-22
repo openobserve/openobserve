@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    loading: {{ variableItem.isLoading }} values:
+    <!-- loading: {{ variableItem.isLoading }} values:
     {{ variableItem.value }} isVariableLoadingPending:
     {{ variableItem.isVariableLoadingPending }} options:
-    {{ variableItem.options.map((it) => it.label) }}
+    {{ variableItem.options.map((it) => it.label) }} -->
     <q-select
       style="min-width: 150px"
       filled
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="selectedValue"
       :display-value="displayValue"
       :label="variableItem?.label || variableItem?.name"
-      :options="fieldsFilteredOptions"
+      :options="filteredOptions"
       input-debounce="0"
       emit-value
       option-value="value"
@@ -36,16 +36,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       behavior="menu"
       use-input
       stack-label
-      @filter="fieldsFilterFn"
+      @filter="filterOptions"
       class="textbox col no-case"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
-      @blur="applyChanges"
-      @focus="loadFieldValues"
-    >
+      @popup-show="onPopupShow"
+      @popup-hide="onPopupHide"
+      @update:model-value="onUpdateValue"
+      ref="selectRef"
+      >
+      <!-- transition-show="scale"
+      transition-hide="scale" -->
       <template v-slot:no-option>
         <q-item>
           <q-item-section class="text-italic text-grey">
@@ -54,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </template>
       <template
-        v-if="variableItem.multiSelect && fieldsFilteredOptions.length > 0"
+        v-if="variableItem.multiSelect && filteredOptions.length > 0"
         v-slot:before-options
       >
         <q-item>
@@ -64,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="toggleSelectAll"
               dense
               class="q-ma-none"
+              @click.stop
             />
           </q-item-section>
           <q-item-section @click.stop="toggleSelectAll" style="cursor: pointer">
@@ -93,213 +98,126 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, toRef, watch, computed } from "vue";
-import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
+import { defineComponent, ref, watch, computed, nextTick } from "vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
   props: ["modelValue", "variableItem", "loadOptions"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
-    //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
-    console.log("[Dropdown] Initial setup:", {
-      variableName: props.variableItem?.name,
-      initialValue: selectedValue.value,
-      isLoading: props.variableItem?.isLoading,
-      options: props.variableItem?.options,
-    });
+    const filterText = ref("");
+    const selectRef = ref(null);
+    const isOpen = ref(false);
 
-    const options = toRef(props.variableItem, "options");
+    const availableOptions = computed(() => props.variableItem?.options || []);
 
-    // get filtered options
-    const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useSelectAutoComplete(options, "value");
-
-    // set watcher on variable item changes at that time change the option value
-    watch(
-      () => props.variableItem,
-      () => {
-        console.log("[Dropdown] Variable item changed:", {
-          variableName: props.variableItem?.name,
-          newOptions: props.variableItem?.options,
-          isLoading: props.variableItem?.isLoading,
-          value: props.variableItem?.value,
-        });
-        options.value = props.variableItem?.options;
-      },
-    );
-
-    // isAllSelected should be true if all options are selected and false otherwise
-    const isAllSelected = computed(() => {
-      return (
-        fieldsFilteredOptions.value.length > 0 &&
-        selectedValue.value.length === fieldsFilteredOptions.value.length
+    const filteredOptions = computed(() => {
+      if (!filterText.value) return availableOptions.value;
+      const searchText = filterText.value.toLowerCase();
+      return availableOptions.value.filter((opt) =>
+        opt.label.toLowerCase().includes(searchText),
       );
     });
 
-    // Function to toggle select/deselect all options
+    const filterOptions = (val: string, update: Function) => {
+      filterText.value = val;
+      update();
+    };
+
+    const isAllSelected = computed(() => {
+      return (
+        filteredOptions.value.length > 0 &&
+        selectedValue.value?.length === filteredOptions.value.length
+      );
+    });
+
     const toggleSelectAll = () => {
-      console.log("[Dropdown] Toggle select all:", {
-        variableName: props.variableItem?.name,
-        currentIsAllSelected: isAllSelected.value,
-        currentValue: selectedValue.value,
-      });
       if (!isAllSelected.value) {
-        selectedValue.value = fieldsFilteredOptions.value.map(
-          (option: any) => option.value,
+        selectedValue.value = filteredOptions.value.map(
+          (option) => option.value,
         );
       } else {
         selectedValue.value = [];
       }
-    };
-
-    const applyChanges = () => {
-      console.log("[Dropdown] Applying changes:", {
-        variableName: props.variableItem?.name,
-        multiSelect: props.variableItem.multiSelect,
-        value: selectedValue.value,
-      });
-      if (props.variableItem.multiSelect) {
-        emitSelectedValues();
-      }
-    };
-
-    // update selected value
-    watch(selectedValue, () => {
-      console.log("[Dropdown] Selected value changed:", {
-        variableName: props.variableItem?.name,
-        newValue: selectedValue.value,
-        multiSelect: props.variableItem.multiSelect,
-      });
-      if (!props.variableItem.multiSelect) {
-        emitSelectedValues();
-      }
-    });
-
-    const emitSelectedValues = () => {
-      console.log("[Dropdown] Emitting selected values:", {
-        variableName: props.variableItem?.name,
-        value: selectedValue.value,
-      });
       emit("update:modelValue", selectedValue.value);
     };
 
-    // Display the selected value
+    const onUpdateValue = (val: any) => {
+      selectedValue.value = val;
+      if (!props.variableItem.multiSelect) {
+        emit("update:modelValue", val);
+      }
+    };
+
+    const onPopupShow = () => {
+      isOpen.value = true;
+      if (props.loadOptions) {
+        props.loadOptions(props.variableItem);
+      }
+    };
+
+    const onPopupHide = () => {
+      isOpen.value = false;
+      if (props.variableItem.multiSelect) {
+        emit("update:modelValue", selectedValue.value);
+      }
+    };
+
     const displayValue = computed(() => {
-      console.log("[Dropdown] Calculating display value", {
-        variableName: props.variableItem?.name,
-        selectedValue: selectedValue.value,
-        multiSelect: props.variableItem.multiSelect,
-      });
-      if (selectedValue.value || selectedValue.value == "") {
+      if (selectedValue.value || selectedValue.value === "") {
         if (Array.isArray(selectedValue.value)) {
           if (selectedValue.value.length > 2) {
-            console.log("[Dropdown] Display value: using ellipsis", {
-              variableName: props.variableItem?.name,
-              selectedValue: selectedValue.value,
-              multiSelect: props.variableItem.multiSelect,
-            });
             const firstTwoValues = selectedValue.value
               .slice(0, 2)
               .map((it: any) => (it === "" ? "<blank>" : it))
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
-          } else if (props.variableItem.options.length == 0) {
-            console.log("[Dropdown] Display value: no data found", {
-              variableName: props.variableItem?.name,
-              selectedValue: selectedValue.value,
-              multiSelect: props.variableItem.multiSelect,
-            });
+          } else if (props.variableItem.options.length === 0) {
             return "(No Data Found)";
           } else {
-            console.log("[Dropdown] Display value: not using ellipsis", {
-              variableName: props.variableItem?.name,
-              selectedValue: selectedValue.value,
-              multiSelect: props.variableItem.multiSelect,
-            });
             return selectedValue.value
               .map((it: any) => (it === "" ? "<blank>" : it))
               .join(", ");
           }
-        } else if (selectedValue.value == "") {
-          console.log("[Dropdown] Display value: blank", {
-            variableName: props.variableItem?.name,
-            selectedValue: selectedValue.value,
-            multiSelect: props.variableItem.multiSelect,
-          });
+        } else if (selectedValue.value === "") {
           return "<blank>";
         } else {
-          console.log("[Dropdown] Display value: single value", {
-            variableName: props.variableItem?.name,
-            selectedValue: selectedValue.value,
-            multiSelect: props.variableItem.multiSelect,
-          });
           return selectedValue.value;
         }
       } else if (!props.variableItem.isLoading) {
-        console.log("[Dropdown] Display value: no data found (not loading)", {
-          variableName: props.variableItem?.name,
-          selectedValue: selectedValue.value,
-          multiSelect: props.variableItem.multiSelect,
-        });
         return "(No Data Found)";
       } else {
-        console.log("[Dropdown] Display value: loading", {
-          variableName: props.variableItem?.name,
-          selectedValue: selectedValue.value,
-          multiSelect: props.variableItem.multiSelect,
-        });
         return "";
       }
     });
-    const loadFieldValues = () => {
-      console.log("[Dropdown] Loading field values:", {
-        variableName: props.variableItem?.name,
-        isLoading: props.variableItem.isLoading,
-        hasLoadOptions: props.loadOptions,
-        currentOptions: props.variableItem?.options,
-        hasExistingValue: !!selectedValue.value,
-        optionsLength: options.value?.length,
-      });
 
-      if (props.variableItem.isLoading || !props.loadOptions) {
-        return;
-      }
-      loadVariableTemp();
-    };
-    const loadVariableTemp = () => {
-      console.log("[Dropdown] Loading variable temp:", {
-        variableName: props.variableItem?.name,
-        currentOptions: props.variableItem.options,
-        currentValue: selectedValue.value,
-        isLoading: props.variableItem.isLoading,
-        hasLoadOptions: props.loadOptions,
-      });
-
-      try {
-        props.loadOptions(props.variableItem);
-        options.value = props.variableItem.options;
-        console.log("[Dropdown] Variable temp loaded:", {
-          variableName: props.variableItem?.name,
-          newOptions: props.variableItem.options,
-          newValue: selectedValue.value,
-        });
-      } catch (error) {
-        console.error("[Dropdown] Error loading variable temp:", error);
-      }
-    };
+    watch(
+      () => props.variableItem.options,
+      () => {
+        if (isOpen.value && selectRef.value) {
+          nextTick(() => {
+            if (selectRef.value) {
+              (selectRef.value as any).updateInputValue();
+            }
+          });
+        }
+      },
+      { deep: true },
+    );
 
     return {
       selectedValue,
-      fieldsFilterFn,
-      fieldsFilteredOptions,
+      filteredOptions,
+      filterOptions,
       isAllSelected,
       toggleSelectAll,
       displayValue,
-      applyChanges,
-      loadFieldValues,
+      onUpdateValue,
+      onPopupShow,
+      onPopupHide,
+      selectRef,
     };
   },
 });

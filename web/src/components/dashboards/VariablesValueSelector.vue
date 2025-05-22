@@ -21,15 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-for="(item, index) in variablesData.values"
-      :key="
-        item.name +
-        item.value +
-        item.type +
-        item.options?.length +
-        item.isLoading +
-        item.isVariableLoadingPending +
-        index
-      "
+      :key="item.name + index"
       :data-test="`dashboard-variable-${item}-selector`"
     >
       <div v-if="item.type == 'query_values'">
@@ -733,18 +725,30 @@ export default defineComponent({
         skipAPILoad.value = true;
       },
     );
-
     watch(
-      () => variablesData,
+      () =>
+        JSON.stringify({
+          values: variablesData.values.map((v) => ({
+            name: v.name,
+            value: v.value,
+            type: v.type,
+            isLoading: v.isLoading,
+            isVariableLoadingPending: v.isVariableLoadingPending,
+          })),
+        }),
       () => {
         emitVariablesData();
       },
-      { deep: true },
     );
 
     const emitVariablesData = () => {
-      instance?.proxy?.$forceUpdate();
-      emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
+      emit("variablesData", {
+        isVariablesLoading: variablesData.isVariablesLoading,
+        values: variablesData.values.map((v) => ({
+          ...v,
+          options: undefined, // Don't emit options to prevent unnecessary updates
+        })),
+      });
     };
 
     // it is used to change/update initial variables values from outside the component
