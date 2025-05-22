@@ -327,6 +327,10 @@ impl StreamingIdCache {
             .insert(k, StreamingIdItem::new(start_time, end_time));
     }
 
+    pub fn exists(&self, k: &str) -> bool {
+        self.data.contains_key(k)
+    }
+
     pub fn check_time(&self, k: &str, start_time: i64, end_time: i64) -> bool {
         match self.data.get_mut(k) {
             Some(mut v) => v.check_time(start_time, end_time),
