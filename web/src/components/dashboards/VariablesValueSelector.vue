@@ -533,10 +533,9 @@ export default defineComponent({
         console.error("Invalid time range");
         return;
       }
-
       // Set loading state before initiating WebSocket
-      // variableObject.isLoading = true;
-      // variableObject.isVariableLoadingPending = true;
+      variableObject.isLoading = true;
+      variableObject.isVariableLoadingPending = true;
       console.log(`[WebSocket] Starting fetch for ${variableObject.name}:`, {
         isLoading: variableObject.isLoading,
         isVariableLoadingPending: variableObject.isVariableLoadingPending,
