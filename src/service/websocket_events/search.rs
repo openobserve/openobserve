@@ -20,7 +20,7 @@ use config::{
     meta::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
-            SearchPartitionResponse, TimeOffset, ValuesEventContext, format_values_search_response,
+            SearchPartitionResponse, TimeOffset, format_values_search_response,
         },
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
@@ -698,8 +698,6 @@ async fn process_delta(
                 accumulated_results.len()
             );
             send_message(req_id, ws_search_res.to_json()).await?;
-
-            
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -1192,4 +1190,3 @@ pub async fn write_results_to_cache(
 
     Ok(())
 }
-

@@ -163,7 +163,9 @@ pub async fn handle_values_request(
                 payload: search_req.clone(),
                 user_id: Some(user_id.to_string()),
                 time_offset: None,
-                values_event_context: Some(ValuesEventContext { field: payload.field }),
+                values_event_context: Some(ValuesEventContext {
+                    field: payload.field,
+                }),
             };
 
             // Step 1(a): handle cache responses & query the deltas
@@ -205,29 +207,31 @@ pub async fn handle_values_request(
                 payload: search_req.clone(),
                 user_id: Some(user_id.to_string()),
                 time_offset: None,
-                values_event_context: Some(ValuesEventContext { field: payload.field }),
+                values_event_context: Some(ValuesEventContext {
+                    field: payload.field,
+                }),
             };
 
-                do_partitioned_search(
-                    request_id,
-                    &mut search_event_req,
-                    &trace_id,
-                    config::meta::sql::MAX_LIMIT,
-                    user_id,
-                    accumulated_results,
-                    max_query_range,
-                    &mut start_timer,
-                    &order_by,
-                )
-                .instrument(ws_values_span.clone())
-                .await?;
-            }
-            // Step 3: Write to results cache
-            // cache only if from is 0 and is not an aggregate_query
-            if search_req.query.from == 0 {
-                // Safely unwrap Option<i64> values with defaults
-                let safe_start_time = start_time.unwrap_or(0);
-                let safe_end_time = end_time.unwrap_or(0);
+            do_partitioned_search(
+                request_id,
+                &mut search_event_req,
+                &trace_id,
+                config::meta::sql::MAX_LIMIT,
+                user_id,
+                accumulated_results,
+                max_query_range,
+                &mut start_timer,
+                &order_by,
+            )
+            .instrument(ws_values_span.clone())
+            .await?;
+        }
+        // Step 3: Write to results cache
+        // cache only if from is 0 and is not an aggregate_query
+        if search_req.query.from == 0 {
+            // Safely unwrap Option<i64> values with defaults
+            let safe_start_time = start_time.unwrap_or(0);
+            let safe_end_time = end_time.unwrap_or(0);
 
             write_results_to_cache(c_resp, safe_start_time, safe_end_time, accumulated_results)
                 .instrument(ws_values_span.clone())
@@ -258,7 +262,9 @@ pub async fn handle_values_request(
             payload: search_req.clone(),
             user_id: Some(user_id.to_string()),
             time_offset: None,
-            values_event_context: Some(ValuesEventContext { field: payload.field }),
+            values_event_context: Some(ValuesEventContext {
+                field: payload.field,
+            }),
         };
 
         do_partitioned_search(

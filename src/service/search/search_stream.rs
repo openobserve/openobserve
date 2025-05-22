@@ -20,6 +20,7 @@ use config::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
             SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
+            format_values_search_response,
         },
         sql::OrderBy,
         stream::StreamType,
@@ -593,6 +594,10 @@ pub async fn do_partitioned_search(
             curr_res_size += total_hits;
         }
 
+        if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+            format_values_search_response(&mut search_res, &values_ctx.clone().unwrap().field);
+        }
+
         if !search_res.hits.is_empty() {
             search_res = order_search_results(search_res, fallback_order_by_col.clone());
 
@@ -622,27 +627,6 @@ pub async fn do_partitioned_search(
                 }
             } else {
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
-            }
-
-            // add top k values for values search
-            if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
-                let search_stream_span = tracing::info_span!(
-                    "src::handler::http::request::search::process_stream::do_partitioned_search::get_top_k_values",
-                    org_id = %org_id,
-                );
-                let instant = Instant::now();
-                let field = values_ctx.as_ref().unwrap().field.clone();
-                let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
-                let no_count = values_ctx.as_ref().unwrap().no_count;
-                let top_k_values = tokio::task::spawn_blocking(move || {
-                    get_top_k_values(&search_res.hits, &field, top_k, no_count)
-                })
-                .instrument(search_stream_span.clone())
-                .await
-                .unwrap();
-                search_res.hits = top_k_values?;
-                let duration = instant.elapsed();
-                log::debug!("Top k values for partition {idx} took {:?}", duration);
             }
 
             // Send the cached response
@@ -1048,6 +1032,10 @@ async fn process_delta(
             trace_id
         );
 
+        if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+            format_values_search_response(&mut search_res, &values_ctx.clone().unwrap().field);
+        }
+
         if !search_res.hits.is_empty() {
             // search_res = order_search_results(search_res, req.fallback_order_by_col.clone());
             // for every partition, compute the queried range omitting the result cache ratio
@@ -1085,25 +1073,6 @@ async fn process_delta(
 
             // `result_cache_ratio` will be 0 for delta search
             let result_cache_ratio = search_res.result_cache_ratio;
-
-            if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
-                let search_stream_span = tracing::info_span!(
-                    "src::handler::http::request::search::process_stream::process_delta::get_top_k_values",
-                    org_id = %org_id,
-                );
-
-                log::debug!("Getting top k values for partition {idx}");
-                let field = values_ctx.as_ref().unwrap().field.clone();
-                let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
-                let no_count = values_ctx.as_ref().unwrap().no_count;
-                let top_k_values = tokio::task::spawn_blocking(move || {
-                    get_top_k_values(&search_res.hits, &field, top_k, no_count)
-                })
-                .instrument(search_stream_span.clone())
-                .await
-                .unwrap();
-                search_res.hits = top_k_values?;
-            }
 
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),

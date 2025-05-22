@@ -886,8 +886,8 @@ pub async fn build_search_request_per_field(
     };
 
     let sql = if no_count {
-            // we use min(0) as a hack to do streaming aggregation but actually return 0,
-            // essentially we are not counting the values
+        // we use min(0) as a hack to do streaming aggregation but actually return 0,
+        // essentially we are not counting the values
         format!(
             "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {top_k}"
         )
@@ -1078,9 +1078,11 @@ async fn values_v1(
     let http_span = http_span.clone();
     // skip values for field which aren't part of the schema
     if schema.field_with_name(&field).is_err() {
-        return Ok(MetaHttpResponse::bad_request("field is not part of the schema"));
+        return Ok(MetaHttpResponse::bad_request(
+            "field is not part of the schema",
+        ));
     }
-    
+
     let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
         format!("{sql_where} AND {field} ILIKE '%{keyword}%'")
     } else if !keyword.is_empty() {
@@ -1114,7 +1116,7 @@ async fn values_v1(
 
     let sql = if no_count {
         format!(
-            "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {top_k}"
+            "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {top_k}"
         )
     } else {
         format!(
@@ -1124,52 +1126,31 @@ async fn values_v1(
     let mut req = req.clone();
     req.query.sql = sql;
 
-        let search_res = SearchService::cache::search(
-            &trace_id,
-            org_id,
-            actual_stream_type,
-            Some(user_id.to_string()),
-            &req,
-            "".to_string(),
-        )
-        .instrument(http_span)
-        .await;
-        let resp_search = match search_res {
-            Ok(res) => res,
-            Err(err) => {
-                http_report_metrics(start, org_id, stream_type, "500", "_values/v1", "", "");
-                log::error!("search values error: {:?}", err);
-                return Ok(error_utils::map_error_to_http_response(
-                    &err,
-                    Some(trace_id),
-                ));
-            }
-        };
-        query_results.push((field.to_string(), resp_search));
-    }
+    let search_res = SearchService::cache::search(
+        &trace_id,
+        org_id,
+        actual_stream_type,
+        Some(user_id.to_string()),
+        &req,
+        "".to_string(),
+    )
+    .instrument(http_span)
+    .await;
+    let mut resp_search = match search_res {
+        Ok(res) => res,
+        Err(err) => {
+            http_report_metrics(start, org_id, stream_type, "500", "_values/v1", "", "");
+            log::error!("search values error: {:?}", err);
+            return Ok(error_utils::map_error_to_http_response(
+                &err,
+                Some(trace_id),
+            ));
+        }
+    };
 
-    let mut final_resp = config::meta::search::Response::default();
-    let mut hit_values: Vec<json::Value> = Vec::new();
-    let mut work_group_set = Vec::with_capacity(query_results.len());
-
-    // Get the size from query parameter for limiting results
-    let size = query
-        .get("size")
-        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
-
-    for (key, mut resp) in query_results {
-        format_values_search_response(&mut resp, &key);
-        final_resp.scan_size = std::cmp::max(final_resp.scan_size, resp.scan_size);
-        final_resp.scan_records = std::cmp::max(final_resp.scan_records, resp.scan_records);
-        final_resp.cached_ratio = std::cmp::max(final_resp.cached_ratio, resp.cached_ratio);
-        final_resp.result_cache_ratio = std::cmp::max(final_resp.result_cache_ratio, resp.result_cache_ratio);
-        work_group_set.push(resp.work_group);
-        hit_values.extend(resp.hits);
-    }
-    final_resp.total = fields.len();
-    final_resp.hits = hit_values;
-    final_resp.size = size;
-    final_resp.took = start.elapsed().as_millis() as usize;
+    let mut work_group_set = Vec::with_capacity(1);
+    format_values_search_response(&mut resp_search, &field);
+    work_group_set.push(resp_search.work_group.clone());
 
     let time = start.elapsed().as_secs_f64();
     http_report_metrics(start, org_id, stream_type, "200", "_values/v1", "", "");
