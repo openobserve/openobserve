@@ -793,7 +793,7 @@ pub static NODE_CONSISTENT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
         Opts::new("node_consistent_hash", "Consistent hash")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["role"],
+        &["type"],
     )
     .expect("Metric created")
 });
