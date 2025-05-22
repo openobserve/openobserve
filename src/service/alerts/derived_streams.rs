@@ -250,7 +250,7 @@ fn get_next_run_at(
     let supposed_next_run_at =
         previous_next_run_at.map_or(Ok(chrono::Utc::now()), |prev_next_run_at| {
             chrono::DateTime::<chrono::Utc>::from_timestamp_micros(prev_next_run_at)
-                .ok_or(anyhow::anyhow!("Invalid previouse next run at timestamp"))
+                .ok_or(anyhow::anyhow!("Invalid previous next run at timestamp"))
         })?;
     Ok(supposed_next_run_at
         .checked_add_signed(delay)
