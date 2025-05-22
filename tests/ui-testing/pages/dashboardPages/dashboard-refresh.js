@@ -23,8 +23,9 @@ export default class DashboardTimeRefresh {
 
   //relative time selection
   async setRelative(date, time) {
+    await this.timeTab.waitFor({ state: "attached" });
     await this.timeTab.click();
-    await this.relativeTime.waitFor({ state: "visible" });
+  
     await this.relativeTime.click();
     await this.page
       .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`).waitFor({
