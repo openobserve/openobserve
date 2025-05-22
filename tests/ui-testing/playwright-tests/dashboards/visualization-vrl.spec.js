@@ -32,12 +32,11 @@ test.describe("logs testcases", () => {
   test("should allow adding a VRL function in the visualization chart", async ({
     page,
   }) => {
-    // await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
-    //   timeout: 5000,
-    // });
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
+      timeout: 5000,
+    });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-4-w-btn"]').click();
-    await page.locator('[data-test="date-time-apply-btn"]').click();
 
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
