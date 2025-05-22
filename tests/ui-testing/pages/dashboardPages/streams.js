@@ -23,6 +23,16 @@ export default class StreamSettingsPage {
     await this.searchInput.fill(streamName);
     await this.page.waitForTimeout(3000);
 
+    // Wait for the expected response
+    await this.page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .includes(
+            "/api/default/streams?type=logs&offset=0&limit=20&keyword=e2e_automate"
+          ) && response.status() === 200
+    );
+
     // Wait for stream details to appear and click
 
     await this.streamDetailButton.waitFor({ state: "visible", timeout: 5000 });
