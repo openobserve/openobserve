@@ -741,7 +741,6 @@ export default defineComponent({
     const { fetchQueryDataWithHttpStream } = useHttpStreaming();
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
-    const openedFilterFields = ref<string[]>([]);
 
     const userDefinedSchemaBtnGroupOption = [
       {
