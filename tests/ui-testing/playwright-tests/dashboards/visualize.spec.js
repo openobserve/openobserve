@@ -14,11 +14,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
     .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click();
+  await page.locator("div.q-item").getByText(`${stream}`).first().click();
 };
 
 test.describe("logs testcases", () => {
@@ -80,13 +76,25 @@ test.describe("logs testcases", () => {
 
     await logsVisualise.applyQueryButtonVisualise();
     await expect(page.getByText("There are some errors, please")).toBeVisible();
-    await page.locator(
-      '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-x-data"]'
-    );
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-x-data"]'
+      )
+      .waitFor({ state: "visible" });
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-x-data"]'
+      )
+      .click();
 
     await logsVisualise.applyQueryButtonVisualise();
 
     await logsVisualise.removeField("_timestamp", "y");
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
+      )
+      .waitFor({ state: "visible" });
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
@@ -103,8 +111,6 @@ test.describe("logs testcases", () => {
     // const x=470;
     // const y=13;
     await logsVisualise.chartRender(470, 13);
-
-    
   });
   test("should correctly plot the data according to the new chart type when changing the chart type.", async ({
     page,
@@ -112,6 +118,11 @@ test.describe("logs testcases", () => {
     const logsVisualise = new LogsVisualise(page);
     await logsVisualise.openLogs();
     await logsVisualise.openVisualiseTab();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
+      )
+      .waitFor({ state: "visible" });
 
     await page
       .locator(
@@ -171,7 +182,20 @@ test.describe("logs testcases", () => {
       .locator(
         '[data-test="logs-search-subfield-add-kubernetes_container_image-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\:v0\\.0\\.3"] [data-test="log-search-subfield-list-equal-kubernetes_container_image-field-btn"]'
       )
+      .waitFor({ state: "visible" });
+
+    await page
+      .locator(
+        '[data-test="logs-search-subfield-add-kubernetes_container_image-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\:v0\\.0\\.3"] [data-test="log-search-subfield-list-equal-kubernetes_container_image-field-btn"]'
+      )
       .click();
+
+    await page
+      .locator(
+        '[data-test="logs-search-subfield-add-kubernetes_container_image-sha256\\:90e0a12eae07ad3d0bbfbb73b076ba3ce6e5ad38fb93babc22fba4d19206ca6b"] [data-test="log-search-subfield-list-not-equal-kubernetes_container_image-field-btn"]'
+      )
+      .waitFor({ state: "visible" });
+
     await page
       .locator(
         '[data-test="logs-search-subfield-add-kubernetes_container_image-sha256\\:90e0a12eae07ad3d0bbfbb73b076ba3ce6e5ad38fb93babc22fba4d19206ca6b"] [data-test="log-search-subfield-list-not-equal-kubernetes_container_image-field-btn"]'
@@ -179,6 +203,13 @@ test.describe("logs testcases", () => {
       .click();
     await logsVisualise.logsApplyQueryButton();
     await logsVisualise.openVisualiseTab();
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
+      )
+      .waitFor({ state: "visible" });
+
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
@@ -259,6 +290,12 @@ test.describe("logs testcases", () => {
       .locator(
         '[data-test="logs-search-subfield-add-kubernetes_container_hash-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\@sha256\\:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589"] [data-test="log-search-subfield-list-equal-kubernetes_container_hash-field-btn"]'
       )
+      .waitFor({ state: "visible" });
+
+    await page
+      .locator(
+        '[data-test="logs-search-subfield-add-kubernetes_container_hash-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\@sha256\\:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589"] [data-test="log-search-subfield-list-equal-kubernetes_container_hash-field-btn"]'
+      )
       .click();
     await logsVisualise.logsApplyQueryButton();
     await logsVisualise.openVisualiseTab();
@@ -312,6 +349,13 @@ test.describe("logs testcases", () => {
     await page
       .locator('[data-test="index-field-search-input"]')
       .fill("kubernetes_container_hash");
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]'
+      )
+      .waitFor({ state: "visible" });
+
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]'
@@ -321,6 +365,13 @@ test.describe("logs testcases", () => {
     await page
       .locator('[data-test="index-field-search-input"]')
       .fill("kubernetes_container_name");
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
+      )
+      .waitFor({ state: "visible" });
+
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
