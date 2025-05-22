@@ -159,7 +159,7 @@ export default class LogsVisualise {
     await this.page
       .locator('[data-test="chart-renderer"] canvas')
       .first()
-      .waitFor({ state: "enabled" });
+      .waitFor({ state: "visible" });
     await this.page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
