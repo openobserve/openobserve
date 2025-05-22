@@ -161,8 +161,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     _ = async {
                         let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
                         match file_info {
-                            Some((trace_id,account, file, file_size, cache)) => {
-                                match download_file(thread, &trace_id,&account, &file, file_size, cache).await {
+                            Some((trace_id, account, file, file_size, cache)) => {
+                                match download_file(thread, &trace_id, &account, &file, file_size, cache).await {
                                     Ok(data_len) => {
                                         if data_len > 0 && data_len != file_size {
                                             log::warn!(
