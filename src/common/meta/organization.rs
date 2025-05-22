@@ -20,7 +20,7 @@ pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
 pub const THRESHOLD: i64 = 9383939382;
 
-use config::meta::cluster::Node;
+use config::meta::{cluster::Node, self_reporting::usage};
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct Organization {
@@ -76,12 +76,52 @@ pub struct StreamSummary {
 pub struct PipelineSummary {
     pub num_realtime: i64,
     pub num_scheduled: i64,
+    pub trigger_status: TriggerStatus,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct AlertSummary {
     pub num_realtime: i64,
     pub num_scheduled: i64,
+    pub trigger_status: TriggerStatus,
+}
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct TriggerStatus {
+    pub healthy: i64,
+    pub failed: i64,
+    pub warning: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TriggerStatusSearchResult {
+    pub module: usage::TriggerDataType,
+    pub status: usage::TriggerDataStatus,
+}
+
+impl TriggerStatus {
+    pub fn from_search_results(
+        results: &Vec<TriggerStatusSearchResult>,
+        module: usage::TriggerDataType,
+    ) -> Self {
+        let mut status = TriggerStatus {
+            healthy: 0,
+            failed: 0,
+            warning: 0,
+        };
+
+        for result in results {
+            if result.module == module {
+                match result.status {
+                    usage::TriggerDataStatus::Completed
+                    | usage::TriggerDataStatus::ConditionNotSatisfied => status.healthy += 1,
+                    usage::TriggerDataStatus::Failed => status.failed += 1,
+                    usage::TriggerDataStatus::Skipped => status.warning += 1,
+                }
+            }
+        }
+
+        status
+    }
 }
 
 /// A container for passcodes and rumtokens
