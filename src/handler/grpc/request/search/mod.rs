@@ -231,6 +231,7 @@ impl Search for Searcher {
             stream_type,
             &request,
             req.skip_max_query_range,
+            true,
         )
         .await;
 

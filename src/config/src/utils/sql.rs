@@ -70,6 +70,24 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
     Ok(false)
 }
 
+/// distinct with no group by
+pub fn is_simple_distinct_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
+    let ast = Parser::parse_sql(&GenericDialect {}, query)?;
+    for statement in ast.iter() {
+        if let Statement::Query(query) = statement {
+            if has_distinct(query)
+                && !has_group_by(query)
+                && !has_join(query)
+                && !has_subquery(statement)
+                && !has_union(query)
+            {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
 /// Checks if _timestamp has been selected
 /// Used for validating scheduled pipeline sql queries
 pub fn is_timestamp_selected(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
@@ -145,6 +163,15 @@ fn has_group_by(query: &Query) -> bool {
             GroupByExpr::All(v) => !v.is_empty(),
             GroupByExpr::Expressions(v, _) => !v.is_empty(),
         }
+    } else {
+        false
+    }
+}
+
+// Check if has distinct
+fn has_distinct(query: &Query) -> bool {
+    if let SetExpr::Select(ref select) = *query.body {
+        select.distinct.is_some()
     } else {
         false
     }

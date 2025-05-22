@@ -46,6 +46,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             log::debug!("[SUPER_CLUSTER:sync] Schema DeleteFields: {}", msg.key);
             delete_fields(msg).await?;
         }
+        MessageType::StreamDelete => {
+            log::debug!("[SUPER_CLUSTER:sync] Stream Delete: {}", msg.key);
+            stream_delete(msg).await?;
+        }
         _ => {
             log::error!(
                 "[SUPER_CLUSTER:DB] Invalid message: type: {:?}, key: {}",
@@ -130,6 +134,25 @@ async fn delete_fields(msg: Message) -> Result<()> {
         );
         return Err(e);
     }
+    Ok(())
+}
+
+async fn stream_delete(msg: Message) -> Result<()> {
+    let (org_id, stream_type, stream_name) = parse_key(&msg.key)?;
+
+    if let Err(e) =
+        crate::service::stream::stream_delete_inner(&org_id, stream_type, &stream_name).await
+    {
+        log::error!(
+            "[SUPER_CLUSTER:sync] Failed to delete stream: {}/{}/{}, error: {}",
+            org_id,
+            stream_type,
+            stream_name,
+            e
+        );
+        return Err(Error::Message(e.to_string()));
+    }
+
     Ok(())
 }
 

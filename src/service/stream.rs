@@ -608,18 +608,6 @@ pub async fn delete_stream(
         )));
     }
 
-    // create delete for compactor
-    if let Err(e) =
-        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
-    {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, format!("failed to delete stream: {e}")))
-            .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("failed to delete stream: {e}"),
-            )));
-    }
-
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
         return Ok(HttpResponse::InternalServerError()
@@ -629,39 +617,6 @@ pub async fn delete_stream(
                 format!("failed to delete stream schema: {e}"),
             )));
     }
-
-    // delete stream schema cache
-    let key = format!("{org_id}/{stream_type}/{stream_name}");
-    let mut w = STREAM_SCHEMAS.write().await;
-    w.remove(&key);
-    drop(w);
-    let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.remove(&key);
-    drop(w);
-
-    // delete stream settings cache
-    let mut w = STREAM_SETTINGS.write().await;
-    w.remove(&key);
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
-
-    // delete stream record id generator cache
-    {
-        STREAM_RECORD_ID_GENERATOR.remove(&key);
-    }
-
-    // delete stream compaction offset
-    if let Err(e) = db::compact::files::del_offset(org_id, stream_type, stream_name).await {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((
-                ERROR_HEADER,
-                format!("failed to delete stream compact offset: {e}"),
-            ))
-            .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("failed to delete stream: {e}"),
-            )));
-    };
 
     // delete associated pipelines
     if let Some(pipeline) =
@@ -686,6 +641,17 @@ pub async fn delete_stream(
         }
     }
 
+    // delete related resource
+    if let Err(e) = stream_delete_inner(org_id, stream_type, stream_name).await {
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, format!("failed to delete stream: {e}")))
+            .json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!("failed to delete stream: {e}"),
+            )));
+    }
+
+    // delete ownership
     crate::common::utils::auth::remove_ownership(
         org_id,
         stream_type.as_str(),
@@ -697,6 +663,60 @@ pub async fn delete_stream(
         StatusCode::OK.into(),
         "stream deleted".to_string(),
     )))
+}
+
+pub async fn stream_delete_inner(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Result<(), anyhow::Error> {
+    // create delete for compactor
+    if let Err(e) =
+        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
+    {
+        log::error!(
+            "Failed to create retention job for stream: {}/{}/{}, error: {}",
+            org_id,
+            stream_type,
+            stream_name,
+            e
+        );
+        return Err(e);
+    }
+
+    // delete stream schema cache
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
+    let mut w = STREAM_SCHEMAS.write().await;
+    w.remove(&key);
+    drop(w);
+    let mut w = STREAM_SCHEMAS_LATEST.write().await;
+    w.remove(&key);
+    drop(w);
+
+    // delete stream settings cache
+    let mut w = STREAM_SETTINGS.write().await;
+    w.remove(&key);
+    infra::schema::set_stream_settings_atomic(w.clone());
+    drop(w);
+
+    // delete stream record id generator cache
+    {
+        STREAM_RECORD_ID_GENERATOR.remove(&key);
+    }
+
+    // delete stream compaction offset
+    if let Err(e) = db::compact::files::del_offset(org_id, stream_type, stream_name).await {
+        log::error!(
+            "Failed to delete stream compact offset for stream: {}/{}/{}, error: {}",
+            org_id,
+            stream_type,
+            stream_name,
+            e
+        );
+        return Err(e);
+    }
+
+    Ok(())
 }
 
 async fn transform_stats(
