@@ -1034,17 +1034,24 @@ async fn search_tantivy_index(
                     bucket_width,
                     num_buckets,
                 )),
-            ) => tantivy_searcher
-                .search(
-                    &query,
-                    &tantivy::collector::HistogramCollector::new::<i64>(
-                        TIMESTAMP_COL_NAME.to_string(),
-                        min_value,
-                        bucket_width,
-                        num_buckets,
-                    ),
-                )
-                .map(|ret| (HashSet::new(), 0, ret)),
+            ) => {
+                // fail the function if field not in tantivy schema
+                if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
+                    log::warn!("_timestamp not index in tantivy file: {}", ttv_file_name);
+                    return Ok((HashSet::new(), 0, vec![]));
+                }
+                tantivy_searcher
+                    .search(
+                        &query,
+                        &tantivy::collector::HistogramCollector::new::<i64>(
+                            TIMESTAMP_COL_NAME.to_string(),
+                            min_value,
+                            bucket_width,
+                            num_buckets,
+                        ),
+                    )
+                    .map(|ret| (HashSet::new(), 0, ret))
+            }
         })
         .await??;
 

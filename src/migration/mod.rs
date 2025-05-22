@@ -114,6 +114,8 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     infra::table::migrate().await?;
     // migrate dashboards
     dashboards::run().await?;
+    // migrate stream schema index_at
+    schema::update_schema_index_updated_at().await?;
 
     infra::set_db_schema_version().await?;
     Ok(())

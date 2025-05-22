@@ -22,9 +22,10 @@ use chrono::Utc;
 use config::{
     meta::{
         dashboards::reports::Report,
+        stream::StreamSettings,
         triggers::{Trigger, TriggerModule, TriggerStatus},
     },
-    utils::json,
+    utils::{json, time::now_micros},
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::{
@@ -116,6 +117,77 @@ pub async fn run() -> Result<(), anyhow::Error> {
         // unlock the lock
         dist_lock::unlock(&locker).await?;
         return Err(e.into());
+    }
+
+    // unlock the lock
+    dist_lock::unlock(&locker).await?;
+
+    Ok(())
+}
+
+pub(super) async fn update_schema_index_updated_at() -> Result<(), anyhow::Error> {
+    // get lock
+    let locker = infra::dist_lock::lock(SCHEMA_MIGRATION_KEY, 0).await?;
+
+    let db = infra_db::get_db().await;
+
+    log::info!("[Schema:Migration]: batch updating schema index_updated_at");
+    let db_key = "/schema/".to_string();
+    log::info!("[Schema:Migration]: Listing all schemas");
+    let data = db.list(&db_key).await?;
+    let default_end_dt = "0".to_string();
+    for (key, val) in data {
+        log::info!("[Schema:Migration]: Start updating schema: {}", key);
+        let key = key.split('/').take(5).collect::<Vec<_>>().join("/");
+        let mut schemas: Vec<Schema> = json::from_slice(&val).unwrap();
+        let mut prev_end_dt: i64 = 0;
+
+        for mut schema in schemas.drain(..) {
+            let meta = schema.metadata();
+            let start_dt: i64 = match meta.get("start_dt") {
+                Some(val) => val.clone().parse().unwrap(),
+                None => {
+                    if prev_end_dt == 0 {
+                        meta.get("created_at").unwrap().clone().parse().unwrap()
+                    } else {
+                        prev_end_dt
+                    }
+                }
+            };
+            prev_end_dt = meta
+                .get("end_dt")
+                .unwrap_or(&default_end_dt)
+                .clone()
+                .parse()
+                .unwrap();
+
+            let mut settings = schema
+                .metadata
+                .get("settings")
+                .map_or(StreamSettings::default(), |v| {
+                    StreamSettings::from(v.as_str())
+                });
+            settings.index_updated_at = now_micros();
+            schema
+                .metadata
+                .insert("settings".to_string(), json::to_string(&settings).unwrap());
+
+            if let Err(e) = db
+                .put(
+                    &key,
+                    json::to_vec(&vec![schema]).unwrap().into(),
+                    NO_NEED_WATCH,
+                    Some(start_dt),
+                )
+                .await
+            {
+                return Err(e.into());
+            }
+        }
+        log::info!(
+            "[Schema:Migration]: Done updating index_updated_at of schema: {}",
+            key
+        );
     }
 
     // unlock the lock
