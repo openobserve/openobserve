@@ -1574,6 +1574,9 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
     }
     for field in index_fields.iter() {
+        if field == TIMESTAMP_COL_NAME {
+            continue;
+        }
         let index_opts = tantivy::schema::TextOptions::default().set_indexing_options(
             tantivy::schema::TextFieldIndexing::default()
                 .set_index_option(tantivy::schema::IndexRecordOption::Basic)

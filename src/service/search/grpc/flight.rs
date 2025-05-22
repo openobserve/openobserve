@@ -489,7 +489,7 @@ fn split_file_list_by_time_range(
     file_list.into_iter().partition(|file| {
         file.meta.min_ts >= start_time
             && file.meta.max_ts <= end_time
-            && file.meta.min_ts > index_updated_at
+            && file.meta.min_ts >= index_updated_at
             && file.meta.index_size > 0
     })
 }
