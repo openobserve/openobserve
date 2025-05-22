@@ -744,7 +744,7 @@ export default defineComponent({
     const emitVariablesData = () => {
       emit("variablesData", {
         isVariablesLoading: variablesData.isVariablesLoading,
-        values: variablesData.values.map((v) => ({
+        values: variablesData.values.map((v: any) => ({
           ...v,
           options: undefined, // Don't emit options to prevent unnecessary updates
         })),
@@ -1556,11 +1556,10 @@ export default defineComponent({
       variablesToUpdate.forEach((variable: any) => {
         variable.isVariableLoadingPending = true;
         variable.isLoading = true;
-        if (variable.multiSelect) {
-          variable.value = [];
-        } else {
-          variable.value = null;
-        }
+        // Set value to null for all child variables
+        variable.value = null;
+        // Emit the null value immediately
+        emitVariablesData();
       });
 
       // Load variables in dependency order
@@ -1570,11 +1569,14 @@ export default defineComponent({
         );
         if (variable) {
           await loadSingleVariableDataByName(variable);
+          // After loading, if options exist, set the first value
+          if (variable.options && variable.options.length > 0) {
+            variable.value = variable.options[0].value;
+            // Emit the new value immediately
+            emitVariablesData();
+          }
         }
       }
-
-      // Emit updated data
-      emitVariablesData();
     };
 
     return {
