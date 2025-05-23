@@ -880,7 +880,7 @@ export const usePanelDataLoader = (
 
       const payload: {
         queryReq: any;
-        type: "search" | "histogram" | "pageCount";
+        type: "search" | "histogram" | "pageCount" | "values";
         isPagination: boolean;
         traceId: string;
         org_id: string;

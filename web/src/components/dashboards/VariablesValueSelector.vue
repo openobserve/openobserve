@@ -21,15 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-for="(item, index) in variablesData.values"
-      :key="
-        item.name +
-        item.value +
-        item.type +
-        item.options?.length +
-        item.isLoading +
-        item.isVariableLoadingPending +
-        index
-      "
+      :key="item.name + index"
       :data-test="`dashboard-variable-${item}-selector`"
     >
       <div v-if="item.type == 'query_values'">
@@ -100,8 +92,16 @@ import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
-import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  escapeSingleQuotes,
+  generateTraceContext,
+  isStreamingEnabled,
+  isWebSocketEnabled,
+} from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -134,9 +134,458 @@ export default defineComponent({
     const oldVariablesData: any = {};
 
     // currently executing promise
-    // obj will have variable name as key
-    // and reject object of promise as value
     const currentlyExecutingPromises: any = {};
+
+    const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+
+    const traceIdMapper = ref<{ [key: string]: string[] }>({});
+    const variableFirstResponseProcessed = ref<{ [key: string]: boolean }>({});
+
+    // ------------- Start WebSocket Implementation -------------
+    const {
+      fetchQueryDataWithWebSocket,
+      sendSearchMessageBasedOnRequestId,
+      cancelSearchQueryBasedOnRequestId,
+    } = useSearchWebSocket();
+
+    // Utility functions
+    const addTraceId = (field: string, traceId: string) => {
+      if (!traceIdMapper.value[field]) {
+        traceIdMapper.value[field] = [];
+      }
+      traceIdMapper.value[field].push(traceId);
+    };
+
+    const removeTraceId = (field: string, traceId: string) => {
+      if (traceIdMapper.value[field]) {
+        traceIdMapper.value[field] = traceIdMapper.value[field].filter(
+          (id) => id !== traceId,
+        );
+      }
+    };
+
+    const cancelTraceId = (field: string) => {
+      const traceIds = traceIdMapper.value[field];
+      if (traceIds && traceIds.length > 0) {
+        traceIds.forEach((traceId) => {
+          cancelSearchQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
+        });
+        // Clear the trace IDs after cancellation
+        traceIdMapper.value[field] = [];
+      }
+    };
+
+    const sendSearchMessage = (queryReq: any) => {
+      const payload = {
+        type: "values",
+        content: {
+          trace_id: queryReq.traceId,
+          payload: queryReq.queryReq,
+          stream_type: queryReq.queryReq.stream_type || "logs",
+          search_type: "ui",
+          use_cache: (window as any).use_cache ?? true,
+          org_id: store.state.selectedOrganization.identifier,
+        },
+      };
+
+      if (
+        Object.hasOwn(queryReq.queryReq, "regions") &&
+        Object.hasOwn(queryReq.queryReq, "clusters")
+      ) {
+        payload.content.payload["regions"] = queryReq.queryReq.regions;
+        payload.content.payload["clusters"] = queryReq.queryReq.clusters;
+      }
+
+      sendSearchMessageBasedOnRequestId(payload);
+    };
+
+    const handleSearchClose = (
+      payload: any,
+      response: any,
+      variableObject: any,
+    ) => {
+      variableObject.isLoading = false;
+      variableObject.isVariableLoadingPending = false;
+
+      const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
+      if (errorCodes.includes(response.code)) {
+        handleSearchError(
+          payload,
+          {
+            content: {
+              message: "WebSocket connection terminated unexpectedly",
+              trace_id: payload.traceId,
+              code: response.code,
+              error_details: response.error_details,
+            },
+            type: "error",
+          },
+          variableObject,
+        );
+      }
+
+      removeTraceId(variableObject.name, payload.traceId);
+    };
+
+    const handleSearchError = (request: any, err: any, variableObject: any) => {
+      variableObject.isLoading = false;
+      variableObject.isVariableLoadingPending = false;
+      resetVariableState(variableObject);
+      removeTraceId(variableObject.name, request.traceId);
+    };
+
+    const handleSearchReset = (data: any) => {
+      console.log("[WebSocket] Received reset:", data);
+
+      const variableObject = variablesData.values.find(
+        (v: any) => v.query_data?.field === data.queryReq?.fields[0],
+      );
+
+      if (variableObject) {
+        variableObject.isLoading = true;
+        variableFirstResponseProcessed.value[variableObject.name] = false;
+
+        fetchFieldValuesWithWebsocket(
+          variableObject,
+          data.queryReq.query_context,
+        );
+      }
+    };
+
+    const handleSearchResponse = (
+      payload: any,
+      response: any,
+      variableObject: any,
+    ) => {
+      console.log(`[Http Streaming] Received response:`, {
+        payload,
+        response,
+      });
+
+      if (!variableObject) {
+        console.error("Variable object is undefined");
+        return;
+      }
+
+      console.log(`[WebSocket] Received response for ${variableObject.name}:`, {
+        responseType: response.type,
+        hasResults: !!response.content?.results?.hits?.length,
+        currentValue: variableObject.value,
+        isLoading: variableObject.isLoading,
+        isVariableLoadingPending: variableObject.isVariableLoadingPending,
+      });
+
+      if (response.type === "cancel_response") {
+        removeTraceId(variableObject.name, response.content.trace_id);
+        return;
+      }
+
+      // Handle completion
+      if (
+        (response.type === "event_progress" &&
+          response.content.percent === 100) ||
+        response.type === "end"
+      ) {
+        variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
+        emitVariablesData();
+        return;
+      }
+
+      try {
+        if (
+          response.content?.results?.hits?.length &&
+          (response.type === "search_response" ||
+            response.type === "search_response_hits")
+        ) {
+          const hits = response.content.results.hits;
+          console.log(
+            `[Http Streaming] Hits for ${variableObject.name}:`,
+            hits,
+          );
+
+          const fieldHit = hits.find(
+            (field: any) => field.field === variableObject.query_data.field,
+          );
+
+          if (fieldHit) {
+            const originalValue = JSON.parse(
+              JSON.stringify(variableObject.value),
+            );
+            // Check if this is the first response for this variable
+            const isFirstResponse =
+              !variableFirstResponseProcessed.value[variableObject.name];
+
+            if (isFirstResponse) {
+              // Initialize options array if it doesn't exist
+              if (!Array.isArray(variableObject.options)) {
+                variableObject.options = [];
+              }
+
+              // Process the first response
+              const newOptions = fieldHit.values
+                .filter((value: any) => value.zo_sql_key !== undefined)
+                .map((value: any) => ({
+                  label:
+                    value.zo_sql_key !== ""
+                      ? value.zo_sql_key.toString()
+                      : "<blank>",
+                  value: value.zo_sql_key.toString(),
+                }));
+
+              variableObject.options = newOptions;
+              variableObject.options.sort((a: any, b: any) =>
+                a.label.localeCompare(b.label),
+              );
+
+              // Update options and handle first response
+              if (oldVariablesData[variableObject.name] !== undefined) {
+                const oldValues = Array.isArray(
+                  oldVariablesData[variableObject.name],
+                )
+                  ? oldVariablesData[variableObject.name]
+                  : [oldVariablesData[variableObject.name]];
+
+                if (variableObject.type === "custom") {
+                  handleCustomVariablesLogic(variableObject, oldValues);
+                } else {
+                  handleQueryValuesLogic(variableObject, oldValues);
+                }
+              } else {
+                variableObject.value = variableObject.options.length
+                  ? variableObject.options[0].value
+                  : null;
+              }
+
+              variableFirstResponseProcessed.value[variableObject.name] = true;
+              variableObject.isVariableLoadingPending = false;
+
+              // Check if value actually changed before loading child variables
+              const hasValueChanged =
+                Array.isArray(originalValue) &&
+                Array.isArray(variableObject.value)
+                  ? JSON.stringify(originalValue) !==
+                    JSON.stringify(variableObject.value)
+                  : originalValue !== variableObject.value;
+
+              console.log(
+                `[WebSocket] First response value change check for ${variableObject.name}:`,
+                {
+                  originalValue,
+                  newValue: variableObject.value,
+                  hasValueChanged,
+                },
+              );
+
+              // Only load child variables if value actually changed
+              if (hasValueChanged) {
+                const childVariables =
+                  variablesDependencyGraph[variableObject.name]
+                    ?.childVariables || [];
+                if (childVariables.length > 0) {
+                  console.log(
+                    `[WebSocket] Loading child variables for ${variableObject.name} due to value change`,
+                  );
+                  const childVariableObjects = variablesData.values.filter(
+                    (variable: any) => childVariables.includes(variable.name),
+                  );
+                  childVariableObjects.forEach((childVariable: any) => {
+                    loadSingleVariableDataByName(childVariable);
+                  });
+                }
+              } else {
+                console.log(
+                  `[WebSocket] Skipping child variable load for ${variableObject.name} - value unchanged`,
+                );
+              }
+            } else {
+              // For subsequent responses, we'll accumulate values but not trigger UI updates
+              const existingValuesSet = new Set(
+                variableObject.options.map((opt: any) => opt.value),
+              );
+
+              // Accumulate new values that don't exist yet
+              const newOptions = fieldHit.values
+                .filter((value: any) => value.zo_sql_key !== undefined)
+                .map((value: any) => ({
+                  label:
+                    value.zo_sql_key !== ""
+                      ? value.zo_sql_key.toString()
+                      : "<blank>",
+                  value: value.zo_sql_key.toString(),
+                }))
+                .filter((opt: any) => !existingValuesSet.has(opt.value));
+
+              // Add new options to the existing array
+              variableObject.options.push(...newOptions);
+              variableObject.options.sort((a: any, b: any) =>
+                a.label.localeCompare(b.label),
+              );
+
+              // Check if the variable's selected value has changed significantly
+              const hasValueChanged =
+                Array.isArray(originalValue) &&
+                Array.isArray(variableObject.value)
+                  ? JSON.stringify(originalValue) !==
+                    JSON.stringify(variableObject.value)
+                  : originalValue !== variableObject.value;
+
+              console.log(
+                `[WebSocket] Subsequent response value change check for ${variableObject.name}:`,
+                {
+                  originalValue,
+                  newValue: variableObject.value,
+                  hasValueChanged,
+                },
+              );
+
+              // Only load child variables if value actually changed
+              if (hasValueChanged) {
+                const childVariables =
+                  variablesDependencyGraph[variableObject.name]
+                    ?.childVariables || [];
+                if (childVariables.length > 0) {
+                  console.log(
+                    `[WebSocket] Loading child variables for ${variableObject.name} due to value change`,
+                  );
+                  const childVariableObjects = variablesData.values.filter(
+                    (variable: any) => childVariables.includes(variable.name),
+                  );
+                  childVariableObjects.forEach((childVariable: any) => {
+                    loadSingleVariableDataByName(childVariable);
+                  });
+                }
+              } else {
+                console.log(
+                  `[WebSocket] Skipping child variable load for ${variableObject.name} - value unchanged`,
+                );
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error(
+          `[WebSocket] Error processing response for ${variableObject.name}:`,
+          error,
+        );
+        resetVariableState(variableObject);
+        variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
+      }
+
+      // Only emit data updates, don't modify loading states here
+      emitVariablesData();
+    };
+
+    const initializeWebSocketConnection = (
+      payload: any,
+      variableObject: any,
+    ): any => {
+      if (isWebSocketEnabled()) {
+        fetchQueryDataWithWebSocket(payload, {
+          open: sendSearchMessage,
+          close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
+          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
+          message: (p: any, r: any) =>
+            handleSearchResponse(p, r, variableObject),
+          reset: handleSearchReset,
+        }) as string;
+        return;
+      }
+
+      if (isStreamingEnabled()) {
+        console.log(
+          `[HTTP Streaming] Starting fetch for ${variableObject.name}:`,
+          {
+            isLoading: variableObject.isLoading,
+            isVariableLoadingPending: variableObject.isVariableLoadingPending,
+            currentValue: variableObject.value,
+            options: variableObject.options,
+          },
+        );
+
+        fetchQueryDataWithHttpStream(payload, {
+          data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
+          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
+          complete: (p: any, r: any) => handleSearchClose(p, r, variableObject),
+          reset: handleSearchReset,
+        });
+        return;
+      }
+    };
+
+    const fetchFieldValuesWithWebsocket = (
+      variableObject: any,
+      queryContext: string,
+    ) => {
+      if (!variableObject?.query_data?.field) {
+        console.error("Invalid variable object or missing field");
+        return;
+      }
+
+      const startTime = props.selectedTimeDate?.start_time?.getTime();
+      const endTime = props.selectedTimeDate?.end_time?.getTime();
+
+      if (!startTime || !endTime) {
+        console.error("Invalid time range");
+        return;
+      }
+      // Set loading state before initiating WebSocket
+      variableObject.isLoading = true;
+      variableObject.isVariableLoadingPending = true;
+      console.log(`[WebSocket] Starting fetch for ${variableObject.name}:`, {
+        isLoading: variableObject.isLoading,
+        isVariableLoadingPending: variableObject.isVariableLoadingPending,
+        currentValue: variableObject.value,
+        options: variableObject.options,
+      });
+
+      // Reset first response flag when starting a new fetch
+      variableFirstResponseProcessed.value[variableObject.name] = false;
+
+      const payload = {
+        fields: [variableObject.query_data.field],
+        size: variableObject.query_data.max_record_size || 10,
+        no_count: true,
+        start_time: startTime,
+        end_time: endTime,
+        stream_name: variableObject.query_data.stream,
+        stream_type: variableObject.query_data.stream_type || "logs",
+        use_cache: (window as any).use_cache ?? true,
+        sql: queryContext || "",
+      };
+
+      const wsPayload = {
+        queryReq: payload,
+        type: "values",
+        isPagination: false,
+        traceId: generateTraceContext().traceId,
+        org_id: store.state.selectedOrganization.identifier,
+        meta: payload,
+      };
+      console.log("wsPayload", wsPayload);
+      try {
+        // Start new connection
+        initializeWebSocketConnection(wsPayload, variableObject);
+        addTraceId(variableObject.name, wsPayload.traceId);
+      } catch (error) {
+        console.error("WebSocket connection failed:", error);
+        variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
+        console.log(
+          `[WebSocket] Failed to connect for ${variableObject.name}:`,
+          {
+            isLoading: variableObject.isLoading,
+            isVariableLoadingPending: variableObject.isVariableLoadingPending,
+          },
+        );
+      }
+    };
+
+    // ------------- End WebSocket Implementation -------------
 
     // reset variables data
     // it will executed once on mount
@@ -275,18 +724,30 @@ export default defineComponent({
         skipAPILoad.value = true;
       },
     );
-
     watch(
-      () => variablesData,
+      () =>
+        JSON.stringify({
+          values: variablesData.values.map((v: any) => ({
+            name: v.name,
+            value: v.value,
+            type: v.type,
+            isLoading: v.isLoading,
+            isVariableLoadingPending: v.isVariableLoadingPending,
+          })),
+        }),
       () => {
         emitVariablesData();
       },
-      { deep: true },
     );
 
     const emitVariablesData = () => {
-      instance?.proxy?.$forceUpdate();
-      emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
+      emit("variablesData", {
+        isVariablesLoading: variablesData.isVariablesLoading,
+        values: variablesData.values.map((v: any) => ({
+          ...v,
+          options: undefined, // Don't emit options to prevent unnecessary updates
+        })),
+      });
     };
 
     // it is used to change/update initial variables values from outside the component
@@ -320,6 +781,9 @@ export default defineComponent({
       currentVariable: any,
       oldVariableSelectedValues: any[],
     ) => {
+      console.log("oldVariableSelectedValues", oldVariableSelectedValues);
+      console.log("currentVariable", currentVariable);
+
       // Pre-calculate the options values array
       const optionsValues =
         currentVariable.options.map((option: any) => option.value) ?? [];
@@ -327,42 +791,42 @@ export default defineComponent({
       // if multi select
       if (currentVariable.multiSelect) {
         // old selected values
-        const selectedValues = currentVariable.options
-          .filter((option: any) =>
-            oldVariableSelectedValues.includes(option.value),
-          )
-          .map((option: any) => option.value);
+        const selectedValues = oldVariableSelectedValues.filter((value) => {
+          // Keep old values even if not in current options
+          return value !== undefined && value !== null;
+        });
 
         // if selected values exist, select the values
         if (selectedValues.length > 0) {
           currentVariable.value = selectedValues;
         } else {
           //here, multiselect and old values will be not exist
-
           switch (currentVariable?.selectAllValueForMultiSelect) {
             case "custom":
               currentVariable.value = optionsValues.filter((value: any) =>
-                currentVariable?.customMultiSelectValue.includes(value),
+                currentVariable?.customMultiSelectValue?.includes(value),
               );
               break;
             case "all":
               currentVariable.value = optionsValues;
               break;
             default:
-              currentVariable.value = [currentVariable.options[0].value];
+              // Always set first option as default for multi-select
+              currentVariable.value =
+                currentVariable.options.length > 0
+                  ? [currentVariable.options[0].value]
+                  : [];
           }
         }
       } else {
         // here, multi select is false
 
-        // old selected value
-        const oldValue = currentVariable.options.find(
-          (option: any) => option.value === oldVariableSelectedValues[0],
-        )?.value;
-
-        // if old value exist, select the old value
-        if (oldValue) {
-          currentVariable.value = oldValue;
+        // Keep old value if it exists, regardless of whether it's in current options
+        if (
+          oldVariableSelectedValues[0] !== undefined &&
+          oldVariableSelectedValues[0] !== null
+        ) {
+          currentVariable.value = oldVariableSelectedValues[0];
         } else if (currentVariable.options.length > 0) {
           // here, multi select is false and old value not exist
 
@@ -370,7 +834,7 @@ export default defineComponent({
             const customValue = currentVariable.options.find(
               (variableOption: any) =>
                 variableOption.value ===
-                currentVariable.customMultiSelectValue[0],
+                currentVariable.customMultiSelectValue?.[0],
             );
 
             // customValue can be undefined or default value
@@ -403,42 +867,33 @@ export default defineComponent({
 
       // if multi select
       if (currentVariable.multiSelect) {
-        // old selected values
-        const selectedValues = currentVariable.options
-          .filter((option: any) =>
-            oldVariableSelectedValues.includes(option.value),
-          )
-          .map((option: any) => option.value);
+        // Keep old selected values even if not in current options
+        const selectedValues = oldVariableSelectedValues.filter((value) => {
+          return value !== undefined && value !== null;
+        });
 
         // if old selected values exist, select the values
         if (selectedValues.length > 0) {
           currentVariable.value = selectedValues;
         } else {
           // here, multiselect is true and old values will be not exist
-
-          // if custom value is not defined, select the first option
-          // NOTE: this is the same logic as before but with a simpler way to understand
+          // Always set first option as default for multi-select
           currentVariable.value =
-            selectedOptionsValues.length > 0
-              ? selectedOptionsValues
-              : [currentVariable?.options?.[0]?.value];
+            currentVariable.options.length > 0
+              ? [currentVariable.options[0].value]
+              : [];
         }
       } else {
         // here, multi select is false
 
-        // old selected value
-        const oldValue = currentVariable.options.find(
-          (option: any) => option.value === oldVariableSelectedValues[0],
-        )?.value;
-
-        // if old value exist, select the old value
-        if (oldValue) {
-          currentVariable.value = oldValue;
+        // Keep old value if it exists, regardless of whether it's in current options
+        if (
+          oldVariableSelectedValues[0] !== undefined &&
+          oldVariableSelectedValues[0] !== null
+        ) {
+          currentVariable.value = oldVariableSelectedValues[0];
         } else if (currentVariable.options.length > 0) {
           // here, multi select is false and old value not exist
-
-          // if custom value is not defined, select the first option
-          // NOTE: this is the same logic as before but with a simpler way to understand
           currentVariable.value =
             selectedOptionsValues.length > 0
               ? selectedOptionsValues[0]
@@ -516,15 +971,30 @@ export default defineComponent({
      * @returns {Promise<boolean>} - true if the variable was loaded successfully, false if it was not
      */
     const loadSingleVariableDataByName = async (variableObject: any) => {
+      console.log(
+        `[WebSocket] Loading variable data for ${variableObject.name}:`,
+        variableObject,
+      );
+      console.log(
+        `[WebSocket] Currently executing promises:`,
+        currentlyExecutingPromises,
+      );
+
       return new Promise(async (resolve, reject) => {
         const { name } = variableObject;
 
         if (!name || !variableObject) {
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: variableObject is invalid`,
+          );
           return resolve(false);
         }
 
         // If the variable is already being processed
         if (currentlyExecutingPromises[name]) {
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: cancelling previous promise for ${name}`,
+          );
           currentlyExecutingPromises[name](false);
         }
         currentlyExecutingPromises[name] = reject;
@@ -539,20 +1009,36 @@ export default defineComponent({
             isInvalidDate(props.selectedTimeDate?.start_time) ||
             isInvalidDate(props.selectedTimeDate?.end_time)
           ) {
+            console.log(
+              `[WebSocket] loadSingleVariableDataByName: invalid date for ${name}`,
+            );
             return resolve(false);
           }
         }
 
         // For variables with dependencies, check if dependencies are loaded
         if (hasParentVariables && isDependentVariableLoading(variableObject)) {
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: dependent variables are still loading for ${name}`,
+          );
           return resolve(false);
         }
 
         try {
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: starting to load ${name}`,
+          );
           const success = await handleVariableType(variableObject);
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: finished loading ${name}`,
+          );
           await finalizeVariableLoading(variableObject, success);
           resolve(success);
         } catch (error) {
+          console.log(
+            `[WebSocket] loadSingleVariableDataByName: error loading ${name}`,
+            error,
+          );
           await finalizeVariableLoading(variableObject, false);
           resolve(false);
         }
@@ -565,31 +1051,75 @@ export default defineComponent({
      * @returns {Promise<boolean>} - true if the variable was handled successfully, false if it was not
      */
     const handleVariableType = async (variableObject: any) => {
+      console.log(
+        `[WebSocket] handleVariableType: starting handle for ${variableObject.name}`,
+      );
       switch (variableObject.type) {
         case "query_values": {
+          console.log(
+            `[WebSocket] handleVariableType: building query context for ${variableObject.name}`,
+          );
           try {
             const queryContext: any = await buildQueryContext(variableObject);
-            const response = await fetchFieldValues(
-              variableObject,
-              queryContext,
+            console.log(
+              `[WebSocket] handleVariableType: built query context for ${variableObject.name}`,
             );
-            updateVariableOptions(variableObject, response.data.hits);
-            return true;
+
+            if (isWebSocketEnabled() || isStreamingEnabled()) {
+              // For WebSocket, we don't need to wait for the response here
+              // as it will be handled by the WebSocket handlers
+              fetchFieldValuesWithWebsocket(variableObject, queryContext);
+              return true;
+            } else {
+              // For REST API, we handle the response directly
+              const response = await fetchFieldValuesREST(
+                variableObject,
+                queryContext,
+              );
+              console.log(
+                `[WebSocket] handleVariableType: fetched field values for ${variableObject.name}`,
+                response,
+              );
+              if (response?.data?.hits) {
+                updateVariableOptions(variableObject, response.data.hits);
+                console.log(
+                  `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
+                );
+                return true;
+              }
+            }
+            return false;
           } catch (error) {
+            console.log(
+              `[WebSocket] handleVariableType: error fetching field values for ${variableObject.name}`,
+              error,
+            );
             resetVariableState(variableObject);
             return false;
           }
         }
         case "custom": {
+          console.log(
+            `[WebSocket] handleVariableType: handling custom variable ${variableObject.name}`,
+          );
           handleCustomVariable(variableObject);
+          console.log(
+            `[WebSocket] handleVariableType: finished handling custom variable ${variableObject.name}`,
+          );
           return true;
         }
         case "constant":
         case "textbox":
         case "dynamic_filters": {
+          console.log(
+            `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
+          );
           return true;
         }
         default: {
+          console.log(
+            `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
+          );
           return false;
         }
       }
@@ -647,16 +1177,15 @@ export default defineComponent({
     };
 
     /**
-     * Fetches field values based on the provided variable object and query context.
+     * Extract REST API implementation to separate function.
      * @param variableObject - The variable object containing query data.
      * @param queryContext - The context for the query as a string.
      * @returns The response from the stream service containing field values.
      */
-    const fetchFieldValues = async (
+    const fetchFieldValuesREST = async (
       variableObject: any,
       queryContext: string,
     ) => {
-      // Prepare the request payload for fetching field values
       const payload = {
         org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
         stream_name: variableObject.query_data.stream, // Name of the stream
@@ -683,13 +1212,15 @@ export default defineComponent({
      * @param hits - The result from the stream service containing field values.
      */
     const updateVariableOptions = (variableObject: any, hits: any[]) => {
+      console.log("hits", hits);
+
       const fieldHit = hits.find(
         (field: any) => field.field === variableObject.query_data.field,
       );
 
       if (fieldHit) {
         // Extract the values for the specified field from the result
-        variableObject.options = fieldHit.values
+        const newOptions = fieldHit.values
           .filter((value: any) => value.zo_sql_key || value.zo_sql_key === "")
           .map((value: any) => ({
             // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
@@ -699,29 +1230,67 @@ export default defineComponent({
             value: value.zo_sql_key.toString(),
           }));
 
+        // Update options with new values
+        variableObject.options = newOptions;
+
         // Set default value
         if (oldVariablesData[variableObject.name] !== undefined) {
           const oldValues = Array.isArray(oldVariablesData[variableObject.name])
             ? oldVariablesData[variableObject.name]
             : [oldVariablesData[variableObject.name]];
 
-          if (variableObject.type === "custom") {
-            // Handle custom variable logic
-            handleCustomVariablesLogic(variableObject, oldValues);
+          // Check if this is a child variable
+          const isChildVariable =
+            variablesDependencyGraph[variableObject.name]?.parentVariables
+              ?.length > 0;
+
+          if (isChildVariable) {
+            // For child variables, only keep old values that exist in new options
+            const validOldValues = oldValues.filter((value: string) =>
+              newOptions.some((opt: { value: string }) => opt.value === value),
+            );
+
+            if (validOldValues.length > 0) {
+              // If we have valid old values, use them
+              variableObject.value = variableObject.multiSelect
+                ? validOldValues
+                : validOldValues[0];
+            } else {
+              // If no valid old values, use first option
+              variableObject.value = variableObject.multiSelect
+                ? newOptions.length > 0
+                  ? [newOptions[0].value]
+                  : []
+                : newOptions.length > 0
+                  ? newOptions[0].value
+                  : null;
+            }
           } else {
-            // Handle query values logic
-            handleQueryValuesLogic(variableObject, oldValues);
+            // For non-child variables, preserve old values as before
+            if (variableObject.type === "custom") {
+              handleCustomVariablesLogic(variableObject, oldValues);
+            } else {
+              handleQueryValuesLogic(variableObject, oldValues);
+            }
           }
         } else {
           // Set default value to the first option if no old values are available
-          variableObject.value = variableObject.options.length
-            ? variableObject.options[0].value
-            : null;
+          variableObject.value = variableObject.multiSelect
+            ? newOptions.length > 0
+              ? [newOptions[0].value]
+              : []
+            : newOptions.length > 0
+              ? newOptions[0].value
+              : null;
         }
       } else {
         // Reset variable state if no field values are available
         resetVariableState(variableObject);
       }
+      console.log(
+        `[WebSocket] isLoading=false (updateVariableOptions) for`,
+        variableObject.name,
+      );
     };
 
     /**
@@ -735,6 +1304,10 @@ export default defineComponent({
     ) => {
       const { name } = variableObject;
 
+      console.log(
+        `[WebSocket] Finalizing load for ${name} with success=${success}`,
+      );
+
       // Clear the currently executing promise
       currentlyExecutingPromises[name] = null;
 
@@ -742,14 +1315,28 @@ export default defineComponent({
         // Update old variables data
         oldVariablesData[name] = variableObject.value;
 
+        console.log(
+          `[WebSocket] Updated old variables data for ${name}`,
+          oldVariablesData,
+        );
+
         // Update loading states
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
+
+        console.log(
+          `[WebSocket] Updated loading states for ${name}`,
+          variableObject,
+        );
 
         // Update global loading state
         variablesData.isVariablesLoading = variablesData.values.some(
           (val: { isLoading: any; isVariableLoadingPending: any }) =>
             val.isLoading || val.isVariableLoadingPending,
+        );
+
+        console.log(
+          `[WebSocket] Updated global loading state to ${variablesData.isVariablesLoading}`,
         );
 
         // Don't load child variables on dropdown open events
@@ -761,8 +1348,15 @@ export default defineComponent({
             (variable: any) => childVariables.includes(variable.name),
           );
 
+          console.log(
+            `[WebSocket] Found child variables for ${name}`,
+            childVariableObjects,
+          );
+
           // Only load children if the parent value actually changed
           if (oldVariablesData[name] !== variableObject.value) {
+            console.log(`[WebSocket] Loading child variables for ${name}`);
+
             await Promise.all(
               childVariableObjects.map((childVariable: any) =>
                 loadSingleVariableDataByName(childVariable),
@@ -785,7 +1379,11 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when the options have been loaded.
      */
     const loadVariableOptions = async (variableObject: any) => {
-      // When a dropdown is opened, only load that specific variable
+      console.log(
+        `[WebSocket] Loading options for ${variableObject.name} on dropdown open`,
+      );
+
+      // When a dropdown is opened, only load the variable data
       await loadSingleVariableDataByName(variableObject);
     };
 
@@ -976,11 +1574,10 @@ export default defineComponent({
       variablesToUpdate.forEach((variable: any) => {
         variable.isVariableLoadingPending = true;
         variable.isLoading = true;
-        if (variable.multiSelect) {
-          variable.value = [];
-        } else {
-          variable.value = null;
-        }
+        // Set value to null for all child variables
+        variable.value = null;
+        // Emit the null value immediately
+        emitVariablesData();
       });
 
       // Load variables in dependency order
@@ -990,11 +1587,14 @@ export default defineComponent({
         );
         if (variable) {
           await loadSingleVariableDataByName(variable);
+          // After loading, if options exist, set the first value
+          if (variable.options && variable.options.length > 0) {
+            variable.value = variable.options[0].value;
+            // Emit the new value immediately
+            emitVariablesData();
+          }
         }
       }
-
-      // Emit updated data
-      emitVariablesData();
     };
 
     return {
