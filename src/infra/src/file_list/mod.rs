@@ -52,11 +52,11 @@ pub fn connect_local_cache() -> Box<dyn FileList> {
 pub trait FileList: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
-    async fn add(&self, file: &str, meta: &FileMeta) -> Result<()>;
-    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()>;
+    async fn add(&self, file: &str, meta: &FileMeta) -> Result<i64>;
+    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<i64>;
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
-    async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()>;
+    async fn batch_add_with_id(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_process(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_deleted(
@@ -70,7 +70,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()>;
-    async fn list(&self) -> Result<Vec<(String, FileMeta)>>;
+    async fn list(&self) -> Result<Vec<FileKey>>;
     async fn query(
         &self,
         org_id: &str,
@@ -79,15 +79,15 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
-    ) -> Result<Vec<(String, FileMeta)>>;
+    ) -> Result<Vec<FileKey>>;
     async fn query_by_date(
         &self,
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
         date_range: Option<(String, String)>,
-    ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>>;
+    ) -> Result<Vec<FileKey>>;
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>>;
     async fn query_ids(
         &self,
         org_id: &str,
@@ -95,6 +95,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<FileId>>;
+    async fn query_ids_by_files(&self, files: &[FileKey]) -> Result<stdHashMap<String, i64>>;
     async fn query_old_data_hours(
         &self,
         org_id: &str,
@@ -181,12 +182,12 @@ pub async fn create_table_index() -> Result<()> {
 }
 
 #[inline]
-pub async fn add(file: &str, meta: &FileMeta) -> Result<()> {
+pub async fn add(file: &str, meta: &FileMeta) -> Result<i64> {
     CLIENT.add(file, meta).await
 }
 
 #[inline]
-pub async fn add_history(file: &str, meta: &FileMeta) -> Result<()> {
+pub async fn add_history(file: &str, meta: &FileMeta) -> Result<i64> {
     CLIENT.add_history(file, meta).await
 }
 
@@ -245,7 +246,7 @@ pub async fn update_compressed_size(file: &str, size: i64) -> Result<()> {
 }
 
 #[inline]
-pub async fn list() -> Result<Vec<(String, FileMeta)>> {
+pub async fn list() -> Result<Vec<FileKey>> {
     CLIENT.list().await
 }
 
@@ -258,7 +259,7 @@ pub async fn query(
     time_level: PartitionTimeLevel,
     time_range: Option<(i64, i64)>,
     flattened: Option<bool>,
-) -> Result<Vec<(String, FileMeta)>> {
+) -> Result<Vec<FileKey>> {
     validate_time_range(time_range)?;
     CLIENT
         .query(
@@ -279,7 +280,7 @@ pub async fn query_by_date(
     stream_type: StreamType,
     stream_name: &str,
     date_range: Option<(String, String)>,
-) -> Result<Vec<(String, FileMeta)>> {
+) -> Result<Vec<FileKey>> {
     CLIENT
         .query_by_date(org_id, stream_type, stream_name, date_range)
         .await
@@ -287,7 +288,7 @@ pub async fn query_by_date(
 
 #[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
-pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
+pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<FileKey>> {
     CLIENT.query_by_ids(ids).await
 }
 
@@ -303,6 +304,12 @@ pub async fn query_ids(
     CLIENT
         .query_ids(org_id, stream_type, stream_name, time_range)
         .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_ids_by_files")]
+pub async fn query_ids_by_files(files: &[FileKey]) -> Result<stdHashMap<String, i64>> {
+    CLIENT.query_ids_by_files(files).await
 }
 
 #[inline]
@@ -529,16 +536,28 @@ pub struct FileRecord {
     pub flattened: bool,
 }
 
-impl From<&FileRecord> for FileMeta {
-    fn from(record: &FileRecord) -> Self {
+impl From<&FileRecord> for FileKey {
+    fn from(r: &FileRecord) -> Self {
         Self {
-            min_ts: record.min_ts,
-            max_ts: record.max_ts,
-            records: record.records,
-            original_size: record.original_size,
-            compressed_size: record.compressed_size,
-            index_size: record.index_size,
-            flattened: record.flattened,
+            id: r.id,
+            key: "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+            meta: r.into(),
+            deleted: r.deleted,
+            segment_ids: None,
+        }
+    }
+}
+
+impl From<&FileRecord> for FileMeta {
+    fn from(r: &FileRecord) -> Self {
+        Self {
+            min_ts: r.min_ts,
+            max_ts: r.max_ts,
+            records: r.records,
+            original_size: r.original_size,
+            compressed_size: r.compressed_size,
+            index_size: r.index_size,
+            flattened: r.flattened,
         }
     }
 }
@@ -609,4 +628,10 @@ pub struct FileId {
     pub original_size: i64,
     #[sqlx(default)]
     pub deleted: bool,
+}
+
+#[derive(Clone, Debug, Default, sqlx::FromRow)]
+pub struct FileIdWithFile {
+    pub id: i64,
+    pub file: String,
 }

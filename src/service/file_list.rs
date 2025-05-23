@@ -42,7 +42,7 @@ pub async fn query(
     time_min: i64,
     time_max: i64,
 ) -> Result<Vec<FileKey>> {
-    let files = file_list::query(
+    file_list::query(
         org_id,
         stream_type,
         stream_name,
@@ -50,17 +50,7 @@ pub async fn query(
         Some((time_min, time_max)),
         None,
     )
-    .await?;
-    let mut file_keys = Vec::with_capacity(files.len());
-    for file in files {
-        file_keys.push(FileKey {
-            key: file.0,
-            meta: file.1,
-            deleted: false,
-            segment_ids: None,
-        });
-    }
-    Ok(file_keys)
+    .await
 }
 
 #[tracing::instrument(
@@ -75,23 +65,13 @@ pub async fn query_by_date(
     date_start: &str,
     date_end: &str,
 ) -> Result<Vec<FileKey>> {
-    let files = file_list::query_by_date(
+    file_list::query_by_date(
         org_id,
         stream_type,
         stream_name,
         Some((date_start.to_string(), date_end.to_string())),
     )
-    .await?;
-    let mut file_keys = Vec::with_capacity(files.len());
-    for file in files {
-        file_keys.push(FileKey {
-            key: file.0,
-            meta: file.1,
-            deleted: false,
-            segment_ids: None,
-        });
-    }
-    Ok(file_keys)
+    .await
 }
 
 #[tracing::instrument(name = "service::file_list::query_by_ids", skip_all)]
@@ -114,10 +94,7 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
                 Vec::new()
             }
         };
-        let cached_ids = cached_files
-            .iter()
-            .map(|(id, ..)| *id)
-            .collect::<HashSet<_>>();
+        let cached_ids = cached_files.iter().map(|f| f.id).collect::<HashSet<_>>();
         log::info!(
             "{}",
             search_inspector_fields(
@@ -144,17 +121,8 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
             .with_label_values(&[])
             .set(cached_ids.len() as i64);
 
-        let mut file_keys = Vec::with_capacity(ids.len());
-        for (_, key, meta) in cached_files {
-            file_keys.push(FileKey {
-                key,
-                meta,
-                deleted: false,
-                segment_ids: None,
-            });
-        }
         (
-            file_keys,
+            cached_files,
             ids_set.difference(&cached_ids).cloned().collect::<Vec<_>>(),
         )
     } else {
@@ -164,20 +132,6 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
     // 2. query from remote db
     let start = std::time::Instant::now();
     let db_files = file_list::query_by_ids(&ids).await?;
-    let db_files = db_files
-        .into_iter()
-        .map(|(id, key, meta)| {
-            (
-                id,
-                FileKey {
-                    key,
-                    meta,
-                    deleted: false,
-                    segment_ids: None,
-                },
-            )
-        })
-        .collect::<Vec<_>>();
     log::info!(
         "{}",
         search_inspector_fields(
@@ -199,7 +153,6 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
     // 3. set the local cache
     if !cfg.common.local_mode {
         let start = std::time::Instant::now();
-        let db_files: Vec<_> = db_files.iter().map(|(id, f)| (*id, f)).collect();
         if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
             log::error!("[trace_id {trace_id}] file_list set cache failed: {:?}", e);
         }
@@ -224,7 +177,7 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
     }
 
     // 4. merge the results
-    files.extend(db_files.into_iter().map(|(_, f)| f));
+    files.extend(db_files);
 
     Ok(files)
 }
@@ -275,7 +228,7 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64> {
 // Delete one parquet file and update the file list
 pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<()> {
     // delete from file list in metastore
-    file_list::batch_process(&[FileKey::new(key.to_string(), Default::default(), true)]).await?;
+    file_list::batch_process(&[FileKey::new(0, key.to_string(), Default::default(), true)]).await?;
 
     // delete the parquet whaterever the file is exists or not
     if !file_list_only {

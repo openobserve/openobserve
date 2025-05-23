@@ -61,11 +61,11 @@ impl super::FileList for SqliteFileList {
         create_table_index().await
     }
 
-    async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
+    async fn add(&self, file: &str, meta: &FileMeta) -> Result<i64> {
         self.inner_add("file_list", file, meta).await
     }
 
-    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()> {
+    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<i64> {
         self.inner_add("file_list_history", file, meta).await
     }
 
@@ -91,12 +91,8 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_process("file_list", files).await
     }
 
-    async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()> {
-        let files = files
-            .iter()
-            .map(|(id, f)| (Some(*id), *f))
-            .collect::<Vec<_>>();
-        self.inner_batch_process_with_id("file_list", &files).await
+    async fn batch_add_with_id(&self, files: &[FileKey]) -> Result<()> {
+        self.inner_batch_process("file_list", files).await
     }
 
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
@@ -268,22 +264,14 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(())
     }
 
-    async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
+    async fn list(&self) -> Result<Vec<FileKey>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened FROM file_list;"#,
+            r#"SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened FROM file_list;"#,
         )
         .fetch_all(&pool)
         .await?;
-        Ok(ret
-            .iter()
-            .map(|r| {
-                (
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
-                    r.into(),
-                )
-            })
-            .collect())
+        Ok(ret.iter().map(|r| r.into()).collect())
     }
 
     async fn query(
@@ -294,7 +282,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         _time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
-    ) -> Result<Vec<(String, FileMeta)>> {
+    ) -> Result<Vec<FileKey>> {
         if let Some((start, end)) = time_range {
             if start == 0 && end == 0 {
                 return Ok(Vec::new());
@@ -307,7 +295,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
@@ -321,7 +309,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                 "#,
@@ -335,16 +323,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         };
         Ok(ret?
             .iter()
-            .filter_map(|r| {
-                if r.deleted {
-                    None
-                } else {
-                    Some((
-                        "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                        r.into(),
-                    ))
-                }
-            })
+            .filter_map(|r| if r.deleted { None } else { Some(r.into()) })
             .collect())
     }
 
@@ -354,7 +333,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         stream_type: StreamType,
         stream_name: &str,
         date_range: Option<(String, String)>,
-    ) -> Result<Vec<(String, FileMeta)>> {
+    ) -> Result<Vec<FileKey>> {
         if let Some((start, end)) = date_range.as_ref() {
             if start.is_empty() && end.is_empty() {
                 return Ok(Vec::new());
@@ -367,7 +346,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let (date_start, date_end) = date_range.unwrap_or(("".to_string(), "".to_string()));
         let ret = sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = $1 AND date >= $2 AND date <= $3;
                 "#,
@@ -379,20 +358,11 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .await;
         Ok(ret?
             .iter()
-            .filter_map(|r| {
-                if r.deleted {
-                    None
-                } else {
-                    Some((
-                        "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                        r.into(),
-                    ))
-                }
-            })
+            .filter_map(|r| if r.deleted { None } else { Some(r.into()) })
             .collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>> {
         if ids.is_empty() {
             return Ok(Vec::default());
         }
@@ -418,16 +388,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             ret.extend_from_slice(&res);
         }
 
-        Ok(ret
-            .iter()
-            .map(|r| {
-                (
-                    r.id,
-                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                    r.into(),
-                )
-            })
-            .collect())
+        Ok(ret.iter().map(|r| r.into()).collect())
     }
 
     async fn query_ids(
@@ -494,6 +455,45 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             };
         }
         Ok(rets)
+    }
+
+    async fn query_ids_by_files(&self, files: &[FileKey]) -> Result<stdHashMap<String, i64>> {
+        let mut ret = stdHashMap::with_capacity(files.len());
+        // group by date
+        let mut stream_files = HashMap::new();
+        let mut files_map = HashMap::with_capacity(files.len());
+        for file in files {
+            if file.id > 0 {
+                ret.insert(file.key.clone(), file.id);
+                continue;
+            }
+            let (stream_key, date_key, file_name) =
+                parse_file_key_columns(&file.key).map_err(|e| Error::Message(e.to_string()))?;
+            let stream_entry = stream_files.entry(stream_key).or_insert(HashMap::new());
+            let date_entry = stream_entry.entry(date_key).or_insert(Vec::new());
+            date_entry.push(file_name.clone());
+            files_map.insert(file_name, &file.key);
+        }
+        for (stream_key, stream_files) in stream_files {
+            let pool = CLIENT_RO.clone();
+            for (date_key, files) in stream_files {
+                let sql = format!(
+                    "SELECT id, file FROM file_list WHERE stream = $1 AND date = $2 AND file IN ({});",
+                    files.join(",")
+                );
+                let query_res = sqlx::query_as::<_, super::FileIdWithFile>(&sql)
+                    .bind(&stream_key)
+                    .bind(&date_key)
+                    .fetch_all(&pool)
+                    .await?;
+                for file in query_res {
+                    if let Some(file_name) = files_map.get(&file.file) {
+                        ret.insert(file_name.to_string(), file.id);
+                    }
+                }
+            }
+        }
+        Ok(ret)
     }
 
     async fn query_old_data_hours(
@@ -1122,7 +1122,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
 }
 
 impl SqliteFileList {
-    async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<()> {
+    async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<i64> {
         self.inner_add_with_id(table, None, file, meta).await
     }
 
@@ -1132,7 +1132,7 @@ impl SqliteFileList {
         id: Option<i64>,
         file: &str,
         meta: &FileMeta,
-    ) -> Result<()> {
+    ) -> Result<i64> {
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
@@ -1160,25 +1160,16 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
         .execute(&*client)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
-                  Ok(())
+                  Ok(0)
             } else {
                   Err(Error::Message(e.to_string()))
             },
             Err(e) =>  Err(e.into()),
-            Ok(_) => Ok(()),
+            Ok(v) => Ok(v.last_insert_rowid()),
         }
     }
 
     async fn inner_batch_process(&self, table: &str, files: &[FileKey]) -> Result<()> {
-        let files: Vec<(Option<i64>, _)> = files.iter().map(|f| (None, f)).collect::<Vec<_>>();
-        self.inner_batch_process_with_id(table, &files).await
-    }
-
-    async fn inner_batch_process_with_id(
-        &self,
-        table: &str,
-        files: &[(Option<i64>, &FileKey)],
-    ) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
@@ -1187,14 +1178,15 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
         let client = client.lock().await;
         let mut tx = client.begin().await?;
 
-        let add_items = files.iter().filter(|v| !v.1.deleted).collect::<Vec<_>>();
+        let add_items = files.iter().filter(|f| !f.deleted).collect::<Vec<_>>();
         if !add_items.is_empty() {
             let chunks = add_items.chunks(100);
             for files in chunks {
                 let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
                 format!("INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str(),
                 );
-                query_builder.push_values(files, |mut b, (id, item)| {
+                query_builder.push_values(files, |mut b, item| {
+                    let id = if item.id > 0 { Some(item.id) } else { None };
                     let (stream_key, date_key, file_name) =
                         parse_file_key_columns(&item.key).expect("parse file key failed");
                     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
@@ -1224,14 +1216,18 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
             }
         }
 
-        let del_items = files.iter().filter(|v| v.1.deleted).collect::<Vec<_>>();
+        let del_items = files.iter().filter(|f| f.deleted).collect::<Vec<_>>();
         if !del_items.is_empty() {
             let chunks = del_items.chunks(1000);
             for files in chunks {
                 // get ids of the files
                 let mut ids = Vec::with_capacity(files.len());
                 for file in files {
-                    let (stream_key, date_key, file_name) = parse_file_key_columns(&file.1.key)
+                    if file.id > 0 {
+                        ids.push(file.id.to_string());
+                        continue;
+                    }
+                    let (stream_key, date_key, file_name) = parse_file_key_columns(&file.key)
                         .map_err(|e| Error::Message(e.to_string()))?;
                     let query_res: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
                     r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,

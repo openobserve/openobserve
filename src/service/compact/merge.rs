@@ -639,20 +639,14 @@ pub async fn merge_by_stream(
                     if new_file.key.is_empty() {
                         continue;
                     }
-                    events.push(FileKey {
-                        key: new_file.key,
-                        meta: new_file.meta,
-                        deleted: false,
-                        segment_ids: None,
-                    });
+                    events.push(new_file);
                 }
 
                 for file in delete_file_list {
                     events.push(FileKey {
-                        key: file.key.clone(),
-                        meta: file.meta.clone(),
                         deleted: true,
                         segment_ids: None,
+                        ..file.clone()
                     });
                 }
                 events.sort_by(|a, b| a.key.cmp(&b.key));
@@ -691,7 +685,7 @@ pub async fn merge_by_stream(
     Ok(())
 }
 
-/// merge small files into big file, upload to storage, returns the big file key and merged files
+/// merge small files into big file, upload to storage, returns the big files and merged files
 pub async fn merge_files(
     thread_id: usize,
     org_id: &str,
@@ -699,7 +693,7 @@ pub async fn merge_files(
     stream_name: &str,
     prefix: &str,
     files_with_size: &[FileKey],
-) -> Result<(Vec<String>, Vec<FileMeta>, Vec<FileKey>), anyhow::Error> {
+) -> Result<(Vec<FileKey>, Vec<FileKey>), anyhow::Error> {
     let start = std::time::Instant::now();
     #[cfg(feature = "enterprise")]
     let is_match_downsampling_rule = get_largest_downsampling_rule(
@@ -712,7 +706,7 @@ pub async fn merge_files(
     let is_match_downsampling_rule = false;
 
     if files_with_size.len() <= 1 && !is_match_downsampling_rule {
-        return Ok((Vec::new(), Vec::new(), Vec::new()));
+        return Ok((Vec::new(), Vec::new()));
     }
 
     let mut new_file_size = 0;
@@ -740,7 +734,7 @@ pub async fn merge_files(
     }
     // no files need to merge
     if new_file_list.len() <= 1 && !is_match_downsampling_rule {
-        return Ok((Vec::new(), Vec::new(), Vec::new()));
+        return Ok((Vec::new(), Vec::new()));
     }
 
     let retain_file_list = new_file_list.clone();
@@ -756,7 +750,7 @@ pub async fn merge_files(
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
     if new_file_list.len() <= 1 && !is_match_downsampling_rule {
-        return Ok((Vec::new(), Vec::new(), retain_file_list));
+        return Ok((Vec::new(), retain_file_list));
     }
 
     // get time range and stats for these files in a single iteration
@@ -947,8 +941,7 @@ pub async fn merge_files(
         );
     }
 
-    let mut new_file_keys = Vec::new();
-    let mut new_file_metas = Vec::new();
+    let mut new_files = Vec::new();
     match buf {
         MergeParquetResult::Single(buf) => {
             new_file_meta.compressed_size = buf.len() as i64;
@@ -988,8 +981,7 @@ pub async fn merge_files(
                 )
                 .await?;
             }
-            new_file_keys.push(new_file_key);
-            new_file_metas.push(new_file_meta);
+            new_files.push(FileKey::new(0, new_file_key, new_file_meta, false));
         }
         MergeParquetResult::Multiple { bufs, file_metas } => {
             for (buf, file_meta) in bufs.into_iter().zip(file_metas.into_iter()) {
@@ -1024,24 +1016,23 @@ pub async fn merge_files(
                     .await?;
                 }
 
-                new_file_keys.push(new_file_key);
-                new_file_metas.push(new_file_meta);
+                new_files.push(FileKey::new(0, new_file_key, new_file_meta, false));
             }
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
-                new_file_keys,
-                new_file_metas.iter().map(|m| m.original_size).sum::<i64>(),
-                new_file_metas
+                new_files,
+                new_files.iter().map(|f| f.meta.original_size).sum::<i64>(),
+                new_files
                     .iter()
-                    .map(|m| m.compressed_size)
+                    .map(|f| f.meta.compressed_size)
                     .sum::<i64>(),
                 start.elapsed().as_millis(),
             );
         }
     };
 
-    Ok((new_file_keys, new_file_metas, retain_file_list))
+    Ok((new_files, retain_file_list))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1098,6 +1089,7 @@ async fn generate_inverted_index(
             if let Err(e) = write_file_list(
                 org_id,
                 &[FileKey {
+                    id: 0,
                     key: file_name.clone(),
                     meta: filemeta,
                     deleted: false,
@@ -1185,7 +1177,15 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
     if success {
         // send broadcast to other nodes
         if get_config().cache_latest_files.enabled {
-            if let Err(e) = db::file_list::broadcast::send(events, None).await {
+            // get id for all the new files
+            let file_ids = infra_file_list::query_ids_by_files(events).await?;
+            let mut events = events.to_vec();
+            for event in events.iter_mut() {
+                if let Some(id) = file_ids.get(&event.key) {
+                    event.id = *id;
+                }
+            }
+            if let Err(e) = db::file_list::broadcast::send(&events).await {
                 log::error!("[COMPACTOR] send broadcast for file_list failed: {}", e);
             }
         }

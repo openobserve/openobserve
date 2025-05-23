@@ -63,11 +63,11 @@ impl super::FileList for PostgresFileList {
         create_table_index().await
     }
 
-    async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
+    async fn add(&self, file: &str, meta: &FileMeta) -> Result<i64> {
         self.inner_add("file_list", file, meta).await
     }
 
-    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()> {
+    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<i64> {
         self.inner_add("file_list_history", file, meta).await
     }
 
@@ -94,7 +94,7 @@ impl super::FileList for PostgresFileList {
         self.inner_batch_process("file_list", files).await
     }
 
-    async fn batch_add_with_id(&self, _files: &[(i64, &FileKey)]) -> Result<()> {
+    async fn batch_add_with_id(&self, _files: &[FileKey]) -> Result<()> {
         unimplemented!("Unsupported")
     }
 
@@ -300,7 +300,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(())
     }
 
-    async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
+    async fn list(&self) -> Result<Vec<FileKey>> {
         return Ok(vec![]); // disallow list all data
     }
 
@@ -312,7 +312,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         _time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
-    ) -> Result<Vec<(String, FileMeta)>> {
+    ) -> Result<Vec<FileKey>> {
         if let Some((start, end)) = time_range {
             if start == 0 && end == 0 {
                 return Ok(Vec::new());
@@ -329,7 +329,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list 
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#
@@ -341,7 +341,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             let sql = r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list 
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                 "#;
@@ -360,16 +360,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .observe(time);
         Ok(ret?
             .iter()
-            .filter_map(|r| {
-                if r.deleted {
-                    None
-                } else {
-                    Some((
-                        "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                        r.into(),
-                    ))
-                }
-            })
+            .filter_map(|r| if r.deleted { None } else { Some(r.into()) })
             .collect())
     }
 
@@ -379,7 +370,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         stream_type: StreamType,
         stream_name: &str,
         date_range: Option<(String, String)>,
-    ) -> Result<Vec<(String, FileMeta)>> {
+    ) -> Result<Vec<FileKey>> {
         if let Some((start, end)) = date_range.as_ref() {
             if start.is_empty() && end.is_empty() {
                 return Ok(Vec::new());
@@ -396,7 +387,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let (date_start, date_end) = date_range.unwrap_or(("".to_string(), "".to_string()));
         let sql = r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list 
     WHERE stream = $1 AND date >= $2 AND date <= $3;
                 "#;
@@ -413,20 +404,11 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .observe(time);
         Ok(ret?
             .iter()
-            .filter_map(|r| {
-                if r.deleted {
-                    None
-                } else {
-                    Some((
-                        "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                        r.into(),
-                    ))
-                }
-            })
+            .filter_map(|r| if r.deleted { None } else { Some(r.into()) })
             .collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>> {
         if ids.is_empty() {
             return Ok(Vec::default());
         }
@@ -459,16 +441,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             ret.extend_from_slice(&res?);
         }
 
-        Ok(ret
-            .into_iter()
-            .map(|r| {
-                (
-                    r.id,
-                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                    FileMeta::from(&r),
-                )
-            })
-            .collect())
+        Ok(ret.iter().map(|r| r.into()).collect())
     }
 
     async fn query_ids(
@@ -543,6 +516,45 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .with_label_values(&["query_ids", "file_list"])
             .observe(time);
         Ok(rets)
+    }
+
+    async fn query_ids_by_files(&self, files: &[FileKey]) -> Result<stdHashMap<String, i64>> {
+        let mut ret = stdHashMap::with_capacity(files.len());
+        // group by date
+        let mut stream_files = HashMap::new();
+        let mut files_map = HashMap::with_capacity(files.len());
+        for file in files {
+            if file.id > 0 {
+                ret.insert(file.key.clone(), file.id);
+                continue;
+            }
+            let (stream_key, date_key, file_name) =
+                parse_file_key_columns(&file.key).map_err(|e| Error::Message(e.to_string()))?;
+            let stream_entry = stream_files.entry(stream_key).or_insert(HashMap::new());
+            let date_entry = stream_entry.entry(date_key).or_insert(Vec::new());
+            date_entry.push(file_name.clone());
+            files_map.insert(file_name, &file.key);
+        }
+        for (stream_key, stream_files) in stream_files {
+            let pool = CLIENT_RO.clone();
+            for (date_key, files) in stream_files {
+                let sql = format!(
+                    "SELECT id, file FROM file_list WHERE stream = $1 AND date = $2 AND file IN ({});",
+                    files.join(",")
+                );
+                let query_res = sqlx::query_as::<_, super::FileIdWithFile>(&sql)
+                    .bind(&stream_key)
+                    .bind(&date_key)
+                    .fetch_all(&pool)
+                    .await?;
+                for file in query_res {
+                    if let Some(file_name) = files_map.get(&file.file) {
+                        ret.insert(file_name.to_string(), file.id);
+                    }
+                }
+            }
+        }
+        Ok(ret)
     }
 
     async fn query_old_data_hours(
@@ -1274,7 +1286,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
 }
 
 impl PostgresFileList {
-    async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<()> {
+    async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<i64> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
@@ -1282,14 +1294,13 @@ impl PostgresFileList {
         DB_QUERY_NUMS
             .with_label_values(&["insert", table, ""])
             .inc();
-        match
-            sqlx
-                ::query(
+        let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
                     format!(
                         r#"
 INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-    ON CONFLICT DO NOTHING;
+    ON CONFLICT DO NOTHING
+    RETURNING id;
             "#
                     ).as_str()
                 )
@@ -1305,15 +1316,17 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
                 .bind(meta.compressed_size)
                 .bind(meta.index_size)
                 .bind(meta.flattened)
-                .execute(&pool).await
-        {
-            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
-                Ok(())
-            } else {
-                Err(Error::Message(e.to_string()))
+                .fetch_one(&pool).await;
+        match ret {
+            Err(sqlx::Error::Database(e)) => {
+                if e.is_unique_violation() {
+                    Ok(0)
+                } else {
+                    Err(Error::Message(e.to_string()))
+                }
             }
             Err(e) => Err(e.into()),
-            Ok(_) => Ok(()),
+            Ok(v) => Ok(v.unwrap_or(0)),
         }
     }
 
@@ -1371,6 +1384,10 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
                 // get ids of the files
                 let mut ids = Vec::with_capacity(files.len());
                 for file in files {
+                    if file.id > 0 {
+                        ids.push(file.id.to_string());
+                        continue;
+                    }
                     let (stream_key, date_key, file_name) = parse_file_key_columns(&file.key)
                         .map_err(|e| Error::Message(e.to_string()))?;
                     DB_QUERY_NUMS
