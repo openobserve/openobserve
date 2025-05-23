@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-separator />
     <div class="flex" style="height: calc(100vh - 162px); overflow: auto">
-      <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 100%">
+      <div ref="addAlertFormRef" class="q-px-md q-my-md" style="width: 100%">
         <q-form
           class="create-report-form"
           data-test="action-setup-form"
@@ -57,124 +57,102 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @submit="saveActionSetup"
         >
           <!-- Step 1: Setup Action -->
-          <div class="tw-p-2 tw-rounded-md stepper-box-shadow">
-            <q-expansion-item
-              v-model="actionSetupExpanded"
-              header-class="action-details-header justify-between"
-              expand-icon-toggle
-              expand-separator
+          <div class="tw-rounded-md stepper-box-shadow">
+            <div
+              data-test="add-action-script-name-input"
+              class="report-name-input o2-input q-px-sm"
+              style="padding-top: 12px"
             >
-              <template v-slot:header>
-                <div class="tw-flex tw-items-center tw-gap-3">
-                  <q-btn outline round color="primary" icon="edit" size="8px" />
-                  <div class="tw-text-[18px]">
-                    {{ t("actions.setupAction") }}
-                  </div>
-                </div>
+              <q-input
+                v-model.trim="formData.name"
+                :label="t('alerts.name') + ' *'"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop"
+                stack-label
+                outlined
+                filled
+                dense
+                :rules="[
+                  (val: any) =>
+                    !!val
+                      ? isValidResourceName(val) ||
+                        `Characters like :, ?, /, #, and spaces are not allowed.`
+                      : t('common.nameRequired'),
+                ]"
+                tabindex="0"
+                style="width: 400px"
+                :disable="actionId && !isEditingActionScript"
+              >
+                <template v-slot:hint>
+                  Characters like :, ?, /, #, and spaces are not allowed.
+                </template>
+              </q-input>
+            </div>
+            <div
+              data-test="add-action-script-description-input"
+              class="report-name-input o2-input q-px-sm q-pb-md"
+            >
+              <q-input
+                v-model="formData.description"
+                :label="t('reports.description')"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop"
+                stack-label
+                outlined
+                filled
+                dense
+                tabindex="0"
+                style="width: 800px"
+                :disable="actionId && !isEditingActionScript"
+              />
+            </div>
+
+            <div
+              data-test="add-action-script-type"
+              class="report-name-input o2-input q-px-sm q-pb-md"
+            >
+              <div class="text-bold text-grey-8">{{ t("common.type") }} *</div>
+
+              <template
+                v-for="(actionType, index) in actionTypes"
+                :key="actionType.value"
+              >
+                <q-radio
+                  name="shape"
+                  v-model="formData.type"
+                  :val="actionType.value"
+                  :label="actionType.label"
+                  class="q-mt-sm"
+                  :class="index > 0 ? 'q-ml-md' : ''"
+                  :disable="actionId && !isEditingActionScript"
+                  :readonly="actionId && !isEditingActionScript"
+                />
               </template>
-              <div class="q-pa-md">
-                <div
-                  data-test="add-action-script-name-input"
-                  class="report-name-input o2-input q-px-sm"
-                  style="padding-top: 12px"
-                >
-                  <q-input
-                    v-model.trim="formData.name"
-                    :label="t('alerts.name') + ' *'"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="showLabelOnTop"
-                    stack-label
-                    outlined
-                    filled
-                    dense
-                    :rules="[
-                      (val: any) =>
-                        !!val
-                          ? isValidResourceName(val) ||
-                            `Characters like :, ?, /, #, and spaces are not allowed.`
-                          : t('common.nameRequired'),
-                    ]"
-                    tabindex="0"
-                    style="width: 400px"
-                    :disable="actionId && !isEditingActionScript"
-                  >
-                    <template v-slot:hint>
-                      Characters like :, ?, /, #, and spaces are not allowed.
-                    </template>
-                  </q-input>
-                </div>
-                <div
-                  data-test="add-action-script-description-input"
-                  class="report-name-input o2-input q-px-sm q-pb-md"
-                >
-                  <q-input
-                    v-model="formData.description"
-                    :label="t('reports.description')"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="showLabelOnTop"
-                    stack-label
-                    outlined
-                    filled
-                    dense
-                    tabindex="0"
-                    style="width: 800px"
-                    :disable="actionId && !isEditingActionScript"
-                  />
-                </div>
+            </div>
 
-                <div
-                  data-test="add-action-script-type"
-                  class="report-name-input o2-input q-px-sm q-pb-md"
-                >
-                  <div class="text-bold text-grey-8">
-                    {{ t("common.type") }} *
-                  </div>
-
-                  <template
-                    v-for="(actionType, index) in actionTypes"
-                    :key="actionType.value"
-                  >
-                    <q-radio
-                      name="shape"
-                      v-model="formData.type"
-                      :val="actionType.value"
-                      :label="actionType.label"
-                      class="q-mt-sm"
-                      :class="index > 0 ? 'q-ml-md' : ''"
-                      :disable="actionId && !isEditingActionScript"
-                      :readonly="actionId && !isEditingActionScript"
-                    />
-                  </template>
-                </div>
-
-                <!-- Setup Action save/cancel buttons -->
-                <div
-                  v-if="!actionId"
-                  class="q-mt-md q-px-sm flex justify-start"
-                >
-                  <q-btn
-                    data-test="setup-action-cancel-btn"
-                    class="text-bold"
-                    :label="t('alerts.cancel')"
-                    text-color="light-text"
-                    padding="sm md"
-                    no-caps
-                    @click="openCancelDialog"
-                  />
-                  <q-btn
-                    data-test="setup-action-save-btn"
-                    :label="t('alerts.save')"
-                    class="text-bold no-border q-ml-md"
-                    color="secondary"
-                    padding="sm xl"
-                    no-caps
-                    type="submit"
-                  />
-                </div>
-              </div>
-            </q-expansion-item>
+            <!-- Setup Action save/cancel buttons -->
+            <div v-if="!actionId" class="q-mt-md q-px-sm flex justify-start">
+              <q-btn
+                data-test="setup-action-cancel-btn"
+                class="text-bold"
+                :label="t('alerts.cancel')"
+                text-color="light-text"
+                padding="sm md"
+                no-caps
+                @click="openCancelDialog"
+              />
+              <q-btn
+                data-test="setup-action-save-btn"
+                :label="t('alerts.save')"
+                class="text-bold no-border q-ml-md"
+                color="secondary"
+                padding="sm xl"
+                no-caps
+                type="submit"
+              />
+            </div>
           </div>
         </q-form>
 
@@ -185,90 +163,486 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @submit="onSubmit"
         >
           <div
-            class="tw-mt-6 tw-p-4 tw-rounded-md stepper-box-shadow"
+            class="tw-mt-6 tw-rounded-md stepper-box-shadow"
             :class="{ 'disabled-section': !actionId }"
           >
-            <q-expansion-item
-              v-model="actionDetailsExpanded"
-              :disable="!actionId"
-              header-class="action-details-header justify-between"
-              expand-icon-toggle
-              expand-separator
+            <q-stepper
+              v-model="step"
+              vertical
+              color="primary"
+              animated
+              class="q-mt-md q-px-sm"
+              header-nav
             >
-              <template v-slot:header>
-                <div class="tw-flex tw-items-center tw-gap-3">
-                  <q-btn
-                    outline
-                    round
-                    color="primary"
-                    icon="edit"
-                    size="8px"
-                    :disable="!actionId"
-                  />
-                  <div class="tw-text-[18px]">
-                    {{ t("actions.actionDetails") }}
+              <q-step
+                data-test="add-action-script-step-1"
+                :name="1"
+                :title="t('actions.selectServiceAccount')"
+                :icon="outlinedDashboard"
+                :done="step > 1"
+              >
+                <div class="flex items-center o2-input">
+                  <div class="o2-input service-account-selector">
+                    <div
+                      data-test="add-action-script-service-account-title"
+                      class="q-mb-xs text-bold text-grey-8"
+                    >
+                      {{ t("actions.serviceAccount") + " *" }}
+                      <q-icon
+                        :name="outlinedInfo"
+                        size="17px"
+                        class="q-ml-xs cursor-pointer"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'text-grey-5'
+                            : 'text-grey-7'
+                        "
+                      >
+                        <q-tooltip anchor="center right" self="center left">
+                          <span style="font-size: 14px">
+                            Make sure service account has permissions to access
+                            Actions.
+                          </span>
+                        </q-tooltip>
+                      </q-icon>
+                    </div>
+                    <q-select
+                      data-test="add-action-script-service-account-select"
+                      v-model="formData.service_account"
+                      :options="filteredServiceAccounts"
+                      :loading="isFetchingServiceAccounts"
+                      :popup-content-style="{ textTransform: 'lowercase' }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="q-py-sm no-case"
+                      filled
+                      outlined
+                      dense
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
+                      @filter="filterServiceAccounts"
+                      behavior="menu"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                      style="
+                        min-width: 250px !important;
+                        width: 250px !important;
+                      "
+                    />
                   </div>
                 </div>
-              </template>
 
-              <q-stepper
-                v-model="step"
-                vertical
-                color="primary"
-                animated
+                <q-stepper-navigation>
+                  <q-btn
+                    data-test="add-action-script-step1-continue-btn"
+                    @click="
+                      formData.type === 'scheduled' ? (step = 2) : (step = 3)
+                    "
+                    color="secondary"
+                    label="Continue"
+                    no-caps
+                    class="q-mt-sm"
+                  />
+                </q-stepper-navigation>
+              </q-step>
+
+              <q-step
+                v-if="formData.type === 'scheduled'"
+                data-test="add-action-script-step-2"
+                :name="2"
+                :title="t('actions.envVariables')"
+                icon="lock"
+                :done="step > 2"
                 class="q-mt-md"
-                header-nav
               >
-                <q-step
-                  data-test="add-action-script-step-1"
-                  :name="1"
-                  :title="t('actions.selectServiceAccount')"
-                  :icon="outlinedDashboard"
-                  :done="step > 1"
+                <div
+                  v-for="(header, index) in environmentalVariables"
+                  :key="header.uuid"
+                  class="row q-col-gutter-sm o2-input"
+                  data-test="add-action-script-env-variable"
                 >
-                  <div class="flex items-center o2-input">
-                    <div class="o2-input service-account-selector">
+                  <div class="col-5 q-ml-none">
+                    <q-input
+                      :data-test="`add-action-script-header-${header['key']}-key-input`"
+                      v-model="header.key"
+                      color="input-border"
+                      bg-color="input-bg"
+                      stack-label
+                      outlined
+                      filled
+                      :placeholder="'Key'"
+                      dense
+                      tabindex="0"
+                    />
+                  </div>
+                  <div class="col-5 q-ml-none q-mb-sm">
+                    <q-input
+                      :data-test="`add-action-script-header-${header['key']}-value-input`"
+                      v-model="header.value"
+                      :placeholder="t('alert_destinations.api_header_value')"
+                      color="input-border"
+                      bg-color="input-bg"
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      isUpdatingDestination
+                      tabindex="0"
+                    />
+                  </div>
+                  <div class="col-2 q-ml-none">
+                    <q-btn
+                      :data-test="`add-action-script-header-${header['key']}-delete-btn`"
+                      icon="delete"
+                      class="iconHoverBtn"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      :title="t('alert_templates.delete')"
+                      @click="deleteApiHeader(header)"
+                    />
+                    <q-btn
+                      data-test="add-action-script-add-header-btn"
+                      v-if="index === environmentalVariables.length - 1"
+                      icon="add"
+                      class="q-ml-xs iconHoverBtn"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      :title="t('alert_templates.edit')"
+                      @click="addApiHeader()"
+                    />
+                  </div>
+                </div>
+
+                <q-stepper-navigation>
+                  <div>
+                    <q-btn
+                      data-test="add-action-script-step2-continue-btn"
+                      @click="step = 3"
+                      color="secondary"
+                      label="Continue"
+                      no-caps
+                    />
+                    <q-btn
+                      data-test="add-action-script-step2-back-btn"
+                      @click="step = 1"
+                      flat
+                      color="primary"
+                      label="Back"
+                      class="q-ml-sm"
+                      no-caps
+                    />
+                  </div>
+                </q-stepper-navigation>
+              </q-step>
+
+              <q-step
+                data-test="add-action-script-step-3"
+                :name="3"
+                :title="t('actions.uploadCode')"
+                :icon="outlinedDashboard"
+                :done="step > 3"
+                class="q-mt-md"
+              >
+                <div
+                  data-test="add-action-script-file-input"
+                  class="flex tw-flex-col tw-mt-2"
+                >
+                  <div class="tw-pb-2 tw-text-[14px]">Upload ZIP File</div>
+
+                  <div class="tw-text-[13px]">
+                    It may contain various resources such as .py, .txt and
+                    main.py file etc.
+                  </div>
+                  <q-file
+                    v-if="showUploadFile"
+                    ref="fileInput"
+                    color="primary"
+                    filled
+                    v-model="formData.codeZip"
+                    bg-color="input-bg"
+                    class="tw-w-[300px] q-pt-sm q-pb-sm showLabelOnTop action-file-uploader tw-min-h-[150px] tw-max-h-[150px] tw-h-[150px] tw-w-[244px] cursor-pointer"
+                    stack-label
+                    outlined
+                    dense
+                    icon="attach_file"
+                    accept=".zip"
+                    :rules="[
+                      (val: any) => {
+                        if (!isEditingActionScript) {
+                          return !!val || 'ZIP File is required!';
+                        }
+                        return true;
+                      },
+                    ]"
+                  >
+                    <template v-slot:prepend>
                       <div
-                        data-test="add-action-script-service-account-title"
-                        class="q-mb-xs text-bold text-grey-8"
+                        class="tw-flex tw-items-center tw-flex-col text-center"
                       >
-                        {{ t("actions.serviceAccount") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
-                          size="17px"
-                          class="q-ml-xs cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
-                          "
+                        <q-icon name="upload" />
+                        <div class="tw-flex tw-flex-col tw-text-[14px]">
+                          <div>Drag and Drop or Browse .zip file</div>
+                          <div>Only .zip files are accepted.</div>
+                        </div>
+                      </div>
+                    </template>
+                  </q-file>
+
+                  <div v-if="!showUploadFile" class="tw-w-full">
+                    <div class="tw-pt-2 tw-flex">
+                      <div
+                        data-test="action-uploaded-zip-file-name"
+                        class="report-name-input o2-input q-pb-md"
+                      >
+                        <q-input
+                          v-model="formData.fileNameToShow"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="q-ml-none"
+                          outlined
+                          filled
+                          dense
+                          tabindex="0"
+                          style="width: 250px"
+                          disable
+                        />
+                      </div>
+                      <q-btn
+                        data-test="add-action-script-edit-file-btn"
+                        @click="editFileToUpload"
+                        icon="upload"
+                        no-caps
+                        dense
+                        class="q-ml-sm q-mb-xs no-border tw-h-fit tw-py-[6px] tw-pl-[8px] tw-pr-[12px]"
+                        color="secondary"
+                        :label="t(`actions.reupload`)"
+                        size="14px"
+                      />
+                      <q-btn
+                        data-test="add-action-script-edit-file-btn"
+                        @click="updateCodeEditorView"
+                        icon="code"
+                        no-caps
+                        dense
+                        class="q-ml-sm q-mb-xs tw-h-fit tw-py-[6px] tw-pl-[8px] tw-pr-[12px]"
+                        :label="t(`actions.editCode`)"
+                        size="14px"
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="isEditingActionScript && showUploadFile"
+                    class="q-pt-xs q-mt-xs"
+                  >
+                    <q-btn
+                      data-test="cancel-upload-new-btn-file"
+                      @click="cancelUploadingNewFile"
+                      no-caps
+                      dense
+                      class="q-mb-xs text-bold"
+                      padding="sm md"
+                      :label="t(`common.cancel`)"
+                      size="14px"
+                    />
+                  </div>
+
+                  <div
+                    v-if="!isEditingActionScript && showUploadFile"
+                    class="q-pt-xs q-mt-xs"
+                  >
+                    <div
+                      class="tw-text-[14px] tw-text-grey-7 tw-mb-4 text-bold tw-w-[240px] text-center"
+                    >
+                      OR
+                    </div>
+                    <q-btn
+                      data-test="cancel-upload-new-btn-file"
+                      no-caps
+                      icon="code"
+                      dense
+                      class="q-mb-xs text-bold tw-w-[240px]"
+                      padding="sm md"
+                      :label="t(`actions.startCoding`)"
+                      size="14px"
+                      @click="updateCodeEditorView"
+                    />
+                  </div>
+                </div>
+
+                <q-stepper-navigation>
+                  <q-btn
+                    data-test="add-action-script-step3-continue-btn"
+                    @click="step = 4"
+                    color="secondary"
+                    label="Continue"
+                    no-caps
+                    class="q-mt-sm"
+                  />
+                  <q-btn
+                    data-test="add-action-script-step3-back-btn"
+                    @click="step = formData.type === 'scheduled' ? 2 : 1"
+                    flat
+                    color="primary"
+                    label="Back"
+                    class="q-ml-sm"
+                    no-caps
+                  />
+                </q-stepper-navigation>
+              </q-step>
+              <q-step
+                data-test="add-action-script-step-4"
+                :name="4"
+                :title="t('actions.schedule')"
+                icon="schedule"
+                :done="step > 4"
+                class="q-mt-md"
+              >
+                <div class="q-my-sm q-px-sm">
+                  <div
+                    style="font-size: 14px"
+                    class="text-bold text-grey-8 q-mb-sm"
+                    data-test="add-action-script-frequency-title"
+                  >
+                    {{ t("actions.frequency") }} *
+                  </div>
+                  <div
+                    style="
+                      border: 1px solid #d7d7d7;
+                      width: fit-content;
+                      border-radius: 2px;
+                    "
+                  >
+                    <template
+                      v-for="visual in frequencyTabs"
+                      :key="visual.value"
+                    >
+                      <q-btn
+                        :data-test="`add-action-script-schedule-frequency-${visual.value}-btn`"
+                        :color="
+                          visual.value === frequency.type ? 'primary' : ''
+                        "
+                        :flat="visual.value === frequency.type ? false : true"
+                        dense
+                        no-caps
+                        size="12px"
+                        class="q-px-lg visual-selection-btn"
+                        style="padding-top: 4px; padding-bottom: 4px"
+                        @click="frequency.type = visual.value"
+                        :disable="isEditingActionScript"
+                        :readonly="isEditingActionScript"
+                      >
+                        {{ visual.label }}</q-btn
+                      >
+                    </template>
+                  </div>
+
+                  <div
+                    v-if="frequency.type === 'once'"
+                    class="flex justify-start items-center q-mt-md"
+                    data-test="add-action-script-frequency-info"
+                  >
+                    <q-icon name="event" class="q-mr-sm" />
+                    <div style="font-size: 14px">
+                      The script will be triggered immediately after it is saved
+                    </div>
+                  </div>
+
+                  <template v-if="frequency.type === 'repeat'">
+                    <div
+                      class="flex items-center justify-start q-mt-md o2-input"
+                    >
+                      <div
+                        data-test="add-action-script-cron-input"
+                        class="q-mr-sm"
+                        style="padding-top: 0; width: 320px"
+                      >
+                        <div
+                          class="q-mb-xs text-bold text-grey-8"
+                          data-test="add-action-script-cron-expression-title"
                         >
-                          <q-tooltip anchor="center right" self="center left">
-                            <span style="font-size: 14px">
-                              Make sure service account has permissions to
-                              access Actions.
-                            </span>
-                          </q-tooltip>
-                        </q-icon>
+                          {{ t("reports.cronExpression") + " *" }}
+                          <q-icon
+                            data-test="add-action-script-cron-info"
+                            :name="outlinedInfo"
+                            size="17px"
+                            class="q-ml-xs cursor-pointer"
+                            :class="
+                              store.state.theme === 'dark'
+                                ? 'text-grey-5'
+                                : 'text-grey-7'
+                            "
+                          >
+                            <q-tooltip anchor="center right" self="center left">
+                              <span style="font-size: 14px">
+                                Pattern: * * * * * means every minute .
+                                <br />
+                                Format: [Minute 0-59] [Hour 0-23] [Day of Month
+                                1-31, 'L'] [Month 1-12] [Day of Week 0-7 or
+                                '1L-7L', 0 and 7 for Sunday].
+                                <br />
+                                Use '*' to represent any value, 'L' for the last
+                                day/weekday. <br />
+                                Example: 0 12 * * ? - Triggers at 12:00 PM
+                                daily. It specifies minute, hour, day of month,
+                                month, and day of week, respectively.</span
+                              >
+                            </q-tooltip>
+                          </q-icon>
+                        </div>
+
+                        <q-input
+                          filled
+                          v-model="frequency.cron"
+                          color="input-border"
+                          bg-color="input-bg"
+                          type="text"
+                          outlined
+                          :rules="[
+                            (val: any) =>
+                              !!val.length
+                                ? cronError.length
+                                  ? cronError
+                                  : true
+                                : 'Field is required!',
+                          ]"
+                          dense
+                          debounce="300"
+                          style="width: 100%"
+                          @update:model-value="
+                            validateFrequency(frequency.cron)
+                          "
+                          :disable="isEditingActionScript"
+                          :readonly="isEditingActionScript"
+                        />
                       </div>
                       <q-select
-                        data-test="add-action-script-service-account-select"
-                        v-model="formData.service_account"
-                        :options="filteredServiceAccounts"
+                        data-test="add-action-script-timezone-select"
+                        v-model="formData.timezone"
+                        :options="['UTC']"
+                        :label="t('actions.timezone') + ' *'"
                         :loading="isFetchingServiceAccounts"
                         :popup-content-style="{ textTransform: 'lowercase' }"
                         color="input-border"
                         bg-color="input-bg"
-                        class="q-py-sm no-case"
+                        class="showLabelOnTop no-case"
                         filled
+                        stack-label
                         outlined
                         dense
                         use-input
                         hide-selected
                         fill-input
                         :input-debounce="400"
-                        @filter="filterServiceAccounts"
                         behavior="menu"
+                        disable
                         :rules="[(val: any) => !!val || 'Field is required!']"
                         style="
                           min-width: 250px !important;
@@ -276,424 +650,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       />
                     </div>
-                  </div>
-
-                  <q-stepper-navigation>
-                    <q-btn
-                      data-test="add-action-script-step1-continue-btn"
-                      @click="
-                        formData.type === 'scheduled' ? (step = 2) : (step = 3)
-                      "
-                      color="secondary"
-                      label="Continue"
-                      no-caps
-                      class="q-mt-sm"
-                    />
-                  </q-stepper-navigation>
-                </q-step>
-
-                <q-step
-                  v-if="formData.type === 'scheduled'"
-                  data-test="add-action-script-step-2"
-                  :name="2"
-                  :title="t('actions.envVariables')"
-                  icon="lock"
-                  :done="step > 2"
-                  class="q-mt-md"
-                >
-                  <div
-                    v-for="(header, index) in environmentalVariables"
-                    :key="header.uuid"
-                    class="row q-col-gutter-sm o2-input"
-                    data-test="add-action-script-env-variable"
-                  >
-                    <div class="col-5 q-ml-none">
-                      <q-input
-                        :data-test="`add-action-script-header-${header['key']}-key-input`"
-                        v-model="header.key"
-                        color="input-border"
-                        bg-color="input-bg"
-                        stack-label
-                        outlined
-                        filled
-                        :placeholder="'Key'"
-                        dense
-                        tabindex="0"
-                      />
-                    </div>
-                    <div class="col-5 q-ml-none q-mb-sm">
-                      <q-input
-                        :data-test="`add-action-script-header-${header['key']}-value-input`"
-                        v-model="header.value"
-                        :placeholder="t('alert_destinations.api_header_value')"
-                        color="input-border"
-                        bg-color="input-bg"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        isUpdatingDestination
-                        tabindex="0"
-                      />
-                    </div>
-                    <div class="col-2 q-ml-none">
-                      <q-btn
-                        :data-test="`add-action-script-header-${header['key']}-delete-btn`"
-                        icon="delete"
-                        class="q-ml-xs iconHoverBtn"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        :title="t('alert_templates.delete')"
-                        @click="deleteApiHeader(header)"
-                      />
-                      <q-btn
-                        data-test="add-action-script-add-header-btn"
-                        v-if="index === environmentalVariables.length - 1"
-                        icon="add"
-                        class="q-ml-xs iconHoverBtn"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        :title="t('alert_templates.edit')"
-                        @click="addApiHeader()"
-                      />
-                    </div>
-                  </div>
-
-                  <q-stepper-navigation>
-                    <div>
-                      <q-btn
-                        data-test="add-action-script-step2-continue-btn"
-                        @click="step = 3"
-                        color="secondary"
-                        label="Continue"
-                        class="q-ml-sm"
-                        no-caps
-                      />
-                      <q-btn
-                        data-test="add-action-script-step2-back-btn"
-                        @click="step = 1"
-                        flat
-                        color="primary"
-                        label="Back"
-                        class="q-ml-sm"
-                        no-caps
-                      />
-                    </div>
-                  </q-stepper-navigation>
-                </q-step>
-
-                <q-step
-                  data-test="add-action-script-step-3"
-                  :name="3"
-                  :title="t('actions.uploadCode')"
-                  :icon="outlinedDashboard"
-                  :done="step > 3"
-                  class="q-mt-md"
-                >
-                  <div
-                    data-test="add-action-script-file-input"
-                    class="flex items-center"
-                  >
-                    <q-file
-                      v-if="
-                        !isEditingActionScript || formData.fileNameToShow == ''
-                      "
-                      ref="fileInput"
-                      color="primary"
-                      filled
-                      v-model="formData.codeZip"
-                      bg-color="input-bg"
-                      class="tw-w-[300px] q-pt-md q-pb-sm showLabelOnTop action-file-uploader tw-min-h-[150px] tw-max-h-[150px] tw-h-[150px] tw-w-[244px]"
-                      stack-label
-                      outlined
-                      dense
-                      icon="attach_file"
-                      accept=".zip"
-                      :rules="[
-                        (val: any) => {
-                          if (!isEditingActionScript) {
-                            return !!val || 'ZIP File is required!';
-                          }
-                          return true;
-                        },
-                      ]"
-                    >
-                      <template v-slot:prepend>
-                        <div
-                          class="tw-flex tw-items-center tw-flex-col text-center"
-                        >
-                          <q-icon name="upload" />
-                          <div class="tw-flex tw-flex-col tw-text-[14px]">
-                            <div>Drag and Drop or Browse .zip file</div>
-                            <div>Only .zip files are accepted.</div>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-slot:hint>
-                        Note: Only .zip files are accepted and it may contain
-                        various resources such as .py, .txt and main.py file
-                        etc.
-                      </template>
-                    </q-file>
-
-                    <div
-                      v-else-if="
-                        isEditingActionScript && formData.fileNameToShow != ''
-                      "
-                    ></div>
-
-                    <div v-if="!showUploadFile" class="tw-w-full">
-                      <div>
-                        <div>Upload ZIP File</div>
-                        <div caption class="tw-pt-2">
-                          It may contain various resources such as .py, .txt and
-                          main.py file etc.
-                        </div>
-                        <div class="tw-pt-4">
-                          {{ formData.fileNameToShow }}
-                          <q-btn
-                            data-test="add-action-script-edit-file-btn"
-                            @click="editFileToUpload"
-                            icon="upload"
-                            no-caps
-                            dense
-                            class="q-ml-md q-mb-xs text-bold no-border"
-                            padding="sm md"
-                            color="secondary"
-                            :label="t(`actions.reupload`)"
-                            size="14px"
-                          />
-                          <q-btn
-                            data-test="add-action-script-edit-file-btn"
-                            @click="updateCodeEditorView"
-                            icon="code"
-                            no-caps
-                            dense
-                            class="q-ml-md q-mb-xs text-bold"
-                            padding="sm md"
-                            :label="t(`actions.editCode`)"
-                            size="14px"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      v-if="
-                        isEditingActionScript && formData.fileNameToShow == ''
-                      "
-                      class="q-pt-md q-mt-xs q-pl-md"
-                    >
-                      <q-btn
-                        data-test="cancel-upload-new-btn-file"
-                        @click="cancelUploadingNewFile"
-                        color="red"
-                        label="Cancel"
-                        no-caps
-                      />
-                    </div>
-                  </div>
-
-                  <q-stepper-navigation>
-                    <q-btn
-                      data-test="add-action-script-step3-continue-btn"
-                      @click="step = 4"
-                      color="secondary"
-                      label="Continue"
-                      no-caps
-                      class="q-mt-sm"
-                    />
-                    <q-btn
-                      data-test="add-action-script-step3-back-btn"
-                      @click="step = formData.type === 'scheduled' ? 2 : 1"
-                      flat
-                      color="primary"
-                      label="Back"
-                      class="q-ml-sm"
-                      no-caps
-                    />
-                  </q-stepper-navigation>
-                </q-step>
-                <q-step
-                  data-test="add-action-script-step-4"
-                  :name="4"
-                  :title="t('actions.schedule')"
-                  icon="schedule"
-                  :done="step > 4"
-                  class="q-mt-md"
-                >
-                  <div class="q-my-sm q-px-sm">
-                    <div
-                      style="font-size: 14px"
-                      class="text-bold text-grey-8 q-mb-sm"
-                      data-test="add-action-script-frequency-title"
-                    >
-                      {{ t("actions.frequency") }} *
-                    </div>
-                    <div
-                      style="
-                        border: 1px solid #d7d7d7;
-                        width: fit-content;
-                        border-radius: 2px;
-                      "
-                    >
-                      <template
-                        v-for="visual in frequencyTabs"
-                        :key="visual.value"
-                      >
-                        <q-btn
-                          :data-test="`add-action-script-schedule-frequency-${visual.value}-btn`"
-                          :color="
-                            visual.value === frequency.type ? 'primary' : ''
-                          "
-                          :flat="visual.value === frequency.type ? false : true"
-                          dense
-                          no-caps
-                          size="12px"
-                          class="q-px-lg visual-selection-btn"
-                          style="padding-top: 4px; padding-bottom: 4px"
-                          @click="frequency.type = visual.value"
-                          :disable="isEditingActionScript"
-                          :readonly="isEditingActionScript"
-                        >
-                          {{ visual.label }}</q-btn
-                        >
-                      </template>
-                    </div>
-
-                    <div
-                      v-if="frequency.type === 'once'"
-                      class="flex justify-start items-center q-mt-md"
-                      data-test="add-action-script-frequency-info"
-                    >
-                      <q-icon name="event" class="q-mr-sm" />
-                      <div style="font-size: 14px">
-                        The script will be triggered immediately after it is
-                        saved
-                      </div>
-                    </div>
-
-                    <template v-if="frequency.type === 'repeat'">
-                      <div
-                        class="flex items-center justify-start q-mt-md o2-input"
-                      >
-                        <div
-                          data-test="add-action-script-cron-input"
-                          class="q-mr-sm"
-                          style="padding-top: 0; width: 320px"
-                        >
-                          <div
-                            class="q-mb-xs text-bold text-grey-8"
-                            data-test="add-action-script-cron-expression-title"
-                          >
-                            {{ t("reports.cronExpression") + " *" }}
-                            <q-icon
-                              data-test="add-action-script-cron-info"
-                              :name="outlinedInfo"
-                              size="17px"
-                              class="q-ml-xs cursor-pointer"
-                              :class="
-                                store.state.theme === 'dark'
-                                  ? 'text-grey-5'
-                                  : 'text-grey-7'
-                              "
-                            >
-                              <q-tooltip
-                                anchor="center right"
-                                self="center left"
-                              >
-                                <span style="font-size: 14px">
-                                  Pattern: * * * * * means every minute .
-                                  <br />
-                                  Format: [Minute 0-59] [Hour 0-23] [Day of
-                                  Month 1-31, 'L'] [Month 1-12] [Day of Week 0-7
-                                  or '1L-7L', 0 and 7 for Sunday].
-                                  <br />
-                                  Use '*' to represent any value, 'L' for the
-                                  last day/weekday. <br />
-                                  Example: 0 12 * * ? - Triggers at 12:00 PM
-                                  daily. It specifies minute, hour, day of
-                                  month, month, and day of week,
-                                  respectively.</span
-                                >
-                              </q-tooltip>
-                            </q-icon>
-                          </div>
-
-                          <q-input
-                            filled
-                            v-model="frequency.cron"
-                            color="input-border"
-                            bg-color="input-bg"
-                            type="text"
-                            outlined
-                            :rules="[
-                              (val: any) =>
-                                !!val.length
-                                  ? cronError.length
-                                    ? cronError
-                                    : true
-                                  : 'Field is required!',
-                            ]"
-                            dense
-                            debounce="300"
-                            style="width: 100%"
-                            @update:model-value="
-                              validateFrequency(frequency.cron)
-                            "
-                            :disable="isEditingActionScript"
-                            :readonly="isEditingActionScript"
-                          />
-                        </div>
-                        <q-select
-                          data-test="add-action-script-timezone-select"
-                          v-model="formData.timezone"
-                          :options="['UTC']"
-                          :label="t('actions.timezone') + ' *'"
-                          :loading="isFetchingServiceAccounts"
-                          :popup-content-style="{ textTransform: 'lowercase' }"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="showLabelOnTop no-case"
-                          filled
-                          stack-label
-                          outlined
-                          dense
-                          use-input
-                          hide-selected
-                          fill-input
-                          :input-debounce="400"
-                          behavior="menu"
-                          disable
-                          :rules="[(val: any) => !!val || 'Field is required!']"
-                          style="
-                            min-width: 250px !important;
-                            width: 250px !important;
-                          "
-                        />
-                      </div>
-                    </template>
-                  </div>
-                  <q-stepper-navigation>
-                    <q-btn
-                      data-test="add-action-script-step4-back-btn"
-                      flat
-                      @click="step = 3"
-                      color="primary"
-                      label="Back"
-                      class="q-ml-sm"
-                      no-caps
-                    />
-                  </q-stepper-navigation>
-                </q-step>
-              </q-stepper>
-            </q-expansion-item>
+                  </template>
+                </div>
+                <q-stepper-navigation>
+                  <q-btn
+                    data-test="add-action-script-step4-back-btn"
+                    flat
+                    @click="step = 3"
+                    color="primary"
+                    label="Back"
+                    no-caps
+                  />
+                </q-stepper-navigation>
+              </q-step>
+            </q-stepper>
           </div>
         </q-form>
       </div>
@@ -918,6 +888,14 @@ watch(
   () => router.currentRoute.value.query?.id,
   async (action_id) => {
     await handleActionScript();
+  },
+);
+
+watch(
+  () => router.currentRoute.value.query?.action,
+  async (action_id) => {
+    if (action_id == "edit" && router.currentRoute.value.query?.id) {
+    }
   },
 );
 
@@ -1362,6 +1340,13 @@ const handleActionScript = async () => {
             timeout: 4000,
           });
         }
+
+        router.replace({
+          name: "actionScripts",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       })
       .finally(() => {
         isFetchingActionScript.value = false;
@@ -1430,20 +1415,6 @@ onBeforeMount(async () => {
 </script>
 
 <style lang="scss">
-.stepper-box-shadow {
-  box-shadow:
-    0 1px 5px rgba(0, 0, 0, 0.2),
-    0 2px 2px rgba(0, 0, 0, 0.14),
-    0 3px 1px -2px rgba(0, 0, 0, 0.12);
-}
-
-.dark-theme .stepper-box-shadow {
-  box-shadow:
-    0 1px 5px #fff3,
-    0 2px 2px #ffffff24,
-    0 3px 1px -2px #ffffff1f;
-}
-
 .create-action-page {
   .q-expansion-item .q-item {
     padding: 0 8px;
@@ -1471,6 +1442,15 @@ onBeforeMount(async () => {
     display: flex;
     align-items: center;
     justify-content: center;
+
+    .q-field__control-container {
+      width: 200px !important;
+      max-width: 200px !important;
+      .q-field__input {
+        width: 240px !important;
+        transform: translateX(-224px);
+      }
+    }
   }
 }
 
@@ -1501,6 +1481,17 @@ onBeforeMount(async () => {
 
   :deep(.q-expansion-item__container) {
     &.q-item {
+    }
+  }
+  :deep(.q-stepper) {
+    box-shadow: none !important;
+
+    .q-stepper__tab {
+      padding: 12px 0px !important;
+    }
+
+    .q-stepper__step-inner {
+      padding-left: 40px !important;
     }
   }
 }

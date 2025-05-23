@@ -19,15 +19,7 @@
           <div class="tw-text-[16px]">Code Editor</div>
         </div>
         <q-space />
-        <q-btn
-          flat
-          round
-          dense
-          size="10px"
-          icon="fullscreen"
-          @click="toggleFullscreen"
-          class="q-mr-sm cursor-pointer"
-        />
+
         <q-btn
           flat
           round

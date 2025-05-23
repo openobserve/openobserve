@@ -563,7 +563,7 @@ export default defineComponent({
       maxRecordToReturn.value = val;
     };
 
-    const addAlert = () => {
+    const addAction = () => {
       showAddActionScriptDialog.value = true;
     };
 
@@ -677,7 +677,7 @@ export default defineComponent({
         },
       });
 
-      addAlert();
+      addAction();
 
       if (config.enableAnalytics == "true") {
         segment.track("Button Click", {
@@ -714,7 +714,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-        addAlert();
+        addAction();
 
         if (config.enableAnalytics == "true") {
           segment.track("Button Click", {
@@ -895,7 +895,7 @@ export default defineComponent({
       refreshList,
       perPageOptions,
       selectedPerPage,
-      addAlert,
+      addAction,
       deleteAlert,
       isUpdated,
       showAddUpdateFn,

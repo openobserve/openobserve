@@ -1167,7 +1167,8 @@
     "actionDetails": "Action Details",
     "reupload": "Reupload",
     "updateCode": "Update Code",
-    "editCode": "Edit Code"
+    "editCode": "Edit Code",
+    "startCoding": "Start Coding"
   },
   "cipherKey": {
     "header": "Cipher Keys",
