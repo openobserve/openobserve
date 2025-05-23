@@ -135,7 +135,7 @@ impl super::FileList for MysqlFileList {
         .execute(&pool)
         .await {
             if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback file_list update file dump error: {e}",);
+                log::error!("[MYSQL] rollback file_list update file dump error: {e}");
             }
             return Err(e.into());
         }
@@ -161,7 +161,7 @@ impl super::FileList for MysqlFileList {
                 .observe(time);
             if let Err(e) = res {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback file_list update file dump error: {e}",);
+                    log::error!("[MYSQL] rollback file_list update file dump error: {e}");
                 }
                 return Err(e.into());
             }
