@@ -65,22 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <q-input
             v-model="firstName"
-            :label="t('user.firstName')"
+            :label="t('user.description')"
             color="input-border"
             bg-color="input-bg"
             class="q-py-md showLabelOnTop q-mt-sm"
-            stack-label
-            outlined
-            filled
-            dense
-          />
-
-          <q-input
-            v-model="lastName"
-            :label="t('user.lastName')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop"
             stack-label
             outlined
             filled
@@ -132,7 +120,6 @@ const defaultValue: any = () => {
     org_member_id: "",
     role: "admin",
     first_name: "",
-    last_name: "",
     email: "",
     organization: "",
   };
@@ -165,7 +152,6 @@ export default defineComponent({
     const logout_confirm = ref(false);
 
     const firstName = ref(formData.value.first_name);
-    const lastName = ref("");
 
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
@@ -186,7 +172,6 @@ export default defineComponent({
       loadingOrganizations,
       logout_confirm,
       firstName,
-      lastName,
     };
   },
   created() {
@@ -201,7 +186,6 @@ export default defineComponent({
       this.beingUpdated = true;
       this.formData = {...this.modelValue};
       this.firstName = this.modelValue?.first_name;
-      this.lastName = this.modelValue?.last_name;
     }
   },
   methods: {
@@ -218,7 +202,6 @@ export default defineComponent({
         selectedOrg = encodeURIComponent(this.formData.other_organization);
       }
       this.formData.first_name = this.firstName;
-      this.formData.last_name = this.lastName;
       if (this.beingUpdated) {
         const userEmail = this.formData.email;
         delete this.formData.email;
