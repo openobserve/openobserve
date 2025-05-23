@@ -212,7 +212,7 @@ export default defineComponent({
 }
 
 .app-dialog-content {
-  padding: 20px;
+  /* padding: 20px; */
   overflow-y: auto;
   flex: 1;
 }
