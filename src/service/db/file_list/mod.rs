@@ -86,8 +86,8 @@ async fn progress(key: &str, data: Option<&FileMeta>, delete: bool) -> Result<i6
         if let Err(e) = infra::file_list::remove(key).await {
             log::error!("service:db:file_list: delete {}, remove error: {}", key, e);
         }
-    } else {
-        match infra::file_list::add(key, data.unwrap()).await {
+    } else if let Some(data) = data {
+        match infra::file_list::add(key, data).await {
             Ok(v) => id = v,
             Err(e) => {
                 log::error!("service:db:file_list: add {}, add error: {}", key, e);
@@ -95,7 +95,7 @@ async fn progress(key: &str, data: Option<&FileMeta>, delete: bool) -> Result<i6
         }
         // update stream stats realtime
         if config::get_config().common.local_mode {
-            if let Err(e) = infra::cache::stats::incr_stream_stats(key, data.unwrap()) {
+            if let Err(e) = infra::cache::stats::incr_stream_stats(key, data) {
                 log::error!(
                     "service:db:file_list: add {}, incr_stream_stats error: {}",
                     key,
