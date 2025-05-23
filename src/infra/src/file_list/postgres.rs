@@ -612,9 +612,12 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         for (stream_key, stream_files) in stream_files {
             let pool = CLIENT_RO.clone();
             for (date_key, files) in stream_files {
+                if files.is_empty() {
+                    continue;
+                }
                 let sql = format!(
-                    "SELECT id, file FROM file_list WHERE stream = $1 AND date = $2 AND file IN ({});",
-                    files.join(",")
+                    "SELECT id, file FROM file_list WHERE stream = $1 AND date = $2 AND file IN ('{}');",
+                    files.join("','")
                 );
                 let query_res = sqlx::query_as::<_, super::FileIdWithFile>(&sql)
                     .bind(&stream_key)
