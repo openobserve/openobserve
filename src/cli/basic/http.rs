@@ -96,6 +96,7 @@ pub async fn node_offline() -> Result<(), anyhow::Error> {
     }
     Ok(())
 }
+
 pub async fn node_online() -> Result<(), anyhow::Error> {
     let url = "/node/enable?value=true";
     let response = request(url, None, reqwest::Method::PUT).await?;
@@ -262,6 +263,35 @@ pub async fn local_node_metrics() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn consistent_hash(files: Vec<String>) -> Result<(), anyhow::Error> {
+    let url = "/node/consistent_hash";
+    let req = config::meta::search::HashFileRequest { files };
+    let body = serde_json::to_vec(&req)?;
+    let response = request(url, Some(body), reqwest::Method::POST).await?;
+    let Some(body) = response else {
+        return Err(anyhow::anyhow!("consistent hash failed"));
+    };
+    let response: config::meta::search::HashFileResponse = serde_json::from_str(&body)?;
+
+    // Create header row with all column names
+    let mut table = Table::new();
+    table.add_row(Row::new(vec![
+        Cell::new("File"),
+        Cell::new("Querier"),
+        Cell::new("Alert Querier"),
+    ]));
+    for (file, nodes) in response.files.iter() {
+        table.add_row(Row::new(vec![
+            Cell::new(file),
+            Cell::new(nodes.get("querier_interactive").unwrap_or(&"".to_string())),
+            Cell::new(nodes.get("querier_background").unwrap_or(&"".to_string())),
+        ]));
+    }
+
+    table.printstd();
+    Ok(())
+}
+
 async fn request(
     url: &str,
     body: Option<Vec<u8>>,
@@ -273,11 +303,12 @@ async fn request(
     let url = format!("{}{}", local.http_addr, url);
     let user = cfg.auth.root_user_email.clone();
     let password = cfg.auth.root_user_password.clone();
-    let mut response = client.request(method, url).basic_auth(user, Some(password));
+    let mut req = client.request(method, url).basic_auth(user, Some(password));
     if let Some(body) = body {
-        response = response.body(body);
+        req = req.header("Content-Type", "application/json");
+        req = req.body(body);
     }
-    let response = response.send().await?;
+    let response = req.send().await?;
     let status = response.status();
     let body = response.text().await?;
     if status.is_success() {

@@ -19,7 +19,7 @@ use config::{
     get_config,
     meta::{
         search::ScanStats,
-        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
+        stream::{FileKey, PartitionTimeLevel, StreamType},
     },
     metrics::{FILE_LIST_CACHE_HIT_COUNT, FILE_LIST_ID_SELECT_COUNT},
     utils::file::get_file_meta as util_get_file_meta,
@@ -48,7 +48,7 @@ pub async fn query(
     time_max: i64,
 ) -> Result<Vec<FileKey>> {
     let cfg = get_config();
-    let files = file_list::query(
+    let mut files = file_list::query(
         org_id,
         stream_type,
         stream_name,
@@ -73,8 +73,8 @@ pub async fn query(
             .collect::<HashSet<_>>();
         let missing_files: usize = files
             .iter()
-            .map(|(_account, name, _)| {
-                if dumped_file_names.contains(name) {
+            .map(|f| {
+                if dumped_file_names.contains(&f.key) {
                     0
                 } else {
                     1
@@ -87,42 +87,19 @@ pub async fn query(
             );
         }
     }
-    let mut file_keys = Vec::with_capacity(files.len());
-    for (account, key, meta) in files {
-        file_keys.push(FileKey {
-            account,
-            key,
-            meta,
-            deleted: false,
-            segment_ids: None,
-        });
-    }
+
     if !cfg.common.file_list_dump_dual_write {
         // we only consider these files in case of dual write disabled,
         // because with dual write there are some edge cases which cannot be sovled even with id
         // de-dup so the data gets counted twice.
-        for file in dumped_files {
-            file_keys.push(FileKey {
-                account: file.account,
-                key: "files/".to_string() + &file.stream + "/" + &file.date + "/" + &file.file,
-                meta: FileMeta {
-                    min_ts: file.min_ts,
-                    max_ts: file.max_ts,
-                    records: file.records,
-                    original_size: file.original_size,
-                    compressed_size: file.compressed_size,
-                    index_size: file.index_size,
-                    flattened: file.flattened,
-                },
-                deleted: file.deleted,
-                segment_ids: None,
-            })
+        for file in dumped_files.iter() {
+            files.push(file.into())
         }
     }
 
-    file_keys.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
-    file_keys.dedup_by(|a, b| a.key == b.key);
-    Ok(file_keys)
+    files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
+    Ok(files)
 }
 
 /// NOTE: This will not query the files from file_dump. If you also want files from the dump, use
@@ -148,20 +125,10 @@ pub async fn query_for_merge(
         Some((date_start.to_string(), date_end.to_string())),
     )
     .await?;
-    let mut file_keys = Vec::with_capacity(files.len());
-    for (account, key, meta) in files {
-        file_keys.push(FileKey {
-            account,
-            key,
-            meta,
-            deleted: false,
-            segment_ids: None,
-        });
-    }
     // we don't need to query from dump here, because
     // we expected all dumped files to be already compacted,
     // and the compaction marks old files as deleted, which is not possible with dump
-    Ok(file_keys)
+    Ok(files)
 }
 
 #[tracing::instrument(name = "service::file_list::query_by_ids", skip_all)]
@@ -191,10 +158,7 @@ pub async fn query_by_ids(
                 Vec::new()
             }
         };
-        let cached_ids = cached_files
-            .iter()
-            .map(|(id, ..)| *id)
-            .collect::<HashSet<_>>();
+        let cached_ids = cached_files.iter().map(|f| f.id).collect::<HashSet<_>>();
         log::info!(
             "{}",
             search_inspector_fields(
@@ -221,18 +185,8 @@ pub async fn query_by_ids(
             .with_label_values(&[])
             .set(cached_ids.len() as i64);
 
-        let mut file_keys = Vec::with_capacity(ids.len());
-        for (_, account, key, meta) in cached_files {
-            file_keys.push(FileKey {
-                account,
-                key,
-                meta,
-                deleted: false,
-                segment_ids: None,
-            });
-        }
         (
-            file_keys,
+            cached_files,
             ids_set.difference(&cached_ids).cloned().collect::<Vec<_>>(),
         )
     } else {
@@ -242,21 +196,6 @@ pub async fn query_by_ids(
     // 2. query from remote db
     let start = std::time::Instant::now();
     let db_files = file_list::query_by_ids(&ids).await?;
-    let db_files = db_files
-        .into_iter()
-        .map(|(id, account, key, meta)| {
-            (
-                id,
-                FileKey {
-                    account,
-                    key,
-                    meta,
-                    deleted: false,
-                    segment_ids: None,
-                },
-            )
-        })
-        .collect::<Vec<_>>();
     log::info!(
         "{}",
         search_inspector_fields(
@@ -288,37 +227,15 @@ pub async fn query_by_ids(
     )
     .await?;
 
-    let dumped_files: Vec<_> = dumped_files
-        .into_iter()
+    let dumped_files: Vec<FileKey> = dumped_files
+        .iter()
         .filter(|r| ids.contains(&r.id))
-        .map(|r| {
-            (
-                r.id,
-                FileKey {
-                    account: r.account,
-                    key: "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                    meta: FileMeta {
-                        min_ts: r.min_ts,
-                        max_ts: r.max_ts,
-                        records: r.records,
-                        original_size: r.original_size,
-                        compressed_size: r.compressed_size,
-                        index_size: r.index_size,
-                        flattened: r.flattened,
-                    },
-                    deleted: r.deleted,
-                    segment_ids: None,
-                },
-            )
-        })
+        .map(|r| r.into())
         .collect();
 
     if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
-        let dump_ids = dumped_files
-            .iter()
-            .map(|entry| entry.0)
-            .collect::<HashSet<_>>();
-        let db_ids = db_files.iter().map(|entry| entry.0).collect::<Vec<_>>();
+        let dump_ids = dumped_files.iter().map(|f| f.id).collect::<HashSet<_>>();
+        let db_ids = db_files.iter().map(|f| f.id).collect::<Vec<_>>();
         let missing_files: usize = db_ids
             .iter()
             .map(|id| if dump_ids.contains(id) { 0 } else { 1 })
@@ -333,7 +250,6 @@ pub async fn query_by_ids(
     // 3. set the local cache
     if !cfg.common.local_mode {
         let start = std::time::Instant::now();
-        let db_files: Vec<_> = db_files.iter().map(|(id, f)| (*id, f)).collect();
         if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
             log::error!(
                 "[trace_id {trace_id}] file_list set cache failed for db files: {:?}",
@@ -342,7 +258,6 @@ pub async fn query_by_ids(
         }
 
         if !cfg.common.file_list_dump_dual_write {
-            let dumped_files: Vec<_> = dumped_files.iter().map(|(id, f)| (*id, f)).collect();
             if let Err(e) = file_list::LOCAL_CACHE
                 .batch_add_with_id(&dumped_files)
                 .await
@@ -374,9 +289,9 @@ pub async fn query_by_ids(
     }
 
     // 4. merge the results
-    files.extend(db_files.into_iter().map(|(_, f)| f));
+    files.extend(db_files);
     if !cfg.common.file_list_dump_dual_write {
-        files.extend(dumped_files.into_iter().map(|(_, f)| f));
+        files.extend(dumped_files);
     }
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
@@ -421,7 +336,7 @@ pub async fn query_ids(
         }
     }
     if !cfg.common.file_list_dump_dual_write {
-        files.extend(dumped_files.into_iter());
+        files.extend(dumped_files);
     }
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);
@@ -458,6 +373,7 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64> {
 pub async fn delete_parquet_file(account: &str, key: &str, file_list_only: bool) -> Result<()> {
     // delete from file list in metastore
     file_list::batch_process(&[FileKey::new(
+        0,
         account.to_string(),
         key.to_string(),
         Default::default(),
