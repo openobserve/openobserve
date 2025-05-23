@@ -1259,6 +1259,8 @@ export default defineComponent({
     const toggleAIChat = () => {
       const isEnabled = !store.state.isAiChatEnabled;
       store.dispatch("setIsAiChatEnabled", isEnabled);
+      window.dispatchEvent(new Event("resize"));
+
     };
 
     return {
