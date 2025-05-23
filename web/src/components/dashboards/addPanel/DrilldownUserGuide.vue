@@ -80,11 +80,23 @@
     <br />
     <div class="header">Use Series name and value</div>
     <p>
-      You can reference the series name and value with the following variables:
+      You can reference the following variables to pass chart data when using
+      the drilldown feature:
     </p>
+
     <ul>
-      <li><span class="bg-highlight">${series.__name}</span></li>
-      <li><span class="bg-highlight">${series.__value}</span></li>
+      <li>
+        <span class="bg-highlight">${series.__name}</span> – The name of the
+        series.
+      </li>
+      <li>
+        <span class="bg-highlight">${series.__value}</span> – The numeric value
+        of the data point.
+      </li>
+      <li>
+        <span class="bg-highlight">${series.__axisValue}</span> – The value on
+        the axis for the selected/clicked data point.
+      </li>
     </ul>
 
     <br />
@@ -104,6 +116,15 @@
         <span class="bg-highlight">${row.field["test"]}</span>)
       </li>
       <li><span class="bg-highlight">${row.index}</span></li>
+    </ul>
+
+    <br />
+
+    <div class="header">For Pie/Donut chart drilldown</div>
+    <p>You can reference the series and value with the following variables:</p>
+    <ul>
+      <li><span class="bg-highlight">${series.__name}</span></li>
+      <li><span class="bg-highlight">${series.__value}</span></li>
     </ul>
 
     <br />
