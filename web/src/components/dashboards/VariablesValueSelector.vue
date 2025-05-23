@@ -802,18 +802,21 @@ export default defineComponent({
           currentVariable.value = selectedValues;
         } else {
           //here, multiselect and old values will be not exist
-
           switch (currentVariable?.selectAllValueForMultiSelect) {
             case "custom":
               currentVariable.value = optionsValues.filter((value: any) =>
-                currentVariable?.customMultiSelectValue.includes(value),
+                currentVariable?.customMultiSelectValue?.includes(value),
               );
               break;
             case "all":
               currentVariable.value = optionsValues;
               break;
             default:
-              currentVariable.value = [currentVariable.options[0].value];
+              // Always set first option as default for multi-select
+              currentVariable.value =
+                currentVariable.options.length > 0
+                  ? [currentVariable.options[0].value]
+                  : [];
           }
         }
       } else {
@@ -834,7 +837,7 @@ export default defineComponent({
             const customValue = currentVariable.options.find(
               (variableOption: any) =>
                 variableOption.value ===
-                currentVariable.customMultiSelectValue[0],
+                currentVariable.customMultiSelectValue?.[0],
             );
 
             // customValue can be undefined or default value
@@ -879,13 +882,11 @@ export default defineComponent({
           currentVariable.value = selectedValues;
         } else {
           // here, multiselect is true and old values will be not exist
-
-          // if custom value is not defined, select the first option
-          // NOTE: this is the same logic as before but with a simpler way to understand
+          // Always set first option as default for multi-select
           currentVariable.value =
-            selectedOptionsValues.length > 0
-              ? selectedOptionsValues
-              : [currentVariable?.options?.[0]?.value];
+            currentVariable.options.length > 0
+              ? [currentVariable.options[0].value]
+              : [];
         }
       } else {
         // here, multi select is false
@@ -900,9 +901,6 @@ export default defineComponent({
           currentVariable.value = oldValue;
         } else if (currentVariable.options.length > 0) {
           // here, multi select is false and old value not exist
-
-          // if custom value is not defined, select the first option
-          // NOTE: this is the same logic as before but with a simpler way to understand
           currentVariable.value =
             selectedOptionsValues.length > 0
               ? selectedOptionsValues[0]
