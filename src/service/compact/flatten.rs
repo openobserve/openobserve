@@ -139,16 +139,10 @@ pub async fn generate_by_stream(
         start.elapsed().as_millis()
     );
 
-    for (file, meta) in files {
-        if PROCESSING_FILES.read().contains(&file) {
+    for file in files {
+        if PROCESSING_FILES.read().contains(&file.key) {
             continue;
         }
-        let file = FileKey {
-            key: file,
-            meta,
-            deleted: false,
-            segment_ids: None,
-        };
         // add into queue
         PROCESSING_FILES.write().insert(file.key.clone());
         worker_tx.send(file).await?;

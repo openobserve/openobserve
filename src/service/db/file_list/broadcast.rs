@@ -41,25 +41,16 @@ static EVENTS: Lazy<RwLock<HashMap<String, EventChannel>>> =
 type EventChannel = Arc<mpsc::UnboundedSender<Vec<FileKey>>>;
 
 /// send an event to broadcast, will create a new channel for each nodes
-pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), anyhow::Error> {
+pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     if cfg.common.local_mode || items.is_empty() {
         return Ok(());
     }
-    let nodes = if let Some(node_uuid) = node_uuid {
-        cluster::get_node_by_uuid(&node_uuid)
-            .await
-            .map(|node| vec![node])
-            .unwrap_or_default()
-    } else {
-        cluster::get_cached_nodes(|node| {
-            node.scheduled
-                && (node.is_querier())
-                && (node.status == NodeStatus::Prepare || node.status == NodeStatus::Online)
-        })
-        .await
-        .unwrap_or_default()
-    };
+    let nodes = cluster::get_cached_nodes(|node| {
+        node.scheduled && node.is_querier() && node.status == NodeStatus::Online
+    })
+    .await
+    .unwrap_or_default();
     let mut events = EVENTS.write().await;
     for node in nodes {
         if node.uuid.eq(&LOCAL_NODE.uuid) {
@@ -74,7 +65,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
             }
             // check if the item is for interactive node
             if let Some(node_name) = cluster::get_node_from_consistent_hash(
-                &item.key,
+                &item.id.to_string(),
                 &Role::Querier,
                 Some(RoleGroup::Interactive),
             )
@@ -87,7 +78,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
             }
             // check if the item is for background node
             if let Some(node_name) = cluster::get_node_from_consistent_hash(
-                &item.key,
+                &item.id.to_string(),
                 &Role::Querier,
                 Some(RoleGroup::Background),
             )

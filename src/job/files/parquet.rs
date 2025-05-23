@@ -327,7 +327,7 @@ async fn prepare_files(
         columns.remove(4);
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(FileKey::new(file_key.clone(), parquet_meta, false));
+        partition.push(FileKey::new(0, file_key.clone(), parquet_meta, false));
         // mark the file as processing
         PROCESSING_FILES.write().await.insert(file_key);
     }
@@ -531,8 +531,7 @@ async fn move_files(
         }
 
         // write file list to storage
-        let ret = db::file_list::set(&new_file_name, Some(new_file_meta), false).await;
-        if let Err(e) = ret {
+        if let Err(e) = db::file_list::set(&new_file_name, Some(new_file_meta), false).await {
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
                 new_file_name,
@@ -543,7 +542,7 @@ async fn move_files(
                 PROCESSING_FILES.write().await.remove(&file.key);
             }
             return Ok(());
-        }
+        };
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {

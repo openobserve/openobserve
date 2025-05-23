@@ -24,11 +24,15 @@ use actix_web::{
 };
 use arrow_schema::Schema;
 use config::{
-    cluster::LOCAL_NODE, get_config, get_instance_id, meta::{
+    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config, get_instance_id,
+    meta::{
         cluster::{NodeStatus, Role, RoleGroup},
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
-    }, utils::{json, schema_ext::SchemaExt}, Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME
+    },
+    utils::{json, schema_ext::SchemaExt},
 };
 use hashbrown::HashMap;
 use infra::{

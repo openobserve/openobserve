@@ -47,16 +47,25 @@ pub static BLOCKED_ORGS: Lazy<HashSet<String>> = Lazy::new(|| {
 });
 
 pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
-    let file_data = FileKey::new(key.to_string(), meta.clone().unwrap_or_default(), deleted);
+    let mut file_data = FileKey::new(
+        0,
+        key.to_string(),
+        meta.clone().unwrap_or_default(),
+        deleted,
+    );
 
     // write into file_list storage
     // retry 5 times
     for _ in 0..5 {
-        if let Err(e) = progress(key, meta.as_ref(), deleted).await {
-            log::error!("[FILE_LIST] Error saving file to storage, retrying: {}", e);
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        } else {
-            break;
+        match progress(key, meta.as_ref(), deleted).await {
+            Ok(v) => {
+                file_data.id = v;
+                break;
+            }
+            Err(e) => {
+                log::error!("[FILE_LIST] Error saving file to storage, retrying: {}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            }
         }
     }
 
@@ -71,22 +80,18 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()>
     Ok(())
 }
 
-async fn progress(key: &str, data: Option<&FileMeta>, delete: bool) -> Result<()> {
+async fn progress(key: &str, data: Option<&FileMeta>, delete: bool) -> Result<i64> {
+    let mut id = 0;
     if delete {
         if let Err(e) = infra::file_list::remove(key).await {
-            log::error!(
-                "service:db:file_list: delete {}, set_file_to_cache error: {}",
-                key,
-                e
-            );
+            log::error!("service:db:file_list: delete {}, remove error: {}", key, e);
         }
     } else {
-        if let Err(e) = infra::file_list::add(key, data.unwrap()).await {
-            log::error!(
-                "service:db:file_list: add {}, set_file_to_cache error: {}",
-                key,
-                e
-            );
+        match infra::file_list::add(key, data.unwrap()).await {
+            Ok(v) => id = v,
+            Err(e) => {
+                log::error!("service:db:file_list: add {}, add error: {}", key, e);
+            }
         }
         // update stream stats realtime
         if config::get_config().common.local_mode {
@@ -100,7 +105,7 @@ async fn progress(key: &str, data: Option<&FileMeta>, delete: bool) -> Result<()
         }
     }
 
-    Ok(())
+    Ok(id)
 }
 
 pub async fn cache_stats() -> Result<()> {
