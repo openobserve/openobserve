@@ -33,7 +33,7 @@ use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::{RwLock as TokioRwLock, mpsc};
+use tokio::sync::mpsc;
 use vector_enrichment::TableRegistry;
 
 use crate::{
