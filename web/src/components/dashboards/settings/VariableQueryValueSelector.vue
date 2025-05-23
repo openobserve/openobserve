@@ -115,7 +115,7 @@ export default defineComponent({
     const filteredOptions = computed(() => {
       if (!filterText.value) return availableOptions.value;
       const searchText = filterText.value.toLowerCase();
-      return availableOptions.value.filter((opt) =>
+      return availableOptions.value.filter((opt: any) =>
         opt.label.toLowerCase().includes(searchText),
       );
     });
@@ -135,7 +135,7 @@ export default defineComponent({
     const toggleSelectAll = () => {
       if (!isAllSelected.value) {
         selectedValue.value = filteredOptions.value.map(
-          (option) => option.value,
+          (option: any) => option.value,
         );
       } else {
         selectedValue.value = [];
