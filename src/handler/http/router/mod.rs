@@ -261,7 +261,8 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .service(status::enable_node)
             .service(status::flush_node)
             .service(status::list_node)
-            .service(status::node_metrics),
+            .service(status::node_metrics)
+            .service(status::consistent_hash),
     );
 
     if get_config().common.swagger_enabled {

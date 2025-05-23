@@ -28,6 +28,7 @@ import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
 import {
   addLabelsToSQlQuery,
   changeHistogramInterval,
+  convertQueryIntoSingleLine,
 } from "@/utils/query/sqlUtils";
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
@@ -1413,7 +1414,8 @@ export const usePanelDataLoader = (
                   panelSchema.value.queryType,
                 );
 
-              const query = query2;
+              // convert query into single line
+              const query = await convertQueryIntoSingleLine(query2);
 
               const metadata: any = {
                 originalQuery: it.query,

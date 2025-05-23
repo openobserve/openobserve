@@ -260,7 +260,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     };
 
     // update node status metrics
-    node.metrics = super::update_node_status_metrics();
+    node.metrics = super::update_node_status_metrics().await;
 
     let val = json::to_string(&node).unwrap();
 

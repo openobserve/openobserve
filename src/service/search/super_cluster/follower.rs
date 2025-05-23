@@ -314,7 +314,7 @@ pub async fn search(
         physical_plan = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
     }
 
-    log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish",);
+    log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish");
 
     // we should collect scan state by `collect_stats`, here need to reutrn empty for super cluster
     // follower

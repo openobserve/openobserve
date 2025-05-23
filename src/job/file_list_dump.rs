@@ -436,6 +436,7 @@ async fn generate_dump(
     infra::storage::put(&account, &file_key, buf.into()).await?;
 
     let dump_file = FileKey {
+        id: 0,
         account: account.clone(),
         key: file_key.clone(),
         meta: meta.clone(),

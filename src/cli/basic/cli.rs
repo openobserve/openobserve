@@ -231,6 +231,14 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .required(true)
                     .help("snowflake id"),
             ]),
+            clap::Command::new("consistent-hash").about("consistent hash").args([
+                clap::Arg::new("file")
+                    .short('f')
+                    .long("file")
+                    .required(true)
+                    .num_args(1..)
+                    .help("file"),
+            ]),
             clap::Command::new("upgrade-db")
                 .about("upgrade db table schemas").args(dataArgs()),
         ])
@@ -494,6 +502,14 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let t = chrono::Utc.timestamp_nanos(ts * 1_000_000);
             let td = t.format("%Y-%m-%dT%H:%M:%SZ").to_string();
             println!("datetimes: {}", td);
+        }
+        "consistent-hash" => {
+            let files = command
+                .get_many::<String>("file")
+                .unwrap()
+                .collect::<Vec<_>>();
+            let files = files.iter().map(|f| f.to_string()).collect::<Vec<_>>();
+            super::http::consistent_hash(files).await?;
         }
         "upgrade-db" => {
             crate::migration::init_db().await?;

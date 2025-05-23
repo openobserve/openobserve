@@ -328,6 +328,7 @@ async fn prepare_files(
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(
+            0,
             "".to_string(), // here we don't need it
             file_key.clone(),
             parquet_meta,
@@ -536,8 +537,9 @@ async fn move_files(
         }
 
         // write file list to storage
-        let ret = db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await;
-        if let Err(e) = ret {
+        if let Err(e) =
+            db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await
+        {
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
                 new_file_name,

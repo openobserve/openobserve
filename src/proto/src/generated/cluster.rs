@@ -86,16 +86,18 @@ pub struct FileList {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileKey {
-    #[prost(string, tag = "1")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub meta: ::core::option::Option<FileMeta>,
-    #[prost(bool, tag = "3")]
-    pub deleted: bool,
-    #[prost(bytes = "vec", optional, tag = "4")]
-    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
-    #[prost(string, tag = "5")]
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    #[prost(string, tag = "2")]
     pub account: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "4")]
+    pub meta: ::core::option::Option<FileMeta>,
+    #[prost(bool, tag = "5")]
+    pub deleted: bool,
+    #[prost(bytes = "vec", optional, tag = "6")]
+    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
