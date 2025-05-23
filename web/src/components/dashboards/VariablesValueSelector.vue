@@ -727,7 +727,7 @@ export default defineComponent({
     watch(
       () =>
         JSON.stringify({
-          values: variablesData.values.map((v) => ({
+          values: variablesData.values.map((v: any) => ({
             name: v.name,
             value: v.value,
             type: v.type,
