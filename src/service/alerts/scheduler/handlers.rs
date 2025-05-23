@@ -856,7 +856,7 @@ async fn handle_derived_stream_triggers(
             "Pipeline associated with trigger not found: {}/{}/{}/{}. Checking after 5 mins.",
             org_id, stream_type, pipeline_name, pipeline_id
         );
-        // Check after 7 days if the pipeline is created
+        // Check after 5 mins if the pipeline is created
         new_trigger.next_run_at += Duration::try_minutes(5)
             .unwrap()
             .num_microseconds()
@@ -896,7 +896,7 @@ async fn handle_derived_stream_triggers(
     };
 
     if !pipeline.enabled {
-        // Pipeline not enabled, check after 7 days
+        // Pipeline not enabled, check again in 5 mins
         let msg = format!(
             "Pipeline associated with trigger not enabled: {}/{}/{}/{}. Checking after 5 mins.",
             org_id, stream_type, pipeline_name, pipeline_id
@@ -982,9 +982,14 @@ async fn handle_derived_stream_triggers(
 
     // in case the range [start_time, end_time] is greater than querying period, it needs to
     // evaluate and ingest 1 period at a time.
-    let suppossed_to_be_run_at = trigger.next_run_at;
-    let mut final_end_time = suppossed_to_be_run_at;
-    // let now = Utc::now().timestamp_micros();
+    let user_defined_delay = derived_stream
+        .delay
+        .and_then(|delay_in_mins| {
+            chrono::Duration::try_minutes(delay_in_mins as _).and_then(|td| td.num_microseconds())
+        })
+        .unwrap_or_default();
+    let supposed_to_be_run_at = trigger.next_run_at - user_defined_delay;
+    let mut final_end_time = supposed_to_be_run_at;
     let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
         .unwrap()
         .num_microseconds()
@@ -999,30 +1004,29 @@ async fn handle_derived_stream_triggers(
         // For derived stream, period is in minutes, so we need to convert it to seconds for
         // align_time
         let aligned_curr_time = TriggerCondition::align_time(
-            current_time,
+            current_time - user_defined_delay,
             derived_stream.tz_offset,
             derived_stream.trigger_condition.period * 60,
         );
         final_end_time = if aligned_curr_time > t0 {
             aligned_curr_time
         } else {
-            suppossed_to_be_run_at
+            supposed_to_be_run_at
         };
-        // If the delay is equal to or greater than the frequency, we need to ingest data one by
-        // one If the delay is less than the frequency, we need to ingest data for
-        // the "next run at" period, For example, if the current time is 5:19pm,
-        // frequency is 5 mins, and delay is 4mins (supposed to be run at 5:15pm),
-        // we need to ingest data for the period from 5:10pm to 5:15pm only. The
-        // next run at will be 5:20pm which will query for the period from 5:15pm to
-        // 5:20pm. But, if the suppossed to be run at is 5:10pm, then we need ingest
-        // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
-        // period from 5:05pm to 5:15pm.
+        // If the delay is equal to or greater than the frequency, we need to ingest data one by one
+        // If the delay is less than the frequency, we need to ingest data for the "next run at"
+        // period, For example, if the current time is 5:19pm, frequency is 5 mins, and
+        // delay is 4mins (supposed to be run at 5:15pm), we need to ingest data for the
+        // period from 5:10pm to 5:15pm only. The next run at will be 5:20pm which will
+        // query for the period from 5:15pm to 5:20pm. But, if the suppossed to be run at is
+        // 5:10pm, then we need ingest data for the period from 5:05pm to 5:15pm.
+        // Which is to cover the skipped period from 5:05pm to 5:15pm.
         (
             Some(t0),
-            std::cmp::min(suppossed_to_be_run_at, t0 + period_num_microseconds),
+            std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds),
         )
     } else {
-        (None, suppossed_to_be_run_at)
+        (None, supposed_to_be_run_at)
     };
 
     // In case the scheduler background job (watch_timeout) updates the trigger retries
@@ -1310,7 +1314,8 @@ async fn handle_derived_stream_triggers(
             // Store the last used derived stream period end time
             if let Some(start_time) = start {
                 new_trigger.data = json::to_string(&ScheduledTriggerData {
-                    period_end_time: Some(start_time), // updated start_time as end_time
+                    // updated start_time as end_time
+                    period_end_time: Some(start_time),
                     tolerance: 0,
                     last_satisfied_at: None,
                 })
