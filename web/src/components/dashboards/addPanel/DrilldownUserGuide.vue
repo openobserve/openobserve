@@ -79,10 +79,7 @@
     <br />
     <br />
     <div class="header">Use Series name and value</div>
-    <p>
-      You can reference the following variables to pass chart data when using
-      the drilldown feature:
-    </p>
+    <p>You can reference the following variables to pass chart data:</p>
 
     <ul>
       <li>
