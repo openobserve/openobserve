@@ -22,7 +22,7 @@ use config::{
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
-    metrics::QUERY_PARQUET_CACHE_RATIO_NODE,
+    metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -146,11 +146,11 @@ pub(crate) async fn create_context(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let cache_type = cache_files(
+    let (cache_type, cache_hits, cache_misses) = cache_files(
         trace_id,
         &files
             .iter()
-            .map(|f| (&f.account, &f.key, f.meta.compressed_size))
+            .map(|f| (&f.account, &f.key, f.meta.compressed_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "parquet",
@@ -161,6 +161,14 @@ pub(crate) async fn create_context(
         log::error!("[trace_id {trace_id}] promql->search->storage: cache files error: {e}");
         DataFusionError::Execution(e.to_string())
     })?;
+
+    // report cache hit and miss metrics
+    metrics::QUERY_DISK_CACHE_HIT_COUNT
+        .with_label_values(&[org_id, &stream_type.to_string(), "parquet"])
+        .inc_by(cache_hits);
+    metrics::QUERY_DISK_CACHE_MISS_COUNT
+        .with_label_values(&[org_id, &stream_type.to_string(), "parquet"])
+        .inc_by(cache_misses);
 
     scan_stats.querier_files = scan_stats.files;
     let cached_ratio = (scan_stats.querier_memory_cached_files

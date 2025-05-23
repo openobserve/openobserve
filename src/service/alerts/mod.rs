@@ -530,7 +530,7 @@ impl ConditionListExt for ConditionList {
                     let data_type = match schema.field_with_name(&cond.column) {
                         Ok(field) => field.data_type(),
                         Err(_) => {
-                            return Err(anyhow::anyhow!("Column {} not found", &cond.column,));
+                            return Err(anyhow::anyhow!("Column {} not found", &cond.column));
                         }
                     };
                     cond_sql_list.push(build_expr(cond, "", data_type)?);
@@ -551,7 +551,7 @@ impl ConditionListExt for ConditionList {
                 let data_type = match schema.field_with_name(&node.column) {
                     Ok(field) => field.data_type(),
                     Err(_) => {
-                        return Err(anyhow::anyhow!("Column {} not found", &node.column,));
+                        return Err(anyhow::anyhow!("Column {} not found", &node.column));
                     }
                 };
                 build_expr(node, "", data_type)

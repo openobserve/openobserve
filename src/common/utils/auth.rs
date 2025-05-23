@@ -663,6 +663,7 @@ impl FromRequest for AuthExtractor {
                 || path.contains("query_manager")
                 || path.contains("/short")
                 || path.contains("/ws")
+                || path.contains("/_values_stream")
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),

@@ -1125,6 +1125,12 @@ pub struct Common {
     pub file_list_dump_min_hour: usize,
     #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
     pub file_list_dump_debug_check: bool,
+    #[env_config(
+        name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
+        default = false,
+        help = "Enable to use stream settings for partitions. This will apply for all streams"
+    )]
+    pub use_stream_settings_for_partitions_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1203,6 +1209,12 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
+    pub file_download_priority_queue_thread_num: usize,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
+    pub file_download_priority_queue_window_secs: i64,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_ENABLE_PRIORITY_QUEUE", default = true)]
+    pub file_download_enable_priority_queue: bool,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
     #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
@@ -1538,7 +1550,7 @@ pub struct CacheLatestFiles {
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
     pub download_from_node: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_NODE_SIZE", default = 100)] // MB
-    pub download_node_size: usize,
+    pub download_node_size: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1999,6 +2011,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.limit.file_download_thread_num == 0 {
         cfg.limit.file_download_thread_num = std::cmp::max(1, cpu_num / 2);
+    }
+
+    if cfg.limit.file_download_priority_queue_thread_num == 0 {
+        cfg.limit.file_download_priority_queue_thread_num = std::cmp::max(1, cpu_num / 2);
     }
 
     // HACK for move_file_thread_num equal to CPU core

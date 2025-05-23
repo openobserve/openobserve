@@ -1302,7 +1302,7 @@ pub async fn search_partition(
     let cfg = get_config();
 
     let http_span = if cfg.common.tracing_search_enabled {
-        tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone(),)
+        tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone())
     } else {
         Span::none()
     };
@@ -1333,6 +1333,7 @@ pub async fn search_partition(
         stream_type,
         &req,
         false,
+        true,
     )
     .instrument(http_span)
     .await;
