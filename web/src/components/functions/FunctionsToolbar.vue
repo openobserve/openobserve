@@ -69,6 +69,20 @@
       </q-form>
     </div>
     <div class="add-function-actions flex justify-center">
+          <q-btn
+            :ripple="false"
+            @click="emit('open:chat',!store.state.isAiChatEnabled)"
+            data-test="menu-link-ai-item"
+            no-caps
+            :borderless="true"
+            flat
+            dense
+            class="o2-button"
+          >
+          <div class="row items-center no-wrap tw-gap-2 q-px-sm">
+            <img src="../../assets/images/common/ai_icon.svg" class="header-icon" />
+          </div>
+        </q-btn>
       <q-btn
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
@@ -145,7 +159,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["test", "save", "update:name", "back", "cancel"]);
+const emit = defineEmits(["test", "save", "update:name", "back", "cancel", "open:chat"]);
 
 const addFunctionForm = ref(null);
 

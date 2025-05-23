@@ -25,13 +25,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @save="onSubmit"
         @back="closeAddFunction"
         @cancel="cancelAddFunction"
+        @open:chat="openChat"
         class="tw-pr-4"
       />
       <q-separator />
     </div>
+  <div class="tw-flex tw-pr-2">
+
 
     <div
-      class="tw-flex tw-h-[calc(100vh-112px)] tw-overflow-auto tw-pr-2 tw-pb-4"
+      class="tw-flex tw-overflow-auto tw-pr-2 tw-pb-4"
+      :class="`tw-h-[calc(100vh-(112px + ${heightOffset}px))]`"
+      :style="{
+        width: store.state.isAiChatEnabled ? '75%' : '100%',
+      }"
     >
       <q-splitter
         v-model="splitterModel"
@@ -58,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ref="editorRef"
                     editor-id="add-function-editor"
                     class="monaco-editor"
+                    :style="{ height: `calc(100vh - (160px + ${heightOffset}px))` }"
                     v-model:query="formData.function"
                     language="vrl"
                   />
@@ -100,11 +108,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="testFunctionRef"
               :vrlFunction="formData"
               @function-error="handleFunctionError"
+              :heightOffset="heightOffset"
             />
           </div>
         </template>
       </q-splitter>
     </div>
+    <div v-if="store.state.isAiChatEnabled" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+      <O2AIChat :style="{
+        height: `calc(100vh - (112px + ${heightOffset}px))`
+      }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
+    </div>
+  </div>
   </div>
   <confirm-dialog
     :title="confirmDialogMeta.title"
@@ -136,6 +151,7 @@ import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { onBeforeRouteLeave } from "vue-router";
+import O2AIChat from "@/components/O2AIChat.vue";
 
 const defaultValue: any = () => {
   return {
@@ -159,6 +175,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    heightOffset: {
+      type: Number,
+      default: 0,
+    },
   },
   components: {
     QueryEditor,
@@ -166,6 +186,7 @@ export default defineComponent({
     FullViewContainer,
     TestFunction,
     ConfirmDialog,
+    O2AIChat,
   },
   emits: ["update:list", "cancel:hideform"],
   setup(props, { emit }) {
@@ -429,6 +450,9 @@ end`;
       confirmDialogMeta.value.onConfirm = () => {};
       confirmDialogMeta.value.data = null;
     };
+    const openChat = (val: boolean) => {
+      store.state.isAiChatEnabled = val;
+    };
 
     return {
       t,
@@ -463,6 +487,7 @@ end`;
       confirmDialogMeta,
       resetConfirmDialog,
       cancelAddFunction,
+      openChat,
     };
   },
   created() {
@@ -485,7 +510,6 @@ end`;
 <style scoped lang="scss">
 .monaco-editor {
   width: 100%;
-  height: calc(100vh - 160px);
   border-radius: 5px;
 }
 

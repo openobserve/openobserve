@@ -2,7 +2,7 @@
   <div class="chat-container" :class="[{ 'chat-open': isOpen }, store.state.theme == 'dark' ? 'dark-mode' : 'light-mode']" 
   >
     <div v-if="isOpen" class="chat-content-wrapper" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-      <div class="chat-header" style="height: 82.5px;">
+      <div class="chat-header" :style="{ height:  headerHeight ? headerHeight + 'px' : '' }">
         <div class="chat-title tw-flex tw-justify-between tw-items-center tw-w-full">
 
           <div >
@@ -92,9 +92,8 @@
               { 'error-message': message.content.startsWith('Error:') }
             ]">
             <div class="message-content" >
-              <q-avatar size="24px" class="q-mr-sm">
-                <img v-if="message.role === 'assistant'" src="/src/assets/images/common/o2_ai_logo.svg" />
-                <q-icon size="16px" v-else color="primary" name="person" />
+              <q-avatar v-if="message.role === 'user'" size="24px" class="q-mr-sm">
+                <q-icon size="16px" color="primary" name="person" />
               </q-avatar>
               <div class="message-blocks" style="background-color: transparent;" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
                 <template v-for="(block, blockIndex) in message.blocks" :key="blockIndex">
@@ -297,6 +296,10 @@ export default defineComponent({
     isOpen: {
       type: Boolean,
       default: false
+    },
+    headerHeight: {
+      type: Number,
+      default: 0,
     }
   },
   setup(props) {
@@ -897,7 +900,7 @@ export default defineComponent({
   .messages-container {
     flex: 1;
     overflow-y: auto;
-    padding: 16px;
+    padding: 8px;
     display: flex;
     flex-direction: column;
     gap: 16px;
