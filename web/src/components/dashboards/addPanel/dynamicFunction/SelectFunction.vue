@@ -40,20 +40,39 @@
           class="tw-w-full tw-flex tw-flex-col"
         >
           <div class="tw-flex">
-            <div class="tw-mr-2 tw-relative">
+            <!-- <div class="tw-mr-2 tw-relative">
               <SubTaskArrow class="tw-absolute" />
               <div
                 v-if="argIndex !== fields.args.length - 1"
                 class="tw-border-l-[1px] tw-border-[#001495] tw-opacity-50 tw-relative tw-h-full"
               ></div>
+            </div> -->
+            <div class="tw-mr-2 tw-relative" style="min-height: 50px">
+              <!-- Vertical Line using top & bottom instead of height -->
+              <div
+                class="tw-absolute tw-top-0 tw-w-[1px] tw-bg-[#001495] tw-opacity-50"
+                :style="{
+                  bottom:
+                    argIndex === fields.args.length - 1
+                      ? 'calc(100% - 32px)'
+                      : '0',
+                  left: '0.5px',
+                }"
+              ></div>
+
+              <!-- SubTask Arrow -->
+              <div class="tw-absolute" :style="{ top: '28px', right: '-11px' }">
+                <SubTaskArrow />
+              </div>
             </div>
+
             <div>
               <div class="tw-flex tw-items-center tw-gap-x-2">
                 <label :for="'arg-' + argIndex"
                   >Parameters {{ argIndex + 1 }}</label
                 >
               </div>
-              <div class="tw-flex tw-gap-x-3">
+              <div class="tw-flex">
                 <!-- type selector -->
                 <q-select
                   v-model="fields.args[argIndex].type"
@@ -71,10 +90,15 @@
                   emit-value
                   dense
                   filled
-                  label="Select Type"
-                  class="tw-w-40 tw-min-w-40 tw-h-10 tw-text-white"
+                  :display-value="''"
+                  class="tw-w-22 tw-min-w-22 tw-h-10 text-sm bg-primary text-white q-field--dark"
+                  :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
-                />
+                >
+                  <template v-slot:prepend>
+                    <q-icon name="event" />
+                  </template>
+                </q-select>
 
                 <!-- Render different input types based on validation -->
                 <!-- <q-select
