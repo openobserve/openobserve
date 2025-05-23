@@ -1164,7 +1164,10 @@
     "envVariables": "Environment Variables",
     "schedule": "Schedule",
     "setupAction": "Setup Action",
-    "actionDetails": "Action Details"
+    "actionDetails": "Action Details",
+    "reupload": "Reupload",
+    "updateCode": "Update Code",
+    "editCode": "Edit Code"
   },
   "cipherKey": {
     "header": "Cipher Keys",

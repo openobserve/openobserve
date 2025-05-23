@@ -398,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div
                     data-test="add-action-script-file-input"
-                    class="flex items-center o2-input"
+                    class="flex items-center"
                   >
                     <q-file
                       v-if="
@@ -408,12 +408,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       color="primary"
                       filled
                       v-model="formData.codeZip"
-                      :label="t('actions.zipFile') + ' *'"
                       bg-color="input-bg"
-                      class="tw-w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
+                      class="tw-w-[300px] q-pt-md q-pb-sm showLabelOnTop action-file-uploader tw-min-h-[150px] tw-max-h-[150px] tw-h-[150px] tw-w-[244px]"
                       stack-label
                       outlined
                       dense
+                      icon="attach_file"
                       accept=".zip"
                       :rules="[
                         (val: any) => {
@@ -425,7 +425,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                     >
                       <template v-slot:prepend>
-                        <q-icon name="attachment" />
+                        <div
+                          class="tw-flex tw-items-center tw-flex-col text-center"
+                        >
+                          <q-icon name="upload" />
+                          <div class="tw-flex tw-flex-col tw-text-[14px]">
+                            <div>Drag and Drop or Browse .zip file</div>
+                            <div>Only .zip files are accepted.</div>
+                          </div>
+                        </div>
                       </template>
                       <template v-slot:hint>
                         Note: Only .zip files are accepted and it may contain
@@ -438,30 +446,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="
                         isEditingActionScript && formData.fileNameToShow != ''
                       "
-                    >
-                      {{ formData.fileNameToShow }}
-                      <q-btn
-                        data-test="add-action-script-edit-file-btn"
-                        @click="editFileToUpload"
-                        icon="edit"
-                        no-caps
-                        dense
-                        flat
-                        size="14px"
-                      />
-                    </div>
+                    ></div>
 
-                    <iframe
-                      v-if="originalActionScriptData.length"
-                      id="vscode-iframe"
-                      :src="`${store.state.API_ENDPOINT}/web/vscode?origin=${encodeURIComponent(store.state.API_ENDPOINT + '?id=' + actionId + '&name=' + formData.name)}`"
-                      sandbox="allow-scripts allow-same-origin"
-                      class="q-mt-md"
-                      style="
-                        width: 100%;
-                        height: max(700px, calc(100vh - 200px));
-                      "
-                    />
+                    <div v-if="!showUploadFile" class="tw-w-full">
+                      <div>
+                        <div>Upload ZIP File</div>
+                        <div caption class="tw-pt-2">
+                          It may contain various resources such as .py, .txt and
+                          main.py file etc.
+                        </div>
+                        <div class="tw-pt-4">
+                          {{ formData.fileNameToShow }}
+                          <q-btn
+                            data-test="add-action-script-edit-file-btn"
+                            @click="editFileToUpload"
+                            icon="upload"
+                            no-caps
+                            dense
+                            class="q-ml-md q-mb-xs text-bold no-border"
+                            padding="sm md"
+                            color="secondary"
+                            :label="t(`actions.reupload`)"
+                            size="14px"
+                          />
+                          <q-btn
+                            data-test="add-action-script-edit-file-btn"
+                            @click="updateCodeEditorView"
+                            icon="code"
+                            no-caps
+                            dense
+                            class="q-ml-md q-mb-xs text-bold"
+                            padding="sm md"
+                            :label="t(`actions.editCode`)"
+                            size="14px"
+                          />
+                        </div>
+                      </div>
+                    </div>
 
                     <div
                       v-if="
@@ -709,6 +730,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="saveActionScript"
       />
     </div>
+    <ActionCodeEditor
+      v-model="isCodeEditorOpen"
+      :uploaded-file="formData.codeZip"
+      :action-id="actionId"
+      :form-data="formData"
+      @save="onCodeSave"
+      @close="isCodeEditorOpen = false"
+    />
   </div>
   <ConfirmDialog
     v-model="dialog.show"
@@ -746,6 +775,7 @@ import cronParser from "cron-parser";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
+import ActionCodeEditor from "@/components/actionScripts/ActionCodeEditor.vue";
 
 defineProps({
   report: {
@@ -795,12 +825,18 @@ const detailsFormRef: Ref<any> = ref(null);
 
 const step = ref(1);
 
+const codeMode = ref("zip");
+
 // Control visibility of Action Details section
 const actionDetailsExpanded = ref(false);
 
 const actionSetupExpanded = ref(true);
 
 const formData = ref(defaultActionScript);
+
+const isCodeEditorOpen = ref(false);
+
+const showUploadFile = ref(false);
 
 const q = useQuasar();
 
@@ -896,7 +932,7 @@ const getOrigin = computed(() => {
 const onSubmit = () => {};
 
 const actionId = computed(() => {
-  return router.currentRoute.value.query?.id;
+  return router.currentRoute.value.query?.id as string;
 });
 
 // Save just the initial setup and create the action
@@ -1264,12 +1300,14 @@ const openCancelDialog = () => {
   dialog.value.okCallback = goToActionScripts;
 };
 const editFileToUpload = () => {
+  showUploadFile.value = true;
   formData.value.fileNameToShow = "";
 };
 const cancelUploadingNewFile = () => {
   formData.value.fileNameToShow = JSON.parse(
     originalActionScriptData.value,
   ).zip_file_name;
+  showUploadFile.value = false;
 };
 const addApiHeader = (key: string = "", value: string = "") => {
   environmentalVariables.value.push({
@@ -1373,6 +1411,19 @@ const getServiceAccounts = async () => {
   }
 };
 
+const updateCodeEditorView = () => {
+  isCodeEditorOpen.value = true;
+};
+
+const onCodeSave = (data) => {
+  // Handle the saved code
+  q.notify({
+    type: "positive",
+    message: "Code updated successfully",
+    timeout: 2000,
+  });
+};
+
 onBeforeMount(async () => {
   await getServiceAccounts();
 });
@@ -1410,9 +1461,16 @@ onBeforeMount(async () => {
 </style>
 
 <style scoped lang="scss">
-.lookup-table-file-uploader {
+.action-file-uploader {
   :deep(.q-field__label) {
     left: -30px;
+  }
+
+  :deep(.q-field__control) {
+    height: 100% !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 

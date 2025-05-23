@@ -677,6 +677,8 @@ export default defineComponent({
         },
       });
 
+      addAlert();
+
       if (config.enableAnalytics == "true") {
         segment.track("Button Click", {
           button: "Add Action",
