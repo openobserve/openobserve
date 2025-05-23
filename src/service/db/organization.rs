@@ -57,17 +57,51 @@ pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> e
 }
 
 pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error> {
+    #[cfg(not(feature = "cloud"))]
+    let trial_period_expiry = None;
+    #[cfg(feature = "cloud")]
+    let trial_period_expiry = {
+        use o2_enterprise::enterprise::{
+            cloud::billings, common::infra::config::get_config as get_o2_config,
+        };
+        let o2_config = get_o2_config();
+
+        // if trial period check is disabled, everything is free trial period
+        if !o2_config.cloud.trial_period_enabled || org_id == "_meta" {
+            None
+        } else {
+            // first check if the org is
+            let subscription = billings::get_billing_by_org_id(org_id).await.ok();
+            match subscription {
+                None | Some(None) => match infra::table::organizations::get(org_id).await {
+                    Ok(org) => Some(org.trial_ends_at),
+                    Err(_) => None,
+                },
+                Some(Some(s)) if s.subscription_type.is_free_sub() => {
+                    match infra::table::organizations::get(org_id).await {
+                        Ok(org) => Some(org.trial_ends_at),
+                        Err(_) => None,
+                    }
+                }
+                _ => None,
+            }
+        }
+    };
+
     let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_id);
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.clone());
+        let mut ret = v.clone();
+        ret.free_trial_expiry = trial_period_expiry;
+        return Ok(ret);
     }
     let _settings = db::get(&key).await?;
-    let settings: OrganizationSetting = json::from_slice(&_settings)?;
+    let mut settings: OrganizationSetting = json::from_slice(&_settings)?;
     // cache the org setting
     ORGANIZATION_SETTING
         .write()
         .await
         .insert(key.to_string(), settings.clone());
+    settings.free_trial_expiry = trial_period_expiry;
     Ok(settings)
 }
 
