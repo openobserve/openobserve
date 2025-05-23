@@ -477,6 +477,9 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
         for (stream_key, stream_files) in stream_files {
             let pool = CLIENT_RO.clone();
             for (date_key, files) in stream_files {
+                if files.is_empty() {
+                    continue;
+                }
                 let sql = format!(
                     "SELECT id, file FROM file_list WHERE stream = $1 AND date = $2 AND file IN ('{}');",
                     files.join("','")
