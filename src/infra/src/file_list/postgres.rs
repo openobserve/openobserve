@@ -165,14 +165,14 @@ impl super::FileList for PostgresFileList {
                 .observe(time);
             if let Err(e) = res {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[POSTGRES] rollback file_list update dump error: {e}",);
+                    log::error!("[POSTGRES] rollback file_list update dump error: {e}");
                 }
                 return Err(e.into());
             }
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit file_list dump update error: {e}",);
+            log::error!("[POSTGRES] commit file_list dump update error: {e}");
             return Err(e.into());
         }
         Ok(())

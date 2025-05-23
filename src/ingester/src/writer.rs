@@ -446,7 +446,7 @@ impl Writer {
         let path = old_wal.path().clone();
         let path_str = path.display().to_string();
         let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
-        log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str,);
+        log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str);
         IMMUTABLES.write().await.insert(path, table);
         log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {}", path_str);
 

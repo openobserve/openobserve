@@ -31,13 +31,13 @@ pub(crate) async fn process(operator: JobOperator) -> Result<()> {
         }
         JobOperator::Set(operator) => {
             if let Err(e) = set(operator.clone()).await {
-                log::error!("[SUPER_CLUSTER:DB] Failed to set job: {operator:?}, error: {e}",);
+                log::error!("[SUPER_CLUSTER:DB] Failed to set job: {operator:?}, error: {e}");
                 return Err(e);
             }
         }
         JobOperator::Cancel { job_id, updated_at } => {
             if let Err(e) = cancel_job(job_id.as_str(), updated_at).await {
-                log::error!("[SUPER_CLUSTER:DB] Failed to cancel job: {job_id}, error: {e}",);
+                log::error!("[SUPER_CLUSTER:DB] Failed to cancel job: {job_id}, error: {e}");
                 return Err(e);
             }
         }
@@ -50,13 +50,13 @@ pub(crate) async fn process(operator: JobOperator) -> Result<()> {
             if let Err(e) =
                 set_job_start(job_id.as_str(), cluster.as_str(), node.as_str(), updated_at).await
             {
-                log::error!("[SUPER_CLUSTER:DB] Failed to set job start: {job_id}, error: {e}",);
+                log::error!("[SUPER_CLUSTER:DB] Failed to set job start: {job_id}, error: {e}");
                 return Err(e);
             }
         }
         JobOperator::Delete { job_id } => {
             if let Err(e) = clean_deleted_job(job_id.as_str()).await {
-                log::error!("[SUPER_CLUSTER:DB] Failed to clean deleted job: {job_id}, error: {e}",);
+                log::error!("[SUPER_CLUSTER:DB] Failed to clean deleted job: {job_id}, error: {e}");
                 return Err(e);
             }
         }
@@ -68,7 +68,7 @@ pub(crate) async fn process(operator: JobOperator) -> Result<()> {
             if let Err(e) =
                 retry_search_job(job_id.as_str(), new_trace_id.as_str(), updated_at).await
             {
-                log::error!("[SUPER_CLUSTER:DB] Failed to retry job: {job_id}, error: {e}",);
+                log::error!("[SUPER_CLUSTER:DB] Failed to retry job: {job_id}, error: {e}");
                 return Err(e);
             }
         }

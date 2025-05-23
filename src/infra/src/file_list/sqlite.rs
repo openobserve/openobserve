@@ -133,7 +133,7 @@ impl super::FileList for SqliteFileList {
         .execute(&mut *tx)
         .await{
             if let Err(e) = tx.rollback().await {
-                log::error!("[SQLITE] rollback file_list dump file update error: {e}",);
+                log::error!("[SQLITE] rollback file_list dump file update error: {e}");
             }
             return Err(e.into());
         }
@@ -150,7 +150,7 @@ impl super::FileList for SqliteFileList {
             let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
             if let Err(e) = sqlx::query(&query_str).execute(&mut *tx).await {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[SQLITE] rollback file_list dump file update error: {e}",);
+                    log::error!("[SQLITE] rollback file_list dump file update error: {e}");
                 }
                 return Err(e.into());
             }

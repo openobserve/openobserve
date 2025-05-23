@@ -209,7 +209,7 @@ pub async fn query_by_ids(
                 .component("file_list query from db".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .desc(format!("query from db: {}", db_files.len(),))
+                .desc(format!("query from db: {}", db_files.len()))
                 .build()
         )
     );
@@ -282,7 +282,7 @@ pub async fn query_by_ids(
                     .component("file_list set cached_ids".to_string())
                     .search_role("follower".to_string())
                     .duration(start.elapsed().as_millis() as usize)
-                    .desc(format!("set cached_ids: {}", db_files.len(),))
+                    .desc(format!("set cached_ids: {}", db_files.len()))
                     .build()
             )
         );
