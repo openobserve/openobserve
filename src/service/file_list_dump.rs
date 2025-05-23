@@ -230,16 +230,7 @@ pub async fn query(
     let db_time = db_start.elapsed().as_millis();
 
     let process_start = std::time::Instant::now();
-    let dump_files: Vec<_> = dump_files
-        .into_iter()
-        .map(|f| FileKey {
-            account: f.account.to_string(),
-            key: format!("files/{}/{}/{}", stream_key, f.date, f.file),
-            meta: (&f).into(),
-            deleted: false,
-            segment_ids: None,
-        })
-        .collect();
+    let dump_files: Vec<_> = dump_files.iter().map(|f| f.into()).collect();
     let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
 
     let stream_key = format!("{org}/{stream_type}/{stream}");
@@ -283,16 +274,7 @@ pub async fn get_ids_in_range(
     let db_time = db_start.elapsed().as_millis();
 
     let process_start = std::time::Instant::now();
-    let dump_files: Vec<_> = dump_files
-        .into_iter()
-        .map(|f| FileKey {
-            account: f.account.to_string(),
-            key: format!("files/{}/{}/{}", stream_key, f.date, f.file),
-            meta: (&f).into(),
-            deleted: false,
-            segment_ids: None,
-        })
-        .collect();
+    let dump_files: Vec<_> = dump_files.iter().map(|f| f.into()).collect();
     let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
 
     let stream_key = format!("{org}/{stream_type}/{stream}");
@@ -367,12 +349,11 @@ async fn move_and_delete(
         let items: Vec<_> = list
             .iter()
             .chain(dump_files.iter())
-            .map(|f| FileKey {
-                account: f.account.to_string(),
-                key: format!("files/{}/{}/{}", f.stream, f.date, f.file),
-                meta: f.into(),
-                deleted: true,
-                segment_ids: None,
+            .map(|f| {
+                let mut f = FileKey::from(f);
+                f.deleted = true;
+                f.segment_ids = None;
+                f
             })
             .collect();
         if let Err(e) = infra::file_list::batch_process(&items).await {
@@ -461,16 +442,7 @@ pub async fn stats(
         return Ok(vec![]);
     }
 
-    let dump_files: Vec<_> = dump_files
-        .into_iter()
-        .map(|f| FileKey {
-            account: f.account.to_string(),
-            key: format!("files/{}/{}/{}", f.stream, f.date, f.file),
-            meta: (&f).into(),
-            deleted: false,
-            segment_ids: None,
-        })
-        .collect();
+    let dump_files: Vec<_> = dump_files.iter().map(|f| f.into()).collect();
 
     let sql = format!(
         r#"

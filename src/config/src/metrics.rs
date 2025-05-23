@@ -1063,8 +1063,8 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
         .expect("Metric registered");
     registry
-    .register(Box::new(NODE_CONSISTENT_HASH.clone()))
-    .expect("Metric registered");
+        .register(Box::new(NODE_CONSISTENT_HASH.clone()))
+        .expect("Metric registered");
 
     // query disk cache metrics
     registry

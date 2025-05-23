@@ -235,7 +235,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 clap::Arg::new("file")
                     .short('f')
                     .long("file")
-                    .required(true) 
+                    .required(true)
                     .num_args(1..)
                     .help("file"),
             ]),

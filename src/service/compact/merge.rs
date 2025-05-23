@@ -644,11 +644,9 @@ pub async fn merge_by_stream(
 
                 for file in delete_file_list {
                     events.push(FileKey {
-                        account: file.account.clone(),
-                        key: file.key.clone(),
-                        meta: file.meta.clone(),
                         deleted: true,
                         segment_ids: None,
+                        ..file.clone()
                     });
                 }
                 events.sort_by(|a, b| a.key.cmp(&b.key));
@@ -999,7 +997,7 @@ pub async fn merge_files(
                 )
                 .await?;
             }
-            new_files.push(FileKey::new(account, new_file_key, new_file_meta, false));
+            new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
         }
         MergeParquetResult::Multiple { bufs, file_metas } => {
             for (buf, file_meta) in bufs.into_iter().zip(file_metas.into_iter()) {
@@ -1041,7 +1039,7 @@ pub async fn merge_files(
                     .await?;
                 }
 
-                new_files.push(FileKey::new(account, new_file_key, new_file_meta, false));
+                new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
             }
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
@@ -1114,6 +1112,7 @@ async fn generate_inverted_index(
             if let Err(e) = write_file_list(
                 org_id,
                 &[FileKey {
+                    id: 0,
                     account,
                     key: file_name.clone(),
                     meta: filemeta,
@@ -1203,7 +1202,15 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
     if success {
         // send broadcast to other nodes
         if get_config().cache_latest_files.enabled {
-            if let Err(e) = db::file_list::broadcast::send(events, None).await {
+            // get id for all the new files
+            let file_ids = infra_file_list::query_ids_by_files(events).await?;
+            let mut events = events.to_vec();
+            for event in events.iter_mut() {
+                if let Some(id) = file_ids.get(&event.key) {
+                    event.id = *id;
+                }
+            }
+            if let Err(e) = db::file_list::broadcast::send(&events).await {
                 log::error!("[COMPACTOR] send broadcast for file_list failed: {}", e);
             }
         }
