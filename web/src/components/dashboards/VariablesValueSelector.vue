@@ -791,11 +791,10 @@ export default defineComponent({
       // if multi select
       if (currentVariable.multiSelect) {
         // old selected values
-        const selectedValues = currentVariable.options
-          .filter((option: any) =>
-            oldVariableSelectedValues.includes(option.value),
-          )
-          .map((option: any) => option.value);
+        const selectedValues = oldVariableSelectedValues.filter((value) => {
+          // Keep old values even if not in current options
+          return value !== undefined && value !== null;
+        });
 
         // if selected values exist, select the values
         if (selectedValues.length > 0) {
@@ -822,14 +821,12 @@ export default defineComponent({
       } else {
         // here, multi select is false
 
-        // old selected value
-        const oldValue = currentVariable.options.find(
-          (option: any) => option.value === oldVariableSelectedValues[0],
-        )?.value;
-
-        // if old value exist, select the old value
-        if (oldValue) {
-          currentVariable.value = oldValue;
+        // Keep old value if it exists, regardless of whether it's in current options
+        if (
+          oldVariableSelectedValues[0] !== undefined &&
+          oldVariableSelectedValues[0] !== null
+        ) {
+          currentVariable.value = oldVariableSelectedValues[0];
         } else if (currentVariable.options.length > 0) {
           // here, multi select is false and old value not exist
 
@@ -870,12 +867,10 @@ export default defineComponent({
 
       // if multi select
       if (currentVariable.multiSelect) {
-        // old selected values
-        const selectedValues = currentVariable.options
-          .filter((option: any) =>
-            oldVariableSelectedValues.includes(option.value),
-          )
-          .map((option: any) => option.value);
+        // Keep old selected values even if not in current options
+        const selectedValues = oldVariableSelectedValues.filter((value) => {
+          return value !== undefined && value !== null;
+        });
 
         // if old selected values exist, select the values
         if (selectedValues.length > 0) {
@@ -891,14 +886,12 @@ export default defineComponent({
       } else {
         // here, multi select is false
 
-        // old selected value
-        const oldValue = currentVariable.options.find(
-          (option: any) => option.value === oldVariableSelectedValues[0],
-        )?.value;
-
-        // if old value exist, select the old value
-        if (oldValue) {
-          currentVariable.value = oldValue;
+        // Keep old value if it exists, regardless of whether it's in current options
+        if (
+          oldVariableSelectedValues[0] !== undefined &&
+          oldVariableSelectedValues[0] !== null
+        ) {
+          currentVariable.value = oldVariableSelectedValues[0];
         } else if (currentVariable.options.length > 0) {
           // here, multi select is false and old value not exist
           currentVariable.value =
@@ -1227,7 +1220,7 @@ export default defineComponent({
 
       if (fieldHit) {
         // Extract the values for the specified field from the result
-        variableObject.options = fieldHit.values
+        const newOptions = fieldHit.values
           .filter((value: any) => value.zo_sql_key || value.zo_sql_key === "")
           .map((value: any) => ({
             // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
@@ -1237,30 +1230,58 @@ export default defineComponent({
             value: value.zo_sql_key.toString(),
           }));
 
+        // Update options with new values
+        variableObject.options = newOptions;
+
         // Set default value
         if (oldVariablesData[variableObject.name] !== undefined) {
           const oldValues = Array.isArray(oldVariablesData[variableObject.name])
             ? oldVariablesData[variableObject.name]
             : [oldVariablesData[variableObject.name]];
-          console.log(
-            `[WebSocket] before Restoring old values for ${variableObject.name}:`,
-            {
-              oldValues,
-              type: variableObject.type,
-            },
-          );
-          if (variableObject.type === "custom") {
-            // Handle custom variable logic
-            handleCustomVariablesLogic(variableObject, oldValues);
+
+          // Check if this is a child variable
+          const isChildVariable =
+            variablesDependencyGraph[variableObject.name]?.parentVariables
+              ?.length > 0;
+
+          if (isChildVariable) {
+            // For child variables, only keep old values that exist in new options
+            const validOldValues = oldValues.filter((value: string) =>
+              newOptions.some((opt: { value: string }) => opt.value === value),
+            );
+
+            if (validOldValues.length > 0) {
+              // If we have valid old values, use them
+              variableObject.value = variableObject.multiSelect
+                ? validOldValues
+                : validOldValues[0];
+            } else {
+              // If no valid old values, use first option
+              variableObject.value = variableObject.multiSelect
+                ? newOptions.length > 0
+                  ? [newOptions[0].value]
+                  : []
+                : newOptions.length > 0
+                  ? newOptions[0].value
+                  : null;
+            }
           } else {
-            // Handle query values logic
-            handleQueryValuesLogic(variableObject, oldValues);
+            // For non-child variables, preserve old values as before
+            if (variableObject.type === "custom") {
+              handleCustomVariablesLogic(variableObject, oldValues);
+            } else {
+              handleQueryValuesLogic(variableObject, oldValues);
+            }
           }
         } else {
           // Set default value to the first option if no old values are available
-          variableObject.value = variableObject.options.length
-            ? variableObject.options[0].value
-            : null;
+          variableObject.value = variableObject.multiSelect
+            ? newOptions.length > 0
+              ? [newOptions[0].value]
+              : []
+            : newOptions.length > 0
+              ? newOptions[0].value
+              : null;
         }
       } else {
         // Reset variable state if no field values are available
