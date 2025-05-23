@@ -23,7 +23,7 @@ use utoipa::ToSchema;
 use crate::{
     config::get_config,
     meta::{sql::OrderBy, stream::StreamType},
-    utils::{base64, json},
+    utils::{base64, json, json::get_string_value},
 };
 
 pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
@@ -929,8 +929,6 @@ impl TryFrom<&str> for SearchEventType {
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ValuesEventContext {
-    pub top_k: Option<i64>,
-    pub no_count: bool,
     pub field: String,
 }
 
@@ -1178,7 +1176,7 @@ pub struct PaginationQuery {
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ValuesRequest {
-    pub fields: Vec<String>,
+    pub field: String,
     #[serde(default)]
     pub size: Option<i64>,
     pub no_count: bool,
@@ -1201,6 +1199,29 @@ pub struct ValuesRequest {
     pub stream_name: String,
     pub stream_type: StreamType,
     pub sql: String,
+}
+
+/// Mutates the search_res in place to add the field and values to the hits
+/// Values Response is a clone of the search response but with the hits wrapped in a new object
+/// structure
+pub fn format_values_search_response(search_res: &mut Response, field: &str) {
+    search_res.hits.iter_mut().for_each(|hit| {
+        if let Some(obj) = hit.as_object_mut() {
+            let key = match obj.get_mut("zo_sql_key") {
+                Some(v) => get_string_value(v),
+                None => "".to_string(),
+            };
+            obj.insert("zo_sql_key".to_string(), json::Value::String(key));
+        }
+    });
+
+    // Wrap the hits in a new object structure
+    let values = std::mem::take(&mut search_res.hits);
+    let wrapped_obj = json::json!({
+        "field": field,
+        "values": values
+    });
+    search_res.hits = vec![wrapped_obj];
 }
 
 #[cfg(test)]

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::Reverse, collections::BinaryHeap, io::Error};
+use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, post, web};
 use arrow_schema::Schema;
@@ -21,7 +21,7 @@ use chrono::Utc;
 use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        search::{SearchEventType, SearchHistoryHitResponse},
+        search::{SearchEventType, SearchHistoryHitResponse, format_values_search_response},
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -71,7 +71,7 @@ async fn can_use_distinct_stream(
     org: &str,
     stream_name: &str,
     stream_type: StreamType,
-    fields: &[String],
+    field: &str,
     query: &config::meta::search::Query,
     start_time: i64,
 ) -> bool {
@@ -84,21 +84,19 @@ async fn can_use_distinct_stream(
         .unwrap_or_default();
 
     // all fields which are requested must be in the distinct stream
-    let all_fields_distinct = fields.iter().all(|f| {
-        if DISTINCT_FIELDS.contains(f) {
-            return true;
-        }
-        if f == "count" {
-            // count is reserved field from oo side, so if user has count field
-            // in original stream, it won't actually be in the distinct stream, so
-            // we need to fallback to normal search
-            return false;
-        }
+    let is_distinct_field = if DISTINCT_FIELDS.contains(&field.to_string()) {
+        true
+    } else if field == "count" {
+        // count is reserved field from oo side, so if user has count field
+        // in original stream, it won't actually be in the distinct stream, so
+        // we need to fallback to normal search
+        false
+    } else {
         stream_settings
             .distinct_value_fields
             .iter()
-            .any(|entry| entry.name == *f && entry.added_ts <= start_time)
-    });
+            .any(|entry| entry.name == field && entry.added_ts <= start_time)
+    };
 
     // all the fields used in the query sent must be in the distinct stream
     #[allow(deprecated)]
@@ -140,7 +138,7 @@ async fn can_use_distinct_stream(
             .any(|entry| entry.name == *f && entry.added_ts <= start_time)
     });
 
-    all_fields_distinct && all_query_fields_distinct
+    is_distinct_field && all_query_fields_distinct
 }
 
 /// SearchStreamData
@@ -607,7 +605,7 @@ pub async fn around_v2(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "stream_name name"),
-        ("fields" = String, Query, description = "fields, split by comma"),
+        ("field" = String, Query, description = "field"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b"),
         ("keyword" = Option<String>, Query, description = "keyword, eg: abc"),
         ("size" = i64, Query, description = "size"), // topN
@@ -710,7 +708,7 @@ pub async fn build_search_request_per_field(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-) -> Result<Vec<(config::meta::search::Request, StreamType, FieldName)>, Error> {
+) -> Result<(config::meta::search::Request, StreamType), Error> {
     let query_fn = req
         .vrl_fn
         .as_ref()
@@ -729,12 +727,11 @@ pub async fn build_search_request_per_field(
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap_or(Schema::empty());
-    let fields = req
-        .fields
-        .iter()
-        .filter(|field| schema.field_with_name(field).is_ok())
-        .cloned()
-        .collect::<Vec<_>>();
+
+    let field = req.field.clone();
+    if schema.field_with_name(&field).is_err() {
+        return Err(Error::other("field not found"));
+    }
 
     let no_count = req.no_count;
 
@@ -764,10 +761,11 @@ pub async fn build_search_request_per_field(
         (start_time, end_time)
     };
 
-    let decoded_sql = base64::decode_url(&req.sql).unwrap_or_default();
+    let top_k = req.size.unwrap_or(get_config().limit.query_default_limit);
 
     let mut query = config::meta::search::Query {
-        sql: decoded_sql.clone(), // Will be populated per field in the loop below
+        sql: base64::decode_url(&req.sql).unwrap_or_default(), /* Will be populated per field in
+                                                                * the loop below */
         from: 0,
         size: config::meta::sql::MAX_LIMIT,
         start_time,
@@ -778,26 +776,44 @@ pub async fn build_search_request_per_field(
 
     let (sql_where, can_use_distinct_stream) = match req.filter.as_ref() {
         None => {
-            if !decoded_sql.is_empty() {
+            if !req.sql.is_empty() {
                 query.uses_zo_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
-                    .any(|fn_name| decoded_sql.contains(&format!("{}(", fn_name)));
+                    .any(|fn_name| query.sql.contains(&format!("{}(", fn_name)));
 
-                // pick up where clause from sql
-                let sql_where_from_query =
-                    match SearchService::sql::pickup_where(&decoded_sql, None) {
+                let Ok(sql) = crate::service::search::sql::Sql::new(
+                    &(query.clone().into()),
+                    org_id,
+                    stream_type,
+                    None,
+                )
+                .await
+                else {
+                    return Err(Error::other("Failed to parse sql"));
+                };
+
+                let sql_where_from_query = if !sql.is_complex_query {
+                    // pick up where clause from sql
+                    match SearchService::sql::pickup_where(&query.sql, None) {
                         Ok(Some(v)) => format!("WHERE {}", v),
                         Ok(None) => "".to_string(),
                         Err(e) => {
                             return Err(Error::other(e));
                         }
-                    };
+                    }
+                } else {
+                    // we don't need to pick up where clause from sql for complex queries
+                    // this is the business logic for complex queries, since its hard to parse
+                    // the where clause from the sql and make a filter out of it
+                    "".to_string()
+                };
+
                 let can_use_distinct_stream = can_use_distinct_stream(
                     org_id,
                     stream_name,
                     stream_type,
-                    &fields,
+                    &field,
                     &query,
                     start_time,
                 )
@@ -827,7 +843,7 @@ pub async fn build_search_request_per_field(
                     org_id,
                     stream_name,
                     stream_type,
-                    &fields,
+                    &field,
                     &query,
                     start_time,
                 )
@@ -840,7 +856,7 @@ pub async fn build_search_request_per_field(
 
     let timeout = req.timeout.unwrap_or(0);
 
-    let req = config::meta::search::Request {
+    let mut req = config::meta::search::Request {
         query,
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
@@ -870,26 +886,20 @@ pub async fn build_search_request_per_field(
         stream_type
     };
 
-    let mut requests = Vec::new();
-    for field in fields {
-        let sql = if no_count {
-            // we use min(0) as a hack to do streaming aggregation but actually return 0,
-            // essentially we are not counting the values
-            format!(
-                "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
-            )
-        } else {
-            format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
-            )
-        };
+    let sql = if no_count {
+        // we use min(0) as a hack to do streaming aggregation but actually return 0,
+        // essentially we are not counting the values
+        format!(
+            "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {top_k}"
+        )
+    } else {
+        format!(
+            "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {top_k}"
+        )
+    };
 
-        let mut req = req.clone();
-        req.query.sql = sql;
-        requests.push((req, actual_stream_type, field));
-    }
-
-    Ok(requests)
+    req.query.sql = sql;
+    Ok((req, actual_stream_type))
 }
 
 // If all fields requested in the query AND fields from the
@@ -910,9 +920,9 @@ async fn values_v1(
     let cfg = get_config();
 
     let mut uses_fn = false;
-    let fields = match query.get("fields") {
-        Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
-        None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
+    let field = match query.get("field") {
+        Some(v) => v.to_string(),
+        None => return Ok(MetaHttpResponse::bad_request("field is empty")),
     };
     let query_fn = query
         .get("query_fn")
@@ -1037,7 +1047,7 @@ async fn values_v1(
         org_id,
         stream_name,
         stream_type,
-        &fields,
+        &field,
         &req_query,
         start_time,
     )
@@ -1060,188 +1070,104 @@ async fn values_v1(
         .await
         .unwrap_or(Schema::empty());
 
-    let mut query_results = Vec::with_capacity(fields.len());
     let sql_where = if where_str.is_empty() {
         "".to_string()
     } else {
         format!("WHERE {}", where_str)
     };
-    for field in &fields {
-        let http_span = http_span.clone();
-        // skip values for field which aren't part of the schema
-        if schema.field_with_name(field).is_err() {
-            continue;
-        }
-        let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
-            format!("{sql_where} AND {field} ILIKE '%{keyword}%'")
-        } else if !keyword.is_empty() {
-            format!("WHERE {field} ILIKE '%{keyword}%'")
-        } else {
-            sql_where.clone()
-        };
 
-        let distinct_prefix;
-        let count_fn;
-        let actual_stream_type;
-
-        if use_distinct_stream {
-            distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
-            // if we are using distinct stream, we have already partially aggregated
-            // the counts, so we need to sum over that field
-            count_fn = "SUM(count)";
-            // distinct_values_* stream is metadata
-            actual_stream_type = StreamType::Metadata;
-        } else {
-            distinct_prefix = "".to_owned();
-            // for non-distinct fields, we need the actual count
-            count_fn = "COUNT(*)";
-            actual_stream_type = stream_type;
-        }
-
-        let sql = if no_count {
-            format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
-            )
-        } else {
-            format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
-            )
-        };
-        let mut req = req.clone();
-        req.query.sql = sql;
-
-        let search_res = SearchService::cache::search(
-            &trace_id,
-            org_id,
-            actual_stream_type,
-            Some(user_id.to_string()),
-            &req,
-            "".to_string(),
-        )
-        .instrument(http_span)
-        .await;
-        let resp_search = match search_res {
-            Ok(res) => res,
-            Err(err) => {
-                http_report_metrics(start, org_id, stream_type, "500", "_values/v1", "", "");
-                log::error!("search values error: {:?}", err);
-                return Ok(error_utils::map_error_to_http_response(
-                    &err,
-                    Some(trace_id),
-                ));
-            }
-        };
-        query_results.push((field.to_string(), resp_search));
+    let http_span = http_span.clone();
+    // skip values for field which aren't part of the schema
+    if schema.field_with_name(&field).is_err() {
+        return Ok(MetaHttpResponse::bad_request(
+            "field is not part of the schema",
+        ));
     }
 
-    let mut resp = config::meta::search::Response::default();
-    let mut hit_values: Vec<json::Value> = Vec::new();
-    let mut work_group_set = Vec::with_capacity(query_results.len());
+    let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
+        format!("{sql_where} AND {field} ILIKE '%{keyword}%'")
+    } else if !keyword.is_empty() {
+        format!("WHERE {field} ILIKE '%{keyword}%'")
+    } else {
+        sql_where.clone()
+    };
+
+    let distinct_prefix;
+    let count_fn;
+    let actual_stream_type;
+
+    if use_distinct_stream {
+        distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
+        // if we are using distinct stream, we have already partially aggregated
+        // the counts, so we need to sum over that field
+        count_fn = "SUM(count)";
+        // distinct_values_* stream is metadata
+        actual_stream_type = StreamType::Metadata;
+    } else {
+        distinct_prefix = "".to_owned();
+        // for non-distinct fields, we need the actual count
+        count_fn = "COUNT(*)";
+        actual_stream_type = stream_type;
+    }
 
     // Get the size from query parameter for limiting results
-    let size = query
+    let top_k = query
         .get("size")
         .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
 
-    for (key, ret) in query_results {
-        let mut top_hits: HashMap<String, i64> = HashMap::default();
-        for row in ret.hits {
-            let key = row
-                .get("zo_sql_key")
-                .map(json::get_string_value)
-                .unwrap_or("".to_string());
-            let num = row
-                .get("zo_sql_num")
-                .map(|v| v.as_i64().unwrap_or(0))
-                .unwrap_or(0);
-            let key_num = top_hits.entry(key).or_insert(0);
-            *key_num += num;
+    let sql = if no_count {
+        format!(
+            "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {top_k}"
+        )
+    } else {
+        format!(
+            "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {top_k}"
+        )
+    };
+    let mut req = req.clone();
+    req.query.sql = sql;
+
+    let search_res = SearchService::cache::search(
+        &trace_id,
+        org_id,
+        actual_stream_type,
+        Some(user_id.to_string()),
+        &req,
+        "".to_string(),
+    )
+    .instrument(http_span)
+    .await;
+    let mut resp_search = match search_res {
+        Ok(res) => res,
+        Err(err) => {
+            http_report_metrics(start, org_id, stream_type, "500", "_values/v1", "", "");
+            log::error!("search values error: {:?}", err);
+            return Ok(error_utils::map_error_to_http_response(
+                &err,
+                Some(trace_id),
+            ));
         }
+    };
 
-        // Use a min heap (BinaryHeap with Reverse) to find top k elements
-        let mut min_heap: BinaryHeap<Reverse<(i64, String)>> =
-            BinaryHeap::with_capacity(size as usize);
-
-        if no_count {
-            // For alphabetical sorting, collect all entries first
-            let mut all_entries: Vec<_> = top_hits.into_iter().collect();
-            all_entries.sort_by(|a, b| a.0.cmp(&b.0));
-            all_entries.truncate(size as usize);
-
-            let top_hits = all_entries
-                .into_iter()
-                .map(|(k, v)| {
-                    let mut item = json::Map::new();
-                    item.insert("zo_sql_key".to_string(), json::Value::String(k));
-                    item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
-                    json::Value::Object(item)
-                })
-                .collect::<Vec<_>>();
-
-            let mut field_value: json::Map<String, json::Value> = json::Map::new();
-            field_value.insert("field".to_string(), json::Value::String(key));
-            field_value.insert("values".to_string(), json::Value::Array(top_hits));
-            hit_values.push(json::Value::Object(field_value));
-        } else {
-            // For value-based sorting, use a min heap to get top k elements
-            for (k, v) in top_hits {
-                if min_heap.len() < size as usize {
-                    // If heap not full, just add
-                    min_heap.push(Reverse((v, k)));
-                } else if !min_heap.is_empty() && v > min_heap.peek().unwrap().0.0 {
-                    // If current value is larger than smallest in heap, replace it
-                    min_heap.pop();
-                    min_heap.push(Reverse((v, k)));
-                }
-            }
-
-            // Convert heap to vector and sort in descending order
-            let mut top_elements: Vec<_> =
-                min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
-            top_elements.sort_by(|a, b| b.1.cmp(&a.1));
-
-            let top_hits = top_elements
-                .into_iter()
-                .map(|(k, v)| {
-                    let mut item = json::Map::new();
-                    item.insert("zo_sql_key".to_string(), json::Value::String(k));
-                    item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
-                    json::Value::Object(item)
-                })
-                .collect::<Vec<_>>();
-
-            let mut field_value: json::Map<String, json::Value> = json::Map::new();
-            field_value.insert("field".to_string(), json::Value::String(key));
-            field_value.insert("values".to_string(), json::Value::Array(top_hits));
-            hit_values.push(json::Value::Object(field_value));
-        }
-
-        resp.scan_size = std::cmp::max(resp.scan_size, ret.scan_size);
-        resp.scan_records = std::cmp::max(resp.scan_records, ret.scan_records);
-        resp.cached_ratio = std::cmp::max(resp.cached_ratio, ret.cached_ratio);
-        resp.result_cache_ratio = std::cmp::max(resp.result_cache_ratio, ret.result_cache_ratio);
-        work_group_set.push(ret.work_group);
-    }
-    resp.total = fields.len();
-    resp.hits = hit_values;
-    resp.size = size;
-    resp.took = start.elapsed().as_millis() as usize;
+    let mut work_group_set = Vec::with_capacity(1);
+    format_values_search_response(&mut resp_search, &field);
+    work_group_set.push(resp_search.work_group.clone());
 
     let time = start.elapsed().as_secs_f64();
     http_report_metrics(start, org_id, stream_type, "200", "_values/v1", "", "");
 
     let req_stats = RequestStats {
-        records: resp.hits.len() as i64,
+        records: resp_search.hits.len() as i64,
         response_time: time,
-        size: resp.scan_size as f64,
+        size: resp_search.scan_size as f64,
         request_body: Some(req.query.sql),
         user_email: Some(user_id.to_string()),
         min_ts: Some(start_time),
         max_ts: Some(end_time),
-        cached_ratio: Some(resp.cached_ratio),
+        cached_ratio: Some(resp_search.cached_ratio),
         search_type: Some(SearchEventType::Values),
         trace_id: Some(trace_id),
-        took_wait_in_queue: Some(resp.took_detail.wait_in_queue),
+        took_wait_in_queue: Some(resp_search.took_detail.wait_in_queue),
         work_group: get_work_group(work_group_set),
         ..Default::default()
     };
@@ -1257,7 +1183,7 @@ async fn values_v1(
     )
     .await;
 
-    Ok(HttpResponse::Ok().json(resp))
+    Ok(HttpResponse::Ok().json(resp_search))
 }
 
 /// SearchStreamPartition
