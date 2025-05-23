@@ -161,7 +161,8 @@ pub async fn search(
             }
         })
         .collect_vec();
-    let index_updated_at = get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
+    let mut index_updated_at =
+        get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
 
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
@@ -242,6 +243,11 @@ pub async fn search(
             idx_optimize_rule,
             Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
         );
+        if is_simple_histogram {
+            let ttv_timestamp_added_at =
+                db::metas::tantivy_index::get_ttv_timestamp_added_at().await;
+            index_updated_at = index_updated_at.max(ttv_timestamp_added_at);
+        }
         if is_aggregate_exec && (is_simple_count || is_simple_histogram) {
             let (tantivy_files, datafusion_files) = split_file_list_by_time_range(
                 file_list,

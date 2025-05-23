@@ -18,7 +18,7 @@ use infra::db::{ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl};
 use schema::migrate_resource_names;
 use version_compare::Version;
 
-use crate::service::db::version;
+use crate::service::db::metas;
 
 pub mod dashboards;
 pub mod file_list;
@@ -105,7 +105,7 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     // we initialize both clients here to avoid potential deadlock afterwards
     ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     // check version upgrade
-    let old_version = version::get().await.unwrap_or("v0.0.0".to_string());
+    let old_version = metas::version::get().await.unwrap_or("v0.0.0".to_string());
     check_upgrade(&old_version, config::VERSION).await?;
 
     #[allow(deprecated)]
@@ -114,8 +114,6 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     infra::table::migrate().await?;
     // migrate dashboards
     dashboards::run().await?;
-    // migrate stream schema index_at
-    schema::update_schema_index_updated_at().await?;
 
     infra::set_db_schema_version().await?;
     Ok(())

@@ -96,7 +96,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("organization cache sync failed");
 
     // check version
-    db::version::set().await.expect("db version set failed");
+    db::metas::version::set()
+        .await
+        .expect("db version set failed");
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
