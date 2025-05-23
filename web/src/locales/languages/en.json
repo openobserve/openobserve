@@ -485,13 +485,7 @@
     "streamTitle": "Associate Stream",
     "conditionTitle": "Associate Condition",
     "query": "Associate Query",
-    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
-    "import":"Import",
-    "export":"Export",
-    "edit":"Edit",
-    "delete":"Delete",
-    "view":"View",
-    "delay":"Delay"
+    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?"
   },
   "function": {
     "header": "Functions",
@@ -938,8 +932,7 @@
     "SearchFunctionNotDefined": "Error: Search function not defined.",
     "SearchParquetFileNotFound": "Error: Search parquet file not found.",
     "SearchFieldHasNoCompatibleDataType": "Error: Search file has no compatible data type.",
-    "SearchSQLExecuteError": "Error: Search SQL execute error.",
-    "SearchSQLCancelled": "Error: Search SQL was cancelled."
+    "SearchSQLExecuteError": "Error: Search SQL execute error."
   },
   "alerts": {
     "header": "Alerts",
@@ -1093,8 +1086,7 @@
     "spanIdFieldName": "Span ID Field Name",
     "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
     "cipherKeys": "Cipher Keys",
-    "nodes": "Nodes",
-    "enableStreamingSearch": "Enable Streaming Search"
+    "nodes": "Nodes"
   },
   "reports": {
     "header": "Reports",
@@ -1211,7 +1203,7 @@
     "version": "Version",
     "cpu": "CPU %",
     "memory": "Memory %",
-    "tcp": "TCP Connections",
+    "tcp": "TCP",
     "filter_header": "Filters",
     "clear_all": "Clear All",
     "region": "Region",

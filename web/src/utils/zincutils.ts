@@ -826,7 +826,7 @@ export const durationFormatter = (durationInSeconds: number): string => {
   return formattedDuration;
 };
 
-export const getTimezoneOffset = (timezone: string |null = null) => {
+export const getTimezoneOffset = () => {
   const now = new Date();
 
   // Get the day, month, and year from the date object
@@ -844,7 +844,7 @@ export const getTimezoneOffset = (timezone: string |null = null) => {
   // Combine them in the HH:MM format
   const scheduleTime = `${hours}:${minutes}`;
 
-  const ScheduleTimezone = timezone ? timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const ScheduleTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const convertedDateTime = convertDateToTimestamp(
     scheduleDate,
@@ -994,20 +994,6 @@ export const isWebSocketEnabled = () => {
     return (window as any).use_web_socket;
   }
 };
-
-export const isStreamingEnabled = () => {
-  if (!store.state.zoConfig?.streaming_enabled) {
-    return false;
-  }
-
-  if ((window as any).use_streaming === undefined) {
-    return store?.state?.organizationData?.organizationSettings
-      ?.enable_streaming_search;
-  } else {
-    return (window as any).use_streaming;
-  }
-};
-
 export const maxLengthCharValidation = (
   val: string = "",
   char_length: number = 50,

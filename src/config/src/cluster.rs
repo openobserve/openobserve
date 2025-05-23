@@ -73,7 +73,7 @@ fn load_local_node_role() -> Vec<Role> {
         .collect()
 }
 
-pub fn load_role_group() -> RoleGroup {
+fn load_role_group() -> RoleGroup {
     RoleGroup::from(get_config().common.node_role_group.as_str())
 }
 

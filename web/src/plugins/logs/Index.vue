@@ -387,7 +387,7 @@ import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
-import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
+import { isWebSocketEnabled } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -565,8 +565,8 @@ export default defineComponent({
       isLimitQuery,
       enableRefreshInterval,
       buildWebSocketPayload,
-      initializeSearchConnection,
-      addTraceId,
+      initializeWebSocketConnection,
+      addRequestId,
       sendCancelSearchMessage,
       isDistinctQuery,
       isWithQuery,
@@ -839,7 +839,6 @@ export default defineComponent({
         }
 
         searchObj.meta.quickMode = isQuickModeEnabled();
-        searchObj.meta.showHistogram = isHistogramEnabled();
 
         isLogsMounted.value = true;
       } catch (error) {
@@ -869,11 +868,6 @@ export default defineComponent({
     // Helper function to check if quick mode is enabled
     function isQuickModeEnabled() {
       return store.state.zoConfig.quick_mode_enabled;
-    }
-
-    // Helper function to check if histogram is enabled
-    function isHistogramEnabled() {
-      return store.state.zoConfig.histogram_enabled;
     }
 
     const handleActivation = async () => {
@@ -1542,7 +1536,9 @@ export default defineComponent({
     // [END] cancel running queries
 
     const cancelOnGoingSearchQueries = () => {
-      sendCancelSearchMessage(searchObj.data.searchWebSocketTraceIds);
+      sendCancelSearchMessage(
+        searchObj.data.searchWebSocketRequestIdsAndTraceIds,
+      );
     };
 
     return {
@@ -1593,15 +1589,14 @@ export default defineComponent({
       fnParsedSQL,
       isLimitQuery,
       buildWebSocketPayload,
-      initializeSearchConnection,
-      addTraceId,
+      initializeWebSocketConnection,
+      addRequestId,
       isWebSocketEnabled,
       showJobScheduler,
       showSearchScheduler,
       closeSearchSchedulerFn,
       isDistinctQuery,
       isWithQuery,
-      isStreamingEnabled,
     };
   },
   computed: {
@@ -1680,17 +1675,14 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
-            -1,
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",-1
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (
-          this.searchObj.meta.sqlMode &&
-          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
-        ) {
+        } 
+        else if (this.searchObj.meta.sqlMode && (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))) {
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
-            -1,
+            -1
           );
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (this.searchObj.data.stream.selectedStream.length > 1) {
@@ -1707,11 +1699,11 @@ export default defineComponent({
           this.searchObj.loadingHistogram = true;
 
           const shouldUseWebSocket = this.isWebSocketEnabled();
-          const shouldUseStreaming = this.isStreamingEnabled();
+
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
-          if (shouldUseWebSocket || shouldUseStreaming) {
+          if (shouldUseWebSocket) {
             // Use WebSocket for histogram data
             const payload = this.buildWebSocketPayload(
               this.searchObj.data.histogramQuery,
@@ -1721,10 +1713,10 @@ export default defineComponent({
                 isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
               },
             );
-            const requestId = this.initializeSearchConnection(payload);
+            const requestId = this.initializeWebSocketConnection(payload);
 
             if (requestId) {
-              this.addTraceId(payload.traceId);
+              this.addRequestId(requestId, payload.traceId);
             }
 
             return;
@@ -1789,12 +1781,8 @@ export default defineComponent({
     async fullSQLMode(newVal) {
       if (newVal) {
         await nextTick();
-        if (this.searchObj.meta.sqlModeManualTrigger) {
-          this.searchObj.meta.sqlModeManualTrigger = false;
-        } else {
-          this.setQuery(newVal);
-          this.updateUrlQueryParams();
-        }
+        this.setQuery(newVal);
+        this.updateUrlQueryParams();
       } else {
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";

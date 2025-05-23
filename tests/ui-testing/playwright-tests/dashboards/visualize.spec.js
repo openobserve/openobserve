@@ -54,7 +54,6 @@ test.describe(" visualize UI testcases", () => {
     });
     // get the data from the search variable
     await expect.poll(async () => (await search).status()).toBe(200);
-
     // await search.hits.FIXME_should("be.an", "array");
   }
   // tebefore(async function () {
@@ -123,11 +122,7 @@ test.describe(" visualize UI testcases", () => {
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-    await page
-      .getByRole("switch", { name: "SQL Mode" })
-      .locator("div")
-      .nth(2)
-      .click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(1000);
     await page
       .locator('[data-test="logs-search-index-list"]')
@@ -165,7 +160,7 @@ test.describe(" visualize UI testcases", () => {
     ).toBeVisible();
   });
 
-  test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
+  test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart", async ({
     page,
   }) => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -216,7 +211,7 @@ test.describe(" visualize UI testcases", () => {
       });
   });
 
-  test("should correctly plot the data according to the new chart type when changing the chart type.", async ({
+  test("should correctly plot the data according to the new chart type when changing the chart type", async ({
     page,
   }) => {
     await page.locator('[data-test="logs-visualize-toggle"]').click();
@@ -235,7 +230,6 @@ test.describe(" visualize UI testcases", () => {
     ).toBeVisible();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -288,9 +282,6 @@ test.describe(" visualize UI testcases", () => {
       });
     await page.locator('[data-test="selected-chart-scatter-item"]').click();
     await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
       .click({
@@ -300,11 +291,6 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-pie-item"]').click();
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -315,10 +301,6 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-donut-item"]').click();
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -329,10 +311,6 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-gauge-item"]').click();
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -444,7 +422,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
   });
 
-  test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
+  test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization", async ({
     page,
   }) => {
     // Chart should not reflect changes made to X or Y axis.
@@ -574,11 +552,7 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
 
     // Switch to SQL mode, apply the query, and refresh the search
-    await page
-      .getByRole("switch", { name: "SQL Mode" })
-      .locator("div")
-      .nth(2)
-      .click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
 
     // Toggle visualization

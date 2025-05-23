@@ -190,8 +190,6 @@ use crate::{common::meta, handler::http::request};
         request::search::search_job::get_job_result,
         request::search::search_job::delete_job,
         request::search::search_job::retry_job,
-        request::search::search_stream::search_http2_stream,
-        request::search::search_stream::values_http2_stream,
     ),
     components(
         schemas(
@@ -284,6 +282,7 @@ use crate::{common::meta, handler::http::request};
             config::meta::search::RequestEncoding,
             config::meta::search::Response,
             config::meta::search::ResponseTook,
+            config::meta::search::ResponseNodeTook,
             config::meta::search::SearchEventType,
             config::meta::search::SearchEventContext,
             config::meta::search::SearchPartitionRequest,

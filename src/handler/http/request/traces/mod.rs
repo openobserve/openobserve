@@ -17,6 +17,7 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
 use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
+use infra::errors;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
@@ -25,9 +26,7 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::http::get_or_create_trace_id,
     },
-    handler::http::request::{
-        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, search::error_utils::map_error_to_http_response,
-    },
+    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{search as SearchService, traces},
 };
 
@@ -242,6 +241,30 @@ pub async fn get_latest_traces(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .inc();
+    // get a local search queue lock
+    #[cfg(not(feature = "enterprise"))]
+    let locker = SearchService::QUEUE_LOCKER.clone();
+    #[cfg(not(feature = "enterprise"))]
+    let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    if !cfg.common.feature_query_queue_enabled {
+        drop(locker);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
+    log::info!(
+        "http traces latest API wait in queue took: {} ms",
+        took_wait
+    );
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .dec();
+
     // search
     let query_sql = format!(
         "SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}",
@@ -316,7 +339,18 @@ pub async fn get_latest_traces(
                 ])
                 .inc();
             log::error!("get traces latest data error: {:?}", err);
-            return Ok(map_error_to_http_response(&err, Some(trace_id)));
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => match code {
+                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                        .json(meta::http::HttpResponse::error_code(code)),
+                    _ => HttpResponse::InternalServerError()
+                        .json(meta::http::HttpResponse::error_code(code)),
+                },
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
         }
     };
     if resp_search.hits.is_empty() {
@@ -398,7 +432,18 @@ pub async fn get_latest_traces(
                     ])
                     .inc();
                 log::error!("get traces latest data error: {:?}", err);
-                return Ok(map_error_to_http_response(&err, Some(trace_id)));
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => match code {
+                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                            .json(meta::http::HttpResponse::error_code(code)),
+                        _ => HttpResponse::InternalServerError()
+                            .json(meta::http::HttpResponse::error_code(code)),
+                    },
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
             }
         };
 

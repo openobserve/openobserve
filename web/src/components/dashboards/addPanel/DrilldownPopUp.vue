@@ -167,8 +167,6 @@
             filled
             dense
             style="width: 100%"
-            :loading="getFoldersListLoading.isLoading.value"
-            :disable="getFoldersListLoading.isLoading.value"
             data-test="dashboard-drilldown-folder-select"
           >
             <!-- template when on options -->
@@ -195,8 +193,6 @@
             filled
             dense
             style="width: 100%"
-            :loading="getDashboardListLoading.isLoading.value"
-            :disable="getDashboardListLoading.isLoading.value"
             data-test="dashboard-drilldown-dashboard-select"
           >
             <!-- template when on options -->
@@ -225,8 +221,6 @@
             filled
             dense
             style="width: 100%"
-            :loading="getTabListLoading.isLoading.value"
-            :disable="getTabListLoading.isLoading.value"
             data-test="dashboard-drilldown-tab-select"
           >
             <!-- template when on options -->
@@ -368,7 +362,6 @@ import { onMounted, onUnmounted } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
-import { useLoading } from "@/composables/useLoading";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
 );
@@ -443,18 +436,6 @@ export default defineComponent({
     const dashboardList: any = ref([]);
     const tabList: any = ref([]);
 
-    const getFoldersListLoading = useLoading(async () => {
-      await getFoldersList(store);
-    });
-
-    const getDashboardListLoading = useLoading(async () => {
-      await getDashboardList();
-    });
-
-    const getTabListLoading = useLoading(async () => {
-      await getTabList();
-    });
-
     onMounted(async () => {
       // if no folders in organization, get folders
       if (
@@ -463,13 +444,13 @@ export default defineComponent({
           store.state.organizationData.folders.length === 0)
       ) {
         // get folders(will be api call)
-        await getFoldersListLoading.execute();
+        await getFoldersList(store);
       }
 
       // get dashboard list
       // get tab list
-      await getDashboardListLoading.execute();
-      await getTabListLoading.execute();
+      await getDashboardList();
+      await getTabList();
 
       // get variables list
       await getvariableNames();
@@ -479,7 +460,7 @@ export default defineComponent({
     watch(
       () => drilldownData.value.data.folder,
       async (newVal, oldVal) => {
-        await getDashboardListLoading.execute();
+        await getDashboardList();
         if (newVal !== oldVal) {
           // take first value from new options list
           drilldownData.value.data.dashboard =
@@ -493,7 +474,7 @@ export default defineComponent({
     watch(
       () => drilldownData.value.data.dashboard,
       async (newVal, oldVal) => {
-        await getTabListLoading.execute();
+        await getTabList();
         if (newVal !== oldVal) {
           // take first value from new options list
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
@@ -778,9 +759,6 @@ export default defineComponent({
       options,
       variableNamesFn,
       updateQueryValue,
-      getFoldersListLoading,
-      getDashboardListLoading,
-      getTabListLoading,
     };
   },
 });

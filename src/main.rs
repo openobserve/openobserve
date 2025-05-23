@@ -39,7 +39,7 @@ use openobserve::{
     cli::basic::cli,
     common::{
         infra::{self as common_infra, cluster},
-        meta,
+        meta, migration,
         utils::zo_logger,
     },
     handler::{
@@ -59,7 +59,7 @@ use openobserve::{
         },
         http::router::*,
     },
-    job, migration, router,
+    job, router,
     service::{
         cluster_info::ClusterInfoService, db, metadata, node::NodeService, search::SEARCH_SERVER,
         self_reporting, tls::http_tls_config,
@@ -92,8 +92,6 @@ use tonic::{
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
-#[cfg(feature = "enterprise")]
-use {config::Config, o2_enterprise::enterprise::common::infra::config::O2Config};
 #[cfg(feature = "pyroscope")]
 use {
     pyroscope::PyroscopeAgent,
@@ -247,13 +245,6 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("config init failed: {}", e);
             }
-
-            // db related inits
-            if let Err(e) = migration::init_db().await {
-                job_init_tx.send(false).ok();
-                panic!("db init failed: {}", e);
-            }
-
             // init infra
             if let Err(e) = infra::init().await {
                 job_init_tx.send(false).ok();
@@ -269,6 +260,30 @@ async fn main() -> Result<(), anyhow::Error> {
             if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
                 panic!("enerprise init failed: {}", e);
+            }
+
+            // check version upgrade
+            let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
+            if let Err(e) = migration::check_upgrade(&old_version, config::VERSION).await {
+                job_init_tx.send(false).ok();
+                panic!("check upgrade failed: {}", e);
+            }
+
+            #[allow(deprecated)]
+            migration::upgrade_resource_names()
+                .await
+                .expect("migrate resource names into supported ofga format failed");
+
+            // migrate infra_sea_orm
+            if let Err(e) = infra::table::migrate().await {
+                job_init_tx.send(false).ok();
+                panic!("infra sea_orm migrate failed: {}", e);
+            }
+
+            // migrate dashboards
+            if let Err(e) = migration::dashboards::run().await {
+                job_init_tx.send(false).ok();
+                panic!("migrate dashboards failed: {}", e);
             }
 
             // ingester init
@@ -292,7 +307,7 @@ async fn main() -> Result<(), anyhow::Error> {
             // init websocket gc
             if cfg.websocket.enabled {
                 log::info!("Initializing WebSocket session garbage collector");
-                if let Err(e) = handler::http::request::ws::init().await {
+                if let Err(e) = handler::http::request::ws_v2::init().await {
                     job_init_tx.send(false).ok();
                     panic!("websocket gc init failed: {}", e);
                 }
@@ -721,7 +736,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
-            .wrap(middlewares::Compress::default())
+            .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
@@ -841,7 +856,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
-            .wrap(middlewares::Compress::default())
+            .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
@@ -1088,7 +1103,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
-            .wrap(middlewares::Compress::default())
+            .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
@@ -1177,36 +1192,11 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         openobserve::super_cluster_queue::init().await?;
     }
 
-    // check ratelimit config
-    let cfg = config::get_config();
-    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
-    if let Err(e) = check_ratelimit_config(&cfg, &o2cfg) {
-        panic!("ratelimit config error: {e}");
-    }
-
     o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
-    if o2cfg.rate_limit.rate_limit_enabled && o2_openfga::config::get_config().enabled {
+    if config::get_config().ratelimit.ratelimit_enabled && o2_openfga::config::get_config().enabled
+    {
         o2_ratelimit::init(openobserve::handler::http::router::openapi::openapi_info().await)
             .await?;
-    }
-    Ok(())
-}
-#[cfg(feature = "enterprise")]
-fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::Error> {
-    if o2cfg.rate_limit.rate_limit_enabled {
-        let meta_store: config::meta::meta_store::MetaStore =
-            cfg.common.queue_store.as_str().into();
-        if meta_store != config::meta::meta_store::MetaStore::Nats {
-            return Err(anyhow::anyhow!(
-                "ZO_QUEUE_STORE must be nats when ratelimit is enabled"
-            ));
-        }
-    }
-
-    if o2cfg.rate_limit.rate_limit_rule_refresh_interval < 2 {
-        return Err(anyhow::anyhow!(
-            "ratelimit rules refresh interval must be greater than or equal to 2 seconds"
-        ));
     }
     Ok(())
 }

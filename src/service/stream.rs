@@ -39,18 +39,13 @@ use infra::{
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
 
-use super::db::enrichment_table;
 use crate::{
     common::meta::{
         authz::Authz,
         http::HttpResponse as MetaHttpResponse,
         stream::{Stream, StreamProperty},
     },
-    handler::http::router::ERROR_HEADER,
-    service::{
-        db::{self, distinct_values},
-        metrics::get_prom_metadata_from_schema,
-    },
+    service::{db, db::distinct_values, metrics::get_prom_metadata_from_schema},
 };
 
 const LOCAL: &str = "disk";
@@ -67,7 +62,7 @@ pub async fn get_stream(
 
     if schema != Schema::empty() {
         let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
-        transform_stats(&mut stats, org_id, stream_name, stream_type).await;
+        transform_stats(&mut stats);
         Some(stream_res(stream_name, stream_type, schema, Some(stats)))
     } else {
         None
@@ -115,9 +110,7 @@ pub async fn get_streams(
             stream_loc.stream_name.as_str(),
             stream_loc.stream_type,
         );
-        if stats.eq(&StreamStats::default())
-            && stream_loc.stream_type != StreamType::EnrichmentTables
-        {
+        if stats.eq(&StreamStats::default()) {
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
@@ -125,13 +118,7 @@ pub async fn get_streams(
                 None,
             ));
         } else {
-            transform_stats(
-                &mut stats,
-                org_id,
-                stream_loc.stream_name.as_str(),
-                stream_loc.stream_type,
-            )
-            .await;
+            transform_stats(&mut stats);
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
@@ -210,15 +197,12 @@ pub async fn save_stream_settings(
     let cfg = config::get_config();
     // check if we are allowed to ingest
     if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
-        return Ok(HttpResponse::BadRequest()
-            .append_header((
-                ERROR_HEADER,
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 format!("stream [{stream_name}] is being deleted"),
-            ))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("stream [{stream_name}] is being deleted"),
-            )));
+            )),
+        );
     }
 
     // only allow setting user defined schema for logs stream
@@ -263,12 +247,12 @@ pub async fn save_stream_settings(
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(e) => {
-            return Ok(HttpResponse::InternalServerError()
-                .append_header((ERROR_HEADER, format!("error in getting schema : {e}")))
-                .json(MetaHttpResponse::error(
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                     format!("error in getting schema : {e}"),
-                )));
+                )),
+            );
         }
     };
     let schema_fields = schema
@@ -370,28 +354,6 @@ pub async fn update_stream_settings(
                 settings.data_retention = data_retention;
             }
 
-            if let Some(index_original_data) = new_settings.index_original_data {
-                settings.index_original_data = index_original_data;
-            }
-
-            if let Some(index_all_values) = new_settings.index_all_values {
-                settings.index_all_values = index_all_values;
-            }
-
-            // if index_original_data is true, store_original_data must be true
-            if settings.index_original_data {
-                settings.store_original_data = true;
-            }
-
-            // index_original_data & index_all_values only can open one at a time
-            if settings.index_original_data && settings.index_all_values {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    "index_original_data & index_all_values cannot be true at the same time"
-                        .to_string(),
-                )));
-            }
-
             // check for user defined schema
             if !new_settings.defined_schema_fields.add.is_empty() {
                 if !cfg.common.allow_user_defined_schemas {
@@ -486,15 +448,12 @@ pub async fn update_stream_settings(
                         f,
                     );
                     if let Err(e) = distinct_values::add(record).await {
-                        return Ok(HttpResponse::InternalServerError()
-                            .append_header((
-                                ERROR_HEADER,
-                                format!("error in updating settings : {e}"),
-                            ))
-                            .json(MetaHttpResponse::error(
+                        return Ok(HttpResponse::InternalServerError().json(
+                            MetaHttpResponse::error(
                                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                                 format!("error in updating settings : {e}"),
-                            )));
+                            ),
+                        ));
                     }
                     // we cannot allow duplicate entries here
                     let temp = DistinctField {
@@ -513,15 +472,12 @@ pub async fn update_stream_settings(
                         match check_field_use(org_id, stream_name, stream_type.as_str(), f).await {
                             Ok(entry) => entry,
                             Err(e) => {
-                                return Ok(HttpResponse::InternalServerError()
-                                    .append_header((
-                                        ERROR_HEADER,
-                                        format!("error in updating settings : {e}"),
-                                    ))
-                                    .json(MetaHttpResponse::error(
+                                return Ok(HttpResponse::InternalServerError().json(
+                                    MetaHttpResponse::error(
                                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                                         format!("error in updating settings : {e}"),
-                                    )));
+                                    ),
+                                ));
                             }
                         };
                     // if there are multiple uses, we cannot allow it to be removed
@@ -608,80 +564,26 @@ pub async fn delete_stream(
         )));
     }
 
-    // delete stream schema
-    if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, format!("failed to delete stream schema: {e}")))
-            .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("failed to delete stream schema: {e}"),
-            )));
-    }
-
-    // delete associated pipelines
-    if let Some(pipeline) =
-        db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
-    {
-        if let Err(e) = db::pipeline::delete(&pipeline.id).await {
-            return Ok(HttpResponse::InternalServerError()
-                .append_header((
-                    ERROR_HEADER,
-                    format!(
-                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
-                        pipeline.name
-                    ),
-                ))
-                .json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!(
-                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
-                        pipeline.name
-                    ),
-                )));
-        }
-    }
-
-    // delete related resource
-    if let Err(e) = stream_delete_inner(org_id, stream_type, stream_name).await {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, format!("failed to delete stream: {e}")))
-            .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("failed to delete stream: {e}"),
-            )));
-    }
-
-    // delete ownership
-    crate::common::utils::auth::remove_ownership(
-        org_id,
-        stream_type.as_str(),
-        Authz::new(stream_name),
-    )
-    .await;
-
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        StatusCode::OK.into(),
-        "stream deleted".to_string(),
-    )))
-}
-
-pub async fn stream_delete_inner(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> Result<(), anyhow::Error> {
     // create delete for compactor
     if let Err(e) =
         db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
     {
-        log::error!(
-            "Failed to create retention job for stream: {}/{}/{}, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            e
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!("failed to delete stream: {e}"),
+            )),
         );
-        return Err(e);
+    }
+
+    // delete stream schema
+    if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!("failed to delete stream: {e}"),
+            )),
+        );
     }
 
     // delete stream schema cache
@@ -706,34 +608,48 @@ pub async fn stream_delete_inner(
 
     // delete stream compaction offset
     if let Err(e) = db::compact::files::del_offset(org_id, stream_type, stream_name).await {
-        log::error!(
-            "Failed to delete stream compact offset for stream: {}/{}/{}, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            e
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!("failed to delete stream: {e}"),
+            )),
         );
-        return Err(e);
+    };
+
+    // delete associated pipelines
+    if let Some(pipeline) =
+        db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
+    {
+        if let Err(e) = db::pipeline::delete(&pipeline.id).await {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    format!(
+                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
+                        pipeline.name
+                    ),
+                )),
+            );
+        }
     }
 
-    Ok(())
+    crate::common::utils::auth::remove_ownership(
+        org_id,
+        stream_type.as_str(),
+        Authz::new(stream_name),
+    )
+    .await;
+
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        StatusCode::OK.into(),
+        "stream deleted".to_string(),
+    )))
 }
 
-async fn transform_stats(
-    stats: &mut StreamStats,
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-) {
+fn transform_stats(stats: &mut StreamStats) {
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
-    if stream_type == StreamType::EnrichmentTables {
-        if let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await {
-            stats.doc_time_min = meta.start_time;
-            stats.doc_time_max = meta.end_time;
-        }
-    }
 }
 
 pub fn stream_created(schema: &Schema) -> Option<i64> {

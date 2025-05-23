@@ -77,8 +77,6 @@ use crate::{
               ],
               "node_name": "usertest-openobserve-ingester-0",
               "search_role": "follower",
-              "region": "us-east-1",
-              "cluster": "cluster-0",
               "duration": 0,
               "component": "wal:memtable load",
               "desc": "wal mem search load groups 1, files 6, scan_size 16.01 MB, compressed_size 16.85 MB"
@@ -333,10 +331,7 @@ pub async fn get_search_profile(
                 "",
             );
             log::error!("[trace_id {trace_id}] search error: {}", err);
-            Ok(error_utils::map_error_to_http_response(
-                &err,
-                Some(trace_id),
-            ))
+            Ok(error_utils::map_error_to_http_response(err, trace_id))
         }
     }
 }

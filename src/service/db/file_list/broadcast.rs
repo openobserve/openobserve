@@ -70,10 +70,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
         for item in items.iter() {
             if !node.is_querier() {
                 node_items.push(item.clone());
-                continue;
-            }
-            // check if the item is for interactive node
-            if let Some(node_name) = cluster::get_node_from_consistent_hash(
+            } else if let Some(node_name) = cluster::get_node_from_consistent_hash(
                 &item.key,
                 &Role::Querier,
                 Some(RoleGroup::Interactive),
@@ -82,20 +79,6 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
             {
                 if node_name.eq(&node.name) {
                     node_items.push(item.clone());
-                    continue;
-                }
-            }
-            // check if the item is for background node
-            if let Some(node_name) = cluster::get_node_from_consistent_hash(
-                &item.key,
-                &Role::Querier,
-                Some(RoleGroup::Background),
-            )
-            .await
-            {
-                if node_name.eq(&node.name) {
-                    node_items.push(item.clone());
-                    continue;
                 }
             }
         }
@@ -222,11 +205,7 @@ async fn send_to_node(
                     return Ok(());
                 }
             };
-            let mut req_query = proto::cluster_rpc::FileList {
-                node_addr: LOCAL_NODE.grpc_addr.clone(),
-                ..Default::default()
-            };
-            log::debug!("[broadcast] req_query created: {:?}", req_query);
+            let mut req_query = cluster_rpc::FileList::default();
             for item in items.iter() {
                 req_query.items.push(cluster_rpc::FileKey::from(item));
             }

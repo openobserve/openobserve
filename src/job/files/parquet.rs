@@ -327,12 +327,7 @@ async fn prepare_files(
         columns.remove(4);
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(FileKey::new(
-            "".to_string(), // here we don't need it
-            file_key.clone(),
-            parquet_meta,
-            false,
-        ));
+        partition.push(FileKey::new(file_key.clone(), parquet_meta, false));
         // mark the file as processing
         PROCESSING_FILES.write().await.insert(file_key);
     }
@@ -515,7 +510,7 @@ async fn move_files(
         // yield to other tasks
         tokio::task::yield_now().await;
         // merge file and get the big file key
-        let (account, new_file_name, new_file_meta, new_file_list) =
+        let (new_file_name, new_file_meta, new_file_list) =
             match merge_files(thread_id, latest_schema.clone(), &wal_dir, &files_with_size).await {
                 Ok(v) => v,
                 Err(e) => {
@@ -536,7 +531,7 @@ async fn move_files(
         }
 
         // write file list to storage
-        let ret = db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await;
+        let ret = db::file_list::set(&new_file_name, Some(new_file_meta), false).await;
         if let Err(e) = ret {
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
@@ -552,32 +547,20 @@ async fn move_files(
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {
-            // use same lock to combine the operations of check lock and add to removing list
-            let wal_lock = infra::local_lock::lock("wal").await?;
-            let can_delete = if wal::lock_files_exists(&file.key) {
+            if wal::lock_files_exists(&file.key) {
                 log::warn!(
                     "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {}",
                     file.key
                 );
                 // add to pending delete list
-                if let Err(e) =
-                    db::file_list::local::add_pending_delete(&org_id, &file.account, &file.key)
-                        .await
-                {
+                if let Err(e) = db::file_list::local::add_pending_delete(&org_id, &file.key).await {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
                         file.key,
                         e.to_string()
                     );
                 }
-                false
             } else {
-                db::file_list::local::add_removing(&file.key).await?;
-                true
-            };
-            drop(wal_lock);
-
-            if can_delete {
                 match remove_file(wal_dir.join(&file.key)) {
                     Err(e) => {
                         log::warn!(
@@ -586,12 +569,8 @@ async fn move_files(
                             e.to_string()
                         );
                         // add to pending delete list
-                        if let Err(e) = db::file_list::local::add_pending_delete(
-                            &org_id,
-                            &file.account,
-                            &file.key,
-                        )
-                        .await
+                        if let Err(e) =
+                            db::file_list::local::add_pending_delete(&org_id, &file.key).await
                         {
                             log::error!(
                                 "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
@@ -611,9 +590,6 @@ async fn move_files(
                             .sub(file.meta.compressed_size);
                     }
                 }
-
-                // remove the file from removing set
-                db::file_list::local::remove_removing(&file.key).await?;
             }
 
             // metrics
@@ -637,14 +613,9 @@ async fn merge_files(
     latest_schema: Arc<Schema>,
     wal_dir: &Path,
     files_with_size: &[FileKey],
-) -> Result<(String, String, FileMeta, Vec<FileKey>), anyhow::Error> {
+) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
     if files_with_size.is_empty() {
-        return Ok((
-            String::from(""),
-            String::from(""),
-            FileMeta::default(),
-            Vec::new(),
-        ));
+        return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
 
     let cfg = get_config();
@@ -672,12 +643,7 @@ async fn merge_files(
     }
     // no files need to merge
     if new_file_list.is_empty() {
-        return Ok((
-            String::from(""),
-            String::from(""),
-            FileMeta::default(),
-            Vec::new(),
-        ));
+        return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
 
     let retain_file_list = new_file_list.clone();
@@ -715,24 +681,19 @@ async fn merge_files(
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
-    let (defined_schema_fields, need_original, index_original_data, index_all_values) =
-        match stream_settings {
-            Some(s) => (
-                s.defined_schema_fields.unwrap_or_default(),
-                s.store_original_data,
-                s.index_original_data,
-                s.index_all_values,
-            ),
-            None => (Vec::new(), false, false, false),
-        };
+    let (defined_schema_fields, need_original) = match stream_settings {
+        Some(s) => (
+            s.defined_schema_fields.unwrap_or_default(),
+            s.store_original_data,
+        ),
+        None => (Vec::new(), false),
+    };
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
         let latest_schema = generate_schema_for_defined_schema_fields(
             &latest_schema,
             &defined_schema_fields,
             need_original,
-            index_original_data,
-            index_all_values,
         );
         latest_schema.schema().clone()
     } else {
@@ -837,17 +798,11 @@ async fn merge_files(
 
     // upload file
     let buf = Bytes::from(buf);
-    if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
-        infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
-        log::debug!("merge_files {new_file_key} file_data::disk::set success");
-    }
-
-    let account = storage::get_account(&new_file_key).unwrap_or_default();
-    storage::put(&account, &new_file_key, buf.clone()).await?;
+    storage::put(&new_file_key, buf.clone()).await?;
 
     // skip index generation if not enabled or not basic type
     if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
-        return Ok((account, new_file_key, new_file_meta, retain_file_list));
+        return Ok((new_file_key, new_file_meta, retain_file_list));
     }
 
     // skip index generation if no fields to index
@@ -867,7 +822,7 @@ async fn merge_files(
             stream_type,
             stream_name
         );
-        return Ok((account, new_file_key, new_file_meta, retain_file_list));
+        return Ok((new_file_key, new_file_meta, retain_file_list));
     }
 
     // generate parquet format inverted index
@@ -911,7 +866,7 @@ async fn merge_files(
         new_file_meta.index_size = index_size as i64;
     }
 
-    Ok((account, new_file_key, new_file_meta, retain_file_list))
+    Ok((new_file_key, new_file_meta, retain_file_list))
 }
 
 fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
@@ -1118,7 +1073,7 @@ pub(crate) async fn generate_index_on_compactor(
     index_fields: &[String],
     schema: Arc<Schema>,
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
-) -> Result<Vec<(String, String, FileMeta)>, anyhow::Error> {
+) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
     let start = std::time::Instant::now();
 
     if full_text_search_fields.is_empty() && index_fields.is_empty() {
@@ -1216,10 +1171,7 @@ pub(crate) async fn generate_index_on_compactor(
     log::info!(
         "[COMPACTOR:JOB] generated parquet index file: {}, index files: {:?}, took: {} ms",
         new_file_key,
-        files
-            .iter()
-            .map(|(_account, file, _)| file)
-            .collect::<Vec<_>>(),
+        files.iter().map(|(k, _)| k).collect::<Vec<_>>(),
         start.elapsed().as_millis(),
     );
 
@@ -1491,18 +1443,7 @@ pub(crate) async fn create_tantivy_index(
     else {
         return Ok(0);
     };
-
-    if get_config().cache_latest_files.cache_index
-        && get_config().cache_latest_files.download_from_node
-    {
-        infra::cache::file_data::disk::set(&idx_file_name, Bytes::from(puffin_bytes.clone()))
-            .await?;
-        log::info!("file: {idx_file_name} file_data::disk::set success");
-    }
-
-    // the index file is stored in the same account as the parquet file
-    let account = storage::get_account(parquet_file_name).unwrap_or_default();
-    match storage::put(&account, &idx_file_name, Bytes::from(puffin_bytes)).await {
+    match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(
                 "{} generated tantivy index file: {}, size {}, took: {} ms",
