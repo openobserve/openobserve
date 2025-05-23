@@ -262,8 +262,8 @@ const initDB = () => {
   });
 };
 
-// Register VRL as a JavaScript alias ()
-hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript'));
+// Register VRL as a JavaScript alias (type assertion)
+hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript') as any);
 
 // Configure marked options with custom language support
 const markedOptions = {
@@ -306,14 +306,14 @@ export default defineComponent({
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
     const currentStreamingMessage = ref('');
-    const selectedProvider = ref('openai');
-    const selectedModel = ref('gpt-4.1');
+    const selectedProvider = ref<string>('openai');
+    const selectedModel = ref<any>('gpt-4.1');
     const showHistory = ref(false);
     const chatHistory = ref<ChatHistoryEntry[]>([]);
     const currentChatId = ref<number | null>(null);
     const store = useStore ();
     
-    const modelConfig = {
+    const modelConfig: any = {
       openai: [
         'o4-mini-2025-04-16',
         'gpt-4.1'
@@ -539,7 +539,7 @@ export default defineComponent({
         const store = transaction.objectStore(STORE_NAME);
         const request = store.index('timestamp').openCursor(null, 'prev');
         
-        const history = [];
+        const history: any[] = [];
         
         return new Promise((resolve, reject) => {
           request.onsuccess = (event: Event) => {
