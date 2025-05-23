@@ -378,14 +378,7 @@ export default defineComponent({
       {
         name: "first_name",
         field: "first_name",
-        label: t("user.firstName"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "last_name",
-        field: "last_name",
-        label: t("user.lastName"),
+        label: t("user.description"),
         align: "left",
         sortable: true,
       },
