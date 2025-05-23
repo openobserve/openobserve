@@ -560,6 +560,87 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total
     expected_hits_sql_cache = total_exp  # what we're expecting
     assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
 
+def test_update_max_query_range(create_session, base_url):
+    session = create_session
+    url = f"{base_url}api/{org_id}/streams/{stream_name}/settings?type=logs"
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    payload = {
+        "partition_keys": {"add": [], "remove": []},
+        "index_fields": {"add": [], "remove": []},
+        "full_text_search_keys": {"add": [], "remove": []},
+        "bloom_filter_fields": {"add": [], "remove": []},
+        "defined_schema_fields": {"add": [], "remove": []},
+        "extended_retention_days": {"add": [], "remove": []},
+        "max_query_range": 1,
+        "data_retention": 3650,
+        "store_original_data": False,
+        "approx_partition": False
+    }
+
+    response = session.put(url, json=payload)
+
+    assert response.status_code == 200 
+    print(f"Response {url} Update Max Query Range:", response.content)
+    # Add more assertions as needed to validate the response content
+
+def test_sql_query_range(create_session, base_url):
+    """Running an E2E test for sql max query range."""
+
+    session = create_session
+    url = base_url
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    sixtyone_min_ago = int((now - timedelta(minutes=61)).timestamp() * 1000000)
+    json_sql_query_range = {
+    "query": {
+        "sql": f"SELECT * FROM \"{stream_name}\"",
+        "start_time": sixtyone_min_ago,
+        "end_time": end_time,
+        "from": 0,
+        "size": 50,
+        "quick_mode": False,
+        "sql_mode": "full"
+            },
+    }
+    
+    res_sql_query_range = session.post(f"{url}api/{org_id}/_search?type=logs&search_type=UI&use_cache=false", json=json_sql_query_range)
+   
+    assert (
+        res_sql_query_range.status_code == 200
+    ), f"SQL mode added 200, but got {res_sql_query_range.status_code} {res_sql_query_range.content}"
+
+    # print(f"Response {url} SQL False Cache HTTP:", res_sql_query_range.content) 
+
+    print(f"Body {url}api/{org_id}/_search?type=logs&search_type=UI&use_cache=false", json_sql_query_range) 
+
+    # Parse the JSON response
+    
+    res_data_sql_query_range = res_sql_query_range.json()
+
+    # Expected error message
+    expected_error_message = "Query duration is modified due to query range restriction of 1 hours"
+    
+    # Assert that 'function_error' exists in the response and contains the expected message
+    assert "function_error" in res_data_sql_query_range, "function_error key is missing from the response"
+    assert expected_error_message in res_data_sql_query_range["function_error"], "Expected error message not found in function_error"
+
+
+    # Generate request for cache
+    res_sql_cache_query_range = session.post(f"{url}api/{org_id}/_search?type=logs&search_type=UI&use_cache=true", json=json_sql_query_range)
+   
+    assert (
+        res_sql_cache_query_range.status_code == 200
+    ), f"SQL cache mode added 200, but got {res_sql_cache_query_range.status_code} {res_sql_cache_query_range.content}"
+
+    # print(f"Response Cache True SQL {url} HTTP:", res_sql_cache_query_range.content) 
+
+    res_data_sql_cache_query_range = res_sql_cache_query_range.json()
+
+    # Assert that 'function_error' exists in the response and contains the expected message
+    assert "function_error" in res_data_sql_cache_query_range, "function_error key is missing from the response"        
+    assert expected_error_message in res_data_sql_cache_query_range["function_error"], "Expected error message not found in function_error"
+
 
 
 # Define test data with different queries and expected response details for streaming enable
@@ -734,6 +815,69 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_s
     # Adjust the assertion based on our expectations
     expected_hits_sql_cache = total_exp  # what we're expecting
     assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
+
+def test_streaming_sql_query_range(create_session, base_url):
+    """Running an E2E test for sql max query range with streaming enabled."""
+
+    session = create_session
+    url = base_url
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    sixtyone_min_ago = int((now - timedelta(minutes=61)).timestamp() * 1000000)
+    json_sql_query_range = {
+    "query": {
+        "sql": f"SELECT * FROM \"{stream_name}\"",
+        "start_time": sixtyone_min_ago,
+        "end_time": end_time,
+        "from": 0,
+        "size": 50,
+        "quick_mode": False,
+        "sql_mode": "full"
+            },
+    }
+   
+    res_sql_query_range = session.post(f"{url}api/{org_id}/_search_stream?type=logs&search_type=UI&use_cache=false", json=json_sql_query_range, stream=True)
+   
+    assert (
+        res_sql_query_range.status_code == 200
+    ), f"SQL mode added 200, but got {res_sql_query_range.status_code} {res_sql_query_range.content}"
+
+    print(f"Response {url} SQL False Cache Streaming:", res_sql_query_range.status_code) 
+
+   
+    # Parse the JSON response   
+    
+    res_stream_sql_query_range = read_response(res_sql_query_range)
+
+    # print(f"Body {url}api/{org_id}/_search_stream?type=logs&search_type=UI&use_cache=false", res_stream_sql_query_range ) 
+
+
+    # Expected error message
+    expected_error_message = "Query duration is modified due to query range restriction of 1 hours"
+    
+    # Assert that 'function_error' exists in the response and contains the expected message
+    assert "function_error" in res_stream_sql_query_range['results'], "function_error key is missing from the response"     
+    assert expected_error_message in res_stream_sql_query_range['results']["function_error"], "Expected error message not found in function_error"
+
+
+    # Generate request for cache
+    res_sql_cache_query_range = session.post(f"{url}api/{org_id}/_search_stream?type=logs&search_type=UI&use_cache=true", json=json_sql_query_range, stream=True)
+   
+    assert (
+        res_sql_cache_query_range.status_code == 200
+    ), f"SQL cache mode added 200, but got {res_sql_cache_query_range.status_code} {res_sql_cache_query_range.content}"
+
+    print(f"Response Cache True SQL {url} Streaming:", res_sql_cache_query_range.status_code) 
+
+    res_stream_sql_cache_query_range = read_response(res_sql_cache_query_range)
+
+    # print(f"Body {url}api/{org_id}/_search_stream?type=logs&search_type=UI&use_cache=true", res_stream_sql_cache_query_range ) 
+
+    # Assert that 'function_error' exists in the response and contains the expected message
+    assert "function_error" in res_stream_sql_cache_query_range['results'], "function_error key is missing from the response"        
+    assert expected_error_message in res_stream_sql_cache_query_range['results']["function_error"], "Expected error message not found in function_error"
+
 
 
 
