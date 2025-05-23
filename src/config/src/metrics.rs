@@ -789,6 +789,16 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static NODE_CONSISTENT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_consistent_hash", "Consistent hash")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["type"],
+    )
+    .expect("Metric created")
+});
+
 // query disk cache metrics
 pub static QUERY_DISK_CACHE_HIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -1052,6 +1062,9 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
         .expect("Metric registered");
+    registry
+    .register(Box::new(NODE_CONSISTENT_HASH.clone()))
+    .expect("Metric registered");
 
     // query disk cache metrics
     registry

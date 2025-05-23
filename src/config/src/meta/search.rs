@@ -16,6 +16,7 @@
 use std::collections::VecDeque;
 
 use bytes::Bytes as BytesImpl;
+use hashbrown::HashMap;
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
@@ -1201,6 +1202,16 @@ pub struct ValuesRequest {
     pub stream_name: String,
     pub stream_type: StreamType,
     pub sql: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct HashFileRequest {
+    pub files: Vec<String>,
+}
+
+#[derive(Debug, Default, Deserialize, Clone, Serialize)]
+pub struct HashFileResponse {
+    pub files: HashMap<String, HashMap<String, String>>,
 }
 
 #[cfg(test)]
