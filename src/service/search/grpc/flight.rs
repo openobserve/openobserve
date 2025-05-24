@@ -244,9 +244,9 @@ pub async fn search(
             Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
         );
         if is_simple_histogram {
-            let ttv_timestamp_added_at =
-                db::metas::tantivy_index::get_ttv_timestamp_added_at().await;
-            index_updated_at = index_updated_at.max(ttv_timestamp_added_at);
+            let ttv_timestamp_updated_at =
+                db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
+            index_updated_at = index_updated_at.max(ttv_timestamp_updated_at);
         }
         if is_aggregate_exec && (is_simple_count || is_simple_histogram) {
             let (tantivy_files, datafusion_files) = split_file_list_by_time_range(

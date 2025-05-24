@@ -62,17 +62,17 @@ pub mod tantivy_index {
 
     use super::db;
 
-    static TIMESTAMP_ADDED_AT: OnceCell<i64> = OnceCell::const_new();
+    static TIMESTAMP_UPDATED_AT: OnceCell<i64> = OnceCell::const_new();
 
-    pub async fn get_ttv_timestamp_added_at() -> i64 {
-        TIMESTAMP_ADDED_AT
+    pub async fn get_ttv_timestamp_updated_at() -> i64 {
+        TIMESTAMP_UPDATED_AT
             .get_or_init(get_or_create_idx_updated_at)
             .await
             .to_owned()
     }
 
     async fn get_or_create_idx_updated_at() -> i64 {
-        let key = "/tantivy/timestamp/added_at";
+        let key = "/tantivy/_timestamp/updated_at";
         match db::get(key).await {
             Ok(ret) if !ret.is_empty() => {
                 let timestamp = String::from_utf8_lossy(&ret)
@@ -86,7 +86,7 @@ pub mod tantivy_index {
                 let data = bytes::Bytes::from(timestamp.to_string());
                 if let Err(e) = db::put(key, data, db::NO_NEED_WATCH, None).await {
                     log::warn!(
-                        "[db::metas] Error storing tantivy timestamp index added_at: {}",
+                        "[db::metas] Error storing tantivy _timestamp index updated_at: {}",
                         e
                     );
                 }
