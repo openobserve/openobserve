@@ -1078,7 +1078,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
              
             </div>
-            <div v-if="store.state.isAiChatEnabled" style="width: 35%; max-width: 100%; min-width: 75px; height: calc(100vh - 140px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+            <div class="q-ml-sm" v-if="store.state.isAiChatEnabled" style="width: 35%; max-width: 100%; min-width: 75px; height: calc(100vh - 140px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
               <O2AIChat style="height: calc(100vh - 140px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
 
             </div>
