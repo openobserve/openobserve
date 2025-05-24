@@ -321,7 +321,6 @@ export default defineComponent({
     
     const modelConfig: any = {
       openai: [
-        'o4-mini-2025-04-16',
         'gpt-4.1'
       ],
       groq: [
