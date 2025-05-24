@@ -260,7 +260,7 @@ fn has_union(query: &Query) -> bool {
 
 fn has_subquery(stat: &Statement) -> bool {
     let mut visitor = SubqueryVisitor::new();
-    stat.visit(&mut visitor);
+    let _ = stat.visit(&mut visitor);
     visitor.is_subquery
 }
 
@@ -326,7 +326,7 @@ impl Visitor for SubqueryVisitor {
 
 fn has_timestamp(stat: &Statement) -> bool {
     let mut visitor = TimestampVisitor::new();
-    stat.visit(&mut visitor);
+    let _ = stat.visit(&mut visitor);
     visitor.timestamp_selected
 }
 

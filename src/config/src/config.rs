@@ -389,13 +389,12 @@ pub async fn get_sns_client() -> &'static aws_sdk_sns::Client {
 }
 
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
-    let blocked_streams = get_config()
+    get_config()
         .common
         .blocked_streams
         .split(',')
         .map(|x| x.to_string())
-        .collect();
-    blocked_streams
+        .collect()
 });
 
 #[derive(EnvConfig)]

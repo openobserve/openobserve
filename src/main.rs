@@ -264,7 +264,9 @@ async fn main() -> Result<(), anyhow::Error> {
             }
 
             // check version upgrade
-            let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
+            let old_version = db::metas::version::get()
+                .await
+                .unwrap_or("v0.0.0".to_string());
             if let Err(e) = migration::check_upgrade(&old_version, config::VERSION).await {
                 job_init_tx.send(false).ok();
                 panic!("check upgrade failed: {}", e);

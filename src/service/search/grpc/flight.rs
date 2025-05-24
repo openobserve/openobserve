@@ -55,7 +55,7 @@ use crate::service::{
                 empty_exec::NewEmptyExec,
             },
             exec::{prepare_datafusion_context, register_udf},
-            plan::tantivy_count_exec::TantivyCountExec,
+            plan::tantivy_count_exec::TantivyOptimizeExec,
             table_provider::{enrich_table::NewEnrichTable, uniontable::NewUnionTable},
         },
         index::IndexCondition,
@@ -164,7 +164,8 @@ pub async fn search(
             }
         })
         .collect_vec();
-    let index_updated_at = get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
+    let mut index_updated_at =
+        get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
 
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
@@ -190,7 +191,7 @@ pub async fn search(
         use_inverted_index: req.index_info.use_inverted_index,
     });
 
-    let mut idx_optimize_rule: Option<InvertedIndexOptimizeMode> =
+    let idx_optimize_rule: Option<InvertedIndexOptimizeMode> =
         req.index_info.index_optimize_mode.clone().map(|x| x.into());
 
     // get all tables
@@ -234,13 +235,23 @@ pub async fn search(
             )
         );
 
-        if physical_plan.name() == "AggregateExec"
-            && physical_plan.schema().fields().len() == 1
+        let mut storage_search_idx_optimize_rule = idx_optimize_rule.clone();
+        let is_aggregate_exec = physical_plan.name() == "AggregateExec";
+        let is_simple_count = physical_plan.schema().fields().len() == 1
             && matches!(
                 idx_optimize_rule,
                 Some(InvertedIndexOptimizeMode::SimpleCount)
-            )
-        {
+            );
+        let is_simple_histogram = matches!(
+            idx_optimize_rule,
+            Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
+        );
+        if is_simple_histogram {
+            let ttv_timestamp_updated_at =
+                db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
+            index_updated_at = index_updated_at.max(ttv_timestamp_updated_at);
+        }
+        if is_aggregate_exec && (is_simple_count || is_simple_histogram) {
             let (tantivy_files, datafusion_files) = split_file_list_by_time_range(
                 file_list,
                 req.search_info.start_time,
@@ -249,7 +260,14 @@ pub async fn search(
             );
             tantivy_file_list = tantivy_files;
             file_list = datafusion_files;
-            idx_optimize_rule = None;
+            storage_search_idx_optimize_rule = None;
+            log::debug!(
+                "[trace_id {}] flight->search: after_split_file idx: {}, datafusion_files: {}, optimize_rule: {:?}",
+                trace_id,
+                tantivy_file_list.len(),
+                file_list.len(),
+                storage_search_idx_optimize_rule
+            );
         }
 
         // sort by max_ts, the latest file should be at the top
@@ -265,7 +283,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
-            idx_optimize_rule,
+            storage_search_idx_optimize_rule,
         )
         .await
         {
@@ -379,11 +397,12 @@ pub async fn search(
 
     if !tantivy_file_list.is_empty() {
         scan_stats.add(&collect_stats(&tantivy_file_list));
-        let tantivy_exec = Arc::new(TantivyCountExec::new(
+        let tantivy_exec = Arc::new(TantivyOptimizeExec::new(
             query_params,
             physical_plan.schema(),
             tantivy_file_list,
             index_condition.unwrap(),
+            idx_optimize_rule.unwrap(), // guaranteed Some, if tantivy_file_list is not empty
         ));
         physical_plan = Arc::new(UnionExec::new(vec![physical_plan, tantivy_exec as _]));
     }
@@ -493,7 +512,7 @@ fn split_file_list_by_time_range(
     file_list.into_iter().partition(|file| {
         file.meta.min_ts >= start_time
             && file.meta.max_ts <= end_time
-            && file.meta.min_ts > index_updated_at
+            && file.meta.min_ts >= index_updated_at
             && file.meta.index_size > 0
     })
 }
