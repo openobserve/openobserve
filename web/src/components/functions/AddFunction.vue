@@ -451,7 +451,7 @@ end`;
       confirmDialogMeta.value.data = null;
     };
     const openChat = (val: boolean) => {
-      store.state.isAiChatEnabled = val;
+        store.dispatch("setIsAiChatEnabled", val);
     };
 
     return {

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center">
             <q-btn
             :ripple="false"
-            @click="store.state.isAiChatEnabled = !store.state.isAiChatEnabled"
+            @click="toggleAIChat"
             data-test="menu-link-ai-item"
             no-caps
             :borderless="true"
@@ -2089,6 +2089,11 @@ const updateDelay = (val: any) => {
   emits("update:delay",val)
 }
 
+const toggleAIChat = () => {
+  const isEnabled = !store.state.isAiChatEnabled;
+  store.dispatch("setIsAiChatEnabled", isEnabled);
+}
+
 defineExpose({
   tab,
   validateInputs,
@@ -2119,7 +2124,8 @@ defineExpose({
   copyLogToClipboard,
   copyToClipboard,
   updateDelay,
-  delayCondition
+  delayCondition,
+  toggleAIChat
 });
 
 </script>
