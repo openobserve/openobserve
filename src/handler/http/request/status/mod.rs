@@ -463,7 +463,9 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use crate::common::meta::user::{AuthTokens, UserRole};
+    use config::meta::user::UserRole;
+
+    use crate::common::meta::user::AuthTokens;
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {

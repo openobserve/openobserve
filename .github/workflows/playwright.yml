@@ -32,10 +32,11 @@ env:
   ZO_USAGE_REPORTING_ENABLED: true
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
   ZO_WEBSOCKET_ENABLED: true
-  ZO_STREAMING_ENABLED: true 
+  ZO_STREAMING_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
   ZO_SMTP_ENABLED: true
   ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
+  ZO_CREATE_ORG_THROUGH_INGESTION: true
 
 jobs:
   build_binary:
@@ -137,7 +138,7 @@ jobs:
             "websocket.spec.js",
             "alertImportTDA.spec.js",
             "streamname.spec.js",
-            "streaming.spec.js"
+            "streaming.spec.js",
             # "remotepipeline.spec.js",
 
           ]

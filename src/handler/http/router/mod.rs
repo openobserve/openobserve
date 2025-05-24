@@ -243,6 +243,10 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     svc.service(status::healthz)
         .service(status::healthz_head)
         .service(status::schedulez);
+
+    #[cfg(feature = "cloud")]
+    svc.service(web::scope("/webhook").service(billings::handle_stripe_event));
+
     svc.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -372,6 +376,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(users::delete)
         .service(users::update)
         .service(users::add_user_to_org)
+        .service(users::list_invitations)
+        .service(users::list_roles)
         .service(organization::org::organizations)
         .service(organization::settings::get)
         .service(organization::settings::create)
@@ -526,6 +532,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(logs::ingest::handle_gcp_request)
         .service(organization::org::create_org)
         .service(authz::fga::create_role)
+        .service(organization::org::rename_org)
         .service(authz::fga::get_roles)
         .service(authz::fga::update_role)
         .service(authz::fga::get_role_permissions)
@@ -535,6 +542,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(authz::fga::get_group_details)
         .service(authz::fga::get_resources)
         .service(authz::fga::get_users_with_role)
+        .service(authz::fga::get_roles_for_user)
+        .service(authz::fga::get_groups_for_user)
         .service(authz::fga::delete_role)
         .service(authz::fga::delete_group)
         .service(users::list_roles)
@@ -586,6 +595,20 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ratelimit::update_ratelimit)
         .service(ratelimit::api_modules)
         .service(actions::operations::test_action);
+
+    #[cfg(feature = "cloud")]
+    let service = service
+        .service(organization::org::get_org_invites)
+        .service(organization::org::generate_org_invite)
+        .service(organization::org::accept_org_invite)
+        .service(billings::create_checkout_session)
+        .service(billings::process_session_detail)
+        .service(billings::list_subscription)
+        .service(billings::list_invoices)
+        .service(billings::unsubscribe)
+        .service(billings::create_billing_portal_session)
+        .service(billings::org_usage::get_org_quota_threshold)
+        .service(billings::org_usage::get_org_usage);
 
     svc.service(service);
 }
