@@ -1847,6 +1847,12 @@ pub struct Pipeline {
         help = "pipeline exporter client max connections"
     )]
     pub max_connections: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_STORE_ORIGINAL_DATA",
+        default = false,
+        help = "default store_original_data behavior when stream create using pipeline"
+    )]
+    pub store_original_data: bool,
 }
 
 #[derive(EnvConfig)]

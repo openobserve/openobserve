@@ -151,7 +151,8 @@ async fn settings(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
-    if !config::get_config().common.skip_formatting_stream_name {
+    let config = config::get_config();
+    if !config.common.skip_formatting_stream_name {
         stream_name = format_stream_name(&stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -164,7 +165,11 @@ async fn settings(
             )),
         );
     }
-    stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
+    
+    let mut settings = settings.into_inner();
+    settings.store_original_data = settings.store_original_data || config.pipeline.store_original_data;
+    
+    stream::save_stream_settings(&org_id, &stream_name, stream_type, settings).await
 }
 
 /// UpdateStreamSettings
