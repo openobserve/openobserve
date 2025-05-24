@@ -637,7 +637,7 @@ export default defineComponent({
                   role: 'assistant',
                   content: ''
                 });
-                const response = await fetchAiChat(chatMessages.value.slice(0, -1), "", store.state.org_id);
+                const response = await fetchAiChat(chatMessages.value.slice(0, -1), "", store.state.selectedOrganization.identifier);
                 if (!response || !response.ok || !response.body) {
                   throw new Error('Failed to get AI response');
                 }
