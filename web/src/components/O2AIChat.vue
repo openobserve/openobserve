@@ -80,8 +80,7 @@
           <div v-if="chatMessages.length === 0" class="welcome-section ">
             <div class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full ">
               <img :src="store.state.theme == 'dark' ? '/src/assets/images/common/o2_ai_logo_dark.svg' : '/src/assets/images/common/o2_ai_logo.svg'" />
-              <span class="tw-text-[14px] tw-font-[600] tw-text-center">Build Queries faster with O2 AI</span>
-              <span class="tw-text-[12px] tw-text-center tw-font-[400]">O2 is powered by AI, so mistakes are possible.Review output carefully before using.</span>
+              <span class="tw-text-[14px] tw-font-[600] tw-text-center">AI native  observability</span>
             </div>
           </div>
           <div v-for="(message, index) in processedMessages" 
