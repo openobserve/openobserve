@@ -204,7 +204,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, nextTick, watch, computed } from 'vue';
+import { defineComponent, ref, onMounted, nextTick, watch, computed, onUnmounted } from 'vue';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import { marked } from 'marked';
@@ -318,6 +318,7 @@ export default defineComponent({
     const chatUpdated = computed(() => store.state.chatUpdated);
 
     const currentChatTimestamp = ref<string | null>(null);
+    const saveHistoryLoading = ref(false);
     
     const modelConfig: any = {
       openai: [
@@ -370,15 +371,6 @@ export default defineComponent({
       }
     };
 
-    // watch(chatUpdated, (newChatUpdated: boolean) => {
-    //   if (newChatUpdated && store.state.currentChatTimestamp) {
-    //     loadChat(store.state.currentChatTimestamp);
-    //   }
-    //   if(newChatUpdated && !store.state.currentChatTimestamp) {
-    //     addNewChat();
-    //   }
-    //   store.dispatch('setChatUpdated', false);
-    // });
 
     //fetchInitialMessage is called when the component is mounted and the isOpen prop is true
 
@@ -502,6 +494,7 @@ export default defineComponent({
     };
 
     const saveToHistory = async () => {
+      saveHistoryLoading.value = true;
       if (chatMessages.value.length === 0) return;
       
       try {
@@ -538,8 +531,8 @@ export default defineComponent({
           ...chatData, 
           id: chatId // Use timestamp as ID if no current ID
         });
-        store.dispatch('setCurrentChatTimestamp', chatId);
-        store.dispatch('setChatUpdated', true);
+
+
 
 
         request.onsuccess = (event: Event) => {
@@ -549,6 +542,9 @@ export default defineComponent({
         };
       } catch (error) {
         console.error('Error saving chat history:', error);
+      }
+      finally {
+        saveHistoryLoading.value = false;
       }
     };
 
@@ -677,6 +673,9 @@ export default defineComponent({
 
         const reader = response.body.getReader();
         await processStream(reader);
+
+        store.dispatch('setCurrentChatTimestamp', currentChatId.value);
+        store.dispatch('setChatUpdated', true);
         
         // Save is now handled after stream processing completes
 
@@ -727,6 +726,26 @@ export default defineComponent({
         loadChat(store.state.currentChatTimestamp);
       }
     });
+
+    onUnmounted(()=>{
+      store.dispatch('setCurrentChatTimestamp', currentChatId.value);
+      store.dispatch('setChatUpdated', true);      if ( store.state.currentChatTimestamp) {
+        loadChat(store.state.currentChatTimestamp);
+      }
+      if(!store.state.currentChatTimestamp) {
+        addNewChat();
+      }
+    })
+
+        watch(chatUpdated, (newChatUpdated: boolean) => {
+          if (newChatUpdated && store.state.currentChatTimestamp) {
+            loadChat(store.state.currentChatTimestamp);
+          }
+          if(newChatUpdated && !store.state.currentChatTimestamp) {
+            addNewChat();
+          }
+          store.dispatch('setChatUpdated', false);
+        });
 
     const copyToClipboard = async (text: string) => {
       try {
@@ -889,7 +908,8 @@ export default defineComponent({
       dislikeCodeBlock,
       currentChatTimestamp,
       o2AiTitleLogo,
-      getGenerateAiIcon
+      getGenerateAiIcon,
+      saveHistoryLoading
     }
   }
 });
