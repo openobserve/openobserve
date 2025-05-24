@@ -7,7 +7,7 @@
 
           <div >
             <q-avatar size="24px" class="q-mr-sm">
-              <img :src="store.state.theme == 'dark' ? '/src/assets/images/common/o2_ai_logo_dark.svg' : '/src/assets/images/common/o2_ai_logo.svg'" />
+              <img :src="o2AiTitleLogo" />
             </q-avatar>
             <span>O2 AI</span>
           </div>
@@ -79,7 +79,7 @@
         <div class="messages-container " ref="messagesContainer">
           <div v-if="chatMessages.length === 0" class="welcome-section ">
             <div class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full ">
-              <img :src="store.state.theme == 'dark' ? '/src/assets/images/common/o2_ai_logo_dark.svg' : '/src/assets/images/common/o2_ai_logo.svg'" />
+              <img :src="o2AiTitleLogo" />
               <span class="tw-text-[14px] tw-font-[600] tw-text-center">AI native  observability</span>
             </div>
           </div>
@@ -193,7 +193,7 @@
 
           >
             <div class="tw-flex tw-items-center tw-gap-2">
-              <img src="/src/assets/images/common/ai_icon.svg" class="tw-w-4 tw-h-4" />
+              <img :src="getGenerateAiIcon" class="tw-w-4 tw-h-4" />
               <span class="tw-text-[12px]">Generate</span>
             </div>
           </q-btn>
@@ -214,6 +214,7 @@ import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
 
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
+import { getImageURL } from '@/utils/zincutils';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -369,15 +370,15 @@ export default defineComponent({
       }
     };
 
-    watch(chatUpdated, (newChatUpdated: boolean) => {
-      if (newChatUpdated && store.state.currentChatTimestamp) {
-        loadChat(store.state.currentChatTimestamp);
-      }
-      if(newChatUpdated && !store.state.currentChatTimestamp) {
-        addNewChat();
-      }
-      store.dispatch('setChatUpdated', false);
-    });
+    // watch(chatUpdated, (newChatUpdated: boolean) => {
+    //   if (newChatUpdated && store.state.currentChatTimestamp) {
+    //     loadChat(store.state.currentChatTimestamp);
+    //   }
+    //   if(newChatUpdated && !store.state.currentChatTimestamp) {
+    //     addNewChat();
+    //   }
+    //   store.dispatch('setChatUpdated', false);
+    // });
 
     //fetchInitialMessage is called when the component is mounted and the isOpen prop is true
 
@@ -613,9 +614,6 @@ export default defineComponent({
             
             // Check if the last message is a user message without an assistant response
             const lastMessage = formattedMessages[formattedMessages.length - 1];
-            const pendingUserPrompt = lastMessage && lastMessage.role === 'user' && 
-              (!formattedMessages[formattedMessages.length - 2] || 
-               formattedMessages[formattedMessages.length - 2].role !== 'assistant');
             
             chatMessages.value = formattedMessages;
             selectedProvider.value = chat.provider || 'openai';
@@ -628,30 +626,6 @@ export default defineComponent({
               store.dispatch('setChatUpdated', true);
             }
             
-            // If there's a pending user prompt, trigger the AI response
-            if (pendingUserPrompt) {
-              isLoading.value = true;
-              currentStreamingMessage.value = '';
-              try {
-                chatMessages.value.push({
-                  role: 'assistant',
-                  content: ''
-                });
-                const response = await fetchAiChat(chatMessages.value.slice(0, -1), "", store.state.selectedOrganization.identifier);
-                if (!response || !response.ok || !response.body) {
-                  throw new Error('Failed to get AI response');
-                }
-                const reader = response.body.getReader();
-                await processStream(reader);
-              } catch (error) {
-                console.error('Error processing pending user prompt:', error);
-                if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant') {
-                  chatMessages.value[chatMessages.value.length - 1].content = 'Error: Unable to get response from the server';
-                }
-                await saveToHistory();
-              }
-              isLoading.value = false;
-            }
             
             // Scroll to bottom after loading chat
             await nextTick(() => {
@@ -877,6 +851,12 @@ export default defineComponent({
     const dislikeCodeBlock = (message: any) => {
       console.log('dislikeCodeBlock', message);
     };
+    const o2AiTitleLogo = computed(() => {
+      return store.state.theme == 'dark' ? getImageURL('images/common/o2_ai_logo_dark.svg') : getImageURL('images/common/o2_ai_logo.svg')
+    });
+    const getGenerateAiIcon = computed(()=> {
+      return getImageURL('images/common/ai_icon.svg')
+    })
     return {
       inputMessage,
       chatMessages,
@@ -908,6 +888,8 @@ export default defineComponent({
       likeCodeBlock,
       dislikeCodeBlock,
       currentChatTimestamp,
+      o2AiTitleLogo,
+      getGenerateAiIcon
     }
   }
 });
