@@ -241,7 +241,6 @@ const initDB = () => {
   return new Promise<IDBDatabase>((resolve, reject) => {
     //this opens / creates(if not exists) the database with the name o2ChatDB and version 1
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    console.log('request', request);
 
     request.onerror = () => reject(request.error);
     //this is called when the database is successfully opened and returns the database object
@@ -728,6 +727,10 @@ export default defineComponent({
     });
 
     onUnmounted(()=>{
+      //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
+      //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
+      //so we need to make sure that the currentChatTimestamp is set to the correct chatId
+      //and the chat gets updated when the component is unmounted so that the main layout component can load the correct chat
       store.dispatch('setCurrentChatTimestamp', currentChatId.value);
       store.dispatch('setChatUpdated', true);      if ( store.state.currentChatTimestamp) {
         loadChat(store.state.currentChatTimestamp);
@@ -736,16 +739,17 @@ export default defineComponent({
         addNewChat();
       }
     })
-
-        watch(chatUpdated, (newChatUpdated: boolean) => {
-          if (newChatUpdated && store.state.currentChatTimestamp) {
-            loadChat(store.state.currentChatTimestamp);
-          }
-          if(newChatUpdated && !store.state.currentChatTimestamp) {
-            addNewChat();
-          }
-          store.dispatch('setChatUpdated', false);
-        });
+    //this watch is added to make sure that the chat gets updated 
+    // when the component is unmounted so that the main layout component can load the correct chat
+      watch(chatUpdated, (newChatUpdated: boolean) => {
+        if (newChatUpdated && store.state.currentChatTimestamp) {
+          loadChat(store.state.currentChatTimestamp);
+        }
+        if(newChatUpdated && !store.state.currentChatTimestamp) {
+          addNewChat();
+        }
+        store.dispatch('setChatUpdated', false);
+      });
 
     const copyToClipboard = async (text: string) => {
       try {
