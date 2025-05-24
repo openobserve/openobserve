@@ -70,6 +70,7 @@
     </div>
     <div class="add-function-actions flex justify-center">
           <q-btn
+            v-if="config.isEnterprise == 'true'"
             :ripple="false"
             @click="emit('open:chat',!store.state.isAiChatEnabled)"
             data-test="menu-link-ai-item"
@@ -139,7 +140,7 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
-
+import config from "../../aws-exports";
 const { t } = useI18n();
 
 const q = useQuasar();

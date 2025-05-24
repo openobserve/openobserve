@@ -593,9 +593,14 @@ export default defineComponent({
 
     const loadChat = async (chatId: number) => {
       try {
+
         const db = await initDB();
         const transaction = db.transaction(STORE_NAME, 'readonly');
         const indexDbStore = transaction.objectStore(STORE_NAME);
+        if(chatId == null) {
+          addNewChat();
+          return;
+        }
         const request = indexDbStore.get(chatId);
 
         request.onsuccess = async () => {
@@ -655,7 +660,7 @@ export default defineComponent({
         });
         let response: any;
         try { 
-          response = await fetchAiChat(chatMessages.value.slice(0, -1),"",store.state.org_id);
+          response = await fetchAiChat(chatMessages.value.slice(0, -1),"",store.state.selectedOrganization.identifier);
         } catch (error) {
           console.error('Error fetching AI chat:', error);
           return;
