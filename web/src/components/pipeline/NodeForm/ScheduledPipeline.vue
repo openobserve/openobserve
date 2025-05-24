@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             dense
             class="o2-button q-mr-sm tw-h-[32px]"
+            v-if="config.isEnterprise == 'true'"
 
         >
           <div class="row items-center no-wrap tw-gap-2 q-px-sm">
@@ -1189,6 +1190,9 @@ import useStreams from "@/composables/useStreams";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
+
+import config from "../../../aws-exports";
+
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),

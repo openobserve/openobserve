@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>   
             <q-btn
+            v-if="config.isEnterprise == 'true'"
             :ripple="false"
             @click="toggleAIChat"
             data-test="menu-link-ai-item"
