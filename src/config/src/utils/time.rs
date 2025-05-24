@@ -357,6 +357,36 @@ mod tests {
         let s = "Wed, 8 Mar 2023 16:46:51 CST";
         let t = parse_str_to_time(s).unwrap();
         assert_eq!(t.timestamp_micros(), 1678315611000000);
+
+        // Test milliseconds format (3 decimal places)
+        let s = "2021-01-01T00:00:00.123";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200123000);
+
+        // Test microseconds format (6 decimal places)
+        let s = "2021-01-01T00:00:00.123456";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200123456);
+
+        // Test other decimal places (fallback to RFC3339)
+        let s = "2021-01-01T00:00:00.123456789";
+        let t = parse_str_to_time(s);
+        assert!(t.is_err());
+
+        // Test with timezone and milliseconds
+        let s = "2021-01-01T00:00:00.123Z";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200123000);
+
+        // Test with timezone and microseconds
+        let s = "2021-01-01T00:00:00.123456+08:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609430400123456);
+
+        // Test with timezone and other decimal places
+        let s = "2021-01-01T00:00:00.123456789-08:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609488000123456);
     }
 
     #[test]
