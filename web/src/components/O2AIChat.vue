@@ -314,6 +314,9 @@ export default defineComponent({
     const chatHistory = ref<ChatHistoryEntry[]>([]);
     const currentChatId = ref<number | null>(null);
     const store = useStore ();
+    const chatUpdated = computed(() => store.state.chatUpdated);
+
+    const currentChatTimestamp = ref<string | null>(null);
     
     const modelConfig: any = {
       openai: [
@@ -365,6 +368,16 @@ export default defineComponent({
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
       }
     };
+
+    watch(chatUpdated, (newChatUpdated: boolean) => {
+      if (newChatUpdated && store.state.currentChatTimestamp) {
+        loadChat(store.state.currentChatTimestamp);
+      }
+      if(newChatUpdated && !store.state.currentChatTimestamp) {
+        addNewChat();
+      }
+      store.dispatch('setChatUpdated', false);
+    });
 
     //fetchInitialMessage is called when the component is mounted and the isOpen prop is true
 
@@ -493,7 +506,7 @@ export default defineComponent({
       try {
         const db = await initDB();
         const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
+        const DbIndexStore = transaction.objectStore(STORE_NAME);
 
         // Generate a title from the first user message
         const firstUserMessage = chatMessages.value.find(msg => msg.role === 'user');
@@ -519,10 +532,14 @@ export default defineComponent({
 
         // Always use put with the current chat ID to update existing chat
         // instead of creating a new one
-        const request = store.put({ 
+        let chatId = currentChatId.value || Date.now();
+        const request = DbIndexStore.put({ 
           ...chatData, 
-          id: currentChatId.value || Date.now() // Use timestamp as ID if no current ID
+          id: chatId // Use timestamp as ID if no current ID
         });
+        store.dispatch('setCurrentChatTimestamp', chatId);
+        store.dispatch('setChatUpdated', true);
+
 
         request.onsuccess = (event: Event) => {
           if (!currentChatId.value) {
@@ -568,6 +585,9 @@ export default defineComponent({
       selectedProvider.value = 'openai';
       selectedModel.value = modelConfig.openai[0];
       showHistory.value = false;
+      currentChatTimestamp.value = null;
+      store.dispatch('setCurrentChatTimestamp', null);
+      store.dispatch('setChatUpdated', true);
     };
 
     const openHistory = async () => {
@@ -579,10 +599,10 @@ export default defineComponent({
       try {
         const db = await initDB();
         const transaction = db.transaction(STORE_NAME, 'readonly');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.get(chatId);
+        const indexDbStore = transaction.objectStore(STORE_NAME);
+        const request = indexDbStore.get(chatId);
 
-        request.onsuccess = () => {
+        request.onsuccess = async () => {
           const chat = request.result;
           if (chat) {
             // Ensure messages are properly formatted
@@ -591,14 +611,50 @@ export default defineComponent({
               content: msg.content
             }));
             
+            // Check if the last message is a user message without an assistant response
+            const lastMessage = formattedMessages[formattedMessages.length - 1];
+            const pendingUserPrompt = lastMessage && lastMessage.role === 'user' && 
+              (!formattedMessages[formattedMessages.length - 2] || 
+               formattedMessages[formattedMessages.length - 2].role !== 'assistant');
+            
             chatMessages.value = formattedMessages;
             selectedProvider.value = chat.provider || 'openai';
             selectedModel.value = chat.model || modelConfig.openai[0];
             currentChatId.value = chatId;
             showHistory.value = false;
             
+            if(chatId !== store.state.currentChatTimestamp) {
+              store.dispatch('setCurrentChatTimestamp', chatId);
+              store.dispatch('setChatUpdated', true);
+            }
+            
+            // If there's a pending user prompt, trigger the AI response
+            if (pendingUserPrompt) {
+              isLoading.value = true;
+              currentStreamingMessage.value = '';
+              try {
+                chatMessages.value.push({
+                  role: 'assistant',
+                  content: ''
+                });
+                const response = await fetchAiChat(chatMessages.value.slice(0, -1), "", store.state.org_id);
+                if (!response || !response.ok || !response.body) {
+                  throw new Error('Failed to get AI response');
+                }
+                const reader = response.body.getReader();
+                await processStream(reader);
+              } catch (error) {
+                console.error('Error processing pending user prompt:', error);
+                if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant') {
+                  chatMessages.value[chatMessages.value.length - 1].content = 'Error: Unable to get response from the server';
+                }
+                await saveToHistory();
+              }
+              isLoading.value = false;
+            }
+            
             // Scroll to bottom after loading chat
-            nextTick(() => {
+            await nextTick(() => {
               scrollToBottom();
             });
           }
@@ -694,6 +750,7 @@ export default defineComponent({
       if (props.isOpen) {
         fetchInitialMessage();
         loadHistory(); // Load history on mount if chat is open
+        loadChat(store.state.currentChatTimestamp);
       }
     });
 
@@ -819,7 +876,7 @@ export default defineComponent({
 
     const dislikeCodeBlock = (message: any) => {
       console.log('dislikeCodeBlock', message);
-    }
+    };
     return {
       inputMessage,
       chatMessages,
@@ -849,8 +906,9 @@ export default defineComponent({
       outlinedThumbUpOffAlt,
       outlinedThumbDownOffAlt,
       likeCodeBlock,
-      dislikeCodeBlock
-    };
+      dislikeCodeBlock,
+      currentChatTimestamp,
+    }
   }
 });
 </script>
