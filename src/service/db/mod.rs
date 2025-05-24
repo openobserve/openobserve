@@ -29,10 +29,10 @@ pub mod distinct_values;
 pub mod enrichment_table;
 pub mod file_list;
 pub mod functions;
-pub mod instance;
 #[cfg(feature = "enterprise")]
 pub mod keys;
 pub mod kv;
+pub mod metas;
 pub mod metrics;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
@@ -47,7 +47,6 @@ pub mod session;
 pub mod short_url;
 pub mod syslog;
 pub mod user;
-pub mod version;
 
 pub(crate) use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
 
