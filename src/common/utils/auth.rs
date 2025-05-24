@@ -664,7 +664,7 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/short")
                 || path.contains("/ws")
                 || path.contains("/_values_stream")
-                || path_columns[1].eq("ai")
+                || (url_len > 1 && path_columns[1].eq("ai"))
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
