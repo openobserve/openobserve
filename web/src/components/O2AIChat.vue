@@ -132,7 +132,7 @@
                         <span class="tw-ml-1" >Retry</span>
                       </div>
                       </q-btn>
-                      <div class="tw-flex tw-items-center tw-gap-2">
+                      <div v-if="false" class="tw-flex tw-items-center tw-gap-2">
                         <q-btn flat dense :icon="outlinedThumbUpOffAlt" color="primary" @click="likeCodeBlock(message)"  />
                         <q-btn flat dense :icon="outlinedThumbDownOffAlt" color="primary" @click="dislikeCodeBlock(message)"  />
                       </div>
