@@ -86,6 +86,8 @@ export default createStore({
     allRoleLimitsByOrgIdByRole: {},
     modulesToDisplay: {},
     isAiChatEnabled: false,
+    currentChatTimestamp: null,
+    chatUpdated: false,
   },
   mutations: {
     login(state, payload) {
@@ -227,6 +229,12 @@ export default createStore({
     setIsAiChatEnabled(state, payload) {
       state.isAiChatEnabled = payload;
     },
+    setCurrentChatTimestamp(state, payload) {
+      state.currentChatTimestamp = payload;
+    },
+    setChatUpdated(state, payload) {
+      state.chatUpdated = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -363,6 +371,12 @@ export default createStore({
     },
     setIsAiChatEnabled(context, payload) {
       context.commit("setIsAiChatEnabled", payload);
+    },
+    setCurrentChatTimestamp(context, payload) {
+      context.commit("setCurrentChatTimestamp", payload);
+    },
+    setChatUpdated(context, payload) {
+      context.commit("setChatUpdated", payload);
     },
   },
   modules: {},
