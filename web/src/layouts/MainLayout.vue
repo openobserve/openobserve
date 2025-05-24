@@ -441,7 +441,7 @@ class="padding-none" />
 
     <div
       class="col-auto"
-      v-show="store.state.isAiChatEnabled"
+      v-show="store.state.isAiChatEnabled && isLoading"
       style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10 "
       :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
