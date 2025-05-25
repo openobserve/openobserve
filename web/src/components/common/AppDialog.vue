@@ -22,7 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="app-dialog-backdrop"
         @click="handleBackdropClick"
       >
-        <div class="app-dialog" ref="dialogRef" @click.stop>
+        <div
+          class="app-dialog"
+          ref="dialogRef"
+          @click.stop
+          role="dialog"
+          aria-modal="true"
+        >
           <div class="app-dialog-content">
             <slot></slot>
           </div>
@@ -33,7 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, onMounted, onBeforeUnmount } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+} from "vue";
 
 export default defineComponent({
   name: "AppDialog",
@@ -114,12 +127,12 @@ export default defineComponent({
         if (isOpen) {
           document.body.style.overflow = "hidden";
           // Focus the dialog after it's shown
-          setTimeout(() => {
+          nextTick(() => {
             const focusable = dialogRef.value?.querySelector(
               'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
             ) as HTMLElement;
             focusable?.focus();
-          }, 50);
+          });
         } else {
           document.body.style.overflow = "";
         }
