@@ -105,21 +105,26 @@ pub async fn chat(body: web::Json<PromptRequest>) -> impl Responder {
 #[post("/{org_id}/ai/chat_stream")]
 pub async fn chat_stream(body: web::Json<PromptRequest>) -> impl Responder {
     let config = get_o2_config();
-    if config.ai.enabled {
+
+    let stream = if config.ai.enabled {
         let req_body = body.into_inner();
-        let response =
+        let enabled_stream =
             ai::service::chat_stream(ai::AiServerRequest::new(req_body.messages, req_body.model))
                 .await;
-        match response {
-            Ok(stream) => HttpResponse::Ok()
-                .content_type("text/event-stream")
-                .streaming(stream),
-            Err(e) => {
-                log::error!("Error in ai chat stream: {}", e);
-                MetaHttpResponse::internal_error(e)
-            }
-        }
+        enabled_stream
     } else {
-        MetaHttpResponse::bad_request("AI is not enabled")
-    }
+        // Create a channel for the error message
+        let (tx, rx) = tokio::sync::mpsc::channel::<Result<bytes::Bytes, anyhow::Error>>(1);
+        let _ = tx
+            .send(Ok(bytes::Bytes::from(
+                "data: {\"error\": \"AI is not enabled\"}\n\n",
+            )))
+            .await;
+        let error_stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+        error_stream
+    };
+
+    HttpResponse::Ok()
+        .content_type("text/event-stream")
+        .streaming(stream)
 }
