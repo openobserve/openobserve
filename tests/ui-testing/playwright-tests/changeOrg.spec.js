@@ -21,7 +21,8 @@ import { CreateOrgPage } from "../pages/createOrgPage.js";
 test.describe("Change Organisation", () => {
     let loginPage, logsPage, ingestionPage, homePage, metricsPage,
         tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage,
-        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage;
+        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage
+        multiorgIdentifier;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -45,8 +46,8 @@ test.describe("Change Organisation", () => {
         await loginPage.loginAsInternalUser();
         await loginPage.login();
         await ingestionPage.ingestion();
-        let orgId = await createOrgPage.createOrg();
-        await ingestionPage.ingestionMultiOrg(orgId);
+        multiOrgIdentifier = await createOrgPage.createOrg();
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
     });
 
     test("Home Page default validation", async ({ page }) => {
@@ -65,7 +66,6 @@ test.describe("Change Organisation", () => {
         await homePage.gotoHomePage();
         await homePage.homePageValidation();
         await homePage.homePageURLValidation();
-
     });
 
     test("Logs Page default validation", async ({ page }) => {
@@ -295,14 +295,13 @@ test.describe("Change Organisation", () => {
     });
 
     test("Management Page change organisation validation", async ({ page }) => {
-
         await managementPage.goToManagement();
         await page.waitForTimeout(5000);
         await managementPage.managementPageDefaultMultiOrg();
         await page.waitForTimeout(5000);
-        await managementPage.managementPageURLValidation();
+        await managementPage.managementPageURLValidation(multiOrgIdentifier);
         await managementPage.goToManagement();
-        await managementPage.managementPageURLValidation();
+        await managementPage.managementPageURLValidation(multiOrgIdentifier);
 
     });
 
