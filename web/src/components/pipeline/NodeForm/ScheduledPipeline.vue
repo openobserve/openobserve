@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         
           <div class="flex items-center">
             <q-btn
+            v-if="config.isEnterprise == 'true'"
             :ripple="false"
             @click="toggleAIChat"
             data-test="menu-link-ai-item"
@@ -33,14 +34,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :borderless="true"
             flat
             dense
-            class="o2-button q-mr-sm tw-h-[32px]"
-            v-if="config.isEnterprise == 'true'"
+            class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm"
+            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            style="border-radius: 100%;"
+            @mouseenter="isHovered = true"
+            @mouseleave="isHovered = false"
 
-        >
-          <div class="row items-center no-wrap tw-gap-2 q-px-sm">
-            <img src="../../../assets/images/common/ai_icon.svg" class="header-icon" />
-          </div>
-        </q-btn>
+          >
+            <div class="row items-center no-wrap tw-gap-2  ">
+              <img  :src="getBtnLogo" class="header-icon ai-icon" />
+            </div>
+          </q-btn>
             <div class="flex items-center">
               <q-tabs
                 data-test="scheduled-pipeline-tabs"
@@ -108,8 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <q-separator />
 
-    <div  class="q-mb-sm stepper-header" >
-            <div  class="" style="height: 100% !important;">
+    <div  class="q-mb-sm stepper-header tw-w-full tw-flex tw-h-full" >
+            <div  :class="store.state.isAiChatEnabled ? 'tw-w-[75%]' : 'tw-w-[100%]'" style="height: 100% !important;">
   
            
   
@@ -987,8 +991,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              <div class="full-width tw-flex ">
 
               <div :style="{
-                width: store.state.isAiChatEnabled ? 'calc(100% - 35%)' : '100%'
-              }" style="height: calc(100vh - 140px) !important;" >
+              }" style="height: calc(100vh - 140px) !important; width: 100%;" >
               <div class="query-editor-container scheduled-pipelines">
                 <span @click.stop="expandState.query = !expandState.query">
                 <FullViewContainer
@@ -1079,10 +1082,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
              
             </div>
-            <div class="q-ml-sm" v-if="store.state.isAiChatEnabled" style="width: 35%; max-width: 100%; min-width: 75px; height: calc(100vh - 140px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-              <O2AIChat style="height: calc(100vh - 140px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
 
-            </div>
           </div>
 
             <div class="flex justify-end q-mt-md">
@@ -1132,7 +1132,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             
           </div>
 
+          <div  class="q-ml-sm" v-if="store.state.isAiChatEnabled " style="width: 25%; max-width: 100%; min-width: 75px; height: calc(100vh - 70px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+              <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
 
+            </div>
 
 
 
@@ -1337,8 +1340,9 @@ const dateTime  = ref({
 });
 const streamFields: any = ref([]);
 const previewPromqlQueryRef : any = ref(null);
-
+const isHovered = ref(false);
 const loading = ref(false);
+
 
 const selectedStreamType = ref(props.streamType || "logs");
 
@@ -2094,6 +2098,18 @@ const toggleAIChat = () => {
   store.dispatch("setIsAiChatEnabled", isEnabled);
 }
 
+
+const getBtnLogo = computed(() => {
+      if (isHovered.value || store.state.isAiChatEnabled) {
+        return getImageURL('images/common/ai_icon_dark.svg')
+      }
+
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
+
+
 defineExpose({
   tab,
   validateInputs,
@@ -2125,7 +2141,9 @@ defineExpose({
   copyToClipboard,
   updateDelay,
   delayCondition,
-  toggleAIChat
+  toggleAIChat,
+  isHovered,
+  getBtnLogo
 });
 
 </script>

@@ -882,7 +882,7 @@ export default defineComponent({
       return store.state.theme == 'dark' ? getImageURL('images/common/o2_ai_logo_dark.svg') : getImageURL('images/common/o2_ai_logo.svg')
     });
     const getGenerateAiIcon = computed(()=> {
-      return getImageURL('images/common/ai_icon.svg')
+      return getImageURL('images/common/ai_icon_dark.svg')
     })
     return {
       inputMessage,
