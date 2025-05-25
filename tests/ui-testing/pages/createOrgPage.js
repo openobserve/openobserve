@@ -29,7 +29,7 @@ export class CreateOrgPage {
                 const jsonData = await response.json();
                 console.log(response.status);
                 console.log(jsonData);
-                return jsonData.identifier;
+                return jsonData.name;
                 // Process JSON data here
             } else {
                 const textData = await response.text();
