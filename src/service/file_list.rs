@@ -87,7 +87,7 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         let cached_files = match file_list::LOCAL_CACHE.query_by_ids(ids).await {
             Ok(files) => files,
             Err(e) => {
-                log::error!(
+                log::debug!(
                     "[trace_id {trace_id}] file_list query cache failed: {:?}",
                     e
                 );
