@@ -21,7 +21,7 @@ import { CreateOrgPage } from "../pages/createOrgPage.js";
 test.describe("Change Organisation", () => {
     let loginPage, logsPage, ingestionPage, homePage, metricsPage,
         tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage,
-        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage
+        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage,
         multiOrgIdentifier;
 
     test.beforeEach(async ({ page }) => {
