@@ -26,8 +26,7 @@ const auth = {
     return res.data;
   },
   refresh_token: async () => {
-    const res = await http().get("/config/dex_refresh");
-    return res.data;
+    return http().get("/config/dex_refresh");
   }
 };
 

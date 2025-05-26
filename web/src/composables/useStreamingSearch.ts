@@ -90,6 +90,51 @@ const useHttpStreaming = () => {
 
     errorOccurred.value = true;
     
+    // Handle 401 unauthorized error
+    if (error.status === 401 || error.code === 401) {
+      // Store the request data for retry
+      const requestData = traceMap.value[traceId].requestData;
+      
+      // Cancel the current request
+      if (abortControllers.value[traceId]) {
+        abortControllers.value[traceId].abort();
+        delete abortControllers.value[traceId];
+      }
+      
+      // Cancel in worker
+      if (streamWorker) {
+        streamWorker.postMessage({
+          action: 'cancelStream',
+          traceId
+        });
+      }
+      
+      // Refresh the auth token
+      try{
+        await resetAuthToken();
+      } catch(e) {
+        console.error("Error refreshing auth token", e);
+      }
+      
+      // Retry the request
+      if (requestData) {
+        // Clear current handlers
+        traceMap.value[traceId].isInitiated = false;
+        
+        // Initiate new connection
+        initiateStreamConnection(requestData, {
+          data: traceMap.value[traceId].data[0],
+          error: traceMap.value[traceId].error[0],
+          complete: traceMap.value[traceId].complete[0],
+          reset: traceMap.value[traceId].reset[0],
+        });
+        
+        return;
+      }
+
+      return;
+    }
+    
     const response = convertToWsError(traceId, error);
 
     for (const handler of traceMap.value[traceId].error) {
@@ -97,7 +142,6 @@ const useHttpStreaming = () => {
     }
 
     cleanUpListeners(traceId);
-
   };
 
   const onReset = (data: any, traceId: string) => {
@@ -220,10 +264,20 @@ const useHttpStreaming = () => {
       });
 
       if (!response.ok) {
-        onError(traceId, {
-          status: response.status,
-          ...(await response.json()),
-        });
+        let errorData;
+        try {
+          errorData = await response.json();
+          onError(traceId, {
+            status: response.status,
+            ...errorData,
+          });
+        } catch(e){
+          onError(traceId, {
+            status: response.status,
+            error: response.statusText,
+          });
+        }
+
         return;
       }
 
@@ -354,8 +408,8 @@ const useHttpStreaming = () => {
     activeStreamId.value = null;
   };
 
-  const resetAuthToken = async () => {
-    await authService.refresh_token();
+  const resetAuthToken = () => {
+    return authService.refresh_token();
   };
 
 

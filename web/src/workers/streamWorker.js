@@ -61,6 +61,23 @@ async function processStream(traceId, reader) {
       const chunk = decoder.decode(value, { stream: true });
       buffer += chunk;
       
+      // Check for 401 error in the response
+      if (buffer.includes('"status":401') || buffer.includes('"code":401')) {
+        self.postMessage({
+          type: 'error',
+          traceId,
+          data: { 
+            message: 'Authentication error', 
+            code: 401,
+            status: 401
+          },
+        });
+        
+        delete activeStreams[traceId];
+        delete activeBuffers[traceId];
+        break;
+      }
+      
       // Process complete messages
       const messages = buffer.split('\n\n');
       // Keep the last potentially incomplete message in buffer
