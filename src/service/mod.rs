@@ -37,6 +37,8 @@ pub mod logs;
 pub mod metadata;
 pub mod metrics;
 pub mod node;
+#[cfg(feature = "cloud")]
+pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
 pub mod promql;
