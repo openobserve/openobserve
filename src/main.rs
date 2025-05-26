@@ -112,18 +112,16 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(
-            cfg.tokio_console.tokio_console_retention,
+            get_config().tokio_console.tokio_console_retention,
         ))
         .server_addr(
             format!(
                 "{}:{}",
-                cfg.tokio_console.tokio_console_server_addr,
-                cfg.tokio_console.tokio_console_server_port
+                get_config().tokio_console.tokio_console_server_addr,
+                get_config().tokio_console.tokio_console_server_port
             )
             .as_str()
             .parse::<SocketAddr>()?,
@@ -132,28 +130,29 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // setup profiling
     #[cfg(feature = "profiling")]
-    let pprof_guard = if cfg.profiling.pprof_enabled || cfg.profiling.pprof_protobuf_enabled {
-        let guard = pprof::ProfilerGuardBuilder::default()
-            .frequency(1000)
-            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-            .build()
-            .unwrap();
-        Some(guard)
-    } else {
-        None
-    };
+    let pprof_guard =
+        if get_config().profiling.pprof_enabled || get_config().profiling.pprof_protobuf_enabled {
+            let guard = pprof::ProfilerGuardBuilder::default()
+                .frequency(1000)
+                .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+                .build()
+                .unwrap();
+            Some(guard)
+        } else {
+            None
+        };
 
     // setup pyroscope
     #[cfg(feature = "pyroscope")]
-    let pyroscope_agent = if cfg.profiling.pyroscope_enabled {
+    let pyroscope_agent = if get_config().profiling.pyroscope_enabled {
         let agent = PyroscopeAgent::builder(
-            &cfg.profiling.pyroscope_server_url,
-            &cfg.profiling.pyroscope_project_name,
+            &get_config().profiling.pyroscope_server_url,
+            &get_config().profiling.pyroscope_project_name,
         )
         .tags(
             [
-                ("role", cfg.common.node_role.as_str()),
-                ("instance", cfg.common.instance_name.as_str()),
+                ("role", get_config().common.node_role.as_str()),
+                ("instance", get_config().common.instance_name.as_str()),
                 ("version", config::VERSION),
             ]
             .to_vec(),
@@ -172,13 +171,14 @@ async fn main() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let mut tracer_provider = None;
+    let cfg = get_config();
 
     // setup logs
     #[cfg(feature = "tokio-console")]
     let enable_tokio_console = true;
     #[cfg(not(feature = "tokio-console"))]
     let enable_tokio_console = false;
+    let mut tracer_provider = None;
     let _guard: Option<WorkerGuard> = if enable_tokio_console {
         None
     } else if cfg.log.events_enabled {
