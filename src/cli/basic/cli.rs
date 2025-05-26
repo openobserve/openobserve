@@ -295,7 +295,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 }
                 "stream-stats" => {
                     // init nats client
-                    if !cfg.common.local_mode && cfg.common.meta_store.to_lowercase() == "nats" {
+                    if !cfg.common.local_mode
+                        && cfg.common.cluster_coordinator.to_lowercase() == "nats"
+                    {
                         let (tx, _rx) = tokio::sync::mpsc::channel::<infra::db::nats::NatsEvent>(1);
                         infra::db::nats::init_nats_client(tx).await?;
                     }

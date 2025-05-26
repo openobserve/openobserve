@@ -106,15 +106,6 @@ impl Streams for StreamServiceImpl {
             stream_type,
             stream_name,
         );
-        for entry in entries.iter() {
-            if entry.stream.contains("default8") {
-                log::info!(
-                    "[grpc:stream_stats] stream: {}, records: {}",
-                    entry.stream,
-                    entry.stats.as_ref().unwrap().doc_num
-                );
-            }
-        }
         Ok(Response::new(StreamStatsResponse { entries }))
     }
 }
