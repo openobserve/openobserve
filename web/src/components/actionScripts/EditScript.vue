@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="!actionId" class="q-mt-md q-px-sm flex justify-start">
               <q-btn
                 data-test="setup-action-cancel-btn"
-                class="text-bold"
+                class="text-bold no-border"
                 :label="t('alerts.cancel')"
                 text-color="light-text"
                 padding="sm md"
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @submit="onSubmit"
         >
           <div
-            class="tw-mt-6 tw-rounded-md stepper-box-shadow"
+            class="tw-rounded-md stepper-box-shadow"
             :class="{ 'disabled-section': !actionId }"
           >
             <q-stepper
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               vertical
               color="primary"
               animated
-              class="q-mt-md q-px-sm"
+              class="q-px-sm"
               header-nav
             >
               <q-step
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     color="secondary"
                     label="Continue"
                     no-caps
-                    class="q-mt-sm"
+                    class="q-mt-sm no-border"
                   />
                 </q-stepper-navigation>
               </q-step>
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-btn
                       :data-test="`add-action-script-header-${header['key']}-delete-btn`"
                       icon="delete"
-                      class="iconHoverBtn"
+                      class="iconHoverBtn no-border"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-add-header-btn"
                       v-if="index === environmentalVariables.length - 1"
                       icon="add"
-                      class="q-ml-xs iconHoverBtn"
+                      class="q-ml-xs iconHoverBtn no-border"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -328,6 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       color="secondary"
                       label="Continue"
                       no-caps
+                      class="no-border"
                     />
                     <q-btn
                       data-test="add-action-script-step2-back-btn"
@@ -354,9 +355,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-action-script-file-input"
                   class="flex tw-flex-col tw-mt-2"
                 >
-                  <div class="tw-pb-2 tw-text-[14px]">Upload ZIP File</div>
+                  <div class="tw-text-[14px]">Upload ZIP File</div>
 
-                  <div class="tw-text-[13px]">
+                  <div class="tw-text-[13px] tw-pt-2 tw-pb-3">
                     It may contain various resources such as .py, .txt and
                     main.py file etc.
                   </div>
@@ -367,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     filled
                     v-model="formData.codeZip"
                     bg-color="input-bg"
-                    class="tw-w-[300px] q-pt-sm q-pb-sm showLabelOnTop action-file-uploader tw-min-h-[150px] tw-max-h-[150px] tw-h-[150px] tw-w-[244px] cursor-pointer"
+                    class="q-pb-sm showLabelOnTop action-file-uploader tw-min-h-[150px] tw-max-h-[150px] tw-h-[150px] tw-w-[244px] cursor-pointer"
                     stack-label
                     outlined
                     dense
@@ -386,8 +387,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         class="tw-flex tw-items-center tw-flex-col text-center"
                       >
-                        <q-icon name="upload" />
-                        <div class="tw-flex tw-flex-col tw-text-[14px]">
+                        <q-icon :name="outlinedUploadFile" size="30px" />
+                        <div class="tw-flex tw-flex-col tw-text-[14px] tw-pt-2">
                           <div>Drag and Drop or Browse .zip file</div>
                           <div>Only .zip files are accepted.</div>
                         </div>
@@ -484,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     color="secondary"
                     label="Continue"
                     no-caps
-                    class="q-mt-sm"
+                    class="q-mt-sm no-border"
                   />
                   <q-btn
                     data-test="add-action-script-step3-back-btn"
@@ -683,7 +684,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <q-btn
         data-test="add-action-script-cancel-btn"
-        class="text-bold"
+        class="text-bold no-border"
         :label="t('alerts.cancel')"
         text-color="light-text"
         padding="sm md"
@@ -742,7 +743,10 @@ import actions from "@/services/action_scripts";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import cronParser from "cron-parser";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedInfo,
+  outlinedUploadFile,
+} from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
 import ActionCodeEditor from "@/components/actionScripts/ActionCodeEditor.vue";
@@ -1459,10 +1463,12 @@ onBeforeMount(async () => {
     display: flex;
     align-items: center;
     justify-content: center;
+    outline-color: #949494 !important;
+    outline-style: dashed !important;
+    outline-width: 1px !important;
+    border-radius: 2px !important;
 
     .q-field__control-container {
-      width: 200px !important;
-      max-width: 200px !important;
       .q-field__input {
         width: 240px !important;
         transform: translateX(-224px);
@@ -1502,9 +1508,10 @@ onBeforeMount(async () => {
   }
   :deep(.q-stepper) {
     box-shadow: none !important;
+    padding-left: 0px !important;
 
     .q-stepper__tab {
-      padding: 12px 0px !important;
+      padding: 12px 8px !important;
     }
 
     .q-stepper__step-inner {
