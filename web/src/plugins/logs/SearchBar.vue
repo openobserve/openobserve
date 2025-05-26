@@ -2481,6 +2481,11 @@ export default defineComponent({
               await updatedLocalLogFilterField();
             }
 
+            if(searchObj.meta.toggleFunction == false) {
+              searchObj.config.fnSplitterModel = 99.5;
+              resetFunctionContent();
+            }
+
             updateEditorWidth();
 
             $q.notify({
