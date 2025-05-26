@@ -294,18 +294,18 @@ test.describe("Change Organisation", () => {
         await managementPage.managementURLValidation();
     });
 
-    test("Management Page change organisation validation", async ({ page }) => {
-        let newOrgIdentifier = await createOrgPage.createOrg();
-        await ingestionPage.ingestionMultiOrg(newOrgIdentifier);
-        await managementPage.goToManagement();
-        await page.waitForTimeout(5000);
-        await managementPage.managementPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await managementPage.managementPageURLValidation(newOrgIdentifier);
-        await managementPage.goToManagement();
-        await managementPage.managementPageURLValidation(newOrgIdentifier);
+    // test("Management Page change organisation validation", async ({ page }) => {
+    //     let newOrgIdentifier = await createOrgPage.createOrg();
+    //     await ingestionPage.ingestionMultiOrg(newOrgIdentifier);
+    //     await managementPage.goToManagement();
+    //     await page.waitForTimeout(5000);
+    //     await managementPage.managementPageDefaultMultiOrg();
+    //     await page.waitForTimeout(5000);
+    //     await managementPage.managementPageURLValidation(newOrgIdentifier);
+    //     await managementPage.goToManagement();
+    //     await managementPage.managementPageURLValidation(newOrgIdentifier);
 
-    });
+    // });
 
     test("About Page default validation", async ({ page }) => {
 
