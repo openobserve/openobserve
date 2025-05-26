@@ -22,7 +22,7 @@ test.describe("Change Organisation", () => {
     let loginPage, logsPage, ingestionPage, homePage, metricsPage,
         tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage,
         reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage
-        multiorgIdentifier;
+        multiOrgIdentifier;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
