@@ -546,11 +546,66 @@ export default defineComponent({
     };
 
     const refreshedVariablesDataUpdated = (variablesData: any) => {
+      console.log(
+        "View Dashboard Updating refreshed variables data:",
+        variablesData,
+      );
       Object.assign(refreshedVariablesData, variablesData);
+      console.log(
+        "View Dashboard Updated refreshedVariablesData:",
+        refreshedVariablesData,
+      );
     };
-
     const isVariablesChanged = computed(() => {
-      return !isEqual(variablesData, refreshedVariablesData);
+      // Convert both objects to a consistent format for comparison
+      const normalizeVariables = (obj) => {
+        const normalized = JSON.parse(JSON.stringify(obj));
+        // Sort arrays to ensure consistent ordering
+        if (normalized.values) {
+          normalized.values = normalized.values
+            .map((variable) => {
+              if (Array.isArray(variable.value)) {
+                variable.value.sort((a, b) =>
+                  JSON.stringify(a).localeCompare(JSON.stringify(b)),
+                );
+              }
+              return variable;
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return normalized;
+      };
+
+      const normalizedCurrent = normalizeVariables(variablesData);
+      const normalizedRefreshed = normalizeVariables(refreshedVariablesData);
+
+      console.log(
+        "View Dashboard Current variables (normalized):",
+        JSON.stringify(normalizedCurrent, null, 2),
+      );
+      console.log(
+        "View Dashboard Refreshed variables (normalized):",
+        JSON.stringify(normalizedRefreshed, null, 2),
+      );
+
+      const result = !isEqual(normalizedCurrent, normalizedRefreshed);
+      console.log("View Dashboard isVariablesChanged:", result);
+
+      if (result) {
+        console.log(
+          "Differences found between current and refreshed variables",
+        );
+        Object.keys(normalizedCurrent).forEach((key) => {
+          if (!isEqual(normalizedCurrent[key], normalizedRefreshed[key])) {
+            console.log(`Difference in key "${key}":`, {
+              current: normalizedCurrent[key],
+              refreshed: normalizedRefreshed[key],
+            });
+          }
+        });
+      }
+
+      return result;
     });
     // ======= [START] default variable values
 
