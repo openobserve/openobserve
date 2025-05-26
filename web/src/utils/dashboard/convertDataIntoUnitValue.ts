@@ -1200,11 +1200,10 @@ export function addMissingArgs(fields: any): any {
   const updatedArgs = [...args]; // Clone the existing args array
 
   // Iterate through the function definition's arguments
-  functionDef.args.forEach((argDef: any) => {
-    const isArgProvided = updatedArgs.some((arg: any) => {
-      // Check if the argument's type matches any of the required types
-      return argDef.type.map((t: any) => t.value).includes(arg.type);
-    });
+  functionDef.args.forEach((argDef: any, index: number) => {
+    const isArgProvided = updatedArgs?.[index]?.type
+      ? argDef.type.map((t: any) => t.value).includes(updatedArgs[index]?.type)
+      : false;
 
     if (!isArgProvided) {
       // If the argument is missing, add it

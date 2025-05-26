@@ -63,13 +63,13 @@ const migrateV5FieldsToV6 = (
   if (!fieldItem) return;
   // mirgrate old args
   // previously, args was only used for histogram interval
-  // so, add arg type as histogramInverval
+  // so, add arg type as histogramInterval
   if (!fieldItem.args) {
     fieldItem.args = [];
   } else {
     fieldItem.args.forEach((arg: any) => {
       if (!arg.type) {
-        arg.type = "histogramInverval";
+        arg.type = "histogramInterval";
       }
     });
   }
