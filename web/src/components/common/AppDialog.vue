@@ -134,6 +134,7 @@ export default defineComponent({
             focusable?.focus();
           });
         } else {
+          // Remove overflow from body when dialog is closed
           document.body.style.overflow = "";
         }
       },
