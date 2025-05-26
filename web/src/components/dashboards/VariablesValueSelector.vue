@@ -294,7 +294,6 @@ export default defineComponent({
         emitVariablesData();
         return;
       }
-
       try {
         if (
           response.content?.results?.hits?.length &&
@@ -516,7 +515,6 @@ export default defineComponent({
         return;
       }
     };
-
     const fetchFieldValuesWithWebsocket = (
       variableObject: any,
       queryContext: string,
@@ -798,9 +796,20 @@ export default defineComponent({
 
         // if selected values exist, select the values
         if (selectedValues.length > 0) {
+          console.log(
+            "currentVariable.selectAllValueForMultiSelect selectedValues",
+            selectedValues,
+            "currentVariable.value",
+            currentVariable.value,
+          );
+
           currentVariable.value = selectedValues;
         } else {
           //here, multiselect and old values will be not exist
+          console.log(
+            "currentVariable.selectAllValueForMultiSelect",
+            currentVariable.selectAllValueForMultiSelect,
+          );
           switch (currentVariable?.selectAllValueForMultiSelect) {
             case "custom":
               currentVariable.value = optionsValues.filter((value: any) =>
@@ -819,6 +828,15 @@ export default defineComponent({
           }
         }
       } else {
+        console.log(
+          "currentVariable.selectAllValueForMultiSelect inside else",
+          currentVariable.selectAllValueForMultiSelect,
+        );
+        console.log(
+          "currentVariable.selectAllValueForMultiSelect currentVariable.customMultiSelectValue inside else---",
+          currentVariable.customMultiSelectValue,
+        );
+
         // here, multi select is false
 
         // Keep old value if it exists, regardless of whether it's in current options
@@ -826,24 +844,54 @@ export default defineComponent({
           oldVariableSelectedValues[0] !== undefined &&
           oldVariableSelectedValues[0] !== null
         ) {
+          console.log(
+            "currentVariable.selectAllValueForMultiSelect currentVariable.value inside if",
+            currentVariable.value,
+          );
+
           currentVariable.value = oldVariableSelectedValues[0];
         } else if (currentVariable.options.length > 0) {
           // here, multi select is false and old value not exist
 
           if (currentVariable.selectAllValueForMultiSelect === "custom") {
-            const customValue = currentVariable.options.find(
-              (variableOption: any) =>
-                variableOption.value ===
-                currentVariable.customMultiSelectValue?.[0],
+            console.log(
+              "currentVariable.selectAllValueForMultiSelect currentVariable.customMultiSelectValue inside if",
+              currentVariable.customMultiSelectValue,
             );
+
+            // const customValue = currentVariable.options.find(
+            //   (variableOption: any) =>
+            //     variableOption.value ===
+            //     currentVariable.customMultiSelectValue?.[0],
+            // );
+            // console.log(
+            //   "currentVariable.selectAllValueForMultiSelect currentVariable.customMultiSelectValue inside if customValue",
+            //   customValue,
+            //   currentVariable.options,
+            // );
 
             // customValue can be undefined or default value
             currentVariable.value =
-              customValue?.value ?? currentVariable.options[0].value;
+              currentVariable.customMultiSelectValue?.[0] ??
+              currentVariable.options[0].value;
+            console.log(
+              "currentVariable.selectAllValueForMultiSelect currentVariable.value inside if",
+              currentVariable.value,
+            );
           } else {
+            console.log(
+              "currentVariable.selectAllValueForMultiSelect currentVariable.selectAllValueForMultiSelect inside else---",
+              currentVariable.selectAllValueForMultiSelect,
+            );
+
             currentVariable.value = currentVariable.options[0].value;
           }
         } else {
+          console.log(
+            "currentVariable.selectAllValueForMultiSelect currentVariable.options.length inside else",
+            currentVariable.options.length,
+          );
+
           currentVariable.value = null;
         }
       }
