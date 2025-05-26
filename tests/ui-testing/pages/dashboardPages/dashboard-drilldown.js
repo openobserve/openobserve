@@ -25,7 +25,6 @@ export default class DashboardDrilldownPage {
       '[data-test="dashboard-drilldown-url-textarea"]'
     );
     this.logBtn = page.locator('[data-test="dashboard-drilldown-by-logs-btn"]');
-
   }
 
   generateUniqueDrilldownName(prefix = "u") {
@@ -36,9 +35,9 @@ export default class DashboardDrilldownPage {
     return `${prefix}_${Date.now()}`;
   }
 
-  generateUniquePanelName(prefix = "panel") {
-    return `${prefix}_${Date.now()}`;
-  } //generateUniquePanelName
+  // generateUniquePanelName(prefix = "panel") {
+  //   return `${prefix}_${Date.now()}`;
+  // } //generateUniquePanelName
 
   async addDrillownDashboard(
     folderName,
