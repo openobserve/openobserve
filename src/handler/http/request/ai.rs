@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, Responder, post, web};
+use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
 use o2_enterprise::enterprise::{ai, common::infra::config::get_config as get_o2_config};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::models::ai::{PromptRequest, PromptResponse},
+    handler::http::{
+        models::ai::{PromptRequest, PromptResponse},
+        request::search::search_stream::report_to_audit,
+    },
 };
 
 /// CreateChat
@@ -103,27 +106,50 @@ pub async fn chat(body: web::Json<PromptRequest>) -> impl Responder {
     ),
 )]
 #[post("/{org_id}/ai/chat_stream")]
-pub async fn chat_stream(body: web::Json<PromptRequest>) -> impl Responder {
+pub async fn chat_stream(
+    org_id: web::Path<String>,
+    body: web::Json<PromptRequest>,
+    in_req: HttpRequest,
+) -> impl Responder {
     let config = get_o2_config();
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let org_id = org_id.into_inner();
+    let trace_id = in_req
+        .headers()
+        .get("trace_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let mut code = 200;
+    let req_body = body.into_inner();
+    let body_bytes = serde_json::to_string(&req_body).unwrap();
 
-    let stream = if config.ai.enabled {
-        let req_body = body.into_inner();
-        let enabled_stream =
-            ai::service::chat_stream(ai::AiServerRequest::new(req_body.messages, req_body.model))
-                .await;
-        enabled_stream
-    } else {
-        // Create a channel for the error message
-        let (tx, rx) = tokio::sync::mpsc::channel::<Result<bytes::Bytes, anyhow::Error>>(1);
-        let _ = tx
-            .send(Ok(bytes::Bytes::from(
-                "data: {\"error\": \"AI is not enabled\"}\n\n",
-            )))
-            .await;
-        let error_stream = tokio_stream::wrappers::ReceiverStream::new(rx);
-        error_stream
-    };
+    if !config.ai.enabled {
+        let error_message = Some("AI is not enabled".to_string());
+        code = 400;
+        report_to_audit(
+            user_id,
+            org_id,
+            trace_id,
+            code,
+            error_message,
+            &in_req,
+            body_bytes,
+        )
+        .await;
 
+        return MetaHttpResponse::bad_request("AI is not enabled");
+    }
+
+    let stream =
+        ai::service::chat_stream(ai::AiServerRequest::new(req_body.messages, req_body.model)).await;
+
+    report_to_audit(user_id, org_id, trace_id, code, None, &in_req, body_bytes).await;
     HttpResponse::Ok()
         .content_type("text/event-stream")
         .streaming(stream)
