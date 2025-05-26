@@ -231,7 +231,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     if app.subcommand().is_none() {
         return Ok(false);
     }
-    let cfg = config::get_config();
+
     #[cfg(not(feature = "tokio-console"))]
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
@@ -250,6 +250,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     }
 
     // init infra, create data dir & tables
+    let cfg = config::get_config();
     infra::init().await.expect("infra init failed");
     match name {
         "reset" => {
@@ -293,6 +294,11 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
+                    // init nats client
+                    if !cfg.common.local_mode && cfg.common.meta_store.to_lowercase() == "nats" {
+                        let (tx, _rx) = tokio::sync::mpsc::channel::<infra::db::nats::NatsEvent>(1);
+                        infra::db::nats::init_nats_client(tx).await?;
+                    }
                     // reset stream stats update offset
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data

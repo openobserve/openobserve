@@ -101,11 +101,20 @@ impl Streams for StreamServiceImpl {
 
         let entries = Self::process_orgs_batch(&orgs, stream_type, stream_name).await;
         log::debug!(
-            "orgs:{:?}, stream_type:{:?}, stream_name:{:?}",
+            "[grpc:stream_stats] orgs: {:?}, stream_type: {:?}, stream_name: {:?}",
             orgs,
             stream_type,
             stream_name,
         );
+        for entry in entries.iter() {
+            if entry.stream.contains("default8") {
+                log::info!(
+                    "[grpc:stream_stats] stream: {}, records: {}",
+                    entry.stream,
+                    entry.stats.as_ref().unwrap().doc_num
+                );
+            }
+        }
         Ok(Response::new(StreamStatsResponse { entries }))
     }
 }
