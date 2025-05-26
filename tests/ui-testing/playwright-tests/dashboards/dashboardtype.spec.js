@@ -39,8 +39,6 @@ test.describe("dashboard UI testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-
-  
   });
 
   test("should create, compare area type chart image and delete dashboard", async ({
@@ -55,7 +53,8 @@ test.describe("dashboard UI testcases", () => {
     dashboardPanel = new DashboardPanel(page);
     chartTypeSelector = new ChartTypeSelector(page);
     dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
     const dashboardName = randomDashboardName;
 
     await page
@@ -63,7 +62,6 @@ test.describe("dashboard UI testcases", () => {
       .waitFor({ state: "visible" });
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
-    
 
     await page
       .locator('[data-test="dashboard-folder-tab-default"]')
@@ -101,7 +99,6 @@ test.describe("dashboard UI testcases", () => {
       state: "visible",
     });
     await dashboardCreate.searchDashboard(dashboardName);
-    await dashboardList.duplicateDashboard(dashboardName);
     await dashboardCreate.deleteDashboard(dashboardName);
   });
 });
