@@ -613,22 +613,49 @@ test.describe(" visualize UI testcases", () => {
     // Open the dropdown
     await page.locator('[data-test="index-dropdown-stream"]').click();
 
+    // await page.waitForTimeout(5000);
     // Check if the dropdown is blank
-    const dropdownOptions = await page.getByRole("option");
-    const dropdownCount = await dropdownOptions.count();
+    // const dropdownOptions = await page.getByRole("option");
+    // const dropdownCount = await dropdownOptions.count();
 
-    console.log("Dropdown count:", dropdownCount); // Debugging line
+    // console.log("Dropdown count:", dropdownCount); // Debugging line
 
-    // Ensure the dropdown options are blank
-    expect(dropdownCount).toBeGreaterThan(0);
+    // // Ensure the dropdown options are blank
+    // expect(dropdownCount).toBeGreaterThan(0);
 
-    // Get the row element
+    // // Get the row element
+    // const row = page
+    //   .getByRole("row", { name: "_timestamp +X +Y +B +F" })
+    //   .first();
+
+    // // Alternative assertions
+    // await expect(row).toBeDefined();
+
+    // Wait until dropdown options are loaded and stable
+    let previousCount = -1;
+    let currentCount = 0;
+    const maxRetries = 10;
+
+    for (let i = 0; i < maxRetries; i++) {
+      const options = await page.getByRole("option");
+      currentCount = await options.count();
+
+      if (currentCount > 0 && currentCount === previousCount) {
+        break; // Options loaded and stable
+      }
+
+      previousCount = currentCount;
+      await page.waitForTimeout(300); // Small delay before checking again
+    }
+
+    console.log("Dropdown count:", currentCount);
+    expect(currentCount).toBeGreaterThan(0);
+
+    // Validate the row element
     const row = page
       .getByRole("row", { name: "_timestamp +X +Y +B +F" })
       .first();
-
-    // Alternative assertions
-    await expect(row).toBeDefined();
+    await expect(row).toBeVisible(); // Use visible check
   });
 
   test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
