@@ -281,9 +281,9 @@ test.describe("Change Organisation", () => {
         await page.waitForTimeout(5000);
         await iamPage.iamPageDefaultMultiOrg();
         await page.waitForTimeout(5000);
-        await iamPage.iamPageURLValidation();
+        await iamPage.iamURLValidation();
         await iamPage.gotoIamPage();
-        await iamPage.iamPageURLValidation();
+        await iamPage.iamURLValidation();
 
     });
 
@@ -294,18 +294,17 @@ test.describe("Change Organisation", () => {
         await managementPage.managementURLValidation();
     });
 
-    // test("Management Page change organisation validation", async ({ page }) => {
-    //     let newOrgIdentifier = await createOrgPage.createOrg();
-    //     await ingestionPage.ingestionMultiOrg(newOrgIdentifier);
-    //     await managementPage.goToManagement();
-    //     await page.waitForTimeout(5000);
-    //     await managementPage.managementPageDefaultMultiOrg();
-    //     await page.waitForTimeout(5000);
-    //     await managementPage.managementPageURLValidation(newOrgIdentifier);
-    //     await managementPage.goToManagement();
-    //     await managementPage.managementPageURLValidation(newOrgIdentifier);
+    test("Management Page change organisation validation", async ({ page }) => {
+        
+        await managementPage.goToManagement();
+        await page.waitForTimeout(5000);
+        await managementPage.managementPageDefaultMultiOrg();
+        await page.waitForTimeout(5000);
+        await managementPage.managementURLValidation();
+        await managementPage.goToManagement();
+        await managementPage.managementURLValidation();
 
-    // });
+    });
 
     test("About Page default validation", async ({ page }) => {
 
