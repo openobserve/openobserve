@@ -782,6 +782,18 @@ export default defineComponent({
       console.log("oldVariableSelectedValues", oldVariableSelectedValues);
       console.log("currentVariable", currentVariable);
 
+      // If we have custom values, set them immediately
+      if (
+        currentVariable?.selectAllValueForMultiSelect === "custom" &&
+        currentVariable?.customMultiSelectValue?.length > 0
+      ) {
+        currentVariable.value = currentVariable.multiSelect
+          ? [...currentVariable.customMultiSelectValue]
+          : currentVariable.customMultiSelectValue[0];
+        currentVariable.isVariableLoadingPending = true;
+        return;
+      }
+
       // Pre-calculate the options values array
       const optionsValues =
         currentVariable.options.map((option: any) => option.value) ?? [];
@@ -794,28 +806,19 @@ export default defineComponent({
           return value !== undefined && value !== null;
         });
 
-        // if selected values exist, select the values
+        // if selected values exist or we have custom values, use them
         if (selectedValues.length > 0) {
-          console.log(
-            "currentVariable.selectAllValueForMultiSelect selectedValues",
-            selectedValues,
-            "currentVariable.value",
-            currentVariable.value,
-          );
-
           currentVariable.value = selectedValues;
+        } else if (
+          currentVariable?.selectAllValueForMultiSelect === "custom" &&
+          currentVariable?.customMultiSelectValue?.length > 0
+        ) {
+          // Set initial value from customMultiSelectValue even before API calls
+          currentVariable.value = [...currentVariable.customMultiSelectValue];
+          // Ensure we still load te API vhalues
+          currentVariable.isVariableLoadingPending = true;
         } else {
-          //here, multiselect and old values will be not exist
-          console.log(
-            "currentVariable.selectAllValueForMultiSelect",
-            currentVariable.selectAllValueForMultiSelect,
-          );
           switch (currentVariable?.selectAllValueForMultiSelect) {
-            case "custom":
-              currentVariable.value = optionsValues.filter((value: any) =>
-                currentVariable?.customMultiSelectValue?.includes(value),
-              );
-              break;
             case "all":
               currentVariable.value = optionsValues;
               break;
@@ -828,70 +831,23 @@ export default defineComponent({
           }
         }
       } else {
-        console.log(
-          "currentVariable.selectAllValueForMultiSelect inside else",
-          currentVariable.selectAllValueForMultiSelect,
-        );
-        console.log(
-          "currentVariable.selectAllValueForMultiSelect currentVariable.customMultiSelectValue inside else---",
-          currentVariable.customMultiSelectValue,
-        );
-
-        // here, multi select is false
-
-        // Keep old value if it exists, regardless of whether it's in current options
+        // Single select logic
         if (
           oldVariableSelectedValues[0] !== undefined &&
           oldVariableSelectedValues[0] !== null
         ) {
-          console.log(
-            "currentVariable.selectAllValueForMultiSelect currentVariable.value inside if",
-            currentVariable.value,
-          );
-
           currentVariable.value = oldVariableSelectedValues[0];
+        } else if (
+          currentVariable.selectAllValueForMultiSelect === "custom" &&
+          currentVariable?.customMultiSelectValue?.length > 0
+        ) {
+          // Use the first custom value for single select
+          currentVariable.value = currentVariable.customMultiSelectValue[0];
+          // Ensure we still load the API values
+          currentVariable.isVariableLoadingPending = true;
         } else if (currentVariable.options.length > 0) {
-          // here, multi select is false and old value not exist
-
-          if (currentVariable.selectAllValueForMultiSelect === "custom") {
-            console.log(
-              "currentVariable.selectAllValueForMultiSelect currentVariable.customMultiSelectValue inside if",
-              currentVariable.customMultiSelectValue,
-            );
-
-            // const customValue = currentVariable.options.find(
-            //   (variableOption: any) =>
-            //     variableOption.value ===
-            //     currentVariable.customMultiSelectValue?.[0],
-            // );
-            // console.log(
-            //   "currentVariable.selectAllValueForMultiSelect currentVariable.customMultiSelectValue inside if customValue",
-            //   customValue,
-            //   currentVariable.options,
-            // );
-
-            // customValue can be undefined or default value
-            currentVariable.value =
-              currentVariable.customMultiSelectValue?.[0] ??
-              currentVariable.options[0].value;
-            console.log(
-              "currentVariable.selectAllValueForMultiSelect currentVariable.value inside if",
-              currentVariable.value,
-            );
-          } else {
-            console.log(
-              "currentVariable.selectAllValueForMultiSelect currentVariable.selectAllValueForMultiSelect inside else---",
-              currentVariable.selectAllValueForMultiSelect,
-            );
-
-            currentVariable.value = currentVariable.options[0].value;
-          }
+          currentVariable.value = currentVariable.options[0].value;
         } else {
-          console.log(
-            "currentVariable.selectAllValueForMultiSelect currentVariable.options.length inside else",
-            currentVariable.options.length,
-          );
-
           currentVariable.value = null;
         }
       }
@@ -924,7 +880,7 @@ export default defineComponent({
         if (selectedValues.length > 0) {
           currentVariable.value = selectedValues;
         } else {
-          // here, multiselect is true and old values will be not exist
+          // here, multiselect and old values will be not exist
           // Always set first option as default for multi-select
           currentVariable.value =
             currentVariable.options.length > 0
@@ -1107,6 +1063,15 @@ export default defineComponent({
           console.log(
             `[WebSocket] handleVariableType: building query context for ${variableObject.name}`,
           );
+
+          // If we have custom values, emit immediately before making API call
+          if (
+            variableObject?.selectAllValueForMultiSelect === "custom" &&
+            variableObject?.customMultiSelectValue?.length > 0
+          ) {
+            emitVariablesData();
+          }
+
           try {
             const queryContext: any = await buildQueryContext(variableObject);
             console.log(
