@@ -247,7 +247,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     if app.subcommand().is_none() {
         return Ok(false);
     }
-    let cfg = config::get_config();
+
     #[cfg(not(feature = "tokio-console"))]
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
@@ -266,6 +266,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     }
 
     // init infra, create data dir & tables
+    let cfg = config::get_config();
     infra::init().await.expect("infra init failed");
     match name {
         "reset" => {
