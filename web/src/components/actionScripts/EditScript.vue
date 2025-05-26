@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             height: 22px;
           "
           title="Go Back"
-          @click="router.back()"
+          @click="routeToActions"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
@@ -1268,7 +1268,7 @@ const setupEditingActionScript = async (report: any) => {
 };
 
 const openCancelDialog = () => {
-  if (originalActionScriptData.value === JSON.stringify(formData.value)) {
+  if (!areUnsavedChanges()) {
     goToActionScripts();
     return;
   }
@@ -1406,6 +1406,23 @@ const onCodeSave = (data) => {
     type: "positive",
     message: "Code updated successfully",
     timeout: 2000,
+  });
+};
+
+const areUnsavedChanges = () => {
+  return originalActionScriptData.value !== JSON.stringify(formData.value);
+};
+
+const routeToActions = () => {
+  if (areUnsavedChanges()) {
+    openCancelDialog();
+    return;
+  }
+  router.replace({
+    name: "actionScripts",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
   });
 };
 
