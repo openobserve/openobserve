@@ -695,10 +695,24 @@ export default defineComponent({
             });
           });
         });
+      } else if (
+        ["pie", "donut", "gauge"].includes(dashboardPanelData.data.type)
+      ) {
+        selectedValues = [
+          { label: "Series Name", value: "${series.__name}" },
+          { label: "Series Value", value: "${series.__value}" },
+          ...variableListName,
+        ];
+      } else if (dashboardPanelData.data.type === "metric") {
+        selectedValues = [
+          { label: "Series Value", value: "${series.__value}" },
+          ...variableListName,
+        ];
       } else {
         selectedValues = [
           { label: "Series Name", value: "${series.__name}" },
           { label: "Series Value", value: "${series.__value}" },
+          { label: "Axis Value", value: "${series.__axisValue}" },
           ...variableListName,
         ];
       }

@@ -66,17 +66,18 @@ pub const INGESTER_ROUTES: [&str; 11] = [
 
 #[inline]
 pub fn is_querier_route(path: &str) -> bool {
+    let path = remove_base_uri(path);
     QUERIER_ROUTES.iter().any(|(route, skip_segments)| {
         if path.contains(route) {
-            let segments = path
-                .split('/')
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>();
-            // check if we have enough segments
-            if segments.len() <= *skip_segments {
-                return false;
+            let mut segments = path.split('/').filter(|s| !s.is_empty());
+            // Skip the required number of segments
+            for _ in 0..*skip_segments {
+                if segments.next().is_none() {
+                    return false;
+                }
             }
-            let route_part = segments[*skip_segments..].join("/");
+            // Join remaining segments without collecting into a Vec
+            let route_part = segments.collect::<Vec<_>>().join("/");
             route_part.starts_with(route)
                 && INGESTER_ROUTES
                     .iter()
@@ -89,10 +90,41 @@ pub fn is_querier_route(path: &str) -> bool {
 
 #[inline]
 pub fn is_querier_route_by_body(path: &str) -> bool {
+    let path = remove_base_uri(path);
     QUERIER_ROUTES_BY_BODY.iter().any(|x| path.contains(x))
 }
 
 #[inline]
 pub fn is_fixed_querier_route(path: &str) -> bool {
+    let path = remove_base_uri(path);
     FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x))
+}
+
+#[inline]
+pub fn is_ws_route(path: &str) -> bool {
+    let path = remove_base_uri(path);
+    let mut segments = path.split('/').filter(|s| !s.is_empty());
+    // Skip first 3 segments
+    for _ in 0..3 {
+        if segments.next().is_none() {
+            return false;
+        }
+    }
+    segments.next() == Some("ws")
+        && INGESTER_ROUTES
+            .iter()
+            .all(|ingest_route| !path.ends_with(ingest_route))
+}
+
+#[inline]
+fn remove_base_uri(path: &str) -> &str {
+    let base_uri = &crate::get_config().common.base_uri;
+    if base_uri.is_empty() {
+        return path;
+    }
+    if let Some(stripped) = path.strip_prefix(base_uri) {
+        stripped
+    } else {
+        path
+    }
 }
