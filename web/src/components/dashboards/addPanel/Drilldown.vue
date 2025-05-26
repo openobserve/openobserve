@@ -80,16 +80,6 @@
       no-caps
       data-test="dashboard-addpanel-config-drilldown-add-btn"
     />
-    <!-- <div v-if="showDrilldownPopUp">
-      <drilldown-pop-up
-        :drilldown-data-index="selectedDrilldownIndexToEdit"
-        :is-edit-mode="isDrilldownEditMode"
-        :variables-data="variablesData"
-        @close="saveDrilldownData"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-      />
-    </div> -->
-
     <app-dialog v-model="showDrilldownPopUp">
       <drilldown-pop-up
         :drilldown-data-index="selectedDrilldownIndexToEdit"
