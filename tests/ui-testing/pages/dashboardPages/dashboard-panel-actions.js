@@ -10,6 +10,11 @@ export default class DashboardactionPage {
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
   }
 
+  // Generate a unique panel name
+  generateUniquePanelName(prefix = "panel") {
+    return `${prefix}_${Date.now()}`;
+  }
+
   // Add panel name
   async addPanelName(panelName) {
     await this.panelNameInput.click();
