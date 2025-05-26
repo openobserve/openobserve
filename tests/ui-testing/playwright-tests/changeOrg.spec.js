@@ -295,13 +295,15 @@ test.describe("Change Organisation", () => {
     });
 
     test("Management Page change organisation validation", async ({ page }) => {
+        let newOrgIdentifier = await createOrgPage.createOrg();
+        await ingestionPage.ingestionMultiOrg(newOrgIdentifier);
         await managementPage.goToManagement();
         await page.waitForTimeout(5000);
         await managementPage.managementPageDefaultMultiOrg();
         await page.waitForTimeout(5000);
-        await managementPage.managementPageURLValidation(multiOrgIdentifier);
+        await managementPage.managementPageURLValidation(newOrgIdentifier);
         await managementPage.goToManagement();
-        await managementPage.managementPageURLValidation(multiOrgIdentifier);
+        await managementPage.managementPageURLValidation(newOrgIdentifier);
 
     });
 

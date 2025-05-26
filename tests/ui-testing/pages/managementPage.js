@@ -44,7 +44,7 @@ export
     }
 
     async managementPageURLValidation(org_name) {
-        await expect(this.page).toHaveURL(new RegExp(org_name));
+        await expect(this.page).toHaveURL(new RegExp(`org_identifier=${org_name}`));
     }
 
     async managementURLValidation() {
