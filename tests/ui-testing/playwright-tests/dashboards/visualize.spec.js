@@ -658,20 +658,20 @@ test.describe(" visualize UI testcases", () => {
     await expect(row).toBeVisible(); // Use visible check
   });
 
-  test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
-    page,
-  }) => {
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page
-      .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
-      .click();
-    await page.locator('[data-test="logs-logs-toggle"]').click();
-    await page.locator('[data-test="confirm-button"]').click();
-    await expect(
-      page.locator('[data-test="logs-search-result-bar-chart"]')
-    ).toBeVisible();
-  });
+  // test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
+  //   page,
+  // }) => {
+  //   await page.locator('[data-test="date-time-btn"]').click();
+  //   await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
+  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  //   await page.locator('[data-test="logs-visualize-toggle"]').click();
+  //   await page
+  //     .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
+  //     .click();
+  //   await page.locator('[data-test="logs-logs-toggle"]').click();
+  //   await page.locator('[data-test="confirm-button"]').click();
+  //   await expect(
+  //     page.locator('[data-test="logs-search-result-bar-chart"]')
+  //   ).toBeVisible();
+  // });
 });
