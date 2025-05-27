@@ -25,7 +25,7 @@ use datafusion::{
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
         PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
+        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal, NoOp},
     },
     scalar::ScalarValue,
 };
@@ -34,7 +34,10 @@ use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
     Term,
-    query::{BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery},
+    query::{
+        AllQuery, BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery,
+        TermQuery,
+    },
     schema::{Field, IndexRecordOption, Schema},
 };
 
@@ -101,6 +104,7 @@ pub enum Condition {
     Regex(String, String),
     MatchAll(String),
     FuzzyMatchAll(String, u8),
+    All(),
     Or(Box<Condition>, Box<Condition>),
     And(Box<Condition>, Box<Condition>),
 }
@@ -193,6 +197,7 @@ impl Condition {
                 "{}:fuzzy({}, {})",
                 INDEX_FIELD_NAME_FOR_ALL, value, distance
             ),
+            Condition::All() => "ALL".to_string(),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
                 format!("({} AND {})", left.to_query(), right.to_query())
@@ -350,6 +355,7 @@ impl Condition {
                 let term = Term::from_field_text(default_field, value);
                 Box::new(FuzzyTermQuery::new(term, *distance, false))
             }
+            Condition::All() => Box::new(AllQuery {}),
             Condition::Or(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_field)?;
                 let right_query = right.to_tantivy_query(schema, default_field)?;
@@ -381,6 +387,7 @@ impl Condition {
             Condition::FuzzyMatchAll(..) => {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
+            Condition::All() => {}
             Condition::Or(left, right) | Condition::And(left, right) => {
                 fields.extend(left.get_tantivy_fields());
                 fields.extend(right.get_tantivy_fields());
@@ -407,6 +414,7 @@ impl Condition {
             Condition::FuzzyMatchAll(..) => {
                 fields.extend(fst_fields.iter().cloned());
             }
+            Condition::All() => {}
             Condition::Or(left, right) | Condition::And(left, right) => {
                 fields.extend(left.get_schema_fields(fst_fields));
                 fields.extend(right.get_schema_fields(fst_fields));
@@ -492,6 +500,7 @@ impl Condition {
                 }
                 Ok(disjunction(expr_list))
             }
+            Condition::All() => Ok(Arc::new(NoOp::new())),
             Condition::Or(left, right) => {
                 let left = left.to_physical_expr(schema, fst_fields)?;
                 let right = right.to_physical_expr(schema, fst_fields)?;
@@ -512,6 +521,7 @@ impl Condition {
             Condition::Regex(..) => false,
             Condition::MatchAll(v) => is_blank_or_alphanumeric(v),
             Condition::FuzzyMatchAll(..) => false,
+            Condition::All() => true,
             Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
             Condition::And(left, right) => left.can_remove_filter() && right.can_remove_filter(),
         }
