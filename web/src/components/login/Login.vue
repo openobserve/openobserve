@@ -221,8 +221,7 @@ export default defineComponent({
 
     onBeforeMount(() => {
       if (
-        config.isCloud == "true" &&
-        router.currentRoute.value.query.action == "getstarted"
+        config.isCloud == "true"
       ) {
         autoRedirectDexLogin.value = true;
         loginWithSSo();
