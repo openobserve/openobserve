@@ -718,7 +718,7 @@ export default defineComponent({
         name: "folder2",
       },
     ]);
-    const activeFolderId = ref("default");
+    const activeFolderId = ref(router.currentRoute.value.query.folder ?? "default");
     const showMoveAlertDialog = ref(false);
     const expandedRow: Ref<any> = ref("");
     const triggerExpand = (props: any) => {
@@ -1014,23 +1014,36 @@ export default defineComponent({
       getDestinations();
     });
     onActivated(() => getDestinations());
-    onMounted(async () => {
-      if (!store.state.organizationData.foldersByType) {
-        await getFoldersListByType(store, "alerts");
-      }
-      if (
-        router.currentRoute.value.query.folder &&
-        store.state.organizationData?.foldersByType?.find(
-          (it: any) => it.folderId === router.currentRoute.value.query.folder,
-        )
-      ) {
-        activeFolderId.value = router.currentRoute.value.query.folder as string;
-      } else {
-        activeFolderId.value = "default";
-      }
-      await getAlertsFn(store, router.currentRoute.value.query.folder ?? "default");
-      filterAlertsByTab();
-    });
+    // onMounted(async () => {
+    //   if (!store.state.organizationData.foldersByType) {
+    //     await getFoldersListByType(store, "alerts");
+    //   }
+    //   if (
+    //     router.currentRoute.value.query.folder &&
+    //     store.state.organizationData?.foldersByType?.find(
+    //       (it: any) => it.folderId === router.currentRoute.value.query.folder,
+    //     )
+    //   ) {
+    //     activeFolderId.value = router.currentRoute.value.query.folder as string;
+    //   } else {
+    //     activeFolderId.value = "default";
+    //   }
+    //   await getAlertsFn(store, router.currentRoute.value.query.folder ?? "default");
+    //   filterAlertsByTab();
+    // });
+    watch(
+        () => store.state.organizationData.foldersByType["alerts"],
+        async (folders) => {
+          if (!folders) return;
+
+          const folderQuery = router.currentRoute.value.query.folder;
+          const matchingFolder = folders.find((it: any) => it.folderId === folderQuery);
+
+          activeFolderId.value = matchingFolder ? folderQuery : "default";
+          filterAlertsByTab();
+        },
+        { immediate: true }
+      );
     watch(
       () => activeFolderId.value,
       async (newVal) => {
