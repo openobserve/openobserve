@@ -43,7 +43,7 @@ use datafusion::{
         file_format::parquet::ParquetFormat,
         get_statistics_with_limit,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl, PartitionedFile},
-        physical_plan::{FileScanConfig, parquet::ParquetExecBuilder},
+        physical_plan::{FileScanConfig, ParquetSource},
     },
     error::DataFusionError,
     execution::{
@@ -62,6 +62,7 @@ use futures::{
 use hashbrown::HashMap;
 use helpers::*;
 use object_store::ObjectStore;
+use parquet_reader::NewParquetFileReaderFactory;
 use tokio::sync::Semaphore;
 
 use crate::service::search::index::IndexCondition;
@@ -268,25 +269,35 @@ impl NewListingTable {
         let Some(parquet) = self.options.format.as_any().downcast_ref::<ParquetFormat>() else {
             return plan_err!("ParquetFormat not found");
         };
-        let store = state.runtime_env().object_store(&conf.object_store_url)?;
-        let mut builder = ParquetExecBuilder::new_with_options(conf, parquet.options().clone())
-            .with_parquet_file_reader_factory(Arc::new(
-                parquet_reader::NewParquetFileReaderFactory::new(store),
-            ));
+
+        let mut predicate = None;
+        let mut metadata_size_hint = None;
 
         // If enable pruning then combine the filters to build the predicate.
         // If disable pruning then set the predicate to None, thus readers
         // will not prune data based on the statistics.
         if parquet.enable_pruning() {
-            if let Some(predicate) = filters.cloned() {
-                builder = builder.with_predicate(predicate);
+            if let Some(pred) = filters.cloned() {
+                predicate = Some(pred);
             }
         }
-        if let Some(metadata_size_hint) = parquet.metadata_size_hint() {
-            builder = builder.with_metadata_size_hint(metadata_size_hint);
+        if let Some(metadata) = parquet.metadata_size_hint() {
+            metadata_size_hint = Some(metadata);
         }
 
-        Ok(builder.build_arc())
+        let mut source = ParquetSource::new(parquet.options().clone());
+
+        let store = state.runtime_env().object_store(&conf.object_store_url)?;
+        source = source
+            .with_parquet_file_reader_factory(Arc::new(NewParquetFileReaderFactory::new(store)));
+        if let Some(predicate) = predicate {
+            source = source.with_predicate(Arc::clone(&conf.file_schema), predicate);
+        }
+        if let Some(metadata_size_hint) = metadata_size_hint {
+            source = source.with_metadata_size_hint(metadata_size_hint)
+        }
+
+        Ok(conf.with_source(Arc::new(source)).build())
     }
 }
 
@@ -422,13 +433,17 @@ impl TableProvider for NewListingTable {
         let parquet_exec = self
             .create_physical_plan(
                 session_state,
-                FileScanConfig::new(object_store_url, Arc::clone(&self.file_schema))
-                    .with_file_groups(partitioned_file_lists)
-                    .with_statistics(statistics)
-                    .with_projection(parquet_projection.cloned())
-                    .with_limit(limit)
-                    .with_output_ordering(output_ordering)
-                    .with_table_partition_cols(table_partition_cols),
+                FileScanConfig::new(
+                    object_store_url,
+                    Arc::clone(&self.file_schema),
+                    self.options.format.file_source(),
+                )
+                .with_file_groups(partitioned_file_lists)
+                .with_statistics(statistics)
+                .with_projection(parquet_projection.cloned())
+                .with_limit(limit)
+                .with_output_ordering(output_ordering)
+                .with_table_partition_cols(table_partition_cols),
                 filters.as_ref(),
             )
             .await?;

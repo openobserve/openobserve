@@ -25,7 +25,7 @@ use datafusion::{
         array::{ArrayRef, Float64Array},
         datatypes::DataType,
     },
-    common::{DataFusionError, downcast_value, internal_err, not_impl_err, plan_err},
+    common::{downcast_value, internal_err, not_impl_err, plan_err},
     error::Result,
     logical_expr::{
         Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
