@@ -147,7 +147,29 @@ pub async fn chat_stream(
     }
 
     let stream =
-        ai::service::chat_stream(ai::AiServerRequest::new(req_body.messages, req_body.model)).await;
+        match ai::service::chat_stream(ai::AiServerRequest::new(req_body.messages, req_body.model))
+            .await
+        {
+            Ok(stream) => stream,
+            Err(e) => {
+                let error_message = Some(e.to_string());
+                // TODO: Handle the error rather than hard coding
+                code = 500;
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    code,
+                    error_message,
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+
+                log::error!("Error in chat_stream: {}", e);
+                return MetaHttpResponse::bad_request(e.to_string());
+            }
+        };
 
     report_to_audit(user_id, org_id, trace_id, code, None, &in_req, body_bytes).await;
     HttpResponse::Ok()
