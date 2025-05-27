@@ -4,6 +4,8 @@ import os
 import random
 import string
 from pathlib import Path
+import base64
+import json
 
 BASE_URL = os.environ["ZO_BASE_URL"]
 root_dir = Path(__file__).parent.parent.parent
@@ -28,22 +30,54 @@ def _create_session_inner_v2():
     s = requests.Session()
     username = os.environ["ZO_ROOT_USER_EMAIL"]
     password = os.environ["ZO_ROOT_USER_PASSWORD"]
-    # s.auth = (username, password)
-    # resp = s.post(BASE_URL)
     resp = s.post(f"{BASE_URL}auth/login", json={"name": username, "password": password})
-    print (resp.status_code)
+    print("Login response:", resp.text)
     if resp.status_code != 200:
         raise Exception("Invalid username/password")
-    return s
+    
+    # Get the auth_tokens cookie
+    auth_tokens = None
+    for cookie in resp.cookies:
+        if cookie.name == "auth_tokens":
+            auth_tokens = cookie.value
+            break
+    
+    if not auth_tokens:
+        raise Exception("No auth_tokens cookie found")
+    
+    # Decode the auth_tokens cookie
+    try:
+        # First try to decode as base64
+        decoded = base64.b64decode(auth_tokens)
+        # Then try to decode as JSON without assuming UTF-8
+        tokens = json.loads(decoded)
+        access_token = tokens.get("access_token")
+        if not access_token:
+            raise Exception("No access token found in auth_tokens")
+    except Exception as e:
+        # If decoding fails, try to use the raw cookie value
+        print(f"Warning: Failed to decode auth_tokens: {e}")
+        print(f"Using raw auth_tokens value: {auth_tokens}")
+        access_token = auth_tokens
+    
+    return s, auth_tokens, access_token
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def create_session():
     """Create a session and return it."""
-    return _create_session_inner()
+    session, _, _ = _create_session_inner_v2()
+    return session
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
+def auth_token():
+    """Return the authentication token."""
+    _, auth_tokens, access_token = _create_session_inner_v2()
+    return auth_tokens, access_token
+
+
+@pytest.fixture(scope="session")
 def base_url():
     """Return the base URL."""
     return BASE_URL
