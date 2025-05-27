@@ -1,4 +1,3 @@
-import time
 
 def test_e2e_organisations(create_session, base_url):
     """Running an E2E test for get all the alerts list."""
@@ -108,3 +107,9 @@ def test_create_organization(create_session, base_url, random_string):
     print("Org identifier:", org_id)
 
     yield org_id
+
+    # Cleanup: Delete the organization after all tests are done
+    resp_delete_organization = session.delete(
+        f"{base_url}api/organizations/{org_id}"
+    )
+    print(f"Deleted organization {org_id}")
