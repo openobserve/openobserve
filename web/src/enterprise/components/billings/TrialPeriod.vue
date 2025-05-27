@@ -120,16 +120,14 @@ export default defineComponent({
 .gradient-banner {
   background: linear-gradient(
     to right,
-    #ffffff 70%,
-    #f7f7ff 80%,
-    #D7D7D7 90%,
-    #e7fcf2 95%,
-    #cfd9df 100%
-  );
+    transparent 60%,
+    #f7f7ff 70%,
+    #cdf7e4 100%  );
 }
 
 .trial-period-container {
   border: 1px solid #D7D7D7;
+  border-radius: 6px;
 }
 
 .o2-trial-message {
@@ -142,5 +140,19 @@ export default defineComponent({
   font-size: 16px;
   font-weight: 400;
   line-height: 22px;
+}
+
+.body--dark {
+  .gradient-banner {
+    background: linear-gradient(
+      to right,
+      transparent 60%,
+      #24262F 70%,
+      #2C3934 100%  );
+  }
+
+  .trial-period-container {
+    border: 1px solid #454F5B;
+  }
 }
 </style>

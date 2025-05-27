@@ -16,50 +16,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-card class="col o2-card-wrapper">
-    <div class="row items-center justify-between q-pa-md">
+    <div class="row items-center justify-between q-px-md q-py-sm">
       <div>
-        <div class="o2-card-title">{{ t("billing.proPlanLabel") }}</div>
-        <div class="o2-card-subtitle">{{ t("billing.proPlanSubtitle") }}</div>
+        <div class="o2-card-title q-pt-sm">{{ t("billing.proPlanLabel") }}</div>
+        <div class="o2-card-subtitle q-mt-sm">{{ t("billing.proPlanSubtitle") }}</div>
       </div>
       <q-chip
         v-if="planType == planName"
         color="indigo-1"
         text-color="indigo-10"
         :label="t('billing.subscribed')"
-        class="q-mt-sm text-caption"
+        class="q-mt-sm text-caption q-px-sm q-py-md"
+        style="border-radius: 0px"
         dense
       />
     </div>
 
     <q-separator spaced />
 
-    <div class="q-pa-md">
+    <div class="q-px-md q-py-sm">
       <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
-      <div class="o2-page-subtitle2 q-mb-md">{{ t("billing.included") }}</div>
+      <div class="o2-page-subtitle2 q-mb-md q-mt-xs">{{ t("billing.included") }}</div>
 
       <div v-for="(feature, index) in features" :key="index" class="row items-center justify-between q-mb-sm">
         <div class="row items-center">
-          <q-icon v-if="feature.is_parent" name="check_circle_outline" color="green" size="16px" class="q-mr-sm" />
+          <q-icon v-if="feature.is_parent" name="check_circle" color="green" size="16px" class="q-mr-sm" />
           <q-icon v-else name="" color="green" size="16px" class="q-mr-sm" />
-          <div class="text-body2" :class="{ 'tw-font-semibold': feature.is_parent }">{{ feature.name }}</div>
+          <div class="o2-page-subtitle3">{{ feature.name }}</div>
         </div>
         <div
           v-if="feature.price !== ''"
           class="q-mx-sm"
-          style="flex: 1; border-top: 1px dotted #dfdfdf; height: 0;"
+          style="flex: 1; border-top: 1px dotted #454F5B; height: 0;"
         ></div>
-        <div class="text-body2 text-grey-8 text-bold">{{ feature.price }}</div>
+        <div class="o2-page-subtitle3 text-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <q-separator />
 
-    <div class="text-caption text-grey-7  q-px-md q-pt-sm">
+    <div class="o2-page-subtitle2 q-px-md q-pt-sm">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
     </div>
 
-    <div class="row justify-between q-gutter-sm  q-pa-md">
+    <div class="row justify-between q-pa-md">
       <q-btn
         v-if="planType == planName"
         :label="btnCancelSubscription"
@@ -90,7 +91,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const planName = "pay-as-you-go";
-    const btnCancelSubscription = ref(t('billing.cancelSubscription'));
+    const btnCancelSubscription = ref(t('billing.manageSubscription'));
     const btnSubscribe = ref(t('billing.subscribe'));
 
     const features = [
