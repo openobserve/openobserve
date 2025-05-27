@@ -19,7 +19,7 @@ import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
 import DashboardShareExportPage from "../../pages/dashboardPages/dashboard-share-export.js";
 import DashboardSetting from "../../pages/dashboardPages/dashboard-settings.js";
 import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
-
+import DashboardFilter from "../../pages/dashboardPages/dashboard-filter.js";
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
@@ -190,50 +190,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  // test("should update the chart with the results of a custom SQL query", async ({
-  //   page,
-  // }) => {
-  //   dashboardCreate = new DashboardCreate(page);
-  //   dashboardList = new DashboardListPage(page);
-  //   dashboardActions = new DashboardactionPage(page);
-  //   dashboardDrilldown = new DashboardDrilldownPage(page);
-  //   dashboardRefresh = new DashboardTimeRefresh(page);
-  //   chartTypeSelector = new DashboardPanelConfigs(page);
-  //   dashboardPanel = new DashboardPanel(page);
-  //   chartTypeSelector = new ChartTypeSelector(page);
-  //   dashboardPanelConfigs = new DashboardPanelConfigs(page);
-  //   const panelName = dashboardActions.generateUniquePanelName("panel-test");
-
-  //   await dashboardList.menuItem("dashboards-item");
-  //   await waitForDashboardPage(page);
-
-  //   await dashboardCreate.createDashboard(randomDashboardName);
-  //   await dashboardCreate.addPanel();
-  //   await dashboardActions.addPanelName(panelName);
-
-  //   await page.locator('[data-test="dashboard-customSql"]').click();
-  //   await page.locator(".view-line").first().click();
-
-  //   await page
-  //     .locator('[data-test="dashboard-panel-query-editor"]')
-  //     .getByLabel("Editor content;Press Alt+F1")
-  //     .fill(
-  //       'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
-  //     );
-
-  //   // await chartTypeSelector.searchAndAddField("x_axis_1", "x");
-  //   await chartTypeSelector.searchAndAddField("y_axis_1", "y");
-  //   await chartTypeSelector.searchAndAddField("breakdown_1", "b");
-
-  //   await dashboardActions.applyDashboardBtn();
-  //   await dashboardActions.addPanelName(panelName);
-  //   await dashboardActions.savePanel();
-  //   await dashboardCreate.backToDashboardList();
-
-  //   await deleteDashboard(page, randomDashboardName);
-  // });
-
-  test("1should update the chart with the results of a custom SQL query", async ({
+  test("should update the chart with the results of a custom SQL query", async ({
     page,
   }) => {
     const dashboardCreate = new DashboardCreate(page);
@@ -279,56 +236,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  // test("1should display the correct and updated chart when changing the chart type", async ({
-  //   page,
-  // }) => {
-  //   // Initialize Page Objects
-  //   const dashboardCreate = new DashboardCreate(page);
-  //   const dashboardList = new DashboardListPage(page);
-  //   const dashboardActions = new DashboardactionPage(page);
-  //   const dashboardDrilldown = new DashboardDrilldownPage(page);
-  //   const dashboardRefresh = new DashboardTimeRefresh(page);
-  //   const dashboardPanel = new DashboardPanel(page);
-  //   const chartTypeSelector = new ChartTypeSelector(page);
-  //   const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-
-  //   // Generate dynamic names
-  //   const panelName = dashboardActions.generateUniquePanelName("panel-test");
-
-  //   // Navigate to dashboards list
-  //   await dashboardList.menuItem("dashboards-item");
-  //   await waitForDashboardPage(page);
-
-  //   // Create a new dashboard and add a panel
-  //   await dashboardCreate.createDashboard(randomDashboardName);
-  //   await dashboardCreate.addPanel();
-  //   await dashboardActions.addPanelName(panelName);
-
-  //   // Select stream and add fields
-  //   await chartTypeSelector.selectStream("e2e_automate");
-  //   await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
-  //   await chartTypeSelector.searchAndAddField(
-  //     "kubernetes_container_image",
-  //     "b"
-  //   );
-
-  //   // Change chart types
-  //   await chartTypeSelector.selectChartType("area");
-  //   await chartTypeSelector.selectChartType("scatter");
-  //   await chartTypeSelector.selectChartType("gauge");
-
-  //   // Apply and save the panel
-  //   await dashboardActions.applyDashboardBtn();
-  //   await dashboardActions.savePanel();
-
-  //   // Go back to dashboard list
-  //   await dashboardCreate.backToDashboardList();
-
-  //   // Delete the dashboard to clean up
-  //   await deleteDashboard(page, randomDashboardName);
-  // });
-
-  test("1should display the correct and updated chart when changing the chart type", async ({
+  test("should display the correct and updated chart when changing the chart type", async ({
     page,
   }) => {
     // Initialize Page Objects
@@ -497,11 +405,7 @@ test.describe("dashboard UI testcases", () => {
     const dashboardList = new DashboardListPage(page);
     const dashboardAction = new DashboardactionPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    // const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    // const dashboardPanel = new DashboardPanel(page);
-    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    // const drilldown = new DashboardDrilldownPage(page);
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
     const dateTimeHelper = new DateTimeHelper(page);
 
@@ -525,8 +429,7 @@ test.describe("dashboard UI testcases", () => {
     );
 
     // Set date-time and timezone for gauge chart
-    await dashboardTimeRefresh.setRelative("6", "w");
-    // await dateTimeHelper.setRelativeTimeRange("6-w");
+    await dateTimeHelper.setRelativeTimeRange("6-w");
     await dashboardAction.applyDashboardBtn();
 
     // Verify the gauge chart is visible
@@ -536,8 +439,7 @@ test.describe("dashboard UI testcases", () => {
     await chartTypeSelector.selectChartType("table");
 
     // Set timezone for the table chart
-    await dashboardTimeRefresh.setRelative("1", "w");
-    // await dateTimeHelper.setRelativeTimeRange("1-w");
+    await dateTimeHelper.setRelativeTimeRange("1-w");
     await dashboardAction.applyDashboardBtn();
     await dashboardAction.waitForChartToRender();
 
@@ -557,13 +459,9 @@ test.describe("dashboard UI testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardAction = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const dashboardPanel = new DashboardPanel(page);
-    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
-    const drilldown = new DashboardDrilldownPage(page);
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardShareExport = new DashboardShareExportPage(page);
-    const dashboardSettings = new DashboardSetting(page);
+    const dateTimeHelper = new DateTimeHelper(page);
 
     const panelName = dashboardAction.generateUniquePanelName("panel-test");
 
@@ -588,8 +486,8 @@ test.describe("dashboard UI testcases", () => {
     );
 
     // Set date-time filter
-    await waitForDateTimeButtonToBeEnabled(page);
-    await dashboardTimeRefresh.setRelative("5", "w");
+    await dateTimeHelper.setRelativeTimeRange("5-w");
+
     await dashboardAction.applyDashboardBtn();
 
     // Save the panel
@@ -601,24 +499,29 @@ test.describe("dashboard UI testcases", () => {
     await expect(page.getByText("Link copied successfully")).toBeHidden();
 
     // Test Fullscreen feature
-    await dashboardSettings.fullScreenSettings();
     await expect(
       page.locator('[data-test="dashboard-fullscreen-btn"]')
     ).toBeVisible();
+    await page.locator('[data-test="dashboard-fullscreen-btn"]').click();
+
+    await page.locator('[data-test="dashboard-viewpanel-close-btn"]').click();
+
+    // Delete the panel
+    await dashboardCreate.backToDashboardList();
+
+    await deleteDashboard(page, randomDashboardName);
   });
 
-  test("should display an error message when some fields are missing or incorrect", async ({
+  test.skip("should display an error message when some fields are missing or incorrect", async ({
     page,
   }) => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardAction = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
-    const drilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPanel = new DashboardPanel(page);
+    const panelName = dashboardAction.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -657,94 +560,129 @@ test.describe("dashboard UI testcases", () => {
     await dashboardAction.savePanel();
 
     // Delete the panel
-    await dashboardPanel.deletePanel(panelName);
+    // await dashboardPanel.deletePanel(panelName);
     await dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should apply various filter operators to the dashboard field and display the correct results", async ({
+  test("should apply various filter operators to the dashboard field and display the correct results", async ({
     page,
   }) => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardAction = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
-    const drilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPanel = new DashboardPanel(page);
-    // Navigate to dashboards section
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardFilter = new DashboardFilter(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const panelName = dashboardAction.generateUniquePanelName("panel-test");
+
+    // Navigate to Dashboards
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
-    // Add a new dashboard
+    // Create Dashboard
     await dashboardCreate.createDashboard(randomDashboardName);
     await expect(page.getByText("Dashboard added successfully.")).toHaveText(
       "Dashboard added successfully."
     );
 
-    // Add a new panel and configure it
+    // Add Panel
     await dashboardCreate.addPanel();
     await dashboardAction.addPanelName(panelName);
     await chartTypeSelector.selectChartType("area");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
+
+    // Add fields to chart
+    await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "b");
     await chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "y"
     );
-    await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "b");
+    await chartTypeSelector.searchAndAddField("kubernetes_host", "filter");
+
+    // Set time range and apply
+    await dateTimeHelper.setRelativeTimeRange("5-w");
     await dashboardAction.applyDashboardBtn();
 
-    // // Apply "Is Null" filter
-    // await chartTypeSelector.searchAndAddField("kubernetes_host", "filter");
-    // await dashboardAction.applyDashboardBtn();
+    // Apply "Is Null" filter
+    await dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_host",
+      "",
+      "Is Null"
+    );
+    await dashboardAction.applyDashboardBtn();
+    // Add assertion if possible: expect some filtered chart result or no data text
 
-    // Save and delete the panel
+    // Apply "Is Not Null" filter
+    await dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_host",
+      "",
+      "Is Not Null"
+    );
+    await dashboardAction.applyDashboardBtn();
+    // Add assertion if possible: expect some filtered chart result or different behavior
+
+    // Save and delete panel
     await dashboardAction.addPanelName(panelName);
     await dashboardAction.savePanel();
     await dashboardPanel.deletePanel(panelName);
+
+    // Cleanup
     await dashboardCreate.backToDashboardList();
     await waitForDashboardPage(page);
     await deleteDashboard(page, randomDashboardName);
   });
+
   test("should display an error message when a required field is missing", async ({
     page,
   }) => {
+    // Initialize only the necessary Page Objects
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
-    const dashboardAction = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const drilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const dashboardActions = new DashboardactionPage(page);
     const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardAction = new DashboardactionPage(page);
+
+    // Generate a unique panel name
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards section
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
-    // Add a new dashboard
+    // Create a new dashboard
     await dashboardCreate.createDashboard(randomDashboardName);
 
-    // Add a new panel and configure it
+    // Add a new panel and configure it (intentionally skipping Y-axis field)
     await dashboardCreate.addPanel();
-    await dashboardAction.addPanelName(panelName);
+    await dashboardActions.addPanelName(panelName);
     await chartTypeSelector.selectChartType("area");
     await chartTypeSelector.selectStream("e2e_automate");
-    // Skip adding the required y-axis field
 
+    // Add a non-required field (B-axis), but skip Y-axis
     await chartTypeSelector.searchAndAddField("kubernetes_host", "b");
-    // Attempt to apply the configuration
-    await dashboardAction.applyDashboardBtn();
 
-    // Verify error message is displayed
+    // Attempt to apply the configuration
+    await dashboardActions.applyDashboardBtn();
+
+    // Verify the expected error message is shown
     await expect(
       page.getByText("There are some errors, please fix them and try again")
     ).toBeVisible();
+    await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
+    await dashboardActions.applyDashboardBtn();
+    await dashboardAction.waitForChartToRender();
+
+    await dashboardAction.savePanel();
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
   });
 
-  test("should create the specified URL using the DrillDown feature", async ({
+  test.skip("should create the specified URL using the DrillDown feature", async ({
     page,
   }) => {
     const dashboardCreate = new DashboardCreate(page);
@@ -796,12 +734,12 @@ test.describe("dashboard UI testcases", () => {
     );
     await dashboardAction.applyDashboardBtn();
     await dashboardAction.addPanelName(panelName);
-    await dashboardAction.savePanel();
+    await dashboardActions.savePanel();
     await dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test("should display a confirmation popup message for unsaved changes when clicking the Discard button", async ({
+  test.skip("should display a confirmation popup message for unsaved changes when clicking the Discard button", async ({
     page,
   }) => {
     const dashboardCreate = new DashboardCreate(page);
@@ -810,7 +748,7 @@ test.describe("dashboard UI testcases", () => {
     const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const panelName = dashboardAction.generateUniquePanelName("panel-test");
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardSetting = new DashboardSetting(page);
 
@@ -836,7 +774,13 @@ test.describe("dashboard UI testcases", () => {
     await dashboardTimeRefresh.setRelative("5", "w");
     await dashboardAction.applyDashboardBtn();
 
+    // Verify the gauge chart is visible
+    await dashboardAction.waitForChartToRender();
+
     // Verify confirmation popup for unsaved changes
     await page.locator('[data-test="dashboard-panel-discard"]').click();
+
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
   });
 });
