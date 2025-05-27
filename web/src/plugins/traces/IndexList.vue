@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
-                :title="props.row.name"
+                :title="props.row.label || props.row.name"
               >
                 <div class="field_label ellipsis" style="font-size: 14px">
                   {{ props.row.label || props.row.name }}

@@ -13,6 +13,7 @@
         <div
           class="field_label ellipsis"
           style="width: calc(100% - 28px); font-size: 14px"
+          :title="row.label || row.name"
         >
           {{ row.label || row.name }}
         </div>
