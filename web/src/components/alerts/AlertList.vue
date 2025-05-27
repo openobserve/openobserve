@@ -1064,7 +1064,7 @@ export default defineComponent({
             name: "alertList",
             query: {
               org_identifier: store.state.selectedOrganization.identifier,
-              folder: activeFolderId.value,
+              folder: newVal,
             },
           });
         }
@@ -1329,18 +1329,20 @@ export default defineComponent({
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       await getAlertsFn(store, folderId);
-      hideForm();
       activeFolderId.value = folderId;
+      hideForm();
+
     };
     const hideForm = () => {
       showAddAlertDialog.value = false;
       router.push({
         name: "alertList",
         query: {
-          folder: activeFolderId.value,
           org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
         },
       });
+
     };
     const deleteAlertByAlertId = () => {
       alertsService
