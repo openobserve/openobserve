@@ -782,13 +782,21 @@ export default defineComponent({
       console.log("oldVariableSelectedValues", oldVariableSelectedValues);
       console.log("currentVariable", currentVariable);
 
+      // Skip setting value if the variable already has a value and we're just opening the dropdown
+      if (
+        currentVariable.value !== null &&
+        currentVariable.value !== undefined
+      ) {
+        return;
+      }
+
       // If we have custom values, set them immediately
       if (
         currentVariable?.selectAllValueForMultiSelect === "custom" &&
         currentVariable?.customMultiSelectValue?.length > 0
       ) {
         currentVariable.value = currentVariable.multiSelect
-          ? [...currentVariable.customMultiSelectValue]
+          ? currentVariable.customMultiSelectValue
           : currentVariable.customMultiSelectValue[0];
         currentVariable.isVariableLoadingPending = true;
         return;
@@ -802,48 +810,30 @@ export default defineComponent({
       if (currentVariable.multiSelect) {
         // old selected values
         const selectedValues = oldVariableSelectedValues.filter((value) => {
-          // Keep old values even if not in current options
           return value !== undefined && value !== null;
         });
 
-        // if selected values exist or we have custom values, use them
+        // if selected values exist, use them
         if (selectedValues.length > 0) {
           currentVariable.value = selectedValues;
-        } else if (
-          currentVariable?.selectAllValueForMultiSelect === "custom" &&
-          currentVariable?.customMultiSelectValue?.length > 0
-        ) {
-          // Set initial value from customMultiSelectValue even before API calls
-          currentVariable.value = [...currentVariable.customMultiSelectValue];
-          // Ensure we still load te API vhalues
+        } else if (currentVariable?.customMultiSelectValue?.length > 0) {
+          currentVariable.value = currentVariable.customMultiSelectValue;
           currentVariable.isVariableLoadingPending = true;
+        } else if (currentVariable.options.length > 0) {
+          // Default to first option if nothing else is set
+          currentVariable.value = [currentVariable.options[0].value];
         } else {
-          switch (currentVariable?.selectAllValueForMultiSelect) {
-            case "all":
-              currentVariable.value = optionsValues;
-              break;
-            default:
-              // Always set first option as default for multi-select
-              currentVariable.value =
-                currentVariable.options.length > 0
-                  ? [currentVariable.options[0].value]
-                  : [];
-          }
+          currentVariable.value = [];
         }
       } else {
         // Single select logic
         if (
-          oldVariableSelectedValues[0] !== undefined &&
-          oldVariableSelectedValues[0] !== null
+          oldVariableSelectedValues[0] !== null &&
+          oldVariableSelectedValues[0] !== undefined
         ) {
           currentVariable.value = oldVariableSelectedValues[0];
-        } else if (
-          currentVariable.selectAllValueForMultiSelect === "custom" &&
-          currentVariable?.customMultiSelectValue?.length > 0
-        ) {
-          // Use the first custom value for single select
+        } else if (currentVariable?.customMultiSelectValue?.length > 0) {
           currentVariable.value = currentVariable.customMultiSelectValue[0];
-          // Ensure we still load the API values
           currentVariable.isVariableLoadingPending = true;
         } else if (currentVariable.options.length > 0) {
           currentVariable.value = currentVariable.options[0].value;
@@ -988,17 +978,13 @@ export default defineComponent({
         const { name } = variableObject;
 
         if (!name || !variableObject) {
-          console.log(
-            `[WebSocket] loadSingleVariableDataByName: variableObject is invalid`,
-          );
-          return resolve(false);
+          console.error("Invalid variable object", variableObject);
+          resolve(false);
+          return;
         }
 
-        // If the variable is already being processed
+        // If the variable is already being processed, cancel the previous request
         if (currentlyExecutingPromises[name]) {
-          console.log(
-            `[WebSocket] loadSingleVariableDataByName: cancelling previous promise for ${name}`,
-          );
           currentlyExecutingPromises[name](false);
         }
         currentlyExecutingPromises[name] = reject;
@@ -1013,36 +999,50 @@ export default defineComponent({
             isInvalidDate(props.selectedTimeDate?.start_time) ||
             isInvalidDate(props.selectedTimeDate?.end_time)
           ) {
-            console.log(
-              `[WebSocket] loadSingleVariableDataByName: invalid date for ${name}`,
-            );
-            return resolve(false);
+            console.error("Invalid date range");
+            resolve(false);
+            return;
           }
         }
 
-        // For variables with dependencies, check if dependencies are loaded
-        if (hasParentVariables && isDependentVariableLoading(variableObject)) {
-          console.log(
-            `[WebSocket] loadSingleVariableDataByName: dependent variables are still loading for ${name}`,
+        // For variables with dependencies, check if they are ready
+        if (hasParentVariables) {
+          const parentVariables =
+            variablesDependencyGraph[name].parentVariables;
+          const areParentsReady = parentVariables.every(
+            (parentName: string) => {
+              const parentVariable = variablesData.values.find(
+                (v: any) => v.name === parentName,
+              );
+              return (
+                parentVariable &&
+                !parentVariable.isLoading &&
+                !parentVariable.isVariableLoadingPending &&
+                parentVariable.value !== null &&
+                parentVariable.value !== undefined &&
+                (!Array.isArray(parentVariable.value) ||
+                  parentVariable.value.length > 0)
+              );
+            },
           );
-          return resolve(false);
+
+          if (!areParentsReady) {
+            console.log(`Parents not ready for ${name}, skipping load`);
+            resolve(false);
+            return;
+          }
         }
 
+        // Set loading state
+        variableObject.isLoading = true;
+        emitVariablesData();
+
         try {
-          console.log(
-            `[WebSocket] loadSingleVariableDataByName: starting to load ${name}`,
-          );
           const success = await handleVariableType(variableObject);
-          console.log(
-            `[WebSocket] loadSingleVariableDataByName: finished loading ${name}`,
-          );
           await finalizeVariableLoading(variableObject, success);
           resolve(success);
         } catch (error) {
-          console.log(
-            `[WebSocket] loadSingleVariableDataByName: error loading ${name}`,
-            error,
-          );
+          console.error(`Error loading variable ${name}:`, error);
           await finalizeVariableLoading(variableObject, false);
           resolve(false);
         }
@@ -1568,8 +1568,8 @@ export default defineComponent({
         const allChildren: string[] = [...immediateChildren];
 
         for (const childName of immediateChildren) {
-          const childrenOfChild = getAllAffectedVariables(childName, visited);
-          allChildren.push(...childrenOfChild);
+          const grandChildren = getAllAffectedVariables(childName, visited);
+          allChildren.push(...grandChildren);
         }
 
         return Array.from(new Set(allChildren));
@@ -1587,11 +1587,25 @@ export default defineComponent({
       variablesToUpdate.forEach((variable: any) => {
         variable.isVariableLoadingPending = true;
         variable.isLoading = true;
-        // Set value to null for all child variables
-        variable.value = null;
-        // Emit the null value immediately
+        // Reset value based on multiSelect property
+        variable.value = variable.multiSelect ? [] : null;
+        // Reset options array
+        variable.options = [];
+        // Emit the updated values immediately
         emitVariablesData();
       });
+
+      // If parent value is null or empty, don't load child variables
+      const isParentValueEmpty =
+        !currentVariable.value ||
+        (Array.isArray(currentVariable.value) &&
+          currentVariable.value.length === 0);
+
+      if (isParentValueEmpty) {
+        // Just emit the reset state
+        emitVariablesData();
+        return;
+      }
 
       // Load variables in dependency order
       for (const varName of affectedVariables) {
@@ -1600,12 +1614,6 @@ export default defineComponent({
         );
         if (variable) {
           await loadSingleVariableDataByName(variable);
-          // After loading, if options exist, set the first value
-          if (variable.options && variable.options.length > 0) {
-            variable.value = variable.options[0].value;
-            // Emit the new value immediately
-            emitVariablesData();
-          }
         }
       }
     };
