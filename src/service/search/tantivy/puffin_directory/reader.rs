@@ -236,20 +236,23 @@ pub async fn warm_up_terms(
                 warm_up_terms_futures
                     .push(async move { inv_idx_clone.warm_postings(term, *position_needed).await });
             }
+        }
+    }
 
-            // only warm up fast fields if needed
-            if need_fast_field {
-                // only warm up fast fields once per segment
-                let segment_id = segment_reader.segment_id();
-                if !warmed_segments.contains(&segment_id) {
-                    let fast_field_reader = segment_reader.fast_fields();
-                    warm_up_fast_fields_futures
-                        .push(async move { warm_up_fastfield(fast_field_reader).await });
-                    warmed_segments.insert(segment_id);
-                }
+    // only warm up fast fields if needed
+    if need_fast_field {
+        for segment_reader in searcher.segment_readers() {
+            // only warm up fast fields once per segment
+            let segment_id = segment_reader.segment_id();
+            if !warmed_segments.contains(&segment_id) {
+                let fast_field_reader = segment_reader.fast_fields();
+                warm_up_fast_fields_futures
+                    .push(async move { warm_up_fastfield(fast_field_reader).await });
+                warmed_segments.insert(segment_id);
             }
         }
     }
+
     if !warm_up_fields_futures.is_empty() {
         try_join_all(warm_up_fields_futures).await?;
     }
@@ -265,6 +268,7 @@ pub async fn warm_up_terms(
     Ok(())
 }
 
+// warm up the fast field, only support _timestamp field
 async fn warm_up_fastfield(
     fast_field_reader: &tantivy::fastfield::FastFieldReaders,
 ) -> anyhow::Result<()> {
