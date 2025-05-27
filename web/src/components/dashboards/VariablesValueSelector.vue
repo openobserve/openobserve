@@ -483,18 +483,6 @@ export default defineComponent({
       payload: any,
       variableObject: any,
     ): any => {
-      if (isWebSocketEnabled()) {
-        fetchQueryDataWithWebSocket(payload, {
-          open: sendSearchMessage,
-          close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
-          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
-          message: (p: any, r: any) =>
-            handleSearchResponse(p, r, variableObject),
-          reset: handleSearchReset,
-        }) as string;
-        return;
-      }
-
       if (isStreamingEnabled()) {
         console.log(
           `[HTTP Streaming] Starting fetch for ${variableObject.name}:`,
@@ -512,6 +500,18 @@ export default defineComponent({
           complete: (p: any, r: any) => handleSearchClose(p, r, variableObject),
           reset: handleSearchReset,
         });
+        return;
+      }
+
+      if (isWebSocketEnabled()) {
+        fetchQueryDataWithWebSocket(payload, {
+          open: sendSearchMessage,
+          close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
+          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
+          message: (p: any, r: any) =>
+            handleSearchResponse(p, r, variableObject),
+          reset: handleSearchReset,
+        }) as string;
         return;
       }
     };
