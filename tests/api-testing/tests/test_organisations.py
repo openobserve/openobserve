@@ -1,3 +1,5 @@
+import time
+
 def test_e2e_organisations(create_session, base_url):
     """Running an E2E test for get all the alerts list."""
 
@@ -7,7 +9,7 @@ def test_e2e_organisations(create_session, base_url):
 
     resp_get_allorgs = session.get(f"{url}api/organizations")
 
-    print(resp_get_allorgs.content)
+    # print(resp_get_allorgs.content)
     assert (
         resp_get_allorgs.status_code == 200
     ), f"Get all alerts list 200, but got {resp_get_allorgs.status_code} {resp_get_allorgs.content}"
@@ -71,3 +73,38 @@ def test_e2e_reset_passcode(create_session, base_url):
     assert (
         resp_put_passcode.status_code == 200
     ), f"Put all passcode list 200, but got {resp_put_passcode.status_code} {resp_put_passcode.content}"
+
+def test_create_organization(create_session, base_url, random_string):
+    """Running an E2E test for creating organization."""
+    session = create_session
+    # Create a new organization
+
+    org_id_new = random_string(5)  # Call the function returned by the fixture
+
+    print("Random Org ID:", org_id_new)
+
+    payload = {
+        "name": org_id_new
+    }
+
+    # Verify session is authenticated
+    resp_auth_check = session.get(f"{base_url}api/organizations")
+    assert resp_auth_check.status_code == 200, f"Authentication check failed: {resp_auth_check.status_code} {resp_auth_check.content}"
+
+    resp_create_organization = session.post(
+        f"{base_url}api/organizations", json=payload
+    )
+
+    print("Create organization response:", resp_create_organization.content)
+    
+    assert (
+        resp_create_organization.status_code == 200
+    ), f"Expected 200, but got {resp_create_organization.status_code} {resp_create_organization.content}"
+
+    assert resp_create_organization.json().get("name") == org_id_new
+
+    org_id = resp_create_organization.json().get("identifier")
+
+    print("Org identifier:", org_id)
+
+    yield org_id
