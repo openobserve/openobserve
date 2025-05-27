@@ -29,6 +29,11 @@ export class HomePage {
         await this.page.getByText('default', { exact: true }).click();
     }
 
+    async homePageURLValidationDefaultOrg() {
+        // TODO: Fix this test
+        await expect(this.page).toHaveURL(/default/);
+    }
+
     async homePageDefaultMultiOrg() {
         // await this.page.pause();
         await this.page.waitForTimeout(5000);
@@ -42,5 +47,25 @@ export class HomePage {
     async homePageURLValidation() {
         // TODO: Fix this test
         await expect(this.page).not.toHaveURL(/default/);
+    }
+
+    async homePageOrg(orgName) {
+        // await this.page.pause();
+        await this.page.waitForTimeout(5000);
+        await this.page.reload();
+        await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+        await this.page.waitForTimeout(5000);
+
+        await this.page.getByRole('option', { name: orgName }).locator('div').nth(2).click();
+    }
+
+    async homePageURLValidation(orgName) {
+        // TODO: Fix this test
+        await expect(this.page).not.toHaveURL(orgName);
+    }
+
+    async homePageURLContains(orgNameIdentifier) {
+        // TODO: Fix this test
+        await expect(this.page).toHaveURL(orgNameIdentifier);
     }
 }

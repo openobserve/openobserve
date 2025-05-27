@@ -24,6 +24,7 @@ test.describe("Change Organisation", () => {
         reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage,
         multiOrgIdentifier;
 
+    const newOrgName = `def${Math.floor(Math.random() * 1000)}`;
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
         ingestionPage = new IngestionPage(page);
@@ -46,8 +47,7 @@ test.describe("Change Organisation", () => {
         await loginPage.loginAsInternalUser();
         await loginPage.login();
         await ingestionPage.ingestion();
-        multiOrgIdentifier = await createOrgPage.createOrg();
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        
     });
 
     test("Home Page default validation", async ({ page }) => {
@@ -57,15 +57,21 @@ test.describe("Change Organisation", () => {
         await homePage.homePageValidation();
         await homePage.gotoHomePage();
         await homePage.homePageValidation();
+        await homePage.homePageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
+
     });
 
     test("Home Page change organisation validation", async ({ page }) => {
-        await homePage.homePageDefaultMultiOrg();
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await homePage.homePageValidation();
-        await homePage.homePageURLValidation();
+        await homePage.homePageURLValidation(newOrgName);
         await homePage.gotoHomePage();
         await homePage.homePageValidation();
-        await homePage.homePageURLValidation();
+        await homePage.homePageURLValidation(newOrgName);
+        await homePage.homePageURLContains(multiOrgIdentifier);
     });
 
     test("Logs Page default validation", async ({ page }) => {
