@@ -25,7 +25,7 @@ use datafusion::{
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
         PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal, NoOp},
+        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
     },
     scalar::ScalarValue,
 };
@@ -500,7 +500,7 @@ impl Condition {
                 }
                 Ok(disjunction(expr_list))
             }
-            Condition::All() => Ok(Arc::new(NoOp::new())),
+            Condition::All() => Ok(Arc::new(Literal::new(ScalarValue::Boolean(Some(true))))),
             Condition::Or(left, right) => {
                 let left = left.to_physical_expr(schema, fst_fields)?;
                 let right = right.to_physical_expr(schema, fst_fields)?;
