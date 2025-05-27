@@ -693,8 +693,8 @@ pub async fn search_partition(
                 log::warn!("Data retention is zero, setting to 1 to prevent division by zero");
                 data_retention = 1;
             }
-            let records = (stats.doc_num as i64 * query_duration) / data_retention;
-            let original_size = (stats.storage_size as i64 * query_duration) / data_retention;
+            let records = (stats.doc_num as i64 / data_retention) * query_duration;
+            let original_size = (stats.storage_size as i64 / data_retention) * query_duration;
             log::info!(
                 "[trace_id {trace_id}] using approximation: stream: {}, records: {}, original_size: {}",
                 stream_name,
