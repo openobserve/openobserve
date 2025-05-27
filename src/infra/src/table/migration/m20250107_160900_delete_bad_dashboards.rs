@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,9 @@
 //! parsed into a dashboard.
 
 use chrono::{DateTime, FixedOffset};
-use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, PaginatorTrait, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryOrder, TransactionTrait,
+};
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -30,7 +32,9 @@ impl MigrationTrait for Migration {
 
         // Migrate pages of 100 records at a time to avoid loading too many
         // records into memory.
-        let mut pages = sea_orm_dashboards::Entity::find().paginate(&txn, 100);
+        let mut pages = sea_orm_dashboards::Entity::find()
+            .order_by_asc(sea_orm_dashboards::Column::Id)
+            .paginate(&txn, 100);
 
         while let Some(dashboards) = pages.fetch_and_next().await? {
             for d in dashboards {
