@@ -917,6 +917,14 @@ const actionId = computed(() => {
   return router.currentRoute.value.query?.id as string;
 });
 
+const getFormPayload = (data: { [key: string]: any }) => {
+  const form = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    form.append(key, value);
+  });
+  return form;
+};
+
 // Save just the initial setup and create the action
 const saveActionSetup = async () => {
   try {
@@ -937,11 +945,11 @@ const saveActionSetup = async () => {
   });
 
   // Create a simple object with just the necessary fields for creating an action
-  const setupData = {
+  const setupData = getFormPayload({
     name: formData.value.name,
     description: formData.value.description,
     type: formData.value.type,
-  };
+  });
 
   actionDetailsExpanded.value = true;
   formData.value.id = getUUID();
