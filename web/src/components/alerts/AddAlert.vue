@@ -70,11 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              <div v-show="expandState.alertSetup" class="tw-w-full ">
 
               <div
-                data-test="add-alert-name-input row"
                 class="alert-name-input o2-input flex justify-between items-center q-px-lg tw-gap-10"
                 style="padding-top: 12px;"
+                data-test="add-alert-name-input-container"
               >
                 <q-input
+                  data-test="add-alert-name-input row"
                   v-model="formData.name"
                   :label="t('alerts.name') + ' *'"
                   color="input-border"
@@ -113,13 +114,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex q-px-lg tw-w-full items-center justify-between row tw-gap-10"
                 style="padding-top: 0px"
                 v-show="expandState.alertSetup"
+                data-test="add-alert-stream-type-select-container"
               >
                 <div
                   data-test="add-alert-stream-type-select"
                   class="alert-stream-type o2-input tw-w-full col "
                   style="padding-top: 0"
+
                 >
                   <q-select
+                    data-test="add-alert-stream-type-select-dropdown"
                     v-model="formData.stream_type"
                     :options="streamTypes"
                     :label="t('alerts.streamType') + ' *'"
@@ -143,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="padding-top: 0"
                 >
                   <q-select
+                    data-test="add-alert-stream-name-select-dropdown"
                     v-model="formData.stream_name"
                     :options="filteredStreams"
                     :label="t('alerts.stream_name') + ' *'"
@@ -319,6 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center q-mb-sm">
                   <span class="text-bold custom-input-label">Row Template</span>
                   <q-btn
+                    data-test="add-alert-row-input-info-btn"
                     style="color: #A0A0A0;"
                     no-caps
                     padding="xs"
@@ -333,6 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
           </div>
                 <q-input
+                  data-test="add-alert-row-input-textarea"
                   v-model="formData.row_template"
                   color="input-border"
                   bg-color="input-bg"
