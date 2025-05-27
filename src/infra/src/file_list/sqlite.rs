@@ -1207,6 +1207,7 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
                         .push_bind(item.meta.index_size)
                         .push_bind(item.meta.flattened);
                 });
+                query_builder.push(" ON CONFLICT(id) DO NOTHING");
                 if let Err(e) = query_builder.build().execute(&mut *tx).await {
                     if let Err(e) = tx.rollback().await {
                         log::error!(
