@@ -1078,10 +1078,6 @@ export default defineComponent({
           });
         }
 
-        if (selectedOrg.value.identifier != "" && config.isCloud == "true") {
-          mainLayoutMixin.setup().getOrganizationThreshold(store);
-        }
-
         if (
           Object.keys(selectedOrg.value).length > 0 &&
           selectedOrg.value.identifier != "" &&
@@ -1117,6 +1113,7 @@ export default defineComponent({
             orgSettings?.data?.data?.enable_websocket_search ?? false,
           enable_streaming_search:
             orgSettings?.data?.data?.enable_streaming_search ?? false,
+          free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
         });
       } catch (error) {
         console.error("Error in getOrganizationSettings:", error);

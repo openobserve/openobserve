@@ -81,7 +81,8 @@
     "save": "Save",
     "update": "Update",
     "favourite": "Favorite",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "contactUs": "Contact Us"
   },
   "search": {
     "metrics": "Metrics",
@@ -900,7 +901,8 @@
   "billing": {
     "header": "Usage & Billing",
     "plans": "Plans",
-    "subtitle": "Simple, transparent pricing",
+    "title": "Simple, transparent pricing",
+    "subtitle": "We believe OpenObserve should be accessible to all companies, no matter the size.",
     "individuals": "For Individuals",
     "startups": "For Startups",
     "basic": "Free",
@@ -932,7 +934,22 @@
     "invoiceHistoryLabel": "Invoice History",
     "downgradeMessage": "You are downgrading the subscription plan. Are you sure you want to proceed?",
     "captureCardDetail": "To proceed, please provide your credit card details. You will not be charged at this stage. Charges will only apply when you subscribe to a paid plan. Click the button below to proceed.",
-    "proceedtoPaymentDetail": "Proceed to Payment Details"
+    "proceedtoPaymentDetail": "Proceed to Payment Details",
+    "upgradeNow": "Upgrade Now",
+    "subscribe": "Subscribe",
+    "cancelSubscription": "Cancel Subscription",
+    "features": "FEATURES",
+    "included": "What's included?",
+    "proPlanSubtitle": "Custom solutions for small teams",
+    "unlimitedNote": "Unlimited users, logs, metrics, traces & more.",
+    "paymentNote": "Payment calculated by usage at the end of monthly billing cycle.",
+    "proPlanLabel": "Pay as you go",
+    "contactLabel": "Contact Sales",
+    "enterpriseLabel": "Enterprise Plan",
+    "enterpriseSubtitle": "Advanced functionality and support for Enterprise demands",
+    "discountTag": "On Discount",
+    "enterpriseNote": "High volume needs? Let's talk scale! Contact us for tailored solutions.",
+    "contactSupport": "Contact Support"
   },
   "message": {
     "ServerInternalError": "Error: Something went wrong. Internal server error.",
