@@ -1093,6 +1093,7 @@ export default defineComponent({
           const folderQuery = router.currentRoute.value.query.folder;
           const matchingFolder = folders.find((it: any) => it.folderId === folderQuery);
 
+
           activeFolderId.value = matchingFolder ? folderQuery : "default";
           filterAlertsByTab();
         },
@@ -1383,16 +1384,16 @@ export default defineComponent({
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       await getAlertsFn(store, folderId);
-      hideForm();
+      await hideForm();
       activeFolderId.value = folderId;
     };
-    const hideForm = () => {
+    const hideForm = async () => {
       showAddAlertDialog.value = false;
-      router.push({
+      await router.push({
         name: "alertList",
         query: {
-          folder: activeFolderId.value,
           org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
         },
       });
     };
