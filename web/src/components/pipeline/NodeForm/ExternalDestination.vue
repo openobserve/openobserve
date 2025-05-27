@@ -55,170 +55,191 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               dense
               tabindex="0"
-            />
-          </div>
-          <div class="col-12 q-pb-md"></div>
-          <div v-if="createNewDestination" class="col-12 q-py-xs">
-            <q-input
-              data-test="add-destination-name-input"
-              v-model="formData.name"
-              :label="t('alerts.name') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[
-                (val: any) =>
-                  !!val
-                    ? isValidResourceName(val) ||
-                      `Characters like :, ?, /, #, and spaces are not allowed.`
-                    : t('common.nameRequired'),
-              ]"
-              tabindex="0"
-            />
-          </div>
-
-          <div v-if="createNewDestination" class="col-12 q-py-xs">
-            <q-input
-              data-test="add-destination-url-input"
-              v-model="formData.url"
-              :label="t('alert_destinations.url') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-              tabindex="0"
-            />
-          </div>
-          <div
-            v-if="createNewDestination"
-            class="col-12 q-py-xs destination-method-select"
-          >
-            <q-select
-              data-test="add-destination-method-select"
-              v-model="formData.method"
-              :label="t('alert_destinations.method') + ' *'"
-              :options="apiMethods"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              :popup-content-style="{ textTransform: 'uppercase' }"
-              filled
-              dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              tabindex="0"
-            />
-          </div>
-          <div v-if="createNewDestination" class="col-12 q-py-sm">
-            <div class="text-bold q-py-xs" style="paddingleft: 10px">
-              Headers
-            </div>
-            <div
-              v-for="(header, index) in apiHeaders"
-              :key="header.uuid"
-              class="row q-col-gutter-sm q-pb-sm wrap"
             >
-              <div class="col-5 q-ml-none">
-                <q-input
-                  :data-test="`add-destination-header-${header['key']}-key-input`"
-                  v-model="header.key"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  outlined
-                  filled
-                  :placeholder="t('alert_destinations.api_header')"
-                  dense
-                  tabindex="0"
-                />
-              </div>
-              <div class="col-5 q-ml-none">
-                <q-input
-                  :data-test="`add-destination-header-${header['key']}-value-input`"
-                  v-model="header.value"
-                  :placeholder="t('alert_destinations.api_header_value')"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  isUpdatingDestination
-                  tabindex="0"
-                />
-              </div>
-              <div class="col-2 q-ml-none headers-btns">
-                <q-btn
-                  :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                  icon="delete"
-                  class="q-ml-xs iconHoverBtn"
-                  :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :title="t('alert_templates.edit')"
-                  @click="deleteApiHeader(header)"
-                />
-                <q-btn
-                  data-test="add-destination-add-header-btn"
-                  v-if="index === apiHeaders.length - 1"
-                  icon="add"
-                  :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                  class="q-ml-xs iconHoverBtn"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :title="t('alert_templates.edit')"
-                  @click="addApiHeader()"
-                />
-              </div>
-            </div>
+              <template v-slot:option="scope">
+                <q-item
+                  style="max-width: calc(40vw - 42px)"
+                  v-bind="scope.itemProps"
+                >
+                  <q-item-section class="flex flex-col">
+                    <q-item-label>
+                      <span class="text-bold"> {{ scope.opt.label }}</span> -
+                      <span class="truncate-url"> {{ scope.opt.url }}</span>
+                    </q-item-label>
+                  </q-item-section>
+                </q-item>
+              </template>
+            </q-select>
           </div>
-          <div v-if="createNewDestination" class="col-12 q-py-sm">
-            <div class="q-py-sm">
-              <q-toggle
-                data-test="add-destination-skip-tls-verify-toggle"
-                class="q-mt-sm"
-                v-model="formData.skip_tls_verify"
-                :label="t('alert_destinations.skip_tls_verify')"
+          <q-form
+            ref="destinationForm"
+            @submit="
+              createNewDestination ? createDestination() : saveDestination()
+            "
+            class="col-12"
+          >
+            <div class="col-12 q-py-xs">
+              <q-input
+                v-if="createNewDestination"
+                data-test="add-destination-name-input"
+                v-model="formData.name"
+                :label="t('alerts.name') + ' *'"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop"
+                stack-label
+                outlined
+                filled
+                dense
+                :rules="[
+                  (val: any) =>
+                    !!val
+                      ? isValidResourceName(val) ||
+                        `Characters like :, ?, /, #, and spaces are not allowed.`
+                      : t('common.nameRequired'),
+                ]"
+                tabindex="0"
               />
             </div>
-          </div>
+            <div v-if="createNewDestination" class="col-12 q-py-xs">
+              <q-input
+                data-test="add-destination-url-input"
+                v-model="formData.url"
+                :label="t('alert_destinations.url') + ' *'"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop"
+                stack-label
+                outlined
+                filled
+                dense
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                tabindex="0"
+              />
+            </div>
+            <div
+              v-if="createNewDestination"
+              class="col-12 q-py-xs destination-method-select"
+            >
+              <q-select
+                data-test="add-destination-method-select"
+                v-model="formData.method"
+                :label="t('alert_destinations.method') + ' *'"
+                :options="apiMethods"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop"
+                stack-label
+                outlined
+                :popup-content-style="{ textTransform: 'uppercase' }"
+                filled
+                dense
+                :rules="[(val: any) => !!val || 'Field is required!']"
+                tabindex="0"
+              />
+            </div>
+            <div v-if="createNewDestination" class="col-12 q-py-sm">
+              <div class="text-bold q-py-xs" style="paddingleft: 10px">
+                Headers
+              </div>
+              <div
+                v-for="(header, index) in apiHeaders"
+                :key="header.uuid"
+                class="row q-col-gutter-sm q-pb-sm wrap"
+              >
+                <div class="col-5 q-ml-none">
+                  <q-input
+                    :data-test="`add-destination-header-${header['key']}-key-input`"
+                    v-model="header.key"
+                    color="input-border"
+                    bg-color="input-bg"
+                    stack-label
+                    outlined
+                    filled
+                    :placeholder="t('alert_destinations.api_header')"
+                    dense
+                    tabindex="0"
+                  />
+                </div>
+                <div class="col-5 q-ml-none">
+                  <q-input
+                    :data-test="`add-destination-header-${header['key']}-value-input`"
+                    v-model="header.value"
+                    :placeholder="t('alert_destinations.api_header_value')"
+                    color="input-border"
+                    bg-color="input-bg"
+                    stack-label
+                    outlined
+                    filled
+                    dense
+                    isUpdatingDestination
+                    tabindex="0"
+                  />
+                </div>
+                <div class="col-2 q-ml-none headers-btns">
+                  <q-btn
+                    :data-test="`add-destination-header-${header['key']}-delete-btn`"
+                    icon="delete"
+                    class="q-ml-xs iconHoverBtn"
+                    :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    :title="t('alert_templates.edit')"
+                    @click="deleteApiHeader(header)"
+                  />
+                  <q-btn
+                    data-test="add-destination-add-header-btn"
+                    v-if="index === apiHeaders.length - 1"
+                    icon="add"
+                    :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                    class="q-ml-xs iconHoverBtn"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    :title="t('alert_templates.edit')"
+                    @click="addApiHeader()"
+                  />
+                </div>
+              </div>
+            </div>
+            <div v-if="createNewDestination" class="col-12 q-py-sm">
+              <div class="q-py-sm">
+                <q-toggle
+                  data-test="add-destination-skip-tls-verify-toggle"
+                  class="q-mt-sm"
+                  v-model="formData.skip_tls_verify"
+                  :label="t('alert_destinations.skip_tls_verify')"
+                />
+              </div>
+            </div>
+            <div class="flex justify-start q-mt-lg">
+              <q-btn
+                data-test="add-destination-cancel-btn"
+                v-close-popup="true"
+                class="q-mb-md text-bold"
+                :label="t('alerts.cancel')"
+                text-color="light-text"
+                padding="sm md"
+                no-caps
+                @click="$emit('cancel:hideform')"
+              />
+              <q-btn
+                data-test="add-destination-submit-btn"
+                :label="t('alerts.save')"
+                class="q-mb-md text-bold no-border q-ml-md"
+                color="secondary"
+                padding="sm xl"
+                type="submit"
+                no-caps
+              />
+            </div>
+          </q-form>
         </div>
-      </div>
-      <div class="flex justify-center q-mt-lg">
-        <q-btn
-          data-test="add-destination-cancel-btn"
-          v-close-popup="true"
-          class="q-mb-md text-bold"
-          :label="t('alerts.cancel')"
-          text-color="light-text"
-          padding="sm md"
-          no-caps
-          @click="$emit('cancel:hideform')"
-        />
-        <q-btn
-          data-test="add-destination-submit-btn"
-          :label="t('alerts.save')"
-          class="q-mb-md text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          @click="createNewDestination ? createDestination() : saveDestination()"
-          no-caps
-        />
       </div>
     </q-page>
   </div>
@@ -264,14 +285,20 @@ const formData: Ref<DestinationData> = ref({
   template: "",
   headers: {},
   emails: "",
-  type: "remote_pipeline",
+  type: "http",
 });
 const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
+const destinationForm = ref(null);
 const { addNode, pipelineObj } = useDragAndDrop();
 const retries = ref(0);
-const selectedDestination = ref(
-  pipelineObj.currentSelectedNodeData.data.destination_name || "",
+const selectedDestination: any = ref(
+  pipelineObj.currentSelectedNodeData?.data?.destination_name
+    ? {
+        label: pipelineObj.currentSelectedNodeData.data.destination_name,
+        value: pipelineObj.currentSelectedNodeData.data.destination_name,
+      }
+    : { label: "", value: "" },
 );
 const destinations = ref([]);
 
@@ -306,11 +333,12 @@ watch(
         template: "",
         headers: {},
         emails: "",
-        type: "remote_pipeline",
+        type: "http",
       };
       apiHeaders.value = [{ key: "", value: "", uuid: getUUID() }];
     }
-  })
+  },
+);
 
 const isValidDestination = computed(
   () => formData.value.name && formData.value.url && formData.value.method,
@@ -341,7 +369,7 @@ const createDestination = () => {
     template: formData.value.template,
     headers: headers,
     name: formData.value.name,
-    type: "remote_pipeline",
+    type: "http",
   };
 
   destinationService
@@ -364,8 +392,6 @@ const createDestination = () => {
       createNewDestination.value = false;
 
       getDestinations();
-
-
     })
     .catch((err: any) => {
       if (err.response?.status == 403) {
@@ -385,16 +411,22 @@ const deleteApiHeader = (header: any) => {
   apiHeaders.value = apiHeaders.value.filter(
     (_header) => _header.uuid !== header.uuid,
   );
-  if (formData.value.headers[header.key])
-    delete formData.value.headers[header.key];
+  if (formData.value?.headers?.[header.key])
+    delete formData.value?.headers?.[header.key];
   if (!apiHeaders.value.length) addApiHeader();
 };
 
 const getFormattedDestinations = computed(() => {
   return destinations.value.map((destination: any) => {
+    const truncatedUrl =
+      destination.url.length > 70
+        ? destination.url.slice(0, 70) + "..."
+        : destination.url;
+
     return {
       label: destination.name,
       value: destination.name,
+      url: truncatedUrl,
     };
   });
 });
@@ -421,7 +453,7 @@ const getDestinations = () => {
       sort_by: "name",
       desc: false,
       org_identifier: store.state.selectedOrganization.identifier,
-      dst_type: "remote_pipeline",
+      module: "pipeline",
     })
     .then((res) => {
       destinations.value = res.data;
@@ -446,7 +478,10 @@ const saveDestination = () => {
     io_type: "output",
     org_id: store.state.selectedOrganization.identifier,
   };
-  if (!selectedDestination.value) {
+  if (
+    selectedDestination.value.hasOwnProperty("value") &&
+    selectedDestination.value.value === ""
+  ) {
     q.notify({
       message: "Please select External destination from the list",
       color: "negative",
@@ -475,5 +510,13 @@ const saveDestination = () => {
       filter: none !important;
     }
   }
+}
+.truncate-url {
+  display: inline-block;
+  max-width: calc(40vw - 200px); /* Adjust the width as needed */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 </style>

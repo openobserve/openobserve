@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,8 +25,8 @@ use arrow_schema::Schema;
 use futures::TryStreamExt;
 use parquet::{
     arrow::{
-        arrow_reader::ArrowReaderMetadata, async_reader::ParquetRecordBatchStream,
-        AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
+        AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata,
+        async_reader::ParquetRecordBatchStream,
     },
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
@@ -39,22 +39,29 @@ pub fn new_parquet_writer<'a>(
     schema: &'a Arc<Schema>,
     bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
+    write_metadata: bool,
+    compression: Option<&str>,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let cfg = get_config();
+    let compression = compression.unwrap_or(&cfg.common.parquet_compression);
     let mut writer_props = WriterProperties::builder()
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
-        .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
-        .set_compression(Compression::ZSTD(Default::default()))
+        .set_compression(get_parquet_compression(compression))
         .set_column_dictionary_enabled(
-            cfg.common.column_timestamp.as_str().into(),
+            TIMESTAMP_COL_NAME.into(),
             false,
         )
         .set_column_encoding(
-            cfg.common.column_timestamp.as_str().into(),
+            TIMESTAMP_COL_NAME.into(),
             Encoding::DELTA_BINARY_PACKED,
-        )
-        .set_key_value_metadata(Some(vec![
+        );
+    if cfg.common.timestamp_compression_disabled {
+        writer_props = writer_props
+            .set_column_compression(TIMESTAMP_COL_NAME.into(), Compression::UNCOMPRESSED);
+    }
+    if write_metadata {
+        writer_props = writer_props.set_key_value_metadata(Some(vec![
             KeyValue::new("min_ts".to_string(), metadata.min_ts.to_string()),
             KeyValue::new("max_ts".to_string(), metadata.max_ts.to_string()),
             KeyValue::new("records".to_string(), metadata.records.to_string()),
@@ -63,6 +70,7 @@ pub fn new_parquet_writer<'a>(
                 metadata.original_size.to_string(),
             ),
         ]));
+    }
     // Bloom filter stored by row_group, set NDV to reduce the memory usage.
     // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
     // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
@@ -93,7 +101,8 @@ pub async fn write_recordbatch_to_parquet(
     metadata: &FileMeta,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata);
+    let mut writer =
+        new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true, None);
     for batch in record_batches {
         writer.write(batch).await?;
     }

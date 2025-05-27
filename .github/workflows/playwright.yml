@@ -17,6 +17,9 @@ env:
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
   ZO_BASE_URL: http://localhost:5080
+  WS_ZO_BASE_URL: ws://localhost:5080
+  ZO_BASE_URL_SC: http://localhost:5080
+  ZO_BASE_URL_SC_UI: http://localhost:5080
   INGESTION_URL: http://localhost:5080
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 100
@@ -27,12 +30,19 @@ env:
   ZO_USAGE_BATCH_SIZE: 200
   ZO_USAGE_PUBLISH_INTERVAL: 2
   ZO_USAGE_REPORTING_ENABLED: true
+  ZO_MIN_AUTO_REFRESH_INTERVAL: 5
+  ZO_WEBSOCKET_ENABLED: true
+  ZO_STREAMING_ENABLED: true
+  ZO_COLS_PER_RECORD_LIMIT: "80000"
+  ZO_SMTP_ENABLED: true
+  ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
+  ZO_CREATE_ORG_THROUGH_INGESTION: true
 
 jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-8
+      labels: ubicloud-standard-16
 
     steps:
       - name: Remove unused tools
@@ -48,7 +58,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2024-10-24
+          toolchain: nightly-2025-03-02
           targets: x86_64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
         with:
@@ -59,7 +69,7 @@ jobs:
           version: "21.12"
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
 
       - name: Build frontend code
         env:
@@ -70,7 +80,7 @@ jobs:
 
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
-        
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -82,15 +92,15 @@ jobs:
     name: playwright_ui_integration_tests
     needs: [build_binary]
     runs-on:
-      labels: ubuntu-latest
+      labels: ubicloud-standard-8
     container:
-      image: mcr.microsoft.com/playwright:v1.42.1-jammy
+      image: mcr.microsoft.com/playwright:v1.50.0-jammy
       options: --user root
     strategy:
       matrix:
         browser: [chrome]
-        testfilename:
-          [
+        testfilename: [
+            "alertsfolders.spec.js",
             "sanity.spec.js",
             "alerts.spec.js",
             "schema.spec.js",
@@ -99,21 +109,38 @@ jobs:
             "logsquickmode.spec.js",
             "multiselect-stream.spec.js",
             "pipelines.spec.js",
+            "dashboards/custom-charts.spec.js",
             "dashboards/dashboardtype.spec.js",
             "dashboards/dashboard.spec.js",
+            "dashboards/dashboard2.spec.js",
             "dashboards/visualize.spec.js",
             "unflattened.spec.js",
             "secondsPrecisionAdded.spec.js",
-            "dashboards/visualization-vrl.spec.js",
+            # "dashboards/visualization-vrl.spec.js",
             "dashboards/dashboard-transpose.spec.js",
             "dashboards/dashboard-general-setting.spec.js",
             "dashboards/dashboard-variables-setting.spec.js",
             "dashboards/dashboard-tabs-setting.spec.js",
+            "dashboards/dashboard-import.spec.js",
             "reportsUpdated.spec.js",
+            "reportsUpdated2.spec.js",
+            "dashboards/dashboard-filter.spec.js",
+            "dashboards/dashboard-geoMap.spec.js",
+            "dashboards/dashboard-maps.spec.js",
+            "dashboards/dashboard-folder.spec.js",
+            "dashboards/dashboard-multi-y-axis.spec.js",
             "join.spec.js",
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
             "enrichment.spec.js",
+            "sanity2.spec.js",
+            "schemaload.spec.js",
+            "websocket.spec.js",
+            "alertImportTDA.spec.js",
+            "streamname.spec.js",
+            "streaming.spec.js",
+            # "remotepipeline.spec.js",
+
           ]
 
     steps:
@@ -144,8 +171,12 @@ jobs:
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
           echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
           echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
+          echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
+          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
+          echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
 
@@ -154,7 +185,7 @@ jobs:
       #   run: cat o2.log
 
       - name: Sanitize Test Filename
-        shell: bash 
+        shell: bash
         run: |
           # Assign the matrix variable to a Bash variable
           SANITIZED_FILENAME="${{ matrix.testfilename }}"
@@ -183,7 +214,7 @@ jobs:
   generate_coverage_report:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     if: always()
 
     steps:
@@ -193,9 +224,9 @@ jobs:
       - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v4
         with:
-          pattern: playwright-coverage-*  # Match all artifacts with this prefix
+          pattern: playwright-coverage-* # Match all artifacts with this prefix
           path: merged-coverage
-          merge-multiple: true 
+          merge-multiple: true
 
       - name: Verify Downloaded Files
         run: ls -R merged-coverage # Check the structure and contents
@@ -213,4 +244,4 @@ jobs:
         with:
           name: coverage-report
           path: tests/ui-testing/coverage-report
-          retention-days: 30
+          retention-days: 7

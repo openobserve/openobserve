@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use actix_web::{dev::ServerHandle, middleware, web, App, HttpServer};
+use actix_web::{App, HttpServer, dev::ServerHandle, middleware, web};
 
 use crate::router::{healthz, send_report};
 
@@ -51,7 +51,7 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
 async fn graceful_shutdown(handle: ServerHandle) {
     #[cfg(unix)]
     {
-        use tokio::signal::unix::{signal, SignalKind};
+        use tokio::signal::unix::{SignalKind, signal};
 
         let mut sigquit = signal(SignalKind::quit()).unwrap();
         let mut sigterm = signal(SignalKind::terminate()).unwrap();

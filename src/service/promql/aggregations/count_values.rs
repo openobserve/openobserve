@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,8 +17,8 @@ use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 
 use crate::service::promql::{
-    value::{InstantValue, Label, Sample, Value},
     Engine,
+    value::{InstantValue, Label, Sample, Value},
 };
 
 pub async fn count_values(
@@ -26,7 +26,7 @@ pub async fn count_values(
     timestamp: i64,
     param: Box<PromExpr>,
     modifier: &Option<LabelModifier>,
-    data: &Value,
+    data: Value,
 ) -> Result<Value> {
     let param = ctx.exec_expr(&param).await?;
     let label_name = match param {

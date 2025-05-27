@@ -34,7 +34,7 @@ You can reduce your log storage costs by ~140x compared to Elasticsearch by usin
 
 ## 🎥 Introduction Video
 
-[![OpenObserve Introduction](./screenshots/o2_intro.webp)](https://www.youtube.com/watch?v=3rHxOVgIY6A)
+[![OpenObserve Introduction](./screenshots/o2_intro.webp)](https://www.youtube.com/watch?v=4VwuC1tpRP4)
 
 ## 🌟 Features:
 
@@ -172,7 +172,23 @@ Error tracking
 
 ![Ingestion](./screenshots/ingestion1.png)
 
-![Ingestion](./screenshots/ingestion2.webp)
+### Pipeline
+
+Pipeline
+![Pipeline](./screenshots/pipeline.png)
+
+Function
+![Function](./screenshots/function.png)
+
+
+### IAM
+
+SSO (Single Sign On)
+![SSO](./screenshots/sso.png)
+
+RBAC (Role Based Access Control)
+![RBAC](./screenshots/iam_rbac.png)
+
 
 ### SBOM
 

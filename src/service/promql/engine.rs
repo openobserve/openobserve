@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,11 @@
 
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
+use arrow::array::Array;
 use async_recursion::async_recursion;
 use config::{
-    get_config,
-    meta::promql::{HashLabelValue, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    TIMESTAMP_COL_NAME,
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, HashLabelValue, NAME_LABEL, VALUE_LABEL},
     utils::json,
 };
 use datafusion::{
@@ -28,26 +29,26 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     functions_aggregate::min_max::max,
-    prelude::{col, lit, DataFrame, SessionContext},
+    prelude::{DataFrame, SessionContext, col, lit},
 };
-use futures::{future::try_join_all, TryStreamExt};
+use futures::{TryStreamExt, future::try_join_all};
 use hashbrown::HashMap;
 use promql_parser::{
     label::MatchOp,
     parser::{
-        token, AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function,
-        FunctionArgs, LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr,
-        StringLiteral, UnaryExpr, VectorMatchCardinality, VectorSelector,
+        AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function, FunctionArgs,
+        LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr,
+        VectorMatchCardinality, VectorSelector, token,
     },
 };
-use rayon::slice::ParallelSliceMut;
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
-    utils::{apply_label_selector, apply_matchers},
     PromqlContext,
+    utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
+    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros, value::*,
 };
 
 pub struct Engine {
@@ -181,9 +182,9 @@ impl Engine {
                 match val {
                     Value::Vector(v) => {
                         let out = v
-                            .iter()
-                            .map(|instant| InstantValue {
-                                labels: instant.labels.without_metric_name(),
+                            .into_iter()
+                            .map(|mut instant| InstantValue {
+                                labels: std::mem::take(&mut instant.labels),
                                 sample: Sample {
                                     timestamp: instant.sample.timestamp,
                                     value: -1.0 * instant.sample.value,
@@ -236,13 +237,13 @@ impl Engine {
                         Value::Float(value)
                     }
                     (Value::Vector(left), Value::Vector(right)) => {
-                        binaries::vector_bin_op(expr, &left, &right)?
+                        binaries::vector_bin_op(expr, left, right)?
                     }
                     (Value::Vector(left), Value::Float(right)) => {
-                        binaries::vector_scalar_bin_op(expr, &left, right, false).await?
+                        binaries::vector_scalar_bin_op(expr, left, right, false).await?
                     }
                     (Value::Float(left), Value::Vector(right)) => {
-                        binaries::vector_scalar_bin_op(expr, &right, left, true).await?
+                        binaries::vector_scalar_bin_op(expr, right, left, true).await?
                     }
                     (Value::None, Value::None) => Value::None,
                     _ => {
@@ -353,14 +354,20 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let metrics_name = selector.name.as_ref().expect("Missing selector name");
+        let data_cache_key = &selector.to_string();
 
-        let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
+        let cache_exists = {
+            self.ctx
+                .data_cache
+                .read()
+                .await
+                .contains_key(data_cache_key)
+        };
         if !cache_exists {
             self.selector_load_data(&selector, None).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(metrics_name) {
+        let metrics_cache = match metrics_cache.get(data_cache_key) {
             Some(v) => match v.get_ref_matrix_values() {
                 Some(v) => v,
                 None => return Ok(vec![]),
@@ -386,22 +393,29 @@ impl Engine {
 
         let mut values = vec![];
         for metric in metrics_cache {
-            if let Some(last_value) = metric
+            let end_index = metric
                 .samples
-                .iter()
-                .filter_map(|s| {
-                    let modified_ts = s.timestamp + offset_modifier;
-                    (start < modified_ts && modified_ts <= eval_ts).then_some(s.value)
-                })
-                .last()
-            {
-                values.push(
-                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                    InstantValue {
-                        labels: metric.labels.clone(),
-                        sample: Sample::new(eval_ts, last_value),
-                    },
-                );
+                .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
+            let match_sample = if end_index > 0 {
+                metric.samples.get(end_index - 1)
+            } else if !metric.samples.is_empty() {
+                metric.samples.first()
+            } else {
+                None
+            };
+            if let Some(sample) = match_sample {
+                if sample.timestamp + offset_modifier <= eval_ts
+                    && sample.timestamp + offset_modifier > start
+                {
+                    let last_value = sample.value;
+                    values.push(
+                        // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
+                        InstantValue {
+                            labels: metric.labels.clone(),
+                            sample: Sample::new(eval_ts, last_value),
+                        },
+                    );
+                }
             }
         }
         Ok(values)
@@ -436,13 +450,19 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let metrics_name = selector.name.as_ref().expect("Missing selector name");
-        let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
+        let data_cache_key = &selector.to_string();
+        let cache_exists = {
+            self.ctx
+                .data_cache
+                .read()
+                .await
+                .contains_key(data_cache_key)
+        };
         if !cache_exists {
             self.selector_load_data(&selector, Some(range)).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(metrics_name) {
+        let metrics_cache = match metrics_cache.get(data_cache_key) {
             Some(v) => match v.get_ref_matrix_values() {
                 Some(v) => v,
                 None => return Ok(vec![]),
@@ -468,15 +488,20 @@ impl Engine {
 
         let mut values = Vec::with_capacity(metrics_cache.len());
         for metric in metrics_cache {
-            let samples = metric
+            // use binary search to find the start and end index
+            let start_index = metric
                 .samples
+                .partition_point(|v| v.timestamp + offset_modifier < start);
+            let end_index = metric
+                .samples
+                .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
+            let samples = metric.samples[start_index..end_index]
                 .iter()
-                .map(|s: &super::value::Sample| super::value::Sample {
-                    timestamp: s.timestamp + offset_modifier,
-                    value: s.value,
+                .map(|v| Sample {
+                    timestamp: v.timestamp + offset_modifier,
+                    value: v.value,
                 })
-                .filter(|v| start < v.timestamp && v.timestamp <= eval_ts)
-                .collect();
+                .collect::<Vec<_>>();
             let exemplars = if self.ctx.query_exemplars {
                 metric.exemplars.clone()
             } else {
@@ -499,17 +524,20 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
     ) -> Result<()> {
-        let table_name = selector.name.as_ref().unwrap();
+        let data_cache_key = selector.to_string();
         let mut data_loaded = self.ctx.data_loading.lock().await;
-        if data_loaded.contains(table_name) {
+        if data_loaded.contains(&data_cache_key) {
             return Ok(()); // data is already loading
         }
 
         let metrics = match self.selector_load_data_inner(selector, range).await {
             Ok(v) => v,
             Err(e) => {
-                log::error!("[trace_id: {}] [PromQL] Failed to load data for stream: {table_name}, error: {e:?}", self.trace_id);
-                data_loaded.insert(table_name.to_string());
+                log::error!(
+                    "[trace_id: {}] [PromQL] Failed to load data for stream: {data_cache_key}, error: {e:?}",
+                    self.trace_id
+                );
+                data_loaded.insert(data_cache_key);
                 return Err(e);
             }
         };
@@ -520,25 +548,23 @@ impl Engine {
                 .data_cache
                 .write()
                 .await
-                .insert(table_name.to_string(), Value::None);
-            data_loaded.insert(table_name.to_string());
+                .insert(data_cache_key.clone(), Value::None);
+            data_loaded.insert(data_cache_key);
             return Ok(());
         }
 
         // cache data
         let mut metric_values = metrics.into_values().collect::<Vec<_>>();
-        for metric in metric_values.iter_mut() {
-            metric
-                .samples
-                .par_sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        metric_values.par_iter_mut().for_each(|metric| {
+            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             if self.ctx.query_exemplars && metric.exemplars.is_some() {
                 metric
                     .exemplars
                     .as_mut()
                     .unwrap()
-                    .par_sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp));
+                    .sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             }
-        }
+        });
         let values = if metric_values.is_empty() {
             Value::None
         } else {
@@ -548,8 +574,8 @@ impl Engine {
             .data_cache
             .write()
             .await
-            .insert(table_name.to_string(), values);
-        data_loaded.insert(table_name.to_string());
+            .insert(data_cache_key.clone(), values);
+        data_loaded.insert(data_cache_key);
         Ok(())
     }
 
@@ -659,7 +685,7 @@ impl Engine {
         }
 
         log::info!(
-            "[trace_id: {}] load data done for stream: {}, took: {}ms",
+            "[trace_id: {}] load data done for stream: {}, took: {} ms",
             self.trace_id,
             table_name,
             start_time.elapsed().as_millis()
@@ -679,19 +705,19 @@ impl Engine {
         let input = self.exec_expr(expr).await?;
 
         Ok(match op.id() {
-            token::T_SUM => aggregations::sum(sample_time, modifier, &input)?,
-            token::T_AVG => aggregations::avg(sample_time, modifier, &input)?,
-            token::T_COUNT => aggregations::count(sample_time, modifier, &input)?,
-            token::T_MIN => aggregations::min(sample_time, modifier, &input)?,
-            token::T_MAX => aggregations::max(sample_time, modifier, &input)?,
-            token::T_GROUP => aggregations::group(sample_time, modifier, &input)?,
-            token::T_STDDEV => aggregations::stddev(sample_time, modifier, &input)?,
-            token::T_STDVAR => aggregations::stdvar(sample_time, modifier, &input)?,
+            token::T_SUM => aggregations::sum(sample_time, modifier, input)?,
+            token::T_AVG => aggregations::avg(sample_time, modifier, input)?,
+            token::T_COUNT => aggregations::count(sample_time, modifier, input)?,
+            token::T_MIN => aggregations::min(sample_time, modifier, input)?,
+            token::T_MAX => aggregations::max(sample_time, modifier, input)?,
+            token::T_GROUP => aggregations::group(sample_time, modifier, input)?,
+            token::T_STDDEV => aggregations::stddev(sample_time, modifier, input)?,
+            token::T_STDVAR => aggregations::stdvar(sample_time, modifier, input)?,
             token::T_TOPK => {
-                aggregations::topk(self, param.clone().unwrap(), modifier, &input).await?
+                aggregations::topk(self, param.clone().unwrap(), modifier, input).await?
             }
             token::T_BOTTOMK => {
-                aggregations::bottomk(self, param.clone().unwrap(), modifier, &input).await?
+                aggregations::bottomk(self, param.clone().unwrap(), modifier, input).await?
             }
             token::T_COUNT_VALUES => {
                 aggregations::count_values(
@@ -699,12 +725,12 @@ impl Engine {
                     sample_time,
                     param.clone().unwrap(),
                     modifier,
-                    &input,
+                    input,
                 )
                 .await?
             }
             token::T_QUANTILE => {
-                aggregations::quantile(self, sample_time, param.clone().unwrap(), &input).await?
+                aggregations::quantile(self, sample_time, param.clone().unwrap(), input).await?
             }
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -821,12 +847,12 @@ impl Engine {
         };
 
         Ok(match func_name {
-            Func::Abs => functions::abs(&input)?,
-            Func::Absent => functions::absent(&input, self.time)?,
-            Func::AbsentOverTime => functions::absent_over_time(&input)?,
-            Func::AvgOverTime => functions::avg_over_time(&input)?,
-            Func::Ceil => functions::ceil(&input)?,
-            Func::Changes => functions::changes(&input)?,
+            Func::Abs => functions::abs(input)?,
+            Func::Absent => functions::absent(input, self.time)?,
+            Func::AbsentOverTime => functions::absent_over_time(input)?,
+            Func::AvgOverTime => functions::avg_over_time(input)?,
+            Func::Ceil => functions::ceil(input)?,
+            Func::Changes => functions::changes(input)?,
             Func::Clamp => {
                 let err =
                     "Invalid args, expected \"clamp(v instant-vector, min scalar, max scalar)\"";
@@ -847,7 +873,7 @@ impl Engine {
                         return Err(DataFusionError::NotImplemented(err.into()));
                     }
                 };
-                functions::clamp(&input, min_f, max_f)?
+                functions::clamp(input, min_f, max_f)?
             }
             Func::ClampMax => {
                 let err = "Invalid args, expected \"clamp(v instant-vector, max scalar)\"";
@@ -861,7 +887,7 @@ impl Engine {
                         return Err(DataFusionError::NotImplemented(err.into()));
                     }
                 };
-                functions::clamp(&input, f64::MIN, max_f)?
+                functions::clamp(input, f64::MIN, max_f)?
             }
             Func::ClampMin => {
                 let err = "Invalid args, expected \"clamp(v instant-vector, min scalar)\"";
@@ -875,17 +901,17 @@ impl Engine {
                         return Err(DataFusionError::NotImplemented(err.into()));
                     }
                 };
-                functions::clamp(&input, min_f, f64::MAX)?
+                functions::clamp(input, min_f, f64::MAX)?
             }
-            Func::CountOverTime => functions::count_over_time(&input)?,
-            Func::DayOfMonth => functions::day_of_month(&input)?,
-            Func::DayOfWeek => functions::day_of_week(&input)?,
-            Func::DayOfYear => functions::day_of_year(&input)?,
-            Func::DaysInMonth => functions::days_in_month(&input)?,
-            Func::Delta => functions::delta(&input)?,
-            Func::Deriv => functions::deriv(&input)?,
-            Func::Exp => functions::exp(&input)?,
-            Func::Floor => functions::floor(&input)?,
+            Func::CountOverTime => functions::count_over_time(input)?,
+            Func::DayOfMonth => functions::day_of_month(input)?,
+            Func::DayOfWeek => functions::day_of_week(input)?,
+            Func::DayOfYear => functions::day_of_year(input)?,
+            Func::DaysInMonth => functions::days_in_month(input)?,
+            Func::Delta => functions::delta(input)?,
+            Func::Deriv => functions::deriv(input)?,
+            Func::Exp => functions::exp(input)?,
+            Func::Floor => functions::floor(input)?,
             Func::HistogramCount => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Function: {:?}",
@@ -939,12 +965,12 @@ impl Engine {
                 let scaling_factor = self.parse_f64_else_err(&sf, err)?;
                 let trend_factor = self.parse_f64_else_err(&tf, err)?;
 
-                functions::holt_winters(&input, scaling_factor, trend_factor)?
+                functions::holt_winters(input, scaling_factor, trend_factor)?
             }
-            Func::Hour => functions::hour(&input)?,
-            Func::Idelta => functions::idelta(&input)?,
-            Func::Increase => functions::increase(&input)?,
-            Func::Irate => functions::irate(&input)?,
+            Func::Hour => functions::hour(input)?,
+            Func::Idelta => functions::idelta(input)?,
+            Func::Increase => functions::increase(input)?,
+            Func::Irate => functions::irate(input)?,
             Func::LabelJoin => {
                 let err = "Invalid args, expected \"label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)\"";
                 self.ensure_ge_three_args(args, err)?;
@@ -968,7 +994,7 @@ impl Engine {
                         "source labels can not be empty or invalid".into(),
                     ));
                 }
-                functions::label_join(&input, &dst_label, &separator, source_labels)?
+                functions::label_join(input, &dst_label, &separator, source_labels)?
             }
             Func::LabelReplace => {
                 let err = "Invalid args, expected \"label_replace(v instant-vector, dst_label string, replacement string, src_label string, regex string)\"";
@@ -991,16 +1017,16 @@ impl Engine {
                     DataFusionError::NotImplemented("Invalid regex string found".into()),
                 )?;
 
-                functions::label_replace(&input, &dst_label, &replacement, &src_label, &regex)?
+                functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)?
             }
-            Func::LastOverTime => functions::last_over_time(&input)?,
-            Func::Ln => functions::ln(&input)?,
-            Func::Log10 => functions::log10(&input)?,
-            Func::Log2 => functions::log2(&input)?,
-            Func::MaxOverTime => functions::max_over_time(&input)?,
-            Func::MinOverTime => functions::min_over_time(&input)?,
-            Func::Minute => functions::minute(&input)?,
-            Func::Month => functions::month(&input)?,
+            Func::LastOverTime => functions::last_over_time(input)?,
+            Func::Ln => functions::ln(input)?,
+            Func::Log10 => functions::log10(input)?,
+            Func::Log2 => functions::log2(input)?,
+            Func::MaxOverTime => functions::max_over_time(input)?,
+            Func::MinOverTime => functions::min_over_time(input)?,
+            Func::Minute => functions::minute(input)?,
+            Func::Month => functions::month(input)?,
             Func::PredictLinear => {
                 let err = "Invalid args, expected \"predict_linear(v range-vector, t scalar)\"";
 
@@ -1012,7 +1038,7 @@ impl Engine {
                         "Invalid prediction_steps, f64 expected".into(),
                     ),
                 )?;
-                functions::predict_linear(&input, prediction_steps)?
+                functions::predict_linear(input, prediction_steps)?
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";
@@ -1027,11 +1053,11 @@ impl Engine {
                     }
                 };
                 let input = self.call_expr_second_arg(args).await?;
-                functions::quantile_over_time(self.time, phi_quantile, &input)?
+                functions::quantile_over_time(self.time, phi_quantile, input)?
             }
-            Func::Rate => functions::rate(&input)?,
-            Func::Resets => functions::resets(&input)?,
-            Func::Round => functions::round(&input)?,
+            Func::Rate => functions::rate(input)?,
+            Func::Resets => functions::resets(input)?,
+            Func::Round => functions::round(input)?,
             Func::Scalar => match input {
                 Value::Float(_) => input,
                 _ => {
@@ -1041,7 +1067,7 @@ impl Engine {
                     )));
                 }
             },
-            Func::Sgn => functions::sgn(&input)?,
+            Func::Sgn => functions::sgn(input)?,
             Func::Sort => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Function: {:?}",
@@ -1054,17 +1080,17 @@ impl Engine {
                     func_name
                 )));
             }
-            Func::Sqrt => functions::sqrt(&input)?,
-            Func::StddevOverTime => functions::stddev_over_time(&input)?,
-            Func::StdvarOverTime => functions::stdvar_over_time(&input)?,
-            Func::SumOverTime => functions::sum_over_time(&input)?,
+            Func::Sqrt => functions::sqrt(input)?,
+            Func::StddevOverTime => functions::stddev_over_time(input)?,
+            Func::StdvarOverTime => functions::stdvar_over_time(input)?,
+            Func::SumOverTime => functions::sum_over_time(input)?,
             Func::Time => Value::Float((self.time / 1_000_000) as f64),
-            Func::Timestamp => match &input {
+            Func::Timestamp => match input {
                 Value::Vector(instant_value) => {
                     let out: Vec<InstantValue> = instant_value
-                        .iter()
-                        .map(|instant| InstantValue {
-                            labels: instant.labels.without_metric_name(),
+                        .into_iter()
+                        .map(|mut instant| InstantValue {
+                            labels: std::mem::take(&mut instant.labels),
                             sample: Sample {
                                 timestamp: instant.sample.timestamp,
                                 value: (instant.sample.timestamp / 1000 / 1000) as f64,
@@ -1080,8 +1106,8 @@ impl Engine {
                     )));
                 }
             },
-            Func::Vector => functions::vector(&input, self.time)?,
-            Func::Year => functions::year(&input)?,
+            Func::Vector => functions::vector(input, self.time)?,
+            Func::Year => functions::year(input)?,
         })
     }
 }
@@ -1101,9 +1127,9 @@ async fn selector_load_data_from_datafusion(
     let table_name = selector.name.as_ref().unwrap();
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => v.filter(
-            col(&cfg.common.column_timestamp)
+            col(TIMESTAMP_COL_NAME)
                 .gt(lit(start))
-                .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
+                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
             return Ok(HashMap::default());
@@ -1117,15 +1143,24 @@ async fn selector_load_data_from_datafusion(
         None => return Ok(HashMap::default()),
     }
 
+    // check if exemplars field is exists
+    if query_exemplars {
+        let schema: Schema = df_group.schema().into();
+        if schema.field_with_name(EXEMPLARS_LABEL).is_err() {
+            return Ok(HashMap::default());
+        }
+    }
+
     let label_cols = df_group
         .schema()
         .fields()
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == &cfg.common.column_timestamp
+            if name == TIMESTAMP_COL_NAME
                 || name == VALUE_LABEL
                 || name == EXEMPLARS_LABEL
+                || name == NAME_LABEL
             {
                 None
             } else {
@@ -1146,7 +1181,7 @@ async fn selector_load_data_from_datafusion(
         .clone()
         .aggregate(
             vec![col(HASH_LABEL)],
-            vec![max(col(&cfg.common.column_timestamp)).alias(&cfg.common.column_timestamp)],
+            vec![max(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
         )?
         .sort(vec![col(HASH_LABEL).sort(true, true)])?
         .limit(0, Some(max_series))?
@@ -1160,7 +1195,7 @@ async fn selector_load_data_from_datafusion(
                 .iter()
                 .flat_map(|batch| {
                     let ts = batch
-                        .column_by_name(&cfg.common.column_timestamp)
+                        .column_by_name(TIMESTAMP_COL_NAME)
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Int64Array>()
@@ -1181,7 +1216,7 @@ async fn selector_load_data_from_datafusion(
                 .iter()
                 .flat_map(|batch| {
                     let ts = batch
-                        .column_by_name(&cfg.common.column_timestamp)
+                        .column_by_name(TIMESTAMP_COL_NAME)
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Int64Array>()
@@ -1210,7 +1245,7 @@ async fn selector_load_data_from_datafusion(
     // get series
     let series = df_group
         .clone()
-        .filter(col(&cfg.common.column_timestamp).in_list(timestamp_values, false))?
+        .filter(col(TIMESTAMP_COL_NAME).in_list(timestamp_values, false))?
         .select(label_cols)?
         .collect()
         .await?;
@@ -1218,6 +1253,24 @@ async fn selector_load_data_from_datafusion(
     let mut metrics: HashMap<HashLabelValue, RangeValue> =
         HashMap::with_capacity(hash_value_set.len());
     for batch in series {
+        let columns = batch.columns();
+        let schema = batch.schema();
+        let fields = schema.fields();
+        let mut cols = fields
+            .iter()
+            .zip(columns)
+            .filter_map(|(field, col)| {
+                if field.name() == HASH_LABEL {
+                    None
+                } else {
+                    col.as_any()
+                        .downcast_ref::<StringArray>()
+                        .map(|col| (field.name(), col))
+                }
+            })
+            .collect::<Vec<(_, _)>>();
+        cols.sort_by(|a, b| a.0.cmp(b.0));
+        let mut labels = Vec::with_capacity(columns.len());
         if hash_field_type == &DataType::UInt64 {
             let hash_values = batch
                 .column_by_name(HASH_LABEL)
@@ -1233,23 +1286,17 @@ async fn selector_load_data_from_datafusion(
                 if metrics.contains_key(&hash) {
                     continue;
                 }
-                let mut labels = Vec::with_capacity(batch.num_columns());
-                for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
-                    let name = k.name();
-                    if name == HASH_LABEL {
+                labels.clear(); // reset and reuse the same vector
+                for (name, value) in cols.iter() {
+                    if value.is_null(i) {
                         continue;
                     }
-                    if v.is_null(i) {
-                        continue;
-                    }
-                    let value = v.as_any().downcast_ref::<StringArray>().unwrap();
                     labels.push(Arc::new(Label {
                         name: name.to_string(),
                         value: value.value(i).to_string(),
                     }));
                 }
-                labels.sort_by(|a, b| a.name.cmp(&b.name));
-                metrics.insert(hash, RangeValue::new(labels, Vec::new()));
+                metrics.insert(hash, RangeValue::new(labels.clone(), Vec::new()));
             }
         } else {
             let hash_values = batch
@@ -1266,23 +1313,17 @@ async fn selector_load_data_from_datafusion(
                 if metrics.contains_key(&hash) {
                     continue;
                 }
-                let mut labels = Vec::with_capacity(batch.num_columns());
-                for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
-                    let name = k.name();
-                    if name == HASH_LABEL {
+                labels.clear(); // reset and reuse the same vector
+                for (name, value) in cols.iter() {
+                    if value.is_null(i) {
                         continue;
                     }
-                    if v.is_null(i) {
-                        continue;
-                    }
-                    let value = v.as_any().downcast_ref::<StringArray>().unwrap();
                     labels.push(Arc::new(Label {
                         name: name.to_string(),
                         value: value.value(i).to_string(),
                     }));
                 }
-                labels.sort_by(|a, b| a.name.cmp(&b.name));
-                metrics.insert(hash, RangeValue::new(labels, Vec::new()));
+                metrics.insert(hash, RangeValue::new(labels.clone(), Vec::new()));
             }
         }
     }
@@ -1300,7 +1341,7 @@ async fn selector_load_data_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] load samples took: {:?}",
+        "[trace_id: {trace_id}] load data took: {:?}",
         start_time.elapsed()
     );
 
@@ -1314,9 +1355,8 @@ async fn load_samples_from_datafusion(
     df: DataFrame,
 ) -> Result<()> {
     let start_time = std::time::Instant::now();
-    let cfg = get_config();
     let streams = df
-        .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
+        .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
         .execute_stream_partitioned()
         .await?;
 
@@ -1331,12 +1371,11 @@ async fn load_samples_from_datafusion(
         let mut series = metrics.clone();
         let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
             tokio::task::spawn(async move {
-                let cfg = get_config();
                 loop {
                     match stream.try_next().await {
                         Ok(Some(batch)) => {
                             let time_values = batch
-                                .column_by_name(&cfg.common.column_timestamp)
+                                .column_by_name(TIMESTAMP_COL_NAME)
                                 .unwrap()
                                 .as_any()
                                 .downcast_ref::<Int64Array>()
@@ -1414,16 +1453,22 @@ async fn load_samples_from_datafusion(
 }
 
 async fn load_exemplars_from_datafusion(
-    _trace_id: &str,
+    trace_id: &str,
     hash_field_type: &DataType,
     metrics: &mut HashMap<HashLabelValue, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
+    let start_time = std::time::Instant::now();
     let streams = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
         .execute_stream_partitioned()
         .await?;
+
+    log::info!(
+        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
+        start_time.elapsed()
+    );
 
     let mut tasks = Vec::new();
     for mut stream in streams {
@@ -1463,7 +1508,7 @@ async fn load_exemplars_from_datafusion(
                                                         .exemplars
                                                         .as_mut()
                                                         .unwrap()
-                                                        .push(Exemplar::from(exemplar));
+                                                        .push(Arc::new(Exemplar::from(exemplar)));
                                                 }
                                             }
                                         }
@@ -1492,7 +1537,7 @@ async fn load_exemplars_from_datafusion(
                                                         .exemplars
                                                         .as_mut()
                                                         .unwrap()
-                                                        .push(Exemplar::from(exemplar));
+                                                        .push(Arc::new(Exemplar::from(exemplar)));
                                                 }
                                             }
                                         }
@@ -1532,6 +1577,11 @@ async fn load_exemplars_from_datafusion(
             }
         }
     }
+
+    log::info!(
+        "[trace_id: {trace_id}] group batches took: {:?}",
+        start_time.elapsed()
+    );
 
     Ok(())
 }

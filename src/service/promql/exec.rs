@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,8 +26,8 @@ use tokio::sync::{Mutex, RwLock, Semaphore};
 
 use super::Engine;
 use crate::service::promql::{
-    micros, micros_since_epoch, selector_visitor::MetricSelectorVisitor, value::*, TableProvider,
-    DEFAULT_LOOKBACK,
+    DEFAULT_LOOKBACK, TableProvider, micros, micros_since_epoch,
+    selector_visitor::MetricSelectorVisitor, value::*,
 };
 
 #[derive(Clone)]
@@ -115,7 +115,7 @@ impl PromqlContext {
         let mut string_literals = Vec::new();
         let mut tasks = Vec::new();
         let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
-        let nr_steps = ((self.end - self.start) / self.interval) + 1;
+        let nr_steps = (self.end - self.start + self.interval - 1) / self.interval;
         for i in 0..nr_steps {
             let time = self.start + (self.interval * i);
             let expr = expr.clone();

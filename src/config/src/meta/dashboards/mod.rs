@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,6 +30,7 @@ fn default_version() -> i32 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Dashboard {
     pub v1: Option<v1::Dashboard>,
     pub v2: Option<v2::Dashboard>,
@@ -38,6 +39,8 @@ pub struct Dashboard {
     pub v5: Option<v5::Dashboard>,
     pub version: i32,
     pub hash: String,
+    #[serde(default)]
+    pub updated_at: i64,
 }
 
 impl Dashboard {
@@ -83,6 +86,10 @@ impl Dashboard {
         };
     }
 
+    pub fn set_updated_at(&mut self) {
+        self.updated_at = Utc::now().timestamp_micros();
+    }
+
     pub fn owner(&self) -> Option<&str> {
         match self.version {
             1 => self.v1.as_ref().map(|inner| inner.owner.as_str()),
@@ -92,6 +99,37 @@ impl Dashboard {
             5 => self.v5.as_ref().map(|inner| inner.owner.as_str()),
             _ => None,
         }
+    }
+
+    pub fn set_owner(&mut self, owner: String) {
+        match self {
+            Self {
+                version: 1,
+                v1: Some(inner),
+                ..
+            } => inner.owner = owner,
+            Self {
+                version: 2,
+                v2: Some(inner),
+                ..
+            } => inner.owner = owner,
+            Self {
+                version: 3,
+                v3: Some(inner),
+                ..
+            } => inner.owner = owner,
+            Self {
+                version: 4,
+                v4: Some(inner),
+                ..
+            } => inner.owner = owner,
+            Self {
+                version: 5,
+                v5: Some(inner),
+                ..
+            } => inner.owner = owner,
+            _ => {}
+        };
     }
 
     pub fn title(&self) -> Option<&str> {

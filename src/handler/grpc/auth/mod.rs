@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,18 +15,21 @@
 
 use config::meta::cluster::get_internal_grpc_token;
 use http_auth_basic::Credentials;
-use tonic::{metadata::MetadataValue, Request, Status};
+use tonic::{Request, Status, metadata::MetadataValue};
 
-use crate::common::{
-    infra::config::{ROOT_USER, USERS},
-    utils::auth::{get_hash, is_root_user},
+use crate::{
+    common::{
+        infra::config::ROOT_USER,
+        utils::auth::{get_hash, is_root_user},
+    },
+    service::db::org_users::get_cached_user_org,
 };
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     let cfg = config::get_config();
     let metadata = req.metadata();
     if !metadata.contains_key(&cfg.grpc.org_header_key) && !metadata.contains_key("authorization") {
-        return Err(Status::unauthenticated("No valid auth token"));
+        return Err(Status::unauthenticated("No valid auth token[1]"));
     }
 
     let token = req
@@ -36,9 +39,24 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         .to_str()
         .unwrap()
         .to_string();
-    if token.eq(get_internal_grpc_token().as_str()) {
+    if token.is_empty() {
+        if get_internal_grpc_token().is_empty() {
+            log::error!("Internal grpc token is not set");
+        } else {
+            log::error!("Internal grpc token is set, but auth token is empty");
+        }
+        return Err(Status::unauthenticated("No valid auth token[2]"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    let super_cluster_token =
+        o2_enterprise::enterprise::super_cluster::kv::cluster::get_grpc_token();
+    #[cfg(not(feature = "enterprise"))]
+    let super_cluster_token = get_internal_grpc_token();
+    if token.eq(get_internal_grpc_token().as_str()) || token.eq(super_cluster_token.as_str()) {
         Ok(req)
     } else {
+        log::debug!("Auth token is not internal grpc token");
         let org_id = metadata.get(&cfg.grpc.org_header_key);
         if org_id.is_none() {
             return Err(Status::invalid_argument(format!(
@@ -50,22 +68,19 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         let credentials = match Credentials::from_header(token) {
             Ok(c) => c,
             Err(err) => {
-                log::info!("Err authenticating {}", err);
-                return Err(Status::unauthenticated("No valid auth token"));
+                log::error!("Err authenticating {}", err);
+                return Err(Status::unauthenticated("No valid auth token[3]"));
             }
         };
 
         let user_id = credentials.user_id;
         let user = if is_root_user(&user_id) {
-            ROOT_USER.get("root").unwrap()
-        } else if let Some(user) = USERS.get(&format!(
-            "{}/{}",
-            org_id.unwrap().to_str().unwrap(),
-            &user_id
-        )) {
+            ROOT_USER.get("root").unwrap().to_owned()
+        } else if let Some(user) = get_cached_user_org(org_id.unwrap().to_str().unwrap(), &user_id)
+        {
             user
         } else {
-            return Err(Status::unauthenticated("No valid auth token"));
+            return Err(Status::unauthenticated("No valid auth token[4]"));
         };
 
         if user.token.eq(&credentials.password) {
@@ -81,17 +96,16 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
             Ok(req)
         } else {
-            Err(Status::unauthenticated("No valid auth token"))
+            Err(Status::unauthenticated("No valid auth token[5]"))
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use config::{cache_instance_id, get_config};
+    use config::{cache_instance_id, get_config, meta::user::User};
 
     use super::*;
-    use crate::common::meta::user::User;
 
     #[tokio::test]
     async fn test_check_no_auth() {
@@ -101,7 +115,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
@@ -134,7 +148,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
@@ -165,7 +179,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),

@@ -1,18 +1,17 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import logsdata from "../../test-data/logs_data.json";
 import { LogsPage } from '../pages/logsPage.js';
-import { toZonedTime } from "date-fns-tz";
-import { log } from "console";
 
 test.describe.configure({ mode: "parallel" });
-const folderName = `Folder ${Date.now()}`;
-const dashboardName = `AutomatedDashboard${Date.now()}`;
+
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-  // await page.getByText("Login as internal user").click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
+ 
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -23,17 +22,6 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(4000);
-  await page
-    .locator('[data-test="log-search-index-list-select-stream"]')
-    .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
-};
 
 const getHeaders = () => {
   const basicAuthCredentials = Buffer.from(
@@ -109,7 +97,7 @@ test.describe("Stream multiselect testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
     await logsPage.clickQuickModeToggle();
 
@@ -209,10 +197,12 @@ await page.waitForTimeout(1000);
       .click({ force: true });
     await page.getByPlaceholder("Search Stream").click();
     await page.getByPlaceholder("Search Stream").fill("e2e");
+    await page.waitForTimeout(1000);
     await page
       .getByRole("button", { name: "Explore" })
       .first()
       .click({ force: true });
+    await page.waitForTimeout(1000);
     await expect(page.url()).toContain("logs");
   });
 
@@ -232,7 +222,7 @@ await page.waitForTimeout(1000);
       .click({
         force: true,
       });
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);
     await page
         .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')

@@ -1,12 +1,16 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
+import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: 'parallel' });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText('Login as internal user').click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
+ 
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   await page
@@ -49,14 +53,10 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(4000);
-  await page.locator('[data-test="log-search-index-list-select-stream"]').click({ force: true });
-  
-  await page.locator("div.q-item").getByText(`${stream}`).first().click({ force: true });
-};
+
 
 test.describe("Logs Quickmode testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -78,6 +78,7 @@ test.describe("Logs Quickmode testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
@@ -86,9 +87,10 @@ test.describe("Logs Quickmode testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
+ 
     await applyQueryButton(page);
-    await page.waitForSelector('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+
     // Get the toggle button element
     const toggleButton = await page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
     // Evaluate the class attribute to determine if the toggle is in the off state
@@ -112,7 +114,7 @@ test.describe("Logs Quickmode testcases", () => {
       )
       .first()
       .click();
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);
     await expect(
       page
@@ -183,7 +185,7 @@ test.describe("Logs Quickmode testcases", () => {
       )
       .first()
       .click();
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForSelector('[data-test="logs-search-bar-query-editor"]');
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate"')
@@ -218,7 +220,7 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click({
@@ -263,7 +265,7 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click({
@@ -297,7 +299,7 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,8 @@
 use config::{cluster::LOCAL_NODE, meta::cluster::get_internal_grpc_token};
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
-use tracing::{info_span, Instrument};
+use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
+use tracing::{Instrument, info_span};
 
 use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse},
@@ -36,7 +36,7 @@ pub async fn get_cached_results(
 ) -> Option<CachedQueryResponse> {
     let start = std::time::Instant::now();
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] get_cached_results: no querier node online");
@@ -126,11 +126,8 @@ pub async fn get_cached_results(
                             &node.grpc_addr,
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(super::super::server_internal_error("querier node error"));
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
                     }
                 };
 
@@ -257,7 +254,7 @@ pub async fn delete_cached_results(path: String) -> bool {
     let trace_id = path.clone();
     let mut delete_response = true;
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] delete_cached_results: no querier node online");
@@ -338,11 +335,8 @@ pub async fn delete_cached_results(path: String) -> bool {
                             &node.grpc_addr,
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(super::super::server_internal_error("querier node error"));
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
                     }
                 };
 

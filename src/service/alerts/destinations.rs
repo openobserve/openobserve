@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,85 +13,60 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::http;
-use config::meta::alerts::destinations::{Destination, DestinationType, DestinationWithTemplate};
+use config::meta::destinations::{Destination, DestinationType, Module, Template};
 
 use crate::{
     common::{
-        infra::config::STREAM_ALERTS,
+        infra::config::ALERTS,
         meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    service::db::{self, user},
+    service::db::{self, alerts::destinations::DestinationError, user},
 };
 
 pub async fn save(
-    org_id: &str,
     name: &str,
     mut destination: Destination,
     create: bool,
-) -> Result<(), (http::StatusCode, anyhow::Error)> {
+) -> Result<(), DestinationError> {
     // First validate the `destination` according to its `destination_type`
-    match destination.destination_type {
-        DestinationType::Http => {
-            if destination.url.is_empty() {
-                return Err((
-                    http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Alert destination URL needs to be specified"),
-                ));
-            }
-        }
-        DestinationType::Email => {
-            if destination.emails.is_empty() {
-                return Err((
-                    http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Atleast one alert destination email is required"),
-                ));
-            }
-            let mut lowercase_emails = vec![];
-            for email in destination.emails.iter() {
-                let email = email.trim().to_lowercase();
-                // Check if the email is part of the org
-                match user::get(Some(org_id), &email).await {
-                    Ok(user) => {
-                        if user.is_none() {
-                            return Err((
-                                http::StatusCode::BAD_REQUEST,
-                                anyhow::anyhow!("Destination email must be part of this org"),
-                            ));
-                        }
-                    }
-                    Err(_) => {
-                        return Err((
-                            http::StatusCode::BAD_REQUEST,
-                            anyhow::anyhow!("Destination email must be part of this org"),
-                        ));
-                    }
+    match &mut destination.module {
+        Module::Alert {
+            destination_type, ..
+        } => match destination_type {
+            DestinationType::Email(email) => {
+                if email.recipients.is_empty() {
+                    return Err(DestinationError::EmptyEmail);
                 }
-                lowercase_emails.push(email);
+                if !config::get_config().smtp.smtp_enabled {
+                    return Err(DestinationError::SMTPUnavailable);
+                }
+                let mut lowercase_emails = vec![];
+                for email in email.recipients.iter() {
+                    let email = email.trim().to_lowercase();
+                    // Check if the email is part of the org
+                    let res = user::get(Some(&destination.org_id), &email).await;
+                    if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
+                        return Err(DestinationError::UserNotPermitted);
+                    }
+                    lowercase_emails.push(email);
+                }
+                email.recipients = lowercase_emails;
             }
-            if !config::get_config().smtp.smtp_enabled {
-                return Err((
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    anyhow::anyhow!("SMTP not configured"),
-                ));
+            DestinationType::Http(endpoint) => {
+                if endpoint.url.is_empty() {
+                    return Err(DestinationError::EmptyUrl);
+                }
             }
-            destination.emails = lowercase_emails;
-        }
-        DestinationType::Sns => {
-            if destination.sns_topic_arn.is_none() || destination.aws_region.is_none() {
-                return Err((
-                    http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Topic ARN and Region are required for SNS destinations"),
-                ));
+            DestinationType::Sns(aws_sns) => {
+                if aws_sns.sns_topic_arn.is_empty() || aws_sns.aws_region.is_empty() {
+                    return Err(DestinationError::InvalidSns);
+                }
             }
-        }
-        DestinationType::RemotePipeline => {
-            if destination.url.is_empty() {
-                return Err((
-                    http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Remote pipeline URL needs to be specified"),
-                ));
+        },
+        Module::Pipeline { endpoint, .. } => {
+            if endpoint.url.is_empty() {
+                return Err(DestinationError::EmptyUrl);
             }
         }
     }
@@ -100,136 +75,94 @@ pub async fn save(
         destination.name = name.to_string();
     }
     destination.name = destination.name.trim().to_string();
-    // Don't allow the characters not supported by ofga
-    if is_ofga_unsupported(&destination.name) {
-        return Err((
-            http::StatusCode::BAD_REQUEST,
-            anyhow::anyhow!(
-                "Alert destination name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
-            ),
-        ));
-    }
     if destination.name.is_empty() {
-        return Err((
-            http::StatusCode::BAD_REQUEST,
-            anyhow::anyhow!("Alert destination name is required"),
-        ));
+        return Err(DestinationError::EmptyName);
     }
-    if destination.name.contains('/') {
-        return Err((
-            http::StatusCode::BAD_REQUEST,
-            anyhow::anyhow!("Alert destination name cannot contain '/'"),
-        ));
+    if destination.name.contains('/') || is_ofga_unsupported(&destination.name) {
+        return Err(DestinationError::InvalidName);
     }
 
-    if destination.destination_type != DestinationType::RemotePipeline
-        && db::alerts::templates::get(org_id, &destination.template)
-            .await
-            .is_err()
-    {
-        return Err((
-            http::StatusCode::BAD_REQUEST,
-            anyhow::anyhow!("Alert template {} not found", destination.template),
-        ));
-    }
-
-    match db::alerts::destinations::get(org_id, &destination.name).await {
+    match db::alerts::destinations::get(&destination.org_id, &destination.name).await {
         Ok(_) => {
             if create {
-                return Err((
-                    http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Alert destination already exists"),
-                ));
+                return Err(DestinationError::AlreadyExists);
             }
         }
         Err(_) => {
             if !create {
-                return Err((
-                    http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Alert destination not found"),
-                ));
+                return Err(DestinationError::NotFound);
             }
         }
     }
 
-    match db::alerts::destinations::set(org_id, &destination).await {
-        Ok(_) => {
-            if name.is_empty() {
-                set_ownership(org_id, "destinations", Authz::new(&destination.name)).await;
-            }
-            Ok(())
-        }
-        Err(e) => Err((http::StatusCode::BAD_REQUEST, e)),
+    let saved = db::alerts::destinations::set(destination).await?;
+    if name.is_empty() {
+        set_ownership(&saved.org_id, "destinations", Authz::new(&saved.name)).await;
     }
+    Ok(())
 }
 
-pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {
-    db::alerts::destinations::get(org_id, name)
-        .await
-        .map_err(|_| anyhow::anyhow!("Alert destination not found"))
+pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
+    db::alerts::destinations::get(org_id, name).await
 }
 
 pub async fn get_with_template(
     org_id: &str,
     name: &str,
-) -> Result<DestinationWithTemplate, anyhow::Error> {
+) -> Result<(Destination, Template), DestinationError> {
     let dest = get(org_id, name).await?;
-    let template = db::alerts::templates::get(org_id, &dest.template).await?;
-    Ok(dest.with_template(template))
+    if let Module::Alert { template, .. } = &dest.module {
+        let template = db::alerts::templates::get(org_id, template)
+            .await
+            .map_err(|_| DestinationError::TemplateNotFound)?;
+        Ok((dest, template))
+    } else {
+        Err(DestinationError::TemplateNotFound)
+    }
 }
 
 pub async fn list(
     org_id: &str,
+    module: Option<&str>,
     permitted: Option<Vec<String>>,
-    dst_type: DestinationType,
-) -> Result<Vec<Destination>, anyhow::Error> {
-    let destinations = db::alerts::destinations::list(org_id).await?;
-    let is_target_type = |dest: &Destination| match dst_type {
-        DestinationType::RemotePipeline => dest.is_remote_pipeline(),
-        _ => !dest.is_remote_pipeline(),
-    };
-
-    let has_permission = |dest: &Destination| {
-        permitted.as_ref().map_or(true, |perms| {
-            perms.contains(&format!("destination:{}", dest.name))
-                || perms.contains(&format!("destination:_all_{}", org_id))
-        })
-    };
-
-    let result = destinations
+) -> Result<Vec<Destination>, DestinationError> {
+    Ok(db::alerts::destinations::list(org_id, module)
+        .await?
         .into_iter()
-        .filter(|dest| is_target_type(dest) && has_permission(dest))
-        .collect();
-
-    Ok(result)
+        .filter(|dest| {
+            permitted.is_none()
+                || permitted
+                    .as_ref()
+                    .unwrap()
+                    .contains(&format!("destination:{}", dest.name))
+                || permitted
+                    .as_ref()
+                    .unwrap()
+                    .contains(&format!("destination:_all_{}", org_id))
+        })
+        .collect())
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    let cacher = STREAM_ALERTS.read().await;
-    for (stream_key, alerts) in cacher.iter() {
-        for alert in alerts.iter() {
-            if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
-                return Err((
-                    http::StatusCode::CONFLICT,
-                    anyhow::anyhow!("Alert destination is in use for alert {}", alert.name),
-                ));
-            }
+pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
+    let cacher = ALERTS.read().await;
+    for (stream_key, (_, alert)) in cacher.iter() {
+        if stream_key.starts_with(&format!("{}/", org_id))
+            && alert.destinations.contains(&name.to_string())
+        {
+            return Err(DestinationError::UsedByAlert(alert.name.to_string()));
         }
     }
     drop(cacher);
 
-    if db::alerts::destinations::get(org_id, name).await.is_err() {
-        return Err((
-            http::StatusCode::NOT_FOUND,
-            anyhow::anyhow!("Alert destination not found {}", name),
-        ));
+    if let Ok(pls) = db::pipeline::list_by_org(org_id).await {
+        for pl in pls {
+            if pl.contains_remote_destination(name) {
+                return Err(DestinationError::UsedByPipeline(pl.name));
+            }
+        }
     }
 
-    match db::alerts::destinations::delete(org_id, name).await {
-        Ok(_) => {
-            remove_ownership(org_id, "destinations", Authz::new(name)).await;
-            Ok(())
-        }
-        Err(e) => Err((http::StatusCode::INTERNAL_SERVER_ERROR, e)),
-    }
+    db::alerts::destinations::delete(org_id, name).await?;
+    remove_ownership(org_id, "destinations", Authz::new(name)).await;
+    Ok(())
 }

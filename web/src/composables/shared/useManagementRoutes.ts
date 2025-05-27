@@ -69,10 +69,32 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "cipher_keys",
+          name: "cipherKeys",
+          component: () => import("@/components/settings/CipherKeys.vue"),
+          meta: {
+            keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
           component: () =>
             import("@/components/alerts/PipelinesDestinationList.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "nodes",
+          name: "nodes",
+          component: () => import("@/components/settings/Nodes.vue"),
+          meta: {
+            keepAlive: true,
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

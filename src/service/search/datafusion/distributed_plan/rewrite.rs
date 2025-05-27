@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,14 +18,14 @@ use std::sync::Arc;
 use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
 use datafusion::{
     common::{
+        DataFusionError, Result, TableReference,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
-        Result, TableReference,
     },
     physical_expr::LexOrdering,
     physical_plan::{
+        ExecutionPlan, ExecutionPlanProperties, Partitioning,
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
-        ExecutionPlan, ExecutionPlanProperties, Partitioning,
     },
 };
 use hashbrown::HashMap;
@@ -53,7 +53,7 @@ impl RemoteScanRewriter {
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
-        index_optimizer_mode: Option<InvertedIndexOptimizeMode>,
+        index_optimize_mode: Option<InvertedIndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -66,7 +66,7 @@ impl RemoteScanRewriter {
                 equal_keys,
                 match_all_keys,
                 index_condition,
-                index_optimizer_mode,
+                index_optimize_mode,
                 is_leader,
                 opentelemetry_context,
             ),
@@ -216,6 +216,12 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
             && node.children().first().unwrap().name() == "AggregateExec"
             && config::get_config().common.feature_query_streaming_aggs
         {
+            if !streaming_aggs_exec::GLOBAL_ID_CACHE.exists(&self.id) {
+                return Err(DataFusionError::Plan(format!(
+                    "streaming aggregation cache not found with id: {}",
+                    self.id
+                )));
+            }
             let cached_data = streaming_aggs_exec::GLOBAL_CACHE
                 .get(&self.id)
                 .unwrap_or_default();

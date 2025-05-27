@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,16 +16,16 @@
 use std::{
     collections::VecDeque,
     sync::{
-        atomic::{AtomicI64, Ordering},
         Arc,
+        atomic::{AtomicI64, Ordering},
     },
 };
 
 use config::{
     get_config,
     utils::{
-        hash::{gxhash, Sum64},
-        time::{now, now_micros, second_micros},
+        hash::{Sum64, gxhash},
+        time::{get_ymdh_from_micros, now_micros, second_micros},
     },
 };
 use hashbrown::HashMap;
@@ -56,7 +56,7 @@ static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
 
 pub async fn init() -> Result<()> {
     let cfg = get_config();
-    if !cfg.common.metrics_cache_enabled || !cfg.disk_cache.enabled {
+    if !cfg.common.metrics_cache_enabled {
         return Ok(());
     }
 
@@ -155,28 +155,38 @@ pub async fn get(
 
     let mut new_start = start;
     for series in resp.series.iter_mut() {
-        // filter the samples, remove the samples over end
+        // filter the samples, remove the samples over time range
+        let value_n = series.samples.len();
+        let mut first_i = 0;
+        while first_i < value_n && series.samples[first_i].time < start {
+            first_i += 1;
+        }
+        if first_i > 0 {
+            series.samples.drain(0..first_i);
+        }
         let value_n = series.samples.len();
         let mut last_i = value_n;
-        for i in 0..last_i {
-            if series.samples[i].time > end {
-                last_i = i;
-                break;
-            }
+        while last_i > 0 && series.samples[last_i - 1].time > end {
+            last_i -= 1;
         }
         if last_i < value_n {
             series.samples.drain(last_i..);
         }
 
-        // filter the exemplars, remove the exemplars over end
+        // filter the exemplars, remove the exemplars over time range
         if let Some(exemplars) = series.exemplars.as_mut() {
             let value_n = exemplars.exemplars.len();
+            let mut first_i = 0;
+            while first_i < value_n && exemplars.exemplars[first_i].time < start {
+                first_i += 1;
+            }
+            if first_i > 0 {
+                exemplars.exemplars.drain(0..first_i);
+            }
+            let value_n = exemplars.exemplars.len();
             let mut last_i = value_n;
-            for i in (0..last_i).rev() {
-                if exemplars.exemplars[i].time < end {
-                    last_i = i;
-                    break;
-                }
+            while last_i > 0 && exemplars.exemplars[last_i - 1].time > end {
+                last_i -= 1;
             }
             if last_i < value_n {
                 exemplars.exemplars.drain(last_i..);
@@ -206,6 +216,7 @@ pub async fn get(
 
 pub async fn set(
     trace_id: &str,
+    org: &str,
     query: &str,
     start: i64,
     end: i64,
@@ -321,8 +332,8 @@ pub async fn set(
     let bytes_data = resp.encode_to_vec();
 
     // store the series to disk cache
-    let cache_key = get_cache_item_key(&key, start, new_end);
-    infra::cache::file_data::disk::set(trace_id, &cache_key, bytes_data.into())
+    let cache_key = get_cache_item_key(&key, org, start, new_end);
+    infra::cache::file_data::disk::set(&cache_key, bytes_data.into())
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 
@@ -380,10 +391,11 @@ fn get_hash_key(query: &str, step: i64) -> String {
     config::utils::md5::hash(&format!("{}-{}", query, step))
 }
 
-fn get_cache_item_key(prefix: &str, start: i64, end: i64) -> String {
+fn get_cache_item_key(prefix: &str, org: &str, start: i64, end: i64) -> String {
     format!(
-        "metrics_results/{}/{}_{}_{}_{}.pb",
-        now().format("%Y/%m/%d/%H"),
+        "metrics_results/{}/{}/{}_{}_{}_{}.pb",
+        org,
+        get_ymdh_from_micros(start),
         prefix,
         start,
         end,
@@ -398,7 +410,7 @@ fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
     if !key.starts_with("metrics_results/") || !key.ends_with(".pb") {
         return None;
     }
-    let item_key = key.split('/').last().unwrap_or("");
+    let item_key = key.split('/').next_back().unwrap_or("");
     let parts = item_key.split('_').collect::<Vec<_>>();
     if parts.len() != 4 {
         return None;
@@ -496,6 +508,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_promql_cache_set_and_get() {
+        let org = "default";
         let trace_id = "test_trace1";
         let query = "test_query1";
         let end = now_micros();
@@ -526,7 +539,7 @@ mod tests {
         let expected_value = range_values.first().unwrap().clone();
 
         // Test setting cache
-        let set_result = set(trace_id, query, start, end, step, range_values).await;
+        let set_result = set(trace_id, org, query, start, end, step, range_values).await;
         assert!(set_result.is_ok());
 
         // Test getting cache
@@ -547,6 +560,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_promql_cache_max_items() {
+        let org = "default";
         let trace_id = "test_trace2";
         let query = "test_query2";
         let end = now_micros();
@@ -567,7 +581,8 @@ mod tests {
                 time_window: None,
             }];
 
-            let set_result = set(trace_id, query, start, end, step, range_values.clone()).await;
+            let set_result =
+                set(trace_id, org, query, start, end, step, range_values.clone()).await;
             assert!(set_result.is_ok());
         }
 

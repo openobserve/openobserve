@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,7 @@
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use config::{
     meta::{
+        cluster::RoleGroup,
         search::{self, Response, SearchPartitionRequest},
         stream::StreamType,
     },
@@ -77,7 +78,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
             }
 
             if let Err(e) = update_running_job(&job_id).await {
-                log::error!("[SEARCH JOB {id}] job_id: {job_id}, update_job_status failed: {e}",);
+                log::error!("[SEARCH JOB {id}] job_id: {job_id}, update_job_status failed: {e}");
             }
         }
     });
@@ -87,7 +88,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     if job.partition_num.is_none() {
         let res = handle_search_partition(&job).await;
         if let Err(e) = res {
-            set_job_error_message(&job.id, &e.to_string()).await?;
+            set_job_error_message(&job.id, &job.trace_id, &e.to_string()).await?;
             log::error!(
                 "[SEARCH JOB {id}] job_id: {}, handle_search_partition error: {e}",
                 job.id
@@ -116,7 +117,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
             let total = match res {
                 Ok(total) => total,
                 Err(e) => {
-                    set_job_error_message(&job.id, &e.to_string()).await?;
+                    set_job_error_message(&job.id, &job.trace_id, &e.to_string()).await?;
                     log::error!(
                         "[SEARCH JOB {id}] job_id: {}, run_partition_job error: {e}",
                         job.id
@@ -142,10 +143,10 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     response.set_trace_id(job.trace_id.clone());
     let buf = json::to_vec(&response)?;
     let path = generate_result_path(job.created_at, &job.trace_id, None);
-    storage::put(&path, buf.into()).await?;
+    storage::put("", &path, buf.into()).await?;
 
     // 6. update `search_jobs` table
-    set_job_finish(&job.id, &path).await?;
+    set_job_finish(&job.id, &job.trace_id, &path).await?;
 
     log::info!(
         "[SEARCH JOB {id}] finish running, job_id: {}, time_elapsed: {}ms",
@@ -167,6 +168,7 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
         &job.org_id,
         stream_type,
         &partition_req,
+        Some(RoleGroup::Interactive),
         true,
     )
     .await?;
@@ -216,6 +218,7 @@ async fn run_partition_job(
         stream_type,
         Some(job.user_id.clone()),
         &req,
+        Some(RoleGroup::Interactive),
     )
     .await;
     if let Err(e) = res {
@@ -224,13 +227,13 @@ async fn run_partition_job(
     }
     let mut result = res.unwrap();
     let took = start.elapsed().as_millis();
-    result.set_local_took(took as usize, 0);
+    result.set_took(took as usize);
 
     // 4. write the result to s3
     let hits = result.total;
     let buf = json::to_vec(&result)?;
     let path = generate_result_path(job.created_at, &job.trace_id, Some(partition_id));
-    storage::put(&path, buf.into()).await?;
+    storage::put("", &path, buf.into()).await?;
 
     // 5. set the partition status to finish
     set_partition_job_finish(&job.id, partition_id, path.as_str()).await?;
@@ -256,7 +259,7 @@ async fn filter_partition_job(
         // if the result_path is not none, means the partition job is done
         if partition_job.result_path.is_some() {
             let path = partition_job.result_path.as_ref().unwrap();
-            let buf = storage::get(path).await?;
+            let buf = storage::get_bytes("", path).await?;
             let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
             need -= res.total as i64;
         } else {
@@ -326,7 +329,7 @@ pub async fn delete_jobs() -> Result<(), anyhow::Error> {
 
         // delete all files
         if let Err(e) = delete_result(deleted_files).await {
-            log::warn!("[SEARCH JOB] delete_jobs failed to delete files error: {e}",);
+            log::warn!("[SEARCH JOB] delete_jobs failed to delete files error: {e}");
         }
 
         // 3. delete the partition jobs from database
@@ -349,7 +352,7 @@ async fn check_status(id: i64, job_id: &str, org_id: &str) -> Result<(), anyhow:
             "[SEARCH JOB {id}] job_id: {}, status is not running when running search job, current status: {}",
             job.id, job.status
         );
-        set_job_error_message(&job.id, message.as_str()).await?;
+        set_job_error_message(&job.id, &job.trace_id, message.as_str()).await?;
         log::error!("{}", message);
         return Err(anyhow::anyhow!(message));
     }
@@ -395,15 +398,7 @@ pub async fn merge_response(
     let mut resp = response.remove(0);
     for r in response {
         resp.took += r.took;
-        resp.took_detail = match (resp.took_detail, r.took_detail.as_ref()) {
-            (Some(mut a), Some(b)) => {
-                a.add(b);
-                Some(a)
-            }
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b.clone()),
-            (None, None) => None,
-        };
+        resp.took_detail.add(&r.took_detail);
         resp.hits.extend(r.hits);
         resp.total += r.total;
         resp.file_count += r.file_count;
@@ -411,7 +406,7 @@ pub async fn merge_response(
         resp.idx_scan_size += r.idx_scan_size;
         resp.scan_records += r.scan_records;
         if !r.function_error.is_empty() {
-            resp.function_error = format!("{} \n {}", resp.function_error, r.function_error);
+            resp.function_error.extend(r.function_error);
             resp.is_partial = true;
         }
     }
@@ -437,7 +432,7 @@ pub async fn get_result(
     size: i64,
 ) -> Result<Response, anyhow::Error> {
     if *cluster == config::get_cluster_name() {
-        let buf = storage::get(path).await?;
+        let buf = storage::get_bytes("", path).await?;
         let mut res: Response = json::from_slice::<Response>(&buf)?;
         res.pagination(from, size);
         return Ok(res);
@@ -445,11 +440,12 @@ pub async fn get_result(
 
     // super cluster
     if get_o2_config().super_cluster.enabled {
+        let trace_id = config::ider::generate_trace_id();
         let node = get_cluster_node_by_name(cluster).await?;
         let path = path.to_string();
         let task = tokio::task::spawn(async move {
             let mut request = tonic::Request::new(proto::cluster_rpc::GetResultRequest { path });
-            let mut client = make_grpc_search_client(&mut request, &node).await?;
+            let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
             let response = match client.get_result(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -458,13 +454,8 @@ pub async fn get_result(
                         &node.get_grpc_addr(),
                         err
                     );
-                    if err.code() == tonic::Code::Internal {
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        "search node error".to_string(),
-                    )));
+                    let err = ErrorCodes::from_json(err.message())?;
+                    return Err(Error::ErrorCode(err));
                 }
             };
             Ok(response)
@@ -485,11 +476,12 @@ pub async fn get_result(
 }
 
 pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
-    let local_paths: Vec<&str> = paths.iter().map(|s| s.as_str()).collect();
-    storage::del(&local_paths).await?;
+    let local_paths = paths.iter().map(|s| ("", s.as_str())).collect();
+    storage::del(local_paths).await?;
 
     if get_o2_config().super_cluster.enabled {
-        let nodes = get_cluster_nodes("delete_result", vec![], vec![]).await?;
+        let trace_id = config::ider::generate_trace_id();
+        let nodes = get_cluster_nodes("delete_result", vec![], vec![], None).await?;
         // delete result in all cluster,
         // because for retry job, we don't know partition in which cluster
         for node in nodes {
@@ -497,10 +489,11 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
                 continue;
             }
             let paths = paths.clone();
+            let trace_id = trace_id.clone();
             let task = tokio::task::spawn(async move {
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::DeleteResultRequest { paths });
-                let mut client = make_grpc_search_client(&mut request, &node).await?;
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
                 let response = match client.delete_result(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
@@ -509,13 +502,8 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
                             &node.get_grpc_addr(),
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                            "search node error".to_string(),
-                        )));
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
                     }
                 };
                 Ok(response)

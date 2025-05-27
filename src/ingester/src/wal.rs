@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,14 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     io::{BufRead, BufReader},
     path::PathBuf,
     sync::Arc,
 };
 
 use async_walkdir::WalkDir;
-use config::utils::schema::infer_json_schema_from_values;
+use config::{
+    metrics,
+    utils::{schema::infer_json_schema_from_values, schema_ext::SchemaExt},
+};
 use futures::StreamExt;
 use snafu::ResultExt;
 
@@ -102,17 +105,12 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
 }
 
 // replay wal files to create immutable
-pub(crate) async fn replay_wal_files() -> Result<()> {
-    let wal_dir = PathBuf::from(&config::get_config().common.data_wal_dir).join("logs");
-    create_dir_all(&wal_dir).context(OpenDirSnafu {
-        path: wal_dir.clone(),
-    })?;
-    let wal_files = wal_scan_files(&wal_dir, "wal").await.unwrap_or_default();
+pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) -> Result<()> {
     if wal_files.is_empty() {
         return Ok(());
     }
     for wal_file in wal_files.iter() {
-        log::warn!("starting replay wal file: {:?}", wal_file);
+        log::warn!("replay wal file: {:?} starting...", wal_file);
         let file_str = wal_file
             .strip_prefix(&wal_dir)
             .unwrap()
@@ -175,7 +173,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let Some(entry_bytes) = entry else {
                 break;
             };
-            let entry = match super::Entry::from_bytes(&entry_bytes) {
+            let mut entry = match super::Entry::from_bytes(&entry_bytes) {
                 Ok(v) => v,
                 Err(Error::ReadDataError { source }) => {
                     log::error!("Unable to read entry from: {}, skip the entry", source);
@@ -190,32 +188,56 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let infer_schema =
                 infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
                     .context(InferJsonSchemaSnafu)?;
-            let infer_schema = Arc::new(infer_schema);
+            let latest_schema = infra::schema::get_cache(org_id, &entry.stream, stream_type.into())
+                .await
+                .map_err(|e| Error::ExternalError {
+                    source: Box::new(e),
+                })?;
+            entry.schema_key = latest_schema.hash_key().into();
+            let infer_schema = Arc::new(infer_schema.cloned_from(latest_schema.schema()));
             let batch = entry.into_batch(key.stream_type.clone(), infer_schema.clone())?;
             memtable.write(infer_schema, entry, batch)?;
         }
+
+        // directly dump the memtable to disk
+        let start = std::time::Instant::now();
+        let wal_path = wal_file.to_owned();
+        let immutable = immutable::Immutable::new(idx, key, memtable);
+        let stat = match immutable.persist(&wal_path).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("persist wal file: {:?} to disk error: {}", wal_file, e);
+                continue;
+            }
+        };
+
+        // update metrics
+        metrics::INGEST_MEMTABLE_BYTES
+            .with_label_values(&[])
+            .sub(stat.json_size);
+        metrics::INGEST_MEMTABLE_ARROW_BYTES
+            .with_label_values(&[])
+            .sub(stat.arrow_size as i64);
+        metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+
         log::warn!(
-            "replay wal file: {:?}, entries: {}, records: {}",
-            wal_file,
-            i,
-            total
+            "replay wal file: {:?} done, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",
+            wal_path.to_string_lossy(),
+            stat.json_size,
+            stat.arrow_size,
+            stat.file_num,
+            stat.batch_num,
+            start.elapsed().as_millis(),
         );
-
-        immutable::IMMUTABLES.write().await.insert(
-            wal_file.to_owned(),
-            Arc::new(immutable::Immutable::new(idx, key, memtable)),
-        );
-
-        // to avoid the memory OOM, sleep for a while after reply one wal file
-        if immutable::len().await > 2 {
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        }
     }
 
     Ok(())
 }
 
-async fn wal_scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Result<Vec<PathBuf>> {
+pub(crate) async fn wal_scan_files(
+    root_dir: impl Into<PathBuf>,
+    ext: &str,
+) -> Result<Vec<PathBuf>> {
     Ok(WalkDir::new(root_dir.into())
         .filter_map(|entry| async move {
             let entry = entry.ok()?;
@@ -225,11 +247,7 @@ async fn wal_scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Result<Vec<P
                     .extension()
                     .and_then(|s| s.to_str())
                     .unwrap_or_default();
-                if path_ext == ext {
-                    Some(path)
-                } else {
-                    None
-                }
+                if path_ext == ext { Some(path) } else { None }
             } else {
                 None
             }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
 use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
 
@@ -36,6 +36,8 @@ impl From<PipelineError> for HttpResponse {
 }
 
 /// CreatePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipeline",
@@ -60,7 +62,7 @@ pub async fn save_pipeline(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let mut pipeline = pipeline.into_inner();
-    pipeline.name = pipeline.name.trim().to_string();
+    pipeline.name = pipeline.name.trim().to_lowercase();
     pipeline.org = org_id;
     pipeline.id = ider::generate();
     match pipeline::save_pipeline(pipeline).await {
@@ -73,6 +75,8 @@ pub async fn save_pipeline(
 }
 
 /// ListPipelines
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -96,7 +100,7 @@ async fn list_pipelines(
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+        use o2_openfga::meta::mapping::OFGA_MODELS;
 
         let user_id = _req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
@@ -128,6 +132,8 @@ async fn list_pipelines(
 }
 
 /// GetStreamsWithPipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -155,6 +161,8 @@ async fn list_streams_with_pipeline(
 }
 
 /// DeletePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -187,6 +195,8 @@ async fn delete_pipeline(
 }
 
 /// UpdatePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -219,6 +229,8 @@ pub async fn update_pipeline(
 }
 
 /// EnablePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",

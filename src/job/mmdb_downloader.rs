@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,8 @@
 use std::sync::Arc;
 
 use config::{
-    utils::download_utils::{download_file, is_digest_different},
     MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME,
+    utils::download_utils::{download_file, is_digest_different},
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
@@ -38,8 +38,10 @@ pub static MMDB_INIT_NOTIFIER: Lazy<Arc<Notify>> = Lazy::new(|| Arc::new(Notify:
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
     std::fs::create_dir_all(&cfg.common.mmdb_data_dir)?;
-    // should run it every 24 hours
-    let mut interval = time::interval(time::Duration::from_secs(cfg.common.mmdb_update_duration));
+    // should run it every x days
+    let mut interval = time::interval(time::Duration::from_secs(
+        cfg.common.mmdb_update_duration_days * 86400,
+    ));
 
     loop {
         interval.tick().await;
@@ -53,7 +55,12 @@ async fn run_download_files() {
     log::info!("Checking mmdb files");
 
     // send request and await response
-    let client = reqwest::Client::new();
+    let client = reqwest::ClientBuilder::new()
+        .connect_timeout(std::time::Duration::from_secs(
+            cfg.limit.http_request_timeout,
+        ))
+        .build()
+        .expect("Failed to build mmdb downloader client");
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().common.enable_enterprise_mmdb {

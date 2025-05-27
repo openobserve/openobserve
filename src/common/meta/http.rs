@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{http::StatusCode, HttpResponse as ActixHttpResponse};
+use actix_web::{HttpResponse as ActixHttpResponse, http::StatusCode};
 use infra::errors;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -71,7 +71,7 @@ impl HttpResponse {
         }
     }
 
-    pub fn error_code_with_trace_id(err: errors::ErrorCodes, trace_id: Option<String>) -> Self {
+    pub fn error_code_with_trace_id(err: &errors::ErrorCodes, trace_id: Option<String>) -> Self {
         HttpResponse {
             code: err.get_code(),
             message: err.get_message(),
@@ -91,6 +91,15 @@ impl HttpResponse {
     pub fn bad_request(error: impl ToString) -> ActixHttpResponse {
         ActixHttpResponse::BadRequest().json(Self::error(
             StatusCode::BAD_REQUEST.into(),
+            error.to_string(),
+        ))
+    }
+
+    /// Send an Unauthorized response in json format and sets the
+    /// provided error as the `error` field.
+    pub fn unauthorized(error: impl ToString) -> ActixHttpResponse {
+        ActixHttpResponse::Forbidden().json(Self::error(
+            StatusCode::UNAUTHORIZED.into(),
             error.to_string(),
         ))
     }

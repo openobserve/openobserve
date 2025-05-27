@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,9 +24,9 @@ use byteorder::ByteOrder;
 use bytes::Bytes;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use tantivy::{directory::OwnedBytes, Directory, ReloadPolicy};
+use tantivy::{Directory, ReloadPolicy, directory::OwnedBytes};
 
-use super::{caching_directory::CachingDirectory, EMPTY_FILE_EXT, FOOTER_CACHE};
+use super::{EMPTY_FILE_EXT, FOOTER_CACHE, caching_directory::CachingDirectory};
 
 const FOOTER_CACHE_VERSION: u32 = 1;
 const FOOTER_VERSION_LEN: usize = 4;
@@ -106,6 +106,13 @@ impl FooterCache {
 
     pub(crate) fn from_bytes(bytes: OwnedBytes) -> tantivy::Result<Self> {
         // parse version
+        if bytes.len() < FOOTER_VERSION_LEN + FOOTER_OFFSET_LEN {
+            return Err(tantivy::TantivyError::InvalidArgument(format!(
+                "Invalid footer cache size: expected size {} vs actual size {}",
+                FOOTER_VERSION_LEN + FOOTER_OFFSET_LEN,
+                bytes.len()
+            )));
+        }
         let range = bytes.len() - FOOTER_VERSION_LEN..bytes.len();
         let footer_version = byteorder::LittleEndian::read_u32(&bytes.slice(range));
         if footer_version != FOOTER_CACHE_VERSION {
@@ -119,6 +126,12 @@ impl FooterCache {
             bytes.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN..bytes.len() - FOOTER_VERSION_LEN;
         let footer_offset = byteorder::LittleEndian::read_u64(&bytes.slice(range));
         // parse metadata
+        if bytes.len() < FOOTER_OFFSET_LEN + FOOTER_VERSION_LEN + footer_offset as usize {
+            return Err(tantivy::TantivyError::InvalidArgument(format!(
+                "Invalid footer offset: {}",
+                footer_offset
+            )));
+        }
         let range = footer_offset as usize..(bytes.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN);
         let metadata: FooterCacheMeta = serde_json::from_slice(&bytes.slice(range))?;
         // parse footer data
@@ -126,6 +139,14 @@ impl FooterCache {
         for (path, items) in metadata.files.iter() {
             let mut slice_data = HashMap::new();
             for item in items.iter() {
+                if bytes.len() < item.offset as usize + item.len as usize {
+                    return Err(tantivy::TantivyError::InvalidArgument(format!(
+                        "Invalid footer data: offset {} + len {} > {}",
+                        item.offset,
+                        item.len,
+                        bytes.len()
+                    )));
+                }
                 let range = item.start as usize..(item.start + item.len) as usize;
                 let data = bytes.slice(item.offset as usize..(item.offset + item.len) as usize);
                 slice_data.insert(range, data);

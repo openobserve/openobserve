@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,9 +19,13 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
-use crate::meta::{
-    alerts::{QueryCondition, TriggerCondition},
-    stream::StreamType,
+use crate::{
+    meta::{
+        alerts::{QueryCondition, TriggerCondition},
+        stream::StreamType,
+        triggers::{ScheduledTriggerData, Trigger},
+    },
+    utils::json,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -55,10 +59,12 @@ pub struct Alert {
     /// Timezone offset in minutes.
     /// The negative secs means the Western Hemisphere
     pub tz_offset: i32,
+    /// Will be removed in the future.
     #[serde(default)]
-    pub last_triggered_at: Option<i64>,
+    last_triggered_at: Option<i64>,
     #[serde(default)]
-    pub last_satisfied_at: Option<i64>,
+    /// Will be removed in the future.
+    last_satisfied_at: Option<i64>,
     #[serde(default)]
     pub owner: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -102,6 +108,81 @@ impl Default for Alert {
     }
 }
 
+impl Alert {
+    /// Get the unique identifier of the alert.
+    /// For now it ruturns the `stream_type` and `stream_name` concatenated
+    /// along with alert name. In future, once the migration to v2 alerts
+    /// is complete, it will use the `id` of the alert.
+    pub fn get_unique_key(&self) -> String {
+        self.id
+            .as_ref()
+            .map_or("".to_string(), |id| id.to_string())
+            .to_string()
+    }
+
+    /// Checks the last satisfied at time for the alert from the scheduled_jobs table first.
+    /// If it is not present, then it uses the last_satisfied_at time from the alert table.
+    /// Use this function instead of `get_last_satisfied_at_from_table` to get the actual timestamp.
+    pub fn get_last_satisfied_at(&self, trigger: Option<&Trigger>) -> Option<i64> {
+        if trigger.is_some() {
+            let trigger = trigger.unwrap();
+            log::info!("Trigger data: {}", trigger.data);
+            let trigger_data: ScheduledTriggerData =
+                json::from_str(&trigger.data).unwrap_or_default();
+            // last_satisfied_at is now supposed to be part of the trigger data
+            // but it was previously stored in the alert table. So, in case the trigger
+            // data is not yet updated, we fallback to the value in the alert table.
+            if trigger_data.last_satisfied_at.is_some() {
+                trigger_data.last_satisfied_at
+            } else {
+                self.last_satisfied_at
+            }
+        } else {
+            self.last_satisfied_at
+        }
+    }
+
+    /// Checks the last triggered at time for the alert from the scheduled_jobs table first.
+    /// If it is not present, then it uses the last_triggered_at time from the alert table.
+    /// Use this function instead of `get_last_triggered_at_from_table` to get the actual timestamp.
+    pub fn get_last_triggered_at(&self, trigger: Option<&Trigger>) -> Option<i64> {
+        if trigger.is_some() {
+            let trigger = trigger.unwrap();
+
+            // last_satisfied_at is now supposed to be part of the trigger data
+            // but it was previously stored in the alert table. So, in case the trigger
+            // data is not yet updated, we fallback to the value in the alert table.
+            if trigger.start_time.is_some() {
+                trigger.start_time
+            } else {
+                self.last_triggered_at
+            }
+        } else {
+            self.last_triggered_at
+        }
+    }
+
+    /// Not to be used for new alerts.
+    pub fn get_last_triggered_at_from_table(&self) -> Option<i64> {
+        self.last_triggered_at
+    }
+
+    /// Not to be used for new alerts.
+    pub fn get_last_satisfied_at_from_table(&self) -> Option<i64> {
+        self.last_satisfied_at
+    }
+
+    /// Not to be used for new alerts.
+    pub fn set_last_satisfied_at(&mut self, last_satisfied_at: Option<i64>) {
+        self.last_satisfied_at = last_satisfied_at;
+    }
+
+    /// Not to be used for new alerts.
+    pub fn set_last_triggered_at(&mut self, last_triggered_at: Option<i64>) {
+        self.last_triggered_at = last_triggered_at;
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct AlertListFilter {
     pub enabled: Option<bool>,
@@ -116,6 +197,9 @@ pub struct ListAlertsParams {
 
     /// The optional folder ID surrogate key with which to filter alerts.
     pub folder_id: Option<String>,
+
+    /// The optional case-insensitive alert name substring with which to filter alerts.
+    pub name_substring: Option<String>,
 
     /// The optional stream type and stream name with which to filter alerts.
     ///
@@ -141,6 +225,7 @@ impl ListAlertsParams {
         Self {
             org_id: org_id.to_owned(),
             folder_id: None,
+            name_substring: None,
             stream_type_and_name: None,
             enabled: None,
             owner: None,
@@ -148,9 +233,15 @@ impl ListAlertsParams {
         }
     }
 
-    /// Filter dashboards by the given folder ID surrogate key.
+    /// Filter alerts by the given folder ID surrogate key.
     pub fn in_folder(mut self, folder_id: &str) -> Self {
         self.folder_id = Some(folder_id.to_string());
+        self
+    }
+
+    /// Filter alerts by the given case-insensitive name substring.
+    pub fn with_name_substring(mut self, name_substring: &str) -> Self {
+        self.name_substring = Some(name_substring.to_string());
         self
     }
 

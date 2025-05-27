@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use std::{
 };
 
 use tempfile::tempdir;
-use wal::{build_file_path, Reader, Writer};
+use wal::{Reader, Writer, build_file_path};
 
 #[test]
 fn test_wal_new() {

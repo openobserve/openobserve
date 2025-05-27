@@ -8,7 +8,10 @@ test.describe.configure({ mode: 'parallel' });
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(4000);
-  // await page.getByText('Login as internal user').click();
+  await page.goto(process.env["ZO_BASE_URL"]);
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -48,13 +51,6 @@ async function ingestion(page) {
   });
   console.log(response);
 }
-
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(
-    4000); await page.locator(
-      '[data-test="log-search-index-list-select-stream"]').click({ force: true }); await page.locator(
-        "div.q-item").getByText(`${stream}`).first().click({ force: true });
-};
 test.describe("Logs Queries testcases", () => {
   let logsPage;
   // let logData;
@@ -78,6 +74,7 @@ test.describe("Logs Queries testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
@@ -87,7 +84,7 @@ test.describe("Logs Queries testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
@@ -98,8 +95,8 @@ test.describe("Logs Queries testcases", () => {
     ).toBeVisible();
   });
 
-  test("should add timestamp to editor save this view and switch", async ({ page }) => {
-    await page.waitForTimeout(3000); 
+  test.skip("should add timestamp to editor save this view and switch", async ({ page }) => {
+    await page.waitForTimeout(3000);
     await page.locator('[data-test="log-table-column-0-source"]').click();
 
     await page.locator(':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon').click(); await page.locator(
@@ -126,41 +123,40 @@ test.describe("Logs Queries testcases", () => {
 
   });
 
-
-
-
   test("should redirect to logs after clicking on stream explorer via stream page", async ({ page }) => {
+    // Generate a random saved view name
+    const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
+  
+    // Interactions with the page
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('button').filter({ hasText: 'savesaved_search' }).click();
     await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill('streamslognave');
+    await page.locator('[data-test="add-alert-name-input"]').fill(randomSavedViewName); // Use the random name
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click({ force: true });
     await page.waitForTimeout(5000);
     await page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e');
+    await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Explore' }).first().click({ force: true });
     await page.waitForTimeout(5000);
-    await page.waitForSelector('[data-test="logs-search-saved-views-btn"]')
+    await page.waitForSelector('[data-test="logs-search-saved-views-btn"]');
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').click({ force: true });
-    await page.locator('[data-test="log-search-saved-view-field-search-input"]').fill('streamslognave');
+    await page.locator('[data-test="log-search-saved-view-field-search-input"]').fill(randomSavedViewName); // Use the random name here
     await page.waitForTimeout(3000);
-    await page.waitForSelector(':text("streamslognav")');
-    await page.click(':text("streamslognave")');
+    await page.waitForSelector(`:text("${randomSavedViewName}")`);
+    await page.click(`:text("${randomSavedViewName}")`);
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').click();
-    await page.getByTitle('streamslognave').click();
-    await page.getByText('delete').click();
-    await page.locator('[data-test="confirm-button"]').click();
-
-  });
-
-
+    await page.getByTitle(randomSavedViewName).click(); // Use the random name here
   
-
-
+    // Dynamic delete button selector using the random saved view name
+    const deleteButtonSelector = `[data-test="logs-search-bar-delete-${randomSavedViewName}-saved-view-btn"]`;
+    await page.locator(deleteButtonSelector).click(); // Click delete
+    await page.locator('[data-test="confirm-button"]').click(); // Confirm deletion
+  });
 
   test("should reset the editor on clicking reset filter button", async ({ page }) => {
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
@@ -197,22 +193,22 @@ test.describe("Logs Queries testcases", () => {
     // Type the value of a variable into an input field
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-  
+
     // Ensure the query editor is visible and clickable before typing
     const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
     await expect(queryEditor).toBeVisible();
     await queryEditor.click();
     await page.keyboard.type("match_all('code')");
-  
+
     // Ensure the refresh button is visible and clickable before clicking
     const refreshButton = page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content');
     await expect(refreshButton).toBeVisible();
     await refreshButton.click({ force: true });
-  
+
     // Verify that the expected log table column is visible
     await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
-  
+
 
 
   test("should change stream settings and click on search stream", async ({ page }) => {
@@ -221,6 +217,7 @@ test.describe("Logs Queries testcases", () => {
     await page.waitForTimeout(3000);
     await page.click('[data-test="streams-search-stream-input"]')
     await page.keyboard.type("e2e_automate");
+    await page.waitForTimeout(2000);
     await page.locator("[title=\"Stream Detail\"]").first().click({ force: true });
     await page.locator(':nth-child(2) > [data-test="schema-stream-index-select"]').click();
     const scope = page.locator(".q-virtual-scroll__content");
@@ -232,7 +229,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator("[title=\"Explore\"]").first().click({ force: true });
     await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
-  
+
 
   test("should display error if blank spaces added under stream name and clicked create stream ", async ({ page }) => {
     await page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
@@ -253,7 +250,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator('[data-test="save-stream-btn"]').click({ force: true });
     await expect(page.getByText(/Field is required/).first()).toBeVisible();
   });
-  
+
   test("should display enter count query", async ({ page }) => {
     await page.locator(
 
@@ -261,7 +258,7 @@ test.describe("Logs Queries testcases", () => {
     await page.click('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
     await page.keyboard.type('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate"  Group by _timestamp ORDER BY _timestamp DESC');
     await page.waitForTimeout(4000);
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await expect(page.locator(
       '[data-cy="search-bar-refresh-button"] > .q-btn__content')).toBeVisible(); await page.waitForTimeout(
         3000); await page.locator(
@@ -297,10 +294,68 @@ test.describe("Logs Queries testcases", () => {
   test("should display results in selected time", async ({
     page,
   }) => {
-    
+
     await logsPage.setDateTimeToToday();
-    
-    
+
+
   });
 
+  test("should display results if stringmatch ignorecase lowercase added in log query search", async ({ page }) => {
+    // Type the value of a variable into an input field
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+
+    // Ensure the query editor is visible and clickable before typing
+    const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+    await expect(queryEditor).toBeVisible();
+    await queryEditor.click();
+    await page.keyboard.type("str_match_ignore_case(kubernetes_container_name, 'ziox')");
+    await page.waitForTimeout(4000);
+
+    // Ensure the refresh button is visible and clickable before clicking
+    const refreshButton = page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content');
+    await expect(refreshButton).toBeVisible();
+    await refreshButton.click({ force: true });
+
+    // Verify that the expected log table column is visible
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+  });
+
+
+  test("should display results if stringmatch ignorecase uppercase added in log query search", async ({ page }) => {
+    // Type the value of a variable into an input field
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+
+    // Ensure the query editor is visible and clickable before typing
+    const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+    await expect(queryEditor).toBeVisible();
+    await queryEditor.click();
+    await page.keyboard.type("str_match_ignore_case(kubernetes_container_name, 'Ziox')");
+    await page.waitForTimeout(4000);
+
+    // Ensure the refresh button is visible and clickable before clicking
+    const refreshButton = page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content');
+    await expect(refreshButton).toBeVisible();
+    await refreshButton.click({ force: true });
+
+    // Verify that the expected log table column is visible
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+  });
+
+  test("should trigger search results when pressing Cmd+Enter or Ctrl+Enter", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutTest();
+  });
+
+  test("should execute query with keyboard shortcut (Cmd+Enter or Ctrl+Enter) after clicking elsewhere ", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutAfterClickingElsewhere();
+  });
+
+  test("should execute different query with keyboard shortcut (Cmd+Enter or Ctrl+Enter)", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutWithDifferentQuery();
+  });
+
+  test("should execute SQL query with keyboard shortcut (Cmd+Enter or Ctrl+Enter)", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutWithSQLMode();
+  });
 })

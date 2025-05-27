@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,10 +21,10 @@ use config::meta::otlp::OtlpRequestType;
 use opentelemetry::metrics::Result;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use opentelemetry_sdk::metrics::{
+    InstrumentKind,
     data::{ResourceMetrics, Temporality},
     exporter::PushMetricsExporter,
     reader::TemporalitySelector,
-    InstrumentKind,
 };
 
 use crate::service::metrics::otlp::handle_otlp_request;

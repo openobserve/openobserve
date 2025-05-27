@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::metrics;
+use config::{meta::otlp::OtlpRequestType, metrics};
 use opentelemetry_proto::tonic::collector::logs::v1::{
-    logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
+    ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
 };
 use tonic::{Response, Status};
 
@@ -57,13 +57,13 @@ impl LogsService for LogsServer {
             user_email = user_id.to_str().unwrap();
         };
 
-        match crate::service::logs::otlp_grpc::handle_grpc_request(
+        match crate::service::logs::otlp::handle_request(
             0,
             org_id.unwrap().to_str().unwrap(),
             in_req,
-            true,
             in_stream_name,
             user_email,
+            OtlpRequestType::Grpc,
         )
         .await
         {
@@ -71,10 +71,10 @@ impl LogsService for LogsServer {
                 // metrics
                 let time = start.elapsed().as_secs_f64();
                 metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/otlp/v1/logs", "200", "", "", ""])
+                    .with_label_values(&["/otlp/v1/logs", "200", "", "", "", ""])
                     .observe(time);
                 metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/otlp/v1/logs", "200", "", "", ""])
+                    .with_label_values(&["/otlp/v1/logs", "200", "", "", "", ""])
                     .inc();
 
                 Ok(Response::new(ExportLogsServiceResponse {

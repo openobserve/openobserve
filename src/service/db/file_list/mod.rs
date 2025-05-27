@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,14 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::FileMeta, RwHashMap, RwHashSet};
-use dashmap::{DashMap, DashSet};
-use infra::{cache, cache::stats, file_list, file_list as infra_file_list};
-use once_cell::sync::Lazy;
+use std::collections::HashSet;
 
+use config::{
+    RwHashMap, RwHashSet,
+    meta::stream::{FileKey, FileMeta},
+};
+use dashmap::{DashMap, DashSet};
+use infra::errors::Result;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config,
+    super_cluster::stream::client::super_cluster_cache_stats,
+};
+use once_cell::sync::Lazy;
 pub mod broadcast;
 pub mod local;
-use crate::service::db;
 
 pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
     Lazy::new(|| DashSet::with_capacity_and_hasher(1024, Default::default()));
@@ -28,7 +36,7 @@ pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
 pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
     Lazy::new(|| DashMap::with_capacity_and_hasher(64, Default::default()));
 
-pub static BLOCKED_ORGS: Lazy<Vec<String>> = Lazy::new(|| {
+pub static BLOCKED_ORGS: Lazy<HashSet<String>> = Lazy::new(|| {
     config::get_config()
         .compact
         .blocked_orgs
@@ -37,30 +45,59 @@ pub static BLOCKED_ORGS: Lazy<Vec<String>> = Lazy::new(|| {
         .collect()
 });
 
-pub async fn progress(
-    key: &str,
-    data: Option<&FileMeta>,
-    delete: bool,
-) -> Result<(), anyhow::Error> {
-    if delete {
-        if let Err(e) = file_list::remove(key).await {
-            log::error!(
-                "service:db:file_list: delete {}, set_file_to_cache error: {}",
-                key,
-                e
-            );
+pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
+    let mut file_data = FileKey::new(
+        0,
+        account.to_string(),
+        key.to_string(),
+        meta.clone().unwrap_or_default(),
+        deleted,
+    );
+
+    // write into file_list storage
+    // retry 5 times
+    for _ in 0..5 {
+        match progress(account, key, meta.as_ref(), deleted).await {
+            Ok(id) => {
+                file_data.id = id;
+                break;
+            }
+            Err(e) => {
+                log::error!("[FILE_LIST] Error saving file to storage, retrying: {}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            }
         }
-    } else {
-        if let Err(e) = file_list::add(key, data.unwrap()).await {
-            log::error!(
-                "service:db:file_list: add {}, set_file_to_cache error: {}",
-                key,
-                e
-            );
+    }
+
+    let cfg = config::get_config();
+
+    // notify other nodes
+    if cfg.cache_latest_files.enabled {
+        let mut q = broadcast::BROADCAST_QUEUE.write().await;
+        q.push(file_data);
+    }
+
+    Ok(())
+}
+
+async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: bool) -> Result<i64> {
+    let mut id = 0;
+    if delete {
+        if let Err(e) = infra::file_list::remove(key).await {
+            log::error!("service:db:file_list: delete {}, remove error: {}", key, e);
+        }
+    } else if let Some(data) = data {
+        match infra::file_list::add(account, key, data).await {
+            Ok(v) => {
+                id = v;
+            }
+            Err(e) => {
+                log::error!("service:db:file_list: add {}, add error: {}", key, e);
+            }
         }
         // update stream stats realtime
         if config::get_config().common.local_mode {
-            if let Err(e) = cache::stats::incr_stream_stats(key, data.unwrap()) {
+            if let Err(e) = infra::cache::stats::incr_stream_stats(key, data) {
                 log::error!(
                     "service:db:file_list: add {}, incr_stream_stats error: {}",
                     key,
@@ -70,23 +107,50 @@ pub async fn progress(
         }
     }
 
-    Ok(())
+    Ok(id)
 }
 
-pub async fn cache_stats() -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache().await;
+pub async fn cache_stats() -> Result<()> {
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    {
+        if get_o2_config().super_cluster.enabled {
+            if let Err(err) = super_cluster_cache_stats().await {
+                log::error!("super_cluster_cache_stats error: {err}")
+            }
+        } else {
+            // single cluster
+            if let Err(err) = single_cache_stats().await {
+                log::error!("single_cache_stats error: {err}")
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        // single cluster
+        if let Err(err) = single_cache_stats().await {
+            log::error!("single_cache_stats error: {err}")
+        }
+    }
+
+    Ok(())
+}
+async fn single_cache_stats() -> Result<()> {
+    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
-        let ret = infra_file_list::get_stream_stats(&org_id, None, None).await;
+        let ret = infra::file_list::get_stream_stats(&org_id, None, None).await;
         if ret.is_err() {
-            log::error!("Load stream stats error: {}", ret.err().unwrap());
+            log::error!("Load stream stats from db  error: {}", ret.err().unwrap());
             continue;
         }
+
         for (stream, stats) in ret.unwrap() {
             let columns = stream.split('/').collect::<Vec<&str>>();
             let org_id = columns[0];
             let stream_type = columns[1];
             let stream_name = columns[2];
-            stats::set_stream_stats(org_id, stream_name, stream_type.into(), stats);
+            infra::cache::stats::set_stream_stats(org_id, stream_name, stream_type.into(), stats);
         }
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }

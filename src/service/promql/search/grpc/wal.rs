@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ use std::{
 
 use arrow::record_batch::RecordBatch;
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{cluster::IntoArcVec, search::ScanStats, stream::StreamType},
 };
 use datafusion::{
@@ -28,7 +28,7 @@ use datafusion::{
     datasource::MemTable,
     error::{DataFusionError, Result},
     physical_plan::visit_execution_plan,
-    prelude::{col, lit, SessionContext},
+    prelude::{SessionContext, col, lit},
 };
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
@@ -102,7 +102,7 @@ pub(crate) async fn create_context(
         stats.original_size,
     );
 
-    let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
+    let ctx = prepare_datafusion_context(None, vec![], vec![], false, 0).await?;
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
@@ -131,7 +131,7 @@ async fn get_wal_batches(
     }
     let nodes = nodes.unwrap();
 
-    let ctx = prepare_datafusion_context(None, vec![], false, cfg.limit.cpu_num).await?;
+    let ctx = prepare_datafusion_context(None, vec![], vec![], false, cfg.limit.cpu_num).await?;
     let table = Arc::new(
         NewEmptyTable::new(stream_name, Arc::clone(&schema))
             .with_partitions(ctx.state().config().target_partitions()),
@@ -142,9 +142,9 @@ async fn get_wal_batches(
     let (start, end) = time_range;
     let mut df = match ctx.table(stream_name).await {
         Ok(df) => df.filter(
-            col(&cfg.common.column_timestamp)
+            col(TIMESTAMP_COL_NAME)
                 .gt(lit(start))
-                .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
+                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
             return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));

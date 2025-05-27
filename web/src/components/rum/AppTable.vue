@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
         </template>
         <template v-slot:body="props">
-          <q-tr :props="props" :key="`m_${props.row.index}`">
+          <q-tr :props="props" :key="`m_${props.row.index}`" class="cursor-pointer">
             <q-td
               v-for="col in props.cols"
               :key="col.name"
@@ -130,7 +130,7 @@ defineProps({
 const emit = defineEmits(["event-emitted"]);
 
 const handleDataClick = (columnName: string, row: any) => {
-  emit("event-emitted", "cell-click", { columnName, row });
+  emit("event-emitted", "cell-click", { columnName: "action_play", row });
 };
 
 const onScroll = (e: any) => {

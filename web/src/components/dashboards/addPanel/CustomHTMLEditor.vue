@@ -45,7 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #after>
-          <HTMLRenderer :htmlContent="htmlContent" />
+          <HTMLRenderer
+            :htmlContent="htmlContent"
+            :variables-data="initialVariableValues"
+          />
         </template>
       </q-splitter>
     </div>
@@ -59,7 +62,7 @@ import HTMLRenderer from "../panels/HTMLRenderer.vue";
 export default defineComponent({
   components: {
     MonacoHTMLEditor: defineAsyncComponent(
-      () => import("./MonacoHTMLEditor.vue")
+      () => import("./MonacoHTMLEditor.vue"),
     ),
     HTMLRenderer,
   },
@@ -68,6 +71,10 @@ export default defineComponent({
     modelValue: {
       type: String,
       default: "",
+    },
+    initialVariableValues: {
+      type: Object,
+      default: () => ({}),
     },
   },
   setup(props, { emit }) {

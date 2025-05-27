@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,7 @@ use datafusion::{
     common::Result,
     datasource::TableProvider,
     logical_expr::{Expr, TableProviderFilterPushDown, TableType},
-    physical_plan::{empty::EmptyExec, union::UnionExec, ExecutionPlan},
+    physical_plan::{ExecutionPlan, empty::EmptyExec, union::UnionExec},
 };
 
 #[derive(Debug)]

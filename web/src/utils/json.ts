@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 export const ToString = (o: any) => {
-  if (!o) {
+  if (o === null || o === undefined) {
     return "";
   }
   if (typeof o == "string") {
@@ -32,7 +32,7 @@ export const ToString = (o: any) => {
     }
     return `{${tmp}}`;
   } else {
-    return o;
+    return o.toString();
   }
 };
 
@@ -45,7 +45,7 @@ export const byString = (o: any, s: string) => {
   }
   s = s.replace(/\[(\w+)\]/g, ".$1"); // convert indexes to properties
   s = s.replace(/^\./, ""); // strip a leading dot
-  let a = s.split(".");
+  const a = s.split(".");
 
   // eg.1, o = {"a1": {"b1": "1234", "b2": "1", "b3": {"c1":"12", "c2":"22"}}, "a2":"334"}, s = "a1.b3.c2"
   // eg.2, o = {"a1.b1": "1234", "a1":"233", "a2":"334"}, s = "a1.b1"
@@ -55,7 +55,7 @@ export const byString = (o: any, s: string) => {
     let flag = false;
     for (let j = n; j > i; j--) {
       // Priority matching (longest)
-      let key = a.slice(i, j).join(".");
+      const key = a.slice(i, j).join(".");
       if (typeof o == "object" && key in o) {
         o = o[key];
         flag = true;
@@ -74,13 +74,14 @@ export const deepKeys = (o: any) => {
   if (!(o instanceof Object)) {
     return [];
   }
-  let results = [];
-  let keys = Object.keys(o);
-  for (var i in keys) {
+  const results = [];
+  const keys = Object.keys(o);
+  for (const i in keys) {
+    // Check if we can use === instead of ==
     if (o[keys[i]] == undefined || o[keys[i]].length) {
       results.push(keys[i]);
     } else {
-      let subKeys = deepKeys(o[keys[i]]);
+      const subKeys = deepKeys(o[keys[i]]);
       if (subKeys.length > 0) {
         subKeys.forEach((key) => {
           results.push(keys[i] + "." + key);

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post, put, web};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -51,6 +51,8 @@ impl From<FolderError> for HttpResponse {
 }
 
 /// CreateFolder
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -92,6 +94,8 @@ pub async fn create_folder(
 }
 
 /// UpdateFolder
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -131,6 +135,8 @@ pub async fn update_folder(
 }
 
 /// ListFolders
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -172,6 +178,8 @@ pub async fn list_folders(
 }
 
 /// GetFolder
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -202,6 +210,8 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
 }
 
 /// GetFolderByName
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -232,6 +242,8 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
 }
 
 /// DeleteFolder
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -264,6 +276,8 @@ pub mod deprecated {
     use super::*;
 
     /// CreateFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"create"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -306,6 +320,8 @@ pub mod deprecated {
     }
 
     /// UpdateFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"update"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -346,6 +362,8 @@ pub mod deprecated {
     }
 
     /// ListFolders
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"list"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -385,6 +403,8 @@ pub mod deprecated {
     }
 
     /// GetFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -416,6 +436,8 @@ pub mod deprecated {
     }
 
     /// GetFolderByName
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -447,6 +469,8 @@ pub mod deprecated {
     }
 
     /// DeleteFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"delete"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",

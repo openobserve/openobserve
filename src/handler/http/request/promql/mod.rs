@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,12 @@
 
 use std::io::Error;
 
-use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
-use config::utils::time::{parse_milliseconds, parse_str_to_timestamp_micros};
+use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
+use config::utils::time::{now_micros, parse_milliseconds, parse_str_to_timestamp_micros};
 use infra::errors;
 use promql_parser::parser;
 #[cfg(feature = "enterprise")]
-use {
-    config::meta::stream::StreamType,
-    o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS,
-};
+use {config::meta::stream::StreamType, o2_openfga::meta::mapping::OFGA_MODELS};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
@@ -72,6 +69,8 @@ pub async fn remote_write(
 }
 
 /// prometheus instant queries
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 #[utoipa::path(
     context_path = "/api",
@@ -158,9 +157,9 @@ async fn query(
     let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+        use crate::{
+            common::utils::auth::{AuthExtractor, is_root_user},
+            service::db::org_users::get_cached_user_org,
         };
 
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
@@ -170,10 +169,8 @@ async fn query(
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
             for name in visitor.name {
-                let user: crate::common::meta::user::User = USERS
-                    .get(&format!("{org_id}/{}", user_email))
-                    .unwrap()
-                    .clone();
+                let user: config::meta::user::User =
+                    get_cached_user_org(org_id, user_email).unwrap();
                 if !crate::handler::http::auth::validator::check_permissions(
                     user_email,
                     AuthExtractor {
@@ -202,7 +199,7 @@ async fn query(
     }
 
     let start = match req.time {
-        None => chrono::Utc::now().timestamp_micros(),
+        None => now_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
@@ -229,6 +226,8 @@ async fn query(
 }
 
 /// prometheus range queries
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 #[utoipa::path(
     context_path = "/api",
@@ -306,6 +305,8 @@ pub async fn query_range_post(
 }
 
 /// prometheus query exemplars
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
 #[utoipa::path(
     context_path = "/api",
@@ -415,9 +416,9 @@ async fn query_range(
     let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+        use crate::{
+            common::utils::auth::{AuthExtractor, is_root_user},
+            service::db::org_users::get_cached_user_org,
         };
 
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
@@ -435,10 +436,8 @@ async fn query_range(
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
             for name in visitor.name {
-                let user: crate::common::meta::user::User = USERS
-                    .get(&format!("{org_id}/{}", user_email))
-                    .unwrap()
-                    .clone();
+                let user: config::meta::user::User =
+                    get_cached_user_org(org_id, user_email).unwrap();
                 if user.is_external
                     && !crate::handler::http::auth::validator::check_permissions(
                         user_email,
@@ -468,7 +467,7 @@ async fn query_range(
     }
 
     let start = match req.start {
-        None => chrono::Utc::now().timestamp_micros(),
+        None => now_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
@@ -480,7 +479,7 @@ async fn query_range(
         },
     };
     let end = match req.end {
-        None => chrono::Utc::now().timestamp_micros(),
+        None => now_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
@@ -524,6 +523,8 @@ async fn query_range(
 }
 
 /// prometheus query metric metadata
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
     context_path = "/api",
@@ -584,6 +585,8 @@ pub async fn metadata(
 }
 
 /// prometheus finding series by label matchers
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 #[utoipa::path(
     context_path = "/api",
@@ -666,9 +669,9 @@ async fn series(
 
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+        use crate::{
+            common::utils::auth::{AuthExtractor, is_root_user},
+            service::db::org_users::get_cached_user_org,
         };
 
         let metric_name = match selector
@@ -683,10 +686,7 @@ async fn series(
         let user_email = user_id.to_str().unwrap();
 
         if !is_root_user(user_email) {
-            let user: crate::common::meta::user::User = USERS
-                .get(&format!("{org_id}/{}", user_email))
-                .unwrap()
-                .clone();
+            let user: config::meta::user::User = get_cached_user_org(org_id, user_email).unwrap();
             let stream_type_str = StreamType::Metrics.as_str();
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(
@@ -729,6 +729,8 @@ async fn series(
 }
 
 /// prometheus getting label names
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
 #[utoipa::path(
     context_path = "/api",
@@ -825,6 +827,8 @@ async fn labels(
 }
 
 /// prometheus query label values
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
 #[utoipa::path(
     context_path = "/api",
@@ -929,7 +933,7 @@ fn validate_metadata_params(
         parse_str_to_timestamp_micros(&start.unwrap()).map_err(|e| e.to_string())?
     };
     let end = if end.is_none() || end.as_ref().unwrap().is_empty() {
-        chrono::Utc::now().timestamp_micros()
+        now_micros()
     } else {
         parse_str_to_timestamp_micros(&end.unwrap()).map_err(|e| e.to_string())?
     };
@@ -937,6 +941,8 @@ fn validate_metadata_params(
 }
 
 /// prometheus formatting query expressions
+///
+/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
 #[utoipa::path(
     context_path = "/api",

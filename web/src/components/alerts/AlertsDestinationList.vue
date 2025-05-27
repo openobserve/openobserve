@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <div v-if="!showDestinationEditor">
+    <div v-if="!showDestinationEditor && !showImportDestination">
       <q-table
         data-test="alert-destinations-list-table"
         ref="qTable"
@@ -58,6 +58,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
+            <q-btn
+              icon="download"
+              title="Export Destination"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click.stop="exportDestination(props.row)"
+              data-test="destination-export"
+            ></q-btn>
             <q-btn
               :data-test="`alert-destination-list-${props.row.name}-update-destination`"
               icon="edit"
@@ -102,6 +114,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <q-btn
+            class="q-ml-md text-bold"
+            padding="sm lg"
+            outline
+            no-caps
+            :label="t(`dashboard.import`)"
+            @click="importDestination"
+            data-test="destination-import"
+          />
+          <q-btn
             data-test="alert-destination-list-add-alert-btn"
             class="q-ml-md q-mb-xs text-bold no-border"
             padding="sm lg"
@@ -133,13 +154,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
     </div>
-    <div v-else>
+    <div v-else-if="showDestinationEditor && !showImportDestination">
       <AddDestination
         :is-alerts="true"
         :destination="editingDestination"
         :templates="templates"
         @cancel:hideform="toggleDestinationEditor"
         @get:destinations="getDestinations"
+      />
+    </div>
+    <div v-else>
+      <ImportDestination
+        :destinations="destinations"
+        :templates="templates"
+        @update:destinations="getDestinations"
       />
     </div>
 
@@ -153,7 +181,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts">
-import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted } from "vue"; 
+import {
+  ref,
+  onBeforeMount,
+  onActivated,
+  watch,
+  defineComponent,
+  onMounted,
+} from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableProps } from "quasar";
@@ -170,6 +205,8 @@ import type { DestinationPayload } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import ImportDestination from "./ImportDestination.vue";
+import useActions from "@/composables/useActions";
 
 interface ConformDelete {
   visible: boolean;
@@ -177,13 +214,20 @@ interface ConformDelete {
 }
 export default defineComponent({
   name: "PageAlerts",
-  components: { AddDestination, NoData, ConfirmDialog, QTablePagination },
+  components: {
+    AddDestination,
+    NoData,
+    ConfirmDialog,
+    QTablePagination,
+    ImportDestination,
+  },
   setup() {
     const qTable = ref();
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18n();
     const q = useQuasar();
+    const { getAllActions } = useActions();
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -230,6 +274,7 @@ export default defineComponent({
       data: null,
     });
     const showDestinationEditor = ref(false);
+    const showImportDestination = ref(false);
     const router = useRouter();
     const filterQuery = ref("");
     const perPageOptions: any = [
@@ -252,18 +297,39 @@ export default defineComponent({
     onBeforeMount(() => {
       getDestinations();
       getTemplates();
+      getActions();
     });
 
     watch(
       () => router.currentRoute.value.query.action,
       (action) => {
-        if (!action) showDestinationEditor.value = false;
-      }
+        if (!action) {
+          showDestinationEditor.value = false;
+          showImportDestination.value = false;
+        }
+      },
     );
 
-    onMounted(()=>{
+    onMounted(() => {
       updateRoute();
-    })
+    });
+
+    const getActions = async () => {
+      const dismiss = q.notify({
+        spinner: true,
+        message: "Please wait while loading actions...",
+      });
+      if (store.state.organizationData.actions.length == 0) {
+        await getAllActions()
+          .catch(() => {
+            q.notify({
+              type: "negative",
+              message: "Error while loading actions.",
+            });
+          })
+          .finally(() => dismiss());
+      }
+    };
 
     const getDestinations = () => {
       const dismiss = q.notify({
@@ -277,11 +343,14 @@ export default defineComponent({
           sort_by: "name",
           desc: false,
           org_identifier: store.state.selectedOrganization.identifier,
+          module: "alert",
         })
         .then((res) => {
           res.data = res.data.filter(
             (destination: any) =>
-              destination.type == "http" || destination.type == "email",
+              destination.type == "http" ||
+              destination.type == "email" ||
+              destination.type === "action",
           );
           resultTotal.value = res.data.length;
           destinations.value = res.data.map((data: any, index: number) => ({
@@ -291,7 +360,7 @@ export default defineComponent({
           updateRoute();
         })
         .catch((err) => {
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             q.notify({
               type: "negative",
               message: "Error while pulling destinations.",
@@ -314,12 +383,14 @@ export default defineComponent({
         editDestination(null);
       if (router.currentRoute.value.query.action === "update")
         editDestination(
-          getDestinationByName(router.currentRoute.value.query.name as string)
+          getDestinationByName(router.currentRoute.value.query.name as string),
         );
+      if (router.currentRoute.value.query.action === "import")
+        showImportDestination.value = true;
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find(
-        (destination) => destination.name === name
+        (destination) => destination.name === name,
       );
     };
     const editDestination = (destination: any) => {
@@ -422,6 +493,37 @@ export default defineComponent({
       });
     };
 
+    const exportDestination = (row: any) => {
+      const findDestination: any = getDestinationByName(row.name);
+      const destinationByName = { ...findDestination };
+      if (destinationByName.hasOwnProperty("#")) delete destinationByName["#"];
+      const destinationJson = JSON.stringify(destinationByName, null, 2);
+      const blob = new Blob([destinationJson], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      // Create an anchor element to trigger the download
+      const link = document.createElement("a");
+      link.href = url;
+
+      // Set the filename of the download
+      link.download = `${destinationByName.name}.json`;
+
+      // Trigger the download by simulating a click
+      link.click();
+
+      // Clean up the URL object after download
+      URL.revokeObjectURL(url);
+    };
+    const importDestination = () => {
+      showImportDestination.value = true;
+      router.push({
+        name: "alertDestinations",
+        query: {
+          action: "import",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     return {
       t,
       qTable,
@@ -446,6 +548,9 @@ export default defineComponent({
       pagination,
       outlinedDelete,
       routeTo,
+      exportDestination,
+      showImportDestination,
+      importDestination,
     };
   },
 });

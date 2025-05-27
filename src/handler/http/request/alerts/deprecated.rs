@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,23 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use core::result::Result::Ok;
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
-use config::meta::{
-    alerts::alert::{Alert, AlertListFilter},
-    dashboards::datetime_now,
+use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use config::{
+    meta::{
+        alerts::alert::{Alert, AlertListFilter},
+        dashboards::datetime_now,
+        triggers::{ScheduledTriggerData, TriggerModule},
+    },
+    utils::json,
 };
+use hashbrown::HashMap;
 
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::{auth::UserEmail, http::get_stream_type_from_request},
     },
-    service::alerts::alert::{self, AlertError},
+    service::{
+        alerts::alert::{self, AlertError},
+        db::scheduler,
+    },
 };
 
 /// CreateAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"create"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -59,11 +69,13 @@ pub async fn save_alert(
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
-    alert.owner = Some(user_email.user_id.clone());
+    if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
+        alert.owner = Some(user_email.user_id.clone());
+    };
     alert.last_edited_by = Some(user_email.user_id);
     alert.updated_at = Some(datetime_now());
-    alert.last_triggered_at = None;
-    alert.last_satisfied_at = None;
+    alert.set_last_satisfied_at(None);
+    alert.set_last_triggered_at(None);
 
     match alert::save(&org_id, &stream_name, "", alert, true).await {
         Ok(_) => MetaHttpResponse::ok("Alert saved"),
@@ -72,6 +84,8 @@ pub async fn save_alert(
 }
 
 /// UpdateAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -111,6 +125,8 @@ pub async fn update_alert(
 }
 
 /// ListStreamAlerts
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"list"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -132,19 +148,11 @@ pub async fn update_alert(
 async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => {
-            return MetaHttpResponse::bad_request(e);
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query);
     let user_filter = query.get("owner").map(|v| v.to_string());
     let enabled_filter = query
         .get("enabled")
-        .and_then(|field| match field.parse::<bool>() {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        });
+        .and_then(|field| field.parse::<bool>().ok());
     let alert_filter = AlertListFilter {
         owner: user_filter,
         enabled: enabled_filter,
@@ -173,6 +181,8 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
 }
 
 /// ListAlerts
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"list"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -219,11 +229,8 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
     let user_filter = query.get("owner").map(|v| v.to_string());
     let enabled_filter = query
         .get("enabled")
-        .and_then(|field| match field.parse::<bool>() {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        });
-    let stream_type_filter = get_stream_type_from_request(&query).unwrap_or_default();
+        .and_then(|field| field.parse::<bool>().ok());
+    let stream_type_filter = get_stream_type_from_request(&query);
     let stream_name_filter = query.get("stream_name").map(|v| v.as_str());
 
     let alert_filter = AlertListFilter {
@@ -240,9 +247,35 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
     .await
     {
         Ok(mut data) => {
-            // Hack for frequency: convert seconds to minutes
-            for alert in data.iter_mut() {
-                alert.trigger_condition.frequency /= 60;
+            // `last_triggered_at` and `last_satisfied_at` are not part
+            // of the alerts anymore, so fetch the scheduled_jobs to get
+            // the last_triggered_at and last_satisfied_at.
+
+            if let Ok(scheduled_jobs) =
+                scheduler::list_by_org(&org_id, Some(TriggerModule::Alert)).await
+            {
+                for alert in data.iter_mut() {
+                    // Hack for frequency: convert seconds to minutes
+                    alert.trigger_condition.frequency /= 60;
+                    if let Some(scheduled_job) = scheduled_jobs.iter().find(|job| {
+                        job.module_key.eq(&format!(
+                            "{}/{}/{}",
+                            alert.stream_type, alert.stream_name, alert.name
+                        ))
+                    }) {
+                        alert.set_last_triggered_at(scheduled_job.start_time);
+                        let trigger_data: Result<ScheduledTriggerData, json::Error> =
+                            json::from_str(&scheduled_job.data);
+                        if let Ok(trigger_data) = trigger_data {
+                            alert.set_last_satisfied_at(trigger_data.last_satisfied_at);
+                        }
+                    }
+                }
+            } else {
+                // Hack for frequency: convert seconds to minutes
+                for alert in data.iter_mut() {
+                    alert.trigger_condition.frequency /= 60;
+                }
             }
 
             let mut mapdata = HashMap::new();
@@ -254,6 +287,8 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
 }
 
 /// GetAlertByName
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"get"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -276,14 +311,23 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
 async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return MetaHttpResponse::bad_request(e);
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     match alert::get_by_name(&org_id, stream_type, &stream_name, &name).await {
         Ok(Some(mut data)) => {
+            if let Ok(scheduled_job) = scheduler::get(
+                &org_id,
+                TriggerModule::Alert,
+                &format!("{}/{}/{}", stream_type, stream_name, name),
+            )
+            .await
+            {
+                data.set_last_triggered_at(scheduled_job.start_time);
+                let trigger_data: Result<ScheduledTriggerData, json::Error> =
+                    json::from_str(&scheduled_job.data);
+                if let Ok(trigger_data) = trigger_data {
+                    data.set_last_satisfied_at(trigger_data.last_satisfied_at);
+                }
+            }
             // Hack for frequency: convert seconds to minutes
             data.trigger_condition.frequency /= 60;
             MetaHttpResponse::json(data)
@@ -294,6 +338,8 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
 }
 
 /// DeleteAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"delete"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -317,12 +363,7 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
 async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return MetaHttpResponse::bad_request(e);
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     match alert::delete_by_name(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => MetaHttpResponse::ok("Alert deleted"),
         Err(e) => e.into(),
@@ -330,6 +371,8 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
 }
 
 /// EnableAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -354,12 +397,7 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
 async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return MetaHttpResponse::bad_request(e);
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let enable = match query.get("value") {
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
@@ -373,6 +411,8 @@ async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpReques
 }
 
 /// TriggerAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -399,12 +439,7 @@ async fn trigger_alert(
 ) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return MetaHttpResponse::bad_request(e);
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     match alert::trigger_by_name(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
         Err(e) => e.into(),

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,9 +17,9 @@ use datafusion::error::{DataFusionError, Result};
 
 use crate::service::promql::value::{InstantValue, Labels, Sample, Value};
 
-pub(crate) fn vector(data: &Value, eval_ts: i64) -> Result<Value> {
+pub(crate) fn vector(data: Value, eval_ts: i64) -> Result<Value> {
     let value = match data {
-        Value::Float(f) => *f,
+        Value::Float(f) => f,
         _ => {
             return Err(DataFusionError::NotImplemented(
                 "Unexpected input. Expected: \"vector(s scalar)\"".into(),

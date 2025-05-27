@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,17 +17,17 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, utils::util::zero_or, FxIndexMap};
+use config::{FxIndexMap, cluster, utils::util::zero_or};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
+    Pool, Sqlite,
     sqlite::{
         SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode, SqlitePoolOptions,
         SqliteSynchronous,
     },
-    Pool, Sqlite,
 };
-use tokio::sync::{mpsc, Mutex, OnceCell, RwLock};
+use tokio::sync::{Mutex, OnceCell, RwLock, mpsc};
 
 use super::{DBIndex, IndexStatement};
 use crate::{
@@ -56,7 +56,7 @@ fn connect_rw() -> Pool<Sqlite> {
         _ = std::fs::remove_file(format!("{url}-wal"));
     }
 
-    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 30);
+    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
     let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
 
@@ -66,7 +66,6 @@ fn connect_rw() -> Pool<Sqlite> {
         .synchronous(SqliteSynchronous::Normal)
         .locking_mode(SqliteLockingMode::Normal)
         .busy_timeout(Duration::from_secs(acquire_timeout))
-        // .disable_statement_logging()
         .create_if_missing(true);
 
     SqlitePoolOptions::new()

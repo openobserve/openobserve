@@ -254,8 +254,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         '>',
                         '<',
                         'IN',
+                        'NOT IN',
+                        'str_match',
+                        'str_match_ignore_case',
+                        'match_all',
+                        're_match',
+                        're_not_match',
                         'Contains',
                         'Not Contains',
+                        'Starts With',
+                        'Ends With',
                         'Is Null',
                         'Is Not Null',
                       ]"
@@ -625,7 +633,7 @@ export default defineComponent({
     const addVariableForm: Ref<any> = ref(null);
     const data: any = reactive({
       schemaResponse: [],
-      streamType: ["logs", "metrics", "traces", "enrichment_tables"],
+      streamType: ["logs", "metrics", "traces", "enrichment_tables", "metadata"],
       streams: [],
       currentFieldsList: [],
 

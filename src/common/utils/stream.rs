@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,15 +18,14 @@ use std::io::{Error, ErrorKind};
 use actix_web::HttpResponse;
 use arrow::array::{Int64Array, RecordBatch};
 use config::{
-    get_config,
-    meta::stream::{FileMeta, StreamType},
-    FILE_EXT_JSON,
+    FILE_EXT_JSON, TIMESTAMP_COL_NAME, get_config,
+    meta::{
+        stream::{FileMeta, StreamType},
+        user::{User, UserRole},
+    },
 };
 
-use crate::{
-    common::meta::user::{User, UserRole},
-    service::users,
-};
+use crate::service::users;
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
@@ -77,9 +76,8 @@ pub async fn populate_file_meta(
     if batches.is_empty() {
         return Ok(());
     }
-    let cfg = get_config();
-    let min_field = min_field.unwrap_or_else(|| cfg.common.column_timestamp.as_str());
-    let max_field = max_field.unwrap_or_else(|| cfg.common.column_timestamp.as_str());
+    let min_field = min_field.unwrap_or(TIMESTAMP_COL_NAME);
+    let max_field = max_field.unwrap_or(TIMESTAMP_COL_NAME);
 
     let total = batches.iter().map(|batch| batch.num_rows()).sum::<usize>();
     let mut min_val = i64::MAX;
@@ -115,33 +113,63 @@ pub async fn populate_file_meta(
     Ok(())
 }
 
+/// Get the default maximum query range in hours considering the stream setting max query range
+/// and the environment variable ZO_DEFAULT_MAX_QUERY_RANGE_DAYS
+pub fn get_default_max_query_range(stream_max_query_range: i64) -> i64 {
+    let config = get_config();
+    let default_max_query_range = config.limit.default_max_query_range_days * 24;
+
+    // This will allow the stream setting to override the global setting
+    if stream_max_query_range > 0 {
+        stream_max_query_range
+    } else {
+        default_max_query_range
+    }
+}
+
+/// Get the maximum query range considering service account specific restrictions,
+/// stream setting max query range and the environment variable ZO_DEFAULT_MAX_QUERY_RANGE_DAYS
 pub async fn get_settings_max_query_range(
     stream_max_query_range: i64,
     org_id: &str,
     user_id: Option<&str>,
 ) -> i64 {
+    let effective_max_query_range = get_default_max_query_range(stream_max_query_range);
     if user_id.is_none() {
-        return stream_max_query_range;
+        return effective_max_query_range;
     }
 
     if let Some(user) = users::get_user(Some(org_id), user_id.unwrap()).await {
-        return get_max_query_range_if_sa(stream_max_query_range, &user);
+        // get_max_query_range_by_user_role will use the effective max query range internally
+        // Hence using the stream_max_query_range passed in
+        get_max_query_range_by_user_role(stream_max_query_range, &user)
+    } else {
+        effective_max_query_range
     }
-
-    stream_max_query_range
 }
 
-pub fn get_max_query_range_if_sa(stream_max_query_range: i64, user: &User) -> i64 {
-    log::debug!("get_max_query_range_if_sa stream_max_query_range: {stream_max_query_range}, user_role: {:?}", user.role);
+/// Get the maximum query range with service account specific restrictions
+pub fn get_max_query_range_by_user_role(stream_max_query_range: i64, user: &User) -> i64 {
+    let config = get_config();
+    let effective_max_query_range = get_default_max_query_range(stream_max_query_range);
+    // Then apply service account specific restrictions if applicable
     if user.role == UserRole::ServiceAccount {
-        let max_query_range_sa = get_config().limit.max_query_range_for_sa;
-        return if max_query_range_sa > 0 {
-            std::cmp::min(stream_max_query_range, max_query_range_sa)
+        let max_query_range_sa = config.limit.max_query_range_for_sa;
+        return if max_query_range_sa > 0 && effective_max_query_range > 0 {
+            std::cmp::min(effective_max_query_range, max_query_range_sa)
+        } else if max_query_range_sa > 0 {
+            max_query_range_sa
         } else {
-            stream_max_query_range
+            effective_max_query_range
         };
     }
-    stream_max_query_range
+
+    log::debug!(
+        "get_max_query_range_if_sa stream_max_query_range: {effective_max_query_range}, user_role: {:?}",
+        user.role
+    );
+
+    effective_max_query_range
 }
 
 /// Get the maximum query range for a list of streams in hours
@@ -163,7 +191,7 @@ pub async fn get_max_query_range(
     .filter_map(|settings| {
         settings.map(|s| {
             if let Some(user) = &user {
-                get_max_query_range_if_sa(s.max_query_range, user)
+                get_max_query_range_by_user_role(s.max_query_range, user)
             } else {
                 s.max_query_range
             }
@@ -200,9 +228,11 @@ mod tests {
     #[test]
     fn test_get_file_name_v1() {
         let file_key = get_file_name_v1("nexus", "Olympics", 2);
-        assert!(file_key
-            .as_str()
-            .ends_with("/wal/nexus/logs/Olympics/Olympics_2.json"));
+        assert!(
+            file_key
+                .as_str()
+                .ends_with("/wal/nexus/logs/Olympics/Olympics_2.json")
+        );
     }
 
     #[test]

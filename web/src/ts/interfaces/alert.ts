@@ -27,6 +27,7 @@ interface TimingFunction {
 
 // Alert payload which is sent to backend
 export interface Alert {
+  id?: string;
   name: string;
   stream_name: string;
   stream_type: string;
@@ -82,24 +83,27 @@ export interface Headers {
 }
 export interface Destination {
   name: string;
-  url: string;
-  method: string;
-  skip_tls_verify: boolean;
-  headers: Headers;
-  template: string | Template;
-  emails: string;
-  type: "http" | "email" | "external_destination" | "remote_pipeline";
+  url?: string;
+  method?: string;
+  skip_tls_verify?: boolean;
+  headers?: Headers;
+  template?: string | Template;
+  emails?: string;
+  type: "http" | "email" | "sns" | "action";
+  action_id?: string;
+  output_format?: "json" | "ndjson";
 }
 
 export interface DestinationPayload {
   name: string;
-  url: string;
-  method: string;
-  skip_tls_verify: boolean;
-  headers: Headers;
-  template: string | Template;
-  emails: string[];
-  type: "http" | "email" | "external_destination" | "remote_pipeline";
+  url?: string;
+  method?: string;
+  skip_tls_verify?: boolean;
+  headers?: Headers;
+  template?: string | Template;
+  emails?: string[];
+  type: "http" | "email" | "sns" | "action";
+  action_id?: string;
 }
 
 // Destination object which is modified in frontend to display in table and form

@@ -19,6 +19,8 @@ import dashboardService from "../services/dashboards";
 import { toRaw } from "vue";
 import { date } from "quasar";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
+import commonService from "../services/common";
+
 
 let moment: any;
 let momentInitialized = false;
@@ -164,6 +166,39 @@ export const getAllDashboards = async (store: any, folderId: any) => {
     });
   } catch (error) {
     // handle error
+    throw error;
+  }
+};
+export const getFoldersListByType = async (store: any, type: any) => {
+  try {
+    let folders = (
+      await commonService.list_Folders(
+        store.state.selectedOrganization.identifier,
+        type
+      )
+    ).data.list;
+
+    // get default folder and append it to top
+    let defaultFolder = folders.find((it: any) => it.folderId == "default");
+    folders = folders.filter((it: any) => it.folderId != "default");
+
+    if (!defaultFolder) {
+      defaultFolder = {
+        name: "default",
+        folderId: "default",
+        description: "default",
+      };
+    }
+
+    store.dispatch("setFoldersByType", {
+      [type]: [
+        defaultFolder,
+        ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
+      ],
+    });
+
+    return store.state.organizationData.folders;
+  } catch (error) {
     throw error;
   }
 };
@@ -497,6 +532,7 @@ export const updateDashboard = async (
     const apiResponse = await dashboardService.get_Dashboard(
       store.state.selectedOrganization.identifier,
       dashboardId,
+      folderId,
     );
 
     await retrieveAndStoreDashboardData(
@@ -518,18 +554,19 @@ export const getDashboard = async (
   dashboardId: any,
   folderId: any,
 ) => {
-   // check if dashboard data is present in store
+  // check if dashboard data is present in store
   if (store.state.organizationData.allDashboardData[dashboardId]) {
     return store.state.organizationData.allDashboardData[dashboardId];
   }
-  
-  if(!dashboardId){
+
+  if (!dashboardId) {
     return {};
   }
 
   const apiResponse = await dashboardService.get_Dashboard(
     store.state.selectedOrganization.identifier,
     dashboardId,
+    folderId,
   );
 
   return await retrieveAndStoreDashboardData(
@@ -827,6 +864,19 @@ export const deleteFolderById = async (store: any, folderId: any) => {
   }
 };
 
+export const deleteFolderByIdByType = async (store: any, folderId: any, type: any) => {
+  try {
+    await commonService.delete_Folder(
+      store.state.selectedOrganization.identifier,
+      type,
+      folderId,
+    );
+    await getFoldersListByType(store, type);
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const createFolder = async (store: any, data: any) => {
   try {
     const newFolder = await dashboardService.new_Folder(
@@ -834,6 +884,20 @@ export const createFolder = async (store: any, data: any) => {
       data,
     );
     await getFoldersList(store);
+    return newFolder;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const createFolderByType = async (store: any, data: any, type: any) => {
+  try {
+    const newFolder = await commonService.new_Folder(
+      store.state.selectedOrganization.identifier,
+      type,
+      data,
+    );
+    await getFoldersListByType(store,type);
     return newFolder;
   } catch (error) {
     throw error;
@@ -853,9 +917,27 @@ export const updateFolder = async (store: any, folderId: any, data: any) => {
   }
 };
 
+export const updateFolderByType = async (store: any, folderId: any, data: any, type: any) => {
+  try {
+    await commonService.edit_Folder(
+      store.state.selectedOrganization.identifier,
+      type,
+      folderId,
+      data,
+    );
+    await getFoldersListByType(store, type);
+  } catch (error) {
+    throw error;
+  }
+};
+//from dashboard id is the folder id from where the dashboard will be moved
+//to dashboard id is the folder id to where the dashboard will be moved
+//dashboardIds is the array of dashboard ids that will be moved
+//we require from to get the latest dashboards list after moving
+
 export const moveDashboardToAnotherFolder = async (
   store: any,
-  dashboardId: any,
+  dashboardIds: any,
   from: any,
   to: any,
 ) => {
@@ -863,16 +945,35 @@ export const moveDashboardToAnotherFolder = async (
     //move dashboard
     await dashboardService.move_Dashboard(
       store.state.selectedOrganization.identifier,
-      dashboardId,
-      {
-        from: from,
-        to: to,
-      },
+      dashboardIds,
+      from,
+      to
     );
 
     //update both folders dashboard
     await getAllDashboards(store, to);
     await getAllDashboards(store, from);
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const moveModuleToAnotherFolder = async (
+  store: any,
+  data: any,
+  type: any,
+  folder_id?: any
+) => {
+  try {
+    //move alerts
+    await commonService.move_across_folders(
+      store.state.selectedOrganization.identifier,
+      type,
+      data,
+      folder_id
+
+    );
+
   } catch (error) {
     throw error;
   }

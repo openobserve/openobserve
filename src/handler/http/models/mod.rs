@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,10 @@
 //! This module contains models that can be serialized and deserialized as JSON
 //! for HTTP responses and requests.
 
+pub mod action;
 pub mod alerts;
+#[cfg(feature = "cloud")]
+pub mod billings;
 pub mod dashboards;
+pub mod destinations;
 pub mod folders;

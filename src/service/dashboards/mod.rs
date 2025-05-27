@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,13 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    ider,
+    TIMESTAMP_COL_NAME, ider,
     meta::{
         dashboards::{Dashboard, ListDashboardsParams},
-        folder::{Folder, FolderType, DEFAULT_FOLDER},
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
         stream::{DistinctField, StreamType},
     },
+    utils::time::now_micros,
 };
+use futures::future::join_all;
 use hashbrown::HashMap;
 use infra::table::{
     self,
@@ -33,12 +35,18 @@ use crate::common::{
     utils::auth::{remove_ownership, set_ownership},
 };
 pub mod reports;
+pub mod timed_annotations;
 
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
-    openfga::authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+#[cfg(feature = "enterprise")]
+use o2_openfga::{
+    authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
+    config::get_config as get_openfga_config,
 };
+
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::check_permissions;
 
 /// An error that occurs interacting with dashboards.
 #[derive(Debug, thiserror::Error)]
@@ -98,6 +106,18 @@ pub enum DashboardError {
     /// dashboard variables
     #[error("error in updating distinct values")]
     DistinctValueError,
+
+    /// Error that occurs when the user making the api call is not found.
+    #[error("user not found")]
+    UserNotFound,
+
+    /// Error that occurs when trying to get the list of dashboards that a user is permitted to
+    /// get.
+    #[error(transparent)]
+    ListPermittedDashboardsError(actix_web::Error),
+
+    #[error("Permission denied")]
+    PermissionDenied,
 }
 
 async fn add_distinct_field_entry(
@@ -177,13 +197,18 @@ async fn update_distinct_variables(
                 if stream_settings.full_text_search_keys.contains(f) {
                     continue;
                 }
+
+                if f == "count" || f == TIMESTAMP_COL_NAME {
+                    // these are reserved fields
+                    continue;
+                }
                 // we add entry for all the fields, because we need mappings for each individual
                 // origin-stream-field mapping. The duplicates are handled in add function, so
                 // we can call it for each field without issues
                 add_distinct_field_entry(dashboard_id, org_id, &name, typ.to_string(), f).await?;
                 let _temp = DistinctField {
                     name: f.to_owned(),
-                    added_ts: chrono::Utc::now().timestamp_micros(),
+                    added_ts: now_micros(),
                 };
                 if !stream_settings.distinct_value_fields.contains(&_temp) {
                     stream_settings.distinct_value_fields.push(_temp);
@@ -281,7 +306,7 @@ pub async fn create_dashboard(
 
     let dashboard = if table::folders::exists(org_id, folder_id, FolderType::Dashboards).await? {
         let dashboard_id = ider::generate();
-        let saved = put(org_id, &dashboard_id, folder_id, dashboard, None).await?;
+        let saved = put(org_id, &dashboard_id, folder_id, None, dashboard, None).await?;
         set_ownership(
             org_id,
             "dashboards",
@@ -303,7 +328,7 @@ pub async fn create_dashboard(
             .await
             .map_err(|_| DashboardError::CreateDefaultFolder)?;
         let dashboard_id = ider::generate();
-        let saved = put(org_id, &dashboard_id, folder_id, dashboard, None).await?;
+        let saved = put(org_id, &dashboard_id, folder_id, None, dashboard, None).await?;
         set_ownership(
             org_id,
             "dashboards",
@@ -340,7 +365,7 @@ pub async fn update_dashboard(
     dashboard: Dashboard,
     hash: Option<&str>,
 ) -> Result<Dashboard, DashboardError> {
-    let dashboard = put(org_id, dashboard_id, folder_id, dashboard, hash).await?;
+    let dashboard = put(org_id, dashboard_id, folder_id, None, dashboard, hash).await?;
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
@@ -357,9 +382,13 @@ pub async fn update_dashboard(
 
 #[tracing::instrument]
 pub async fn list_dashboards(
+    user_id: &str,
     params: ListDashboardsParams,
 ) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
+    let org_id = params.org_id.clone();
+    let folder_id = params.folder_id.clone();
     let dashboards = table::dashboards::list(params).await?;
+    let dashboards = filter_permitted_dashboards(&org_id, user_id, dashboards, folder_id).await?;
     Ok(dashboards)
 }
 
@@ -407,36 +436,58 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
 pub async fn move_dashboard(
     org_id: &str,
     dashboard_id: &str,
-    from_folder: &str,
     to_folder: &str,
+    _user_id: &str,
+    _check_openfga: bool,
 ) -> Result<(), DashboardError> {
-    if from_folder.is_empty() || to_folder.is_empty() {
-        return Err(DashboardError::MoveMissingFolderParam);
-    };
-
-    let Some(dashboard) =
-        table::dashboards::get_from_folder(org_id, from_folder, dashboard_id).await?
-    else {
-        return Err(DashboardError::DashboardNotFound);
-    };
-
-    // make sure the destination folder exists
     if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
         return Err(DashboardError::MoveDestinationFolderNotFound);
     };
 
-    // add the dashboard to the destination folder
-    put(org_id, dashboard_id, to_folder, dashboard.clone(), None).await?;
-    // OFGA ownership
+    let (curr_folder, dashboard) = table::dashboards::get_by_id(org_id, dashboard_id)
+        .await?
+        .ok_or(DashboardError::DashboardNotFound)?;
+
+    #[cfg(feature = "enterprise")]
+    if _check_openfga && get_openfga_config().enabled {
+        // TODO: Try to make a single call for all alerts
+        if !check_permissions(
+            Some(dashboard_id.to_owned()),
+            org_id,
+            _user_id,
+            "dashboards",
+            "PUT",
+            &curr_folder.folder_id,
+        )
+        .await
+        {
+            return Err(DashboardError::PermissionDenied);
+        }
+    }
+
+    let hash = dashboard.hash.clone();
+    let _updated_dashboard = put(
+        org_id,
+        dashboard_id,
+        &curr_folder.folder_id,
+        Some(to_folder),
+        dashboard,
+        Some(&hash),
+    )
+    .await?;
+
     #[cfg(feature = "enterprise")]
     {
         if get_o2_config().super_cluster.enabled {
-            let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
-                org_id, to_folder, dashboard,
+            let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put_v2(
+                org_id,
+                &curr_folder.folder_id,
+                Some(to_folder),
+                _updated_dashboard,
             )
             .await;
         }
-        if get_o2_config().openfga.enabled {
+        if get_openfga_config().enabled {
             set_parent_relation(
                 dashboard_id,
                 &get_ofga_type("dashboards"),
@@ -444,40 +495,39 @@ pub async fn move_dashboard(
                 &get_ofga_type("folders"),
             )
             .await;
-        }
-    }
-
-    // delete the dashboard from the source folder
-    table::dashboards::delete_from_folder(org_id, from_folder, dashboard_id)
-        .await
-        .map_err(|e| {
-            DashboardError::MoveDashboardDeleteOld(
-                dashboard_id.to_string(),
-                from_folder.to_string(),
-                e.to_string(),
-            )
-        })?;
-
-    #[cfg(feature = "enterprise")]
-    {
-        if get_o2_config().super_cluster.enabled {
-            let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_delete(
-                org_id,
-                from_folder,
-                dashboard_id,
-            )
-            .await;
-        }
-        if get_o2_config().openfga.enabled {
             remove_parent_relation(
                 dashboard_id,
                 &get_ofga_type("dashboards"),
-                from_folder,
+                &curr_folder.folder_id,
                 &get_ofga_type("folders"),
             )
             .await;
         }
     }
+
+    Ok(())
+}
+
+#[tracing::instrument]
+pub async fn move_dashboards(
+    org_id: &str,
+    dashboard_ids: &[String],
+    to_folder: &str,
+    user_id: &str,
+    check_openfga: bool,
+) -> Result<(), DashboardError> {
+    if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
+        return Err(DashboardError::MoveDestinationFolderNotFound);
+    };
+
+    let futs = dashboard_ids
+        .iter()
+        .map(|d_id| move_dashboard(org_id, d_id, to_folder, user_id, check_openfga));
+    let _ = join_all(futs)
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
     Ok(())
 }
 
@@ -486,6 +536,7 @@ async fn put(
     org_id: &str,
     dashboard_id: &str,
     folder_id: &str,
+    new_folder_id: Option<&str>,
     mut dashboard: Dashboard,
     hash: Option<&str>,
 ) -> Result<Dashboard, DashboardError> {
@@ -517,7 +568,7 @@ async fn put(
     dashboard.set_title(title);
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
-    let dash = table::dashboards::put(org_id, folder_id, dashboard).await?;
+    let dash = table::dashboards::put(org_id, folder_id, new_folder_id, dashboard, false).await?;
     Ok(dash)
 }
 
@@ -531,4 +582,99 @@ pub(crate) async fn get_folder_and_dashboard(
     table::dashboards::get_by_id(org_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)
+}
+
+/// Filters dashboards, returning only those that the user has permission to get.
+#[cfg(not(feature = "enterprise"))]
+async fn filter_permitted_dashboards(
+    _org_id: &str,
+    _user_id: &str,
+    dashboards: Vec<(Folder, Dashboard)>,
+    _folder_id: Option<String>,
+) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
+    Ok(dashboards)
+}
+
+/// Filters dashboards, returning only those that the user has permission to get.
+#[cfg(feature = "enterprise")]
+async fn filter_permitted_dashboards(
+    org_id: &str,
+    user_id: &str,
+    dashboards: Vec<(Folder, Dashboard)>,
+    folder_id: Option<String>,
+) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
+    // This function assumes the user already has `LIST` permission on the folder.
+    // Otherwise, the user will not be able to see the folder in the first place.
+
+    // So, we check for the `GET` permission on the folder.
+    // If the user has `GET` permission on the folder, then they will be able to see the folder and
+    // all its contents. This includes the dashboards inside the folder.
+
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
+
+    if let Some(folder_id) = folder_id {
+        let user_role = match get_user(Some(org_id), user_id).await {
+            Ok(Some(user)) => user.role,
+            _ => return Err(DashboardError::UserNotFound),
+        };
+        let permitted = crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            AuthExtractor {
+                org_id: org_id.to_string(),
+                o2_type: format!("{}:{folder_id}", OFGA_MODELS.get("folders").unwrap().key),
+                method: "GET".to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+                auth: "".to_string(), // We don't need to pass the auth token here.
+            },
+            user_role,
+            false,
+        )
+        .await;
+        if permitted {
+            // The user has `GET` permission on the folder.
+            // So, they will be able to see all the dashboards inside the folder.
+            return Ok(dashboards);
+        }
+    }
+
+    // We also check for the `GET_INDIVIDUAL` permission on the dashboards.
+    // If the user has `GET_INDIVIDUAL` permission on a dashboard, then they will be able to see the
+    // dashboard. This is used to check if the user has permission to see a specific dashboard.
+
+    let permitted_objects = crate::handler::http::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        "GET_INDIVIDUAL",
+        "dashboard",
+    )
+    .await
+    .map_err(DashboardError::ListPermittedDashboardsError)?;
+
+    let permitted_dashboards = dashboards
+        .into_iter()
+        .filter(|(f, d)| {
+            let folder_id = &f.folder_id;
+            let Some(dashboard_id) = d.dashboard_id() else {
+                return false;
+            };
+
+            permitted_objects.is_none()
+                || permitted_objects
+                    .as_ref()
+                    .unwrap()
+                    .contains(&format!("dashboard:{folder_id}/{dashboard_id}"))
+                || permitted_objects
+                    .as_ref()
+                    .unwrap()
+                    .contains(&format!("dashboard:{dashboard_id}"))
+                || permitted_objects
+                    .as_ref()
+                    .unwrap()
+                    .contains(&format!("dashboard:_all_{org_id}"))
+        })
+        .collect();
+    Ok(permitted_dashboards)
 }

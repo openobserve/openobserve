@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,10 @@ use config::meta::search::ScanStats;
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
+#[cfg(feature = "enterprise")]
+use {crate::service::grpc::make_grpc_search_client, config::meta::cluster::NodeInfo};
 
-use super::{datafusion::distributed_plan::remote_scan::RemoteScanExec, DATAFUSION_RUNTIME};
+use super::{DATAFUSION_RUNTIME, datafusion::distributed_plan::remote_scan::RemoteScanExec};
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 
@@ -119,11 +121,30 @@ pub fn conjunction(exprs: Vec<&Expr>) -> Option<Expr> {
     } else {
         // conjuction all expr in exprs
         let mut expr = exprs[0].clone();
+        if matches!(
+            expr,
+            Expr::BinaryOp {
+                op: BinaryOperator::Or,
+                ..
+            }
+        ) {
+            expr = Expr::Nested(Box::new(expr));
+        }
         for e in exprs.into_iter().skip(1) {
             expr = Expr::BinaryOp {
                 left: Box::new(expr),
                 op: BinaryOperator::And,
-                right: Box::new(Expr::Nested(Box::new(e.clone()))),
+                right: if matches!(
+                    e,
+                    Expr::BinaryOp {
+                        op: BinaryOperator::Or,
+                        ..
+                    }
+                ) {
+                    Box::new(Expr::Nested(Box::new(e.clone())))
+                } else {
+                    Box::new(e.clone())
+                },
             }
         }
         Some(expr)
@@ -147,4 +168,37 @@ pub fn is_value(e: &Expr) -> bool {
 
 pub fn is_field(e: &Expr) -> bool {
     matches!(e, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn collect_scan_stats(
+    nodes: &[Arc<dyn NodeInfo>],
+    trace_id: &str,
+    is_leader: bool,
+) -> ScanStats {
+    let mut scan_stats = ScanStats::default();
+    for node in nodes {
+        let mut scan_stats_request = tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
+            trace_id: trace_id.to_string(),
+            is_leader,
+        });
+        let mut client =
+            match make_grpc_search_client(trace_id, &mut scan_stats_request, node).await {
+                Ok(c) => c,
+                Err(e) => {
+                    log::error!("error in creating get scan stats client :{e}, skipping");
+                    continue;
+                }
+            };
+        let stats = match client.get_scan_stats(scan_stats_request).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("error in getting scan stats : {e}, skipping");
+                continue;
+            }
+        };
+        let stats = stats.into_inner().stats.unwrap_or_default();
+        scan_stats.add(&(&stats).into());
+    }
+    scan_stats
 }

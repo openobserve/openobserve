@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,14 +18,14 @@ use promql_parser::parser::Expr as PromExpr;
 use rayon::prelude::*;
 
 use crate::service::promql::{
-    aggregations::prepare_vector, common::quantile as calculate_quantile, value::Value, Engine,
+    Engine, aggregations::prepare_vector, common::quantile as calculate_quantile, value::Value,
 };
 
 pub async fn quantile(
     ctx: &mut Engine,
     timestamp: i64,
     param: Box<PromExpr>,
-    data: &Value,
+    data: Value,
 ) -> Result<Value> {
     let param = ctx.exec_expr(&param).await?;
     let qtile = match param {
@@ -59,8 +59,7 @@ pub async fn quantile(
         return prepare_vector(timestamp, f64::NAN);
     }
 
-    let values: Vec<f64> = data.par_iter().map(|item| item.sample.value).collect();
-
+    let values: Vec<f64> = data.into_par_iter().map(|item| item.sample.value).collect();
     let quantile_value = calculate_quantile(&values, qtile).unwrap();
     prepare_vector(timestamp, quantile_value)
 }

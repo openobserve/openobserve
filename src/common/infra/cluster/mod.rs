@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,28 +17,35 @@ use std::{
     cmp::min,
     collections::HashMap,
     ops::Bound,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
     time::Duration,
 };
 
 use config::{
+    RwAHashMap, RwBTreeMap,
     cluster::*,
     get_config,
     meta::{
         cluster::{Node, NodeStatus, Role, RoleGroup},
         meta_store::MetaStore,
     },
-    utils::{hash::Sum64, json},
-    RwAHashMap, RwBTreeMap,
+    utils::{
+        hash::Sum64,
+        json,
+        sysinfo::{NodeMetrics, get_node_metrics},
+    },
 };
 use infra::{
-    db::{get_coordinator, Event},
+    db::{Event, get_coordinator},
     errors::Result,
 };
 use once_cell::sync::Lazy;
 
 mod etcd;
 mod nats;
+mod scheduler;
+
+pub use scheduler::select_best_node;
 
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
@@ -65,7 +72,7 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role, group: Option
     };
     let mut h = config::utils::hash::gxhash::new();
     for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}:{}{}", CONSISTENT_HASH_PRIME, node.name, i);
+        let key = format!("{}:{}:{}", CONSISTENT_HASH_PRIME, node.name, i);
         let hash = h.sum64(&key);
         nodes.insert(hash, node.name.clone());
     }
@@ -84,7 +91,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role, group: O
     };
     let mut h = config::utils::hash::gxhash::new();
     for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}:{}{}", CONSISTENT_HASH_PRIME, node.name, i);
+        let key = format!("{}:{}:{}", CONSISTENT_HASH_PRIME, node.name, i);
         let hash = h.sum64(&key);
         nodes.remove(&hash);
     }
@@ -153,6 +160,22 @@ pub async fn print_consistent_hash() -> HashMap<String, HashMap<String, Vec<u64>
     }
     drop(r);
     map.insert("flatten_compactor".to_string(), node_map);
+    map
+}
+
+pub async fn count_consistent_hash() -> HashMap<String, usize> {
+    let mut map = HashMap::new();
+    let r = QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await;
+    map.insert("querier_interactive".to_string(), r.len());
+    drop(r);
+    let r = QUERIER_BACKGROUND_CONSISTENT_HASH.read().await;
+    map.insert("querier_background".to_string(), r.len());
+    drop(r);
+    let r = COMPACTOR_CONSISTENT_HASH.read().await;
+    map.insert("compactor".to_string(), r.len());
+    drop(r);
+    let r = FLATTEN_COMPACTOR_CONSISTENT_HASH.read().await;
+    map.insert("flatten_compactor".to_string(), r.len());
     map
 }
 
@@ -233,6 +256,24 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
     }
 }
 
+pub async fn set_unschedulable() -> Result<()> {
+    let node_id = LOCAL_NODE.uuid.clone();
+    if let Some(mut node) = get_node_by_uuid(&node_id).await {
+        node.scheduled = false;
+        update_local_node(&node).await?;
+    };
+    Ok(())
+}
+
+pub async fn set_schedulable() -> Result<()> {
+    let node_id = LOCAL_NODE.uuid.clone();
+    if let Some(mut node) = get_node_by_uuid(&node_id).await {
+        node.scheduled = true;
+        update_local_node(&node).await?;
+    };
+    Ok(())
+}
+
 pub async fn leave() -> Result<()> {
     LOCAL_NODE_STATUS.store(NodeStatus::Offline as _, Ordering::Release);
 
@@ -257,7 +298,10 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
     })?;
 
     for item in items {
-        let node: Node = json::from_slice(&item)?;
+        let node: Node = json::from_slice(&item).map_err(|e| {
+            log::error!("[CLUSTER] error parsing node: {}, payload: {:#?}", e, item);
+            e
+        })?;
         nodes.push(node.to_owned());
     }
 
@@ -284,10 +328,12 @@ async fn watch_node_list() -> Result<()> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let mut item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
                 let (_broadcasted, exist) = match NODES.read().await.get(item_key) {
-                    Some(v) => (v.broadcasted, item_value.eq(v)),
+                    Some(v) => (v.broadcasted, item_value.is_same(v)),
                     None => (false, false),
                 };
                 if exist {
+                    // update the node status metrics in local cache
+                    set_node_status_metrics(&item_value).await;
                     continue;
                 }
                 if item_value.status == NodeStatus::Offline {
@@ -308,6 +354,9 @@ async fn watch_node_list() -> Result<()> {
                         )
                         .await;
                     }
+                    if item_value.is_querier() && LOCAL_NODE.is_router() {
+                        crate::router::http::remove_querier_from_handler(&item_value.name).await;
+                    }
                     if item_value.is_compactor() {
                         remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
                     }
@@ -324,6 +373,12 @@ async fn watch_node_list() -> Result<()> {
                 }
                 log::info!("[CLUSTER] join {:?}", item_value);
                 item_value.broadcasted = true;
+                // check if the same node is already in the cluster
+                if let Some(node) = get_cached_node_by_name(&item_value.name).await {
+                    if node.uuid.ne(&item_value.uuid) {
+                        NODES.write().await.remove(&node.uuid);
+                    }
+                }
                 if item_value.is_interactive_querier() {
                     add_node_to_consistent_hash(
                         &item_value,
@@ -373,6 +428,9 @@ async fn watch_node_list() -> Result<()> {
                     )
                     .await;
                 }
+                if item_value.is_querier() && LOCAL_NODE.is_router() {
+                    crate::router::http::remove_querier_from_handler(&item_value.name).await;
+                }
                 if item_value.is_compactor() {
                     remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
                 }
@@ -412,14 +470,21 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
                 node.http_addr
             );
             let mut w = NODES_HEALTH_CHECK.write().await;
-            let entry = w.entry(node.uuid.clone()).or_insert(0);
+            let Some(entry) = w.get_mut(&node.uuid) else {
+                // node haven't been added to the cluster yet, when the health check first succeed,
+                // it will be added to the check map
+                continue;
+            };
             *entry += 1;
-            if *entry >= cfg.health_check.failed_times {
+            let times = *entry;
+            drop(w);
+
+            if times >= cfg.health_check.failed_times {
                 log::error!(
                     "[CLUSTER] node {}[{}] health check failed {} times, remove it",
                     node.name,
                     node.http_addr,
-                    cfg.health_check.failed_times
+                    times
                 );
                 if node.is_interactive_querier() {
                     remove_node_from_consistent_hash(
@@ -444,13 +509,14 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
                     remove_node_from_consistent_hash(&node, &Role::FlattenCompactor, None).await;
                 }
                 NODES.write().await.remove(&node.uuid);
+                NODES_HEALTH_CHECK.write().await.remove(&node.uuid);
             }
         } else {
+            // first time the node is online, add it to the check map, or reset the check count
             let mut w = NODES_HEALTH_CHECK.write().await;
-            if let Some(entry) = w.get_mut(&node.uuid) {
-                if *entry > 0 {
-                    *entry = 0;
-                }
+            let entry = w.entry(node.uuid.clone()).or_insert(0);
+            if *entry > 0 {
+                *entry = 0;
             }
         }
     }
@@ -471,15 +537,24 @@ pub async fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
     )
 }
 
+pub async fn get_node_by_addr(addr: &str) -> Option<Node> {
+    let nodes = get_cached_nodes(|_| true).await.unwrap_or_default();
+    nodes.iter().find(|n| n.grpc_addr == addr).cloned()
+}
+
 #[inline(always)]
 pub async fn get_cached_node_by_name(name: &str) -> Option<Node> {
     let r = NODES.read().await;
     if r.is_empty() {
+        drop(r);
         return None;
     }
-    r.iter()
+    let node = r
+        .iter()
         .find(|(_uuid, node)| node.name == name)
-        .map(|(_uuid, node)| node.clone())
+        .map(|(_uuid, node)| node.clone());
+    drop(r);
+    node
 }
 
 #[inline(always)]
@@ -489,35 +564,42 @@ pub async fn get_node_by_uuid(uuid: &str) -> Option<Node> {
 
 #[inline]
 pub async fn get_cached_online_nodes() -> Option<Vec<Node>> {
-    get_cached_nodes(|node| node.status == NodeStatus::Online && node.scheduled).await
+    get_cached_nodes(|node| node.status == NodeStatus::Online).await
 }
 
 #[inline]
-pub async fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
-    get_cached_nodes(|node| {
-        node.status == NodeStatus::Online && node.scheduled && node.is_ingester()
-    })
-    .await
-}
-
-#[inline]
-pub async fn get_cached_online_querier_nodes(group: Option<RoleGroup>) -> Option<Vec<Node>> {
-    let nodes = get_cached_nodes(|node| {
-        node.status == NodeStatus::Online && node.scheduled && node.is_querier()
-    })
-    .await;
-    filter_nodes_with_group(nodes, group)
+pub async fn get_cached_online_router_nodes() -> Option<Vec<Node>> {
+    get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_router()).await
 }
 
 #[inline]
 pub async fn get_cached_online_query_nodes(group: Option<RoleGroup>) -> Option<Vec<Node>> {
     let nodes = get_cached_nodes(|node| {
-        node.status == NodeStatus::Online
-            && node.scheduled
-            && (node.is_querier() || node.is_ingester())
+        node.status == NodeStatus::Online && (node.is_querier() || node.is_ingester())
     })
     .await;
     filter_nodes_with_group(nodes, group)
+}
+
+#[inline]
+pub async fn get_cached_online_querier_nodes(group: Option<RoleGroup>) -> Option<Vec<Node>> {
+    let nodes =
+        get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_querier()).await;
+    filter_nodes_with_group(nodes, group)
+}
+
+#[inline]
+pub async fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
+    get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_ingester()).await
+}
+
+#[inline]
+pub async fn get_cached_schedulable_ingester_nodes() -> Option<Vec<Node>> {
+    get_cached_nodes(|node| {
+        // the scheduled used for ingestion, so we need to check it
+        node.status == NodeStatus::Online && node.is_ingester() && node.scheduled
+    })
+    .await
 }
 
 #[inline(always)]
@@ -527,13 +609,72 @@ fn filter_nodes_with_group(
 ) -> Option<Vec<Node>> {
     let mut nodes = nodes?;
     match group {
-        Some(RoleGroup::Interactive) => nodes
-            .retain(|n| n.role_group == RoleGroup::None || n.role_group == RoleGroup::Interactive),
-        Some(RoleGroup::Background) => nodes
-            .retain(|n| n.role_group == RoleGroup::None || n.role_group == RoleGroup::Background),
+        Some(RoleGroup::Interactive) => nodes.retain(|n| {
+            !n.is_querier()
+                || n.role_group == RoleGroup::None
+                || n.role_group == RoleGroup::Interactive
+        }),
+        Some(RoleGroup::Background) => nodes.retain(|n| {
+            !n.is_querier()
+                || n.role_group == RoleGroup::None
+                || n.role_group == RoleGroup::Background
+        }),
         _ => {}
     };
     Some(nodes)
+}
+
+// update the node status metrics in local cache
+async fn set_node_status_metrics(node: &Node) {
+    let mut w = NODES.write().await;
+    if let Some(v) = w.get_mut(node.uuid.as_str()) {
+        v.metrics = node.metrics.clone();
+    }
+}
+
+async fn update_node_status_metrics() -> NodeMetrics {
+    let node_status = get_node_metrics();
+
+    config::metrics::NODE_UP
+        .with_label_values(&[config::VERSION])
+        .set(1);
+    config::metrics::NODE_CPU_TOTAL
+        .with_label_values(&[])
+        .set(node_status.cpu_total as i64);
+    config::metrics::NODE_CPU_USAGE
+        .with_label_values(&[])
+        .set(node_status.cpu_usage as i64);
+    config::metrics::NODE_MEMORY_TOTAL
+        .with_label_values(&[])
+        .set(node_status.memory_total as i64);
+    config::metrics::NODE_MEMORY_USAGE
+        .with_label_values(&[])
+        .set(node_status.memory_usage as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["total"])
+        .set(node_status.tcp_conns as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["established"])
+        .set(node_status.tcp_conns_established as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["close_wait"])
+        .set(node_status.tcp_conns_close_wait as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["time_wait"])
+        .set(node_status.tcp_conns_time_wait as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["resets"])
+        .set(node_status.tcp_conns_resets as i64);
+
+    // update node consistent hash metrics
+    let consistent_hash = count_consistent_hash().await;
+    for (k, v) in consistent_hash {
+        config::metrics::NODE_CONSISTENT_HASH
+            .with_label_values(&[k.as_str()])
+            .set(v as i64);
+    }
+
+    node_status
 }
 
 #[cfg(test)]
@@ -555,10 +696,14 @@ mod tests {
         assert!(get_cached_online_query_nodes(None).await.is_some());
         assert!(get_cached_online_ingester_nodes().await.is_some());
         assert!(get_cached_online_querier_nodes(None).await.is_some());
-    }
 
-    #[tokio::test]
-    async fn test_consistent_hashing() {
+        // Reset the global state.
+        QUERIER_INTERACTIVE_CONSISTENT_HASH.write().await.clear();
+        QUERIER_BACKGROUND_CONSISTENT_HASH.write().await.clear();
+        COMPACTOR_CONSISTENT_HASH.write().await.clear();
+        FLATTEN_COMPACTOR_CONSISTENT_HASH.write().await.clear();
+
+        // Test consistent hash logic.
         let node = load_local_node();
         for i in 0..10 {
             let node_q = Node {
@@ -593,13 +738,13 @@ mod tests {
 
         // gxhash hash
         let data = [
-            ["test", "node-q-4", "node-c-8"],
-            ["test1", "node-q-6", "node-c-2"],
-            ["test2", "node-q-2", "node-c-0"],
-            ["test3", "node-q-6", "node-c-3"],
-            ["test4", "node-q-1", "node-c-6"],
-            ["test5", "node-q-1", "node-c-0"],
-            ["test6", "node-q-2", "node-c-1"],
+            ["test", "node-q-2", "node-c-7"],
+            ["test1", "node-q-3", "node-c-0"],
+            ["test2", "node-q-6", "node-c-5"],
+            ["test3", "node-q-9", "node-c-9"],
+            ["test4", "node-q-2", "node-c-0"],
+            ["test5", "node-q-5", "node-c-8"],
+            ["test6", "node-q-5", "node-c-8"],
         ];
 
         remove_node_from_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;

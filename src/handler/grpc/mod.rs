@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -57,7 +57,7 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
         };
 
         let job = cluster_rpc::Job {
-            trace_id: ider::uuid(),
+            trace_id: ider::generate_trace_id(),
             job: "".to_string(),
             stage: 0,
             partition: 0,

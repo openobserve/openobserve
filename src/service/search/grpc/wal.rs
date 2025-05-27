@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,9 @@
 
 use std::{path::Path, sync::Arc};
 
-use arrow::array::{new_null_array, ArrayRef};
+use arrow::array::{ArrayRef, new_null_array};
 use config::{
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         search::{ScanStats, StorageType},
@@ -25,6 +26,8 @@ use config::{
     utils::{
         file::{is_exists, scan_files},
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
+        record_batch_ext::concat_batches,
+        size::bytes_to_human_readable,
     },
 };
 use datafusion::{
@@ -44,6 +47,7 @@ use crate::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
             generate_filter_from_equal_items, generate_search_schema_diff,
             index::IndexCondition,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             match_source,
         },
     },
@@ -60,6 +64,7 @@ pub async fn search_parquet(
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
 ) -> super::SearchTable {
+    let load_start = std::time::Instant::now();
     // get file list
     let stream_settings =
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
@@ -166,7 +171,7 @@ pub async fn search_parquet(
         wal::release_files(&lock_files);
         return Ok((vec![], ScanStats::new()));
     }
-    let schema_latest_id = schema_versions.len() - 1;
+    let latest_schema_id = schema_versions.len() - 1;
 
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
@@ -188,7 +193,7 @@ pub async fn search_parquet(
                 )));
             }
         };
-        files_group.insert(schema_latest_id, files);
+        files_group.insert(latest_schema_id, files);
     } else {
         scan_stats.files = files.len() as i64;
         for file in files.iter() {
@@ -212,7 +217,7 @@ pub async fn search_parquet(
                         file.meta.max_ts
                     );
                     // HACK: use the latest version if not found in schema versions
-                    schema_latest_id
+                    latest_schema_id
                 }
             };
             let group = files_group.entry(schema_ver_id).or_default();
@@ -221,12 +226,30 @@ pub async fn search_parquet(
     }
 
     log::info!(
-        "[trace_id {}] wal->parquet->search: load groups {}, files {}, scan_size {}, compressed_size {}",
-        query.trace_id,
-        files_group.len(),
-        scan_stats.files,
-        scan_stats.original_size,
-        scan_stats.compressed_size
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] wal->parquet->search: load groups {}, files {}, scan_size {}, compressed_size {}",
+                query.trace_id,
+                files_group.len(),
+                scan_stats.files,
+                scan_stats.original_size,
+                scan_stats.compressed_size
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("wal:parquet load".to_string())
+                .search_role("follower".to_string())
+                .duration(load_start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "wal parquet search load groups {}, files {}, scan_size {}, compressed_size {}",
+                    files_group.len(),
+                    scan_stats.files,
+                    bytes_to_human_readable(scan_stats.original_size as f64),
+                    bytes_to_human_readable(scan_stats.compressed_size as f64)
+                ))
+                .build()
+        )
     );
 
     if cfg.common.memory_circuit_breaker_enable {
@@ -238,22 +261,20 @@ pub async fn search_parquet(
     }
 
     // construct latest schema map
-    let schema_latest = Arc::new(
+    let latest_schema = Arc::new(
         schema
             .as_ref()
             .clone()
             .with_metadata(std::collections::HashMap::new()),
     );
-    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
-    for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field);
+    let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
+    for field in latest_schema.fields() {
+        latest_schema_map.insert(field.name(), field);
     }
 
     let mut tables = Vec::new();
+    let start = std::time::Instant::now();
     for (ver, files) in files_group {
-        if files.is_empty() {
-            continue;
-        }
         if files.is_empty() {
             continue;
         }
@@ -267,16 +288,17 @@ pub async fn search_parquet(
             target_partitions: cfg.limit.cpu_num,
         };
 
-        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         match exec::create_parquet_table(
             &session,
-            schema_latest.clone(),
+            latest_schema.clone(),
             &files,
             diff_fields,
             sorted_by_time,
             file_stat_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
+            true,
         )
         .await
         {
@@ -292,6 +314,23 @@ pub async fn search_parquet(
     // lock these files for this request
     wal::lock_request(&query.trace_id, &lock_files);
 
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] wal->parquet->search: create tables took {} ms",
+                query.trace_id,
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("wal:parquet create tables".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
+
     Ok((tables, scan_stats))
 }
 
@@ -305,6 +344,7 @@ pub async fn search_memtable(
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
 ) -> super::SearchTable {
+    let load_start = std::time::Instant::now();
     let mut scan_stats = ScanStats::new();
 
     // format partition keys
@@ -361,12 +401,30 @@ pub async fn search_memtable(
     }
 
     log::info!(
-        "[trace_id {}] wal->mem->search: load groups {}, files {}, scan_size {}, compressed_size {}",
-        query.trace_id,
-        batch_groups.len(),
-        scan_stats.files,
-        scan_stats.original_size,
-        scan_stats.compressed_size,
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] wal->mem->search: load groups {}, files {}, scan_size {}, compressed_size {}",
+                query.trace_id,
+                batch_groups.len(),
+                scan_stats.files,
+                scan_stats.original_size,
+                scan_stats.compressed_size,
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("wal:memtable load".to_string())
+                .search_role("follower".to_string())
+                .duration(load_start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "wal mem search load groups {}, files {}, scan_size {}, compressed_size {}",
+                    batch_groups.len(),
+                    scan_stats.files,
+                    bytes_to_human_readable(scan_stats.original_size as f64),
+                    bytes_to_human_readable(scan_stats.compressed_size as f64)
+                ))
+                .build()
+        )
     );
 
     let cfg = get_config();
@@ -375,40 +433,94 @@ pub async fn search_memtable(
     }
 
     // construct latest schema map
-    let schema_latest = Arc::new(
+    let latest_schema = Arc::new(
         schema
             .as_ref()
             .clone()
             .with_metadata(std::collections::HashMap::new()),
     );
-    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
-    for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field);
+    let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
+    for field in latest_schema.fields() {
+        latest_schema_map.insert(field.name(), field);
     }
 
     let mut tables = Vec::new();
-    for (schema, mut record_batches) in batch_groups {
+    let start = std::time::Instant::now();
+    for (schema, record_batches) in batch_groups {
         if record_batches.is_empty() {
             continue;
         }
 
-        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
-
-        for batch in record_batches.iter_mut() {
-            *batch = adapt_batch(schema_latest.clone(), batch);
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
+        let mut adapt_batches = Vec::with_capacity(record_batches.len());
+        for batch in record_batches {
+            adapt_batches.push(adapt_batch(latest_schema.clone(), batch));
         }
+        let record_batches = adapt_batches;
 
-        let table = Arc::new(NewMemTable::try_new(
+        tokio::task::coop::consume_budget().await;
+
+        // merge small batches into big batches
+        let mut merge_groupes = Vec::new();
+        let mut current_group = Vec::new();
+        let group_limit = config::PARQUET_BATCH_SIZE;
+        let mut group_size = 0;
+        for batch in record_batches {
+            if group_size > 0 && group_size + batch.num_rows() > group_limit {
+                merge_groupes.push(current_group);
+                current_group = Vec::new();
+                group_size = 0;
+            }
+            group_size += batch.num_rows();
+            current_group.push(batch);
+        }
+        if !current_group.is_empty() {
+            merge_groupes.push(current_group);
+        }
+        let record_batches = merge_groupes
+            .into_iter()
+            .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
+            .collect::<Vec<_>>();
+
+        tokio::task::coop::consume_budget().await;
+
+        let table = match NewMemTable::try_new(
             record_batches[0].schema().clone(),
             vec![record_batches],
             diff_fields,
             sorted_by_time,
             index_condition.clone(),
             fst_fields.clone(),
-        )?);
+        ) {
+            Ok(table) => Arc::new(table),
+            Err(e) => {
+                log::error!(
+                    "[trace_id {}] wal->mem->search: create memtable error: {}",
+                    query.trace_id,
+                    e
+                );
+                return Err(e.into());
+            }
+        };
         tables.push(table as _);
     }
 
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] wal->mem->search: create tables took {} ms",
+                query.trace_id,
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("wal:memtable create tables".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
     Ok((tables, scan_stats))
 }
 
@@ -442,11 +554,6 @@ async fn get_file_list_inner(
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
     let files = scan_files(&pattern, file_ext, None).unwrap_or_default();
-    if files.is_empty() {
-        return Ok(vec![]);
-    }
-
-    // lock theses files
     let files = files
         .iter()
         .map(|f| {
@@ -458,7 +565,19 @@ async fn get_file_list_inner(
                 .to_string()
         })
         .collect::<Vec<_>>();
+
+    // use same lock to combine the operations of filter by pending delete and lock files
+    let wal_lock = infra::local_lock::lock("wal").await?;
+
+    // filter by pending delete
+    let files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
+    if files.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // lock theses files
     wal::lock_files(&files);
+    drop(wal_lock);
 
     let stream_params = Arc::new(StreamParams::new(
         &query.org_id,
@@ -525,13 +644,13 @@ async fn get_file_list(
     .await
 }
 
-pub fn adapt_batch(schema_latest: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
+pub fn adapt_batch(latest_schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
 
-    let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema_latest.fields().len());
-    let mut fields = Vec::with_capacity(schema_latest.fields().len());
-    for field_latest in schema_latest.fields() {
+    let mut cols: Vec<ArrayRef> = Vec::with_capacity(latest_schema.fields().len());
+    let mut fields = Vec::with_capacity(latest_schema.fields().len());
+    for field_latest in latest_schema.fields() {
         if let Some((idx, field)) = batch_schema.column_with_name(field_latest.name()) {
             cols.push(Arc::clone(&batch_cols[idx]));
             fields.push(field.clone());

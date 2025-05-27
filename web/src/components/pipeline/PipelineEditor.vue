@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="pipelineObj.currentSelectedPipeline.name"
           :label="t('pipeline.pipelineName')"
-          style="border: 1px solid #eaeaea"
+          style="border: 1px solid #eaeaea; width: calc(30vw);"
           filled
-          dense
+          dense          
         />
       </div>
     </div>
@@ -62,6 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         color="secondary"
         padding="sm xl"
         no-caps
+        :loading="isPipelineSaving"
+        :disable="isPipelineSaving"
         @click="savePipeline"
       />
     </div>
@@ -81,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator class="q-mb-md" />
 
       <div class="flex q-mt-sm">
-        <NodeSidebar :nodeTypes="nodeTypes" />
+        <NodeSidebar v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'" :nodeTypes="nodeTypes"  />
       </div>
     </div>
     <div
@@ -89,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="chartContainerRef"
       class="relative-position pipeline-chart-container o2vf_node"
       :class="store.state.theme === 'dark' ? '' : 'bg-grey-2'"
+      v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
     >
       <PipelineFlow />
     </div>
@@ -99,10 +102,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     position="right"
     full-height
     maximized
+    @keydown.stop
   >
     <div
       data-test="pipeline-nodes-list-dragable"
       class="stream-routing-dialog-container full-height"
+      @keydown.stop
+      tabindex="0"
     >
       <QueryForm
         v-if="pipelineObj.dialog.name === 'query'"
@@ -380,6 +386,8 @@ const isFetchingFunctions = ref(false);
 
 const chartContainerRef = ref(null);
 
+const isPipelineSaving = ref(false);
+
 const nodeRows = ref<(string | null)[]>([]);
 
 const q = useQuasar();
@@ -634,13 +642,39 @@ const confirmSaveBasicPipeline = async () => {
   confirmDialogBasicPipeline.value = false;
   await onSubmitPipeline();
 };
+const validatePipeline = () => {
+  // Find input node
+  const inputNode = pipelineObj.currentSelectedPipeline.nodes?.find((node: any) => node.type === 'input');
+
+  const outputNode = pipelineObj.currentSelectedPipeline.nodes?.find((node: any) => node.type === 'output');
+  
+
+  // If trying to use enrichment_tables with stream input, return false
+  if ( inputNode.data?.node_type === 'stream' && outputNode.data?.node_type === 'stream' && outputNode.data?.stream_type === 'enrichment_tables') {
+    q.notify({
+      message: "Enrichment tables as destination stream is only available for scheduled pipelines",
+      color: "negative",
+      position: "bottom",
+      timeout: 2000,
+    });
+    return false;
+  }
+
+  return true;
+};
 
 const onSubmitPipeline = async () => {
+  isPipelineSaving.value = true;
+  if(!validatePipeline()){
+    isPipelineSaving.value = false;
+    return;
+  }
   const dismiss = q.notify({
     message: "Saving pipeline...",
     position: "bottom",
     spinner: true,
   });
+
   const saveOperation = pipelineObj.isEditPipeline
     ? pipelineService.updatePipeline({
         data: pipelineObj.currentSelectedPipeline,
@@ -696,6 +730,7 @@ const onSubmitPipeline = async () => {
       }
     })
     .finally(() => {
+      isPipelineSaving.value = false;
       dismiss();
     });
 };

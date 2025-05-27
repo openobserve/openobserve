@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,15 +23,18 @@ mod stream;
 mod wal;
 mod writer;
 
-use std::{path::PathBuf, sync::Arc};
+use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
-use tokio::sync::{mpsc, Mutex};
-pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
+use snafu::ResultExt;
+use tokio::sync::{Mutex, mpsc};
+pub use writer::{Writer, check_memtable_size, flush_all, get_writer, read_from_memtable};
+
+use crate::errors::OpenDirSnafu;
 
 pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchEntry>>);
 
@@ -40,13 +43,27 @@ pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::F
 
 pub static WAL_DIR_DEFAULT_PREFIX: &str = "logs";
 
+// writer signal
+pub enum WriterSignal {
+    Produce,
+    Rotate,
+    Close,
+}
+
 pub async fn init() -> errors::Result<()> {
     // check uncompleted parquet files, need delete those files
     wal::check_uncompleted_parquet_files().await?;
 
     // replay wal files to create immutable
+    let wal_dir = PathBuf::from(&config::get_config().common.data_wal_dir).join("logs");
+    create_dir_all(&wal_dir).context(OpenDirSnafu {
+        path: wal_dir.clone(),
+    })?;
+    let wal_files = wal::wal_scan_files(&wal_dir, "wal")
+        .await
+        .unwrap_or_default();
     tokio::task::spawn(async move {
-        if let Err(e) = wal::replay_wal_files().await {
+        if let Err(e) = wal::replay_wal_files(wal_dir, wal_files).await {
             log::error!("replay wal files error: {}", e);
         }
     });
@@ -75,7 +92,7 @@ pub async fn init() -> errors::Result<()> {
 }
 
 async fn run() -> errors::Result<()> {
-    // start persidt worker
+    // start persist worker
     let cfg = config::get_config();
     let (tx, rx) = mpsc::channel::<PathBuf>(cfg.limit.mem_dump_thread_num);
     let rx = Arc::new(Mutex::new(rx));
@@ -119,4 +136,82 @@ async fn run() -> errors::Result<()> {
 
     log::info!("[INGESTER:MEM] immutable persist is stopped");
     Ok(())
+}
+
+// wal file format:
+// files/{org}/{stype}/{stream}/{thread_id}/{year}/{month}/{day}/{hour}/{schema_key}/{file_name}
+pub fn is_wal_file(local_mode: bool, file: &str) -> bool {
+    // not local mode, directly return false
+    if !local_mode {
+        return false;
+    }
+
+    // local mode, check the file name format
+    let columns = file.split('/').collect::<Vec<_>>();
+    !(columns.len() < 11
+        // thread_id is impossible over 1000
+        || columns[4].len() == 4
+        // schema_key is 16 bytes, and not contains "="
+        || columns[9].len() != 16
+        || columns[9].contains("="))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_wal_file_wal_file() {
+        assert_eq!(
+            is_wal_file(
+                true,
+                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
+            ),
+            true
+        );
+        assert_eq!(
+            is_wal_file(
+                true,
+                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/a=b/file.parquet"
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn test_is_wal_file_storage_file() {
+        assert_eq!(
+            is_wal_file(true, "files/org/stype/stream/2025/03/24/00/file.parquet"),
+            false
+        );
+        assert_eq!(
+            is_wal_file(
+                true,
+                "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn test_is_wal_file_not_local_mode() {
+        assert_eq!(
+            is_wal_file(
+                false,
+                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
+            ),
+            false
+        );
+        assert_eq!(
+            is_wal_file(false, "files/org/stype/stream/2025/03/24/00/file.parquet"),
+            false
+        );
+        assert_eq!(
+            is_wal_file(
+                false,
+                "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
+            ),
+            false
+        );
+    }
 }

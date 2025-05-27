@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ use actix_web::web;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
+    ALL_VALUES_COL_NAME, BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     get_config,
     meta::{
         self_reporting::usage::UsageType,
@@ -29,7 +30,6 @@ use config::{
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 
 use super::{ingestion_log_enabled, log_failed_record};
@@ -39,7 +39,7 @@ use crate::{
         format_stream_name,
         ingestion::check_ingestion_allowed,
         pipeline::batch_execution::{ExecutablePipeline, ExecutablePipelineBulkInputs},
-        schema::get_upto_discard_error,
+        schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 
@@ -70,6 +70,8 @@ pub async fn ingest(
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
+    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
+        .timestamp_micros();
 
     let log_ingestion_errors = ingestion_log_enabled().await;
     let mut action = String::from("");
@@ -82,8 +84,10 @@ pub async fn ingest(
         HashMap::new();
     let mut stream_pipeline_inputs: HashMap<String, ExecutablePipelineBulkInputs> = HashMap::new();
 
-    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut streams_need_original_set: HashSet<String> = HashSet::new();
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    let mut store_original_when_pipeline_exists = false;
 
     let mut json_data_by_stream = HashMap::new();
     let mut next_line_is_data = false;
@@ -169,9 +173,15 @@ pub async fn ingest(
             crate::service::ingestion::get_uds_and_original_data_streams(
                 &streams,
                 &mut user_defined_schema_map,
-                &mut streams_need_original_set,
+                &mut streams_need_original_map,
+                &mut streams_need_all_values_map,
             )
             .await;
+
+            // with pipeline, we need to store original if any of the destinations requires original
+            store_original_when_pipeline_exists = stream_executable_pipelines
+                .contains_key(&stream_name)
+                && streams_need_original_map.values().any(|val| *val);
 
             next_line_is_data = true;
         } else {
@@ -187,14 +197,14 @@ pub async fn ingest(
                     .is_none()
                 {
                     // current stream requires original
-                    streams_need_original_set
-                        .contains(&stream_name)
+                    streams_need_original_map
+                        .get(&stream_name)
+                        .is_some_and(|v| *v)
                         .then_some(value.to_string())
                 } else {
                     // 3. with pipeline, storing original as long as streams_need_original_set is
                     //    not empty
-                    // because not sure the pipeline destinations
-                    (!streams_need_original_set.is_empty()).then_some(value.to_string())
+                    store_original_when_pipeline_exists.then_some(value.to_string())
                 }
             } else {
                 None // `item` won't be flattened, no need to store original
@@ -225,12 +235,16 @@ pub async fn ingest(
                     local_val.insert("_id".to_string(), json::Value::String(doc_id.to_owned()));
                 }
 
-                if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+                if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
                     local_val = crate::service::logs::refactor_map(local_val, fields);
                 }
 
                 // add `_original` and '_record_id` if required by StreamSettings
-                if streams_need_original_set.contains(&stream_name) && original_data.is_some() {
+                if streams_need_original_map
+                    .get(&stream_name)
+                    .is_some_and(|v| *v)
+                    && original_data.is_some()
+                {
                     local_val.insert(
                         ORIGINAL_DATA_COL_NAME.to_string(),
                         original_data.unwrap().into(),
@@ -246,8 +260,33 @@ pub async fn ingest(
                     );
                 }
 
+                // add `_all_values` if required by StreamSettings
+                if streams_need_all_values_map
+                    .get(&stream_name)
+                    .is_some_and(|v| *v)
+                {
+                    let mut values = Vec::with_capacity(local_val.len());
+                    for (k, value) in local_val.iter() {
+                        if [
+                            TIMESTAMP_COL_NAME,
+                            ID_COL_NAME,
+                            ORIGINAL_DATA_COL_NAME,
+                            ALL_VALUES_COL_NAME,
+                        ]
+                        .contains(&k.as_str())
+                        {
+                            continue;
+                        }
+                        values.push(value.to_string());
+                    }
+                    local_val.insert(
+                        ALL_VALUES_COL_NAME.to_string(),
+                        json::Value::String(values.join(" ")),
+                    );
+                }
+
                 // handle timestamp
-                let timestamp = match local_val.get(&cfg.common.column_timestamp) {
+                let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
                     Some(v) => match parse_timestamp_micro_from_value(v) {
                         Ok(t) => t,
                         Err(_e) => {
@@ -277,9 +316,13 @@ pub async fn ingest(
                 };
 
                 // check ingestion time
-                if timestamp < min_ts {
+                if timestamp < min_ts || timestamp > max_ts {
                     bulk_res.errors = true;
-                    let failure_reason = Some(get_upto_discard_error().to_string());
+                    let failure_reason = if timestamp < min_ts {
+                        Some(get_upto_discard_error().to_string())
+                    } else {
+                        Some(get_future_discard_error().to_string())
+                    };
                     metrics::INGEST_ERRORS
                         .with_label_values(&[
                             org_id,
@@ -301,7 +344,7 @@ pub async fn ingest(
                     continue;
                 }
                 local_val.insert(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
 
@@ -312,6 +355,7 @@ pub async fn ingest(
                 *fn_num = Some(0); // no pl -> no func
             }
         }
+        tokio::task::coop::consume_budget().await;
     }
 
     // batch process records through pipeline
@@ -325,7 +369,10 @@ pub async fn ingest(
                 continue;
             };
             let (records, doc_ids, originals) = pipeline_inputs.into_parts();
-            match exec_pl.process_batch(org_id, records).await {
+            match exec_pl
+                .process_batch(org_id, records, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     log::error!(
                         "[Pipeline] for stream {}/{}: Batch execution error: {}.",
@@ -360,6 +407,18 @@ pub async fn ingest(
                             continue;
                         }
 
+                        let destination_stream = stream_params.stream_name.to_string();
+                        if !user_defined_schema_map.contains_key(&destination_stream) {
+                            // a new dynamically created stream. need to check the two maps again
+                            crate::service::ingestion::get_uds_and_original_data_streams(
+                                &[stream_params],
+                                &mut user_defined_schema_map,
+                                &mut streams_need_original_map,
+                                &mut streams_need_all_values_map,
+                            )
+                            .await;
+                        }
+
                         for (idx, mut res) in stream_pl_results {
                             // get json object
                             let mut local_val = match res.take() {
@@ -375,15 +434,16 @@ pub async fn ingest(
                                 );
                             }
 
-                            if let Some(fields) =
-                                user_defined_schema_map.get(stream_params.stream_name.as_str())
+                            if let Some(Some(fields)) =
+                                user_defined_schema_map.get(&destination_stream)
                             {
                                 local_val = crate::service::logs::refactor_map(local_val, fields);
                             }
 
                             // add `_original` and '_record_id` if required by StreamSettings
-                            if streams_need_original_set
-                                .contains(stream_params.stream_name.as_str())
+                            if streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v)
                                 && originals[idx].is_some()
                             {
                                 local_val.insert(
@@ -392,7 +452,7 @@ pub async fn ingest(
                                 );
                                 let record_id = crate::service::ingestion::generate_record_id(
                                     org_id,
-                                    &stream_params.stream_name,
+                                    &destination_stream,
                                     &StreamType::Logs,
                                 );
                                 local_val.insert(
@@ -401,8 +461,33 @@ pub async fn ingest(
                                 );
                             }
 
+                            // add `_all_values` if required by StreamSettings
+                            if streams_need_all_values_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v)
+                            {
+                                let mut values = Vec::with_capacity(local_val.len());
+                                for (k, value) in local_val.iter() {
+                                    if [
+                                        TIMESTAMP_COL_NAME,
+                                        ID_COL_NAME,
+                                        ORIGINAL_DATA_COL_NAME,
+                                        ALL_VALUES_COL_NAME,
+                                    ]
+                                    .contains(&k.as_str())
+                                    {
+                                        continue;
+                                    }
+                                    values.push(value.to_string());
+                                }
+                                local_val.insert(
+                                    ALL_VALUES_COL_NAME.to_string(),
+                                    json::Value::String(values.join(" ")),
+                                );
+                            }
+
                             // handle timestamp
-                            let timestamp = match local_val.get(&cfg.common.column_timestamp) {
+                            let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
                                 Some(v) => match parse_timestamp_micro_from_value(v) {
                                     Ok(t) => t,
                                     Err(_e) => {
@@ -417,12 +502,12 @@ pub async fn ingest(
                                             .inc();
                                         log_failed_record(
                                             log_ingestion_errors,
-                                            &local_val,
+                                            &res,
                                             TS_PARSE_FAILED,
                                         );
                                         add_record_status(
-                                            stream_params.stream_name.to_string(),
-                                            &doc_ids[idx],
+                                            stream_name.clone(),
+                                            &doc_id,
                                             action.clone(),
                                             Some(res),
                                             &mut bulk_res,
@@ -436,9 +521,13 @@ pub async fn ingest(
                             };
 
                             // check ingestion time
-                            if timestamp < min_ts {
+                            if timestamp < min_ts || timestamp > max_ts {
                                 bulk_res.errors = true;
-                                let error = get_upto_discard_error().to_string();
+                                let failure_reason = if timestamp < min_ts {
+                                    Some(get_upto_discard_error().to_string())
+                                } else {
+                                    Some(get_future_discard_error().to_string())
+                                };
                                 metrics::INGEST_ERRORS
                                     .with_label_values(&[
                                         org_id,
@@ -447,11 +536,10 @@ pub async fn ingest(
                                         TS_PARSE_FAILED,
                                     ])
                                     .inc();
-                                log_failed_record(log_ingestion_errors, &local_val, &error);
-                                let failure_reason = Some(error);
+                                log_failed_record(log_ingestion_errors, &res, TS_PARSE_FAILED);
                                 add_record_status(
-                                    stream_params.stream_name.to_string(),
-                                    &doc_ids[idx],
+                                    stream_name.clone(),
+                                    &doc_id,
                                     action.clone(),
                                     Some(res),
                                     &mut bulk_res,
@@ -461,15 +549,17 @@ pub async fn ingest(
                                 continue;
                             }
                             local_val.insert(
-                                cfg.common.column_timestamp.clone(),
+                                TIMESTAMP_COL_NAME.to_string(),
                                 json::Value::Number(timestamp.into()),
                             );
 
                             let (ts_data, fn_num) = json_data_by_stream
-                                .entry(stream_params.stream_name.to_string())
+                                .entry(destination_stream.clone())
                                 .or_insert((Vec::new(), None));
                             ts_data.push((timestamp, local_val));
-                            *fn_num = Some(function_no)
+                            *fn_num = Some(function_no);
+
+                            tokio::task::coop::consume_budget().await;
                         }
                     }
                 }
@@ -479,7 +569,8 @@ pub async fn ingest(
 
     // drop memory-intensive variables
     drop(stream_pipeline_inputs);
-    drop(streams_need_original_set);
+    drop(streams_need_original_map);
+    drop(streams_need_all_values_map);
     drop(user_defined_schema_map);
 
     let (metric_rpt_status_code, response_body) = {
@@ -515,8 +606,9 @@ pub async fn ingest(
             "/api/org/ingest/logs/_bulk",
             metric_rpt_status_code,
             org_id,
-            "",
             StreamType::Logs.as_str(),
+            "",
+            "",
         ])
         .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -524,8 +616,9 @@ pub async fn ingest(
             "/api/org/ingest/logs/_bulk",
             metric_rpt_status_code,
             org_id,
-            "",
             StreamType::Logs.as_str(),
+            "",
+            "",
         ])
         .inc();
 

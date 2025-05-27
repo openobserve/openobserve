@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,23 +16,22 @@
 use std::collections::HashSet;
 
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME,
     meta::promql::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL},
 };
 use datafusion::{
     arrow::datatypes::Schema,
     error::Result,
-    prelude::{col, lit, DataFrame},
+    prelude::{DataFrame, col, lit},
 };
 use promql_parser::label::{MatchOp, Matchers};
 
 use crate::service::search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
 
 pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Result<DataFrame> {
-    let cfg = get_config();
     let mut df = df;
     for mat in matchers.matchers.iter() {
-        if mat.name == cfg.common.column_timestamp
+        if mat.name == TIMESTAMP_COL_NAME
             || mat.name == VALUE_LABEL
             || schema.field_with_name(&mat.name).is_err()
         {
@@ -64,7 +63,6 @@ pub fn apply_label_selector(
     schema: &Schema,
     label_selectors: &Option<HashSet<String>>,
 ) -> Option<DataFrame> {
-    let cfg = get_config();
     let mut df = df;
     if let Some(label_selector) = label_selectors {
         if !label_selector.is_empty() {
@@ -77,7 +75,7 @@ pub fn apply_label_selector(
                 HASH_LABEL.to_string(),
                 VALUE_LABEL.to_string(),
                 BUCKET_LABEL.to_string(),
-                cfg.common.column_timestamp.to_string(),
+                TIMESTAMP_COL_NAME.to_string(),
             ];
             for label in label_selector.iter() {
                 if def_labels.contains(label) {

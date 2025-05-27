@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -40,7 +40,7 @@ impl SchemaExt for Schema {
 
     // ensure schema is compatible
     fn cloned_from(&self, schema: &Schema) -> Schema {
-        let schema_latest_map: HashMap<_, _> = schema
+        let latest_schema_map: HashMap<_, _> = schema
             .fields()
             .iter()
             .map(|field| (field.name(), field))
@@ -48,7 +48,7 @@ impl SchemaExt for Schema {
         let fields = self
             .fields()
             .iter()
-            .map(|f| match schema_latest_map.get(f.name()) {
+            .map(|f| match latest_schema_map.get(f.name()) {
                 Some(f) => (*f).clone(),
                 None => f.clone(),
             })
@@ -119,5 +119,7 @@ mod tests {
             Field::new("flag", DataType::UInt8, false),
         ]);
         assert_ne!(schema1.hash_key(), schema2.hash_key());
+        assert_eq!(schema1.hash_key().len(), 16);
+        assert_eq!(schema2.hash_key().len(), 16);
     }
 }

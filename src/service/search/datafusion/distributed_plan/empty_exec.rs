@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,15 +16,17 @@
 use std::{any::Any, sync::Arc};
 
 use arrow_schema::SortOptions;
-use config::get_config;
+use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
-    common::{internal_err, Result, Statistics},
+    common::{Result, Statistics, internal_err},
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, LexOrdering, Partitioning, PhysicalSortExpr},
     physical_plan::{
-        common, expressions::Column, memory::MemoryStream, DisplayAs, DisplayFormatType,
-        ExecutionMode, ExecutionPlan, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, common,
+        execution_plan::{Boundedness, EmissionType},
+        expressions::Column,
+        memory::MemoryStream,
     },
     prelude::Expr,
 };
@@ -92,14 +94,14 @@ impl NewEmptyExec {
         n_partitions: usize,
         sorted_by_time: bool,
     ) -> PlanProperties {
-        let index = schema.index_of(&get_config().common.column_timestamp);
+        let index = schema.index_of(TIMESTAMP_COL_NAME);
         let eq_properties = if !sorted_by_time {
             EquivalenceProperties::new(schema)
         } else {
             match index {
                 Ok(index) => {
                     let ordering = vec![LexOrdering::new(vec![PhysicalSortExpr {
-                        expr: Arc::new(Column::new(&get_config().common.column_timestamp, index)),
+                        expr: Arc::new(Column::new(TIMESTAMP_COL_NAME, index)),
                         options: SortOptions {
                             descending: true,
                             nulls_first: false,
@@ -116,7 +118,8 @@ impl NewEmptyExec {
             // Output Partitioning
             output_partitioning,
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Incremental,
+            Boundedness::Bounded,
         )
     }
 

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,16 +16,16 @@
 use std::str::FromStr;
 
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{Timelike, Utc};
 use config::{
     get_config,
     meta::{
-        alerts::{FrequencyType, QueryType},
+        alerts::{FrequencyType, QueryType, TriggerEvalResults},
         pipeline::components::DerivedStream,
         search::{SearchEventContext, SearchEventType},
         sql::resolve_stream_names,
     },
-    utils::json::{Map, Value},
+    utils::sql::is_timestamp_selected,
 };
 use cron::Schedule;
 
@@ -35,6 +35,7 @@ pub async fn save(
     mut derived_stream: DerivedStream,
     pipeline_name: &str,
     pipeline_id: &str,
+    needs_validated: bool,
 ) -> Result<(), anyhow::Error> {
     // 1. Start validate DerivedStream
     // checks for query type
@@ -43,7 +44,15 @@ pub async fn save(
             if let Some(sql) = &derived_stream.query_condition.sql {
                 if sql.is_empty() {
                     return Err(anyhow::anyhow!(
-                        "DerivedStreams with SQL mode should have a query"
+                        "Scheduled pipeline with SQL mode should have a query"
+                    ));
+                }
+
+                // check if _timestamp is a selected field, or _timestamp as an alias
+                if !is_timestamp_selected(sql).map_err(|e| anyhow::anyhow!("Invalid SQL: {}", e))? {
+                    return Err(anyhow::anyhow!(
+                        "SQL for scheduled pipeline must include _timestamp, or aliased as _timestamp.\n\
+                        e.g. SELECT app_name, MAX(_timestamp) AS _timestamp FROM ..."
                     ));
                 }
 
@@ -73,7 +82,7 @@ pub async fn save(
                 }
             } else {
                 return Err(anyhow::anyhow!(
-                    "DerivedStreams with SQL mode should have a query"
+                    "Scheduled pipeline with SQL mode should have a query"
                 ));
             }
         }
@@ -82,11 +91,11 @@ pub async fn save(
                 .query_condition
                 .promql
                 .as_ref()
-                .map_or(false, |promql| promql.is_empty())
+                .is_some_and(|promql| promql.is_empty())
                 || derived_stream.query_condition.promql_condition.is_none()
             {
                 return Err(anyhow::anyhow!(
-                    "DerivedStreams with SQL mode should have a query"
+                    "Scheduled pipeline with PromQL mode should have a query and condition"
                 ));
             }
         }
@@ -96,7 +105,12 @@ pub async fn save(
 
     // 2. update the frequency
     if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
-        // Check the cron expression
+        let now = chrono::Utc::now().second();
+        derived_stream.trigger_condition.cron = super::super::alerts::alert::update_cron_expression(
+            &derived_stream.trigger_condition.cron,
+            now,
+        );
+        // Check if the cron expression is valid
         Schedule::from_str(&derived_stream.trigger_condition.cron)?;
     } else if derived_stream.trigger_condition.frequency == 0 {
         // default 3 mins, set min at 1 minutes
@@ -104,21 +118,32 @@ pub async fn save(
             std::cmp::max(1, get_config().limit.derived_stream_schedule_interval / 60);
     }
 
-    // test derived_stream
     let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
-    let test_end_time = Utc::now().timestamp_micros();
-    if let Err(e) = &derived_stream
-        .evaluate((None, test_end_time), &trigger_module_key)
-        .await
-    {
-        return Err(anyhow::anyhow!(
-            "DerivedStream not saved due to failed test run caused by {}",
-            e.to_string()
-        ));
-    };
+    if needs_validated {
+        // test derived_stream
+        let test_end_time = Utc::now().timestamp_micros();
+        let test_start_time = test_end_time
+            - chrono::Duration::try_seconds(5)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        if let Err(e) = &derived_stream
+            .evaluate(
+                (Some(test_start_time), test_end_time),
+                &trigger_module_key,
+                None,
+            )
+            .await
+        {
+            return Err(anyhow::anyhow!(
+                "DerivedStream not saved due to failed test run caused by {}",
+                e.to_string()
+            ));
+        };
+    }
 
     // Save the trigger to db
-    let next_run_at = Utc::now().timestamp_micros();
+    let next_run_at = get_next_run_at(&derived_stream)?;
     let trigger = db::scheduler::Trigger {
         org: derived_stream.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
@@ -155,28 +180,22 @@ pub async fn delete(
 
 #[async_trait]
 pub trait DerivedStreamExt: Sync + Send + 'static {
-    fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String;
     async fn evaluate(
         &self,
         (start_time, end_time): (Option<i64>, i64),
         module_key: &str,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+        trace_id: Option<String>,
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 }
 
 #[async_trait]
 impl DerivedStreamExt for DerivedStream {
-    fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String {
-        format!(
-            "{}/{}/{}/{}",
-            self.stream_type, self.org_id, pipeline_name, pipeline_id
-        )
-    }
-
     async fn evaluate(
         &self,
         (start_time, end_time): (Option<i64>, i64),
         module_key: &str,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+        trace_id: Option<String>,
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
         self.query_condition
             .evaluate_scheduled(
                 &self.org_id,
@@ -188,7 +207,24 @@ impl DerivedStreamExt for DerivedStream {
                 Some(SearchEventContext::with_derived_stream(Some(
                     module_key.to_string(),
                 ))),
+                trace_id,
             )
             .await
     }
+}
+
+pub(super) fn get_next_run_at(derived_stream: &DerivedStream) -> Result<i64, anyhow::Error> {
+    let delay_in_mins = derived_stream.delay.unwrap_or_default();
+    // validate & parse delay value
+    if delay_in_mins < 0 {
+        return Err(anyhow::anyhow!(
+            "Invalid delay value. Value must be non-negative"
+        ));
+    }
+
+    let delay = chrono::Duration::minutes(delay_in_mins as _);
+    Ok(chrono::Utc::now()
+        .checked_add_signed(delay)
+        .ok_or(anyhow::anyhow!("DateTime arithmetic overflow"))?
+        .timestamp_micros())
 }

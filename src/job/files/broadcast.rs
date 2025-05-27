@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use config::cluster;
 
-use crate::service::db::file_list::{broadcast, local::BROADCAST_QUEUE};
+use crate::service::db::file_list::broadcast;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     loop {
@@ -24,13 +24,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         let files = {
-            let mut q = BROADCAST_QUEUE.write().await;
+            let mut q = broadcast::BROADCAST_QUEUE.write().await;
             if q.is_empty() {
                 continue;
             }
             q.drain(..).collect::<Vec<_>>()
         };
-        if let Err(e) = broadcast::send(&files, None).await {
+        if let Err(e) = broadcast::send(&files).await {
             log::error!("[broadcast] local queue to nodes error: {}", e);
         }
     }

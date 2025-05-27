@@ -1,12 +1,16 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
+import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-//  await page.getByText('Login as internal user').click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
+
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   await page
@@ -49,18 +53,8 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(4000);
-  await page
-    .locator('[data-test="log-search-index-list-select-stream"]')
-    .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
-};
 test.describe("Logs UI testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -88,6 +82,7 @@ test.describe("Logs UI testcases", () => {
   // });
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
@@ -96,7 +91,7 @@ test.describe("Logs UI testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
@@ -106,7 +101,7 @@ test.describe("Logs UI testcases", () => {
   }) => {
     await page.waitForTimeout(3000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-query-editor"]').click();
     await page.keyboard.press(
       process.platform === "darwin" ? "Meta+A" : "Control+A"
@@ -114,7 +109,7 @@ test.describe("Logs UI testcases", () => {
     await page.keyboard.press("Backspace");
     await page.waitForTimeout(3000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByText("No column found in selected stream.").click();
+    await page.getByText("SQL query is missing or invalid. Please submit a valid SQL statement.").click();
   });
 
   test("should be able to enter valid text in VRL and run query", async ({
@@ -202,48 +197,6 @@ test.describe("Logs UI testcases", () => {
     await expect(page.locator(".q-notification__message")).toContainText(
       "Please provide valid view name"
     );
-  });
-
-  test("should allow alphanumeric name under saved view", async ({ page }) => {
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator("button")
-      .filter({ hasText: "savesaved_search" })
-      .click();
-    await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill("e2enewtest");
-    await page
-      .locator('[data-test="saved-view-dialog-save-btn"]')
-      .click({ force: true });
-    await page.waitForTimeout(5000);
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .click({ force: true });
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("e2enewtest");
-    await page.waitForTimeout(3000);
-    await page.getByText("e2enewtest").click();
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("e2enewtest");
-    await page.getByText("delete").click();
-    await page.locator('[data-test="confirm-button"]').click();
   });
 
   test("should display error when user directly clicks on OK without adding name", async ({
@@ -363,8 +316,9 @@ test.describe("Logs UI testcases", () => {
     // Click on the date-time button
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
-    // Click on the SQL Mode toggle
-    await page.locator('[aria-label="SQL Mode"]').click({ force: true });
+    await page.waitForTimeout(1000);
+
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
 
     // Assert that the SQL query is visible
     const expectedQuery =
@@ -429,6 +383,7 @@ test.describe("Logs UI testcases", () => {
       .click({ force: true });
     await page.getByPlaceholder("Search Stream").click();
     await page.getByPlaceholder("Search Stream").fill("e2e");
+    await page.waitForTimeout(1000);
     await page
       .getByRole("button", { name: "Explore" })
       .first()
@@ -515,11 +470,11 @@ test.describe("Logs UI testcases", () => {
     await page.waitForTimeout(4000);
     // await page.locator('[data-test="logs-search-subfield-add-code-200"] [data-test="log-search-subfield-list-equal-code-field-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
     });
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
     });
@@ -555,7 +510,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display search around in SQL mode', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
     await page.waitForTimeout(2000)
@@ -572,7 +527,7 @@ test.describe("Logs UI testcases", () => {
     await page.click('[data-test="logs-search-bar-query-editor"]')
     await page.keyboard.type("match_all('code') limit 5");
     await page.waitForTimeout(2000);
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();

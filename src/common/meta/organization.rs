@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,17 +13,78 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::user::UserRole;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+#[cfg(feature = "cloud")]
+use super::user::InviteStatus;
+
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
+pub const USER_DEFAULT: &str = "user_default";
 pub const THRESHOLD: i64 = 9383939382;
+
+use config::meta::cluster::Node;
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct Organization {
+    #[serde(default)]
     pub identifier: String,
-    pub label: String,
+    pub name: String,
+    #[serde(default)]
+    pub org_type: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrgRenameBody {
+    pub new_name: String,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrganizationInvites {
+    #[serde(default)]
+    pub invites: Vec<String>, // user emails
+    pub role: UserRole,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrganizationInviteResponse {
+    #[serde(default)]
+    pub data: OrganizationInviteResponseData, // user emails
+    pub message: String,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, Default, ToSchema, Clone, Debug)]
+pub struct OrganizationInviteResponseData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub valid_members: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub existing_members: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invalid_email: Option<String>,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrganizationInviteUserRecord {
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub role: String,
+    pub status: InviteStatus,
+    pub expires_at: i64,
+    pub is_external: bool,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrgRoleMapping {
+    pub org_id: String,
+    pub org_name: String,
+    pub role: UserRole,
 }
 
 #[derive(Serialize, Clone, ToSchema)]
@@ -45,6 +106,8 @@ pub struct OrgDetails {
     pub org_type: String,
     #[serde(rename = "UserObj")]
     pub user_obj: OrgUser,
+    #[serde(default)]
+    pub plan: i32,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -135,6 +198,10 @@ fn default_enable_websocket_search() -> bool {
     false
 }
 
+fn default_enable_streaming_search() -> bool {
+    false
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -149,6 +216,8 @@ pub struct OrganizationSettingPayload {
     pub toggle_ingestion_logs: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_websocket_search: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_streaming_search: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_auto_refresh_interval: Option<u32>,
 }
@@ -167,6 +236,8 @@ pub struct OrganizationSetting {
     pub toggle_ingestion_logs: bool,
     #[serde(default = "default_enable_websocket_search")]
     pub enable_websocket_search: bool,
+    #[serde(default = "default_enable_streaming_search")]
+    pub enable_streaming_search: bool,
     #[serde(default = "default_auto_refresh_interval")]
     pub min_auto_refresh_interval: u32,
 }
@@ -179,6 +250,7 @@ impl Default for OrganizationSetting {
             span_id_field_name: default_span_id_field_name(),
             toggle_ingestion_logs: default_toggle_ingestion_logs(),
             enable_websocket_search: default_enable_websocket_search(),
+            enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
         }
     }
@@ -187,4 +259,98 @@ impl Default for OrganizationSetting {
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingResponse {
     pub data: OrganizationSetting,
+}
+
+/// Request struct for node listing with region filtering
+///
+/// Regions can be provided in the request body to filter nodes by region.
+/// If no regions are provided, all nodes will be returned.
+#[derive(Serialize, Deserialize, Default)]
+pub struct NodeListRequest {
+    /// List of region names to filter by
+    pub regions: Vec<String>,
+}
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct RegionInfo<T> {
+    #[serde(flatten)]
+    pub clusters: std::collections::HashMap<String, T>,
+}
+
+/// Response struct for node listing with nested hierarchy
+///
+/// Contains a three-level hierarchy with a flat format:
+/// 1. Regions at the top level as object keys
+/// 2. Clusters within each region as object keys
+/// 3. Nodes as arrays directly under each cluster
+#[derive(Serialize, Deserialize, Default)]
+pub struct NodeListResponse {
+    #[serde(flatten)]
+    pub regions: std::collections::HashMap<String, RegionInfo<Vec<Node>>>,
+}
+
+impl NodeListResponse {
+    pub fn new() -> Self {
+        Self {
+            regions: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Adds a node to the appropriate region and cluster
+    ///
+    /// This method will create the region and cluster if they don't exist
+    pub fn add_node(&mut self, node: Node, region_name: String, cluster_name: String) {
+        let region_entry = self
+            .regions
+            .entry(region_name.clone())
+            .or_insert_with(|| RegionInfo {
+                clusters: std::collections::HashMap::new(),
+            });
+
+        let cluster_entry = region_entry
+            .clusters
+            .entry(cluster_name.clone())
+            .or_default();
+
+        cluster_entry.push(node);
+    }
+
+    /// Adds multiple nodes to the response structure
+    pub fn add_nodes(&mut self, nodes: Vec<(Node, String, String)>) {
+        for (node, region, cluster) in nodes {
+            self.add_node(node, region, cluster);
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+pub struct ClusterInfo {
+    pub pending_jobs: u64,
+}
+
+/// Response struct for cluster info
+///
+/// Contains a three-level hierarchy with a flat format:
+/// 1. Regions at the top level as object keys
+/// 2. Clusters within each region as object keys
+#[derive(Serialize, Deserialize, Default)]
+pub struct ClusterInfoResponse {
+    pub regions: std::collections::HashMap<String, RegionInfo<ClusterInfo>>,
+}
+
+impl ClusterInfoResponse {
+    pub fn add_cluster_info(
+        &mut self,
+        cluster_info: ClusterInfo,
+        cluster_name: String,
+        region_name: String,
+    ) {
+        let region_entry = self
+            .regions
+            .entry(region_name)
+            .or_insert_with(|| RegionInfo {
+                clusters: std::collections::HashMap::new(),
+            });
+
+        region_entry.clusters.insert(cluster_name, cluster_info);
+    }
 }

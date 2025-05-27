@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,20 +18,18 @@ use std::{fs::Metadata, ops::Range, path::Path, time::SystemTime};
 use async_walkdir::WalkDir;
 use futures::StreamExt;
 use tokio::{
-    fs::{read_dir, remove_dir, File},
+    fs::{File, metadata, read_dir, remove_dir},
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 
 #[inline(always)]
 pub async fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
-    let file = File::open(path).await?;
-    file.metadata().await
+    metadata(path).await
 }
 
 #[inline(always)]
-pub async fn get_file_len(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
-    let file = File::open(path).await?;
-    file.metadata().await.map(|m| m.len())
+pub async fn get_file_size(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
+    metadata(path).await.map(|f| f.len())
 }
 
 #[inline(always)]
@@ -74,8 +72,25 @@ pub async fn put_file_contents(
     path: impl AsRef<Path>,
     contents: &[u8],
 ) -> Result<(), std::io::Error> {
-    let mut file = File::create(path).await?;
-    file.write_all(contents).await
+    let Some(path) = path.as_ref().to_str() else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Path is not a valid string",
+        ));
+    };
+
+    // Create a temporary file in the same directory
+    let temp_file = format!("{}.tmp", path);
+
+    // Write to temporary file first
+    let mut file_handle = File::create(&temp_file).await?;
+    file_handle.write_all(contents).await?;
+
+    // Atomically rename the temp file to the target file
+    // This ensures we either have the old file or the new file, never a partially written file
+    tokio::fs::rename(temp_file, path).await?;
+
+    Ok(())
 }
 
 pub async fn clean_empty_dirs(

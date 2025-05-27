@@ -18,6 +18,9 @@
         </div>
         </div>
         <div class="flex items-center q-py-sm q-pr-md">
+          <div>
+            <q-toggle v-model="wrapText" label="Wrap Text"  class="q-mr-md" />
+          </div>
           <div class="warning-text flex  items-center q-py-xs q-px-sm q-mr-md  ">
             <q-icon name="info" class="q-mr-xs " size="16px" />
              <div>
@@ -55,9 +58,9 @@
         row-key="trace_id"
         :rows-per-page-options="[]"
         class="custom-table"
-        style="width: 100%;"
         :sort-method="sortMethod"
-      >
+        :wrap-cells='wrapText'
+        >
 
 
       <template v-slot:body="props">
@@ -73,122 +76,95 @@
               flat
               size="xs"
               :icon="
-                expandedRow != props.row.trace_id
+                expandedRow != props.row.uuid
                   ? 'expand_more'
                   : 'expand_less'
               "
             />
           </q-td>
           
-          <q-td v-for="col in columnsToBeRendered.slice(1)" :key="col.name" :props="props">
+          <q-td :style="{whiteSpace: wrapText && col.name === 'sql' ? 'wrap' : 'nowrap'}" v-for="col in columnsToBeRendered.slice(1)" :key="col.name" :props="props">
           {{ props.row[col.field] }}
         </q-td>
         </q-tr>
-  <!-- <q-tr :props="props" @click="triggerExpand(props)">
-    <q-td 
-      :class="`column-${col.name}`"
-      v-for="col in props.cols"
-      :key="col.name"
-      :props="props"
-    >
-      {{ col.value }}
-    </q-td>
-    
-  </q-tr> -->
-  <q-tr v-show="expandedRow === props.row.trace_id" :props="props" >
+        <q-tr v-show="expandedRow === props.row.uuid" :props="props" >
 
-    <q-td  colspan="100%">
+          <q-td  colspan="100%">
+            <div class="app-tabs-schedule-list report-list-tabs">
+              <app-tabs
+                data-test="expanded-list-tabs"
+                class="q-mr-md"
+                :tabs="tabs"
+                v-model:active-tab="activeTab"
+              />
+            </div>
+            <div v-show="activeTab === 'query'">
+              <div class="text-left tw-px-2 q-mb-sm  expanded-content">
+            <div class="tw-flex tw-items-center q-py-sm  ">
+              <strong >SQL Query : <span>  <q-btn
+                  @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
+                  size="xs"
+                  dense
+                  flat
+                  icon="content_copy"
+                  class="copy-btn-sql tw-ml-2  tw-py-2 tw-px-2 "
+                /></span></strong>
+                <q-btn
+                  @click.stop="goToLogs(props.row)"
+                  size="xs"
+                  label="Logs"
+                  dense
+                  class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
+                  icon="search"
+                  flat
+                  style="color: #F2452F; border: #F2452F 1px solid;font-weight:bolder;"
+                />
+            </div>
+              <div class="tw-flex tw-items-start  tw-justify-center" >
+            
+              <div class="scrollable-content  expanded-sql ">
+                <pre style="text-wrap: wrap;">{{ props.row?.sql }}</pre>
 
-      <div class="text-left tw-px-2 q-mb-sm  expanded-content">
-       <div class="tw-flex tw-items-center q-py-sm  ">
-        <strong >SQL Query : <span>  <q-btn
-            @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
-            size="xs"
-            dense
-            flat
-            icon="content_copy"
-            class="copy-btn-sql tw-ml-2  tw-py-2 tw-px-2 "
-          /></span></strong>
-          <q-btn
-            @click.stop="goToLogs(props.row)"
-            size="xs"
-            label="Logs"
-            dense
-            class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
-            icon="search"
-            flat
-            style="color: #F2452F; border: #F2452F 1px solid;font-weight:bolder;"
-          />
-       </div>
-        <div class="tw-flex tw-items-start  tw-justify-center" >
-       
-         <div class="scrollable-content  expanded-sql ">
-          <pre style="text-wrap: wrap;">{{ props.row?.sql }}</pre>
+              </div>
+              </div>
+            </div>
+            <div v-if="props.row?.function" class="text-left q-mb-sm tw-px-2 expanded-content">
+              <div class="tw-flex tw-items-center q-py-sm ">
+              <strong >Function Definition : <span>  <q-btn
+                  @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
+                  size="xs"
+                  dense
+                  flat
+                  icon="content_copy"
+                  class="copy-btn-function tw-ml-2 tw-py-2 tw-px-2 "
+                /></span></strong>
 
-         </div>
+            </div>
 
-         <!-- <div class="tw-pl-2">
-          <q-btn
-            @click.stop="copyToClipboard(props.row.sql)"
-            size="xs"
-            icon="content_copy"
-            class="copy-btn tw-py-3"
-          />
-          <q-btn
-            @click.stop="goToLogs(props.row)"
-            size="xs"
-            label="Go To Logs"
-            class="copy-btn tw-py-3 tw-mx-2"
-          />
-         </div> -->
-        
-         
-        </div>
-      </div>
-      <div v-if="props.row?.function" class="text-left q-mb-sm tw-px-2 expanded-content">
-        <div class="tw-flex tw-items-center q-py-sm ">
-        <strong >Function Definition : <span>  <q-btn
-            @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
-            size="xs"
-            dense
-            flat
-            icon="content_copy"
-            class="copy-btn-function tw-ml-2 tw-py-2 tw-px-2 "
-          /></span></strong>
+              <div class="tw-flex tw-items-start tw-justify-center" >
+            
+              <div class="scrollable-content expanded-function  ">
+                <pre style="text-wrap: wrap;">{{ props.row?.function }}</pre>
 
-       </div>
+              </div>              
+              
+              </div>
+            </div>
+            </div>
+              <query-editor
+              v-show="activeTab === 'more_details'"
+                style="height: 200px"
+                :ref="`QueryEditorRef${props.row.trace_id + props.row.sql}`"
+                :editor-id="`search-query-editor${props.row.trace_id + props.row.sql}`"
+                class="monaco-editor"
+                :debounceTime="600"
+                v-model:query="moreDetailsToDisplay"
+                language="json"
+                read-only
+              />
 
-        <div class="tw-flex tw-items-start tw-justify-center" >
-       
-         <div class="scrollable-content expanded-function  ">
-          <pre style="text-wrap: wrap;">{{ props.row?.function }}</pre>
-
-         </div>
-<!-- 
-         <div class="tw-pl-2 tw-flex tw-my-auto">
-          <q-btn
-            @click.stop="copyToClipboard(props.row.function)"
-            size="xs"
-            icon="content_copy"
-            class="copy-btn tw-py-3"
-          />
-          <q-btn
-            @click.stop="goToLogs(props.row)"
-            size="xs"
-            label="Go To Logs"
-            class="copy-btn tw-py-3 tw-mx-2"
-          />
-         </div> -->
-        
-         
-        </div>
-
-
-
-      </div>
-
-    </q-td>
-  </q-tr>
+          </q-td>
+        </q-tr>
       </template>
       <template #bottom="scope">
         <div class="tw-ml-auto tw-mr-2">
@@ -232,9 +208,10 @@
   </template>
   <script lang="ts">
   //@ts-nocheck
-  import { ref, watch, onMounted  , nextTick,computed} from 'vue';
+  import { ref, watch, onMounted  , nextTick,computed, onUnmounted} from 'vue';
   import {
-    timestampToTimezoneDate , b64EncodeUnicode,convertDateToTimestamp } from "@/utils/zincutils";
+    timestampToTimezoneDate , b64EncodeUnicode,convertDateToTimestamp, 
+    getUUID} from "@/utils/zincutils";
   import { useRouter, useRoute } from 'vue-router';
   import { useStore } from 'vuex';
   import { defineAsyncComponent ,defineComponent} from 'vue';
@@ -247,6 +224,9 @@
   import { date , QTable , useQuasar } from 'quasar';
   import type { Ref } from "vue";
   import QTablePagination from "@/components/shared/grid/Pagination.vue";
+  import AppTabs from '@/components/common/AppTabs.vue';
+
+  const QueryEditor = defineAsyncComponent(() => import('@/components/QueryEditor.vue'));
 
 
   export default defineComponent({
@@ -255,6 +235,8 @@
       DateTime,
       NoData,
       QTablePagination,
+      AppTabs,
+      QueryEditor
     },
     props: {
       isClicked: {
@@ -276,6 +258,7 @@
       const {t} = useI18n();
       const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
       const searchDateTimeRef = ref(null)
+      const wrapText = ref(true);
       const { searchObj, extractTimestamps } = useLogs();
       const dataToBeLoaded :any = ref([]);
       const dateTimeToBeSent = ref({
@@ -288,6 +271,25 @@
       const  expandedRow = ref( []); // Array to track expanded rows
       const isLoading = ref(false);
       const isDateTimeChanged = ref(false);
+      const moreDetailsToDisplay = ref('');
+
+      const activeTab = ref('query');
+      const tabs = ref([
+        {
+          label: 'Query / Function',
+          value: 'query',
+        },
+        {
+          label: 'More Details',
+          value: 'more_details',
+        },
+
+        
+      ])
+
+
+      onUnmounted(()=>{
+      })
 
 
       const perPageOptions: any = [
@@ -308,68 +310,33 @@
       const selectedPerPage = ref(pagination.value.rowsPerPage);
 
       const generateColumns = (data: any) => {
-     if (data.length === 0) return [];
+        if (data.length === 0) return [];
 
-  // Define the desired column order and names
-  const desiredColumns = [
-    {key : '#' , label : '#',align: 'center',sortable: false},
-    { key: 'trace_id', label: 'Trace ID' },
-    { key: 'executed_time', label: 'Executed At' },
+      // Define the desired column order and names
+      const desiredColumns = [
+        { key: '#', label: '#' },
+        { key: 'executed_time', label: 'Executed At' },
 
-    { key: 'start_time', label: 'Start Time' },
-    { key: 'end_time', label: 'End Time' },
-    { key: 'duration', label: 'Duration' },
-    { key: 'took', label: 'Took' },
-    { key: 'scan_size', label: 'Scan Size' },
-    { key: 'scan_records', label: 'Scan Records' },
-    { key: 'cached_ratio', label: 'Cached Ratio' },
-    { key: 'sql', label: 'SQL Query' },
+        { key: 'sql', label: 'SQL Query' },
+        ];
+        let aligin = 'left'
 
-  ];
 
-  return desiredColumns.map(({ key, label }) => {
-    let columnWidth = 200;
 
-    let align = "center";
-    let sortable = true;
-    if(key == "scan_records" || key == "cached_ratio" || key == "took"){
-      columnWidth = 80
-
-    }
-    if(key == "scan_size"){
-      columnWidth = 100
-    }
-    if(key == "duration"){
-      align='left'
-      columnWidth = 100
-    }
-    if( key == 'start_time' || key == 'end_time'){
-      columnWidth = 200
-    }
-    if(key == 'sql'){
-      columnWidth = 300
-      sortable = false;
-    }
-    if(key == "trace_id"){
-      columnWidth = 250
-      sortable = false;
-    }
-    if(key == "#"){
-      columnWidth = 100
-      sortable = false;
-      align = "left"
-    }
-   // Custom width for each column
-    return {
-      name: key,        // Field name
-      label: label,     // Column label
-      field: key,       // Field accessor
-      align: align,
-      sortable: sortable,
-      style: `max-width: ${columnWidth}px; width: ${columnWidth}px;`,
-    };
-  });
-};
+        return desiredColumns.map(({ key, label }) => {
+          if(key == "sql"){
+          aligin = 'left'
+        }
+        // Custom width for each column
+          return {
+            name: key,        // Field name
+            label: label,     // Column label
+            field: key,       // Field accessor
+            align: aligin,
+            sortable: true,
+          };
+        });
+      };
 
       const fetchSearchHistory = async () => {
 
@@ -394,7 +361,10 @@
            }
            columnsToBeRendered.value = generateColumns(filteredHits);
            filteredHits.forEach((hit:any)=>{
-
+            //adding uuid to each which will be used to track the expanded row 
+            //why not trace_id ? because trace_id is not unique for each hit
+            //and it can be same for multiple hits
+            hit.uuid = getUUID();
             const {formatted, raw} = calculateDuration(hit.start_time, hit.end_time);
             hit.duration = formatted;
             hit.rawDuration = raw;
@@ -491,12 +461,6 @@
           return data.sort((a, b) => a.rawExecutedTime - b.rawExecutedTime);
 
         }
-
-
-
-        
-
-        // return a.rawDuration - b.rawDuration;
       }
       const  copyToClipboard = (text,type) => {
       navigator.clipboard.writeText(text).then(() => {
@@ -533,7 +497,7 @@
       const  formatTime = (took)  => {
       return `${took.toFixed(2)} sec`;
       }
-    const calculateDuration = (startTime, endTime) => {
+      const calculateDuration = (startTime, endTime) => {
         const durationMicroseconds = endTime - startTime;
         const durationSeconds = durationMicroseconds / 1e6;
 
@@ -582,18 +546,19 @@
         }
 
       return { formatted: result, raw: rawDuration };
-};
+      };
 
 
 
       const triggerExpand = (props) =>{
-        if (expandedRow.value === props.row.trace_id) {
+        moreDetailsToDisplay.value = JSON.stringify(filterRow(props.row), null, 2);
+        if (expandedRow.value === props.row.uuid) {
             expandedRow.value = null;
           } else {
             // Otherwise, expand the clicked row and collapse any other row
-            expandedRow.value = props.row.trace_id;
-  }
-      }
+            expandedRow.value = props.row.uuid;
+          }
+        }
       const   goToLogs = ( row) => {
         const duration_suffix = row.duration.split(" ")[1];
         // emit('closeSearchHistory');
@@ -652,6 +617,26 @@
           fetchSearchHistory();
         }
       });
+
+      function filterRow(row) {
+      const desiredColumns = [
+        { key: "trace_id", label: "Trace ID" },
+        { key: 'start_time', label: 'Start Time' },
+        { key: 'end_time', label: 'End Time' },
+        { key: 'duration', label: 'Duration' },
+        { key: 'took', label: 'Took' },
+        { key: 'scan_size', label: 'Scan Size' },
+        { key: 'scan_records', label: 'Scan Records' },
+        { key: 'cached_ratio', label: 'Cached Ratio' },
+
+      ];
+      return desiredColumns.reduce((filtered, column) => {
+        if (row[column.key] !== undefined) {
+          filtered[column.key] = row[column.key];
+        }
+        return filtered;
+      }, {});
+    }
       return {
         searchObj,
         store,
@@ -677,6 +662,10 @@
         perPageOptions,
         changePagination,
         selectedPerPage,
+        activeTab,
+        tabs,
+        moreDetailsToDisplay,
+        wrapText
       };
       // Watch the searchObj for changes
       
@@ -685,8 +674,8 @@
   </script>
  <style lang="scss" scoped >
 .expanded-content {
-  padding: 0  3rem;
-  min-width: 100vw;
+  padding: 0  0.5rem 0rem 1rem;
+  width: calc(95vw - 40px);
   max-height: 100vh; /* Set a fixed height for the container */
   overflow: hidden; /* Hide overflow by default */
 }
@@ -707,9 +696,13 @@
 
 .q-td {
   overflow: hidden;
-  white-space: nowrap;
   text-overflow: ellipsis;
+  white-space: nowrap;
+
+
 }
+
+
 
 .custom-table .q-tr > .q-td:nth-child(2){
   text-align: left;
@@ -737,6 +730,54 @@ color: #0A7EBC;
 }
 .expanded-function{
   border-left: #0A7EBC 3px solid;
+}
+
+
+.report-list-tabs {
+    height: fit-content;
+
+    :deep(.rum-tabs) {
+      border: 1px solid #464646;
+    }
+
+    :deep(.rum-tab) {
+      &:hover {
+        background: #464646;
+      }
+
+      &.active {
+        background: #5960b2;
+        color: #ffffff !important;
+      }
+    }
+  }
+
+.report-list-tabs {
+  padding: 0 1rem;
+  height: fit-content;
+  width: fit-content;
+
+  :deep(.rum-tabs) {
+    border: 1px solid #eaeaea;
+    height: fit-content;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  :deep(.rum-tab) {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+
+    &:hover {
+      background: #eaeaea;
+    }
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
+    }
+  }
 }
 
  </style>

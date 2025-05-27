@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,23 +15,27 @@
 
 use std::{cmp::max, sync::Arc};
 
+use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
+    TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
         cluster::RoleGroup,
         search,
         self_reporting::usage::{RequestStats, UsageType},
-        sql::{OrderBy, SqlOperator, TableReferenceExt},
+        sql::{OrderBy, SqlOperator, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
     metrics,
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_aggregate_query},
+        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
+        time::now_micros,
     },
 };
 use datafusion::distributed_plan::streaming_aggs_exec;
@@ -47,21 +51,21 @@ use proto::cluster_rpc::{self, SearchQuery};
 use regex::Regex;
 use sql::Sql;
 use tokio::runtime::Runtime;
-#[cfg(not(feature = "enterprise"))]
-use tokio::sync::Mutex;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::make_grpc_search_client, o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, std::str::FromStr,
-    tracing::info_span,
+    crate::service::grpc::make_grpc_search_client,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
+    std::collections::HashSet, tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
     handler::grpc::request::search::Searcher,
+    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
 pub(crate) mod cache;
@@ -70,7 +74,10 @@ pub(crate) mod datafusion;
 pub(crate) mod grpc;
 pub(crate) mod grpc_search;
 pub(crate) mod index;
+pub(crate) mod inspector;
+pub(crate) mod partition;
 pub(crate) mod request;
+pub(crate) mod search_stream;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
@@ -81,12 +88,12 @@ pub(crate) mod utils;
 pub static RESULT_ARRAY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
 
+/// The result of search in cluster
+/// data, scan_stats, wait_in_queue, is_partial, partial_err
+type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
+
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
-
-#[cfg(not(feature = "enterprise"))]
-pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
-    Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
 pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
@@ -109,7 +116,7 @@ pub async fn search(
     in_req: &search::Request,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
+    let started_at = now_micros();
     let cfg = get_config();
 
     let trace_id = if trace_id.is_empty() {
@@ -117,7 +124,7 @@ pub async fn search(
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
-            ider::uuid()
+            ider::generate_trace_id()
         }
     } else {
         trace_id.to_string()
@@ -173,10 +180,13 @@ pub async fn search(
     if in_req.query.streaming_output {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
     }
-    log::info!("[{trace_id}] request sql : {}", query.sql.clone());
+    if let Some(v) = in_req.local_mode {
+        request.set_local_mode(Some(v));
+    }
+    let meta = Sql::new_from_req(&request, &query).await?;
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
+        async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
             .instrument(span),
     );
     let res = match handle.await {
@@ -184,7 +194,27 @@ pub async fn search(
         Ok(Err(e)) => Err(e),
         Err(e) => Err(Error::Message(e.to_string())),
     };
-    log::info!("[trace_id {trace_id}] in leader task finish");
+
+    #[allow(unused_mut)]
+    let mut search_role = "leader".to_string();
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        search_role = "super".to_string();
+    }
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] in leader task finish"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("service:search leader finish".to_string())
+                .search_role(search_role)
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     // remove task because task if finished
     let mut _work_group = None;
@@ -208,6 +238,9 @@ pub async fn search(
     // do this because of clippy warning
     match res {
         Ok(mut res) => {
+            if in_req.query.streaming_output && meta.order_by.is_empty() {
+                res = crate::service::websocket_events::sort::order_search_results(res, None);
+            }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
             let (report_usage, search_type, search_event_context) = match in_req.search_type {
@@ -218,6 +251,9 @@ pub async fn search(
                             | search::SearchEventType::Dashboards
                             | search::SearchEventType::Values
                             | search::SearchEventType::Other
+                            // Alerts search now uses grpc cache::search which does report usage
+                            | search::SearchEventType::Alerts
+                            | search::SearchEventType::DerivedStream
                     ) {
                         (false, None, None)
                     } else {
@@ -232,10 +268,10 @@ pub async fn search(
             };
 
             if report_usage {
-                let stream_name = match config::meta::sql::Sql::new(&req_query.sql) {
-                    Ok(v) => v.source.to_string(),
+                let stream_name = match resolve_stream_names(&req_query.sql) {
+                    Ok(v) => v.join(","),
                     Err(e) => {
-                        log::error!("report_usage: parse sql error: {:?}", e);
+                        log::error!("ParseSQLError(report_usage: parse sql error: {:?})", e);
                         "".to_string()
                     }
                 };
@@ -256,13 +292,7 @@ pub async fn search(
                     search_type,
                     search_event_context,
                     trace_id: Some(trace_id),
-                    took_wait_in_queue: if res.took_detail.is_some() {
-                        let resp_took = res.took_detail.as_ref().unwrap();
-                        // Consider only the cluster wait queue duration
-                        Some(resp_took.cluster_wait_queue)
-                    } else {
-                        None
-                    },
+                    took_wait_in_queue: Some(res.took_detail.wait_in_queue),
                     work_group: _work_group,
                     result_cache_ratio: Some(res.result_cache_ratio),
                     ..Default::default()
@@ -303,7 +333,7 @@ pub async fn search_multi(
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
-            ider::uuid()
+            ider::generate_trace_id()
         }
     } else {
         trace_id.to_string()
@@ -341,16 +371,16 @@ pub async fn search_multi(
         }
     }
     let queries_len = queries.len();
-    let mut stream_name = "".to_string();
+    let mut stream_names = vec![];
     let mut sqls = vec![];
     let mut index = 0;
 
     for mut req in queries {
-        stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
-            Ok(v) => v.source.to_string(),
+        stream_names = match resolve_stream_names(&req.query.sql) {
+            Ok(v) => v,
             Err(e) => {
-                log::error!("report_usage: parse sql error: {:?}", e);
-                "".to_string()
+                log::error!("ParseSQLError(search_multi: parse sql error: {:?})", e);
+                vec![]
             }
         };
         sqls.push(req.query.sql.clone());
@@ -406,7 +436,7 @@ pub async fn search_multi(
                 } else {
                     // Error in subsequent queries, add the error to the response and break
                     // No need to run the remaining queries
-                    multi_res.function_error = format!("{};{:?}", multi_res.function_error, e);
+                    multi_res.function_error.push(e.to_string());
                     multi_res.is_partial = true;
                     break;
                 }
@@ -435,7 +465,8 @@ pub async fn search_multi(
             }
             Err(err) => {
                 log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
-                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
+                multi_res.function_error.push(err.to_string());
+                multi_res.is_partial = true;
                 None
             }
         };
@@ -451,7 +482,7 @@ pub async fn search_multi(
                         },
                         json::Value::Array(multi_res.hits),
                         org_id,
-                        &[stream_name.clone()],
+                        &stream_names,
                     );
                     ret_val
                         .as_array()
@@ -487,7 +518,7 @@ pub async fn search_multi(
                                 },
                                 hit,
                                 org_id,
-                                &[stream_name.clone()],
+                                &stream_names,
                             );
                             (!ret_val.is_null())
                                 .then_some(config::utils::flatten::flatten(ret_val).unwrap())
@@ -501,7 +532,7 @@ pub async fn search_multi(
         multi_res.hits
     };
     log::debug!("multi_res len after applying vrl: {}", multi_res.hits.len());
-    let column_timestamp = get_config().common.column_timestamp.to_string();
+    let column_timestamp = TIMESTAMP_COL_NAME.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
         if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
@@ -532,7 +563,7 @@ pub async fn search_multi(
         report_request_usage_stats(
             req_stats,
             org_id,
-            &stream_name,
+            &stream_names.join(","),
             stream_type,
             UsageType::Functions,
             0, // The request stats already contains function event
@@ -551,6 +582,7 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
+    is_http_req: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -561,7 +593,7 @@ pub async fn search_partition(
         sql: req.sql.to_string(),
         ..Default::default()
     };
-    let sql = Sql::new(&query, org_id, stream_type).await?;
+    let sql = Sql::new(&query, org_id, stream_type, None).await?;
 
     // check for vrl
     let apply_over_hits = match req.query_fn.as_ref() {
@@ -578,16 +610,23 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
     let is_streaming_aggregate = ts_column.is_none()
         && is_simple_aggregate_query(&req.sql).unwrap_or(false)
         && cfg.common.feature_query_streaming_aggs;
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
+    let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
+    let is_http_distinct = is_simple_distinct && is_http_req;
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
         skip_get_file_list = false;
+    }
+
+    // if http distinct, we should skip file list
+    if is_http_distinct {
+        skip_get_file_list = true;
     }
 
     // check if we need to use streaming_output
@@ -611,10 +650,12 @@ pub async fn search_partition(
         let stream_type = stream.get_stream_type(stream_type);
         let stream_name = stream.stream_name();
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let use_stream_stats_for_partition = stream_settings.approx_partition;
+        let use_stream_stats_for_partition = cfg.common.use_stream_settings_for_partitions_enabled
+            || stream_settings.approx_partition;
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
+                trace_id,
                 &sql.org_id,
                 stream_type,
                 &stream_name,
@@ -640,7 +681,14 @@ pub async fn search_partition(
             // data duration in seconds
             let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
             let stats = stats::get_stream_stats(org_id, &stream_name, stream_type);
-            let data_end_time = std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max);
+
+            // if stats.doc_time_max is 0, handle the case by using current time
+            let data_end_time = if stats.doc_time_max == 0 {
+                Utc::now().timestamp_micros()
+            } else {
+                std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max)
+            };
+
             let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
             if data_retention_based_on_stats > 0 {
                 data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
@@ -661,13 +709,19 @@ pub async fn search_partition(
                 id: Utc::now().timestamp_micros(),
                 records,
                 original_size,
+                deleted: false,
             });
         }
     }
+    log::info!(
+        "[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}",
+        max_query_range,
+        max_query_range_in_hour
+    );
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
         (req.start_time, req.end_time),
         files.len(),
         file_list_took,
@@ -678,9 +732,11 @@ pub async fn search_partition(
         response.partitions.push([req.start_time, req.end_time]);
         response.max_query_range = max_query_range_in_hour;
         response.histogram_interval = sql.histogram_interval;
+        log::info!("[trace_id {trace_id}] search_partition: returning single partition");
         return Ok(response);
     };
 
+    log::info!("[trace_id {trace_id}] search_partition: getting nodes");
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
@@ -693,6 +749,7 @@ pub async fn search_partition(
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
     });
+
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -703,6 +760,7 @@ pub async fn search_partition(
         histogram_interval: sql.histogram_interval,
         partitions: vec![],
         order_by: OrderBy::Desc,
+        limit: sql.limit,
         streaming_output: req.streaming_output,
         streaming_aggs: req.streaming_output && is_streaming_aggregate,
         streaming_id: streaming_id.clone(),
@@ -713,9 +771,14 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        min_step *= sql.histogram_interval.unwrap_or(1);
+        let hist_int = sql.histogram_interval.unwrap_or(1);
+        // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
+        if hist_int > 0 {
+            min_step *= hist_int;
+        }
     }
 
+    // Calculate original step with all factors considered
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
     if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
@@ -728,12 +791,19 @@ pub async fn search_partition(
     if part_num > 1000 {
         part_num = 1000;
     }
+
+    // Calculate step with all constraints
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
     if step < min_step {
         step = min_step;
     }
-    if step % min_step > 0 {
+    // Align step with min_step to ensure partition boundaries match histogram intervals
+    if min_step > 0 && step % min_step > 0 {
+        // If step is not perfectly divisible by min_step, round it down to the nearest multiple
+        // Example: If min_step = 5 minutes  and step = 17 minutes
+        //   step % min_step = 17 % 5 = 2 (2 minutes)
+        //   step = 17 - 2 = 15 (15 minutes, which is divisible by 5)
         step = step - step % min_step;
     }
     // this is to ensure we create partitions less than max_query_range
@@ -745,34 +815,40 @@ pub async fn search_partition(
         };
     }
 
-    // Generate partitions by DESC order
-    let mut partitions = Vec::with_capacity(part_num);
-    let mut end = req.end_time;
-    let mut last_partition_step = end % min_step;
-    let duration = req.end_time - req.start_time;
-    while end > req.start_time {
-        let mut start = max(end - step, req.start_time);
-        if last_partition_step > 0 && duration > min_step && part_num > 1 {
-            partitions.push([end - last_partition_step, end]);
-            start -= last_partition_step;
-            end -= last_partition_step;
-        } else {
-            start = max(start - last_partition_step, req.start_time);
-        }
-        partitions.push([start, end]);
-        end = start;
-        last_partition_step = 0;
-    }
-    if partitions.is_empty() {
-        partitions.push([req.start_time, req.end_time]);
-    }
+    let is_histogram = sql.histogram_interval.is_some();
+    let sql_order_by = sql
+        .order_by
+        .first()
+        .map(|(field, order_by)| {
+            if field == &ts_column.clone().unwrap_or_default() && order_by == &OrderBy::Asc {
+                OrderBy::Asc
+            } else {
+                OrderBy::Desc
+            }
+        })
+        .unwrap_or(OrderBy::Desc);
 
-    // We need to reverse partitions if query is ASC order
-    if let Some((field, order_by)) = sql.order_by.first() {
-        if field == &ts_column.unwrap_or_default() && order_by == &OrderBy::Asc {
-            resp.order_by = OrderBy::Asc;
-            partitions.reverse();
-        }
+    log::debug!(
+        "[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}",
+        total_secs,
+        part_num,
+        step,
+        min_step,
+        is_histogram
+    );
+    // Create a partition generator
+    let generator = partition::PartitionGenerator::new(
+        min_step,
+        cfg.limit.search_mini_partition_duration_secs,
+        is_histogram,
+    );
+
+    // Generate partitions
+    let partitions =
+        generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
+
+    if sql_order_by == OrderBy::Asc {
+        resp.order_by = OrderBy::Asc;
     }
 
     resp.partitions = partitions;
@@ -794,6 +870,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     let nodes = nodes;
 
     // make cluster request
+    let trace_id = config::ider::generate_trace_id();
     let mut tasks = Vec::new();
     for node in nodes.iter().cloned() {
         let node_addr = node.grpc_addr.clone();
@@ -803,24 +880,22 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             node_addr = node_addr.as_str(),
         );
 
+        let trace_id = trace_id.clone();
         let task = tokio::task::spawn(
             async move {
                 let mut request = tonic::Request::new(proto::cluster_rpc::QueryStatusRequest {});
                 let node = Arc::new(node) as _;
-                let mut client = make_grpc_search_client(&mut request, &node).await?;
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
                 let response = match client.query_status(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "search->grpc: node: {}, search err: {:?}",
+                            "[trace_id {trace_id}] search->grpc: node: {}, search err: {:?}",
                             &node.get_grpc_addr(),
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(server_internal_error("search node error"));
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
                     }
                 };
                 Ok(response)
@@ -873,6 +948,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 querier_disk_cached_files: scan_stats.querier_disk_cached_files,
                 idx_scan_size: scan_stats.idx_scan_size / 1024 / 1024, // change to MB
                 idx_took: scan_stats.idx_took,
+                file_list_took: scan_stats.file_list_took,
             });
         let query_status = if result.is_queue {
             "waiting"
@@ -886,9 +962,10 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "Long"
         };
-        let search_type: Option<search::SearchEventType> = result
-            .search_type
-            .map(|s_event_type| search::SearchEventType::from_str(&s_event_type).unwrap());
+        let search_type: Option<search::SearchEventType> = result.search_type.map(|s_event_type| {
+            search::SearchEventType::try_from(s_event_type.as_str())
+                .unwrap_or(search::SearchEventType::UI)
+        });
         status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,
@@ -937,26 +1014,26 @@ pub async fn cancel_query(
         let trace_id = trace_id.to_string();
         let task = tokio::task::spawn(
             async move {
-                let mut request =
-                    tonic::Request::new(proto::cluster_rpc::CancelQueryRequest { trace_id });
+                let mut request = tonic::Request::new(proto::cluster_rpc::CancelQueryRequest {
+                    trace_id: trace_id.clone(),
+                });
                 let node = Arc::new(node) as _;
-                let mut client = make_grpc_search_client(&mut request, &node).await?;
-                let response: cluster_rpc::CancelQueryResponse =
-                    match client.cancel_query(request).await {
-                        Ok(res) => res.into_inner(),
-                        Err(err) => {
-                            log::error!(
-                                "grpc_cancel_query: node: {}, search err: {:?}",
-                                &node.get_grpc_addr(),
-                                err
-                            );
-                            if err.code() == tonic::Code::Internal {
-                                let err = ErrorCodes::from_json(err.message())?;
-                                return Err(Error::ErrorCode(err));
-                            }
-                            return Err(server_internal_error("search node error"));
-                        }
-                    };
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
+                let response: cluster_rpc::CancelQueryResponse = match client
+                    .cancel_query(request)
+                    .await
+                {
+                    Ok(res) => res.into_inner(),
+                    Err(err) => {
+                        log::error!(
+                            "[trace_id {trace_id}] grpc_cancel_query: node: {}, search err: {:?}",
+                            &node.get_grpc_addr(),
+                            err
+                        );
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
+                    }
+                };
                 Ok(response)
             }
             .instrument(grpc_span),
@@ -981,17 +1058,9 @@ pub async fn cancel_query(
         }
     }
 
-    let mut is_success = false;
-    for res in results {
-        if res.is_success {
-            is_success = true;
-            break;
-        }
-    }
-
     Ok(search::CancelQueryResponse {
         trace_id: trace_id.to_string(),
-        is_success,
+        is_success: true,
     })
 }
 
@@ -1127,6 +1196,7 @@ pub async fn search_partition_multi(
                 streaming_output: req.streaming_output,
             },
             false,
+            true,
         )
         .await
         {
@@ -1162,20 +1232,20 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
 // generate parquet file search schema
 pub fn generate_search_schema_diff(
     schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<HashMap<String, DataType>, Error> {
+    latest_schema_map: &HashMap<&String, &Arc<Field>>,
+) -> HashMap<String, DataType> {
     // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = schema_latest_map.get(field.name()) {
+        if let Some(latest_field) = latest_schema_map.get(field.name()) {
             if field.data_type() != latest_field.data_type() {
                 diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
             }
         }
     }
 
-    Ok(diff_fields)
+    diff_fields
 }
 
 pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {
@@ -1319,6 +1389,7 @@ mod tests {
             ),
         ];
 
+        #[allow(deprecated)]
         for (tsql, expected) in sqls {
             let meta = sql::Sql::new(tsql).unwrap();
             let filter = generate_filter_from_quick_text(&meta.quick_text);

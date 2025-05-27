@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{create_dir_all, remove_file, File, Metadata, OpenOptions},
+    fs::{File, Metadata, OpenOptions, create_dir_all, remove_file},
     io,
     io::{BufWriter, Seek, SeekFrom, Write},
     path::PathBuf,
@@ -24,7 +24,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use crc32fast::Hasher;
 use snafu::ResultExt;
 
-use crate::{errors::*, FileHeader};
+use crate::{FileHeader, errors::*};
 
 pub struct Writer {
     path: PathBuf,

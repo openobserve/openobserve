@@ -72,8 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="createEmailTemplate"
           />
         </div>
-        <div class="q-py-xs"
-        :class="{ 'col-6': isAlerts, 'col-12': !isAlerts }"
+        <div
+          class="q-py-xs"
+          :class="{ 'col-6': isAlerts, 'col-12': !isAlerts }"
         >
           <q-input
             data-test="add-destination-name-input"
@@ -98,10 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tabindex="0"
           />
         </div>
-        <div
-        v-if="isAlerts"
-          class="col-6 row q-py-xs"
-        >
+        <div v-if="isAlerts" class="col-6 row q-py-xs">
           <div class="col-12">
             <q-select
               data-test="add-destination-template-select"
@@ -122,9 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <template
-          v-if="
-            isAlerts && formData.type === 'http' || isAlerts == false
-          "
+          v-if="(isAlerts && formData.type === 'http') || isAlerts == false"
         >
           <div class="col-6 q-py-xs">
             <q-input
@@ -261,6 +257,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('user.inviteByEmail')"
           />
         </template>
+
+        <template v-if="formData.type === 'action'">
+          <div class="col-6 q-py-xs action-select">
+            <q-select
+              data-test="add-destination-action-select"
+              v-model="formData.action_id"
+              :label="t('alert_destinations.action') + ' *'"
+              :options="filteredActions"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop no-case"
+              map-options
+              emit-value
+              stack-label
+              outlined
+              filled
+              dense
+              use-input
+              :loading="isLoadingActions"
+              :rules="[(val: any) => !!val || 'Field is required!']"
+              tabindex="0"
+              @filter="filterActions"
+            />
+          </div>
+        </template>
       </div>
     </div>
     <div class="flex justify-center q-mt-lg">
@@ -296,7 +317,7 @@ import {
   defineEmits,
   reactive,
 } from "vue";
-import type { Ref } from "vue";
+import type { Ref, PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
@@ -310,17 +331,24 @@ import type {
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import actionService from "@/services/action_scripts";
+import config from "@/aws-exports";
+import useActions from "@/composables/useActions";
 
-const props = withDefaults(
-  defineProps<{
-    templates: Template[] | [];
-    destination: DestinationPayload | null;
-    isAlerts: boolean;
-  }>(),
-  {
-    isAlerts: true,
-  }
-);
+const props = defineProps({
+  templates: {
+    type: Array as PropType<Template[]>,
+    default: [],
+  },
+  destination: {
+    type: Object as PropType<DestinationPayload | null>,
+    default: null,
+  },
+  isAlerts: {
+    type: Boolean,
+    default: true,
+  },
+});
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
@@ -334,11 +362,20 @@ const formData: Ref<DestinationData> = ref({
   template: "",
   headers: {},
   emails: "",
-  type: props.isAlerts ? "http" : "remote_pipeline",
+  type: "http",
+  action_id: "",
 });
 const isUpdatingDestination = ref(false);
 
+const isLoadingActions = ref(false);
+
 const router = useRouter();
+
+const actionOptions = ref<{ value: string; label: string; type: string }[]>([]);
+
+const filteredActions = ref<any[]>([]);
+
+const { getAllActions } = useActions();
 
 // TODO OK: Use UUID package instead of this and move this method in utils
 const getUUID = () => {
@@ -353,34 +390,56 @@ const apiHeaders: Ref<
   }[]
 > = ref([{ key: "", value: "", uuid: getUUID() }]);
 
-const tabs = computed(() => [
-  {
-    label: "Web Hook",
-    value: "http",
-    style: {
-      width: "fit-content",
-      padding: "4px 14px",
-      background: formData.value.type === "http" ? "#5960B2" : "",
-      border: "none !important",
-      color: formData.value.type === "http" ? "#ffffff !important" : "",
+const tabs = computed(() => {
+  let tabs = [
+    {
+      label: t("alerts.webhook"),
+      value: "http",
+      style: {
+        width: "fit-content",
+        padding: "4px 14px",
+        background: formData.value.type === "http" ? "#5960B2" : "",
+        border: "none !important",
+        color: formData.value.type === "http" ? "#ffffff !important" : "",
+      },
     },
-  },
-  {
-    label: "Email",
-    value: "email",
-    style: {
-      width: "fit-content",
-      padding: "4px 14px",
-      background: formData.value.type === "email" ? "#5960B2" : "",
-      border: "none !important",
-      color: formData.value.type === "email" ? "#ffffff !important" : "",
+    {
+      label: t("alerts.email"),
+      value: "email",
+      style: {
+        width: "fit-content",
+        padding: "4px 14px",
+        background: formData.value.type === "email" ? "#5960B2" : "",
+        border: "none !important",
+        color: formData.value.type === "email" ? "#ffffff !important" : "",
+      },
     },
+  ];
+
+  if (
+    (config.isEnterprise == "true" || config.isCloud == "true") &&
+    store.state.zoConfig.actions_enabled
+  ) {
+    tabs.push({
+      label: t("alerts.action"),
+      value: "action",
+      style: {
+        width: "fit-content",
+        padding: "4px 14px",
+        background: formData.value.type === "action" ? "#5960B2" : "",
+        border: "none !important",
+        color: formData.value.type === "action" ? "#ffffff !important" : "",
+      },
+    });
   }
-]);
+
+  return tabs;
+});
 
 onActivated(() => setupDestinationData());
-onBeforeMount(() => {
+onBeforeMount(async () => {
   setupDestinationData();
+  await getActionOptions();
 });
 
 const setupDestinationData = () => {
@@ -391,18 +450,21 @@ const setupDestinationData = () => {
     formData.value.method = props.destination.method;
     formData.value.skip_tls_verify = props.destination.skip_tls_verify;
     formData.value.template = props.destination.template;
+    if (!props.destination.headers) formData.value.headers = {};
     formData.value.headers = props.destination.headers;
-    formData.value.emails = (props.destination.emails || []).join(", ");
+    formData.value.emails = (props.destination?.emails || []).join(", ");
     formData.value.type = props.destination.type || "http";
+    formData.value.action_id = props.destination.action_id || "";
 
-    if (Object.keys(formData.value.headers).length) {
+    if (Object.keys(formData.value?.headers || {}).length) {
       apiHeaders.value = [];
-      Object.entries(formData.value.headers).forEach(([key, value]) => {
+      Object.entries(formData.value?.headers || {}).forEach(([key, value]) => {
         addApiHeader(key, value);
       });
     }
   }
 };
+
 const getFormattedTemplates = computed(() =>
   props.templates
     .filter((template: any) => {
@@ -410,19 +472,51 @@ const getFormattedTemplates = computed(() =>
         return true;
       else if (formData.value.type !== "email") return true;
     })
-    .map((template: any) => template.name)
+    .map((template: any) => template.name),
 );
 
 const isValidDestination = computed(
   () =>
     formData.value.name &&
-((formData.value.url &&
+    ((formData.value.url &&
       formData.value.method &&
       formData.value.type === "http") ||
-  (formData.value.type === "email" && formData.value.emails.length) ||
-      (!props.isAlerts && formData.value.url && formData.value.method)) &&
+      (formData.value.type === "email" && formData.value?.emails?.length) ||
+      (formData.value.type === "action" && formData.value?.action_id?.length) ||
+      (!props.isAlerts && formData.value.url && formData?.value?.method)) &&
     (props.isAlerts ? formData.value.template : true),
 );
+
+const updateActionOptions = () => {
+  actionOptions.value = [];
+  store.state.organizationData.actions.forEach((action: any) => {
+    if (action.execution_details_type === "service")
+      actionOptions.value.push({
+        value: action.id,
+        label: action.name,
+        type: action.execution_details_type,
+      });
+  });
+  filteredActions.value = actionOptions.value;
+};
+
+const getActionOptions = async () => {
+  try {
+    isLoadingActions.value = true;
+    // Update action options with existing actions
+    updateActionOptions();
+
+    // Get all actions from the server and update the action options
+    await getAllActions();
+    isLoadingActions.value = false;
+    updateActionOptions();
+  } catch (err) {
+    console.error(err);
+  } finally {
+    isLoadingActions.value = false;
+  }
+};
+
 const saveDestination = () => {
   if (!isValidDestination.value) {
     q.notify({
@@ -453,14 +547,19 @@ const saveDestination = () => {
 
   if (formData.value.type === "email") {
     payload["type"] = "email";
-    payload["emails"] = formData.value.emails
+    payload["emails"] = (formData.value?.emails || "")
       .split(/[;,]/)
       .map((email: string) => email.trim());
   }
 
-  if (!props.isAlerts) {
-    payload["type"] = "remote_pipeline";
+  if (formData.value.type === "action") {
+    payload["type"] = "action";
+    payload["action_id"] = formData.value.action_id;
   }
+
+  // if (!props.isAlerts) {
+  //   payload["type"] = "remote_pipeline";
+  // }
 
   if (isUpdatingDestination.value) {
     destinationService
@@ -479,7 +578,7 @@ const saveDestination = () => {
         });
       })
       .catch((err: any) => {
-        if(err.response?.status == 403){
+        if (err.response?.status == 403) {
           return;
         }
         dismiss();
@@ -505,7 +604,7 @@ const saveDestination = () => {
         });
       })
       .catch((err: any) => {
-        if(err.response?.status == 403){
+        if (err.response?.status == 403) {
           return;
         }
         dismiss();
@@ -521,10 +620,10 @@ const addApiHeader = (key: string = "", value: string = "") => {
 };
 const deleteApiHeader = (header: any) => {
   apiHeaders.value = apiHeaders.value.filter(
-    (_header) => _header.uuid !== header.uuid
+    (_header) => _header.uuid !== header.uuid,
   );
-  if (formData.value.headers[header.key])
-    delete formData.value.headers[header.key];
+  if (formData.value?.headers?.[header.key])
+    delete formData.value?.headers?.[header.key];
   if (!apiHeaders.value.length) addApiHeader();
 };
 
@@ -537,6 +636,31 @@ const createEmailTemplate = () => {
       org_identifier: store.state.selectedOrganization.identifier,
     },
   });
+};
+
+const filterColumns = (options: any[], val: String, update: Function) => {
+  let filteredOptions: any[] = [];
+  if (val === "") {
+    update(() => {
+      filteredOptions = [...options];
+    });
+    return filteredOptions;
+  }
+  update(() => {
+    const value = val?.toLowerCase();
+    filteredOptions = options.filter((column: any) => {
+      if (typeof column === "string")
+        return column?.toLowerCase().indexOf(value) > -1;
+      else {
+        return column?.label?.toLowerCase().indexOf(value) > -1;
+      }
+    });
+  });
+  return filteredOptions;
+};
+
+const filterActions = (val: string, update: any) => {
+  filteredActions.value = filterColumns(actionOptions.value, val, update);
 };
 </script>
 <style lang="scss" scoped>

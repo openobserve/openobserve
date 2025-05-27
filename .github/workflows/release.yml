@@ -4,7 +4,7 @@ on:
       - "v*.*.*"
 name: Release
 env:
-  RUST_TOOLCHAIN: nightly-2024-10-24
+  RUST_TOOLCHAIN: nightly-2025-03-02
 jobs:
   build:
     name: Build binary
@@ -12,27 +12,27 @@ jobs:
       matrix:
         include:
           - arch: x86_64-unknown-linux-gnu
-            os: ubuntu-2004-8-cores
+            os: ubuntu-2204-8-cores
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-gnu
-            os: ubuntu-2004-8-cores
+            os: ubuntu-2204-8-cores
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64-simd
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-musl
-            os: ubuntu-2004-8-cores
+            os: ubuntu-2204-8-cores
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64-musl
             file_ext: .tar.gz
           # - arch: aarch64-unknown-linux-musl
-          #   os: ubuntu-2004-8-cores
+          #   os: ubuntu-2204-8-cores
           #   features: "--features mimalloc"
           #   file_name: openobserve-${{ github.ref_name }}-linux-arm64-musl
           #   file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
-            os: ubuntu-2004-8-cores
+            os: ubuntu-2204-8-cores
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
@@ -67,20 +67,20 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ matrix.arch }}-build-cargo-${{ hashFiles('**/Cargo.lock') }}
-        
+
       - name: Install Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
-          cache: 'npm'
+          node-version: 22.x
+          cache: "npm"
           cache-dependency-path: web/package-lock.json
       - name: Build UI
-        env: 
+        env:
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
-            cd web/
-            npm install
-            npm run build
+          cd web/
+          npm install
+          npm run build
 
       - name: Install Protoc for linux
         if: contains(matrix.arch, 'linux')
@@ -109,7 +109,7 @@ jobs:
         run: |
           sudo apt-get -y update
           sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
-      
+
       - name: Install dependencies for linux
         if: contains(matrix.arch, 'linux-musl')
         run: |
@@ -136,7 +136,7 @@ jobs:
 
       - name: Run cargo build
         if: contains(matrix.file_name, '-simd')
-        run: RUSTFLAGS='-C target-feature=+aes,+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx512f,+avx512cd,+avx512er,+avx512bw,+avx512dq,+avx512vl' cargo build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
+        run: RUSTFLAGS='-C target-feature=+aes,+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx512f,+avx512cd,+avx512bw,+avx512dq,+avx512vl' cargo build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
 
       - name: Calculate checksum and rename binary
         if: contains(matrix.arch, 'windows') == false

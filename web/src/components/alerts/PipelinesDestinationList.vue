@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <QTablePagination
             :scope="scope"
-            :pageTitle="t('alert_destinations.header')"
+            :pageTitle="t('pipeline_destinations.header')"
             :position="'top'"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
@@ -253,7 +253,7 @@ export default defineComponent({
           sort_by: "name",
           desc: false,
           org_identifier: store.state.selectedOrganization.identifier,
-          dst_type: "remote_pipeline",
+          module: "pipeline",
         })
         .then((res) => {
           // res.data = res.data.filter(

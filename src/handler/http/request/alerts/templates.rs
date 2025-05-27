@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,35 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
-use config::meta::alerts::templates::Template;
+use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::templates};
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::models::destinations::Template,
+    service::{alerts::templates, db::alerts::templates::TemplateError},
+};
+
+impl From<TemplateError> for HttpResponse {
+    fn from(value: TemplateError) -> Self {
+        match value {
+            TemplateError::InfraError(e) => {
+                MetaHttpResponse::internal_error(TemplateError::InfraError(e))
+            }
+            TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
+            TemplateError::DeleteWithDestination(e) => {
+                MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(e))
+            }
+            other_err => MetaHttpResponse::bad_request(other_err),
+        }
+    }
+}
 
 /// CreateTemplate
+///
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
+    tag = "Templates",
     operation_id = "CreateTemplate",
     security(
         ("Authorization"= [])
@@ -43,17 +63,19 @@ pub async fn save_template(
     tmpl: web::Json<Template>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let tmpl = tmpl.into_inner();
-    match templates::save(&org_id, "", tmpl, true).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert template saved")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    let tmpl = tmpl.into_inner().into(&org_id);
+    match templates::save("", tmpl, true).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Template saved")),
+        Err(e) => Ok(e.into()),
     }
 }
 
 /// UpdateTemplate
+///
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
+    tag = "Templates",
     operation_id = "UpdateTemplate",
     security(
         ("Authorization"= [])
@@ -74,17 +96,19 @@ pub async fn update_template(
     tmpl: web::Json<Template>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    let tmpl = tmpl.into_inner();
-    match templates::save(&org_id, &name, tmpl, false).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert template updated")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    let tmpl = tmpl.into_inner().into(&org_id);
+    match templates::save(&name, tmpl, false).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Template updated")),
+        Err(e) => Ok(e.into()),
     }
 }
 
 /// GetTemplateByName
+///
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
+    tag = "Templates",
     operation_id = "GetTemplate",
     security(
         ("Authorization"= [])
@@ -102,15 +126,17 @@ pub async fn update_template(
 async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     match templates::get(&org_id, &name).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
-        Err(e) => Ok(MetaHttpResponse::not_found(e)),
+        Ok(data) => Ok(MetaHttpResponse::json(Template::from(data))),
+        Err(e) => Ok(e.into()),
     }
 }
 
 /// ListTemplates
+///
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
+    tag = "Templates",
     operation_id = "ListTemplates",
     security(
         ("Authorization"= [])
@@ -153,15 +179,19 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
     }
 
     match templates::list(&org_id, _permitted).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(data) => Ok(MetaHttpResponse::json(
+            data.into_iter().map(Template::from).collect::<Vec<_>>(),
+        )),
+        Err(e) => Ok(e.into()),
     }
 }
 
 /// DeleteTemplate
+///
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
+    tag = "Templates",
     operation_id = "DeleteAlertTemplate",
     security(
         ("Authorization"= [])
@@ -181,11 +211,7 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
 async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     match templates::delete(&org_id, &name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert template deleted")),
-        Err(e) => match e {
-            (http::StatusCode::CONFLICT, e) => Ok(MetaHttpResponse::conflict(e)),
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
-        },
+        Ok(_) => Ok(MetaHttpResponse::ok("Template deleted")),
+        Err(e) => Ok(e.into()),
     }
 }

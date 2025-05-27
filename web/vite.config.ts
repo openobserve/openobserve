@@ -109,7 +109,9 @@ export default defineConfig({
       template: { transformAssetUrls },
     }),
     quasar({
-      sassVariables: "src/styles/quasar-variables.sass",
+      sassVariables: fileURLToPath(
+        new URL('src/styles/quasar-variables.sass', import.meta.url)
+      )
     }),
     process.env.VITE_COVERAGE === "true" &&
       istanbul({

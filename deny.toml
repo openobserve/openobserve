@@ -22,21 +22,18 @@ exceptions = [
     { name = "mach", allow = ["BSD-2-Clause"] },
     { name = "fastdivide", allow = ["zlib-acknowledgement"] },
     { name = "foldhash", allow = ["Zlib"] },
-
     # These two are transitive deps of vrl via dep rustyline.
     # However, rustyline is needed only when we enable feature cli
     # which we haven't. Probably in Cargo.lock due to old code, need
     # to take a look and remove.
     { name = "clipboard-win", allow = ["BSL-1.0"] },
     { name = "error-code", allow = ["BSL-1.0"] },
-
     { name = "base16", allow = ["CC0-1.0"] },
     { name = "tiny-keccak", allow = ["CC0-1.0"] },
-    { name = "enum-iterator-derive", allow = ["0BSD"] },
     { name = "quoted_printable", allow = ["0BSD"] },
     { name = "ring", allow = ["BSD-4-Clause", "OpenSSL"] },
-    { name = "unicode-ident", allow = ["Unicode-DFS-2016"] },
     { name = "adler32", allow = ["Zlib"] },
+    { name = "inferno", allow = ["CDDL-1.0"] },
 ]
 
 allow = [
@@ -44,9 +41,10 @@ allow = [
     "Apache-2.0 WITH LLVM-exception",
     "MPL-2.0",
     "MIT",
-    "BSD-3-Clause",                   # OSI + fsf free
-    "Unicode-3.0",                    # OSI
-    "ISC",                            # OSI + fsf free
+    "BSD-3-Clause", # OSI + fsf free
+    "Unicode-3.0", # OSI
+    "ISC", # OSI + fsf free
+    "BSL-1.0",
 ]
 
 [[licenses.clarify]]

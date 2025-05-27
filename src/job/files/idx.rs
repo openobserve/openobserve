@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,19 +16,18 @@
 use std::sync::Arc;
 
 use arrow::array::{
-    make_builder, Array, ArrayBuilder, BinaryArray, BinaryBuilder, BooleanArray, BooleanBuilder,
-    Int64Array, Int64Builder, RecordBatch, StringArray, StringBuilder,
+    Array, ArrayBuilder, BinaryArray, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array,
+    Int64Builder, RecordBatch, StringArray, StringBuilder, make_builder,
 };
 use arrow_schema::{DataType, Schema};
 use config::{
-    ider,
+    FILE_EXT_PARQUET, ider,
     meta::stream::{FileMeta, StreamPartition, StreamPartitionType, StreamType},
     utils::{
         parquet::new_parquet_writer,
-        record_batch_ext::{concat_batches, RecordBatchExt},
+        record_batch_ext::{RecordBatchExt, concat_batches},
         schema::format_partition_key,
     },
-    FILE_EXT_PARQUET,
 };
 use hashbrown::HashMap;
 use infra::storage;
@@ -63,7 +62,7 @@ pub(crate) async fn write_parquet_index_to_disk(
     stream_type: StreamType,
     stream_name: &str,
     file_name: &str,
-) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
+) -> Result<Vec<(String, String, FileMeta)>, anyhow::Error> {
     let start = std::time::Instant::now();
     let schema = if let Some(first_batch) = batches.first() {
         first_batch.schema()
@@ -108,7 +107,14 @@ pub(crate) async fn write_parquet_index_to_disk(
         // write parquet file
         let mut buf_parquet = Vec::new();
         let bf_fields = vec!["term".to_string()];
-        let mut writer = new_parquet_writer(&mut buf_parquet, &schema, &bf_fields, &file_meta);
+        let mut writer = new_parquet_writer(
+            &mut buf_parquet,
+            &schema,
+            &bf_fields,
+            &file_meta,
+            true,
+            None,
+        );
         writer.write(&batch).await?;
         writer.close().await?;
         file_meta.compressed_size = buf_parquet.len() as i64;
@@ -121,9 +127,15 @@ pub(crate) async fn write_parquet_index_to_disk(
             &prefix,
         );
 
-        let store_file_name = new_idx_file_name.clone();
         let buf_size = buf_parquet.len();
-        match storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await {
+        let account = storage::get_account(&new_idx_file_name).unwrap_or_default();
+        match storage::put(
+            &account,
+            &new_idx_file_name,
+            bytes::Bytes::from(buf_parquet),
+        )
+        .await
+        {
             Ok(_) => {
                 log::info!(
                     "[JOB:IDX] index file upload successfully: {}, size: {}, took: {} ms",
@@ -131,7 +143,7 @@ pub(crate) async fn write_parquet_index_to_disk(
                     buf_size,
                     start.elapsed().as_millis()
                 );
-                ret.push((new_idx_file_name, file_meta));
+                ret.push((account, new_idx_file_name, file_meta));
             }
             Err(err) => {
                 log::error!("[JOB] index file upload error: {:?}", err);

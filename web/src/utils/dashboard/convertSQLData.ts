@@ -29,6 +29,7 @@ import {
   calculateWidthText,
   formatDate,
   formatUnitValue,
+  getContrastColor,
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
@@ -45,6 +46,7 @@ import {
 } from "./colorPalette";
 import { deepCopy } from "@/utils/zincutils";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
+import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -55,9 +57,13 @@ export const convertMultiSQLData = async (
   resultMetaData: any,
   metadata: any,
   chartPanelStyle: any,
+  annotations: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
-    return { options: null };
+    // this sets a blank object until it loads
+    // because of this, it will go to UI and draw something, even 0 or a blank chart
+    // this will give a sence of progress to the user
+    searchQueryData = [[]];
   }
 
   // loop on all search query data
@@ -73,9 +79,16 @@ export const convertMultiSQLData = async (
         [resultMetaData.value[i]],
         { queries: [metadata.queries[i]] },
         chartPanelStyle,
+        annotations,
       ),
     );
   }
+
+  const isAnnotationSeries = (series: any) => {
+    // check if series name is available
+    // if series name is not available then that is anotation series
+    if (!series.name) return true;
+  };
 
   // loop on all options
   if (options && options[0] && options[0].options) {
@@ -84,6 +97,7 @@ export const convertMultiSQLData = async (
         options[0].options.series = [
           ...options[0].options.series,
           ...options[i].options.series.map((it: any) => {
+            if (isAnnotationSeries(it)) return it;
             return {
               ...it,
               name: metadata?.queries[i]?.timeRangeGap.periodAsStr
@@ -108,7 +122,10 @@ export const convertSQLData = async (
   resultMetaData: any,
   metadata: any,
   chartPanelStyle: any,
+  annotations: any,
 ) => {
+  const extras: any = {};
+
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -210,8 +227,20 @@ export const convertSQLData = async (
     }
 
     const { top_results, top_results_others } = panelSchema.config;
+
+    // get the limit series from the config
+    // if top_results is enabled then use the top_results value
+    // otherwise use the max_dashboard_series value
+    const limitSeries = top_results
+      ? (Math.min(
+          top_results,
+          store.state?.zoConfig?.max_dashboard_series ?? 100,
+        ) ?? 100)
+      : (store.state?.zoConfig?.max_dashboard_series ?? 100);
+
     const innerDataArray = data[0];
-    if (!top_results || !breakDownKeys.length) {
+
+    if (!breakDownKeys.length) {
       return innerDataArray;
     }
 
@@ -219,30 +248,63 @@ export const convertSQLData = async (
     const yAxisKey = yAxisKeys[0];
     const xAxisKey = xAxisKeys[0];
 
-    // Step 1: Aggregate y_axis values by breakdown, ignoring items without a breakdown key
+    // Step 1: Aggregate y_axis values by breakdown, ensuring missing values are set to empty string
     const breakdown = innerDataArray.reduce((acc, item) => {
-      const breakdownValue = item[breakdownKey];
-      const yAxisValue = item[yAxisKey];
-      if (breakdownValue) {
-        acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
+      let breakdownValue = item[breakdownKey];
+
+      // Convert null, undefined, and empty string to a default empty string
+      if (
+        breakdownValue == null ||
+        breakdownValue === "" ||
+        breakdownValue === undefined
+      ) {
+        breakdownValue = "";
       }
+
+      const yAxisValue = item[yAxisKey];
+
+      acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
       return acc;
     }, {});
 
     // Step 2: Sort and extract the top keys based on the configured number of top results
-    const topKeys = Object.entries(breakdown)
-      .sort(([, a]: any, [, b]: any) => b - a)
-      .slice(0, top_results)
-      .map(([key]) => key);
+    const allKeys = Object.entries(breakdown).sort(
+      ([, a]: any, [, b]: any) => b - a,
+    );
+
+    // if top_results is enabled and the number of unique breakdown values is greater than the limit, add a warning message
+    // if top_results is not enabled and the number of unique breakdown values is greater than the max_dashboard_series, add a warning message
+    if (
+      (top_results &&
+        top_results > (store.state?.zoConfig?.max_dashboard_series ?? 100) &&
+        allKeys.length > top_results) ||
+      (!top_results &&
+        allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
+    ) {
+      extras.limitNumberOfSeriesWarningMessage =
+        "Limiting the displayed series to ensure optimal performance";
+    }
+
+    const topKeys = allKeys.slice(0, limitSeries).map(([key]) => key);
 
     // Step 3: Initialize result array and others object for aggregation
     const resultArray: any[] = [];
     const othersObj: any = {};
 
     innerDataArray.forEach((item) => {
-      const breakdownValue = item[breakdownKey];
-      if (topKeys.includes(breakdownValue)) {
-        resultArray.push(item);
+      let breakdownValue = item[breakdownKey];
+
+      // Ensure missing breakdown values are treated as empty strings
+      if (
+        breakdownValue == null ||
+        breakdownValue === "" ||
+        breakdownValue === undefined
+      ) {
+        breakdownValue = "";
+      }
+
+      if (topKeys.includes(breakdownValue.toString())) {
+        resultArray.push({ ...item, [breakdownKey]: breakdownValue });
       } else if (top_results_others) {
         const xAxisValue = String(item[xAxisKey]);
         othersObj[xAxisValue] =
@@ -287,7 +349,9 @@ export const convertSQLData = async (
 
   const missingValue = () => {
     // Get the interval in minutes
-    const interval = resultMetaData?.map((it: any) => it.histogram_interval)[0];
+    const interval = resultMetaData?.map(
+      (it: any) => it?.histogram_interval,
+    )?.[0];
 
     if (
       !interval ||
@@ -455,6 +519,10 @@ export const convertSQLData = async (
     }
   }
 
+  const convertedTimeStampToDataFormat = new Date(
+    annotations?.value?.[0]?.start_time / 1000,
+  ).toString();
+
   /**
    * Returns the largest label from the stacked chart data.
    * Calculates the largest value for each unique breakdown and sums those values.
@@ -616,9 +684,11 @@ export const convertSQLData = async (
       // Calculate grid layout for trellis charts
       const gridData = getTrellisGrid(
         chartPanelRef.value.offsetWidth,
+        chartPanelRef.value.offsetHeight,
         options.series.length,
         yAxisNameGap,
         customCols,
+        panelSchema.config?.axis_width,
       );
 
       options.grid = gridData.gridArray;
@@ -631,8 +701,31 @@ export const convertSQLData = async (
 
       options.title = [];
 
+      // Store original series
+      const originalSeries = [...options.series];
+      options.series = [];
+
       // Configure each series with its corresponding grid index
-      options.series.forEach((series: any, index: number) => {
+      originalSeries.forEach((series: any, index: number) => {
+        // Add the original series
+        const updatedSeries = {
+          ...series,
+          xAxisIndex: index,
+          yAxisIndex: index,
+          zlevel: 2,
+        };
+        options.series.push(updatedSeries);
+
+        options.series.push({
+          type: "line",
+          xAxisIndex: index,
+          yAxisIndex: index,
+          data: [[convertedTimeStampToDataFormat, null]],
+          markArea: getSeriesMarkArea(),
+          markLine: getAnnotationMarkLine(),
+          zlevel: 1,
+        });
+
         if (index > 0) {
           options.xAxis.push({
             ...deepCopy(options.xAxis[0]),
@@ -712,39 +805,60 @@ export const convertSQLData = async (
     yAxisNameGap: number,
     gridData: null | any = null,
   ) => {
-    const maxYValue = formatUnitValue(
-      getUnitValue(
-        Math.max(
-          ...yAxisKeys.map((key: any) => getAxisDataFromKey(key)).flat(),
-        ),
-        panelSchema.config?.unit,
-        panelSchema.config?.unit_custom,
-        panelSchema.config?.decimals,
+    const maxYValue = getUnitValue(
+      Math.max(
+        ...yAxisKeys
+          .map((key: any) => getAxisDataFromKey(key))
+          .flat()
+          .filter((value: any) => typeof value === "number"),
       ),
+      "null", // We don't need to add unit, as we are only calculating the max value. Unit will format the value
+      panelSchema.config?.unit_custom,
+      panelSchema.config?.decimals,
     );
 
-    // Update yAxis label properties for each chart yAxis based on the grid position
+    // Some units, currencies are formatted with , separator, we need to remove it and convert it to valid number
+    maxYValue.value = maxYValue.value.replace(",", "");
+
+    const [num, decimals] = maxYValue.value.split(".");
+
+    //  The purpose of addMaxValue is to ensure that the maxYValue.value is in a valid numeric format before updating the yAxis properties. By doing this check, the code ensures that only valid numeric values are used to set the max property of the yAxis, preventing potential errors or invalid configurations.
+    // Summary
+    // addMaxValue is a boolean that verifies if maxYValue.value is a valid numeric string.
+    // It ensures that the max property of the yAxis is only updated with valid numeric values.
+    const addMaxValue =
+      maxYValue.value ===
+      parseInt(num) + (decimals === undefined ? "" : `.${decimals}`);
+
     options.yAxis.forEach((it: any, index: number) => {
-      it.max = maxYValue;
+      if (addMaxValue) {
+        const rounedMaxValue = Math.ceil(parseFloat(maxYValue.value));
+        it.max = rounedMaxValue + rounedMaxValue * 0.1; // Add 10% to the max value, to ensure that the max value is not at the top of the chart
+      }
+
       it.axisLabel = {
-        formatter: function (value: number) {
-          // Force two decimal places for all charts
-          return value.toFixed(2);
+        formatter: function (value: any) {
+          return formatUnitValue(
+            getUnitValue(
+              value,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals,
+            ),
+          );
         },
       };
 
       let showAxisLabel = true;
 
       if (isHorizontalChart) {
-        showAxisLabel =
-          index >=
-          gridData.gridNoOfRow * gridData.gridNoOfCol - gridData.gridNoOfCol;
+        showAxisLabel = options.yAxis.length - gridData.gridNoOfCol <= index;
       } else {
         showAxisLabel = index % gridData.gridNoOfCol === 0;
       }
 
       // Here we are setting the axis label properties, if showAxisLabel is false then we are hiding the axis label
-      it.nameGap = showAxisLabel ? yAxisNameGap : 0;
+      it.nameGap = showAxisLabel ? (isHorizontalChart ? 25 : yAxisNameGap) : 0;
       it.axisLabel.margin = showAxisLabel ? 5 : 0;
       it.axisLabel.fontSize = showAxisLabel ? 12 : 10;
       it.nameTextStyle.fontSize = 12;
@@ -769,9 +883,7 @@ export const convertSQLData = async (
       if (isHorizontalChart) {
         showAxisLabel = index % gridData.gridNoOfCol === 0;
       } else {
-        showAxisLabel =
-          index >=
-          gridData.gridNoOfRow * gridData.gridNoOfCol - gridData.gridNoOfCol;
+        showAxisLabel = options.xAxis.length - gridData.gridNoOfCol <= index;
       }
 
       it.axisTick.length = showAxisLabel ? 5 : 0;
@@ -783,6 +895,21 @@ export const convertSQLData = async (
 
       if (!showAxisLabel) it.name = "";
     });
+  };
+
+  const [min, max] = getSQLMinMaxValue(yAxisKeys, missingValueData);
+
+  const getFinalAxisValue = (
+    configValue: number | null | undefined,
+    dataValue: number,
+    isMin: boolean,
+  ) => {
+    if (configValue === null || configValue === undefined) {
+      return undefined;
+    }
+    return isMin
+      ? Math.min(configValue, dataValue)
+      : Math.max(configValue, dataValue);
   };
 
   const options: any = {
@@ -989,7 +1116,9 @@ export const convertSQLData = async (
           show: true,
         },
         axisLine: {
-          show: panelSchema.config?.axis_border_show || false,
+          show: searchQueryData?.every((it: any) => it.length == 0)
+            ? true
+            : (panelSchema.config?.axis_border_show ?? false),
         },
         axisTick: {
           show: xAxisKeys.length + breakDownKeys.length == 1 ? false : true,
@@ -1013,6 +1142,8 @@ export const convertSQLData = async (
           ? panelSchema.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
+      min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
+      max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       nameGap:
         calculateWidthText(
           panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"
@@ -1046,7 +1177,9 @@ export const convertSQLData = async (
         show: true,
       },
       axisLine: {
-        show: panelSchema.config?.axis_border_show || false,
+        show: searchQueryData?.every((it: any) => it.length == 0)
+          ? true
+          : (panelSchema.config?.axis_border_show ?? false),
       },
     },
     toolbox: {
@@ -1104,9 +1237,10 @@ export const convertSQLData = async (
     if (!breakDownKey) return [];
 
     // Extract unique values for the second x-axis key
+    // NOTE: while filter, we can't compare type as well because set will have string values
     const uniqueValues = [
       ...new Set(missingValueData.map((obj: any) => obj[breakDownKey])),
-    ].filter(Boolean);
+    ].filter((value: any) => value != null || value != undefined);
 
     return uniqueValues;
   }
@@ -1119,6 +1253,11 @@ export const convertSQLData = async (
     };
   };
 
+  const { markLines, markAreas } = getAnnotationsData(
+    annotations,
+    store.state.timezone,
+  );
+
   const getSeriesMarkLine = () => {
     return {
       silent: true,
@@ -1127,12 +1266,32 @@ export const convertSQLData = async (
     };
   };
 
+  const getAnnotationMarkLine = () => {
+    return {
+      itemStyle: {
+        color: "rgba(0, 191, 255, 0.5)",
+      },
+      silent: false,
+      animation: false,
+      data: markLines,
+    };
+  };
+  const getSeriesMarkArea = () => {
+    return {
+      itemStyle: {
+        color: "rgba(0, 191, 255, 0.15)",
+      },
+      data: markAreas,
+    };
+  };
+
   const getSeriesData = (
     breakdownKey: string,
     yAxisKey: string,
     xAxisKey: string,
   ) => {
-    if (!(breakdownKey && yAxisKey && xAxisKey)) return [];
+    if (!(breakdownKey !== null && yAxisKey !== null && xAxisKey !== null))
+      return [];
 
     const data = missingValueData.filter(
       (it: any) => it[breakdownKey] == xAxisKey,
@@ -1150,14 +1309,17 @@ export const convertSQLData = async (
     yAxisName: string,
     seriesData: Array<number> = [],
     seriesConfig: Record<string, any>,
+    seriesName: string,
   ): SeriesObject => {
     return {
       //only append if yaxiskeys length is more than 1
-      name: yAxisName,
+      name: yAxisName?.toString(),
       ...defaultSeriesProps,
       label: getSeriesLabel(),
+      originalSeriesName: seriesName,
       // markLine if exist
       markLine: getSeriesMarkLine(),
+      // markArea: getSeriesMarkArea(),
       // config to connect null values
       connectNulls: panelSchema.config?.connect_nulls ?? false,
       large: true,
@@ -1168,9 +1330,11 @@ export const convertSQLData = async (
           seriesData,
           chartMin,
           chartMax,
+          store.state.theme,
         ) ?? null,
       data: seriesData,
       ...seriesConfig,
+      zlevel: 2,
     };
   };
 
@@ -1191,7 +1355,7 @@ export const convertSQLData = async (
         panelSchema.queries[0].fields.breakdown?.length)
     ) {
       return yAxisKeys.length === 1
-        ? xAXisKey
+        ? xAXisKey !== ""
           ? xAXisKey
           : label
         : `${xAXisKey} (${label})`;
@@ -1213,28 +1377,34 @@ export const convertSQLData = async (
 
     return (
       yAxisKeys
-        .map((yAxis: any) => {
+        .map((yAxis: any, index: number) => {
           let yAxisName = getYAxisLabel(yAxis);
 
-          if (
-            breakDownKeys.length &&
-            (panelSchema.type === "bar" || panelSchema.type === "h-bar") &&
-            !panelSchema.config.trellis?.layout
-          ) {
-            const seriesData = getAxisDataFromKey(yAxis);
-            return getSeriesObj(yAxisName, seriesData, seriesConfig);
-          } else if (breakDownKeys.length) {
+          if (breakDownKeys.length) {
             return stackedXAxisUniqueValue?.map((key: any) => {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
               yAxisName = getYAxisLabel(yAxis, key);
 
               const seriesData = getSeriesData(breakdownKey, yAxis, key);
+              // Add stack property for stacked charts
+              const updatedSeriesConfig = {
+                ...seriesConfig,
+                // Only add stack property for stacked or h-stacked chart types
+                ...(["stacked", "h-stacked"].includes(panelSchema.type) && {
+                  stack: `stack-${index}`,
+                }),
+              };
               // Can create different method to get series
-              return getSeriesObj(yAxisName, seriesData, seriesConfig);
+              return getSeriesObj(
+                yAxisName,
+                seriesData,
+                updatedSeriesConfig,
+                key,
+              );
             });
           } else {
             const seriesData = getAxisDataFromKey(yAxis);
-            return getSeriesObj(yAxisName, seriesData, seriesConfig);
+            return getSeriesObj(yAxisName, seriesData, seriesConfig, "");
           }
         })
         .flat() || []
@@ -1249,14 +1419,16 @@ export const convertSQLData = async (
     case "area-stacked":
     case "line":
     case "area":
-    case "scatter": {
+    case "scatter":
+    case "bar": {
       //if area stacked then continue
       //or if area or line or scatter, then check x axis length
       if (
         panelSchema.type == "area-stacked" ||
         ((panelSchema.type == "line" ||
           panelSchema.type == "area" ||
-          panelSchema.type == "scatter") &&
+          panelSchema.type == "scatter" ||
+          panelSchema.type == "bar") &&
           panelSchema.queries[0].fields.breakdown?.length)
       ) {
         options.xAxis = options.xAxis.slice(0, 1);
@@ -1288,7 +1460,11 @@ export const convertSQLData = async (
           new Set(getAxisDataFromKey(xAxisKeys[0])),
         );
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
-      } else if (panelSchema.type !== "line" && panelSchema.type !== "area") {
+      } else if (
+        panelSchema.type !== "line" &&
+        panelSchema.type !== "area" &&
+        panelSchema.type !== "bar"
+      ) {
         options.tooltip.formatter = function (name: any) {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
           if (
@@ -1365,25 +1541,20 @@ export const convertSQLData = async (
           : {},
       );
 
-      if (panelSchema.config.trellis?.layout && breakDownKeys.length)
+      if (
+        (panelSchema.type === "line" ||
+          panelSchema.type == "area" ||
+          panelSchema.type == "scatter" ||
+          panelSchema.type == "bar") &&
+        panelSchema.config.trellis?.layout &&
+        breakDownKeys.length
+      )
         updateTrellisConfig();
 
       break;
     }
     case "bar": {
       options.series = getSeries({ barMinHeight: 1 });
-
-      if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
-        updateTrellisConfig();
-      } else if (breakDownKeys.length) {
-        options.xAxis.forEach((it: any, index: number) => {
-          it.nameGap = 20 * (xAxisKeys.length + breakDownKeys.length) + 20;
-          it.axisLabel.margin =
-            18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 25;
-          it.axisTick.length =
-            20 * (xAxisKeys.length + breakDownKeys.length - index);
-        });
-      }
 
       break;
     }
@@ -1484,6 +1655,7 @@ export const convertSQLData = async (
                       [params.value],
                       chartMin,
                       chartMax,
+                      store.state.theme,
                     ) ?? null
                   );
                 },
@@ -1554,6 +1726,7 @@ export const convertSQLData = async (
                       [params.value],
                       chartMin,
                       chartMax,
+                      store.state.theme,
                     ) ?? null
                   );
                 },
@@ -1614,10 +1787,6 @@ export const convertSQLData = async (
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
       options.series = getSeries({ barMinHeight: 1 });
-
-      if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
-        updateTrellisConfig();
-      }
 
       break;
     }
@@ -1805,27 +1974,21 @@ export const convertSQLData = async (
       // get second x axis key
       options.series = getSeries({ barMinHeight: 1 });
 
-      if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
-        updateTrellisConfig();
-      }
-
       const temp = options.xAxis;
       options.xAxis = options.yAxis;
       options.yAxis = temp;
 
-      if (!panelSchema.config.trellis?.layout) {
-        const maxYaxisWidth = options.yAxis.reduce((acc: number, it: any) => {
-          return Math.max(acc, it.axisLabel.width || 0);
-        }, 0);
+      const maxYaxisWidth = options.yAxis.reduce((acc: number, it: any) => {
+        return Math.max(acc, it.axisLabel.width || 0);
+      }, 0);
 
-        options.yAxis.map((it: any) => {
-          it.nameGap =
-            Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) +
-            10;
-        });
+      options.yAxis.map((it: any) => {
+        it.nameGap =
+          Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) +
+          10;
+      });
 
-        options.xAxis.nameGap = 25;
-      }
+      options.xAxis.nameGap = 25;
 
       break;
     }
@@ -1838,6 +2001,8 @@ export const convertSQLData = async (
         panelSchema.config?.unit_custom,
         panelSchema.config?.decimals,
       );
+      options.backgroundColor =
+        panelSchema.config?.background?.value?.color ?? "";
       options.dataset = { source: [[]] };
       options.tooltip = {
         show: false,
@@ -1855,6 +2020,10 @@ export const convertSQLData = async (
         {
           ...defaultSeriesProps,
           renderItem: function (params: any) {
+            const backgroundColor =
+              panelSchema.config?.background?.value?.color;
+            const isDarkTheme = store.state.theme === "dark";
+
             return {
               type: "text",
               style: {
@@ -1868,7 +2037,7 @@ export const convertSQLData = async (
                 verticalAlign: "middle",
                 x: params.coordSys.cx,
                 y: params.coordSys.cy,
-                fill: store.state.theme == "dark" ? "#fff" : "#000",
+                fill: getContrastColor(backgroundColor, isDarkTheme),
               },
             };
           },
@@ -1886,7 +2055,7 @@ export const convertSQLData = async (
       const gridDataForGauge = calculateGridPositions(
         chartPanelRef.value.offsetWidth,
         chartPanelRef.value.offsetHeight,
-        yAxisValue.length,
+        yAxisValue.length || 1,
       );
 
       options.dataset = { source: [[]] };
@@ -1927,7 +2096,10 @@ export const convertSQLData = async (
       // for each gague we have separate grid
       options.grid = gridDataForGauge.gridArray;
 
-      options.series = yAxisValue.map((it: any, index: any) => {
+      const gaugeData = yAxisValue.length > 0 ? yAxisValue : [0];
+      const gaugeNames = xAxisValue.length > 0 ? xAxisValue : [""];
+
+      options.series = gaugeData.map((it: any, index: any) => {
         return {
           ...defaultSeriesProps,
           min: panelSchema?.queries[0]?.config?.min || 0,
@@ -1985,7 +2157,7 @@ export const convertSQLData = async (
           data: [
             {
               // gauge name may have or may not have
-              name: xAxisValue[index] ?? "",
+              name: gaugeNames[index] ?? "",
               value: it,
               detail: {
                 formatter: function (value: any) {
@@ -2002,10 +2174,11 @@ export const convertSQLData = async (
                 color:
                   getSeriesColor(
                     panelSchema?.config?.color,
-                    xAxisValue[index] ?? "",
+                    gaugeNames[index] ?? "",
                     [it],
                     chartMin,
                     chartMax,
+                    store.state.theme,
                   ) ?? null,
               },
             },
@@ -2115,6 +2288,14 @@ export const convertSQLData = async (
 
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
+
+        if (
+          showTrellisConfig(panelSchema.type) &&
+          panelSchema.config.trellis?.layout &&
+          breakDownKeys.length
+        )
+          name = [name[0]];
+
         if (
           hoveredSeriesState?.value &&
           panelSchema.id &&
@@ -2150,6 +2331,7 @@ export const convertSQLData = async (
         }
 
         const hoverText: string[] = [];
+
         name.forEach((it: any) => {
           if (it.data[1] != null) {
             // check if the series is the current series being hovered
@@ -2273,6 +2455,13 @@ export const convertSQLData = async (
 
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
+        if (
+          showTrellisConfig(panelSchema.type) &&
+          panelSchema.config.trellis?.layout &&
+          breakDownKeys.length
+        )
+          name = [name[0]];
+
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
           hoveredSeriesState?.value &&
@@ -2392,7 +2581,7 @@ export const convertSQLData = async (
       for (let i = 0; i < xAxisObj[0]?.data?.length; i++) {
         const total = options?.series?.reduce(
           (sum: number, currentSeries: any) =>
-            sum + currentSeries?.data[i] ?? 0,
+            sum + (currentSeries?.data[i] ?? 0),
           0,
         );
         totals.set(i, { label: xAxisObj[0]?.data[i], total });
@@ -2466,18 +2655,45 @@ export const convertSQLData = async (
   if (!["metric", "gauge"].includes(panelSchema.type)) {
     options.series = options.series.filter((it: any) => it.data?.length);
     if (panelSchema.type == "h-bar" || panelSchema.type == "h-stacked") {
-      options.xAxis = options.series.length ? options.xAxis : {};
+      options.xAxis = options.xAxis;
     } else if (!["pie", "donut"].includes(panelSchema.type)) {
-      options.yAxis = options.series.length ? options.yAxis : {};
+      options.yAxis = options.yAxis;
     }
   }
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
+  if (
+    [
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "stacked",
+      "h-stacked",
+    ].includes(panelSchema.type) &&
+    isTimeSeriesFlag &&
+    !panelSchema.config.trellis?.layout
+  ) {
+    options.series.push({
+      type: "line",
+      data: [[convertedTimeStampToDataFormat, null]],
+      markLine: getAnnotationMarkLine(),
+      markArea: getSeriesMarkArea(),
+      zlevel: 1,
+    });
+  }
+
   return {
     options,
-    extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
+    extras: {
+      ...extras,
+      panelId: panelSchema?.id,
+      isTimeSeries: isTimeSeriesFlag,
+    },
   };
 };
 
@@ -2512,6 +2728,11 @@ const largestLabel = (data: any) => {
   }, "");
 
   return largestlabel;
+};
+
+const showTrellisConfig = (type: string) => {
+  const supportedTypes = new Set(["area", "bar", "h-bar", "line", "scatter"]);
+  return supportedTypes.has(type);
 };
 
 /**
@@ -2617,7 +2838,6 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
     case "stacked":
       return {
         type: "bar",
-        stack: "total",
         emphasis: {
           focus: "series",
         },
@@ -2664,7 +2884,6 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
     case "h-stacked":
       return {
         type: "bar",
-        stack: "total",
         emphasis: {
           focus: "series",
         },

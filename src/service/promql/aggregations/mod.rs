@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,14 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use config::{meta::promql::NAME_LABEL, FxIndexMap};
+use config::{FxIndexMap, meta::promql::NAME_LABEL, utils::sort::sort_float};
 use datafusion::error::{DataFusionError, Result};
-use itertools::Itertools;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use rayon::prelude::*;
 
 use crate::service::promql::{
-    value::{InstantValue, Label, Labels, LabelsExt, Sample, Signature, Value},
     Engine,
+    value::{InstantValue, Label, Labels, LabelsExt, Sample, Value},
 };
 
 mod avg;
@@ -82,38 +81,22 @@ pub(crate) struct TopItem {
 
 pub fn labels_to_include(
     include_labels: &[String],
-    actual_labels: &[Arc<Label>],
+    mut actual_labels: Vec<Arc<Label>>,
 ) -> Vec<Arc<Label>> {
+    actual_labels.retain(|label| include_labels.contains(&label.name));
     actual_labels
-        .iter()
-        .flat_map(|label| {
-            if include_labels.contains(&label.name) {
-                Some(label.clone())
-            } else {
-                None
-            }
-        })
-        .collect()
 }
 
 pub fn labels_to_exclude(
     exclude_labels: &[String],
-    actual_labels: &[Arc<Label>],
+    mut actual_labels: Vec<Arc<Label>>,
 ) -> Vec<Arc<Label>> {
+    actual_labels.retain(|label| !exclude_labels.contains(&label.name) && label.name != NAME_LABEL);
     actual_labels
-        .iter()
-        .flat_map(|label| {
-            if !exclude_labels.contains(&label.name) && label.name != NAME_LABEL {
-                Some(label.clone())
-            } else {
-                None
-            }
-        })
-        .collect()
 }
 
 fn eval_arithmetic_processor(
-    score_values: &mut HashMap<Signature, ArithmeticItem>,
+    score_values: &mut HashMap<u64, ArithmeticItem>,
     f_handler: fn(total: f64, val: f64) -> f64,
     sum_labels: &Labels,
     value: f64,
@@ -130,7 +113,7 @@ fn eval_arithmetic_processor(
 }
 
 fn eval_count_values_processor(
-    score_values: &mut HashMap<Signature, CountValuesItem>,
+    score_values: &mut HashMap<u64, CountValuesItem>,
     sum_labels: &Labels,
 ) {
     let sum_hash = sum_labels.signature();
@@ -144,7 +127,7 @@ fn eval_count_values_processor(
 }
 
 fn eval_std_dev_var_processor(
-    score_values: &mut HashMap<Signature, StatisticItems>,
+    score_values: &mut HashMap<u64, StatisticItems>,
     sum_labels: &Labels,
     value: f64,
 ) {
@@ -163,10 +146,10 @@ fn eval_std_dev_var_processor(
 
 pub(crate) fn eval_arithmetic(
     param: &Option<LabelModifier>,
-    data: &Value,
+    data: Value,
     f_name: &str,
     f_handler: fn(total: f64, val: f64) -> f64,
-) -> Result<Option<HashMap<Signature, ArithmeticItem>>> {
+) -> Result<Option<HashMap<u64, ArithmeticItem>>> {
     let data = match data {
         Value::Vector(v) => v,
         Value::None => return Ok(None),
@@ -181,8 +164,8 @@ pub(crate) fn eval_arithmetic(
     match param {
         Some(v) => match v {
             LabelModifier::Include(labels) => {
-                for item in data.iter() {
-                    let sum_labels = labels_to_include(&labels.labels, &item.labels);
+                for item in data.into_iter() {
+                    let sum_labels = labels_to_include(&labels.labels, item.labels);
                     eval_arithmetic_processor(
                         &mut score_values,
                         f_handler,
@@ -192,8 +175,8 @@ pub(crate) fn eval_arithmetic(
                 }
             }
             LabelModifier::Exclude(labels) => {
-                for item in data.iter() {
-                    let sum_labels = labels_to_exclude(&labels.labels, &item.labels);
+                for item in data.into_iter() {
+                    let sum_labels = labels_to_exclude(&labels.labels, item.labels);
                     eval_arithmetic_processor(
                         &mut score_values,
                         f_handler,
@@ -204,7 +187,7 @@ pub(crate) fn eval_arithmetic(
             }
         },
         None => {
-            for item in data.iter() {
+            for item in data.into_iter() {
                 let sum_labels = Labels::default();
                 eval_arithmetic_processor(
                     &mut score_values,
@@ -221,7 +204,7 @@ pub(crate) fn eval_arithmetic(
 pub async fn eval_top(
     ctx: &mut Engine,
     param: Box<PromExpr>,
-    data: &Value,
+    data: Value,
     modifier: &Option<LabelModifier>,
     is_bottom: bool,
 ) -> Result<Value> {
@@ -247,12 +230,13 @@ pub async fn eval_top(
         }
     };
 
-    let mut score_values: FxIndexMap<Signature, Vec<TopItem>> = Default::default();
+    let data_for_labels = data.clone();
+    let mut score_values: FxIndexMap<u64, Vec<TopItem>> = Default::default();
     match modifier {
         Some(v) => match v {
             LabelModifier::Include(labels) => {
-                for (i, item) in data.iter().enumerate() {
-                    let sum_labels = labels_to_include(&labels.labels, &item.labels);
+                for (i, item) in data_for_labels.into_iter().enumerate() {
+                    let sum_labels = labels_to_include(&labels.labels, item.labels);
                     if item.sample.value.is_nan() {
                         continue;
                     }
@@ -265,8 +249,8 @@ pub async fn eval_top(
                 }
             }
             LabelModifier::Exclude(labels) => {
-                for (i, item) in data.iter().enumerate() {
-                    let sum_labels = labels_to_exclude(&labels.labels, &item.labels);
+                for (i, item) in data_for_labels.into_iter().enumerate() {
+                    let sum_labels = labels_to_exclude(&labels.labels, item.labels);
                     if item.sample.value.is_nan() {
                         continue;
                     }
@@ -280,7 +264,7 @@ pub async fn eval_top(
             }
         },
         None => {
-            for (i, item) in data.iter().enumerate() {
+            for (i, item) in data_for_labels.into_iter().enumerate() {
                 let sum_labels = Labels::default();
                 if item.sample.value.is_nan() {
                     continue;
@@ -296,19 +280,16 @@ pub async fn eval_top(
     }
 
     let comparator = if is_bottom {
-        |a: &TopItem, b: &TopItem| a.value.partial_cmp(&b.value).unwrap()
+        |a: &TopItem, b: &TopItem| sort_float(&a.value, &b.value)
     } else {
-        |a: &TopItem, b: &TopItem| b.value.partial_cmp(&a.value).unwrap()
+        |a: &TopItem, b: &TopItem| sort_float(&b.value, &a.value)
     };
 
     let values = score_values
-        .values()
-        .flat_map(|items| {
-            items
-                .iter()
-                .sorted_by(|a, b| comparator(a, b))
-                .take(n)
-                .collect::<Vec<_>>()
+        .into_values()
+        .flat_map(|mut items| {
+            items.sort_by(comparator);
+            items.into_iter().take(n).collect::<Vec<_>>()
         })
         .map(|item| data[item.index].clone())
         .collect();
@@ -317,9 +298,9 @@ pub async fn eval_top(
 
 pub(crate) fn eval_std_dev_var(
     param: &Option<LabelModifier>,
-    data: &Value,
+    data: Value,
     f_name: &str,
-) -> Result<Option<HashMap<Signature, StatisticItems>>> {
+) -> Result<Option<HashMap<u64, StatisticItems>>> {
     let data = match data {
         Value::Vector(v) => v,
         Value::None => return Ok(None),
@@ -334,20 +315,20 @@ pub(crate) fn eval_std_dev_var(
     match param {
         Some(v) => match v {
             LabelModifier::Include(labels) => {
-                for item in data.iter() {
-                    let sum_labels = labels_to_include(&labels.labels, &item.labels);
+                for item in data.into_iter() {
+                    let sum_labels = labels_to_include(&labels.labels, item.labels);
                     eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
                 }
             }
             LabelModifier::Exclude(labels) => {
-                for item in data.iter() {
-                    let sum_labels = labels_to_exclude(&labels.labels, &item.labels);
+                for item in data.into_iter() {
+                    let sum_labels = labels_to_exclude(&labels.labels, item.labels);
                     eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
                 }
             }
         },
         None => {
-            for item in data.iter() {
+            for item in data.into_iter() {
                 let sum_labels = Labels::default();
                 eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
             }
@@ -358,10 +339,10 @@ pub(crate) fn eval_std_dev_var(
 
 pub(crate) fn eval_count_values(
     param: &Option<LabelModifier>,
-    data: &Value,
+    data: Value,
     f_name: &str,
     label_name: &str,
-) -> Result<Option<HashMap<Signature, CountValuesItem>>> {
+) -> Result<Option<HashMap<u64, CountValuesItem>>> {
     let data = match data {
         Value::Vector(v) => v,
         Value::None => return Ok(None),
@@ -378,22 +359,22 @@ pub(crate) fn eval_count_values(
             LabelModifier::Include(labels) => {
                 let mut labels = labels.labels.clone();
                 labels.push(label_name.to_string());
-                for item in data.iter() {
-                    let sum_labels = labels_to_include(&labels, &item.labels);
+                for item in data.into_iter() {
+                    let sum_labels = labels_to_include(&labels, item.labels);
                     eval_count_values_processor(&mut score_values, &sum_labels);
                 }
             }
             LabelModifier::Exclude(labels) => {
                 let mut labels = labels.labels.clone();
                 labels.push(label_name.to_string());
-                for item in data.iter() {
-                    let sum_labels = labels_to_exclude(&labels, &item.labels);
+                for item in data.into_iter() {
+                    let sum_labels = labels_to_exclude(&labels, item.labels);
                     eval_count_values_processor(&mut score_values, &sum_labels);
                 }
             }
         },
         None => {
-            for item in data.iter() {
+            for item in data.into_iter() {
                 let mut sum_labels = Labels::default();
                 sum_labels.set(label_name, item.sample.value.to_string().as_str());
                 eval_count_values_processor(&mut score_values, &sum_labels);
@@ -413,15 +394,14 @@ pub(crate) fn prepare_vector(timestamp: i64, value: f64) -> Result<Value> {
 
 pub(crate) fn score_to_instant_value(
     timestamp: i64,
-    score_values: Option<HashMap<Signature, ArithmeticItem>>,
+    score_values: Option<HashMap<u64, ArithmeticItem>>,
 ) -> Vec<InstantValue> {
-    let values = score_values
+    score_values
         .unwrap()
-        .par_iter()
-        .map(|it| InstantValue {
-            labels: it.1.labels.clone(),
-            sample: Sample::new(timestamp, it.1.value),
+        .into_par_iter()
+        .map(|(_, mut v)| InstantValue {
+            labels: std::mem::take(&mut v.labels),
+            sample: Sample::new(timestamp, v.value),
         })
-        .collect();
-    values
+        .collect()
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,14 +28,14 @@ use config::{
     utils::time::{now_micros, second_micros},
 };
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
-use infra::{cache::tmpfs, errors::Result};
+use infra::errors::Result;
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 
 use super::Value;
 use crate::service::{
-    promql::{name_visitor, value, PromqlContext, TableProvider, DEFAULT_LOOKBACK},
+    promql::{DEFAULT_LOOKBACK, PromqlContext, TableProvider, name_visitor, value},
     search,
 };
 
@@ -114,7 +114,7 @@ pub async fn search(
     } else {
         // 1. get max records stream
         let start_time = std::time::Instant::now();
-        let file_list = match get_max_file_list(org_id, &query.query, start, end).await {
+        let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -161,7 +161,7 @@ pub async fn search(
             let resp = search_inner(&req).await?;
             log::info!(
                 "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
-                 start_time.elapsed().as_millis()
+                start_time.elapsed().as_millis()
             );
             results.push(resp);
         }
@@ -234,14 +234,13 @@ pub async fn search_inner(
 
     // clear session
     search::datafusion::storage::file_list::clear(&trace_id);
-    // clear tmpfs
-    tmpfs::delete(&trace_id, true).unwrap();
 
     scan_stats.format_to_mb();
     Ok((value, result_type, scan_stats))
 }
 
 async fn get_max_file_list(
+    trace_id: &str,
     org_id: &str,
     query: &str,
     start: i64,
@@ -258,6 +257,7 @@ async fn get_max_file_list(
     let mut max_records = 0;
     for stream_name in metrics_name {
         let stream_file_list = crate::service::file_list::query(
+            trace_id,
             org_id,
             &stream_name,
             StreamType::Metrics,
@@ -365,7 +365,7 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Val
                     .filter_map(|x| if x.is_nan() { None } else { Some(x.into()) })
                     .collect::<Vec<_>>();
                 let exemplars = v.exemplars.as_ref().map(|v| {
-                    let exemplars = v.iter().map(|x| x.into()).collect::<Vec<_>>();
+                    let exemplars = v.iter().map(|x| x.as_ref().into()).collect::<Vec<_>>();
                     cluster_rpc::Exemplars { exemplars }
                 });
                 if !samples.is_empty() || exemplars.is_some() {

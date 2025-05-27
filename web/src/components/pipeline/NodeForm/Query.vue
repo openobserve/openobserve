@@ -16,38 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="add-stream-query-routing-section"
+    data-test="add-stream-query-routing-section "
     class="full-width stream-routing-section"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+    :class="[
+      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+      { 'fullscreen-mode': isFullscreenMode },
+    ]"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md">
-      {{ t("pipeline.query") }}
-    </div>
     <q-separator />
 
-    <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
+    <div class="stream-routing-container q-px-md">
       <q-form ref="queryFormRef" @submit="saveQueryData">
-        <div>
-
-            <q-select
-              v-model="streamRoute.stream_type"
-              :options="streamTypes"
-              :label="t('alerts.streamType') + ' *'"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop no-case"
-              stack-label
-              outlined
-              filled
-              dense
-              v-bind:readonly="isUpdating"
-              v-bind:disable="isUpdating"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              style="width: 400px"
-            />
+        <div class="full-width">
           <scheduled-pipeline
-            ref="scheduledAlertRef"
+            ref="scheduledPipelineRef"
             :columns="filteredColumns"
             :conditions="[]"
             :alertData="streamRoute"
@@ -55,48 +37,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disableVrlFunction="true"
             :isValidSqlQuery="isValidSqlQuery"
             :disableQueryTypeSelection="true"
+            :expandedLogs="expandedLogs"
+            :validatingSqlQuery="validatingSqlQuery"
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
+            v-model:promql="streamRoute.query_condition.promql"
+            v-model:delay="streamRoute.delay"
+            v-model:promql_condition="
+              streamRoute.query_condition.promql_condition
+            "
             v-model:query_type="streamRoute.query_condition.type"
             v-model:aggregation="streamRoute.query_condition.aggregation"
+            v-model:stream_type="streamRoute.stream_type"
             v-model:isAggregationEnabled="isAggregationEnabled"
+            v-model:streamType="streamRoute.stream_type"
             @validate-sql="validateSqlQuery"
+            @cancel:form="openCancelDialog"
+            @delete:node="openDeleteDialog"
+            @update:fullscreen="updateFullscreenMode"
+            @update:stream_type="updateStreamType"
+            @expandLog="toggleExpandLog"
+            @update:delay="updateDelay"
             class="q-mt-sm"
-          />
-        </div>
-
-        <div
-          class="flex justify-start full-width"
-          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        >
-      
-          <q-btn
-            data-test="stream-routing-query-cancel-btn"
-            class="text-bold"
-            :label="t('alerts.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            no-caps
-            @click="openCancelDialog"
-          />
-          <q-btn
-            data-test="stream-routing-query-save-btn"
-            :label="t('alerts.save')"
-            class="text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            no-caps
-            type="submit"
-          />
-          <q-btn
-          v-if="pipelineObj.isEditNode"
-            data-test="stream-routing-query-delete-btn"
-            :label="t('pipeline.deleteNode')"
-            class="text-bold no-border q-ml-md"
-            color="negative"
-            padding="sm xl"
-            no-caps
-            @click="openDeleteDialog"
           />
         </div>
       </q-form>
@@ -120,19 +82,20 @@ import {
   onActivated,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { getUUID } from "@/utils/zincutils";
+import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useQuasar } from "quasar";
-import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
+import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
+
 const VariablesInput = defineAsyncComponent(
-  () => import("@/components/alerts/VariablesInput.vue")
+  () => import("@/components/alerts/VariablesInput.vue"),
 );
 
 interface RouteCondition {
@@ -148,6 +111,12 @@ interface StreamRoute {
   conditions: RouteCondition[];
   query_condition: {
     sql: string;
+    promql: string | null;
+    promql_condition: {
+      column: string;
+      operator: string;
+      value: any;
+    } | null;
     type: string;
     aggregation: {
       group_by: string[];
@@ -159,8 +128,8 @@ interface StreamRoute {
     frequency: string;
     cron: string;
     timezone: any;
-
   };
+  delay: number;
   context_attributes: any;
   description: string;
   enabled: boolean;
@@ -207,9 +176,12 @@ const filteredColumns: any = ref([]);
 
 const isValidSqlQuery = ref(true);
 
+const validatingSqlQuery = ref(false);
+
+const expandedLogs = ref([]);
 const validateSqlQueryPromise = ref<Promise<unknown>>();
 
-const scheduledAlertRef = ref<any>(null);
+const scheduledPipelineRef = ref<any>(null);
 
 const filteredStreams: Ref<any[]> = ref([]);
 
@@ -221,7 +193,7 @@ const isAggregationEnabled = ref(false);
 
 const queryFormRef = ref<any>(null);
 
-const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
 const nodeLink = ref({
   from: "",
@@ -235,10 +207,21 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const getDefaultStreamRoute : any = () => {
+const isFullscreenMode = ref(false);
+
+const updateFullscreenMode = (val: boolean) => {
+  isFullscreenMode.value = val;
+};
+
+const getDefaultStreamRoute: any = () => {
   if (pipelineObj.isEditNode) {
     return pipelineObj.currentSelectedNodeData.data;
   }
+
+  const frequency = store.state?.zoConfig?.min_auto_refresh_interval
+    ? Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60)
+    : 15;
+
   return {
     name: "",
     conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
@@ -247,13 +230,20 @@ const getDefaultStreamRoute : any = () => {
       sql: "",
       type: "sql",
       aggregation: null,
+      promql_condition: {
+        column: "",
+        operator: "",
+        value: "",
+      },
     },
     trigger_condition: {
       period: 15,
       frequency_type: "minutes",
       cron: "",
-      frequency: 15,
+      frequency: frequency <= 15 ? 15 : frequency,
+      timezone: "UTC",
     },
+    delay: 0,
     context_attributes: [
       {
         key: "",
@@ -267,9 +257,9 @@ const getDefaultStreamRoute : any = () => {
 };
 
 onMounted(() => {
-  
   if (pipelineObj.isEditNode) {
-    streamRoute.value = pipelineObj.currentSelectedNodeData?.data as StreamRoute;
+    streamRoute.value = pipelineObj.currentSelectedNodeData
+      ?.data as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -279,7 +269,8 @@ onMounted(() => {
 
 onActivated(() => {
   if (pipelineObj.isEditNode) {
-    streamRoute.value = pipelineObj.currentSelectedNodeData?.data as StreamRoute;
+    streamRoute.value = pipelineObj.currentSelectedNodeData
+      ?.data as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -302,7 +293,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1
+      (column: any) => column.toLowerCase().indexOf(value) > -1,
     );
   });
   return filteredOptions;
@@ -323,7 +314,7 @@ const updateStreamFields = async () => {
   const streams: any = await getStream(
     props.streamName,
     props.streamType,
-    true
+    true,
   );
 
   if (streams && Array.isArray(streams.schema)) {
@@ -356,34 +347,45 @@ const openCancelDialog = () => {
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel routing changes?";
   dialog.value.okCallback = closeDialog;
+};
 
+const getDefaultPromqlCondition = () => {
+  return {
+    column: "value",
+    operator: ">=",
+    value: 0,
+  };
 };
 
 // TODO OK : Add check for duplicate routing name
 const saveQueryData = async () => {
-  if (!scheduledAlertRef.value.validateInputs()) {
+  if (!scheduledPipelineRef.value.validateInputs()) {
     return false;
   }
 
   try {
     await validateSqlQuery();
     await validateSqlQueryPromise.value;
-
   } catch (e) {
     return false;
   }
 
-  queryFormRef.value.validate().then((valid: any) => {
-    if (!valid) {
-      return false;
-    }
-  });
+  //this is not needed as we are using validateInputs in scheduledPipeline.vue
+
+  // queryFormRef.value.validate().then((valid: any) => {
+  //   if (!valid) {
+  //     return false;
+  //   }
+  // });
 
   const formData = streamRoute.value;
-  if(typeof formData.trigger_condition.period === 'string') {
-    formData.trigger_condition.period = parseInt(formData.trigger_condition.period);
+  if (typeof formData.trigger_condition.period === "string") {
+    formData.trigger_condition.period = parseInt(
+      formData.trigger_condition.period,
+    );
   }
-  let queryPayload = {
+
+  let queryPayload: any = {
     node_type: "query", // required
     stream_type: formData.stream_type, // required
     org_id: store.state.selectedOrganization.identifier, // required
@@ -392,12 +394,11 @@ const saveQueryData = async () => {
       type: formData.query_condition.type,
       conditions: null,
       sql: formData.query_condition.sql,
-      promql: null,
+      promql: formData.query_condition.promql || null,
       promql_condition: null,
       aggregation: formData.query_condition.aggregation,
       vrl_function: null,
-      search_event_type: "DerivedStream",
-
+      search_event_type: "derivedstream",
     },
     trigger_condition: {
       // same as before
@@ -410,7 +411,20 @@ const saveQueryData = async () => {
       silence: 0,
       timezone: formData.trigger_condition.timezone,
     },
+    delay: formData.delay,
   };
+
+  if (formData.trigger_condition.frequency_type === "cron") {
+    queryPayload.tz_offset =
+      getTimezoneOffset(formData.trigger_condition.timezone) || 0;
+  }
+
+  if (formData.query_condition.type == "promql") {
+    if (queryPayload?.query_condition) {
+      queryPayload.query_condition.sql = "";
+    }
+    queryPayload.query_condition.promql_condition = getDefaultPromqlCondition();
+  }
   addNode(queryPayload);
   emit("cancel:hideform");
 };
@@ -438,8 +452,7 @@ const deleteRoute = () => {
   //   },
   //   type: "condition",
   // });
-  deletePipelineNode (pipelineObj.currentSelectedNodeID);
-
+  deletePipelineNode(pipelineObj.currentSelectedNodeID);
 
   emit("cancel:hideform");
 };
@@ -455,12 +468,17 @@ const addVariable = () => {
 const removeVariable = (variable: any) => {
   streamRoute.value.context_attributes =
     streamRoute.value.context_attributes.filter(
-      (_variable: any) => _variable.id !== variable.id
+      (_variable: any) => _variable.id !== variable.id,
     );
 };
 
 const validateSqlQuery = () => {
-
+  validatingSqlQuery.value = true;
+  if (streamRoute.value.query_condition.type == "promql") {
+    isValidSqlQuery.value = true;
+    validatingSqlQuery.value = false;
+    return;
+  }
   const query = buildQueryPayload({
     sqlMode: true,
     streamName: streamRoute.value.name as string,
@@ -468,8 +486,16 @@ const validateSqlQuery = () => {
 
   delete query.aggs;
 
+  // We get 15 minutes time range for the query, so reducing it by 14 minutes and 55 seconds to get 5 seconds of data as the query is just for validation purpose
+
+  query.query.start_time = query.query.start_time + 895000000;
+
   query.query.sql = streamRoute.value.query_condition.sql;
 
+  //removed the encoding as it is not required for the pipeline queries
+  if (store.state.zoConfig.sql_base64_enabled && query?.encoding) {
+    delete query.encoding;
+  }
 
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
     searchService
@@ -480,12 +506,16 @@ const validateSqlQuery = () => {
       })
       .then((res: any) => {
         isValidSqlQuery.value = true;
+        validatingSqlQuery.value = false;
         resolve("");
       })
       .catch((err: any) => {
-        if (  err) {
+        validatingSqlQuery.value = false;
+        if (err) {
           isValidSqlQuery.value = false;
-          const message = err?.response?.data?.message ? `Invalid SQL Query: ${err?.response?.data?.message}` : "Invalid SQL Query";
+          const message = err?.response?.data?.message
+            ? `Invalid SQL Query: ${err?.response?.data?.message}`
+            : "Invalid SQL Query";
           q.notify({
             type: "negative",
             message: `${message}`,
@@ -497,22 +527,43 @@ const validateSqlQuery = () => {
         resolve("");
       });
   });
+};
+const updateStreamType = (val: string) => {
+  streamRoute.value.stream_type = val;
+};
+const updateQueryType = (val: string) => {
+  streamRoute.value.query_condition.type = val;
+  if (val == "promql") {
+    streamRoute.value.query_condition.sql = "";
+  }
+};
 
+const toggleExpandLog = (index: number) => {
+  expandedLogs.value = [];
+};
+
+const updateDelay = (val: any) => {
+  streamRoute.value.delay = parseInt(val);
 };
 </script>
 
 <style scoped>
 .stream-routing-title {
   font-size: 20px;
-  padding-top: 16px;
 }
 .stream-routing-container {
-  width: 720px;
+  width: 100%;
   border-radius: 8px;
   /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
 }
 
 .stream-routing-section {
   min-height: 100%;
+  width: 97vw !important;
+  padding-left: 1rem;
+
+  &.fullscreen-mode {
+    width: 100vw !important;
+  }
 }
 </style>

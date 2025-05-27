@@ -72,9 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :src="getImageURL('images/common/open_observe_logo.svg')"
             @click="goToHome"
           />
-          <span v-if="config.isCloud == 'true'" class="absolute beta-text"
-            >Beta</span
-          >
         </div>
 
         <q-toolbar-title></q-toolbar-title>
@@ -113,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             dense
             :options="orgOptions"
-            option-label="identifier"
+            option-label="label"
             class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
             @update:model-value="updateOrganization()"
           />
@@ -175,7 +172,7 @@ class="padding-none" />
             {{ t("menu.slack") }}
           </q-tooltip>
         </q-btn>
-        <q-btn round flat dense :ripple="false">
+        <q-btn round flat dense :ripple="false" data-test="menu-link-help-item">
           <div class="row items-center no-wrap">
             <q-icon
               name="help_outline"
@@ -217,6 +214,14 @@ class="padding-none" />
                 <q-item-section>
                   <q-item-label>
                     {{ t(`menu.docs`) }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item to="/about" data-test="menu-link-about-item">
+                <q-item-section>
+                  <q-item-label>
+                    {{ t(`menu.about`) }}
                   </q-item-label>
                 </q-item-section>
               </q-item>
@@ -291,27 +296,6 @@ class="padding-none" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <div v-if="config.isCloud == 'true'">
-                <q-item
-                  v-ripple="true"
-                  v-close-popup="true"
-                  clickable
-                  :to="{ path: '/settings' }"
-                >
-                  <q-item-section avatar>
-                    <q-avatar
-                      size="md"
-                      icon="settings"
-                      color="red"
-                      text-color="white"
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ t("menu.settings") }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-                <q-separator />
-              </div>
               <q-item clickable>
                 <q-item-section avatar>
                   <q-icon size="xs" name="language" class="padding-none" />
@@ -457,7 +441,6 @@ import {
   useLocalUserInfo,
   getImageURL,
   invlidateLoginData,
-  getLogoutURL,
 } from "../utils/zincutils";
 
 import {
@@ -499,12 +482,14 @@ import {
   outlinedSettings,
   outlinedManageAccounts,
   outlinedDescription,
+  outlinedCode,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
+import useSearchWebSocket from "@/composables/useSearchWebSocket";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -555,19 +540,16 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
+      this.closeSocket();
+
       if (config.isEnterprise == "true") {
         invlidateLoginData();
       }
-
-      const logoutURL = getLogoutURL();
       this.store.dispatch("logout");
 
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
 
-      if (config.isCloud == "true") {
-        window.location.href = logoutURL;
-      }
       this.$router.push("/logout");
     },
     goToHome() {
@@ -587,6 +569,7 @@ export default defineComponent({
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
     const { getStreams, resetStreams } = useStreams();
+    const { closeSocket } = useSearchWebSocket();
 
     const isMonacoEditorLoaded = ref(false);
 
@@ -606,6 +589,13 @@ export default defineComponent({
       "alertTemplates",
       "/ingestion/",
     ];
+
+    const isActionsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig.actions_enabled
+      );
+    });
 
     const orgOptions = ref([{ label: Number, value: String }]);
     let slackURL = "https://short.openobserve.ai/community";
@@ -647,7 +637,7 @@ export default defineComponent({
       {
         title: t("menu.rum"),
         icon: "devices",
-        link: "/rum/performance/overview",
+        link: "/rum",
         name: "rum",
       },
       {
@@ -680,12 +670,6 @@ export default defineComponent({
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
-      },
-      {
-        title: t("menu.about"),
-        icon: outlinedFormatListBulleted,
-        link: "/about",
-        name: "about",
       },
     ]);
 
@@ -793,10 +777,33 @@ export default defineComponent({
       }
     });
 
+    const updateActionsMenu = () => {
+      if (isActionsEnabled.value) {
+        const alertIndex = linksList.value.findIndex(
+          (link) => link.name === "alertList",
+        );
+
+        const actionExists = linksList.value.some(
+          (link) => link.name === "actionScripts",
+        );
+
+        if (alertIndex !== -1 && !actionExists) {
+          linksList.value.splice(alertIndex + 1, 0, {
+            title: t("menu.actions"),
+            icon: outlinedCode,
+            link: "/actions",
+            name: "actionScripts",
+          });
+        }
+      }
+    };
+
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
     const filterMenus = () => {
+      updateActionsMenu();
+
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
           ?.split(",")
@@ -805,9 +812,11 @@ export default defineComponent({
 
       store.dispatch("setHiddenMenus", disableMenus);
 
-      linksList.value = linksList.value.filter(
-        (link: { name: string }) => !disableMenus.has(link.name),
-      );
+      linksList.value = linksList.value.filter((link: any) => {
+        const hide = link.hide === undefined ? false : link.hide;
+
+        return !disableMenus.has(link.name) && !hide;
+      });
     };
 
     // additional links based on environment and conditions
@@ -853,9 +862,9 @@ export default defineComponent({
       // Convert the time difference from milliseconds to seconds
       const timeUntilNextAPICallInSeconds = timeUntilNextAPICall / 1000;
 
-      setTimeout(() => {
-        mainLayoutMixin.setup().getRefreshToken();
-      }, timeUntilNextAPICallInSeconds);
+      // setTimeout(() => {
+      //   mainLayoutMixin.setup().getRefreshToken();
+      // }, timeUntilNextAPICallInSeconds);
     };
 
     //get refresh token for cloud environment
@@ -1026,7 +1035,7 @@ export default defineComponent({
 
               return optiondata;
             },
-          );
+          ).sort((a: any, b: any) => a.label.localeCompare(b.label));
         }
 
         if (localOrgFlag == false) {
@@ -1063,6 +1072,9 @@ export default defineComponent({
         if (router.currentRoute.value.query.action == "subscribe") {
           router.push({
             name: "plans",
+            query: {
+              org_identifier: selectedOrg.value.identifier,
+            },
           });
         }
 
@@ -1103,6 +1115,8 @@ export default defineComponent({
             orgSettings?.data?.data?.toggle_ingestion_logs ?? false,
           enable_websocket_search:
             orgSettings?.data?.data?.enable_websocket_search ?? false,
+          enable_streaming_search:
+            orgSettings?.data?.data?.enable_streaming_search ?? false,
         });
       } catch (error) {
         console.error("Error in getOrganizationSettings:", error);
@@ -1123,10 +1137,12 @@ export default defineComponent({
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
-            filterMenus();
           }
+
           store.dispatch("setConfig", res.data);
           await nextTick();
+
+          filterMenus();
           // if rum enabled then setUser to capture session details.
           if (res.data.rum.enabled) {
             setRumUser();
@@ -1200,6 +1216,7 @@ export default defineComponent({
       slackIcon: markRaw(SlackIcon),
       openSlack,
       outlinedSettings,
+      closeSocket,
     };
   },
   computed: {
@@ -1293,6 +1310,8 @@ export default defineComponent({
     margin-left: 0.5rem;
     margin-right: 0;
     width: 150px;
+    max-width: 150px;
+    max-height: 31px;
     cursor: pointer;
 
     &__mini {

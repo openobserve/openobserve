@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, post, put, web, HttpResponse};
+use actix_web::{HttpResponse, delete, get, post, put, web};
 
 use crate::{
     common::{
@@ -31,10 +31,9 @@ use crate::{
     service::db::saved_view,
 };
 
-// GetSavedView
-//
-// Retrieve a single saved view associated with this org.
-//
+/// GetSavedView - Retrieve a single saved view associated with this org.
+///
+/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
@@ -70,10 +69,9 @@ pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse,
     }
 }
 
-// ListSavedViews
-//
-// Retrieve the list of saved views.
-//
+/// ListSavedViews - Retrieve the list of saved views.
+///
+/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
@@ -104,10 +102,9 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
     }
 }
 
-// DeleteSavedViews
-//
-// Delete a view associated with this given org.
-//
+/// DeleteSavedViews - Delete a view associated with this given org.
+///
+/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
@@ -143,10 +140,9 @@ pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpRespon
     }
 }
 
-// CreateSavedViews
-//
-// Create a view for later retrieval associated with the given search.
-//
+/// CreateSavedViews - Create a view for later retrieval associated with the given search.
+///
+/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
@@ -187,10 +183,9 @@ pub async fn create_view(
     }
 }
 
-// UpdateSavedViews
-//
-// Update a saved view
-//
+/// UpdateSavedViews - Update a saved view
+///
+/// #{"ratelimit_module":"Saved Views", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Saved Views",
@@ -229,7 +224,7 @@ pub async fn update_view(
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{test, App};
+    use actix_web::{App, test};
 
     use super::*;
 

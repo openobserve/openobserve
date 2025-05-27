@@ -143,6 +143,71 @@ const useStreams = () => {
     });
   };
 
+  const getPaginatedStreams = async (
+    _streamType: string = "",
+    schema: boolean,
+    notify: boolean = true,
+    offset: number = 0,
+    limit: number = 100,
+    keyword: string = "",
+    sort: string = "",
+    asc: boolean = false
+  ) => {
+    return new Promise(async (resolve, reject) => {
+      const streamType = _streamType || "all";
+
+      // We don't fetch schema while fetching all streams or specific type all streams
+      // So keeping it false, don't change this
+      schema = false;
+      if (getStreamsPromise.value) {
+        await getStreamsPromise.value;
+      }
+      try {
+
+        // Added adddtional check to fetch all streamstype separately if streamName is all
+        const dismiss = notify
+          ? q.notify({
+              spinner: true,
+              message: "Please wait while loading streams...",
+              timeout: 5000,
+            })
+          : () => {};
+        
+
+        getStreamsPromise.value = StreamService.nameList(
+          store.state.selectedOrganization.identifier,
+          _streamType,
+          schema,
+          offset,
+          limit,
+          keyword,
+          sort,
+          asc
+        );
+        getStreamsPromise.value
+          .then((res: any) => {
+            const streamData = {
+              name: streamType,
+              list: res.data.list,
+              schema: false,
+              total: res.data.total,
+            };
+            getStreamsPromise.value = null;
+            dismiss();
+            resolve(streamData);
+          })
+          .catch((e: any) => {
+            getStreamsPromise.value = null;
+            dismiss();
+            reject(new Error(e.message));
+          });
+        
+      } catch (e: any) {
+        reject(new Error(e.message));
+      }
+    });
+  };
+
   const getAllStreamsPayload = () => {
     const streamObject = getStreamPayload();
     streamObject.name = "all";
@@ -283,7 +348,7 @@ const useStreams = () => {
   function removeSchemaFields(streamData: any) {
     if (streamData.schema) {
       streamData.schema = streamData.schema.filter((field: any) => {
-        return field.name != "_original" && field.name != "_o2_id";
+        return field.name != "_o2_id" && field.name != "_original" && field.name != "_all_values";
       });
     }
     return streamData;
@@ -590,6 +655,7 @@ const useStreams = () => {
     addStream,
     getUpdatedSettings,
     resetStreamType,
+    getPaginatedStreams,
   };
 };
 

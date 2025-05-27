@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,8 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
-use config::{get_config, meta::stream::StreamType, metrics, utils::json};
-use infra::errors;
+use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
+use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
@@ -26,7 +25,9 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::http::get_or_create_trace_id,
     },
-    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    handler::http::request::{
+        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, search::error_utils::map_error_to_http_response,
+    },
     service::{search as SearchService, traces},
 };
 
@@ -88,6 +89,8 @@ async fn handle_req(
 }
 
 /// GetLatestTraces
+///
+/// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Traces",
@@ -155,18 +158,17 @@ pub async fn get_latest_traces(
 
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+        use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+        use crate::{
+            common::utils::auth::{AuthExtractor, is_root_user},
+            service::users::get_user,
         };
         let user_id = in_req.headers().get("user_id").unwrap();
         if !is_root_user(user_id.to_str().unwrap()) {
-            let user: meta::user::User = USERS
-                .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
-                .unwrap()
-                .clone();
+            let user: config::meta::user::User = get_user(Some(&org_id), user_id.to_str().unwrap())
+                .await
+                .unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
             if !crate::handler::http::auth::validator::check_permissions(
@@ -239,34 +241,10 @@ pub async fn get_latest_traces(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&org_id])
-        .inc();
-    // get a local search queue lock
-    #[cfg(not(feature = "enterprise"))]
-    let locker = SearchService::QUEUE_LOCKER.clone();
-    #[cfg(not(feature = "enterprise"))]
-    let locker = locker.lock().await;
-    #[cfg(not(feature = "enterprise"))]
-    if !cfg.common.feature_query_queue_enabled {
-        drop(locker);
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let took_wait = start.elapsed().as_millis() as usize;
-    #[cfg(feature = "enterprise")]
-    let took_wait = 0;
-    log::info!(
-        "http traces latest API wait in queue took: {} ms",
-        took_wait
-    );
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&org_id])
-        .dec();
-
     // search
     let query_sql = format!(
         "SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}",
-        cfg.common.column_timestamp
+        TIMESTAMP_COL_NAME
     );
     let query_sql = if filter.is_empty() {
         format!("{query_sql} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
@@ -280,12 +258,12 @@ pub async fn get_latest_traces(
             size,
             start_time,
             end_time,
-            sort_by: None,
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
@@ -297,6 +275,7 @@ pub async fn get_latest_traces(
         search_type: None,
         search_event_context: None,
         use_cache: None,
+        local_mode: None,
     };
     let stream_type = StreamType::Traces;
     let user_id = in_req
@@ -307,9 +286,16 @@ pub async fn get_latest_traces(
         .ok()
         .map(|v| v.to_string());
 
-    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-        .instrument(http_span.clone())
-        .await;
+    let search_res = SearchService::cache::search(
+        &trace_id,
+        &org_id,
+        stream_type,
+        user_id.clone(),
+        &req,
+        "".to_string(),
+    )
+    .instrument(http_span.clone())
+    .await;
 
     let resp_search = match search_res {
         Ok(res) => res,
@@ -320,8 +306,9 @@ pub async fn get_latest_traces(
                     "/api/org/traces/latest",
                     "500",
                     &org_id,
-                    "default",
                     stream_type.as_str(),
+                    "",
+                    "",
                 ])
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
@@ -329,23 +316,13 @@ pub async fn get_latest_traces(
                     "/api/org/traces/latest",
                     "500",
                     &org_id,
-                    "default",
                     stream_type.as_str(),
+                    "",
+                    "",
                 ])
                 .inc();
             log::error!("get traces latest data error: {:?}", err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => match code {
-                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                        .json(meta::http::HttpResponse::error_code(code)),
-                    _ => HttpResponse::InternalServerError()
-                        .json(meta::http::HttpResponse::error_code(code)),
-                },
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
+            return Ok(map_error_to_http_response(&err, Some(trace_id)));
         }
     };
     if resp_search.hits.is_empty() {
@@ -387,7 +364,7 @@ pub async fn get_latest_traces(
         .join("','");
     let query_sql = format!(
         "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM {stream_name} WHERE trace_id IN ('{}') ORDER BY {} ASC",
-        cfg.common.column_timestamp, trace_ids, cfg.common.column_timestamp,
+        TIMESTAMP_COL_NAME, trace_ids, TIMESTAMP_COL_NAME,
     );
     req.query.from = 0;
     req.query.size = 9999;
@@ -397,10 +374,16 @@ pub async fn get_latest_traces(
     let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
 
     loop {
-        let search_res =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-                .instrument(http_span.clone())
-                .await;
+        let search_res = SearchService::cache::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            user_id.clone(),
+            &req,
+            "".to_string(),
+        )
+        .instrument(http_span.clone())
+        .await;
 
         let resp_search = match search_res {
             Ok(res) => res,
@@ -411,8 +394,9 @@ pub async fn get_latest_traces(
                         "/api/org/traces/latest",
                         "500",
                         &org_id,
-                        &stream_name,
                         stream_type.as_str(),
+                        "",
+                        "",
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -420,23 +404,13 @@ pub async fn get_latest_traces(
                         "/api/org/traces/latest",
                         "500",
                         &org_id,
-                        &stream_name,
                         stream_type.as_str(),
+                        "",
+                        "",
                     ])
                     .inc();
                 log::error!("get traces latest data error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code(code)),
-                        _ => HttpResponse::InternalServerError()
-                            .json(meta::http::HttpResponse::error_code(code)),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
+                return Ok(map_error_to_http_response(&err, Some(trace_id)));
             }
         };
 
@@ -504,8 +478,9 @@ pub async fn get_latest_traces(
             "/api/org/traces/latest",
             "200",
             &org_id,
-            &stream_name,
             stream_type.as_str(),
+            "",
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -513,8 +488,9 @@ pub async fn get_latest_traces(
             "/api/org/traces/latest",
             "200",
             &org_id,
-            &stream_name,
             stream_type.as_str(),
+            "",
+            "",
         ])
         .inc();
 

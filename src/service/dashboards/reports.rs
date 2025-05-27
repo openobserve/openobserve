@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,10 +17,10 @@ use std::{str::FromStr, time::Duration};
 
 use actix_web::http;
 use async_trait::async_trait;
-use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams, Page};
+use chromiumoxide::{Page, browser::Browser, cdp::browser_protocol::page::PrintToPdfParams};
 use chrono::Timelike;
 use config::{
-    get_chrome_launch_options, get_config,
+    SMTP_CLIENT, get_chrome_launch_options, get_config,
     meta::dashboards::{
         datetime_now,
         reports::{
@@ -28,14 +28,14 @@ use config::{
             ReportFrequencyType, ReportListFilters, ReportTimerangeType,
         },
     },
-    SMTP_CLIENT,
+    utils::time::now_micros,
 };
 use cron::Schedule;
-use futures::{future::try_join_all, StreamExt};
+use futures::{StreamExt, future::try_join_all};
 use infra::table;
 use lettre::{
-    message::{header::ContentType, MultiPart, SinglePart},
     AsyncTransport, Message,
+    message::{MultiPart, SinglePart, header::ContentType},
 };
 use reqwest::Client;
 
@@ -88,19 +88,13 @@ pub async fn save(
     }
 
     if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let cron_exp = report.frequency.cron.clone();
-        if cron_exp.starts_with("* ") {
-            let (_, rest) = cron_exp.split_once(" ").unwrap();
-            let now = chrono::Utc::now().second().to_string();
-            report.frequency.cron = format!("{now} {rest}");
-            log::debug!(
-                "New cron expression for report {}: {}",
-                report.name,
-                report.frequency.cron
-            );
-        }
+        let now = chrono::Utc::now().second();
+        report.frequency.cron =
+            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
         // Check if the cron expression is valid
-        Schedule::from_str(&report.frequency.cron)?;
+        if let Err(e) = Schedule::from_str(&report.frequency.cron) {
+            return Err(anyhow::anyhow!("Invalid cron expression: {e}"));
+        }
     } else if report.frequency.interval == 0 {
         report.frequency.interval = 1;
     }
@@ -521,7 +515,7 @@ async fn generate_report(
             );
 
             let time_duration: i64 = time_duration.parse()?;
-            let end_time = chrono::Utc::now().timestamp_micros();
+            let end_time = now_micros();
             let start_time = match time_unit {
                 "m" => {
                     end_time

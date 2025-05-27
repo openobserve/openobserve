@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,16 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::Ordering, fmt, sync::Arc, time::Duration};
+use std::{fmt, hash::Hasher, sync::Arc, time::Duration};
 
-use config::{meta::promql::NAME_LABEL, utils::json, FxIndexMap};
+use config::{
+    FxIndexMap,
+    utils::{json, sort::sort_float},
+};
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{
+    Deserialize, Serialize,
     de::{Deserializer, SeqAccess, Visitor},
     ser::{SerializeSeq, SerializeStruct, Serializer},
-    Deserialize, Serialize,
 };
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
@@ -33,13 +36,6 @@ pub type Labels = Vec<Arc<Label>>;
 
 /// Added functionalities on Labels
 pub trait LabelsExt {
-    /// Remove the metric name i.e. __name__ from the given label
-    ///
-    /// ```json
-    /// {"__name__": "my-metric", "job": "k8s"} -> {"job": "k8s"}
-    /// ```
-    fn without_metric_name(&self) -> Labels;
-
     /// Return the value of the label associated with this name of the label.
     fn get_value(&self, name: &str) -> String;
 
@@ -53,10 +49,10 @@ pub trait LabelsExt {
     fn keys(&self) -> Vec<String>;
 
     /// Without label, drops the given label name from the output.
-    fn without_label(&self, name: &str) -> Labels;
+    fn without_label(self, name: &str) -> Labels;
 
     /// Signature for the given set of labels
-    fn signature(&self) -> Signature;
+    fn signature(&self) -> u64;
 
     /// keep the labels as described by the `labels` vector
     /// and delete everything else
@@ -71,15 +67,9 @@ pub trait LabelsExt {
 }
 
 impl LabelsExt for Labels {
-    fn without_label(&self, name: &str) -> Labels {
-        self.iter()
-            .filter(|label| label.name != name)
-            .cloned()
-            .collect()
-    }
-
-    fn without_metric_name(&self) -> Labels {
-        self.without_label(NAME_LABEL)
+    fn without_label(mut self, name: &str) -> Labels {
+        self.retain(|label| label.name != name);
+        self
     }
 
     fn get_value(&self, name: &str) -> String {
@@ -97,7 +87,7 @@ impl LabelsExt for Labels {
         }))
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> u64 {
         signature(self)
     }
 
@@ -388,11 +378,11 @@ impl TimeWindow {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct RangeValue {
     pub labels: Labels,
     pub samples: Vec<Sample>,
-    pub exemplars: Option<Vec<Exemplar>>,
+    pub exemplars: Option<Vec<Arc<Exemplar>>>,
     pub time_window: Option<TimeWindow>,
 }
 
@@ -403,13 +393,17 @@ impl RangeValue {
     }
 
     pub fn extend(&mut self, other: RangeValue) {
-        self.samples.extend(other.samples);
+        if !other.samples.is_empty() {
+            self.samples.extend(other.samples);
+        }
         // check exemplars
-        if let Some(exemplars) = &other.exemplars {
-            if let Some(self_exemplars) = &mut self.exemplars {
-                self_exemplars.extend(exemplars.iter().cloned());
-            } else {
-                self.exemplars = Some(exemplars.clone());
+        if let Some(exemplars) = other.exemplars {
+            if !exemplars.is_empty() {
+                if let Some(self_exemplars) = &mut self.exemplars {
+                    self_exemplars.extend(exemplars);
+                } else {
+                    self.exemplars = Some(exemplars);
+                }
             }
         }
     }
@@ -464,7 +458,7 @@ impl<'de> Deserialize<'de> for RangeValue {
             {
                 let mut labels_map: Option<FxIndexMap<String, String>> = None;
                 let mut samples: Option<Vec<Sample>> = None;
-                let mut exemplars: Option<Vec<Exemplar>> = None;
+                let mut exemplars: Option<Vec<Arc<Exemplar>>> = None;
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
@@ -518,7 +512,7 @@ impl RangeValue {
 
     pub(crate) fn new_with_exemplars<S>(labels: Labels, exemplars: S) -> Self
     where
-        S: IntoIterator<Item = Exemplar>,
+        S: IntoIterator<Item = Arc<Exemplar>>,
     {
         Self {
             labels,
@@ -734,18 +728,13 @@ impl Value {
     pub fn sort(&mut self) {
         match self {
             Value::Vector(v) => {
-                v.sort_by(|a, b| {
-                    b.sample
-                        .value
-                        .partial_cmp(&a.sample.value)
-                        .unwrap_or(Ordering::Equal)
-                });
+                v.sort_by(|a, b| sort_float(&b.sample.value, &a.sample.value));
             }
             Value::Matrix(v) => {
                 v.sort_by(|a, b| {
                     let a = a.samples.iter().map(|x| x.value).sum::<f64>();
                     let b = b.samples.iter().map(|x| x.value).sum::<f64>();
-                    b.partial_cmp(&a).unwrap_or(Ordering::Equal)
+                    sort_float(&b, &a)
                 });
             }
             _ => {}
@@ -792,50 +781,28 @@ impl Value {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct Signature([u8; 32]);
-
-impl PartialOrd for Signature {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Signature {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-
-impl From<Signature> for String {
-    fn from(sig: Signature) -> Self {
-        hex::encode(sig.0)
-    }
-}
-
 // REFACTORME: make this a method of `Metric`
-pub fn signature(labels: &Labels) -> Signature {
+pub fn signature(labels: &Labels) -> u64 {
     signature_without_labels(labels, &[])
 }
 
 /// `signature_without_labels` is just as [`signature`], but only for labels not
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
-pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> Signature {
-    let mut hasher = blake3::Hasher::new();
+pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
+    let mut hasher = std::hash::DefaultHasher::new();
     labels
         .iter()
         .filter(|item| !exclude_names.contains(&item.name.as_str()))
         .for_each(|item| {
-            hasher.update_rayon(item.name.as_bytes());
-            hasher.update_rayon(item.value.as_bytes());
+            hasher.write(item.name.as_bytes());
+            hasher.write(item.value.as_bytes());
         });
-    Signature(hasher.finalize().into())
+    hasher.finish()
 }
 
 #[cfg(test)]
 mod tests {
-    use expect_test::expect;
     use float_cmp::approx_eq;
 
     use super::*;
@@ -866,17 +833,10 @@ mod tests {
         let labels: Labels = generate_test_labels();
 
         let sig = signature(&labels);
-        expect![[r#"
-            "f287fde2994111abd7740b5c7c28b0eeabe3f813ae65397bb6acb684e2ab6b22"
-        "#]]
-        .assert_debug_eq(&String::from(sig));
+        assert_eq!(sig, 17855692611899080986);
 
-        let sig: String = signature_without_labels(&labels, &["a", "c"]).into();
-        expect![[r#"
-            "ec9c3a0c9c03420d330ab62021551cffe993c07b20189c5ed831dad22f54c0c7"
-        "#]]
-        .assert_debug_eq(&sig);
-        assert_eq!(sig.len(), 64);
+        let sig = signature_without_labels(&labels, &["a", "c"]);
+        assert_eq!(sig, 2422580394001170964);
 
         assert_eq!(signature(&labels), signature_without_labels(&labels, &[]));
     }

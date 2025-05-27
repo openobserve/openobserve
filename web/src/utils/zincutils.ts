@@ -17,12 +17,13 @@ import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
 import { v4 as uuidv4 } from "uuid";
-import { useQuasar } from "quasar";
+import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 import { DateTime as _DateTime } from "luxon";
 import store from "../stores";
+import cronParser from "cron-parser";
 
 let moment: any;
 let momentInitialized = false;
@@ -148,18 +149,6 @@ export const getUserInfo = (loginString: string) => {
 
 export const invlidateLoginData = () => {
   userService.logout().then((res: any) => {});
-};
-
-export const getLoginURL = () => {
-  return `https://${config.oauth.domain}/oauth/v2/authorize?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&redirect_uri=${config.oauth.redirectSignIn}&scope=${config.oauth.scope}`;
-};
-
-export const getLogoutURL = () => {
-  return `https://${config.oauth.domain}/oidc/v1/end_session?client_id=${
-    config.aws_user_pools_web_client_id
-  }&id_token_hint=${useLocalUserInfo()}&post_logout_redirect_uri=${
-    config.oauth.redirectSignOut
-  }&state=random_string`;
 };
 
 export const getDecodedAccessToken = (token: string) => {
@@ -383,7 +372,7 @@ export const getPath = () => {
         ? window.location.pathname.slice(0, pos + 5)
         : "";
   const cloudPath = import.meta.env.BASE_URL;
-  return config.isCloud == "true" ? cloudPath : path;
+  return config.isCloud == "true" ? path : path;
 };
 
 export const routeGuard = async (to: any, from: any, next: any) => {
@@ -502,11 +491,16 @@ export const formatSizeFromMB = (sizeInMB: string) => {
     index++;
   }
 
-  return `${size.toFixed(2)} ${units[index]}`;
+  let new_size = size.toFixed(2);
+  if (new_size == "0.00" && size > 0) {
+    new_size = "0.01";
+  }
+
+  return `${new_size} ${units[index]}`;
 };
 
 export const addCommasToNumber = (number: number) => {
-  if (number === null || number === undefined) return '0';
+  if (number === null || number === undefined) return "0";
   return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
@@ -820,7 +814,7 @@ export const durationFormatter = (durationInSeconds: number): string => {
   return formattedDuration;
 };
 
-export const getTimezoneOffset = () => {
+export const getTimezoneOffset = (timezone: string |null = null) => {
   const now = new Date();
 
   // Get the day, month, and year from the date object
@@ -838,7 +832,7 @@ export const getTimezoneOffset = () => {
   // Combine them in the HH:MM format
   const scheduleTime = `${hours}:${minutes}`;
 
-  const ScheduleTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const ScheduleTimezone = timezone ? timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const convertedDateTime = convertDateToTimestamp(
     scheduleDate,
@@ -973,7 +967,7 @@ export const deepCopy = (value: any) => {
 
 export const getWebSocketUrl = (request_id: string, org_identifier: string) => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/${request_id}`;
+  return `${protocol}//${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/v2/${request_id}`;
 };
 
 export const isWebSocketEnabled = () => {
@@ -988,3 +982,67 @@ export const isWebSocketEnabled = () => {
     return (window as any).use_web_socket;
   }
 };
+
+export const isStreamingEnabled = () => {
+  if (!store.state.zoConfig?.streaming_enabled) {
+    return false;
+  }
+
+  if ((window as any).use_streaming === undefined) {
+    return store?.state?.organizationData?.organizationSettings
+      ?.enable_streaming_search;
+  } else {
+    return (window as any).use_streaming;
+  }
+};
+
+export const maxLengthCharValidation = (
+  val: string = "",
+  char_length: number = 50,
+) => {
+  return (
+    (val && val.length <= char_length) ||
+    `Maximum ${char_length} characters allowed`
+  );
+};
+
+export const validateUrl = (val: string) => {
+  try {
+    const url = new URL(val); // Built-in URL constructor
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (error) {
+    return "Please provide correct URL.";
+  }
+};
+
+export function convertUnixToQuasarFormat(unixMicroseconds: any) {
+  if (!unixMicroseconds) return "";
+  const unixSeconds = unixMicroseconds / 1e6;
+  const dateToFormat = new Date(unixSeconds * 1000);
+  const formattedDate = dateToFormat.toISOString();
+  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+}
+
+export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
+  // Parse the cron expression using cron-parser
+  try {
+    const interval = cronParser.parseExpression(cronExpression);
+
+    // Get the first and second execution times
+    const firstExecution = interval.next();
+    const secondExecution = interval.next();
+
+    // Calculate the difference in milliseconds
+    return (secondExecution.getTime() - firstExecution.getTime()) / 1000;
+  } catch (err) {
+    throw new Error("Invalid cron expression");
+  }
+}
+
+export function isAboveMinRefreshInterval(
+  value: number,
+  config: { min_auto_refresh_interval?: string | number },
+) {
+  const minInterval = Number(config?.min_auto_refresh_interval) || 1;
+  return value >= minInterval;
+}

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,7 +27,7 @@ use datafusion::{
     prelude::create_udf,
 };
 use vector_enrichment::TableRegistry;
-use vrl::compiler::{runtime::Runtime, TargetValueRef, VrlRuntime};
+use vrl::compiler::{TargetValueRef, VrlRuntime, runtime::Runtime};
 
 use crate::{common::infra::config::QUERY_FUNCTIONS, service::ingestion::compile_vrl_function};
 

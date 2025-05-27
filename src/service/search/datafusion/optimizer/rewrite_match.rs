@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,12 +16,12 @@
 use datafusion::{
     self,
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
         Column, Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
     },
     error::DataFusionError,
-    logical_expr::{expr::ScalarFunction, utils::disjunction, Expr, Like, LogicalPlan},
-    optimizer::{optimizer::ApplyOrder, utils::NamePreserver, OptimizerConfig, OptimizerRule},
+    logical_expr::{Expr, Like, LogicalPlan, expr::ScalarFunction, utils::disjunction},
+    optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder, utils::NamePreserver},
     scalar::ScalarValue,
 };
 
@@ -69,8 +69,7 @@ impl OptimizerRule for RewriteMatch {
                 if plan
                     .expressions()
                     .iter()
-                    .map(|expr| expr.exists(|expr| Ok(is_match_all(expr))).unwrap())
-                    .any(|x| x)
+                    .any(|expr| expr.exists(|expr| Ok(is_match_all(expr))).unwrap())
                 {
                     let mut expr_rewriter = MatchToFullTextMatch::new(self.fields.clone());
                     let name_preserver = NamePreserver::new(&plan);
@@ -203,10 +202,7 @@ mod tests {
         },
         assert_batches_eq,
         datasource::MemTable,
-        execution::{
-            runtime_env::{RuntimeConfig, RuntimeEnv},
-            session_state::SessionStateBuilder,
-        },
+        execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
         prelude::{SessionConfig, SessionContext},
     };
 
@@ -217,22 +213,28 @@ mod tests {
     #[tokio::test]
     async fn test_rewrite_match() {
         let sqls = [
-            ("select * from t where match_all('open')", vec![
-                "+------------+-------------+-------------+",
-                "| _timestamp | name        | log         |",
-                "+------------+-------------+-------------+",
-                "| 1          | open        | o2          |",
-                "| 3          | openobserve | openobserve |",
-                "+------------+-------------+-------------+",
-            ]),
-            ("select _timestamp from t where match_all('open')", vec![
-                "+------------+",
-                "| _timestamp |",
-                "+------------+",
-                "| 1          |",
-                "| 3          |",
-                "+------------+",
-            ]),
+            (
+                "select * from t where match_all('open')",
+                vec![
+                    "+------------+-------------+-------------+",
+                    "| _timestamp | name        | log         |",
+                    "+------------+-------------+-------------+",
+                    "| 1          | open        | o2          |",
+                    "| 3          | openobserve | openobserve |",
+                    "+------------+-------------+-------------+",
+                ],
+            ),
+            (
+                "select _timestamp from t where match_all('open')",
+                vec![
+                    "+------------+",
+                    "| _timestamp |",
+                    "+------------+",
+                    "| 1          |",
+                    "| 3          |",
+                    "+------------+",
+                ],
+            ),
             (
                 "select _timestamp from t where match_all_raw_ignore_case('observe')",
                 vec![
@@ -291,9 +293,7 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new())
-            .with_runtime_env(Arc::new(
-                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
-            ))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_optimizer_rules(vec![Arc::new(RewriteMatch::new(fields.clone()))])
             .build();

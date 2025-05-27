@@ -23,17 +23,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? '1px solid #3c3c3c'
           : '1px solid #ececec',
     }"
-    style="top: 0; z-index: 999; position: sticky"
+    style="top: 0; z-index: 1999; position: sticky"
     class="flex justify-start items-center header-bg bg-grey-2"
     :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
   >
     <div
-      class="flex justify-start items-center no-wrap row q-px-sm"
+      class="tw-relative flex justify-start items-center no-wrap row q-px-sm"
       :style="{
         width: splitterWidth + 'px',
       }"
     >
       Operation Name
+      <q-avatar
+        color="primary"
+        text-color="white"
+        size="20px"
+        icon="drag_indicator"
+        class="resize-btn"
+        @mousedown="handleMouseDown"
+      />
     </div>
     <div
       class="flex justify-start items-center no-wrap row relative-position"
@@ -41,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         width: `calc(100% - ${splitterWidth}px)`,
       }"
     >
-      <div class="col-3 text-caption q-pl-xs">
+      <div class="col-3 text-caption q-pl-md">
         {{ baseTracePosition.tics[0].label }}
       </div>
       <div class="col-3 text-caption q-pl-xs">
@@ -92,6 +100,12 @@ export default defineComponent({
       default: 0,
     },
   },
+  methods: {
+    handleMouseDown(event:any) {
+      this.$emit("resize-start", event); // Pass the MouseEvent to the parent
+    },
+  },
+
   setup() {
     const store = useStore();
     return {
@@ -120,5 +134,12 @@ $traceChartHeight: 250px;
 
 .header-bg {
   background-color: color-mix(in srgb, currentColor 5%, transparent);
+}
+.resize-btn{
+  position: absolute;
+  right: -10px;
+  top: -2px;
+  z-index: 10;
+  cursor: col-resize;
 }
 </style>

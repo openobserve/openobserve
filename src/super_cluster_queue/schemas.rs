@@ -15,7 +15,10 @@
 
 use arrow::datatypes::Schema;
 use async_recursion::async_recursion;
-use config::{meta::stream::StreamType, utils::json};
+use config::{
+    meta::stream::StreamType,
+    utils::{json, time::now_micros},
+};
 use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
@@ -42,6 +45,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         MessageType::SchemaDeleteFields => {
             log::debug!("[SUPER_CLUSTER:sync] Schema DeleteFields: {}", msg.key);
             delete_fields(msg).await?;
+        }
+        MessageType::StreamDelete => {
+            log::debug!("[SUPER_CLUSTER:sync] Stream Delete: {}", msg.key);
+            stream_delete(msg).await?;
         }
         _ => {
             log::error!(
@@ -71,9 +78,10 @@ async fn merge(msg: Message) -> Result<()> {
             let msg = Message {
                 key: msg.key,
                 value: msg.value,
-                start_dt: Some(chrono::Utc::now().timestamp_micros()),
+                start_dt: Some(now_micros()),
                 need_watch: msg.need_watch,
                 message_type: msg.message_type,
+                source_cluster: msg.source_cluster,
             };
             return merge(msg).await;
         }
@@ -126,6 +134,25 @@ async fn delete_fields(msg: Message) -> Result<()> {
         );
         return Err(e);
     }
+    Ok(())
+}
+
+async fn stream_delete(msg: Message) -> Result<()> {
+    let (org_id, stream_type, stream_name) = parse_key(&msg.key)?;
+
+    if let Err(e) =
+        crate::service::stream::stream_delete_inner(&org_id, stream_type, &stream_name).await
+    {
+        log::error!(
+            "[SUPER_CLUSTER:sync] Failed to delete stream: {}/{}/{}, error: {}",
+            org_id,
+            stream_type,
+            stream_name,
+            e
+        );
+        return Err(Error::Message(e.to_string()));
+    }
+
     Ok(())
 }
 

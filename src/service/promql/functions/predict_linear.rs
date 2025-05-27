@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,15 +17,15 @@ use datafusion::error::{DataFusionError, Result};
 
 use crate::service::promql::{
     common::linear_regression,
-    value::{InstantValue, LabelsExt, Sample, Value},
+    value::{InstantValue, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#predict_linear
-pub(crate) fn predict_linear(data: &Value, duration: f64) -> Result<Value> {
+pub(crate) fn predict_linear(data: Value, duration: f64) -> Result<Value> {
     exec(data, duration)
 }
 
-fn exec(data: &Value, duration: f64) -> Result<Value> {
+fn exec(data: Value, duration: f64) -> Result<Value> {
     let data = match data {
         Value::Matrix(v) => v,
         Value::None => return Ok(Value::None),
@@ -38,9 +38,8 @@ fn exec(data: &Value, duration: f64) -> Result<Value> {
     };
 
     let mut rate_values = Vec::with_capacity(data.len());
-    for metric in data {
-        let labels = metric.labels.without_metric_name();
-
+    for mut metric in data {
+        let labels = std::mem::take(&mut metric.labels);
         let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
         if let Some((slope, intercept)) = linear_regression(&metric.samples, eval_ts / 1000) {
             let value = slope * duration + intercept;

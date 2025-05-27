@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,11 +15,11 @@
 
 use datafusion::{
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion},
         Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion},
     },
     logical_expr::LogicalPlan,
-    optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
+    optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder},
 };
 
 use super::utils::AddSortAndLimit;

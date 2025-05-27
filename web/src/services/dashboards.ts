@@ -26,14 +26,14 @@ const dashboards = {
     folderId: string,
     title: string
   ) => {
-    const params :any = {
+    const params: any = {
       page_num,
       page_size,
       sort_by,
       desc,
       name,
     };
-    if(folderId) {
+    if (folderId) {
       params.folder = folderId;
     }
     // Only add title if it is provided
@@ -51,13 +51,12 @@ const dashboards = {
   },
   delete: (organization: string, dashboardID: string, folderId?: string) => {
     return http().delete(
-      `/api/${organization}/dashboards/${dashboardID}?folder=${
-        folderId ?? "default"
+      `/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"
       }`
     );
   },
-  get_Dashboard: (org_identifier: string, dashboardID: string) => {
-    return http().get(`/api/${org_identifier}/dashboards/${dashboardID}`);
+  get_Dashboard: (org_identifier: string, dashboardID: string, folderId?: string) => {
+    return http().get(`/api/${org_identifier}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`);
   },
   save: (
     organization: string,
@@ -67,8 +66,7 @@ const dashboards = {
     hash?: any
   ) => {
     return http().put(
-      `/api/${organization}/dashboards/${dashboardID}?folder=${
-        folderId ?? "default"
+      `/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"
       }&hash=${hash}`,
       data,
       { headers: { "Content-Type": "application/json; charset=UTF-8" } }
@@ -90,10 +88,13 @@ const dashboards = {
   delete_Folder: (organization: string, folderId: any) => {
     return http().delete(`/api/${organization}/folders/${folderId}`);
   },
-  move_Dashboard: (organization: string, dashboardId: string, data: any) => {
-    return http().put(
-      `/api/${organization}/folders/dashboards/${dashboardId}`,
-      data,
+  move_Dashboard: (organization: string, dashboardIds: string[], from: string, dstFolderId: string) => {
+    return http().patch(
+      `/api/${organization}/dashboards/move?folder=${from}`,
+      {
+        "dashboard_ids": dashboardIds,
+        "dst_folder_id": dstFolderId
+      },
       { headers: { "Content-Type": "application/json; charset=UTF-8" } }
     );
   },

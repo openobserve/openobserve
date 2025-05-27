@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,8 +28,10 @@ use datafusion::{
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::EquivalenceProperties,
     physical_plan::{
-        memory::MemoryStream, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan,
-        ExecutionPlanProperties, Partitioning, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        PlanProperties,
+        execution_plan::{Boundedness, EmissionType},
+        memory::MemoryStream,
     },
 };
 use futures::{Stream, StreamExt};
@@ -111,7 +113,8 @@ impl StreamingAggsExec {
             // Output Partitioning
             output_partitioning,
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Incremental,
+            Boundedness::Bounded,
         )
     }
 }
@@ -322,6 +325,10 @@ impl StreamingIdCache {
     pub fn insert(&self, k: String, start_time: i64, end_time: i64) {
         self.data
             .insert(k, StreamingIdItem::new(start_time, end_time));
+    }
+
+    pub fn exists(&self, k: &str) -> bool {
+        self.data.contains_key(k)
     }
 
     pub fn check_time(&self, k: &str, start_time: i64, end_time: i64) -> bool {
