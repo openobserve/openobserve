@@ -16,7 +16,7 @@ jobs:
         id-token: write
         contents: read
       if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
-      runs-on: ${{ github.event.pull_request.head.repo.fork == true && 'ubuntu-2204-8-cores' || 'ubicloud-standard-4' }}
+      runs-on: ${{ github.event.pull_request.head.repo.fork == true && 'ubuntu-2204-8-cores' || 'ubicloud-standard-8' }}
       steps:
         - name: Remove unused tools
           run: |
